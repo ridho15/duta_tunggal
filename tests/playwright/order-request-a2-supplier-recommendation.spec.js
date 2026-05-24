@@ -16,7 +16,9 @@ function parseMoney(value) {
 async function selectChoicesByLabel(page, labelText, searchText) {
   const wrapper = page
     .locator('.fi-fo-field-wrp')
-    .filter({ has: page.locator(`label:has-text("${labelText}")`) })
+    .filter({
+      has: page.locator('label').filter({ hasText: new RegExp('^' + labelText + '$', 'i') })
+    })
     .first()
 
   await expect(wrapper).toBeVisible()
@@ -91,9 +93,6 @@ test('A2: supplier recommendation and per-item supplier price fallback are corre
   await page.waitForLoadState('networkidle')
   await expect(page).not.toHaveURL(/login/)
 
-  await selectChoicesByLabel(page, 'Cabang', 'Cabang Pusat')
-  await selectChoicesByLabel(page, 'Gudang', '')
-
   const existingRow = page.locator('.fi-fo-repeater-item').first()
   if (await existingRow.count() === 0) {
     const addItemCandidates = [
@@ -130,26 +129,26 @@ test('A2: supplier recommendation and per-item supplier price fallback are corre
 
   const originalPriceInput = row.locator('input[id*="original_price"]').first()
   const unitPriceInput = row.locator('input[id*="unit_price"]').first()
-  await expect(originalPriceInput).toHaveValue('125.000')
-  await expect(unitPriceInput).toHaveValue('125.000')
+  await expect(originalPriceInput).toHaveValue('100.000,00')
+  await expect(unitPriceInput).toHaveValue('100.000,00')
 
   await selectRepeaterChoicesByLabel(page, 'Supplier', SUPPLIER_HIGH_CODE)
   await page.waitForTimeout(500)
-  await expect(originalPriceInput).toHaveValue('145.000')
-  await expect(unitPriceInput).toHaveValue('145.000')
+  await expect(originalPriceInput).toHaveValue('145.000,00')
+  await expect(unitPriceInput).toHaveValue('145.000,00')
 
   await selectRepeaterChoicesByLabel(page, 'Supplier', SUPPLIER_LOW_CODE)
   await page.waitForTimeout(500)
-  await expect(originalPriceInput).toHaveValue('100.000')
-  await expect(unitPriceInput).toHaveValue('100.000')
+  await expect(originalPriceInput).toHaveValue('100.000,00')
+  await expect(unitPriceInput).toHaveValue('100.000,00')
 
   await selectRepeaterChoicesByLabel(page, 'Supplier', SUPPLIER_NULL_CODE)
   await page.waitForTimeout(500)
-  await expect(originalPriceInput).toHaveValue('100.000')
-  await expect(unitPriceInput).toHaveValue('100.000')
+  await expect(originalPriceInput).toHaveValue('125.000,00')
+  await expect(unitPriceInput).toHaveValue('125.000,00')
 
   const fallbackOriginal = parseMoney(await originalPriceInput.inputValue())
   const fallbackUnit = parseMoney(await unitPriceInput.inputValue())
-  expect(fallbackOriginal).toBe(100000)
-  expect(fallbackUnit).toBe(100000)
+  expect(fallbackOriginal).toBe(125000)
+  expect(fallbackUnit).toBe(125000)
 })

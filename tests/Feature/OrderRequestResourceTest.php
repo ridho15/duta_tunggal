@@ -289,6 +289,30 @@ it('does not expose a global tax type select and keeps item-level tax radio', fu
         ->and($file)->toContain("Radio::make('tipe_pajak')");
 });
 
+it('keeps guide full width and styles non editable inputs', function () {
+    $file = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
+
+    expect($file)->toContain('width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;')
+        ->and($file)->toContain('bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400')
+        ->and($file)->toContain('background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;')
+        ->and($file)->toContain("TextInput::make('product_name')")
+        ->and($file)->toContain("TextInput::make('unit')")
+        ->and($file)->toContain("TextInput::make('tax_nominal')")
+        ->and($file)->toContain("TextInput::make('subtotal')");
+});
+
+it('makes create purchase order selected items collapsible with item labels', function () {
+    $file = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
+
+    expect($file)->toContain("Repeater::make('selected_items')")
+        ->and($file)->toContain('->collapsed()')
+        ->and($file)->toContain('->itemLabel(function (array $state): string')
+        ->and($file)->toContain("Checkbox::make('include')")
+        ->and($file)->toContain('->live()')
+        ->and($file)->toContain('Disertakan')
+        ->and($file)->toContain('Tidak disertakan');
+});
+
 it('resolves product supplier options and auto-selects supplier when product changes', function () {
     $secondarySupplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
     $primaryProduct = Product::factory()->forCabang($this->cabang)->create([

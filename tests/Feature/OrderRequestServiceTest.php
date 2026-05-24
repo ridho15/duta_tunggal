@@ -202,6 +202,30 @@ test('createPurchaseOrder uses unit_price override not original_price', function
     expect((float) $poItem->unit_price)->not->toBe($masterPrice);
 });
 
+test('create purchase order from order request auto approves purchase order', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $payload = [
+        'po_number'   => 'PO-OR-AUTO-APPROVE-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date'  => now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id'    => $this->itemA->id,
+                'quantity'   => 5,
+                'unit_price' => 15000,
+                'include'    => true,
+            ],
+        ],
+    ];
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), $payload)->fresh();
+
+    expect($po->status)->toBe('approved')
+        ->and($po->date_approved)->not->toBeNull()
+        ->and($po->approved_by)->toBe($this->user->id);
+});
+
 // ─── Feature 2: tax_type → tipe_pajak mapping ────────────────────────────────
 
 test('item tax type Inklusif maps to Inklusif on purchase order item', function () {

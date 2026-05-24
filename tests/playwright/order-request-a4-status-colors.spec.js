@@ -5,11 +5,11 @@ test.use({ storageState: 'playwright/.auth/user.json' })
 
 const FIXTURES = [
   { requestNumber: 'OR-TEST-A4-REQAPP', statusLabel: 'REQUEST APPROVE', rowClass: 'bg-gray-100' },
-  { requestNumber: 'OR-TEST-A4-APPROVED', statusLabel: 'APPROVED', rowClass: 'bg-blue-50' },
-  { requestNumber: 'OR-TEST-A4-PARTIAL', statusLabel: 'PARTIAL', rowClass: 'bg-yellow-50' },
-  { requestNumber: 'OR-TEST-A4-COMPLETE', statusLabel: 'COMPLETE', rowClass: 'bg-green-50' },
-  { requestNumber: 'OR-TEST-A4-CLOSED', statusLabel: 'CLOSED', rowClass: 'bg-red-50' },
-  { requestNumber: 'OR-TEST-A4-REJECTED', statusLabel: 'REJECTED', rowClass: 'bg-red-50' },
+  { requestNumber: 'OR-TEST-A4-APPROVED', statusLabel: 'APPROVED', rowClass: 'bg-blue-100' },
+  { requestNumber: 'OR-TEST-A4-PARTIAL', statusLabel: 'PARTIAL', rowClass: 'bg-yellow-100' },
+  { requestNumber: 'OR-TEST-A4-COMPLETE', statusLabel: 'COMPLETE', rowClass: 'bg-green-100' },
+  { requestNumber: 'OR-TEST-A4-CLOSED', statusLabel: 'CLOSED', rowClass: 'bg-red-100' },
+  { requestNumber: 'OR-TEST-A4-REJECTED', statusLabel: 'REJECTED', rowClass: 'bg-red-100' },
 ]
 
 test.beforeAll(async () => {

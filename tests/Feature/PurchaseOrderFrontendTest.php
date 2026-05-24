@@ -204,3 +204,41 @@ test('purchase order status presentation handles paid state', function () {
     expect(PurchaseOrderResource::formatStatusLabel('paid'))->toBe('Paid');
     expect(PurchaseOrderResource::getStatusColor('paid'))->toBe('success');
 });
+
+test('purchase order table uses latest created sorting and status color legend', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource.php'));
+
+    expect($resource)->toContain("->defaultSort('created_at', 'desc')")
+        ->and($resource)->not->toContain("orderByDesc('order_date')")
+        ->and($resource)->toContain('width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;')
+        ->and($resource)->toContain('Legenda Warna Status Baris Data')
+        ->and($resource)->toContain('Biru (Approved)')
+        ->and($resource)->toContain('Kuning (Partially Received)')
+        ->and($resource)->toContain('Hijau (Completed/Paid)')
+        ->and($resource)->toContain('Merah (Request Close/Closed)');
+});
+
+test('purchase order form uses collapsed product item repeater and disabled field styling', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource.php'));
+
+    expect($resource)->toContain("Repeater::make('purchaseOrderItem')")
+        ->and($resource)->toContain('->collapsed(function')
+        ->and($resource)->toContain('->itemLabel(function (array $state)')
+        ->and($resource)->toContain('bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400')
+        ->and($resource)->toContain('background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;')
+        ->and($resource)->toContain("TextInput::make('unit')")
+        ->and($resource)->toContain("TextInput::make('total')")
+        ->and($resource)->toContain("TextInput::make('tax_nominal')")
+        ->and($resource)->toContain("TextInput::make('subtotal')");
+});
+
+test('purchase order creation auto approves only order request references', function () {
+    $createPage = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource/Pages/CreatePurchaseOrder.php'));
+    $orderRequestService = file_get_contents(base_path('app/Services/OrderRequestService.php'));
+
+    expect($createPage)->toContain('use App\\Models\\OrderRequest;')
+        ->and($createPage)->toContain('$record->refer_model_type === OrderRequest::class')
+        ->and($createPage)->toContain('$purchaseOrderService->approvePo($record, Auth::id())')
+        ->and($orderRequestService)->toContain('app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id())')
+        ->and($createPage)->toContain('$data[\'status\']     = \'draft\'');
+});

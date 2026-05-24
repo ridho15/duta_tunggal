@@ -15,6 +15,7 @@ $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
 $user = User::where('email', 'ralamzah@gmail.com')->first();
 if (!$user) {
@@ -65,8 +66,53 @@ DB::table('order_requests')->where('request_number', 'like', 'OR-TEST-%')->delet
 
 $now = now();
 
+$hasWarehouseCol = Schema::hasColumn('order_requests', 'warehouse_id');
+$hasCabangCol = Schema::hasColumn('order_requests', 'cabang_id');
+
+$insertOr = function (array $data) use ($hasWarehouseCol, $hasCabangCol, $warehouseId, $cabangId) {
+    if (!$hasWarehouseCol) {
+        unset($data['warehouse_id']);
+    } else {
+        $data['warehouse_id'] = $data['warehouse_id'] ?? $warehouseId;
+    }
+    if (!$hasCabangCol) {
+        unset($data['cabang_id']);
+    } else {
+        $data['cabang_id'] = $data['cabang_id'] ?? $cabangId;
+    }
+    return DB::table('order_requests')->insertGetId($data);
+};
+
+$insertOrRaw = function (array $data) use ($hasWarehouseCol, $hasCabangCol, $warehouseId, $cabangId) {
+    if (!$hasWarehouseCol) {
+        unset($data['warehouse_id']);
+    } else {
+        $data['warehouse_id'] = $data['warehouse_id'] ?? $warehouseId;
+    }
+    if (!$hasCabangCol) {
+        unset($data['cabang_id']);
+    } else {
+        $data['cabang_id'] = $data['cabang_id'] ?? $cabangId;
+    }
+    DB::table('order_requests')->insert($data);
+};
+
+$updateOr = function (int $id, array $data) use ($hasWarehouseCol, $hasCabangCol, $warehouseId, $cabangId) {
+    if (!$hasWarehouseCol) {
+        unset($data['warehouse_id']);
+    } else {
+        $data['warehouse_id'] = $data['warehouse_id'] ?? $warehouseId;
+    }
+    if (!$hasCabangCol) {
+        unset($data['cabang_id']);
+    } else {
+        $data['cabang_id'] = $data['cabang_id'] ?? $cabangId;
+    }
+    DB::table('order_requests')->where('id', $id)->update($data);
+};
+
 // 2. OR #A: status=draft, 1 item
-$orA = DB::table('order_requests')->insertGetId([
+$orA = $insertOr([
     'request_number' => 'OR-TEST-A-DRAFT',
     'warehouse_id'   => $warehouseId,
     'cabang_id'      => $cabangId,
@@ -78,6 +124,7 @@ $orA = DB::table('order_requests')->insertGetId([
 ]);
 DB::table('order_request_items')->insert([
     'order_request_id'   => $orA,
+    'cabang_id'          => $cabangId,
     'product_id'         => $productId1,
     'supplier_id'        => null,     // no per-item supplier (old style)
     'quantity'           => 5,
@@ -93,7 +140,7 @@ DB::table('order_request_items')->insert([
 echo "✅ OR-TEST-A-DRAFT created (id=$orA)\n";
 
 // 3. OR #B: status=request_approve, 1 item, item-level supplier_id, unit_price overridden
-$orB = DB::table('order_requests')->insertGetId([
+$orB = $insertOr([
     'request_number' => 'OR-TEST-B-APPROVE',
     'warehouse_id'   => $warehouseId,
     'cabang_id'      => $cabangId,
@@ -107,6 +154,7 @@ $orB = DB::table('order_requests')->insertGetId([
 // original_price = 150000 (catalog price at time of creation)
 DB::table('order_request_items')->insert([
     'order_request_id'   => $orB,
+    'cabang_id'          => $cabangId,
     'product_id'         => $productId1,
     'supplier_id'        => $supplierA,  // per-item supplier
     'quantity'           => 10,
@@ -125,7 +173,7 @@ echo "✅ OR-TEST-B-APPROVE (id=$orB) - 1 item (panel), unit_price=130000 (OVERR
 // - Item 1: product1, supplier A, unit_price=150000 (catalog)
 // - Item 2: product2, supplier B, unit_price=220000 (overridden, catalog=240000)
 // - Item 3: product3, supplier A, unit_price=75000 (matches catalog)
-$orC = DB::table('order_requests')->insertGetId([
+$orC = $insertOr([
     'request_number' => 'OR-TEST-C-MULTISUPPLIER',
     'warehouse_id'   => $warehouseId,
     'cabang_id'      => $cabangId,
@@ -138,6 +186,7 @@ $orC = DB::table('order_requests')->insertGetId([
 DB::table('order_request_items')->insert([
     [
         'order_request_id'   => $orC,
+        'cabang_id'          => $cabangId,
         'product_id'         => $productId1,
         'supplier_id'        => $supplierA,
         'quantity'           => 5,
@@ -150,6 +199,7 @@ DB::table('order_request_items')->insert([
     ],
     [
         'order_request_id'   => $orC,
+        'cabang_id'          => $cabangId,
         'product_id'         => $productId2,
         'supplier_id'        => $supplierB,
         'quantity'           => 3,
@@ -162,6 +212,7 @@ DB::table('order_request_items')->insert([
     ],
     [
         'order_request_id'   => $orC,
+        'cabang_id'          => $cabangId,
         'product_id'         => $productId3,
         'supplier_id'        => $supplierA,
         'quantity'           => 20,
@@ -176,7 +227,7 @@ DB::table('order_request_items')->insert([
 echo "✅ OR-TEST-C-MULTISUPPLIER (id=$orC) - 3 items: supplierA+supplierA+supplierB\n";
 
 // 5. OR #D: status=approved (for testing create_po action)
-$orD = DB::table('order_requests')->insertGetId([
+$orD = $insertOr([
     'request_number' => 'OR-TEST-D-APPROVED',
     'warehouse_id'   => $warehouseId,
     'cabang_id'      => $cabangId,
@@ -188,6 +239,7 @@ $orD = DB::table('order_requests')->insertGetId([
 ]);
 DB::table('order_request_items')->insert([
     'order_request_id'   => $orD,
+    'cabang_id'          => $cabangId,
     'product_id'         => $productId2,
     'supplier_id'        => $supplierB,
     'quantity'           => 8,
@@ -203,7 +255,7 @@ echo "✅ OR-TEST-D-APPROVED (id=$orD) - 1 item (sensor), supplier B, unit_price
 // 6. Ensure deterministic OR id=3 for Playwright specs
 $or3 = DB::table('order_requests')->where('id', 3)->first();
 if ($or3) {
-    DB::table('order_requests')->where('id', 3)->update([
+    $updateOr(3, [
         'request_number' => 'OR-TEST-C-MULTISUPPLIER',
         'warehouse_id'   => $warehouseId,
         'cabang_id'      => $cabangId,
@@ -213,7 +265,7 @@ if ($or3) {
         'updated_at'     => $now,
     ]);
 } else {
-    DB::table('order_requests')->insert([
+    $insertOrRaw([
         'id'             => 3,
         'request_number' => 'OR-TEST-C-MULTISUPPLIER',
         'warehouse_id'   => $warehouseId,
@@ -230,6 +282,7 @@ DB::table('order_request_items')->where('order_request_id', 3)->delete();
 DB::table('order_request_items')->insert([
     [
         'order_request_id'   => 3,
+        'cabang_id'          => $cabangId,
         'product_id'         => $productId1,
         'supplier_id'        => $supplierA,
         'quantity'           => 5,
@@ -244,6 +297,7 @@ DB::table('order_request_items')->insert([
     ],
     [
         'order_request_id'   => 3,
+        'cabang_id'          => $cabangId,
         'product_id'         => $productId2,
         'supplier_id'        => $supplierB,
         'quantity'           => 3,
@@ -258,6 +312,7 @@ DB::table('order_request_items')->insert([
     ],
     [
         'order_request_id'   => 3,
+        'cabang_id'          => $cabangId,
         'product_id'         => $productId3,
         'supplier_id'        => $supplierA,
         'quantity'           => 20,

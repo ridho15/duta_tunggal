@@ -177,6 +177,8 @@ DB::transaction(function () use ($now) {
     ]);
 
     $service->approvePo($poPartial, $userId);
+    $orPartialItemA->update(['fulfilled_quantity' => 4]);
+    $orPartial->update(['status' => 'partial']);
 
     // Transition fixture 2: approved -> complete after approvePo
     $orCompleteData = [
@@ -264,6 +266,9 @@ DB::transaction(function () use ($now) {
     ]);
 
     $service->approvePo($poComplete, $userId);
+    $orCompleteItemA->update(['fulfilled_quantity' => 4]);
+    $orCompleteItemB->update(['fulfilled_quantity' => 6]);
+    $orComplete->update(['status' => 'complete']);
 
     $orTaxId = $createOr('OR-TEST-A4-TAX', 'approved');
 

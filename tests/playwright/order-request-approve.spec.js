@@ -31,9 +31,9 @@ import { test, expect } from '@playwright/test';
 // OR-TEST-B-APPROVE: qty=10, unit_price=130000 (user override), original_price=150000 (catalog)
 // total_cost = 10 × 130.000 = 1.300.000
 const OR2_REQUEST_NUMBER = 'OR-TEST-B-APPROVE';
-const EXPECTED_ORIGINAL_PRICE = '150.000';
-const EXPECTED_TOTAL_COST     = '1.300.000';
-const EXPECTED_UNIT_PRICE     = '130.000';
+const EXPECTED_ORIGINAL_PRICE = '150.000,00';
+const EXPECTED_TOTAL_COST     = '1.300.000,00';
+const EXPECTED_UNIT_PRICE     = '130.000,00';
 
 /**
  * Open the Approve dropdown item for the given row and return the opened modal.
@@ -233,6 +233,6 @@ test.describe('Order Request Approve Modal — field pre-fill', () => {
     expect(newTotalCost).not.toBe(originalTotalCost);
     expect(newSubtotal).not.toBe(originalSubtotal);
     expect(newTaxNominal).not.toBe(originalTaxNominal);
-    expect(newTotalCost).toContain('1.400.000');
+    expect(newTotalCost).toContain('1.400.000,00');
   });
 });

@@ -187,12 +187,12 @@ class ViewOrderRequest extends ViewRecord
                                 ->default(true)
                                 ->live()
                                 ->columnSpanFull(),
+                            Hidden::make('multi_supplier'),
                             Placeholder::make('multi_supplier_notice')
                                 ->label('')
-                                ->content('Item dalam OR ini memiliki beberapa kombinasi supplier dan cabang berbeda. Sistem akan membuat satu PO per kombinasi secara otomatis.')
+                                ->content('Item dalam OR ini memiliki beberapa supplier dan cabang berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
                                 ->visible(fn(Get $get) => $get('create_purchase_order') && $get('multi_supplier'))
                                 ->columnSpanFull(),
-                            Hidden::make('multi_supplier'),
                         ]),
                     Section::make('Informasi Purchase Order')
                         ->icon('heroicon-o-document-text')
@@ -320,7 +320,7 @@ class ViewOrderRequest extends ViewRecord
 
                         $orderRequestService->approve($record, $data);
                         $record->refresh();
-                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
+                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
                     } catch (Throwable $exception) {
                         ProcurementFailureNotifier::danger(
                             'Gagal Memproses Order Request',
@@ -415,12 +415,12 @@ class ViewOrderRequest extends ViewRecord
                         ->icon('heroicon-o-document-text')
                         ->columns(2)
                         ->schema([
+                            Hidden::make('multi_supplier'),
                             Placeholder::make('multi_supplier_notice')
                                 ->label('')
-                                ->content('Item dalam OR ini memiliki beberapa kombinasi supplier dan cabang berbeda. Sistem akan membuat satu PO per kombinasi secara otomatis.')
+                                ->content('Item dalam OR ini memiliki beberapa supplier dan cabang berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
                                 ->visible(fn(Get $get) => $get('multi_supplier'))
                                 ->columnSpanFull(),
-                            Hidden::make('multi_supplier'),
                             Select::make('supplier_id')
                                 ->label('Supplier')
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
@@ -541,7 +541,7 @@ class ViewOrderRequest extends ViewRecord
                     }
 
                     $orderRequestService->createPurchaseOrder($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
                 })
         ];
     }

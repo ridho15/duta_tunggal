@@ -282,6 +282,16 @@ class OrderRequestResource extends Resource
             ->addable(false)
             ->deletable(false)
             ->reorderable(false)
+            ->collapsed()
+            ->itemLabel(function (array $state): string {
+                $productName = $state['product_name'] ?? '-';
+                $qty = $state['quantity'] ?? '0';
+                $supplierName = $state['supplier_name'] ?? '-';
+                $subtotal = $state['subtotal'] ?? '0';
+                $includeStatus = ($state['include'] ?? true) ? 'Disertakan' : 'Tidak disertakan';
+
+                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal} | {$includeStatus}";
+            })
             ->schema([
                 Hidden::make('item_id'),
                 Hidden::make('item_supplier_id'),
@@ -290,16 +300,20 @@ class OrderRequestResource extends Resource
                 Hidden::make('currency_id'),
                 TextInput::make('product_name')
                     ->label('Nama Produk')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('supplier_name')
                     ->label('Supplier')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('cabang_name')
                     ->label('Cabang')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('uom')
                     ->label('Satuan')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('quantity')
                     ->label('Qty')
                     ->numeric()
@@ -339,7 +353,8 @@ class OrderRequestResource extends Resource
                     ->label('Harga Asli')
                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
                     ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('unit_price')
                     ->label('Harga Override')
                     ->required()
@@ -390,29 +405,35 @@ class OrderRequestResource extends Resource
                     ->options(TaxTypeHelper::options())
                     ->default('eklusif')
                     ->disabled()
-                    ->dehydrated(true),
+                    ->dehydrated(true)
+                    ->extraAttributes(['class' => 'data-[disabled=true]:opacity-75']),
                 TextInput::make('tax')
                     ->label('Pajak (%)')
                     ->numeric()
                     ->readOnly()
-                    ->suffix('%'),
+                    ->suffix('%')
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('tax_nominal')
                     ->label('Nominal Pajak')
                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
                     ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('total_cost')
                     ->label('Total (Harga × Qty)')
                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
                     ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 TextInput::make('subtotal')
                     ->label('Subtotal')
                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
                     ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
-                    ->readOnly(),
+                    ->readOnly()
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']),
                 Checkbox::make('include')
                     ->label('Sertakan')
+                    ->live()
                     ->default(true),
             ]);
     }
@@ -567,592 +588,704 @@ class OrderRequestResource extends Resource
                         Repeater::make('orderRequestItem')
                             ->relationship()
                             ->columnSpanFull()
-                            ->columns(4)
                             ->hint('Tambahkan item produk yang ingin dipesan')
                             ->minItems(1)
                             ->required()
+                            ->collapsed(function (?string $operation, ?\Filament\Forms\ComponentContainer $item, \Filament\Forms\Components\Repeater $component): bool {
+                                if (! $item) {
+                                    return false;
+                                }
+
+                                $state = $component->getState() ?? [];
+                                if (empty($state)) {
+                                    return false;
+                                }
+
+                                $keys = array_keys($state);
+                                $lastKey = end($keys);
+
+                                $statePathParts = explode('.', $item->getStatePath());
+                                $itemKey = end($statePathParts);
+
+                                $itemState = $state[$itemKey] ?? [];
+                                if ($operation !== 'create' && filled($itemState['id'] ?? null)) {
+                                    return true;
+                                }
+
+                                // Collapse all items except the last newly added row.
+                                return $itemKey !== $lastKey;
+                            })
+                            ->addAction(function (\Filament\Forms\Components\Actions\Action $action) {
+                                return $action
+                                    ->color('primary')
+                                    ->icon('heroicon-o-plus-circle')
+                                    ->label('Tambah Items')
+                                    ->extraAttributes(fn ($component) => [
+                                        'onclick' => (function() use ($component) {
+                                            $event = 'repeater-collapse';
+                                            $statePath = $component->getStatePath();
+                                            $eventJs = 'String.fromCharCode(' . implode(',', array_map('ord', str_split($event))) . ')';
+                                            $statePathJs = 'String.fromCharCode(' . implode(',', array_map('ord', str_split($statePath))) . ')';
+                                            return "window.dispatchEvent(new CustomEvent({$eventJs}, { detail: {$statePathJs} }))";
+                                        })(),
+                                    ])
+                                    ->action(function (\Filament\Forms\Components\Repeater $component): void {
+                                        $newUuid = $component->generateUuid();
+
+                                        $items = $component->getState();
+
+                                        if ($newUuid) {
+                                            $items[$newUuid] = [];
+                                        } else {
+                                            $items[] = [];
+                                        }
+
+                                        $component->state($items);
+
+                                        $component->getChildComponentContainer($newUuid ?? array_key_last($items))->fill();
+
+                                        // We deliberately do NOT call $component->collapsed(false) here.
+                                        // This keeps our custom dynamic collapsed evaluation intact!
+
+                                        $component->callAfterStateUpdated();
+                                    });
+                            })
+                            ->itemLabel(function (array $state) {
+                                $productName = '-';
+                                if (!empty($state['product_id'])) {
+                                    $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($state['product_id']);
+                                    $productName = $product ? "({$product->sku}) {$product->name}" : '-';
+                                }
+                                
+                                $qty = $state['quantity'] ?? '0';
+                                
+                                $supplierName = '-';
+                                if (!empty($state['supplier_id'])) {
+                                    $supplier = \App\Models\Supplier::find($state['supplier_id']);
+                                    $supplierName = $supplier ? "({$supplier->code}) {$supplier->perusahaan}" : '-';
+                                }
+                                
+                                $subtotal = $state['subtotal'] ?? '0';
+                                
+                                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: Rp {$subtotal}";
+                            })
                             ->validationMessages([
                                 'required' => 'Order request harus memiliki setidaknya satu item produk.',
                                 'min' => 'Order request harus memiliki setidaknya satu item produk.',
                             ])
                             ->schema([
-                                Select::make('product_id')
-                                    ->label('Product')
-                                    ->reactive()
-                                    ->searchable()
-                                    ->options(fn() => static::resolveProductOptions(limit: 50))
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        if ($state) {
-                                            $product = Product::withoutGlobalScope('product_cabang')->find($state);
-                                            if ($product) {
+                                \Filament\Forms\Components\Grid::make(5)
+                                    ->schema([
+                                        Select::make('product_id')
+                                            ->label('Product')
+                                            ->columnSpan(2)
+                                            ->reactive()
+                                            ->searchable()
+                                            ->options(fn() => static::resolveProductOptions(limit: 50))
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                if ($state) {
+                                                    $product = Product::withoutGlobalScope('product_cabang')->find($state);
+                                                    if ($product) {
+                                                        $itemCurrencyId = is_numeric($get('currency_id'))
+                                                            ? (int) $get('currency_id')
+                                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+                                                        $currentSupplierId = $get('supplier_id');
+                                                        $resolvedSupplierId = static::resolveProductSupplierId((int) $state);
+
+                                                        if ($currentSupplierId) {
+                                                            $supplierMatchesProduct = $product->suppliers()
+                                                                ->where('suppliers.id', $currentSupplierId)
+                                                                ->exists();
+
+                                                            if (! $supplierMatchesProduct) {
+                                                                $currentSupplierId = null;
+                                                            }
+                                                        }
+
+                                                        if (! $currentSupplierId && $resolvedSupplierId) {
+                                                            $currentSupplierId = $resolvedSupplierId;
+                                                        }
+
+                                                        $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
+                                                        $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                        $taxRate = self::resolveItemTaxRate((int) $state, $itemTaxType);
+                                                        $set('tax', $taxRate);
+
+                                                        // Use item-level supplier price if available
+                                                        $itemSupplierId = $currentSupplierId;
+                                                        $unitPrice = self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId, false);
+                                                        if ($itemSupplierId) {
+                                                            $supplierProduct = $product->suppliers()->where('suppliers.id', $itemSupplierId)->first();
+                                                            if ($supplierProduct) {
+                                                                $supplierPrice = $supplierProduct->pivot->supplier_price;
+                                                                $unitPrice = $supplierPrice !== null
+                                                                    ? self::convertIdrToCurrency((float) $supplierPrice, $itemCurrencyId, false)
+                                                                    : self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId, false);
+                                                            }
+                                                        }
+                                                        $set('supplier_id', $itemSupplierId);
+                                                        // Store the master price as original_price; user can override unit_price
+                                                        $set('original_price', self::formatMoneyInputState($unitPrice));
+                                                        $set('unit_price', self::formatMoneyInputState($unitPrice));
+
+                                                        // Persist IDR anchor so currency round-trips stay lossless
+                                                        // Always convert the raw IDR cost_price (not the rounded foreign display value)
+                                                        $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
+                                                        $set('unit_price_idr', $rawIdrPrice);
+                                                        $set('original_price_idr', $rawIdrPrice);
+                                                        $set('unit', $product->uom?->abbreviation ?? '-');
+                                                        // Autofill cabang item from product if available, but keep editable
+                                                        $set('cabang_id', $product->cabang_id ?? Supplier::find($itemSupplierId)?->cabang_id ?? auth()->user()?->cabang_id);
+                                                        // Recalculate subtotal
+                                                        $quantity = (float) ($get('quantity') ?? 0);
+                                                        $discPct  = (float) ($get('discount') ?? 0);
+                                                        $taxPct   = $taxRate;
+                                                        $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                        $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
+                                                        $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
+                                                        $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                                    }
+                                                }
+                                            })
+                                            ->getOptionLabelUsing(fn($value): ?string => static::resolveProductLabel(is_numeric($value) ? (int) $value : null))
+                                            ->getSearchResultsUsing(function (string $search, callable $get) {
+                                                return static::resolveProductOptions($search, 50);
+                                            })
+                                            ->helperText('Pilih produk yang akan dipesan')
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Produk wajib dipilih.',
+                                            ]),
+                                        TextInput::make('unit')
+                                            ->label('Satuan')
+                                            ->columnSpan(1)
+                                            ->readOnly()
+                                            ->dehydrated(false)
+                                            ->default('-')
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if ($record?->product) {
+                                                    $component->state($record->product->uom?->abbreviation ?? '-');
+                                                }
+                                            }),
+                                        TextInput::make('quantity')
+                                            ->label('Quantity')
+                                            ->columnSpan(1)
+                                            ->numeric()
+                                            ->default(0)
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
+                                                $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                $quantity  = (float) ($state ?? 0);
+                                                $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
+                                                $discPct   = (float) ($get('discount') ?? 0);
+                                                $taxPct    = (float) ($get('tax') ?? 0);
+                                                $base      = $quantity * $unitPrice;
+                                                $afterDisc = $base - $base * ($discPct / 100);
+                                                // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
+                                                $taxNominal = round($afterDisc * ($taxPct / 100), 2);
+                                                // Subtotal varies based on tax type interpretation
+                                                $subtotal  = $taxType === 'PPN Included'
+                                                    ? $afterDisc
+                                                    : $afterDisc + $taxNominal;
+                                                $set('subtotal', self::formatMoneyPreviewState($subtotal));
+                                                $set('total', self::formatMoneyPreviewState($quantity * $unitPrice));
+                                                $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
+                                            })
+                                            ->required()
+                                            ->minValue(0.01)
+                                            ->validationMessages([
+                                                'required' => 'Quantity wajib diisi.',
+                                                'numeric' => 'Quantity harus berupa angka.',
+                                                'min' => 'Quantity minimal 0.01.',
+                                            ]),
+                                        Select::make('cabang_id')
+                                            ->label('Cabang Item')
+                                            ->columnSpan(1)
+                                            ->options(function (callable $get) {
+                                                $user = Auth::user();
+                                                $manageType = $user?->manage_type ?? [];
+                                                $productId = $get('product_id');
+                                                $selectedProductCabangId = $productId
+                                                    ? Product::withoutGlobalScope('product_cabang')->find($productId)?->cabang_id
+                                                    : null;
+
+                                                if ($user && is_array($manageType) && in_array('all', $manageType)) {
+                                                    $cabangs = \App\Models\Cabang::orderBy('kode')->limit(50)->get();
+
+                                                    if ($selectedProductCabangId && ! $cabangs->contains('id', $selectedProductCabangId)) {
+                                                        $selectedCabang = \App\Models\Cabang::find($selectedProductCabangId);
+                                                        if ($selectedCabang) {
+                                                            $cabangs->push($selectedCabang);
+                                                        }
+                                                    }
+
+                                                    return $cabangs->unique('id')->mapWithKeys(function ($cabang) {
+                                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                                    });
+                                                }
+
+                                                $cabangIds = array_filter([
+                                                    $user?->cabang_id,
+                                                    $selectedProductCabangId,
+                                                ]);
+
+                                                return \App\Models\Cabang::whereIn('id', $cabangIds)->limit(50)->get()->mapWithKeys(function ($cabang) {
+                                                    return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                                                });
+                                            })
+                                            ->default(fn() => null)
+                                            ->searchable()
+                                            ->preload()
+                                            ->required()
+                                            ->helperText('Cabang per item dipakai untuk memecah Purchase Order bila supplier sama tetapi cabang berbeda.')
+                                            ->validationMessages([
+                                                'required' => 'Cabang item wajib dipilih.',
+                                            ]),
+                                    ]),
+                                \Filament\Forms\Components\Grid::make(2)
+                                    ->schema([
+                                        Select::make('supplier_id')
+                                            ->label('Supplier')
+                                            ->columnSpan(1)
+                                            ->reactive()
+                                            ->searchable()
+                                            ->preload()
+                                            ->nullable()
+                                            ->options(function (callable $get) {
+                                                $productId = $get('product_id');
                                                 $itemCurrencyId = is_numeric($get('currency_id'))
                                                     ? (int) $get('currency_id')
                                                     : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-                                                $currentSupplierId = $get('supplier_id');
-                                                $resolvedSupplierId = static::resolveProductSupplierId((int) $state);
 
-                                                if ($currentSupplierId) {
-                                                    $supplierMatchesProduct = $product->suppliers()
-                                                        ->where('suppliers.id', $currentSupplierId)
-                                                        ->exists();
+                                                return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, null, 50, $itemCurrencyId);
+                                            })
+                                            ->getOptionLabelUsing(function ($value, callable $get): ?string {
+                                                $productId = $get('product_id');
+                                                $itemCurrencyId = is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
 
-                                                    if (! $supplierMatchesProduct) {
-                                                        $currentSupplierId = null;
+                                                return static::resolveSupplierLabel(
+                                                    is_numeric($value) ? (int) $value : null,
+                                                    is_numeric($productId) ? (int) $productId : null,
+                                                    $itemCurrencyId
+                                                );
+                                            })
+                                            ->getSearchResultsUsing(function (string $search, callable $get) {
+                                                $productId = $get('product_id');
+                                                $itemCurrencyId = is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+
+                                                return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, $search, 50, $itemCurrencyId);
+                                            })
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                if ($state) {
+                                                    $productId = $get('product_id');
+                                                    if ($productId) {
+                                                        $product = Product::withoutGlobalScope('product_cabang')->find($productId);
+                                                        if ($product) {
+                                                            $itemCurrencyId = is_numeric($get('currency_id'))
+                                                                ? (int) $get('currency_id')
+                                                                : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+                                                            $supplierProduct = $product->suppliers()->where('suppliers.id', $state)->first();
+                                                            if ($supplierProduct && $supplierProduct->pivot->supplier_price !== null) {
+                                                                $unitPrice = self::convertIdrToCurrency((float) $supplierProduct->pivot->supplier_price, $itemCurrencyId, false);
+                                                            } else {
+                                                                $unitPrice = self::convertIdrToCurrency((float) ($product->cost_price ?? 0), $itemCurrencyId, false);
+                                                            }
+
+                                                            $set('original_price', self::formatMoneyInputState($unitPrice));
+                                                            $set('unit_price', self::formatMoneyInputState($unitPrice));
+
+                                                            // Persist IDR anchor
+                                                            $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
+                                                            $set('unit_price_idr', $rawIdrPrice);
+                                                            $set('original_price_idr', $rawIdrPrice);
+                                                            // Recalculate subtotal
+                                                            $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
+                                                            $taxType  = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                            $quantity = (float) ($get('quantity') ?? 0);
+                                                            $discPct  = (float) ($get('discount') ?? 0);
+                                                            $taxPct   = (float) ($get('tax') ?? 0);
+                                                            $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                            $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
+                                                            $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
+                                                            $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                                        }
                                                     }
                                                 }
-
-                                                if (! $currentSupplierId && $resolvedSupplierId) {
-                                                    $currentSupplierId = $resolvedSupplierId;
+                                            })
+                                            ->helperText('Pilih supplier untuk item ini (opsional, akan memperbarui harga)'),
+                                        Placeholder::make('supplier_recommendation')
+                                            ->label('Rekomendasi Supplier')
+                                            ->columnSpan(1)
+                                            ->content(function (callable $get) {
+                                                $productId = $get('product_id');
+                                                if (!$productId) {
+                                                    return 'Pilih produk untuk melihat rekomendasi supplier.';
                                                 }
+
+                                                $product = Product::with('suppliers')->find($productId);
+                                                if (!$product || $product->suppliers->isEmpty()) {
+                                                    return 'Tidak ada supplier terdaftar untuk produk ini.';
+                                                }
+
+                                                $recommended = $product->suppliers
+                                                    ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
+                                                    ->first();
+
+                                                $price = (float) ($recommended?->pivot->supplier_price ?? 0);
+                                                $itemCurrencyId = is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+
+                                                $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
+
+                                                return "{$recommended->perusahaan} (" . self::formatMoneyByCurrency($itemCurrencyId, $converted) . ')';
+                                            }),
+                                    ]),
+                                \Filament\Forms\Components\Grid::make(5)
+                                    ->schema([
+                                        Select::make('currency_id')
+                                            ->label('Mata Uang Item')
+                                            ->columnSpan(1)
+                                            ->preload()
+                                            ->searchable()
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($state, $old, callable $set, callable $get) {
+                                                $newCurrencyId = is_numeric($state)
+                                                    ? (int) $state
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+                                                $oldCurrencyId = is_numeric($old)
+                                                    ? (int) $old
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+
+                                                if ($newCurrencyId === $oldCurrencyId) {
+                                                    return;
+                                                }
+
+                                                // ── IDR Anchor Strategy ─────────────────────────────────────────────────
+                                                // PROBLEM: reading the current display value (already rounded to 2 dp) and
+                                                // re-converting it loses precision:
+                                                //   1.000.000 ÷ 15.000 = 66.6666 → rounded to 66.67
+                                                //   66.67 × 15.000 = 1.000.050 (wrong!)
+                                                //
+                                                // FIX: always convert from the stored IDR anchor value so the source
+                                                // precision is never truncated by the intermediate display rounding.
+                                                // ────────────────────────────────────────────────────────────────────────
+
+                                                // Read IDR anchor (hidden field populated when product/supplier is set)
+                                                $unitPriceIdrRaw      = MoneyHelper::parseHighPrecision($get('unit_price_idr') ?? 0);
+                                                $originalPriceIdrRaw  = MoneyHelper::parseHighPrecision($get('original_price_idr') ?? 0);
+
+                                                // If anchor is zero/missing, fall back to converting the current display value
+                                                // through the old currency as a best-effort (handles pre-migration rows)
+                                                if ((float) $unitPriceIdrRaw <= 0) {
+                                                    $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
+                                                    $unitPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
+                                                        $currentUnitPrice, $oldCurrencyId
+                                                    );
+                                                }
+                                                if ((float) $originalPriceIdrRaw <= 0) {
+                                                    $currentOriginalPrice = MoneyHelper::parseHighPrecision($get('original_price') ?? 0);
+                                                    $originalPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
+                                                        $currentOriginalPrice, $oldCurrencyId
+                                                    );
+                                                }
+
+                                                // Convert directly from IDR anchor to new currency (no intermediate rounding)
+                                                $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
+                                                    $unitPriceIdrRaw, $newCurrencyId
+                                                );
+                                                $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
+                                                    $originalPriceIdrRaw, $newCurrencyId
+                                                );
+
+                                                // For IDR display: round to whole number (no cents in Rupiah)
+                                                // For foreign currency: keep 2 decimal places
+                                                $newCode = \App\Models\Currency::find($newCurrencyId)?->code;
+                                                if (strtoupper((string) $newCode) === 'IDR') {
+                                                    $convertedUnitPrice     = bcadd($unitPriceIdrRaw, '0', 2);
+                                                    $convertedOriginalPrice = bcadd($originalPriceIdrRaw, '0', 2);
+                                                }
+
+                                                // Update hidden IDR anchor fields with the now-resolved IDR values
+                                                $set('unit_price_idr', $unitPriceIdrRaw);
+                                                $set('original_price_idr', $originalPriceIdrRaw);
+
+                                                $set('original_price', self::formatMoneyInputState($convertedOriginalPrice));
+                                                $set('unit_price', self::formatMoneyInputState($convertedUnitPrice));
 
                                                 $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
                                                 $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                                $taxRate = self::resolveItemTaxRate((int) $state, $itemTaxType);
-                                                $set('tax', $taxRate);
-
-                                                // Use item-level supplier price if available
-                                                $itemSupplierId = $currentSupplierId;
-                                                $unitPrice = self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId, false);
-                                                if ($itemSupplierId) {
-                                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $itemSupplierId)->first();
-                                                    if ($supplierProduct) {
-                                                        $supplierPrice = $supplierProduct->pivot->supplier_price;
-                                                        $unitPrice = $supplierPrice !== null
-                                                            ? self::convertIdrToCurrency((float) $supplierPrice, $itemCurrencyId, false)
-                                                            : self::convertIdrToCurrency((float) $product->cost_price, $itemCurrencyId, false);
-                                                    }
-                                                }
-                                                $set('supplier_id', $itemSupplierId);
-                                                // Store the master price as original_price; user can override unit_price
-                                                $set('original_price', self::formatMoneyInputState($unitPrice));
-                                                $set('unit_price', self::formatMoneyInputState($unitPrice));
-
-                                                // Persist IDR anchor so currency round-trips stay lossless
-                                                // Always convert the raw IDR cost_price (not the rounded foreign display value)
-                                                $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
-                                                $set('unit_price_idr', $rawIdrPrice);
-                                                $set('original_price_idr', $rawIdrPrice);
-                                                $set('unit', $product->uom?->abbreviation ?? '-');
-                                                // Autofill cabang item from product if available, but keep editable
-                                                $set('cabang_id', $product->cabang_id ?? Supplier::find($itemSupplierId)?->cabang_id ?? auth()->user()?->cabang_id);
-                                                // Recalculate subtotal
                                                 $quantity = (float) ($get('quantity') ?? 0);
-                                                $discPct  = (float) ($get('discount') ?? 0);
-                                                $taxPct   = $taxRate;
+                                                $discPct = (float) ($get('discount') ?? 0);
+                                                $taxPct = (float) ($get('tax') ?? 0);
+                                                $preview = self::calculateApprovalItemPreview($quantity, (float) $convertedUnitPrice, $discPct, $taxPct, $taxType);
+
+                                                $set('total', self::formatMoneyPreviewState($preview['total_cost']));
+                                                $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
+                                                $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
+                                                $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                            })
+                                            ->options(function () {
+                                                return Currency::orderBy('name')
+                                                    ->get()
+                                                    ->mapWithKeys(function (Currency $c) {
+                                                        return [$c->id => "{$c->name} ({$c->symbol})"];
+                                                    });
+                                            })
+                                            ->default(fn() => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'))
+                                            ->helperText('Mata uang item')
+                                            ->validationMessages([
+                                                'required' => 'Mata uang item wajib dipilih',
+                                            ]),
+                                        TextInput::make('original_price')
+                                            ->label('Harga Asli (Master)')
+                                            ->columnSpan(1)
+                                            ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
+                                                is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
+                                            ))
+                                            ->default(0)
+                                            ->readOnly()
+                                            ->dehydrated()
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->mask(\Filament\Support\RawJs::make(<<<'JS'
+                                                $money($input, ',', '.', 2)
+                                            JS))
+                                            ->dehydrateStateUsing(fn($state) => self::parseCurrencyState($state ?? 0))
+                                            ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if ($record && $record->original_price !== null) {
+                                                    $component->state(self::formatMoneyPreviewState($record->original_price));
+                                                }
+                                            })
+                                            ->helperText('Harga dari master produk'),
+                                        TextInput::make('unit_price')
+                                            ->label('Harga Override')
+                                            ->columnSpan(1)
+                                            ->reactive()
+                                            ->live()
+                                            ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
+                                                is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
+                                            ))
+                                            ->mask(\Filament\Support\RawJs::make(<<<'JS'
+                                                $money($input, ',', '.', 2)
+                                            JS))
+                                            ->dehydrateStateUsing(fn($state) => self::parseCurrencyState($state ?? 0))
+                                            ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(self::parseCurrencyState($state), 2, ',', '.') : '')
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if ($record && $record->unit_price !== null) {
+                                                    $formatted = number_format(self::parseCurrencyState($record->unit_price), 2, ',', '.');
+                                                    $component->state($formatted);
+                                                }
+                                            })
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
+                                                $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                $quantity  = (float) ($get('quantity') ?? 0);
+                                                $unitPrice = self::parseCurrencyState($state ?? 0);
+                                                $discPct   = (float) ($get('discount') ?? 0);
+                                                $taxPct    = (float) ($get('tax') ?? 0);
+                                                $base      = $quantity * $unitPrice;
+                                                $afterDisc = $base - $base * ($discPct / 100);
+                                                // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
+                                                $taxNominal = round($afterDisc * ($taxPct / 100), 2);
+                                                // Subtotal varies based on tax type interpretation
+                                                $subtotal  = $taxType === 'PPN Included'
+                                                    ? $afterDisc
+                                                    : $afterDisc + $taxNominal;
+                                                $set('subtotal', self::formatMoneyPreviewState($subtotal));
+                                                $set('total', self::formatMoneyPreviewState($quantity * $unitPrice));
+                                                $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
+                                            })
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Harga override wajib diisi.',
+                                                'numeric' => 'Harga override harus berupa angka.',
+                                            ]),
+                                        TextInput::make('discount')
+                                            ->label('Discount (%)')
+                                            ->columnSpan(1)
+                                            ->numeric()
+                                            ->default(0)
+                                            ->minValue(0)
+                                            ->maxValue(100)
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
+                                                $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                $quantity  = (float) ($get('quantity') ?? 0);
+                                                $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
+                                                $discPct   = (float) ($state ?? 0);
+                                                $taxPct    = (float) ($get('tax') ?? 0);
+                                                $base      = $quantity * $unitPrice;
+                                                $afterDisc = $base - $base * ($discPct / 100);
+                                                // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
+                                                $taxNominal = round($afterDisc * ($taxPct / 100), 2);
+                                                // Subtotal varies based on tax type interpretation
+                                                $subtotal  = $taxType === 'PPN Included'
+                                                    ? $afterDisc
+                                                    : $afterDisc + $taxNominal;
+                                                $set('subtotal', self::formatMoneyPreviewState($subtotal));
+                                                $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
+                                            })
+                                            ->validationMessages([
+                                                'numeric' => 'Discount harus berupa angka.',
+                                                'min' => 'Discount tidak boleh negatif.',
+                                                'max' => 'Discount maksimal 100%.',
+                                            ]),
+                                        TextInput::make('total')
+                                            ->label('Total (Harga × Qty)')
+                                            ->columnSpan(1)
+                                            ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
+                                                is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
+                                            ))
+                                            ->readOnly()
+                                            ->dehydrated(false)
+                                            ->default(0)
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if ($record) {
+                                                    $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
+                                                    $total = (float)$record->quantity * $unitPrice;
+                                                    $component->state(self::formatMoneyPreviewState($total));
+                                                }
+                                            }),
+                                    ]),
+                                \Filament\Forms\Components\Grid::make(4)
+                                    ->schema([
+                                        Radio::make('tipe_pajak')
+                                            ->label('Tipe Pajak')
+                                            ->columnSpan(2)
+                                            ->inline()
+                                            ->required()
+                                            ->default('eklusif')
+                                            ->options(TaxTypeHelper::options())
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                $itemTaxType = self::normalizeItemTaxType($state);
+                                                $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+                                                $productId = is_numeric($get('product_id')) ? (int) $get('product_id') : null;
+                                                $taxPct = self::resolveItemTaxRate($productId, $itemTaxType);
+
+                                                $set('tipe_pajak', $itemTaxType);
+                                                $set('tax', $taxPct);
+
+                                                $quantity  = (float) ($get('quantity') ?? 0);
+                                                $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
+                                                $discPct   = (float) ($get('discount') ?? 0);
                                                 $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
                                                 $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
                                                 $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
                                                 $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
-                                            }
-                                        }
-                                    })
-                                    ->getOptionLabelUsing(fn($value): ?string => static::resolveProductLabel(is_numeric($value) ? (int) $value : null))
-                                    ->getSearchResultsUsing(function (string $search, callable $get) {
-                                        return static::resolveProductOptions($search, 50);
-                                    })
-                                    ->helperText('Pilih produk yang akan dipesan')
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Produk wajib dipilih.',
-                                    ]),
-                                TextInput::make('unit')
-                                    ->label('Satuan')
-                                    ->readOnly()
-                                    ->dehydrated(false)
-                                    ->default('-')
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if ($record?->product) {
-                                            $component->state($record->product->uom?->abbreviation ?? '-');
-                                        }
-                                    }),
-                                Select::make('supplier_id')
-                                    ->label('Supplier')
-                                    ->reactive()
-                                    ->searchable()
-                                    ->preload()
-                                    ->nullable()
-                                    ->options(function (callable $get) {
-                                        $productId = $get('product_id');
-                                        $itemCurrencyId = is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-
-                                        return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, null, 50, $itemCurrencyId);
-                                    })
-                                    ->getOptionLabelUsing(function ($value, callable $get): ?string {
-                                        $productId = $get('product_id');
-                                        $itemCurrencyId = is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-
-                                        return static::resolveSupplierLabel(
-                                            is_numeric($value) ? (int) $value : null,
-                                            is_numeric($productId) ? (int) $productId : null,
-                                            $itemCurrencyId
-                                        );
-                                    })
-                                    ->getSearchResultsUsing(function (string $search, callable $get) {
-                                        $productId = $get('product_id');
-                                        $itemCurrencyId = is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-
-                                        return static::resolveSupplierOptions(is_numeric($productId) ? (int) $productId : null, $search, 50, $itemCurrencyId);
-                                    })
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        if ($state) {
-                                            $productId = $get('product_id');
-                                            if ($productId) {
-                                                $product = Product::withoutGlobalScope('product_cabang')->find($productId);
-                                                if ($product) {
-                                                    $itemCurrencyId = is_numeric($get('currency_id'))
-                                                        ? (int) $get('currency_id')
-                                                        : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-                                                    $supplierProduct = $product->suppliers()->where('suppliers.id', $state)->first();
-                                                    if ($supplierProduct && $supplierProduct->pivot->supplier_price !== null) {
-                                                        $unitPrice = self::convertIdrToCurrency((float) $supplierProduct->pivot->supplier_price, $itemCurrencyId, false);
-                                                    } else {
-                                                        $unitPrice = self::convertIdrToCurrency((float) ($product->cost_price ?? 0), $itemCurrencyId, false);
-                                                    }
-
-                                                    $set('original_price', self::formatMoneyInputState($unitPrice));
-                                                    $set('unit_price', self::formatMoneyInputState($unitPrice));
-
-                                                    // Persist IDR anchor
-                                                    $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
-                                                    $set('unit_price_idr', $rawIdrPrice);
-                                                    $set('original_price_idr', $rawIdrPrice);
-                                                    // Recalculate subtotal
-                                                    $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
-                                                    $taxType  = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                                    $quantity = (float) ($get('quantity') ?? 0);
-                                                    $discPct  = (float) ($get('discount') ?? 0);
-                                                    $taxPct   = (float) ($get('tax') ?? 0);
-                                                    $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
-                                                    $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
-                                                    $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
-                                                    $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                            }),
+                                        TextInput::make('tax')
+                                            ->label('Tax (%)')
+                                            ->columnSpan(1)
+                                            ->numeric()
+                                            ->default(function (callable $get) {
+                                                return self::resolveItemTaxRate(
+                                                    is_numeric($get('product_id')) ? (int) $get('product_id') : null,
+                                                    $get('tipe_pajak')
+                                                );
+                                            })
+                                            ->minValue(0)
+                                            ->maxValue(100)
+                                            ->disabled()
+                                            ->dehydrated(true)
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->validationMessages([
+                                                'numeric' => 'Tax harus berupa angka.',
+                                                'min' => 'Tax tidak boleh negatif.',
+                                                'max' => 'Tax maksimal 100%.',
+                                            ]),
+                                        TextInput::make('tax_nominal')
+                                            ->label('Nominal Pajak')
+                                            ->columnSpan(1)
+                                            ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
+                                                is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
+                                            ))
+                                            ->readOnly()
+                                            ->dehydrated(false)
+                                            ->default(0)
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if (! $record) {
+                                                    return;
                                                 }
-                                            }
-                                        }
-                                    })
-                                    ->helperText('Pilih supplier untuk item ini (opsional, akan memperbarui harga)'),
-                                Select::make('currency_id')
-                                    ->label('Mata Uang Item')
-                                    ->preload()
-                                    ->searchable()
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, $old, callable $set, callable $get) {
-                                        $newCurrencyId = is_numeric($state)
-                                            ? (int) $state
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-                                        $oldCurrencyId = is_numeric($old)
-                                            ? (int) $old
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-
-                                        if ($newCurrencyId === $oldCurrencyId) {
-                                            return;
-                                        }
-
-                                        // ── IDR Anchor Strategy ─────────────────────────────────────────────────
-                                        // PROBLEM: reading the current display value (already rounded to 2 dp) and
-                                        // re-converting it loses precision:
-                                        //   1.000.000 ÷ 15.000 = 66.6666 → rounded to 66.67
-                                        //   66.67 × 15.000 = 1.000.050 (wrong!)
-                                        //
-                                        // FIX: always convert from the stored IDR anchor value so the source
-                                        // precision is never truncated by the intermediate display rounding.
-                                        // ────────────────────────────────────────────────────────────────────────
-
-                                        // Read IDR anchor (hidden field populated when product/supplier is set)
-                                        $unitPriceIdrRaw      = MoneyHelper::parseHighPrecision($get('unit_price_idr') ?? 0);
-                                        $originalPriceIdrRaw  = MoneyHelper::parseHighPrecision($get('original_price_idr') ?? 0);
-
-                                        // If anchor is zero/missing, fall back to converting the current display value
-                                        // through the old currency as a best-effort (handles pre-migration rows)
-                                        if ((float) $unitPriceIdrRaw <= 0) {
-                                            $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
-                                            $unitPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
-                                                $currentUnitPrice, $oldCurrencyId
-                                            );
-                                        }
-                                        if ((float) $originalPriceIdrRaw <= 0) {
-                                            $currentOriginalPrice = MoneyHelper::parseHighPrecision($get('original_price') ?? 0);
-                                            $originalPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
-                                                $currentOriginalPrice, $oldCurrencyId
-                                            );
-                                        }
-
-                                        // Convert directly from IDR anchor to new currency (no intermediate rounding)
-                                        $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
-                                            $unitPriceIdrRaw, $newCurrencyId
-                                        );
-                                        $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
-                                            $originalPriceIdrRaw, $newCurrencyId
-                                        );
-
-                                        // For IDR display: round to whole number (no cents in Rupiah)
-                                        // For foreign currency: keep 2 decimal places
-                                        $newCode = \App\Models\Currency::find($newCurrencyId)?->code;
-                                        if (strtoupper((string) $newCode) === 'IDR') {
-                                            $convertedUnitPrice     = bcadd($unitPriceIdrRaw, '0', 2);
-                                            $convertedOriginalPrice = bcadd($originalPriceIdrRaw, '0', 2);
-                                        }
-
-                                        // Update hidden IDR anchor fields with the now-resolved IDR values
-                                        $set('unit_price_idr', $unitPriceIdrRaw);
-                                        $set('original_price_idr', $originalPriceIdrRaw);
-
-                                        $set('original_price', self::formatMoneyInputState($convertedOriginalPrice));
-                                        $set('unit_price', self::formatMoneyInputState($convertedUnitPrice));
-
-                                        $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
-                                        $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                        $quantity = (float) ($get('quantity') ?? 0);
-                                        $discPct = (float) ($get('discount') ?? 0);
-                                        $taxPct = (float) ($get('tax') ?? 0);
-                                        $preview = self::calculateApprovalItemPreview($quantity, (float) $convertedUnitPrice, $discPct, $taxPct, $taxType);
-
-                                        $set('total', self::formatMoneyPreviewState($preview['total_cost']));
-                                        $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
-                                        $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
-                                        $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
-                                    })
-                                    ->options(function () {
-                                        return Currency::orderBy('name')
-                                            ->get()
-                                            ->mapWithKeys(function (Currency $c) {
-                                                return [$c->id => "{$c->name} ({$c->symbol})"];
-                                            });
-                                    })
-                                    ->default(fn() => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'))
-                                    ->helperText('Mata uang item')
-                                    ->validationMessages([
-                                        'required' => 'Mata uang item wajib dipilih',
+                                                $taxPct    = (float) ($record->tax ?? 0);
+                                                $qty       = (float) ($record->quantity ?? 0);
+                                                $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
+                                                $discPct   = (float) ($record->discount ?? 0);
+                                                $base      = $qty * $unitPrice;
+                                                $afterDisc = $base - $base * ($discPct / 100);
+                                                // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
+                                                $taxNominal = round($afterDisc * ($taxPct / 100), 2);
+                                                $component->state(self::formatMoneyPreviewState($taxNominal));
+                                            }),
                                     ]),
-                                Select::make('cabang_id')
-                                    ->label('Cabang Item')
-                                    ->options(function (callable $get) {
-                                        $user = Auth::user();
-                                        $manageType = $user?->manage_type ?? [];
-                                        $productId = $get('product_id');
-                                        $selectedProductCabangId = $productId
-                                            ? Product::withoutGlobalScope('product_cabang')->find($productId)?->cabang_id
-                                            : null;
-
-                                        if ($user && is_array($manageType) && in_array('all', $manageType)) {
-                                            $cabangs = \App\Models\Cabang::orderBy('kode')->limit(50)->get();
-
-                                            if ($selectedProductCabangId && ! $cabangs->contains('id', $selectedProductCabangId)) {
-                                                $selectedCabang = \App\Models\Cabang::find($selectedProductCabangId);
-                                                if ($selectedCabang) {
-                                                    $cabangs->push($selectedCabang);
+                                \Filament\Forms\Components\Grid::make(3)
+                                    ->schema([
+                                        TextInput::make('subtotal')
+                                            ->label('Subtotal')
+                                            ->columnSpan(1)
+                                            ->default(0)
+                                            ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
+                                                is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
+                                            ))
+                                            ->disabled()
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->validationMessages([
+                                                'numeric' => 'Subtotal harus berupa angka.',
+                                            ])
+                                            ->dehydrated(false)
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if (! $record) {
+                                                    return;
                                                 }
-                                            }
-
-                                            return $cabangs->unique('id')->mapWithKeys(function ($cabang) {
-                                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                                            });
-                                        }
-
-                                        $cabangIds = array_filter([
-                                            $user?->cabang_id,
-                                            $selectedProductCabangId,
-                                        ]);
-
-                                        return \App\Models\Cabang::whereIn('id', $cabangIds)->limit(50)->get()->mapWithKeys(function ($cabang) {
-                                            return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                                        });
-                                    })
-                                    ->default(fn() => null)
-                                    ->searchable()
-                                    ->preload()
-                                    ->required()
-                                    ->helperText('Cabang per item dipakai untuk memecah Purchase Order bila supplier sama tetapi cabang berbeda.')
-                                    ->validationMessages([
-                                        'required' => 'Cabang item wajib dipilih.',
+                                                $taxPct    = (float) ($record->tax ?? 0);
+                                                $qty       = (float) ($record->quantity ?? 0);
+                                                $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
+                                                $discPct   = (float) ($record->discount ?? 0);
+                                                $taxType   = \App\Models\OrderRequestItem::taxServiceTypeFromItemTaxType(
+                                                    $record->tipe_pajak ?? null
+                                                );
+                                                $base      = $qty * $unitPrice;
+                                                $afterDisc = $base - $base * ($discPct / 100);
+                                                $taxNominal = round($afterDisc * ($taxPct / 100), 2);
+                                                // Subtotal varies based on tax type
+                                                $subtotal  = $taxType === 'PPN Included'
+                                                    ? $afterDisc
+                                                    : $afterDisc + $taxNominal;
+                                                $component->state(self::formatMoneyPreviewState($subtotal));
+                                            }),
+                                        Textarea::make('note')
+                                            ->nullable()
+                                            ->label('Note')
+                                            ->columnSpan(2)
+                                            ->rows(1),
                                     ]),
-                                Placeholder::make('supplier_recommendation')
-                                    ->label('Rekomendasi Supplier')
-                                    ->content(function (callable $get) {
-                                        $productId = $get('product_id');
-                                        if (!$productId) {
-                                            return 'Pilih produk untuk melihat rekomendasi supplier.';
-                                        }
-
-                                        $product = Product::with('suppliers')->find($productId);
-                                        if (!$product || $product->suppliers->isEmpty()) {
-                                            return 'Tidak ada supplier terdaftar untuk produk ini.';
-                                        }
-
-                                        $recommended = $product->suppliers
-                                            ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
-                                            ->first();
-
-                                        $price = (float) ($recommended?->pivot->supplier_price ?? 0);
-                                        $itemCurrencyId = is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
-
-                                        $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
-
-                                        return "{$recommended->perusahaan} (" . self::formatMoneyByCurrency($itemCurrencyId, $converted) . ')';
-                                    }),
-                                TextInput::make('quantity')
-                                    ->label('Quantity')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
-                                        $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                        $quantity  = (float) ($state ?? 0);
-                                        $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
-                                        $discPct   = (float) ($get('discount') ?? 0);
-                                        $taxPct    = (float) ($get('tax') ?? 0);
-                                        $base      = $quantity * $unitPrice;
-                                        $afterDisc = $base - $base * ($discPct / 100);
-                                        // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
-                                        $taxNominal = round($afterDisc * ($taxPct / 100), 2);
-                                        // Subtotal varies based on tax type interpretation
-                                        $subtotal  = $taxType === 'PPN Included'
-                                            ? $afterDisc
-                                            : $afterDisc + $taxNominal;
-                                        $set('subtotal', self::formatMoneyPreviewState($subtotal));
-                                        $set('total', self::formatMoneyPreviewState($quantity * $unitPrice));
-                                        $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
-                                    })
-                                    ->required()
-                                    ->minValue(0.01)
-                                    ->validationMessages([
-                                        'required' => 'Quantity wajib diisi.',
-                                        'numeric' => 'Quantity harus berupa angka.',
-                                        'min' => 'Quantity minimal 0.01.',
-                                    ]),
-                                // IDR anchor hidden fields — store the authoritative IDR value for
-                                // lossless currency round-trips (IDR→USD→IDR = same IDR value).
-                                // Populated when product/supplier is selected; updated on currency change.
                                 Hidden::make('unit_price_idr')
                                     ->default(fn(Get $get) => \App\Helpers\MoneyHelper::parseHighPrecision($get('unit_price') ?? 0))
                                     ->dehydrated(true),
                                 Hidden::make('original_price_idr')
                                     ->default(fn(Get $get) => \App\Helpers\MoneyHelper::parseHighPrecision($get('original_price') ?? 0))
                                     ->dehydrated(true),
-                                TextInput::make('original_price')
-                                    ->label('Harga Asli (Master)')
-                                    ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
-                                        is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
-                                    ))
-                                    ->default(0)
-                                    ->readOnly()
-                                    ->dehydrated()
-                                    ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, ',', '.', 2)
-        JS))
-                                    ->dehydrateStateUsing(fn($state) => self::parseCurrencyState($state ?? 0))
-                                    ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if ($record && $record->original_price !== null) {
-                                            $component->state(self::formatMoneyPreviewState($record->original_price));
-                                        }
-                                    })
-                                    ->helperText('Harga dari master produk'),
-                                TextInput::make('unit_price')
-                                    ->label('Harga Override')
-                                    ->reactive()
-                                    ->live()
-                                    ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
-                                        is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
-                                    ))
-                                    ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, ',', '.', 2)
-        JS))
-                                    ->dehydrateStateUsing(fn($state) => self::parseCurrencyState($state ?? 0))
-                                    ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? number_format(self::parseCurrencyState($state), 2, ',', '.') : '')
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if ($record && $record->unit_price !== null) {
-                                            $formatted = number_format(self::parseCurrencyState($record->unit_price), 2, ',', '.');
-                                            $component->state($formatted);
-                                        }
-                                    })
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
-                                        $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                        $quantity  = (float) ($get('quantity') ?? 0);
-                                        $unitPrice = self::parseCurrencyState($state ?? 0);
-                                        $discPct   = (float) ($get('discount') ?? 0);
-                                        $taxPct    = (float) ($get('tax') ?? 0);
-                                        $base      = $quantity * $unitPrice;
-                                        $afterDisc = $base - $base * ($discPct / 100);
-                                        // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
-                                        $taxNominal = round($afterDisc * ($taxPct / 100), 2);
-                                        // Subtotal varies based on tax type interpretation
-                                        $subtotal  = $taxType === 'PPN Included'
-                                            ? $afterDisc
-                                            : $afterDisc + $taxNominal;
-                                        $set('subtotal', self::formatMoneyPreviewState($subtotal));
-                                        $set('total', self::formatMoneyPreviewState($quantity * $unitPrice));
-                                        $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
-                                    })
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Harga override wajib diisi.',
-                                        'numeric' => 'Harga override harus berupa angka.',
-                                    ]),
-                                TextInput::make('discount')
-                                    ->label('Discount (%)')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->maxValue(100)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $itemTaxType = $get('tipe_pajak') ?? 'eklusif';
-                                        $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                        $quantity  = (float) ($get('quantity') ?? 0);
-                                        $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
-                                        $discPct   = (float) ($state ?? 0);
-                                        $taxPct    = (float) ($get('tax') ?? 0);
-                                        $base      = $quantity * $unitPrice;
-                                        $afterDisc = $base - $base * ($discPct / 100);
-                                        // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
-                                        $taxNominal = round($afterDisc * ($taxPct / 100), 2);
-                                        // Subtotal varies based on tax type interpretation
-                                        $subtotal  = $taxType === 'PPN Included'
-                                            ? $afterDisc
-                                            : $afterDisc + $taxNominal;
-                                        $set('subtotal', self::formatMoneyPreviewState($subtotal));
-                                        $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
-                                    })
-                                    ->validationMessages([
-                                        'numeric' => 'Discount harus berupa angka.',
-                                        'min' => 'Discount tidak boleh negatif.',
-                                        'max' => 'Discount maksimal 100%.',
-                                    ]),
-                                Radio::make('tipe_pajak')
-                                    ->label('Tipe Pajak')
-                                    ->inline()
-                                    ->required()
-                                    ->default('eklusif')
-                                    ->options(TaxTypeHelper::options())
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $itemTaxType = self::normalizeItemTaxType($state);
-                                        $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                                        $productId = is_numeric($get('product_id')) ? (int) $get('product_id') : null;
-                                        $taxPct = self::resolveItemTaxRate($productId, $itemTaxType);
-
-                                        $set('tipe_pajak', $itemTaxType);
-                                        $set('tax', $taxPct);
-
-                                        $quantity  = (float) ($get('quantity') ?? 0);
-                                        $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
-                                        $discPct   = (float) ($get('discount') ?? 0);
-                                        $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
-                                        $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
-                                        $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
-                                        $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
-                                    }),
-                                TextInput::make('tax')
-                                    ->label('Tax (%)')
-                                    ->numeric()
-                                    ->default(function (callable $get) {
-                                        return self::resolveItemTaxRate(
-                                            is_numeric($get('product_id')) ? (int) $get('product_id') : null,
-                                            $get('tipe_pajak')
-                                        );
-                                    })
-                                    ->minValue(0)
-                                    ->maxValue(100)
-                                    ->disabled()
-                                    ->dehydrated(true)
-                                    ->validationMessages([
-                                        'numeric' => 'Tax harus berupa angka.',
-                                        'min' => 'Tax tidak boleh negatif.',
-                                        'max' => 'Tax maksimal 100%.',
-                                    ]),
-                                TextInput::make('total')
-                                    ->label('Total (Harga × Qty)')
-                                    ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
-                                        is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
-                                    ))
-                                    ->readOnly()
-                                    ->dehydrated(false)
-                                    ->default(0)
-                                    ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if ($record) {
-                                            $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
-                                            $total = (float)$record->quantity * $unitPrice;
-                                            $component->state(self::formatMoneyPreviewState($total));
-                                        }
-                                    }),
-                                TextInput::make('tax_nominal')
-                                    ->label('Nominal Pajak')
-                                    ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
-                                        is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
-                                    ))
-                                    ->readOnly()
-                                    ->dehydrated(false)
-                                    ->default(0)
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if (! $record) {
-                                            return;
-                                        }
-                                        $taxPct    = (float) ($record->tax ?? 0);
-                                        $qty       = (float) ($record->quantity ?? 0);
-                                        $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
-                                        $discPct   = (float) ($record->discount ?? 0);
-                                        $base      = $qty * $unitPrice;
-                                        $afterDisc = $base - $base * ($discPct / 100);
-                                        // Nominal pajak ALWAYS calculated from afterDisc * taxPct, independent of tax type
-                                        $taxNominal = round($afterDisc * ($taxPct / 100), 2);
-                                        $component->state(self::formatMoneyPreviewState($taxNominal));
-                                    }),
-                                TextInput::make('subtotal')
-                                    ->label('Subtotal')
-                                    ->default(0)
-                                    ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
-                                        is_numeric($get('currency_id'))
-                                            ? (int) $get('currency_id')
-                                            : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
-                                    ))
-                                    ->disabled()
-                                    ->validationMessages([
-                                        'numeric' => 'Subtotal harus berupa angka.',
-                                    ])
-                                    ->dehydrated(false)
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if (! $record) {
-                                            return;
-                                        }
-                                        $taxPct    = (float) ($record->tax ?? 0);
-                                        $qty       = (float) ($record->quantity ?? 0);
-                                        $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
-                                        $discPct   = (float) ($record->discount ?? 0);
-                                        $taxType   = \App\Models\OrderRequestItem::taxServiceTypeFromItemTaxType(
-                                            $record->tipe_pajak ?? null
-                                        );
-                                        $base      = $qty * $unitPrice;
-                                        $afterDisc = $base - $base * ($discPct / 100);
-                                        $taxNominal = round($afterDisc * ($taxPct / 100), 2);
-                                        // Subtotal varies based on tax type
-                                        $subtotal  = $taxType === 'PPN Included'
-                                            ? $afterDisc
-                                            : $afterDisc + $taxNominal;
-                                        $component->state(self::formatMoneyPreviewState($subtotal));
-                                    }),
-                                Textarea::make('note')
-                                    ->nullable()
-                                    ->label('Note')
                             ])
                     ])
             ]);
@@ -1250,20 +1383,90 @@ class OrderRequestResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->description(new \Illuminate\Support\HtmlString(
-                '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Order Request</summary>' .
-                    '<div class="mt-2 text-sm">' .
-                    '<ul class="list-disc pl-5">' .
-                    '<li><strong>Apa ini:</strong> Order Request adalah permintaan pembelian internal yang dapat di-approve menjadi Purchase Order.</li>' .
-                    '<li><strong>Cara Approve:</strong> Gunakan tombol <em>Approve</em> pada baris request. Saat approve, Anda dapat memilih untuk membuat Purchase Order secara langsung.</li>' .
-                    '<li><strong>Create PO:</strong> Tombol <em>Create Purchase Order</em> memungkinkan pembuatan PO manual dari request yang telah di-approve.</li>' .
-                    '<li><strong>Dampak:</strong> Setelah disetujui, request berubah status menjadi <em>approved</em> dan siap diteruskan ke proses pembelian.</li>' .
-                    '<li><strong>Catatan:</strong> Akses tombol approve/create PO bergantung pada hak akses pengguna.</li>' .
-                    '</ul>' .
-                    '</div>' .
-                    '</details>'
-            ))
+            ->description(new \Illuminate\Support\HtmlString('
+                <style>.fi-ta-header:has(.dt-table-description-full-width){align-items:stretch}.fi-ta-header>.grid:has(.dt-table-description-full-width){width:100%;max-width:none;flex:1 1 100%;}.dt-table-description-full-width{width:100%;min-width:100%;max-width:none;box-sizing:border-box;}</style>
+                <div class="dt-table-description-full-width space-y-4 mb-6 w-full min-w-full max-w-none" style="width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;">
+                    <!-- Panduan Expandable -->
+                    <details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff; transition: all 0.2s;">
+                        <summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; color: #374151;">
+                            <span class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px;">
+                                <svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px; color: #3b82f6;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Panduan Order Request (Permintaan Pembelian)
+                            </span>
+                            <span class="transition group-open:rotate-180">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </span>
+                        </summary>
+                        <div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top: 12px; font-size: 14px; color: #4b5563; padding-left: 28px; border-left: 2px solid rgba(59, 130, 246, 0.3); display: flex; flex-direction: column; gap: 8px;">
+                            <p><strong>Apa ini:</strong> Order Request adalah dokumen permintaan pembelian internal sebelum diterbitkan menjadi Purchase Order resmi.</p>
+                            <p><strong>Cara Approve:</strong> Pengguna dengan akses persetujuan dapat menekan tombol <em style="color: #2563eb; font-style: normal; font-weight: 600;">Approve</em> pada baris data untuk menyetujui permintaan.</p>
+                            <p><strong>Dampak:</strong> Setelah disetujui, Purchase Order (PO) dapat dibuat secara otomatis atau manual dari item-item request tersebut.</p>
+                        </div>
+                    </details>
+
+                    <!-- Informasi Warna Status (Legend) -->
+                    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff;">
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 16px; height: 16px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                            </svg>
+                            Legenda Warna Status Baris Data
+                        </h4>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
+                            <!-- Biru -->
+                            <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">
+                                <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>
+                                <div class="leading-tight">
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Approved)</span>
+                                    <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Request disetujui</span>
+                                </div>
+                            </div>
+                            <!-- Kuning -->
+                            <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">
+                                <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>
+                                <div class="leading-tight">
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partial)</span>
+                                    <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO sebagian</span>
+                                </div>
+                            </div>
+                            <!-- Hijau -->
+                            <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">
+                                <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>
+                                <div class="leading-tight">
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Complete)</span>
+                                    <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO lengkap selesai</span>
+                                </div>
+                            </div>
+                            <!-- Merah -->
+                            <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">
+                                <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>
+                                <div class="leading-tight">
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Closed/Rejected)</span>
+                                    <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Ditolak / ditutup</span>
+                                </div>
+                            </div>
+                            <!-- Abu-abu -->
+                            <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(243, 244, 246, 0.6); border: 1px solid rgba(229, 231, 235, 0.9);">
+                                <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #6b7280; box-shadow: 0 1px 3px rgba(107, 114, 128, 0.4); flex-shrink: 0;"></div>
+                                <div class="leading-tight">
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #374151;">Abu (Req Approve)</span>
+                                    <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Menunggu review</span>
+                                </div>
+                            </div>
+                            <!-- Putih/Default -->
+                            <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #ffffff; border: 1px solid #edf2f7;">
+                                <div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; flex-shrink: 0;"></div>
+                                <div class="leading-tight">
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Putih (Draft)</span>
+                                    <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Draft baru</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            '))
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')
@@ -1586,7 +1789,7 @@ class OrderRequestResource extends Resource
                                         $orderRequestService->createPurchaseOrder($record, $poData);
                                         $created++;
                                     }
-                                    HelperController::sendNotification(isSuccess: true, title: 'Berhasil', message: "{$created} Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                                    HelperController::sendNotification(isSuccess: true, title: 'Berhasil', message: "{$created} Purchase Order berhasil dibuat dan otomatis disetujui.");
                                 } else {
                                     // Single supplier mode (existing behaviour)
                                     $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
@@ -1595,7 +1798,7 @@ class OrderRequestResource extends Resource
                                         return;
                                     }
                                     $orderRequestService->createPurchaseOrder($record, $data);
-                                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat. Proses selanjutnya: Persetujuan Purchase Order oleh Manajer Purchasing.");
+                                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
                                 }
                             } catch (Throwable $exception) {
                                 ProcurementFailureNotifier::danger(
@@ -1711,12 +1914,12 @@ class OrderRequestResource extends Resource
                                         ->default(true)
                                         ->live()
                                         ->columnSpanFull(),
+                                    Hidden::make('multi_supplier'),
                                     \Filament\Forms\Components\Placeholder::make('multi_supplier_notice')
                                         ->label('')
-                                        ->content('Item dalam OR ini memiliki beberapa kombinasi supplier dan cabang berbeda. Sistem akan membuat satu PO per kombinasi secara otomatis.')
+                                        ->content('Item dalam OR ini memiliki beberapa supplier dan cabang berbeda. Sistem akan membuat satu PO per supplier secara otomatis.')
                                         ->visible(fn(Get $get) => $get('create_purchase_order') && $get('multi_supplier'))
                                         ->columnSpanFull(),
-                                    Hidden::make('multi_supplier'),
                                 ]),
                             Section::make('Informasi Purchase Order')
                                 ->icon('heroicon-o-document-text')
@@ -1859,7 +2062,7 @@ class OrderRequestResource extends Resource
 
                                 $orderRequestService->approve($record, $data);
                                 $record->refresh();
-                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Proses selanjutnya: Pembuatan Purchase Order oleh Tim Purchasing.");
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
                             } catch (Throwable $exception) {
                                 ProcurementFailureNotifier::danger(
                                     'Gagal Memproses Order Request',
@@ -1956,102 +2159,168 @@ class OrderRequestResource extends Resource
                         \Filament\Infolists\Components\RepeatableEntry::make('orderRequestItem')
                             ->label('')
                             ->columnSpanFull()
-                            ->columns(6)
                             ->schema([
-                                \Filament\Infolists\Components\TextEntry::make('product.name')
-                                    ->label('Produk')
-                                    ->columnSpan(2),
-                                \Filament\Infolists\Components\TextEntry::make('supplier_display')
-                                    ->label('Supplier')
-                                    ->getStateUsing(function ($record) {
-                                        if (! $record->supplier_id) {
-                                            return '-';
-                                        }
-
-                                        $code = $record->supplier?->code ?? '-';
-                                        $name = $record->supplier?->perusahaan ?? '-';
-
-                                        return "({$code}) {$name}";
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('cabang.nama')
-                                    ->label('Cabang Item')
-                                    ->getStateUsing(function ($record) {
-                                        $code = $record->cabang?->kode ?? null;
-                                        $name = $record->cabang?->nama ?? null;
-
-                                        if (! $name) {
-                                            return '-';
-                                        }
-
-                                        return $code ? "({$code}) {$name}" : $name;
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('quantity')
-                                    ->label('Qty'),
-                                \Filament\Infolists\Components\TextEntry::make('fulfilled_quantity')
-                                    ->label('Qty Diterima (Penerimaan Barang)')
-                                    ->getStateUsing(fn($record) => (float) ($record->fulfilled_quantity ?? 0)),
-                                \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
-                                    ->label('Sisa Qty Belum Diterima')
-                                    ->getStateUsing(fn($record) => OrderRequestQuantityLock::orderRequestItemLimit((int) $record->id)['remaining_for_po']),
-                                \Filament\Infolists\Components\TextEntry::make('original_price')
-                                    ->label('Harga Supplier')
-                                    ->getStateUsing(function ($record) {
-                                        $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-
-                                        return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->original_price ?? 0);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('unit_price')
-                                    ->label('Harga Override')
-                                    ->getStateUsing(function ($record) {
-                                        $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-
-                                        return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->unit_price ?? 0);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('tipe_pajak')
-                                    ->label('Tipe Pajak')
-                                    ->getStateUsing(function ($record) {
-                                        return $record->tipe_pajak ?? '-';
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('tax')
-                                    ->label('Pajak (%)')
-                                    ->getStateUsing(fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'),
-                                \Filament\Infolists\Components\TextEntry::make('total_cost')
-                                    ->label('Total (Harga x Qty)')
-                                    ->getStateUsing(function ($record) {
-                                        $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
-                                        $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-
-                                        return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($totalCost);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('tax_nominal')
-                                    ->label('Nominal Pajak')
-                                    ->getStateUsing(function ($record) {
-                                        $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
-                                        $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                        $preview = self::calculateApprovalItemPreview(
-                                            (float) ($record->quantity ?? 0),
-                                            (float) ($record->unit_price ?? 0),
-                                            (float) ($record->discount ?? 0),
-                                            (float) ($record->tax ?? 0),
-                                            $taxType
-                                        );
-
-                                        return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['tax_nominal']);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('subtotal')
-                                    ->label('Subtotal')
-                                    ->getStateUsing(function ($record) {
-                                        $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                        $preview = self::calculateApprovalItemPreview(
-                                            (float) ($record->quantity ?? 0),
-                                            (float) ($record->unit_price ?? 0),
-                                            (float) ($record->discount ?? 0),
-                                            (float) ($record->tax ?? 0),
-                                            self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
-                                        );
-
-                                        return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
-                                    }),
+                                \Filament\Infolists\Components\Section::make(function ($record) {
+                                    $productName = $record->product ? "({$record->product->sku}) {$record->product->name}" : '-';
+                                    $qty = (float)($record->quantity ?? 0);
+                                    $supplierName = $record->supplier ? "({$record->supplier->code}) {$record->supplier->perusahaan}" : '-';
+                                    
+                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                    $preview = self::calculateApprovalItemPreview(
+                                        (float) ($record->quantity ?? 0),
+                                        (float) ($record->unit_price ?? 0),
+                                        (float) ($record->discount ?? 0),
+                                        (float) ($record->tax ?? 0),
+                                        self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
+                                    );
+                                    $subtotal = self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
+                                    
+                                    return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal}";
+                                })
+                                ->collapsible()
+                                ->collapsed()
+                                ->schema([
+                                    \Filament\Infolists\Components\Grid::make(5)
+                                        ->schema([
+                                            \Filament\Infolists\Components\TextEntry::make('product.name')
+                                                ->label('Product')
+                                                ->columnSpan(2),
+                                            \Filament\Infolists\Components\TextEntry::make('product.uom.abbreviation')
+                                                ->label('Satuan')
+                                                ->default('-')
+                                                ->columnSpan(1),
+                                            \Filament\Infolists\Components\TextEntry::make('quantity')
+                                                ->label('Qty')
+                                                ->columnSpan(1),
+                                            \Filament\Infolists\Components\TextEntry::make('cabang.nama')
+                                                ->label('Cabang')
+                                                ->getStateUsing(function ($record) {
+                                                    $code = $record->cabang?->kode ?? null;
+                                                    $name = $record->cabang?->nama ?? null;
+                                                    if (! $name) {
+                                                        return '-';
+                                                    }
+                                                    return $code ? "({$code}) {$name}" : $name;
+                                                })
+                                                ->columnSpan(1),
+                                        ]),
+                                    \Filament\Infolists\Components\Grid::make(2)
+                                        ->schema([
+                                            \Filament\Infolists\Components\TextEntry::make('supplier_display')
+                                                ->label('Supplier')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    if (! $record->supplier_id) {
+                                                        return '-';
+                                                    }
+                                                    $code = $record->supplier?->code ?? '-';
+                                                    $name = $record->supplier?->perusahaan ?? '-';
+                                                    return "({$code}) {$name}";
+                                                }),
+                                            \Filament\Infolists\Components\TextEntry::make('supplier_recommendation')
+                                                ->label('Rekomendasi Supplier')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $productId = $record->product_id;
+                                                    if (!$productId) {
+                                                        return '-';
+                                                    }
+                                                    $product = Product::withoutGlobalScope('product_cabang')->with('suppliers')->find($productId);
+                                                    if (!$product || $product->suppliers->isEmpty()) {
+                                                        return 'Tidak ada supplier terdaftar untuk produk ini.';
+                                                    }
+                                                    $recommended = $product->suppliers
+                                                        ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
+                                                        ->first();
+                                                    $price = (float) ($recommended?->pivot->supplier_price ?? 0);
+                                                    $itemCurrencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
+                                                    return "{$recommended->perusahaan} (" . self::resolveCurrencySymbol($itemCurrencyId) . ' ' . self::formatMoneyPreviewState($converted) . ')';
+                                                }),
+                                        ]),
+                                    \Filament\Infolists\Components\Grid::make(5)
+                                        ->schema([
+                                            \Filament\Infolists\Components\TextEntry::make('currency.code')
+                                                ->label('Mata Uang')
+                                                ->columnSpan(1)
+                                                ->default(fn ($record) => $record->currency?->code ?? $record->orderRequest?->currency?->code ?? '-'),
+                                            \Filament\Infolists\Components\TextEntry::make('original_price')
+                                                ->label('Harga Asli (Master)')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->original_price ?? 0);
+                                                }),
+                                            \Filament\Infolists\Components\TextEntry::make('unit_price')
+                                                ->label('Harga Override')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->unit_price ?? 0);
+                                                }),
+                                            \Filament\Infolists\Components\TextEntry::make('discount')
+                                                ->label('Discount')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'),
+                                            \Filament\Infolists\Components\TextEntry::make('total_cost')
+                                                ->label('Total (Harga x Qty)')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($totalCost);
+                                                }),
+                                        ]),
+                                    \Filament\Infolists\Components\Grid::make(4)
+                                        ->schema([
+                                            \Filament\Infolists\Components\TextEntry::make('tipe_pajak')
+                                                ->label('Tipe Pajak')
+                                                ->columnSpan(2)
+                                                ->getStateUsing(function ($record) {
+                                                    return $record->tipe_pajak ?? '-';
+                                                }),
+                                            \Filament\Infolists\Components\TextEntry::make('tax')
+                                                ->label('Tax (%)')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'),
+                                            \Filament\Infolists\Components\TextEntry::make('tax_nominal')
+                                                ->label('Nominal Pajak')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
+                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    $preview = self::calculateApprovalItemPreview(
+                                                        (float) ($record->quantity ?? 0),
+                                                        (float) ($record->unit_price ?? 0),
+                                                        (float) ($record->discount ?? 0),
+                                                        (float) ($record->tax ?? 0),
+                                                        $taxType
+                                                    );
+                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['tax_nominal']);
+                                                }),
+                                        ]),
+                                    \Filament\Infolists\Components\Grid::make(3)
+                                        ->schema([
+                                            \Filament\Infolists\Components\TextEntry::make('subtotal')
+                                                ->label('Subtotal')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    $preview = self::calculateApprovalItemPreview(
+                                                        (float) ($record->quantity ?? 0),
+                                                        (float) ($record->unit_price ?? 0),
+                                                        (float) ($record->discount ?? 0),
+                                                        (float) ($record->tax ?? 0),
+                                                        self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
+                                                    );
+                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
+                                                }),
+                                            \Filament\Infolists\Components\TextEntry::make('note')
+                                                ->label('Note')
+                                                ->columnSpan(2)
+                                                ->placeholder('-'),
+                                        ]),
+                                ]),
                             ]),
                     ]),
             ]);

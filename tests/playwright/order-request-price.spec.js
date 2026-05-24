@@ -20,8 +20,10 @@ import { test, expect } from '@playwright/test';
 
 // ─── Reusable helper: select an exact option in a Filament Choices.js dropdown ──
 async function selectChoicesOption(page, labelText) {
-  // Find the field wrapper that contains the given label
-  const wrapper = page.locator('.fi-fo-field-wrp').filter({ has: page.locator(`label:has-text("${labelText}")`) }).first();
+  // Find the field wrapper that contains the given label with exact text match
+  const wrapper = page.locator('.fi-fo-field-wrp').filter({
+    has: page.locator('label').filter({ hasText: new RegExp('^' + labelText + '$', 'i') })
+  }).first();
   await wrapper.waitFor({ state: 'visible', timeout: 10_000 });
 
   const choicesInner = wrapper.locator('.choices__inner');
@@ -78,14 +80,6 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     await page.waitForLoadState('networkidle');
 
     // ── Fill required header fields ───────────────────────────────────────
-    // 1. Cabang (test user has manage_type=all so it must be selected)
-    await selectChoicesOption(page, 'Cabang');
-
-    // 2. Warehouse (depends on Cabang; wait for options to load)
-    await page.waitForTimeout(800);
-    await selectChoicesOption(page, 'Gudang');
-
-    // 3. No header supplier selected — unit_price should fall back to product.cost_price
 
     // 4. Request date
     const dateInput = page.locator('input[id*="request_date"]').first();
@@ -95,18 +89,21 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     }
 
     // ── Add repeater item ─────────────────────────────────────────────────
-    const addBtn = page.getByRole('button').filter({ hasText: /tambah item|add item/i }).first();
-    const genericAddBtn = page.locator('button[wire\\:click*="addItem"], button[x-on\\:click*="add"]').first();
-    if (await addBtn.isVisible()) {
-      await addBtn.click();
-    } else if (await genericAddBtn.isVisible()) {
-      await genericAddBtn.click();
-    } else {
-      // Filament repeater "Add" button — find it by looking for button near repeater
-      const repeaterAdd = page.locator('.fi-fo-repeater').getByRole('button').last();
-      await repeaterAdd.click();
+    const existingRow = page.locator('.fi-fo-repeater-item').first();
+    if (await existingRow.count() === 0) {
+      const addBtn = page.getByRole('button').filter({ hasText: /tambah item|add item/i }).first();
+      const genericAddBtn = page.locator('button[wire\\:click*="addItem"], button[x-on\\:click*="add"]').first();
+      if (await addBtn.isVisible()) {
+        await addBtn.click();
+      } else if (await genericAddBtn.isVisible()) {
+        await genericAddBtn.click();
+      } else {
+        // Filament repeater "Add" button — find it by looking for button near repeater
+        const repeaterAdd = page.locator('.fi-fo-repeater').getByRole('button').last();
+        await repeaterAdd.click();
+      }
+      await page.waitForTimeout(800);
     }
-    await page.waitForTimeout(800);
 
     // ── Select product: "Panel Kontrol Industri" (SKU: FG-SEED-001) ───────
     await selectProductInRepeater(page, '(FG-SEED-001) Panel Kontrol Industri');
@@ -119,7 +116,7 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     const unitPriceInput = page.locator('input[id*="unit_price"]').first();
     await unitPriceInput.waitFor({ state: 'visible', timeout: 10_000 });
     const unitPriceValue = await unitPriceInput.inputValue();
-    const taxRateInput = page.locator('input[id*="tax"]').first();
+    const taxRateInput = page.locator('input[id$="tax"]').first();
     const taxRateValue = await taxRateInput.inputValue();
 
     console.log(`\n[unit_price after product select]: "${unitPriceValue}"`);
@@ -129,7 +126,7 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
       unitPriceValue,
       `unit_price should be formatted with dots, but got "${unitPriceValue}". ` +
       `Raw floats like "8500000" indicate $set() does not format the value.`
-    ).toMatch(/^\d{1,3}(\.\d{3})*$/);
+    ).toMatch(/^\d{1,3}(\.\d{3})*(,\d{2})?$/);
 
     // ── Change quantity to 2 and verify subtotal ──────────────────────────
     const qtyInput = page.locator('input[id*="quantity"]').first();
@@ -152,7 +149,7 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     expect(
       subtotalValue,
       `subtotal should be formatted with dots, but got "${subtotalValue}".`
-    ).toMatch(/^\d{1,3}(\.\d{3})*$/);
+    ).toMatch(/^\d{1,3}(\.\d{3})*(,\d{2})?$/);
 
     // Subtotal = 2 × unit_price × (1 + tax/100)
     const parsedUnitPrice = parseInt(unitPriceValue.replace(/\./g, ''), 10);
@@ -182,15 +179,15 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     await page.waitForLoadState('networkidle');
 
     // Fill required fields quickly — no header supplier, uses cost_price fallback
-    await selectChoicesOption(page, 'Cabang');
-    await page.waitForTimeout(600);
-    await selectChoicesOption(page, 'Gudang');
 
     // Add repeater item and select product
-    const addBtns = page.locator('.fi-fo-repeater').getByRole('button');
-    const lastAddBtn = addBtns.last();
-    await lastAddBtn.click();
-    await page.waitForTimeout(600);
+    const existingRow = page.locator('.fi-fo-repeater-item').first();
+    if (await existingRow.count() === 0) {
+      const addBtns = page.locator('.fi-fo-repeater').getByRole('button');
+      const lastAddBtn = addBtns.last();
+      await lastAddBtn.click();
+      await page.waitForTimeout(600);
+    }
 
     await selectProductInRepeater(page, '(FG-SEED-001) Panel Kontrol Industri');
     await page.waitForLoadState('networkidle');
@@ -210,7 +207,7 @@ test.describe('Order Request — price formatting & subtotal calculation', () =>
     const parsedSubtotal = parseInt(subtotalValue.replace(/\./g, ''), 10);
     const unitPriceInput = page.locator('input[id*="unit_price"]').first();
     const unitPriceValue = await unitPriceInput.inputValue();
-    const taxRateInput = page.locator('input[id*="tax"]').first();
+    const taxRateInput = page.locator('input[id$="tax"]').first();
     const taxRateValue = await taxRateInput.inputValue();
 
     const parsedUnitPrice = parseInt(unitPriceValue.replace(/\./g, ''), 10);

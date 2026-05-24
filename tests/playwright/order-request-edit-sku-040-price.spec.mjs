@@ -22,6 +22,10 @@ function readSku040DatabaseValue() {
   return JSON.parse(output.trim());
 }
 
+test.beforeAll(async () => {
+  execSync('php scripts/setup_order_request_sku040_playwright_data.php', { stdio: 'inherit' });
+});
+
 test('order request edit page displays SKU-040 USD price with decimal places (29,80 not 30)', async ({ page }) => {
   await loginIfNeeded(page);
 
@@ -39,8 +43,9 @@ test('order request edit page displays SKU-040 USD price with decimal places (29
   await expect(overrideField).toHaveValue('29,80');
 
   const dbValue = readSku040DatabaseValue();
-  expect(dbValue.unit_price).toBe('29.80');
-  expect(dbValue.original_price).toBe('30.00');
+  expect(Number(dbValue.unit_price).toFixed(2)).toBe('29.80');
+  expect(Number(dbValue.original_price).toFixed(2)).toBe('30.00');
   expect(dbValue.currency).toBe('USD');
   expect(dbValue.symbol).toBe('$');
 });
+

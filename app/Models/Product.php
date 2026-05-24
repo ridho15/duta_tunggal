@@ -358,5 +358,19 @@ class Product extends Model
             $product->inventoryStock()->restore();
             $product->stockMovement()->restore();
         });
+
+        static::created(function ($product) {
+            $warehouses = \App\Models\Warehouse::all();
+            foreach ($warehouses as $warehouse) {
+                \App\Models\InventoryStock::create([
+                    'product_id' => $product->id,
+                    'warehouse_id' => $warehouse->id,
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                    'qty_min' => 0,
+                    'rak_id' => null,
+                ]);
+            }
+        });
     }
 }

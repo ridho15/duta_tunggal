@@ -270,6 +270,8 @@ class OrderRequestService
             ]);
         }
 
+        $purchaseOrder = app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
+
         return $purchaseOrder->fresh(['purchaseOrderItem']);
     }
 

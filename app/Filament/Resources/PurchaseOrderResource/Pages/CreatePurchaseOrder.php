@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
 use App\Filament\Resources\PurchaseOrderResource;
+use App\Models\OrderRequest;
 use App\Services\PurchaseOrderService;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions\Action;
@@ -28,12 +29,21 @@ class CreatePurchaseOrder extends CreateRecord
 
     protected function afterCreate()
     {
+        $record = $this->getRecord();
+
         try {
             $purchaseOrderService = app(PurchaseOrderService::class);
-            $purchaseOrderService->updateTotalAmount($this->getRecord());
+            $purchaseOrderService->updateTotalAmount($record);
+
+            if (
+                $record->refer_model_type === OrderRequest::class
+                && filled($record->refer_model_id)
+            ) {
+                $purchaseOrderService->approvePo($record, Auth::id());
+            }
         } catch (Throwable $exception) {
             Log::error('CreatePurchaseOrder afterCreate failed', [
-                'purchase_order_id' => $this->getRecord()?->id,
+                'purchase_order_id' => $record?->id,
                 'user_id' => Auth::id(),
                 'error' => $exception->getMessage(),
             ]);

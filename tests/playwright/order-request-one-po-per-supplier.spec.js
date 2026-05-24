@@ -26,9 +26,9 @@ const OR3_URL = `/admin/order-requests/${OR3_ID}`;
 
 // OR #3 expected items (use substrings matching seeded fixture products/suppliers)
 const EXPECTED_ITEMS = [
-  { productName: 'BRASSCO PIPA SET 1/4 T0.45mm',    supplierName: 'Abdi Karya', qty: '5'  },
-  { productName: 'BRASSCO PIPA SET 1/4 T0.61mm',    supplierName: 'Adil',      qty: '3'  },
-  { productName: 'BRASSCO PIPA SET 1/4 T0.76MM',    supplierName: 'Abdi Karya', qty: '20' },
+  { productName: 'Panel Kontrol Industri',    supplierName: 'PT Supplier Utama', qty: '5'  },
+  { productName: 'Sensor Tekanan Digital',    supplierName: 'CV Distributor Jaya',      qty: '3'  },
+  { productName: 'Bahan Baku Plastik Granul',    supplierName: 'PT Supplier Utama', qty: '20' },
 ];
 
 async function openApproveModal(page) {
@@ -194,7 +194,7 @@ test.describe('OR #3 (multi-supplier) — Approve creates one PO per supplier', 
     let supp1Count = 0;
     for (let i = 0; i < itemCount; i++) {
       const name = await repeaterItems.nth(i).locator('input[id*="supplier_name"]').first().inputValue();
-      if (name.includes('Abdi Karya')) supp1Count++;
+      if (name.includes('PT Supplier Utama')) supp1Count++;
     }
     console.log('Items for PT Supplier Utama:', supp1Count);
     expect(supp1Count, 'Should have 2 items from PT Supplier Utama').toBe(2);
@@ -211,7 +211,7 @@ test.describe('OR #3 (multi-supplier) — Approve creates one PO per supplier', 
     let supp2Count = 0;
     for (let i = 0; i < itemCount; i++) {
       const name = await repeaterItems.nth(i).locator('input[id*="supplier_name"]').first().inputValue();
-      if (name.includes('Adil')) supp2Count++;
+      if (name.includes('CV Distributor Jaya')) supp2Count++;
     }
     console.log('Items for CV Distributor Jaya:', supp2Count);
     expect(supp2Count, 'Should have 1 item from CV Distributor Jaya').toBe(1);

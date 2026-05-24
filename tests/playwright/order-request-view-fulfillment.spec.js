@@ -17,7 +17,7 @@ test.use({ storageState: 'playwright/.auth/user.json' });
 
 function getOrderRequestId(requestNumber) {
   const output = execSync(
-    `php artisan tinker --execute="echo App\\\\Models\\\\OrderRequest::where('request_number', '${requestNumber}')->value('id');"`,
+    `php artisan tinker --execute="echo DB::table('order_requests')->where('request_number', '${requestNumber}')->value('id');"`,
     { encoding: 'utf8' }
   ).trim();
 
@@ -28,6 +28,7 @@ function getOrderRequestId(requestNumber) {
 
   return id;
 }
+
 
 test.beforeAll(() => {
   execSync('php scripts/setup_order_request_a4_playwright_data.php', { stdio: 'inherit' });
@@ -41,8 +42,8 @@ test('view page shows fulfillment summary for partial and complete ORs', async (
   await page.waitForLoadState('networkidle');
 
   const partialBody = await page.textContent('body');
-  expect(partialBody).toMatch(/Qty Terpenuhi/i);
-  expect(partialBody).toMatch(/Sisa Qty/i);
+  expect(partialBody).toMatch(/Qty Diterima \(Penerimaan Barang\)/i);
+  expect(partialBody).toMatch(/Sisa Qty Belum Diterima/i);
   expect(partialBody).toMatch(/4/i);
   expect(partialBody).toMatch(/16/i);
 
@@ -50,8 +51,8 @@ test('view page shows fulfillment summary for partial and complete ORs', async (
   await page.waitForLoadState('networkidle');
 
   const completeBody = await page.textContent('body');
-  expect(completeBody).toMatch(/Qty Terpenuhi/i);
-  expect(completeBody).toMatch(/Sisa Qty/i);
+  expect(completeBody).toMatch(/Qty Diterima \(Penerimaan Barang\)/i);
+  expect(completeBody).toMatch(/Sisa Qty Belum Diterima/i);
   expect(completeBody).toMatch(/10/i);
   expect(completeBody).toMatch(/0/i);
 });
@@ -63,15 +64,15 @@ test('view page shows tax type and item pricing summary for taxable OR', async (
   await page.waitForLoadState('networkidle');
 
   const body = await page.textContent('body');
-  expect(body).toMatch(/Tipe PPN/i);
-  expect(body).toMatch(/PPN Excluded/i);
-  expect(body).toMatch(/Harga Supplier/i);
+  expect(body).toMatch(/Tipe Pajak/i);
+  expect(body).toMatch(/eklusif/i);
+  expect(body).toMatch(/Harga Asli \(Master\)/i);
   expect(body).toMatch(/Harga Override/i);
   expect(body).toMatch(/Rp 100\.000/i);
   expect(body).toMatch(/Subtotal/i);
   expect(body).toMatch(/Rp 333\.000/i);
-  expect(body).toMatch(/Qty Terpenuhi/i);
+  expect(body).toMatch(/Qty Diterima \(Penerimaan Barang\)/i);
   expect(body).toMatch(/1/i);
-  expect(body).toMatch(/Sisa Qty/i);
+  expect(body).toMatch(/Sisa Qty Belum Diterima/i);
   expect(body).toMatch(/2/i);
 });

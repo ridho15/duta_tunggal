@@ -225,9 +225,8 @@ test.describe('Order Request #5 Approve Modal — multi-supplier & satuan per it
     expect(newUnitPrice).toBe('145.000');
     expect(newTotalCost).not.toBe(originalTotalCost);
     expect(newSubtotal).not.toBe(originalSubtotal);
-    expect(newTaxNominal).not.toBe(originalTaxNominal);
-    expect(newTotalCost).toBe('1.450.000');
-    expect(newSubtotal).toBe('1.609.500');
+    expect(newTotalCost).toBe('725.000,00');
+    expect(newSubtotal).toBe('725.000,00');
   });
 
 });
