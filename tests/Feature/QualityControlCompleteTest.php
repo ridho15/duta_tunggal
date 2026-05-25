@@ -241,7 +241,7 @@ class QualityControlCompleteTest extends TestCase
             'rak_id' => null,
         ]);
 
-        $qc = QualityControl::create([
+        $qc = QualityControl::withoutEvents(fn() => QualityControl::create([
             'qc_number' => 'QC-P-' . date('Ymd') . '-9999',
             'passed_quantity' => 7,
             'rejected_quantity' => 0,
@@ -251,7 +251,7 @@ class QualityControlCompleteTest extends TestCase
             'product_id' => $product->id,
             'from_model_type' => PurchaseOrderItem::class,
             'from_model_id' => $poItem->id,
-        ]);
+        ]));
 
         $service = app(QualityControlService::class);
 

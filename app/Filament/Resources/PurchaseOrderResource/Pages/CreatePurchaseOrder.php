@@ -38,6 +38,7 @@ class CreatePurchaseOrder extends CreateRecord
             if (
                 $record->refer_model_type === OrderRequest::class
                 && filled($record->refer_model_id)
+                && PurchaseOrderResource::shouldAutoApproveOrderRequestPurchaseOrder($record)
             ) {
                 $purchaseOrderService->approvePo($record, Auth::id());
             }

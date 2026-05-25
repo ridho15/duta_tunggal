@@ -104,11 +104,11 @@ class PurchaseReceiptResource extends Resource
                             ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->disabled()
+                            ->dehydrated()
                             ->required()
                             ->searchable()
-                            ->helperText('Pilih cabang untuk purchase receipt ini'),
+                            ->helperText('Cabang terisi otomatis sesuai dengan Quality Control, PO, dan Order Request terkait.'),
                         DateTimePicker::make('receipt_date')
                             ->validationMessages([
                                 'required' => 'Tanggal penerimaan belum dipilih',

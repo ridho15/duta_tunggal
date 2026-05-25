@@ -9,6 +9,9 @@ use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\Currency;
@@ -746,6 +749,104 @@ it('views order request details on the Filament view page', function () {
         ->assertSee('Sisa Qty Belum Diterima');
 });
 
+it('keeps order request remaining receipt quantity unchanged after purchase order approval without receipt', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $po = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-OR-VIEW-REMAINING-001',
+        'status' => 'approved',
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $or->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $po->id,
+        'product_id' => $this->product->id,
+        'quantity' => 4,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $item->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertSee('Sisa Qty Belum Diterima');
+
+    expect(OrderRequestResource::resolveRemainingReceiptQuantity($item->fresh()))->toBe(10.0);
+});
+
+it('reduces order request remaining receipt quantity only after accepted purchase receipt quantity exists', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $po = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-OR-VIEW-REMAINING-002',
+        'status' => 'approved',
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $or->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $po->id,
+        'product_id' => $this->product->id,
+        'quantity' => 4,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $item->id,
+    ]);
+
+    $receipt = PurchaseReceipt::factory()->create([
+        'purchase_order_id' => $po->id,
+        'status' => 'completed',
+    ]);
+
+    PurchaseReceiptItem::factory()->create([
+        'purchase_receipt_id' => $receipt->id,
+        'purchase_order_item_id' => $poItem->id,
+        'product_id' => $this->product->id,
+        'qty_received' => 4,
+        'qty_accepted' => 4,
+        'qty_rejected' => 0,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertSee('Sisa Qty Belum Diterima');
+
+    expect(OrderRequestResource::resolveRemainingReceiptQuantity($item->fresh()))->toBe(6.0);
+});
+
 it('approves an order request from the view page action and updates status', function () {
     $or = OrderRequest::factory()->create([
         'status' => 'request_approve',
@@ -899,6 +1000,22 @@ it('approves an order request from the list table action and creates grouped pur
 
     expect($or->fresh()->status)->toBe('approved');
     expect(PurchaseOrder::where('refer_model_type', OrderRequest::class)->where('refer_model_id', $or->id)->count())->toBe(2);
+});
+
+it('order request create PO modals expose cabang and localized date labels', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
+    $viewPage = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource/Pages/ViewOrderRequest.php'));
+
+    expect($resource)->toContain("Select::make('cabang_id')")
+        ->and($resource)->toContain("->label('Cabang')")
+        ->and($resource)->toContain("->label('Tanggal Pembelian')")
+        ->and($resource)->toContain("->label('Tanggal Diharapkan')")
+        ->and($resource)->toContain('->columns(3)')
+        ->and($viewPage)->toContain("Select::make('cabang_id')")
+        ->and($viewPage)->toContain("->label('Cabang')")
+        ->and($viewPage)->toContain("->label('Tanggal Pembelian')")
+        ->and($viewPage)->toContain("->label('Tanggal Diharapkan')")
+        ->and($viewPage)->toContain('->columns(3)');
 });
 
 it('shows decimal unit price on the Filament view page', function () {

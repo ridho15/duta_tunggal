@@ -320,21 +320,60 @@ class OrderRequestResource extends Resource
                     ->minValue(0)
                     ->reactive()
                     ->live()
-                    ->required()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        $taxType = self::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
-                        $preview = self::calculateApprovalItemPreview(
-                            (float) ($state ?? 0),
-                            self::parseCurrencyState($get('unit_price') ?? 0),
-                            0,
-                            (float) ($get('tax') ?? 0),
-                            $taxType
-                        );
-
-                        $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
-                        $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
-                        $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
-                    })
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                     ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                     ->rules([
                         fn($get) => function ($attribute, $value, $fail) use ($get) {
@@ -358,6 +397,8 @@ class OrderRequestResource extends Resource
                 TextInput::make('unit_price')
                     ->label('Harga Override')
                     ->required()
+                    ->disabled(fn(Get $get) => (bool) ($get('../../create_purchase_order') ?? $get('create_purchase_order') ?? false))
+                    ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
                     ->mask(\Filament\Support\RawJs::make(<<<'JS'
             $money($input, ',', '.', 2)
@@ -741,9 +782,11 @@ class OrderRequestResource extends Resource
                                                         $discPct  = (float) ($get('discount') ?? 0);
                                                         $taxPct   = $taxRate;
                                                         $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                        $set('total', self::formatMoneyPreviewState($preview['total_cost']));
                                                         $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
                                                         $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
                                                         $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                                        $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                                     }
                                                 }
                                             })
@@ -792,6 +835,7 @@ class OrderRequestResource extends Resource
                                                 $set('subtotal', self::formatMoneyPreviewState($subtotal));
                                                 $set('total', self::formatMoneyPreviewState($quantity * $unitPrice));
                                                 $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
+                                                $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                             })
                                             ->required()
                                             ->minValue(0.01)
@@ -801,7 +845,7 @@ class OrderRequestResource extends Resource
                                                 'min' => 'Quantity minimal 0.01.',
                                             ]),
                                         Select::make('cabang_id')
-                                            ->label('Cabang Item')
+                                            ->label('Cabang')
                                             ->columnSpan(1)
                                             ->options(function (callable $get) {
                                                 $user = Auth::user();
@@ -841,7 +885,7 @@ class OrderRequestResource extends Resource
                                             ->required()
                                             ->helperText('Cabang per item dipakai untuk memecah Purchase Order bila supplier sama tetapi cabang berbeda.')
                                             ->validationMessages([
-                                                'required' => 'Cabang item wajib dipilih.',
+                                                'required' => 'Cabang wajib dipilih.',
                                             ]),
                                     ]),
                                 \Filament\Forms\Components\Grid::make(2)
@@ -911,9 +955,11 @@ class OrderRequestResource extends Resource
                                                             $discPct  = (float) ($get('discount') ?? 0);
                                                             $taxPct   = (float) ($get('tax') ?? 0);
                                                             $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                            $set('total', self::formatMoneyPreviewState($preview['total_cost']));
                                                             $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
                                                             $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
                                                             $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                                            $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                                         }
                                                     }
                                                 }
@@ -947,7 +993,7 @@ class OrderRequestResource extends Resource
                                                 return "{$recommended->perusahaan} (" . self::formatMoneyByCurrency($itemCurrencyId, $converted) . ')';
                                             }),
                                     ]),
-                                \Filament\Forms\Components\Grid::make(5)
+                                \Filament\Forms\Components\Grid::make(6)
                                     ->schema([
                                         Select::make('currency_id')
                                             ->label('Mata Uang Item')
@@ -1030,6 +1076,7 @@ class OrderRequestResource extends Resource
                                                 $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
                                                 $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
                                                 $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                                $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * (float) $convertedUnitPrice) * ($discPct / 100), 2)));
                                             })
                                             ->options(function () {
                                                 return Currency::orderBy('name')
@@ -1105,6 +1152,7 @@ class OrderRequestResource extends Resource
                                                 $set('subtotal', self::formatMoneyPreviewState($subtotal));
                                                 $set('total', self::formatMoneyPreviewState($quantity * $unitPrice));
                                                 $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
+                                                $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                             })
                                             ->required()
                                             ->validationMessages([
@@ -1136,12 +1184,35 @@ class OrderRequestResource extends Resource
                                                     : $afterDisc + $taxNominal;
                                                 $set('subtotal', self::formatMoneyPreviewState($subtotal));
                                                 $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
+                                                $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                             })
                                             ->validationMessages([
                                                 'numeric' => 'Discount harus berupa angka.',
                                                 'min' => 'Discount tidak boleh negatif.',
                                                 'max' => 'Discount maksimal 100%.',
                                             ]),
+                                        TextInput::make('discount_nominal')
+                                            ->label('Discount (Nominal)')
+                                            ->columnSpan(1)
+                                            ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
+                                                is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null)
+                                            ))
+                                            ->readOnly()
+                                            ->dehydrated(false)
+                                            ->default(0)
+                                            ->extraInputAttributes(['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;'])
+                                            ->formatStateUsing(fn($state) => $state !== null && $state !== '' ? self::formatMoneyPreviewState($state) : '')
+                                            ->afterStateHydrated(function ($component, $record) {
+                                                if ($record) {
+                                                    $unitPrice = self::parseCurrencyState($record->unit_price ?? 0);
+                                                    $qty = (float) ($record->quantity ?? 0);
+                                                    $discPct = (float) ($record->discount ?? 0);
+                                                    $nominal = round(($qty * $unitPrice) * ($discPct / 100), 2);
+                                                    $component->state(self::formatMoneyPreviewState($nominal));
+                                                }
+                                            }),
                                         TextInput::make('total')
                                             ->label('Total (Harga × Qty)')
                                             ->columnSpan(1)
@@ -1186,9 +1257,11 @@ class OrderRequestResource extends Resource
                                                 $unitPrice = self::parseCurrencyState($get('unit_price') ?? 0);
                                                 $discPct   = (float) ($get('discount') ?? 0);
                                                 $preview = self::calculateApprovalItemPreview($quantity, $unitPrice, $discPct, $taxPct, $taxType);
+                                                $set('total', self::formatMoneyPreviewState($preview['total_cost']));
                                                 $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
                                                 $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
                                                 $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                                                $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                             }),
                                         TextInput::make('tax')
                                             ->label('Tax (%)')
@@ -1647,7 +1720,7 @@ class OrderRequestResource extends Resource
                         ->form([
                             Section::make('Informasi Purchase Order')
                                 ->icon('heroicon-o-document-text')
-                                ->columns(2)
+                                ->columns(3)
                                 ->visible(fn(Get $get) => $get('create_purchase_order'))
                                 ->schema([
                                     Hidden::make('tax_type')
@@ -1667,9 +1740,10 @@ class OrderRequestResource extends Resource
                                     // header-level cabang removed; per-item cabang used instead
                                     Select::make('supplier_id')
                                         ->label('Supplier (untuk PO)')
+                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
                                         ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
                                         ->searchable()
-                                        ->columnSpanFull()
+                                        ->columnSpan(1)
                                         ->options(function () {
                                             return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
                                                 return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
@@ -1684,7 +1758,7 @@ class OrderRequestResource extends Resource
                                                     return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                                 });
                                         })
-                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
                                         ->validationMessages([
                                             'required' => 'Supplier wajib dipilih.',
                                         ]),
@@ -1692,7 +1766,9 @@ class OrderRequestResource extends Resource
                                         ->label('PO Number')
                                         ->string()
                                         ->maxLength(255)
-                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
+                                        ->columnSpan(1)
                                         ->suffixAction(
                                             FormAction::make('generatePoNumber')
                                                 ->icon('heroicon-o-arrow-path')
@@ -1705,16 +1781,30 @@ class OrderRequestResource extends Resource
                                             'required' => 'Nomor PO wajib diisi.',
                                             'max' => 'Nomor PO maksimal 255 karakter.',
                                         ]),
+                                    Select::make('cabang_id')
+                                        ->label('Cabang')
+                                        ->options(function () {
+                                            return \App\Models\Cabang::query()
+                                                ->orderBy('nama')
+                                                ->get()
+                                                ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                                ->all();
+                                        })
+                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                        ->disabled()
+                                        ->dehydrated()
+                                        ->columnSpan(1)
+                                        ->helperText('Cabang ditarik dari item Order Request yang dipilih.'),
                                     DatePicker::make('order_date')
-                                        ->label('Order Date')
+                                        ->label('Tanggal Pembelian')
                                         ->required(fn(Get $get) => $get('create_purchase_order'))
                                         ->native(false)
                                         ->displayFormat('d M Y')
                                         ->validationMessages([
-                                            'required' => 'Tanggal order wajib diisi.',
+                                            'required' => 'Tanggal Pembelian wajib diisi.',
                                         ]),
                                     DatePicker::make('expected_date')
-                                        ->label('Expected Delivery Date')
+                                        ->label('Tanggal Diharapkan')
                                         ->native(false)
                                         ->displayFormat('d M Y')
                                         ->nullable(),
@@ -1968,7 +2058,7 @@ class OrderRequestResource extends Resource
                                             'max' => 'Nomor PO maksimal 255 karakter.',
                                         ]),
                                     DatePicker::make('order_date')
-                                        ->label('Order Date')
+                                        ->label('Tanggal Pembelian')
                                         ->required(fn(Get $get) => $get('create_purchase_order'))
                                         ->native(false)
                                         ->displayFormat('d M Y')
@@ -1976,7 +2066,7 @@ class OrderRequestResource extends Resource
                                             'required' => 'Tanggal order wajib diisi.',
                                         ]),
                                     DatePicker::make('expected_date')
-                                        ->label('Expected Delivery Date')
+                                        ->label('Tanggal Diharapkan')
                                         ->native(false)
                                         ->displayFormat('d M Y')
                                         ->nullable(),
@@ -2117,6 +2207,11 @@ class OrderRequestResource extends Resource
         ];
     }
 
+    public static function resolveRemainingReceiptQuantity(\App\Models\OrderRequestItem $item): float
+    {
+        return OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_receipt'];
+    }
+
     public static function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
     {
         return $infolist
@@ -2150,7 +2245,7 @@ class OrderRequestResource extends Resource
                         \Filament\Infolists\Components\TextEntry::make('remaining_quantity')
                             ->label('Sisa Qty Belum Diterima')
                             ->getStateUsing(fn($record) => (float) $record->orderRequestItem->sum(
-                                fn($item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po']
+                                fn($item) => self::resolveRemainingReceiptQuantity($item)
                             )),
                     ]),
                 \Filament\Infolists\Components\Section::make('Detail Item Order Request')
@@ -2180,7 +2275,7 @@ class OrderRequestResource extends Resource
                                 ->collapsible()
                                 ->collapsed()
                                 ->schema([
-                                    \Filament\Infolists\Components\Grid::make(5)
+                                    \Filament\Infolists\Components\Grid::make(6)
                                         ->schema([
                                             \Filament\Infolists\Components\TextEntry::make('product.name')
                                                 ->label('Product')
@@ -2191,6 +2286,10 @@ class OrderRequestResource extends Resource
                                                 ->columnSpan(1),
                                             \Filament\Infolists\Components\TextEntry::make('quantity')
                                                 ->label('Qty')
+                                                ->columnSpan(1),
+                                            \Filament\Infolists\Components\TextEntry::make('remaining_receipt_quantity')
+                                                ->label('Sisa Qty Belum Diterima')
+                                                ->getStateUsing(fn($record) => self::resolveRemainingReceiptQuantity($record))
                                                 ->columnSpan(1),
                                             \Filament\Infolists\Components\TextEntry::make('cabang.nama')
                                                 ->label('Cabang')
@@ -2238,7 +2337,7 @@ class OrderRequestResource extends Resource
                                                     return "{$recommended->perusahaan} (" . self::resolveCurrencySymbol($itemCurrencyId) . ' ' . self::formatMoneyPreviewState($converted) . ')';
                                                 }),
                                         ]),
-                                    \Filament\Infolists\Components\Grid::make(5)
+                                    \Filament\Infolists\Components\Grid::make(6)
                                         ->schema([
                                             \Filament\Infolists\Components\TextEntry::make('currency.code')
                                                 ->label('Mata Uang')
@@ -2262,6 +2361,17 @@ class OrderRequestResource extends Resource
                                                 ->label('Discount')
                                                 ->columnSpan(1)
                                                 ->getStateUsing(fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'),
+                                            \Filament\Infolists\Components\TextEntry::make('discount_nominal')
+                                                ->label('Discount (Nominal)')
+                                                ->columnSpan(1)
+                                                ->getStateUsing(function ($record) {
+                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                    $qty = (float) ($record->quantity ?? 0);
+                                                    $unitPrice = (float) ($record->unit_price ?? 0);
+                                                    $discPct = (float) ($record->discount ?? 0);
+                                                    $nominal = round(($qty * $unitPrice) * ($discPct / 100), 2);
+                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($nominal);
+                                                }),
                                             \Filament\Infolists\Components\TextEntry::make('total_cost')
                                                 ->label('Total (Harga x Qty)')
                                                 ->columnSpan(1)

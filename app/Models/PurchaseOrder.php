@@ -58,6 +58,26 @@ class PurchaseOrder extends Model
         return number_format((float) $value, 2, '.', '');
     }
 
+    public function getCabangIdAttribute($value)
+    {
+        if (!empty($value)) {
+            return (int) $value;
+        }
+
+        // Fall back to the items' referenced model or product cabang
+        foreach ($this->purchaseOrderItem as $item) {
+            $referModel = $item->referItemModel;
+            if ($referModel && !empty($referModel->cabang_id)) {
+                return (int) $referModel->cabang_id;
+            }
+            if ($item->product && !empty($item->product->cabang_id)) {
+                return (int) $item->product->cabang_id;
+            }
+        }
+
+        return null;
+    }
+
     public function purchaseOrderCurrency()
     {
         return $this->hasMany(PurchaseOrderCurrency::class, 'purchase_order_id');
@@ -178,20 +198,81 @@ class PurchaseOrder extends Model
 
     public function getRemainingQtyStatusAttribute()
     {
+        return $this->receiptFulfillmentSummary()['status_label'];
+    }
+
+    public function receiptFulfillmentSummary(): array
+    {
+        $this->loadMissing('purchaseOrderItem.purchaseReceiptItem');
+
         $totalItems = $this->purchaseOrderItem->count();
-        $completedItems = $this->purchaseOrderItem->filter(function ($item) {
-            return $item->remaining_quantity <= 0;
-        })->count();
+        $completedItems = 0;
+        $itemsWithReceiptActivity = 0;
+        $totalOrdered = 0.0;
+        $totalReceived = 0.0;
+        $totalAccepted = 0.0;
 
-        $itemsWithReceipts = $this->purchaseOrderItem->filter(function ($item) {
-            return $item->purchaseReceiptItem()->sum('qty_accepted') > 0;
-        })->count();
+        foreach ($this->purchaseOrderItem as $item) {
+            $ordered = (float) ($item->quantity ?? 0);
+            $received = (float) $item->purchaseReceiptItem->sum('qty_received');
+            $accepted = (float) $item->purchaseReceiptItem->sum('qty_accepted');
 
-        if ($totalItems === 0) return 'No Items';
-        if ($completedItems === $totalItems) return 'Semua Diterima';
-        if ($completedItems > 0) return 'Sebagian (' . $completedItems . '/' . $totalItems . ')';
-        if ($itemsWithReceipts > 0) return 'Sebagian Diterima';
-        return 'Belum Diterima';
+            $totalOrdered += $ordered;
+            $totalReceived += $received;
+            $totalAccepted += $accepted;
+
+            if ($received > 0 || $accepted > 0) {
+                $itemsWithReceiptActivity++;
+            }
+
+            if ($ordered <= 0 || $accepted >= $ordered) {
+                $completedItems++;
+            }
+        }
+
+        $allAccepted = $totalItems > 0 && $completedItems === $totalItems;
+
+        $statusLabel = match (true) {
+            $totalItems === 0 => 'No Items',
+            $allAccepted => 'Semua Diterima',
+            $itemsWithReceiptActivity > 0 || $totalReceived > 0 || $totalAccepted > 0 => 'Sebagian Diterima',
+            default => 'Belum Diterima',
+        };
+
+        return [
+            'total_items' => $totalItems,
+            'completed_items' => $completedItems,
+            'items_with_receipt_activity' => $itemsWithReceiptActivity,
+            'total_ordered' => $totalOrdered,
+            'total_received' => $totalReceived,
+            'total_accepted' => $totalAccepted,
+            'all_received' => $allAccepted,
+            'status_label' => $statusLabel,
+        ];
+    }
+
+    public function syncReceiptFulfillmentStatus(?int $userId = null): void
+    {
+        if (in_array($this->status, ['closed', 'paid'], true)) {
+            return;
+        }
+
+        $summary = $this->receiptFulfillmentSummary();
+        $newStatus = match ($summary['status_label']) {
+            'Semua Diterima' => 'completed',
+            'Sebagian Diterima' => 'partially_received',
+            default => $this->status === 'completed' ? 'approved' : $this->status,
+        };
+
+        if ($newStatus === $this->status) {
+            return;
+        }
+
+        $this->update([
+            'status' => $newStatus,
+            'completed_by' => $newStatus === 'completed' ? ($userId ?? \Illuminate\Support\Facades\Auth::id() ?? 1) : null,
+            'completed_at' => $newStatus === 'completed' ? now() : null,
+        ]);
     }
 
     public function cabang()

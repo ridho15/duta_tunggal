@@ -48,14 +48,7 @@ class QualityControlObserver
             $item = PurchaseOrderItem::find($qualityControl->from_model_id);
             if ($item) {
                 $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                $alreadyInspected = $item->qualityControls()
-                    ->when($qualityControl->exists, fn ($query) => $query->whereKeyNot($qualityControl->id))
-                    ->get()
-                    ->sum(fn ($qc) => (float) $qc->passed_quantity + (float) $qc->rejected_quantity);
-                $maxInspectable = min(
-                    max(0, (float) $item->quantity - (float) $alreadyInspected),
-                    (float) $limit['remaining_received']
-                );
+                $maxInspectable = (float) $limit['remaining_received'];
                 $maxAccepted = min($maxInspectable, (float) $limit['remaining_accepted']);
                 $quantityReceived = $qualityControl->quantity_received;
                 if ($quantityReceived !== null) {

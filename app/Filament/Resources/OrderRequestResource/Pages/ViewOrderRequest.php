@@ -196,7 +196,7 @@ class ViewOrderRequest extends ViewRecord
                         ]),
                     Section::make('Informasi Purchase Order')
                         ->icon('heroicon-o-document-text')
-                        ->columns(2)
+                        ->columns(3)
                         ->visible(fn(Get $get) => $get('create_purchase_order'))
                         ->schema([
                             Select::make('supplier_id')
@@ -205,7 +205,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
                                 ->preload()
                                 ->searchable()
-                                ->columnSpanFull()
+                                ->columnSpan(1)
                                 ->options(function () {
                                     return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
@@ -228,6 +228,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->maxLength(255)
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
                                 ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
+                                ->columnSpan(1)
                                 ->suffixAction(
                                     FormAction::make('generatePoNumber')
                                         ->icon('heroicon-o-arrow-path')
@@ -235,14 +236,28 @@ class ViewOrderRequest extends ViewRecord
                                         ->action(fn($set) => $set('po_number', HelperController::generatePoNumber()))
                                 )
                                 ->validationMessages(['required' => 'Nomor PO wajib diisi.']),
+                            Select::make('cabang_id')
+                                ->label('Cabang')
+                                ->options(function () {
+                                    return \App\Models\Cabang::query()
+                                        ->orderBy('nama')
+                                        ->get()
+                                        ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                        ->all();
+                                })
+                                ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                ->disabled()
+                                ->dehydrated()
+                                ->columnSpan(1)
+                                ->helperText('Cabang ditarik dari item Order Request yang dipilih.'),
                             DatePicker::make('order_date')
-                                ->label('Order Date')
+                                ->label('Tanggal Pembelian')
                                 ->required(fn(Get $get) => $get('create_purchase_order'))
                                 ->native(false)
                                 ->displayFormat('d M Y')
                                 ->validationMessages(['required' => 'Tanggal order wajib diisi.']),
                             DatePicker::make('expected_date')
-                                ->label('Expected Delivery Date')
+                                ->label('Tanggal Diharapkan')
                                 ->nullable()
                                 ->native(false)
                                 ->displayFormat('d M Y'),
@@ -413,7 +428,7 @@ class ViewOrderRequest extends ViewRecord
                 ->form([
                     Section::make('Informasi Purchase Order')
                         ->icon('heroicon-o-document-text')
-                        ->columns(2)
+                        ->columns(3)
                         ->schema([
                             Hidden::make('multi_supplier'),
                             Placeholder::make('multi_supplier_notice')
@@ -426,7 +441,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
                                 ->preload()
                                 ->searchable()
-                                ->columnSpanFull()
+                                ->columnSpan(1)
                                 ->options(function () {
                                     return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
                                         return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
@@ -449,6 +464,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->maxLength(255)
                                 ->visible(fn(Get $get) => !$get('multi_supplier'))
                                 ->required(fn(Get $get) => !$get('multi_supplier'))
+                                ->columnSpan(1)
                                 ->suffixAction(
                                     FormAction::make('generatePoNumber')
                                         ->icon('heroicon-o-arrow-path')
@@ -456,14 +472,28 @@ class ViewOrderRequest extends ViewRecord
                                         ->action(fn($set) => $set('po_number', HelperController::generatePoNumber()))
                                 )
                                 ->validationMessages(['required' => 'Nomor PO wajib diisi.']),
+                            Select::make('cabang_id')
+                                ->label('Cabang')
+                                ->options(function () {
+                                    return \App\Models\Cabang::query()
+                                        ->orderBy('nama')
+                                        ->get()
+                                        ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                        ->all();
+                                })
+                                ->visible(fn(Get $get) => !$get('multi_supplier'))
+                                ->disabled()
+                                ->dehydrated()
+                                ->columnSpan(1)
+                                ->helperText('Cabang ditarik dari item Order Request yang dipilih.'),
                             DatePicker::make('order_date')
-                                ->label('Order Date')
+                                ->label('Tanggal Pembelian')
                                 ->required()
                                 ->native(false)
                                 ->displayFormat('d M Y')
-                                ->validationMessages(['required' => 'Tanggal order wajib diisi.']),
+                                ->validationMessages(['required' => 'Tanggal Pembelian wajib diisi.']),
                             DatePicker::make('expected_date')
-                                ->label('Expected Delivery Date')
+                                ->label('Tanggal Diharapkan')
                                 ->nullable()
                                 ->native(false)
                                 ->displayFormat('d M Y'),

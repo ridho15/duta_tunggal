@@ -18,7 +18,7 @@ class CreateQualityControlPurchase extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if (! QualityControlPurchaseResource::canChooseInspector()) {
+        if (!QualityControlPurchaseResource::canChooseInspector()) {
             $data['inspected_by'] = Auth::id();
         }
 

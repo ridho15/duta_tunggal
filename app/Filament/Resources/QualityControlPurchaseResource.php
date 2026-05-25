@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QualityControlPurchaseResource\Pages;
 use App\Http\Controllers\HelperController;
+use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReturn;
@@ -39,6 +40,7 @@ use Filament\Forms\Components\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section as InfolistSection;
 use Filament\Infolists\Components\TextEntry;
@@ -69,6 +71,109 @@ class QualityControlPurchaseResource extends Resource
         return Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
     }
 
+    public static function resolveQcPurchaseCabangId(?PurchaseOrderItem $purchaseOrderItem = null, ?PurchaseOrder $purchaseOrder = null): ?int
+    {
+        $purchaseOrderItem?->loadMissing([
+            'referItemModel',
+            'purchaseOrder.supplier',
+            'purchaseOrder.referModel',
+        ]);
+
+        $referItem = $purchaseOrderItem?->referItemModel;
+        if ($referItem instanceof OrderRequestItem && filled($referItem->cabang_id)) {
+            return (int) $referItem->cabang_id;
+        }
+
+        $purchaseOrder = $purchaseOrder ?? $purchaseOrderItem?->purchaseOrder;
+        $purchaseOrder?->loadMissing(['supplier', 'referModel']);
+
+        $rawPoCabangId = $purchaseOrder?->getRawOriginal('cabang_id');
+        if (filled($rawPoCabangId)) {
+            return (int) $rawPoCabangId;
+        }
+
+        $referModel = $purchaseOrder?->referModel;
+        if ($referModel && filled($referModel->cabang_id)) {
+            return (int) $referModel->cabang_id;
+        }
+
+        if (filled($purchaseOrder?->supplier?->cabang_id)) {
+            return (int) $purchaseOrder->supplier->cabang_id;
+        }
+
+        return null;
+    }
+
+    public static function resolveQcPurchaseCabangIdFromPurchaseOrderItemId(?int $purchaseOrderItemId): ?int
+    {
+        if (! $purchaseOrderItemId) {
+            return null;
+        }
+
+        $purchaseOrderItem = PurchaseOrderItem::with([
+            'referItemModel',
+            'purchaseOrder.supplier',
+            'purchaseOrder.referModel',
+        ])->find($purchaseOrderItemId);
+
+        return static::resolveQcPurchaseCabangId($purchaseOrderItem);
+    }
+
+    public static function getQcPurchaseWarehouseOptions(?int $cabangId): array
+    {
+        if (! $cabangId) {
+            return [];
+        }
+
+        return Warehouse::withoutGlobalScopes()
+            ->where('status', 1)
+            ->where('cabang_id', $cabangId)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn($warehouse) => [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"])
+            ->all();
+    }
+
+    public static function warehouseMatchesQcPurchaseCabang(?int $warehouseId, ?int $cabangId): bool
+    {
+        if (! $warehouseId || ! $cabangId) {
+            return false;
+        }
+
+        return Warehouse::withoutGlobalScopes()
+            ->whereKey($warehouseId)
+            ->where('status', 1)
+            ->where('cabang_id', $cabangId)
+            ->exists();
+    }
+
+    public static function resolveBatchQcPurchaseCabangId(?int $purchaseOrderId, array $purchaseOrderItemIds = []): ?int
+    {
+        $normalizedItemIds = collect($purchaseOrderItemIds)
+            ->filter()
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($normalizedItemIds->isNotEmpty()) {
+            $cabangIds = PurchaseOrderItem::with([
+                'referItemModel',
+                'purchaseOrder.supplier',
+                'purchaseOrder.referModel',
+            ])
+                ->whereIn('id', $normalizedItemIds)
+                ->get()
+                ->map(fn(PurchaseOrderItem $item) => static::resolveQcPurchaseCabangId($item))
+                ->filter()
+                ->unique()
+                ->values();
+
+            return $cabangIds->count() === 1 ? (int) $cabangIds->first() : null;
+        }
+
+        return null;
+    }
+
     public static function syncQcQuantityAgainstReceived(callable $set, callable $get, ?string $changedField = null): void
     {
         $received = max(0, (float) ($get('quantity_received') ?? 0));
@@ -84,6 +189,26 @@ class QualityControlPurchaseResource extends Resource
         $set('passed_quantity', $passed);
         $set('rejected_quantity', $rejected);
         $set('total_inspected', $received);
+    }
+
+    public static function purchaseOrderItemQcRemaining(PurchaseOrderItem $purchaseOrderItem): array
+    {
+        $purchaseOrderItem->loadMissing('qualityControls');
+
+        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+        $ordered = (float) ($purchaseOrderItem->quantity ?? 0);
+        $passed = (float) $purchaseOrderItem->qualityControls->sum('passed_quantity');
+        $accepted = max($passed, (float) ($limit['accepted_quantity'] ?? 0));
+        $remaining = min(
+            max(0, $ordered - $accepted),
+            (float) ($limit['remaining_accepted'] ?? 0)
+        );
+
+        return [
+            'ordered' => $ordered,
+            'accepted' => $accepted,
+            'remaining' => $remaining,
+        ];
     }
 
     public static function validateQcQuantityAgainstReceived(callable $get, \Closure $fail, mixed $passedValue = null, mixed $rejectedValue = null): void
@@ -133,9 +258,7 @@ class QualityControlPurchaseResource extends Resource
                                                 }
                                                 // Saat create: hanya tampilkan jika masih ada sisa qty yang perlu diinspeksi
                                                 if ($context === 'create') {
-                                                    $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                    $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                    return min(max(0, ($item->quantity - $inspected)), $limit['remaining_received']) > 0;
+                                                    return static::purchaseOrderItemQcRemaining($item)['remaining'] > 0;
                                                 }
                                                 return true;
                                             })
@@ -147,12 +270,12 @@ class QualityControlPurchaseResource extends Resource
                                                 $supplierName = $supplier->perusahaan ?? 'N/A';
                                                 $productName  = $product->name ?? 'N/A';
                                                 $ordered      = $item->quantity ?? 0;
-                                                $inspected    = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                $limit        = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                $remaining    = min(max(0, $ordered - $inspected), $limit['remaining_received']);
+                                                $qcRemaining  = static::purchaseOrderItemQcRemaining($item);
+                                                $accepted     = $qcRemaining['accepted'];
+                                                $remaining    = $qcRemaining['remaining'];
 
                                                 $label = "PO: {$poNumber} - {$supplierName} - {$productName}"
-                                                       . " (Ordered: {$ordered} | Inspected: {$inspected} | Sisa: {$remaining})";
+                                                       . " (Ordered: {$ordered} | Accepted: {$accepted} | Sisa: {$remaining})";
                                                 return [$item->id => $label];
                                             });
                                     })
@@ -168,7 +291,13 @@ class QualityControlPurchaseResource extends Resource
 
                                         $purchaseOrderItemId = $get('from_model_id');
                                         if ($purchaseOrderItemId) {
-                                            $item = PurchaseOrderItem::with(['product.uom', 'qualityControls', 'purchaseOrder.referModel'])->find($purchaseOrderItemId);
+                                            $item = PurchaseOrderItem::with([
+                                                'product.uom',
+                                                'qualityControls',
+                                                'referItemModel',
+                                                'purchaseOrder.supplier',
+                                                'purchaseOrder.referModel',
+                                            ])->find($purchaseOrderItemId);
                                             if ($item) {
                                                 // Populate product information fields
                                                 $set('product_name', $item->product->name ?? '');
@@ -176,18 +305,20 @@ class QualityControlPurchaseResource extends Resource
                                                 $set('uom', $item->product->uom->name ?? '');
                                                 $set('product_id', $item->product_id ?? null);
 
-                                                // Auto-fill warehouse from PurchaseOrder, which is the canonical source.
                                                 $purchaseOrder = $item->purchaseOrder;
+                                                $cabangId = static::resolveQcPurchaseCabangId($item, $purchaseOrder);
                                                 $warehouseId = $purchaseOrder->warehouse_id ?? null;
-                                                $set('warehouse_id', $warehouseId);
-                                                $set('cabang_id', $purchaseOrder->cabang_id ?? null);
+                                                $set('cabang_id', $cabangId);
+                                                $set(
+                                                    'warehouse_id',
+                                                    static::warehouseMatchesQcPurchaseCabang($warehouseId ? (int) $warehouseId : null, $cabangId)
+                                                        ? (int) $warehouseId
+                                                        : null
+                                                );
+                                                $set('rak_id', null);
 
                                                 // Calculate remaining qty based on existing QC records (partial QC support)
-                                                $alreadyInspected = $item->qualityControls->sum(
-                                                    fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                                                );
-                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
+                                                $remainingQty = static::purchaseOrderItemQcRemaining($item)['remaining'];
 
                                                 // Show remaining as "quantity to inspect this time"
                                                 $set('quantity_received', $remainingQty);
@@ -207,7 +338,10 @@ class QualityControlPurchaseResource extends Resource
                                 \Filament\Forms\Components\Hidden::make('from_model_type')
                                     ->default('App\Models\PurchaseOrderItem')
                                     ->dehydrated(true),
-                                \Filament\Forms\Components\Hidden::make('cabang_id')
+                                Select::make('cabang_id')
+                                    ->label('Cabang')
+                                    ->options(\App\Models\Cabang::pluck('nama', 'id'))
+                                    ->disabled()
                                     ->dehydrated(true),
                                 TextInput::make('qc_number')
                                     ->label('QC Number')
@@ -275,24 +409,31 @@ class QualityControlPurchaseResource extends Resource
                                     ->dehydrated(true),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->options(function () {
-                                        $user = Auth::user();
-                                        $manageType = $user?->manage_type ?? [];
-                                        $query = Warehouse::where('status', 1);
+                                    ->options(function ($get) {
+                                        $cabangId = $get('cabang_id')
+                                            ?: static::resolveQcPurchaseCabangIdFromPurchaseOrderItemId(
+                                                is_numeric($get('from_model_id')) ? (int) $get('from_model_id') : null
+                                            );
 
-                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
-                                            $query->where('cabang_id', $user?->cabang_id);
-                                        }
-
-                                        return $query->orderBy('name')
-                                            ->get()
-                                            ->mapWithKeys(function ($warehouse) {
-                                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                                            });
+                                        return static::getQcPurchaseWarehouseOptions($cabangId ? (int) $cabangId : null);
                                     })
                                     ->searchable(['kode', 'name'])
                                     ->required()
                                     ->reactive()
+                                    ->rules([
+                                        function ($get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get): void {
+                                                $cabangId = $get('cabang_id')
+                                                    ?: static::resolveQcPurchaseCabangIdFromPurchaseOrderItemId(
+                                                        is_numeric($get('from_model_id')) ? (int) $get('from_model_id') : null
+                                                    );
+
+                                                if (! static::warehouseMatchesQcPurchaseCabang(is_numeric($value) ? (int) $value : null, $cabangId ? (int) $cabangId : null)) {
+                                                    $fail('Gudang harus sesuai dengan cabang Permintaan Pembelian/Purchase Order.');
+                                                }
+                                            };
+                                        },
+                                    ])
                                     ->validationMessages([
                                         'required' => 'Warehouse harus dipilih'
                                     ]),
@@ -327,11 +468,7 @@ class QualityControlPurchaseResource extends Resource
                                                 if ($purchaseOrderItemId) {
                                                     $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
                                                     if ($item) {
-                                                        $alreadyInspected = $item->qualityControls->sum(
-                                                            fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                                                        );
-                                                        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                        $remainingQty = min(max(0, ($item->quantity ?? 0) - $alreadyInspected), $limit['remaining_accepted']);
+                                                        $remainingQty = static::purchaseOrderItemQcRemaining($item)['remaining'];
 
                                                         if ((float) $value > $remainingQty) {
                                                             $fail("Passed quantity ({$value}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
@@ -368,10 +505,8 @@ class QualityControlPurchaseResource extends Resource
                                     ->label('Inspected By')
                                     ->options(\App\Models\User::pluck('name', 'id'))
                                     ->default(fn (?QualityControl $record) => $record?->inspected_by ?? Auth::id())
-                                    ->disabled(fn () => ! static::canChooseInspector())
+                                    ->disabled(fn () => !static::canChooseInspector())
                                     ->dehydrated(true)
-                                    ->searchable(fn () => static::canChooseInspector())
-                                    ->preload(fn () => static::canChooseInspector())
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Inspected By harus dipilih'
@@ -511,6 +646,8 @@ class QualityControlPurchaseResource extends Resource
                                     ->afterStateUpdated(function ($set) {
                                         // Reset selected items when PO changes
                                         $set('selected_po_item_ids', []);
+                                        $set('warehouse_id', null);
+                                        $set('rak_id', null);
                                     })
                                     ->validationMessages(['required' => 'Purchase Order harus dipilih'])
                                     ->columnSpanFull(),
@@ -530,22 +667,23 @@ class QualityControlPurchaseResource extends Resource
                                             ->get()
                                             ->filter(function ($item) {
                                                 if (!$item->product) return false;
-                                                $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                return min(max(0, $item->quantity - $inspected), $limit['remaining_received']) > 0;
+                                                return static::purchaseOrderItemQcRemaining($item)['remaining'] > 0;
                                             })
                                             ->mapWithKeys(function ($item) {
                                                 $product   = $item->product->name ?? 'N/A';
                                                 $sku       = $item->product->sku ?? '';
-                                                $inspected = $item->qualityControls->sum(fn($qc) => $qc->passed_quantity + $qc->rejected_quantity);
-                                                $limit     = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
-                                                $remaining = min(max(0, $item->quantity - $inspected), $limit['remaining_received']);
-                                                $label     = "{$product}" . ($sku ? " ({$sku})" : '') . " — Dipesan: {$item->quantity} | Sisa QC: {$remaining}";
+                                                $qcRemaining = static::purchaseOrderItemQcRemaining($item);
+                                                $label     = "{$product}" . ($sku ? " ({$sku})" : '') . " — Dipesan: {$item->quantity} | Accepted: {$qcRemaining['accepted']} | Sisa QC: {$qcRemaining['remaining']}";
                                                 return [$item->id => $label];
                                             });
                                     })
                                     ->columns(1)
                                     ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function ($set) {
+                                        $set('warehouse_id', null);
+                                        $set('rak_id', null);
+                                    })
                                     ->validationMessages(['required' => 'Minimal satu produk harus dipilih'])
                                     ->columnSpanFull(),
                             ]),
@@ -555,10 +693,31 @@ class QualityControlPurchaseResource extends Resource
                             ->schema([
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->options(Warehouse::all()->mapWithKeys(fn($w) => [$w->id => "({$w->kode}) {$w->name}"]))
+                                    ->options(function ($get) {
+                                        $cabangId = static::resolveBatchQcPurchaseCabangId(
+                                            is_numeric($get('purchase_order_id')) ? (int) $get('purchase_order_id') : null,
+                                            (array) ($get('selected_po_item_ids') ?? [])
+                                        );
+
+                                        return static::getQcPurchaseWarehouseOptions($cabangId);
+                                    })
                                     ->searchable()
                                     ->required()
                                     ->reactive()
+                                    ->rules([
+                                        function ($get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get): void {
+                                                $cabangId = static::resolveBatchQcPurchaseCabangId(
+                                                    is_numeric($get('purchase_order_id')) ? (int) $get('purchase_order_id') : null,
+                                                    (array) ($get('selected_po_item_ids') ?? [])
+                                                );
+
+                                                if (! static::warehouseMatchesQcPurchaseCabang(is_numeric($value) ? (int) $value : null, $cabangId)) {
+                                                    $fail('Gudang harus sesuai dengan cabang produk PO yang dipilih.');
+                                                }
+                                            };
+                                        },
+                                    ])
                                     ->validationMessages(['required' => 'Gudang harus dipilih']),
                                 Select::make('rak_id')
                                     ->label('Rak')
@@ -576,10 +735,8 @@ class QualityControlPurchaseResource extends Resource
                                     ->label('Inspected By')
                                     ->options(\App\Models\User::pluck('name', 'id'))
                                     ->default(Auth::id())
-                                    ->disabled(fn () => ! static::canChooseInspector())
+                                    ->disabled(fn () => !static::canChooseInspector())
                                     ->dehydrated(true)
-                                    ->searchable(fn () => static::canChooseInspector())
-                                    ->preload(fn () => static::canChooseInspector())
                                     ->required()
                                     ->validationMessages(['required' => 'Inspected By harus dipilih']),
                                 \Filament\Forms\Components\DatePicker::make('inspection_date')
@@ -596,17 +753,42 @@ class QualityControlPurchaseResource extends Resource
                             $created = 0;
                             $selectedItemIds = $data['selected_po_item_ids'] ?? [];
                             $inspectedBy = static::canChooseInspector() ? ($data['inspected_by'] ?? Auth::id()) : Auth::id();
+                            $batchCabangId = static::resolveBatchQcPurchaseCabangId(
+                                is_numeric($data['purchase_order_id'] ?? null) ? (int) $data['purchase_order_id'] : null,
+                                (array) $selectedItemIds
+                            );
+
+                            if (! $batchCabangId) {
+                                throw ValidationException::withMessages([
+                                    'selected_po_item_ids' => 'Produk yang dipilih berasal dari cabang berbeda atau cabangnya tidak ditemukan. Buat QC per cabang.',
+                                ]);
+                            }
+
+                            if (! static::warehouseMatchesQcPurchaseCabang(is_numeric($data['warehouse_id'] ?? null) ? (int) $data['warehouse_id'] : null, $batchCabangId)) {
+                                throw ValidationException::withMessages([
+                                    'warehouse_id' => 'Gudang harus sesuai dengan cabang produk PO yang dipilih.',
+                                ]);
+                            }
 
                             foreach ($selectedItemIds as $poItemId) {
-                            $poItem = PurchaseOrderItem::with(['product', 'qualityControls', 'purchaseOrder'])->find($poItemId);
+                            $poItem = PurchaseOrderItem::with([
+                                'product',
+                                'qualityControls',
+                                'referItemModel',
+                                'purchaseOrder.supplier',
+                                'purchaseOrder.referModel',
+                            ])->find($poItemId);
                             if (!$poItem) continue;
+                            $itemCabangId = static::resolveQcPurchaseCabangId($poItem);
+
+                            if ((int) $itemCabangId !== (int) $batchCabangId) {
+                                throw ValidationException::withMessages([
+                                    'selected_po_item_ids' => 'Produk yang dipilih berasal dari cabang berbeda. Buat QC per cabang.',
+                                ]);
+                            }
 
                             // Check remaining qty (partial QC support)
-                            $alreadyInspected = $poItem->qualityControls->sum(
-                                fn($qc) => $qc->passed_quantity + $qc->rejected_quantity
-                            );
-                            $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItem->id);
-                            $remainingQty = min(max(0, $poItem->quantity - $alreadyInspected), $limit['remaining_received']);
+                            $remainingQty = static::purchaseOrderItemQcRemaining($poItem)['remaining'];
                             if ($remainingQty <= 0) continue; // no more qty to inspect
 
                             $qcNumber = HelperController::generateUniqueCode(
@@ -628,7 +810,7 @@ class QualityControlPurchaseResource extends Resource
                                 'inspected_by'      => $inspectedBy,
                                 'notes'             => $data['notes'] ?? null,
                                 'date_send_stock'   => $data['inspection_date'] ?? now(),
-                                'cabang_id'         => $poItem->purchaseOrder->cabang_id ?? Auth::user()?->cabang_id,
+                                'cabang_id'         => $itemCabangId,
                             ]);
                             $created++;
                         }

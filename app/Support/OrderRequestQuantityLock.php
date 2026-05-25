@@ -74,7 +74,7 @@ class OrderRequestQuantityLock
         $poQuantity = (float) ($purchaseOrderItem->quantity ?? 0);
         $receivedQuantity = self::receiptQuantityForPurchaseOrderItem($purchaseOrderItemId, 'qty_received', $excludeReceiptItemId);
         $acceptedQuantity = self::receiptQuantityForPurchaseOrderItem($purchaseOrderItemId, 'qty_accepted', $excludeReceiptItemId);
-        $remainingReceived = max(0, $poQuantity - $receivedQuantity);
+        $remainingReceived = max(0, $poQuantity - $acceptedQuantity);
         $remainingAccepted = max(0, $poQuantity - $acceptedQuantity);
 
         $orQuantity = null;
@@ -93,7 +93,13 @@ class OrderRequestQuantityLock
                 $orReceivedQuantity = self::receiptQuantityForOrderRequestItem((int) $orderRequestItem->id, 'qty_received', $excludeReceiptItemId);
                 $orAcceptedQuantity = self::receiptQuantityForOrderRequestItem((int) $orderRequestItem->id, 'qty_accepted', $excludeReceiptItemId);
                 $fulfilledQuantity = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
-                $orRemainingReceived = max(0, $orQuantity - $orReceivedQuantity);
+                if ($excludeReceiptItemId) {
+                    $excludedItem = PurchaseReceiptItem::withoutGlobalScopes()->find($excludeReceiptItemId);
+                    if ($excludedItem) {
+                        $fulfilledQuantity = max(0, $fulfilledQuantity - (float) $excludedItem->qty_accepted);
+                    }
+                }
+                $orRemainingReceived = max(0, $orQuantity - max($orAcceptedQuantity, $fulfilledQuantity));
                 $orRemainingAccepted = max(0, $orQuantity - max($orAcceptedQuantity, $fulfilledQuantity));
                 $remainingReceived = min($remainingReceived, $orRemainingReceived);
                 $remainingAccepted = min($remainingAccepted, $orRemainingAccepted);

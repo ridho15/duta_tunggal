@@ -94,11 +94,10 @@ class QCTest extends TestCase
             'purchase_receipt_id' => $purchaseReceipt->id,
             'purchase_order_item_id' => $poItem->id,
             'product_id' => $this->product->id,
-            'qty_received' => 5,
-            'qty_accepted' => 5,
+            'qty_received' => 0,
+            'qty_accepted' => 0,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
         ]);
 
         // Create and complete QC

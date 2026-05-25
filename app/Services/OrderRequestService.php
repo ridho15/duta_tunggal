@@ -128,6 +128,11 @@ class OrderRequestService
                 throw new \RuntimeException('Data mata uang wajib tersedia sebelum order request dapat disetujui.');
             }
 
+            $orderRequest->load('orderRequestItem');
+            $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
+            $firstItem = $resolvedItems->first();
+            $cabangId = $firstItem ? ($firstItem['order_request_item']->cabang_id ?? null) : ($orderRequest->cabang_id ?? null);
+
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
                 'po_number'    => $data['po_number'],
                 'supplier_id'  => $supplier->id,
@@ -137,9 +142,8 @@ class OrderRequestService
                 'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
                 'created_by'   => Auth::id() ?? $orderRequest->created_by,
+                'cabang_id'    => $cabangId,
             ]);
-
-            $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
 
             $itemsForPivotSync = [];
 
@@ -227,6 +231,11 @@ class OrderRequestService
             throw new \RuntimeException('Data mata uang wajib tersedia sebelum purchase order dibuat.');
         }
 
+        $orderRequest->load('orderRequestItem');
+        $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
+        $firstItem = $resolvedItems->first();
+        $cabangId = $firstItem ? ($firstItem['order_request_item']->cabang_id ?? null) : ($orderRequest->cabang_id ?? null);
+
         $purchaseOrder = $orderRequest->purchaseOrders()->create([
             'po_number'    => $data['po_number'],
             'supplier_id'  => $supplier->id,
@@ -236,9 +245,8 @@ class OrderRequestService
             'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
             'created_by'   => Auth::id() ?? $orderRequest->created_by,
+            'cabang_id'    => $cabangId,
         ]);
-
-        $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
 
         foreach ($resolvedItems as $row) {
             /** @var OrderRequestItem $orderRequestItem */

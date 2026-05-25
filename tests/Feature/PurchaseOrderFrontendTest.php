@@ -1,17 +1,22 @@
 <?php
 
 use App\Filament\Resources\PurchaseOrderResource;
+use App\Filament\Resources\PurchaseOrderResource\Pages\ListPurchaseOrders;
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
+use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -135,6 +140,58 @@ test('purchase order index page loads successfully and displays purchase orders'
         ->assertSee('PO-FRONT-001');
 });
 
+test('purchase order list shows cabang from order request item and omits warehouse column', function () {
+    $orderRequestCabang = Cabang::factory()->create([
+        'kode' => 'ORCAB',
+        'nama' => 'Cabang OR Purchase',
+    ]);
+
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->currency->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $orderRequestCabang->id,
+        'quantity' => 5,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-CABANG-OR-001',
+        'status' => 'approved',
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'cabang_id' => null,
+        'created_by' => $this->user->id,
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->product->id,
+        'quantity' => 5,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItem->id,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    expect(PurchaseOrderResource::resolvePurchaseOrderCabang($purchaseOrder->fresh())->id)
+        ->toBe($orderRequestCabang->id);
+
+    Livewire::actingAs($this->user)
+        ->test(ListPurchaseOrders::class)
+        ->assertSee('Cabang')
+        ->assertSee('Cabang OR Purchase')
+        ->assertDontSee('Gudang');
+});
+
 test('purchase order index search does not error when cabang_id column is absent', function () {
     $response = $this->get(PurchaseOrderResource::getUrl('index', ['tableSearch' => 'asdfsdf']));
 
@@ -199,6 +256,14 @@ test('purchase order create form no longer shows a global tax field', function (
     $response->assertDontSee('Tipe Pajak (Global)');
 });
 
+test('purchase order resource no longer exposes cabang item or warehouse list labels', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource.php'));
+
+    expect($resource)->not->toContain('Cabang (Item)')
+        ->and($resource)->not->toContain('Cabang Item')
+        ->and($resource)->not->toContain("->label('Gudang')");
+});
+
 test('purchase order status presentation handles paid state', function () {
     expect(PurchaseOrderResource::formatStatusLabel('partially_received'))->toBe('Partially Received');
     expect(PurchaseOrderResource::formatStatusLabel('paid'))->toBe('Paid');
@@ -222,6 +287,14 @@ test('purchase order form uses collapsed product item repeater and disabled fiel
     $resource = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource.php'));
 
     expect($resource)->toContain("Repeater::make('purchaseOrderItem')")
+        ->and($resource)->toContain("Fieldset::make('Form Pembelian')")
+        ->and($resource)->toContain('->columns(3)')
+        ->and($resource)->toContain("TextInput::make('po_number')")
+        ->and($resource)->toContain("Select::make('cabang_id')")
+        ->and($resource)->toContain("->label('TOP (Term Of Payment)')")
+        ->and($resource)->toContain("->label('Masa Kredit (Hari)')")
+        ->and($resource)->toContain('->disabled(fn(Get $get) => $get(\'refer_model_type\') === \'App\\\\Models\\\\OrderRequest\')')
+        ->and($resource)->toContain('->addable(fn (Get $get) => $get(\'refer_model_type\') !== \'App\\\\Models\\\\OrderRequest\')')
         ->and($resource)->toContain('->collapsed(function')
         ->and($resource)->toContain('->itemLabel(function (array $state)')
         ->and($resource)->toContain('bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400')
@@ -232,12 +305,41 @@ test('purchase order form uses collapsed product item repeater and disabled fiel
         ->and($resource)->toContain("TextInput::make('subtotal')");
 });
 
-test('purchase order creation auto approves only order request references', function () {
+test('purchase order item fields from order request are locked and show nominal discount', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource.php'));
+
+    expect($resource)->toContain('public static function isOrderRequestBackedItem(Get $get): bool')
+        ->and($resource)->toContain("Select::make('product_id')")
+        ->and($resource)->toContain("Select::make('currency_id')")
+        ->and($resource)->toContain("TextInput::make('unit_price')")
+        ->and($resource)->toContain("TextInput::make('discount')")
+        ->and($resource)->toContain("Radio::make('tipe_pajak')")
+        ->and($resource)->toContain('->disabled(fn(Get $get) => self::isOrderRequestBackedItem($get))')
+        ->and($resource)->toContain('->readOnly(fn(Get $get) => self::isOrderRequestBackedItem($get))')
+        ->and($resource)->toContain("TextInput::make('discount_nominal')")
+        ->and($resource)->toContain("->label('Nominal Discount')")
+        ->and($resource)->toContain("'discount_nominal' => round(\$base * (\$discount / 100), 2)");
+
+    $preview = PurchaseOrderResource::calculateCurrencyPreview(
+        quantity: 10,
+        unitPrice: 12500,
+        discount: 5,
+        tax: 11,
+        taxType: 'eklusif',
+        currencyId: $this->currency->id,
+    );
+
+    expect($preview['discount_nominal'])->toBe(6250.0)
+        ->and($preview['total'])->toBe(125000.0);
+});
+
+test('purchase order creation auto approves full order request references conditionally', function () {
     $createPage = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource/Pages/CreatePurchaseOrder.php'));
     $orderRequestService = file_get_contents(base_path('app/Services/OrderRequestService.php'));
 
     expect($createPage)->toContain('use App\\Models\\OrderRequest;')
         ->and($createPage)->toContain('$record->refer_model_type === OrderRequest::class')
+        ->and($createPage)->toContain('PurchaseOrderResource::shouldAutoApproveOrderRequestPurchaseOrder($record)')
         ->and($createPage)->toContain('$purchaseOrderService->approvePo($record, Auth::id())')
         ->and($orderRequestService)->toContain('app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id())')
         ->and($createPage)->toContain('$data[\'status\']     = \'draft\'');

@@ -1,10 +1,14 @@
 <?php
 
 use App\Filament\Resources\QualityControlPurchaseResource\Pages\CreateQualityControlPurchase;
+use App\Filament\Resources\QualityControlPurchaseResource;
+use App\Filament\Resources\QualityControlPurchaseResource\Pages\ListQualityControlPurchases;
 use App\Filament\Resources\PurchaseOrderResource\Pages\EditPurchaseOrder;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PurchaseOrderItemRelationManager;
 use App\Models\Cabang;
 use App\Models\Currency;
+use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -30,6 +34,7 @@ function grantQualityControlPurchasePermissions(User $user): void
         'view any quality control',
         'view quality control',
         'create quality control',
+        'create quality control purchase',
         'update quality control',
         'delete quality control',
     ] as $permission) {
@@ -43,6 +48,7 @@ function grantQualityControlPurchasePermissions(User $user): void
         'view any quality control',
         'view quality control',
         'create quality control',
+        'create quality control purchase',
         'update quality control',
         'delete quality control',
     ]);
@@ -85,6 +91,88 @@ function createQualityControlPurchaseContext(float $quantity = 5): array
     return compact('user', 'otherUser', 'warehouse', 'product', 'purchaseOrder', 'purchaseOrderItem');
 }
 
+function createQualityControlPurchaseOrderRequestBranchContext(): array
+{
+    $cabangA = Cabang::factory()->create(['nama' => 'Cabang QC A']);
+    $cabangB = Cabang::factory()->create(['nama' => 'Cabang QC B']);
+    $user = User::factory()->create([
+        'cabang_id' => $cabangA->id,
+        'manage_type' => 'all',
+    ]);
+    grantQualityControlPurchasePermissions($user);
+
+    UnitOfMeasure::factory()->create();
+    $currency = Currency::factory()->create(['code' => 'IDR', 'to_rupiah' => 1]);
+    $supplier = Supplier::factory()->create(['cabang_id' => $cabangB->id]);
+    $warehouseA = Warehouse::factory()->create([
+        'cabang_id' => $cabangA->id,
+        'status' => 1,
+        'kode' => 'WH-QC-A',
+        'name' => 'Gudang QC Cabang A',
+    ]);
+    $warehouseB = Warehouse::factory()->create([
+        'cabang_id' => $cabangB->id,
+        'status' => 1,
+        'kode' => 'WH-QC-B',
+        'name' => 'Gudang QC Cabang B',
+    ]);
+    $product = Product::factory()->forCabang($cabangA)->create([
+        'supplier_id' => $supplier->id,
+    ]);
+
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'cabang_id' => $cabangB->id,
+        'currency_id' => $currency->id,
+        'created_by' => $user->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $product->id,
+        'supplier_id' => $supplier->id,
+        'cabang_id' => $cabangA->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'currency_id' => $currency->id,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $supplier->id,
+        'cabang_id' => null,
+        'status' => 'approved',
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'created_by' => $user->id,
+    ]);
+
+    $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $product->id,
+        'quantity' => 10,
+        'unit_price' => 1000,
+        'currency_id' => $currency->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItem->id,
+    ]);
+
+    return compact(
+        'cabangA',
+        'cabangB',
+        'user',
+        'currency',
+        'supplier',
+        'warehouseA',
+        'warehouseB',
+        'product',
+        'orderRequest',
+        'orderRequestItem',
+        'purchaseOrder',
+        'purchaseOrderItem',
+    );
+}
+
 test('quality control purchase create defaults inspector to current user for regular user', function () {
     $context = createQualityControlPurchaseContext();
 
@@ -108,6 +196,106 @@ test('quality control purchase create defaults inspector to current user for reg
 
     expect(QualityControl::where('qc_number', 'QC-P-INSPECTOR-001')->value('inspected_by'))
         ->toBe($context['user']->id);
+});
+
+test('quality control purchase warehouse options only show warehouses from order request item cabang', function () {
+    $context = createQualityControlPurchaseOrderRequestBranchContext();
+
+    $resolvedCabangId = QualityControlPurchaseResource::resolveQcPurchaseCabangId($context['purchaseOrderItem']->fresh());
+    $options = QualityControlPurchaseResource::getQcPurchaseWarehouseOptions($resolvedCabangId);
+
+    expect($resolvedCabangId)->toBe($context['cabangA']->id)
+        ->and($options)->toHaveKey($context['warehouseA']->id)
+        ->and($options)->not->toHaveKey($context['warehouseB']->id);
+});
+
+test('quality control purchase create rejects warehouse from another cabang', function () {
+    $context = createQualityControlPurchaseOrderRequestBranchContext();
+
+    Livewire::actingAs($context['user'])
+        ->test(CreateQualityControlPurchase::class)
+        ->fillForm([
+            'from_model_id' => $context['purchaseOrderItem']->id,
+            'qc_number' => 'QC-P-WH-CABANG-LOCK-001',
+            'product_id' => $context['product']->id,
+            'warehouse_id' => $context['warehouseB']->id,
+            'quantity_received' => 5,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'inspected_by' => $context['user']->id,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['warehouse_id']);
+});
+
+test('quality control purchase returns no warehouse options when cabang cannot be resolved', function () {
+    $cabang = Cabang::factory()->create();
+    $warehouse = Warehouse::factory()->create([
+        'cabang_id' => $cabang->id,
+        'status' => 1,
+    ]);
+    $resolvedCabangId = QualityControlPurchaseResource::resolveQcPurchaseCabangId();
+
+    expect($resolvedCabangId)->toBeNull()
+        ->and(QualityControlPurchaseResource::getQcPurchaseWarehouseOptions($resolvedCabangId))->toBe([])
+        ->and(QualityControlPurchaseResource::warehouseMatchesQcPurchaseCabang($warehouse->id, $resolvedCabangId))->toBeFalse();
+});
+
+test('quality control purchase batch action rejects warehouse outside selected item cabang', function () {
+    $context = createQualityControlPurchaseOrderRequestBranchContext();
+
+    Livewire::actingAs($context['user'])
+        ->test(ListQualityControlPurchases::class)
+        ->callTableAction('batch_create_qc', data: [
+            'purchase_order_id' => $context['purchaseOrder']->id,
+            'selected_po_item_ids' => [$context['purchaseOrderItem']->id],
+            'warehouse_id' => $context['warehouseB']->id,
+            'inspected_by' => $context['user']->id,
+            'inspection_date' => now()->toDateString(),
+        ])
+        ->assertHasTableActionErrors(['warehouse_id']);
+});
+
+test('quality control purchase batch action rejects items from different cabang', function () {
+    $context = createQualityControlPurchaseOrderRequestBranchContext();
+    $productB = Product::factory()->forCabang($context['cabangB'])->create([
+        'supplier_id' => $context['supplier']->id,
+    ]);
+    $orderRequestItemB = OrderRequestItem::factory()->create([
+        'order_request_id' => $context['orderRequest']->id,
+        'product_id' => $productB->id,
+        'supplier_id' => $context['supplier']->id,
+        'cabang_id' => $context['cabangB']->id,
+        'quantity' => 5,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'currency_id' => $context['currency']->id,
+    ]);
+    $purchaseOrderItemB = PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $context['purchaseOrder']->id,
+        'product_id' => $productB->id,
+        'quantity' => 5,
+        'unit_price' => 1000,
+        'currency_id' => $context['currency']->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItemB->id,
+    ]);
+
+    expect(QualityControlPurchaseResource::resolveBatchQcPurchaseCabangId(
+        $context['purchaseOrder']->id,
+        [$context['purchaseOrderItem']->id, $purchaseOrderItemB->id]
+    ))->toBeNull();
+
+    Livewire::actingAs($context['user'])
+        ->test(ListQualityControlPurchases::class)
+        ->callTableAction('batch_create_qc', data: [
+            'purchase_order_id' => $context['purchaseOrder']->id,
+            'selected_po_item_ids' => [$context['purchaseOrderItem']->id, $purchaseOrderItemB->id],
+            'warehouse_id' => $context['warehouseA']->id,
+            'inspected_by' => $context['user']->id,
+            'inspection_date' => now()->toDateString(),
+        ])
+        ->assertHasErrors();
 });
 
 test('quality control purchase create allows owner to choose inspector', function () {
@@ -134,7 +322,7 @@ test('quality control purchase create allows owner to choose inspector', functio
         ->toBe($context['otherUser']->id);
 });
 
-test('quality control purchase create form validates passed quantity against received quantity', function () {
+test('quality control purchase create form validates passed quantity against received quantity via auto-correction', function () {
     $context = createQualityControlPurchaseContext(3000);
 
     Livewire::actingAs($context['user'])
@@ -150,7 +338,11 @@ test('quality control purchase create form validates passed quantity against rec
             'inspected_by' => $context['user']->id,
         ])
         ->call('create')
-        ->assertHasFormErrors(['passed_quantity']);
+        ->assertHasNoFormErrors();
+
+    // Expect that the passed_quantity was auto-corrected to 1000 (which is the quantity_received)
+    expect((float) QualityControl::where('qc_number', 'QC-P-RECEIVED-LOCK-001')->value('passed_quantity'))
+        ->toBe(1000.0);
 });
 
 test('purchase order item qc action forces current user as inspector for regular user', function () {
@@ -177,7 +369,7 @@ test('purchase order item qc action forces current user as inspector for regular
         ->toBe($context['user']->id);
 });
 
-test('purchase order item qc action validates passed quantity against received quantity', function () {
+test('purchase order item qc action validates passed quantity against received quantity via auto-correction', function () {
     $context = createQualityControlPurchaseContext(3000);
 
     Livewire::actingAs($context['user'])
@@ -193,7 +385,12 @@ test('purchase order item qc action validates passed quantity against received q
             'rejected_quantity' => 0,
             'condition' => 'good',
         ])
-        ->assertHasTableActionErrors(['passed_quantity']);
+        ->assertHasNoTableActionErrors();
+
+    expect((float) QualityControl::where('from_model_id', $context['purchaseOrderItem']->id)
+        ->where('from_model_type', PurchaseOrderItem::class)
+        ->value('passed_quantity'))
+        ->toBe(1000.0);
 });
 
 test('quality control purchase rejects passed quantity greater than received quantity', function () {

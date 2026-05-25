@@ -359,7 +359,19 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     ->schema([
                                         \Filament\Forms\Components\Select::make('warehouse_id')
                                             ->label('Gudang Tujuan')
-                                            ->options(\App\Models\Warehouse::where('status', 1)->orderBy('name')->limit(50)->get()->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"]))
+                                            ->options(function ($record) {
+                                                 $po = $record->purchaseOrder;
+                                                 $query = \App\Models\Warehouse::where('status', 1);
+                                                 if ($po) {
+                                                     $cabangId = $po->cabang_id ?? $po->supplier->cabang_id ?? null;
+                                                     if ($cabangId) {
+                                                         $query->where('cabang_id', $cabangId);
+                                                     }
+                                                 }
+                                                return $query->orderBy('name')
+                                                    ->get()
+                                                    ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"]);
+                                            })
                                             ->default($defaultWarehouseId)
                                             ->searchable()
                                             ->required()
@@ -368,10 +380,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                             ->label('Diperiksa Oleh')
                                             ->options(\App\Models\User::pluck('name', 'id'))
                                             ->default(Auth::id())
-                                            ->disabled(fn () => ! Auth::user()?->hasRole(['Super Admin', 'Owner']))
+                                            ->disabled(fn () => Auth::user()?->hasRole(['Super Admin', 'Owner']) !== true)
                                             ->dehydrated(true)
-                                            ->searchable(fn () => Auth::user()?->hasRole(['Super Admin', 'Owner']) === true)
-                                            ->preload(fn () => Auth::user()?->hasRole(['Super Admin', 'Owner']) === true)
                                             ->required()
                                             ->validationMessages(['required' => 'Pemeriksa wajib dipilih']),
                                         \Filament\Forms\Components\TextInput::make('quantity_received')

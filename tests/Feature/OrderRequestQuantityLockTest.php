@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Currency;
+use App\Models\Cabang;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
@@ -14,6 +15,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\PurchaseOrderService;
 use App\Services\QualityControlService;
+use App\Support\OrderRequestQuantityLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -24,6 +26,7 @@ class OrderRequestQuantityLockTest extends TestCase
 
     protected User $user;
     protected Supplier $supplier;
+    protected Cabang $cabang;
     protected Product $product;
     protected OrderRequest $orderRequest;
     protected OrderRequestItem $orderRequestItem;
@@ -40,6 +43,7 @@ class OrderRequestQuantityLockTest extends TestCase
         ]);
         $this->user = User::factory()->create();
         $this->supplier = Supplier::factory()->create();
+        $this->cabang = Cabang::factory()->create();
         $this->product = Product::factory()->create();
 
         $this->orderRequest = OrderRequest::factory()->create([
@@ -52,6 +56,7 @@ class OrderRequestQuantityLockTest extends TestCase
             'order_request_id' => $this->orderRequest->id,
             'product_id' => $this->product->id,
             'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
             'quantity' => 10,
             'fulfilled_quantity' => 0,
             'currency_id' => $currency->id,
@@ -69,6 +74,41 @@ class OrderRequestQuantityLockTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         app(PurchaseOrderService::class)->approvePo($draftPo, $this->user->id);
+    }
+
+    #[Test]
+    public function approved_po_reduces_po_remaining_but_not_receipt_remaining_until_accepted(): void
+    {
+        $po = $this->createPoWithItem('PO-LOCK-RECEIPT-001', 'approved', 4);
+        $poItem = $po->purchaseOrderItem()->first();
+
+        $limit = OrderRequestQuantityLock::orderRequestItemLimit((int) $this->orderRequestItem->id);
+
+        $this->assertSame(4.0, $limit['active_po_quantity']);
+        $this->assertSame(0.0, $limit['accepted_receipt_quantity']);
+        $this->assertSame(6.0, $limit['remaining_for_po']);
+        $this->assertSame(10.0, $limit['remaining_for_receipt']);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $po->id,
+            'status' => 'completed',
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 4,
+            'qty_accepted' => 4,
+            'qty_rejected' => 0,
+        ]);
+
+        $limitAfterReceipt = OrderRequestQuantityLock::orderRequestItemLimit((int) $this->orderRequestItem->id);
+
+        $this->assertSame(4.0, $limitAfterReceipt['active_po_quantity']);
+        $this->assertSame(4.0, $limitAfterReceipt['accepted_receipt_quantity']);
+        $this->assertSame(6.0, $limitAfterReceipt['remaining_for_po']);
+        $this->assertSame(6.0, $limitAfterReceipt['remaining_for_receipt']);
     }
 
     #[Test]
@@ -193,11 +233,13 @@ class OrderRequestQuantityLockTest extends TestCase
 
         $mountedPageData = $componentPage->get('mountedActionsData');
         $selectedItemsPage = array_values(end($mountedPageData)['selected_items'] ?? []);
+        $pageCabangId = end($mountedPageData)['cabang_id'] ?? null;
 
         $this->assertCount(1, $selectedItemsPage);
         $this->assertNotNull($selectedItemsPage[0]['original_price'] ?? null);
         $this->assertNotNull($selectedItemsPage[0]['total_cost'] ?? null);
         $this->assertNotNull($selectedItemsPage[0]['subtotal'] ?? null);
+        $this->assertSame($this->cabang->id, $pageCabangId);
 
         // 2. Verify OrderRequestResource table action
         $componentTable = \Livewire\Livewire::test(\App\Filament\Resources\OrderRequestResource\Pages\ListOrderRequests::class)
@@ -206,11 +248,13 @@ class OrderRequestQuantityLockTest extends TestCase
 
         $mountedTableData = $componentTable->get('mountedTableActionsData');
         $selectedItemsTable = array_values(end($mountedTableData)['selected_items'] ?? []);
+        $tableCabangId = end($mountedTableData)['cabang_id'] ?? null;
 
         $this->assertCount(1, $selectedItemsTable);
         $this->assertNotNull($selectedItemsTable[0]['original_price'] ?? null);
         $this->assertNotNull($selectedItemsTable[0]['total_cost'] ?? null);
         $this->assertNotNull($selectedItemsTable[0]['subtotal'] ?? null);
+        $this->assertSame($this->cabang->id, $tableCabangId);
     }
 
     #[Test]
@@ -267,8 +311,8 @@ class OrderRequestQuantityLockTest extends TestCase
         $selectedItemsRaw2 = end($mountedData2)['selected_items'] ?? [];
         $firstKey2 = array_key_first($selectedItemsRaw2);
 
-        // Verify remaining qty for PO is indeed 10 (since draft PO is excluded from limits)
-        $this->assertEquals(10, $selectedItemsRaw2[$firstKey2]['quantity']);
+        // The action auto-approves PO from Order Request, so the first PO locks 5 qty for the next PO.
+        $this->assertEquals(5, $selectedItemsRaw2[$firstKey2]['quantity']);
 
         // Modify quantity of item to 5 and set include = true
         $selectedItemsRaw2[$firstKey2]['quantity'] = 5;
@@ -322,14 +366,13 @@ class OrderRequestQuantityLockTest extends TestCase
         ])
         ->callMountedAction(); // Submit first PO
 
-        // Check first PO is created in draft state
-        $this->assertDatabaseHas('purchase_orders', ['po_number' => 'PO-PARTIAL-TEST-1', 'status' => 'draft']);
+        // Check first PO is created and auto-approved by the Order Request action.
+        $this->assertDatabaseHas('purchase_orders', ['po_number' => 'PO-PARTIAL-TEST-1', 'status' => 'approved']);
         $po1 = PurchaseOrder::where('po_number', 'PO-PARTIAL-TEST-1')->first();
         $po1Item = $po1->purchaseOrderItem()->first();
         $this->assertEquals(5, $po1Item->quantity);
 
-        // 2. Approve the first PO (which locks the quantity backend-side)
-        $po1->update(['status' => 'approved']);
+        // 2. The first PO locks the quantity backend-side immediately after auto-approval.
 
         // 3. Perform partial receipt (QC and Purchase Receipt) for 5 items
         $receipt = PurchaseReceipt::factory()->create([
@@ -375,8 +418,8 @@ class OrderRequestQuantityLockTest extends TestCase
         ])
         ->callMountedAction();
 
-        // 8. Verify the second PO is created successfully
-        $this->assertDatabaseHas('purchase_orders', ['po_number' => 'PO-PARTIAL-TEST-2', 'status' => 'draft']);
+        // 8. Verify the second PO is created successfully and auto-approved.
+        $this->assertDatabaseHas('purchase_orders', ['po_number' => 'PO-PARTIAL-TEST-2', 'status' => 'approved']);
         $po2 = PurchaseOrder::where('po_number', 'PO-PARTIAL-TEST-2')->first();
         $this->assertEquals(5, $po2->purchaseOrderItem()->first()->quantity);
     }

@@ -8,6 +8,8 @@ use App\Models\Cabang;
 use App\Models\Currency;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\ChartOfAccount;
+use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -151,6 +153,46 @@ test('purchase order edit and view pages show supplier code and name', function 
         ->assertSee('(SUP-PO-001) PT Supplier Purchase Order');
 });
 
+test('purchase order view uses infolist sections with purchase order details', function () {
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'po_number' => 'PO-INFOLIST-001',
+        'order_date' => Carbon::now()->toDateString(),
+        'status' => 'approved',
+        'expected_date' => Carbon::now()->addDays(3)->toDateString(),
+        'total_amount' => 26140,
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'top_type' => 'credit_days',
+        'note' => 'PO infolist test',
+        'created_by' => $this->user->id,
+    ]);
+
+    $purchaseOrder->purchaseOrderItem()->create([
+        'product_id' => $this->product->id,
+        'currency_id' => $this->currency->id,
+        'quantity' => 2,
+        'unit_price' => 12500,
+        'discount' => 5,
+        'tax' => 11,
+        'tipe_pajak' => 'eklusif',
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertSee('Informasi Purchase Order')
+        ->assertSee('Ringkasan Quantity')
+        ->assertSee('Detail Item Purchase Order')
+        ->assertSee('Ringkasan Biaya & Total')
+        ->assertSee('PO-INFOLIST-001')
+        ->assertSee($this->supplier->perusahaan)
+        ->assertSee($this->cabang->nama)
+        ->assertSee($this->product->name)
+        ->assertSee('Nominal Discount')
+        ->assertSee('Nominal Pajak')
+        ->assertSee('Status Penerimaan');
+});
+
 test('purchase order can be created through livewire create page', function () {
     $orderDate = Carbon::now()->toDateString();
     $expectedDate = Carbon::now()->addDays(3)->toDateString();
@@ -159,6 +201,7 @@ test('purchase order can be created through livewire create page', function () {
         ->test(CreatePurchaseOrder::class)
         ->set('data.po_number', 'PO-LIVE-001')
         ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
         ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->set('data.order_date', $orderDate)
         ->set('data.expected_date', $expectedDate)
@@ -207,6 +250,274 @@ test('purchase order can be created through livewire create page', function () {
         ->and($line->currency_id)->toBe($this->currency->id);
 });
 
+test('order request approval auto approves purchase order when item quantity consumes full order request quantity', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->currency->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 12500,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-OR-AUTO-FULL-001')
+        ->set('data.refer_model_type', OrderRequest::class)
+        ->set('data.refer_model_id', $orderRequest->id)
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
+        ->set('data.order_date', now()->toDateString())
+        ->set('data.expected_date', now()->addDays(3)->toDateString())
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [[
+            'product_id' => $this->product->id,
+            'currency_id' => $this->currency->id,
+            'quantity' => 10,
+            'unit_price' => 12500,
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => 125000,
+            'tipe_pajak' => 'Non Pajak',
+            'refer_item_model_type' => OrderRequestItem::class,
+            'refer_item_model_id' => $orderRequestItem->id,
+        ]])
+        ->set('data.purchaseOrderCurrency', [[
+            'currency_id' => $this->currency->id,
+            'nominal' => 1.0,
+        ]])
+        ->set('data.purchaseOrderBiaya', [])
+        ->set('data.total_amount', 125000)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(PurchaseOrder::where('po_number', 'PO-OR-AUTO-FULL-001')->first()?->status)
+        ->toBe('approved');
+});
+
+test('order request approval keeps purchase order draft when item quantity is partial', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->currency->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 12500,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-OR-PARTIAL-001')
+        ->set('data.refer_model_type', OrderRequest::class)
+        ->set('data.refer_model_id', $orderRequest->id)
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
+        ->set('data.order_date', now()->toDateString())
+        ->set('data.expected_date', now()->addDays(3)->toDateString())
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [[
+            'product_id' => $this->product->id,
+            'currency_id' => $this->currency->id,
+            'quantity' => 4,
+            'unit_price' => 12500,
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => 50000,
+            'tipe_pajak' => 'Non Pajak',
+            'refer_item_model_type' => OrderRequestItem::class,
+            'refer_item_model_id' => $orderRequestItem->id,
+        ]])
+        ->set('data.purchaseOrderCurrency', [[
+            'currency_id' => $this->currency->id,
+            'nominal' => 1.0,
+        ]])
+        ->set('data.purchaseOrderBiaya', [])
+        ->set('data.total_amount', 50000)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(PurchaseOrder::where('po_number', 'PO-OR-PARTIAL-001')->first()?->status)
+        ->toBe('draft');
+});
+
+test('order request approval auto approves purchase order when it consumes remaining quantity after draft allocation', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->currency->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 12500,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $draftPo = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'status' => 'draft',
+        'created_by' => $this->user->id,
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $draftPo->id,
+        'product_id' => $this->product->id,
+        'quantity' => 4,
+        'unit_price' => 12500,
+        'currency_id' => $this->currency->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItem->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-OR-AUTO-REMAINING-001')
+        ->set('data.refer_model_type', OrderRequest::class)
+        ->set('data.refer_model_id', $orderRequest->id)
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
+        ->set('data.order_date', now()->toDateString())
+        ->set('data.expected_date', now()->addDays(3)->toDateString())
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [[
+            'product_id' => $this->product->id,
+            'currency_id' => $this->currency->id,
+            'quantity' => 6,
+            'unit_price' => 12500,
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => 75000,
+            'tipe_pajak' => 'Non Pajak',
+            'refer_item_model_type' => OrderRequestItem::class,
+            'refer_item_model_id' => $orderRequestItem->id,
+        ]])
+        ->set('data.purchaseOrderCurrency', [[
+            'currency_id' => $this->currency->id,
+            'nominal' => 1.0,
+        ]])
+        ->set('data.purchaseOrderBiaya', [])
+        ->set('data.total_amount', 75000)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(PurchaseOrder::where('po_number', 'PO-OR-AUTO-REMAINING-001')->first()?->status)
+        ->toBe('approved');
+});
+
+test('order request approval keeps multi item purchase order draft when one item is partial', function () {
+    $secondProduct = Product::factory()->forCabang($this->cabang)->create([
+        'supplier_id' => $this->supplier->id,
+        'cost_price' => 8000,
+        'sell_price' => 12000,
+    ]);
+
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->currency->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $firstItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'unit_price' => 12500,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $secondItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $secondProduct->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 5,
+        'unit_price' => 8000,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-OR-MULTI-PARTIAL-001')
+        ->set('data.refer_model_type', OrderRequest::class)
+        ->set('data.refer_model_id', $orderRequest->id)
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
+        ->set('data.order_date', now()->toDateString())
+        ->set('data.expected_date', now()->addDays(3)->toDateString())
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [
+            [
+                'product_id' => $this->product->id,
+                'currency_id' => $this->currency->id,
+                'quantity' => 10,
+                'unit_price' => 12500,
+                'discount' => 0,
+                'tax' => 0,
+                'subtotal' => 125000,
+                'tipe_pajak' => 'Non Pajak',
+                'refer_item_model_type' => OrderRequestItem::class,
+                'refer_item_model_id' => $firstItem->id,
+            ],
+            [
+                'product_id' => $secondProduct->id,
+                'currency_id' => $this->currency->id,
+                'quantity' => 3,
+                'unit_price' => 8000,
+                'discount' => 0,
+                'tax' => 0,
+                'subtotal' => 24000,
+                'tipe_pajak' => 'Non Pajak',
+                'refer_item_model_type' => OrderRequestItem::class,
+                'refer_item_model_id' => $secondItem->id,
+            ],
+        ])
+        ->set('data.purchaseOrderCurrency', [[
+            'currency_id' => $this->currency->id,
+            'nominal' => 1.0,
+        ]])
+        ->set('data.purchaseOrderBiaya', [])
+        ->set('data.total_amount', 149000)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(PurchaseOrder::where('po_number', 'PO-OR-MULTI-PARTIAL-001')->first()?->status)
+        ->toBe('draft');
+});
+
 test('purchase order subtotal and total amount stay formatted after reactive updates and hydration', function () {
     $orderDate = Carbon::now()->toDateString();
     $expectedDate = Carbon::now()->addDays(3)->toDateString();
@@ -215,6 +526,7 @@ test('purchase order subtotal and total amount stay formatted after reactive upd
         ->test(CreatePurchaseOrder::class)
         ->set('data.po_number', 'PO-LIVE-FORMAT-001')
         ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
         ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->set('data.order_date', $orderDate)
         ->set('data.expected_date', $expectedDate)
@@ -260,12 +572,12 @@ test('purchase order subtotal and total amount stay formatted after reactive upd
     expect(collect($editComponent->get('data.purchaseOrderItem'))->pluck('subtotal')->filter()->first())
         ->toBe('37.500,00');
 
-    $viewComponent = Livewire::actingAs($this->user)
+    Livewire::actingAs($this->user)
         ->test(ViewPurchaseOrder::class, ['record' => $purchaseOrder->id])
-        ->assertFormExists();
-
-    expect(collect($viewComponent->get('data.purchaseOrderItem'))->pluck('subtotal')->filter()->first())
-        ->toBe('37.500,00');
+        ->assertSee('Informasi Purchase Order')
+        ->assertSee('Ringkasan Quantity')
+        ->assertSee('Detail Item Purchase Order')
+        ->assertSee('37.500,00');
 });
 
 test('purchase order total amount includes formatted other fee values correctly', function () {
@@ -281,6 +593,7 @@ test('purchase order total amount includes formatted other fee values correctly'
         ->test(CreatePurchaseOrder::class)
         ->set('data.po_number', 'PO-LIVE-FEE-001')
         ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
         ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
         ->set('data.order_date', $orderDate)
         ->set('data.expected_date', $expectedDate)

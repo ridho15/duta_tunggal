@@ -128,13 +128,13 @@ test('purchase receipt view shows related journal entries from receipt and recei
         ->assertSee('QC-VIEW-001')
         ->assertSee('QC purchase receipt test')
         ->assertSee($product->name)
-        ->assertSee('Jurnal Penerimaan Barang')
-        ->assertSee('Related Journal Entries')
-        ->assertSee('Penerimaan Barang')
-        ->assertSee('Item #')
-        ->assertSee('Temporary Procurement')
-        ->assertSee('Zero out temporary procurement positions')
-        ->assertSee('Temporary Procurement - Item sent to QC');
+        ->assertDontSee('Jurnal Penerimaan Barang')
+        ->assertDontSee('Related Journal Entries')
+        ->assertDontSee('Penerimaan Barang')
+        ->assertDontSee('Item #')
+        ->assertDontSee('Temporary Procurement')
+        ->assertDontSee('Zero out temporary procurement positions')
+        ->assertDontSee('Temporary Procurement - Item sent to QC');
 
     expect(JournalEntry::query()
         ->where('source_type', PurchaseReceipt::class)

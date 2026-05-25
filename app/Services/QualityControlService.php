@@ -75,7 +75,13 @@ class QualityControlService
             throw new \Exception('Cannot create QC from receipt without associated PurchaseOrderItem');
         }
         // do not modify receipt item; receipt is purely record now
-        return $this->createQCFromPurchaseOrderItem($poItem, $data);
+        return $this->createQCFromPurchaseOrderItem($poItem, array_merge([
+            'warehouse_id' => $purchaseReceiptItem->warehouse_id ?? null,
+            'rak_id' => $purchaseReceiptItem->rak_id ?? null,
+            'quantity_received' => $purchaseReceiptItem->qty_received ?: null,
+            'passed_quantity' => $purchaseReceiptItem->qty_accepted ?: null,
+            'rejected_quantity' => $purchaseReceiptItem->qty_rejected ?: 0,
+        ], $data));
     }
 
     /**
@@ -88,14 +94,15 @@ class QualityControlService
      */
     public function createQCFromPurchaseOrderItem($purchaseOrderItem, $data)
     {
+        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+
         // Validate passed_quantity doesn't exceed ordered quantity
-        $passedQuantity = $data['passed_quantity'] ?? $purchaseOrderItem->quantity;
+        $passedQuantity = $data['passed_quantity'] ?? min((float) $purchaseOrderItem->quantity, (float) $limit['remaining_accepted']);
         $rejectedQuantity = $data['rejected_quantity'] ?? 0;
         if ($passedQuantity > $purchaseOrderItem->quantity) {
             throw new \Exception("QC passed quantity ({$passedQuantity}) cannot exceed ordered quantity ({$purchaseOrderItem->quantity}) in purchase order.");
         }
 
-        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
         $inspectedQuantity = (float) $passedQuantity + (float) $rejectedQuantity;
         $quantityReceived = $data['quantity_received'] ?? $inspectedQuantity;
         if ((float) $passedQuantity > (float) $quantityReceived) {
@@ -618,14 +625,12 @@ class QualityControlService
 
         Log::info('checkPenerimaanBarang: PO ' . $purchaseOrder->id . ' - Dibutuhkan: ' . $totalQuantityDibutuhkan . ', Diterima: ' . $totalQuantityYangDiterima);
 
-        if ($totalQuantityDibutuhkan == $totalQuantityYangDiterima) {
-            Log::info('checkPenerimaanBarang: Completing PO ' . $purchaseOrder->id);
-            $purchaseOrder->update([
-                'status' => 'completed',
-                'completed_by' => Auth::user()->id,
-                'completed_at' => Carbon::now()
-            ]);
+        $previousStatus = $purchaseOrder->status;
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
+        $purchaseOrder->refresh();
 
+        if ($previousStatus !== 'completed' && $purchaseOrder->status === 'completed') {
+            Log::info('checkPenerimaanBarang: Completing PO ' . $purchaseOrder->id);
             HelperController::sendNotification(isSuccess: true, message: 'Purchase Order Completed', title: 'Information');
         } else {
             Log::info('checkPenerimaanBarang: PO ' . $purchaseOrder->id . ' not completed yet');
@@ -694,8 +699,6 @@ class QualityControlService
             // Complete the purchase receipt
             $purchaseReceipt->update([
                 'status' => 'completed',
-                'completed_by' => Auth::id(),
-                'completed_at' => Carbon::now()
             ]);
 
             // Post the receipt so journals and inventory are posted via PurchaseReceiptService
@@ -708,15 +711,12 @@ class QualityControlService
             Log::info("Completed Purchase Receipt {$purchaseReceipt->id} due to QC completion");
         }
 
-        // Check if the entire purchase order is complete
-        if ($allItemsComplete && $totalOrdered == $totalReceived) {
-            // Complete the purchase order
-            $purchaseOrder->update([
-                'status' => 'completed',
-                'completed_by' => Auth::id(),
-                'completed_at' => Carbon::now()
-            ]);
+        // Check if the entire purchase order is complete using the same receipt status shown in the PO list.
+        $previousStatus = $purchaseOrder->status;
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
+        $purchaseOrder->refresh();
 
+        if ($previousStatus !== 'completed' && $purchaseOrder->status === 'completed') {
             Log::info("Completed Purchase Order {$purchaseOrder->id} due to QC completion");
 
             HelperController::sendNotification(
@@ -733,12 +733,8 @@ class QualityControlService
             ]);
 
             // Note: Receipt posting is already done in completeQualityControl via createJournalEntriesAndInventoryForQC
-        } elseif ($totalReceived > 0) {
-            // Set purchase order to partially_received if some items received but not all
-            if ($purchaseOrder->status === 'approved') {
-                $purchaseOrder->update(['status' => 'partially_received']);
-                Log::info("Set Purchase Order {$purchaseOrder->id} to partially_received");
-            }
+        } elseif ($purchaseOrder->status === 'partially_received') {
+            Log::info("Set Purchase Order {$purchaseOrder->id} to partially_received");
         }
     }
 
@@ -1084,8 +1080,8 @@ class QualityControlService
             return;
         }
 
-        // Don't auto-complete if already completed or closed
-        if (in_array($purchaseOrder->status, ['completed', 'closed', 'paid'])) {
+        // Don't auto-complete if already closed or paid
+        if (in_array($purchaseOrder->status, ['closed', 'paid'])) {
             return;
         }
 
@@ -1095,31 +1091,12 @@ class QualityControlService
         // Load all items with their receipts
         $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
 
-        $allItemsReceived = true;
-        
-        foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            // Sum all received quantities from receipt items for this PO item
-            $totalReceived = $item->purchaseReceiptItem->sum('qty_received');
-            
-            // If any item has not been fully received, don't complete
-            if ($totalReceived < $item->quantity) {
-                $allItemsReceived = false;
-                Log::info('PO item not fully received', [
-                    'po_item_id' => $item->id,
-                    'ordered_qty' => $item->quantity,
-                    'received_qty' => $totalReceived,
-                ]);
-                break;
-            }
-        }
+        $previousStatus = $purchaseOrder->status;
+        $summary = $purchaseOrder->receiptFulfillmentSummary();
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id() ?? 1);
+        $purchaseOrder->refresh();
 
-        if ($allItemsReceived && !in_array($purchaseOrder->status, ['completed', 'closed', 'paid'])) {
-            $purchaseOrder->update([
-                'status' => 'completed',
-                'completed_by' => Auth::id() ?? 1,
-                'completed_at' => now(),
-            ]);
-
+        if ($previousStatus !== 'completed' && $purchaseOrder->status === 'completed') {
             Log::info('Auto-completed Purchase Order', [
                 'po_id' => $purchaseOrder->id,
                 'po_number' => $purchaseOrder->po_number,
@@ -1131,6 +1108,14 @@ class QualityControlService
                 title: 'Purchase Order Completed',
                 message: 'PO ' . $purchaseOrder->po_number . ' has been automatically completed.'
             );
+        } elseif ($summary['status_label'] !== 'Semua Diterima') {
+            Log::info('PO item not fully accepted', [
+                'po_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+                'ordered_qty' => $summary['total_ordered'],
+                'received_qty' => $summary['total_received'],
+                'accepted_qty' => $summary['total_accepted'],
+            ]);
         }
     }
 }

@@ -23,6 +23,7 @@ use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -240,11 +241,21 @@ test('groupBy supplier_id on multisupplier OR produces correct groups', function
 });
 
 test('available order request supplier ids exclude suppliers that already have a purchase order', function () {
-    PurchaseOrder::factory()->create([
+    $purchaseOrder = PurchaseOrder::factory()->create([
         'supplier_id' => $this->supplierA->id,
         'refer_model_type' => OrderRequest::class,
         'refer_model_id' => $this->orderRequest->id,
         'cabang_id' => $this->cabang->id,
+        'status' => 'draft',
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemA->id,
+        'currency_id' => $this->currency->id,
     ]);
 
     $this->orderRequest->load('orderRequestItem');
@@ -259,18 +270,38 @@ test('available order request supplier ids exclude suppliers that already have a
 });
 
 test('available order request supplier ids are empty when all suppliers already have purchase orders', function () {
-    PurchaseOrder::factory()->create([
+    $purchaseOrderA = PurchaseOrder::factory()->create([
         'supplier_id' => $this->supplierA->id,
         'refer_model_type' => OrderRequest::class,
         'refer_model_id' => $this->orderRequest->id,
         'cabang_id' => $this->cabang->id,
+        'status' => 'draft',
     ]);
 
-    PurchaseOrder::factory()->create([
+    $purchaseOrderB = PurchaseOrder::factory()->create([
         'supplier_id' => $this->supplierB->id,
         'refer_model_type' => OrderRequest::class,
         'refer_model_id' => $this->orderRequest->id,
         'cabang_id' => $this->cabang->id,
+        'status' => 'draft',
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrderA->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemA->id,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrderB->id,
+        'product_id' => $this->productB->id,
+        'quantity' => 8,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemB->id,
+        'currency_id' => $this->currency->id,
     ]);
 
     $this->orderRequest->load('orderRequestItem');
@@ -278,6 +309,99 @@ test('available order request supplier ids are empty when all suppliers already 
     $availableSupplierIds = PurchaseOrderResource::getAvailableOrderRequestSupplierIds($this->orderRequest);
 
     expect($availableSupplierIds)->toBe([]);
+});
+
+test('draft purchase order quantity reduces remaining resource quantity for order request item', function () {
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+        'status' => 'draft',
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 4,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemA->id,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
+
+    $items = PurchaseOrderResource::buildOrderRequestItems(
+        $this->orderRequest,
+        (int) $this->supplierA->id,
+        $this->currency->id
+    );
+
+    expect($items)->toHaveCount(1)
+        ->and((float) $items[0]['quantity'])->toBe(6.0)
+        ->and(PurchaseOrderResource::orderRequestItemResourceLimit((int) $this->itemA->id)['remaining_for_po_resource'])->toBe(6.0);
+});
+
+test('fully allocated draft purchase order hides order request item from resource create flow', function () {
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+        'status' => 'draft',
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemA->id,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
+
+    $items = PurchaseOrderResource::buildOrderRequestItems(
+        $this->orderRequest,
+        (int) $this->supplierA->id,
+        $this->currency->id
+    );
+    $availableSupplierIds = PurchaseOrderResource::getAvailableOrderRequestSupplierIds($this->orderRequest);
+
+    expect($items)->toBe([])
+        ->and($availableSupplierIds)->not->toContain($this->supplierA->id)
+        ->and($availableSupplierIds)->toContain($this->supplierB->id);
+});
+
+test('closed draft allocation is ignored by purchase order resource remaining quantity', function () {
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'cabang_id' => $this->cabang->id,
+        'status' => 'closed',
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemA->id,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $this->orderRequest->load('orderRequestItem.product.uom', 'orderRequestItem.product.suppliers');
+
+    $items = PurchaseOrderResource::buildOrderRequestItems(
+        $this->orderRequest,
+        (int) $this->supplierA->id,
+        $this->currency->id
+    );
+
+    expect($items)->toHaveCount(1)
+        ->and((float) $items[0]['quantity'])->toBe(10.0);
 });
 
 test('partial order request with remaining suppliers still appears in refer options', function () {
