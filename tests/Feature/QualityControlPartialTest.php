@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
@@ -140,6 +141,69 @@ class QualityControlPartialTest extends TestCase
         $remaining = max(0, $poItem->quantity - $inspected);
 
         $this->assertEquals(15, $remaining);
+    }
+
+    public function test_helper_remaining_qty_ignores_pending_qc_until_processed(): void
+    {
+        $poItem = $this->makePOItem(20);
+
+        $this->makeQC($poItem, 8, 2); // pending QC should not count yet
+
+        $pendingRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($poItem->fresh());
+
+        $this->assertSame(20.0, (float) $pendingRemaining['ordered']);
+        $this->assertSame(0.0, (float) $pendingRemaining['accepted']);
+        $this->assertSame(20.0, (float) $pendingRemaining['remaining']);
+    }
+
+    public function test_helper_remaining_qty_counts_processed_qc(): void
+    {
+        $poItem = $this->makePOItem(20);
+
+        $qc = $this->makeQC($poItem, 8, 2);
+        $qc->update(['status' => 1]);
+
+        $processedRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($poItem->fresh());
+
+        $this->assertSame(20.0, (float) $processedRemaining['ordered']);
+        $this->assertSame(8.0, (float) $processedRemaining['accepted']);
+        $this->assertSame(12.0, (float) $processedRemaining['remaining']);
+    }
+
+    public function test_helper_progress_summary_marks_pending_partial_and_completed_states(): void
+    {
+        $poItemPending = $this->makePOItem(20);
+        $this->makeQC($poItemPending, 8, 2);
+
+        $pendingSummary = QualityControlPurchaseResource::purchaseOrderItemQcProgressSummary($poItemPending->fresh());
+        $pendingLabel = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+
+        $this->assertSame('QC Pending', $pendingSummary['status_label']);
+        $this->assertSame(0, $pendingSummary['processed_count']);
+        $this->assertSame(1, $pendingSummary['pending_count']);
+        $this->assertSame(20.0, (float) $pendingSummary['remaining']);
+
+        $poItemPartial = $this->makePOItem(20);
+        $processedQc = $this->makeQC($poItemPartial, 8, 2);
+        $processedQc->update(['status' => 1]);
+
+        $partialSummary = QualityControlPurchaseResource::purchaseOrderItemQcProgressSummary($poItemPartial->fresh());
+
+        $this->assertSame('QC Partial', $partialSummary['status_label']);
+        $this->assertSame(1, $partialSummary['processed_count']);
+        $this->assertSame(0, $partialSummary['pending_count']);
+        $this->assertSame(12.0, (float) $partialSummary['remaining']);
+
+        $poItemCompleted = $this->makePOItem(10);
+        $completedQc = $this->makeQC($poItemCompleted, 10, 0);
+        $completedQc->update(['status' => 1]);
+
+        $completedSummary = QualityControlPurchaseResource::purchaseOrderItemQcProgressSummary($poItemCompleted->fresh());
+
+        $this->assertSame('QC Selesai', $completedSummary['status_label']);
+        $this->assertSame(1, $completedSummary['processed_count']);
+        $this->assertSame(0, $completedSummary['pending_count']);
+        $this->assertSame(0.0, (float) $completedSummary['remaining']);
     }
 
     public function test_remaining_qty_decreases_after_partial_qc(): void

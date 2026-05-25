@@ -94,6 +94,48 @@ class PurchaseOrderResource extends Resource
         return self::formatCurrencyPreviewState($value, $currencyId);
     }
 
+    protected static function detailLineEntry(string $name, string $label, \Closure $state, int $columnSpan = 1): \Filament\Infolists\Components\TextEntry
+    {
+        return \Filament\Infolists\Components\TextEntry::make($name)
+            ->label('')
+            ->getStateUsing(fn ($record) => self::detailLineHtml($label, $state($record)))
+            ->html()
+            ->columnSpan($columnSpan);
+    }
+
+    protected static function detailLineHtml(string $label, mixed $value): string
+    {
+        $display = $value;
+
+        if ($display === null || $display === '') {
+            $display = '-';
+        }
+
+        return '<div class="flex gap-2 py-0.5 text-sm">'
+            . '<span class="w-44 shrink-0 font-medium text-gray-600 dark:text-gray-400">' . e($label) . ' :</span>'
+            . '<span class="min-w-0 flex-1 text-gray-950 dark:text-white">' . nl2br(e((string) $display)) . '</span>'
+            . '</div>';
+    }
+
+    protected static function detailColumnEntry(string $name, string $heading, array $rows): \Filament\Infolists\Components\TextEntry
+    {
+        return \Filament\Infolists\Components\TextEntry::make($name)
+            ->label('')
+            ->getStateUsing(function ($record) use ($heading, $rows) {
+                $html = '<div class="space-y-1">';
+                $html .= '<div class="mb-2 text-base font-semibold text-gray-950 dark:text-white">' . e($heading) . '</div>';
+
+                foreach ($rows as [$label, $state]) {
+                    $html .= self::detailLineHtml($label, $state($record));
+                }
+
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->html();
+    }
+
     protected static function topTypeOptions(): array
     {
         return [
@@ -1097,7 +1139,7 @@ class PurchaseOrderResource extends Resource
                                 return $data;
                             })
                             ->columnSpanFull()
-                            ->columns(4)
+                            ->columns(10)
                             ->hint('Tambahkan item pembelian yang akan diinput')
                             ->defaultItems(0)
                             ->collapsed(function (?string $operation, ?\Filament\Forms\ComponentContainer $item, \Filament\Forms\Components\Repeater $component): bool {
@@ -1267,6 +1309,7 @@ class PurchaseOrderResource extends Resource
                                     })
                                     ->disabled(fn(Get $get) => self::isOrderRequestBackedItem($get))
                                     ->dehydrated(true)
+                                    ->columnSpan(4)
                                     ->required(),
                                 TextInput::make('unit')
                                     ->label('Satuan')
@@ -1278,7 +1321,52 @@ class PurchaseOrderResource extends Resource
                                         if ($record?->product) {
                                             $component->state($record->product->uom?->abbreviation ?? '-');
                                         }
-                                    }),
+                                    })
+                                    ->columnSpan(3),
+                                TextInput::make('quantity')
+                                    ->label('Qty')
+                                    ->default(0)
+                                    ->reactive()
+                                    ->helperText(function (Get $get) {
+                                        $orItemId = $get('refer_item_model_id');
+                                        if (!$orItemId) return null;
+                                        $max = self::orderRequestItemResourceLimit((int) $orItemId)['remaining_for_po_resource'];
+                                        return "Maks: {$max} (sisa OR)";
+                                    })
+                                    ->rules([function (Get $get) {
+                                        return function ($attribute, $value, $fail) use ($get) {
+                                            $orItemId = $get('refer_item_model_id');
+                                            if (!$orItemId) return;
+
+                                            // Mengurai index repeater dari path atribut (misal: 'purchaseOrderItem.0.quantity')
+                                            $segments = explode('.', $attribute);
+                                            $index = $segments[1] ?? null;
+                                            $itemId = null;
+                                            if ($index !== null) {
+                                                $items = $get('../../purchaseOrderItem') ?? [];
+                                                $itemId = $items[$index]['id'] ?? null;
+                                            }
+
+                                            $max = self::orderRequestItemResourceLimit(
+                                                (int) $orItemId,
+                                                $itemId ? (int) $itemId : null
+                                            )['remaining_for_po_resource'];
+                                            if ((float) $value > $max) {
+                                                $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");
+                                            }
+                                        };
+                                    }])
+                                    ->afterStateUpdated(function (Set $set, Get $get) {
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                        $qty = (float)$get('quantity');
+                                        $price = self::parseCurrencyState($get('unit_price'));
+                                        $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', self::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                    })
+                                    ->columnSpan(3),
                                 Select::make('currency_id')
                                     ->label('Mata Uang')
                                     ->preload()
@@ -1339,50 +1427,8 @@ class PurchaseOrderResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Mata uang belum dipilih',
                                         'exists' => 'Mata uang tidak tersedia'
-                                    ]),
-                                TextInput::make('quantity')
-                                    ->label('Quantity')
-                                    ->default(0)
-                                    ->reactive()
-                                    ->helperText(function (Get $get) {
-                                        $orItemId = $get('refer_item_model_id');
-                                        if (!$orItemId) return null;
-                                        $max = self::orderRequestItemResourceLimit((int) $orItemId)['remaining_for_po_resource'];
-                                        return "Maks: {$max} (sisa OR)";
-                                    })
-                                    ->rules([function (Get $get) {
-                                        return function ($attribute, $value, $fail) use ($get) {
-                                            $orItemId = $get('refer_item_model_id');
-                                            if (!$orItemId) return;
-
-                                            // Mengurai index repeater dari path atribut (misal: 'purchaseOrderItem.0.quantity')
-                                            $segments = explode('.', $attribute);
-                                            $index = $segments[1] ?? null;
-                                            $itemId = null;
-                                            if ($index !== null) {
-                                                $items = $get('../../purchaseOrderItem') ?? [];
-                                                $itemId = $items[$index]['id'] ?? null;
-                                            }
-
-                                            $max = self::orderRequestItemResourceLimit(
-                                                (int) $orItemId,
-                                                $itemId ? (int) $itemId : null
-                                            )['remaining_for_po_resource'];
-                                            if ((float) $value > $max) {
-                                                $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");
-                                            }
-                                        };
-                                    }])
-                                    ->afterStateUpdated(function (Set $set, Get $get) {
-                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
-                                        $qty = (float)$get('quantity');
-                                        $price = self::parseCurrencyState($get('unit_price'));
-                                        $preview = self::calculateCurrencyPreview($qty, $price, (float)$get('discount'), (float)$get('tax'), self::normalizeTaxTypeValue($get('tipe_pajak') ?? null), $currencyId);
-                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
-                                        $set('discount_nominal', self::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
-                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
-                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
-                                    }),
+                                    ])
+                                    ->columnSpan(2),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->reactive()
@@ -1419,9 +1465,10 @@ class PurchaseOrderResource extends Resource
                                     })
                                     ->prefix(function ($get) {
                                         return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
-                                    }),
+                                    })
+                                    ->columnSpan(2),
                                 TextInput::make('total')
-                                    ->label('Total (Harga × Qty)')
+                                    ->label('Total (Harga x Qty)')
                                     ->prefix(function ($get) {
                                         return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
                                     })
@@ -1442,7 +1489,8 @@ class PurchaseOrderResource extends Resource
                                             $total = (float)$record->quantity * (float)$record->unit_price;
                                             $component->state(self::formatCurrencyPreviewState($total, $currencyId));
                                         }
-                                    }),
+                                    })
+                                    ->columnSpan(2),
                                 TextInput::make('discount')
                                     ->label('Discount (%)')
                                     ->reactive()
@@ -1469,7 +1517,8 @@ class PurchaseOrderResource extends Resource
                                         ? ['class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400', 'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;']
                                         : [])
                                     ->suffix('%')
-                                    ->default(0),
+                                    ->default(0)
+                                    ->columnSpan(2),
                                 TextInput::make('discount_nominal')
                                     ->label('Nominal Discount')
                                     ->prefix(function ($get) {
@@ -1503,7 +1552,40 @@ class PurchaseOrderResource extends Resource
 
                                         $component->state(self::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                     })
-                                    ->helperText('Nominal discount dihitung otomatis dari quantity, unit price, dan discount.'),
+                                    ->helperText('Nominal discount dihitung otomatis dari quantity, unit price, dan discount.')
+                                    ->columnSpan(2),
+                                Radio::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
+                                    ->inline()
+                                    ->reactive()
+                                    ->required()
+                                    ->default('inklusif')
+                                    ->dehydrated(true)
+                                    ->disabled(fn(Get $get) => (($get('../../ppn_option') ?? 'standard') === 'non_ppn') || self::isOrderRequestBackedItem($get))
+                                    ->extraAttributes(['class' => 'data-[disabled=true]:opacity-75'])
+                                    ->options(TaxTypeHelper::options())
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
+                                        $normalizedState = self::normalizeTaxTypeValue($state);
+
+                                        if ($normalizedState === 'none') {
+                                            $set('tax', 0);
+                                        } else {
+                                            $set('tax', $defaultTax);
+                                        }
+                                        $effectiveTax = $normalizedState === 'none' ? 0 : (float)$get('tax');
+                                        // Recalculate subtotal when tax type changes
+                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
+                                        $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), $effectiveTax, $normalizedState, $currencyId);
+                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', self::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
+                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
+                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Tipe Pajak belum dipilih'
+                                    ])
+                                    ->columnSpan(3),
                                 TextInput::make('tax')
                                     ->label('Tax (%)')
                                     ->reactive()
@@ -1533,7 +1615,8 @@ class PurchaseOrderResource extends Resource
                                         $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
                                     ->suffix('%')
-                                    ->default(fn() => \App\Models\TaxSetting::activeRate('PPN')),
+                                    ->default(fn() => \App\Models\TaxSetting::activeRate('PPN'))
+                                    ->columnSpan(2),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak')
                                     ->readOnly()
@@ -1567,9 +1650,10 @@ class PurchaseOrderResource extends Resource
 
                                         $component->state(self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
-                                    ->helperText('Nominal PPN dihitung otomatis dari quantity, harga, diskon, dan tipe pajak.'),
+                                    ->helperText('Nominal PPN dihitung otomatis dari quantity, harga, diskon, dan tipe pajak.')
+                                    ->columnSpan(2),
                                 TextInput::make('subtotal')
-                                    ->label('Sub Total (termasuk pajak)')
+                                    ->label('Subtotal (termasuk Pajak)')
                                     ->reactive()
                                     ->prefix(function ($get) {
                                         return CurrencyConversionResolver::resolveSymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null);
@@ -1644,38 +1728,8 @@ class PurchaseOrderResource extends Resource
                                         }
 
                                         $livewire->data['total_amount'] = self::formatMoneyState($total);
-                                    }),
-                                Radio::make('tipe_pajak')
-                                    ->label('Tipe Pajak')
-                                    ->inline()
-                                    ->reactive()
-                                    ->required()
-                                    ->default('inklusif')
-                                    ->dehydrated(true)
-                                    ->disabled(fn(Get $get) => (($get('../../ppn_option') ?? 'standard') === 'non_ppn') || self::isOrderRequestBackedItem($get))
-                                    ->extraAttributes(['class' => 'data-[disabled=true]:opacity-75'])
-                                    ->options(TaxTypeHelper::options())
-                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
-                                        $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
-                                        $normalizedState = self::normalizeTaxTypeValue($state);
-
-                                        if ($normalizedState === 'none') {
-                                            $set('tax', 0);
-                                        } else {
-                                            $set('tax', $defaultTax);
-                                        }
-                                        $effectiveTax = $normalizedState === 'none' ? 0 : (float)$get('tax');
-                                        // Recalculate subtotal when tax type changes
-                                        $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : null;
-                                        $preview = self::calculateCurrencyPreview((float)$get('quantity'), self::parseCurrencyState($get('unit_price')), (float)$get('discount'), $effectiveTax, $normalizedState, $currencyId);
-                                        $set('total', self::formatCurrencyPreviewState($preview['total'], $currencyId));
-                                        $set('discount_nominal', self::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
-                                        $set('tax_nominal', self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
-                                        $set('subtotal', self::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                     })
-                                    ->validationMessages([
-                                        'required' => 'Tipe Pajak belum dipilih'
-                                    ]),
+                                    ->columnSpan(3),
                                 Placeholder::make('tax_breakdown')
                                     ->label('Rincian Pajak')
                                     ->columnSpanFull()
@@ -2866,22 +2920,17 @@ class PurchaseOrderResource extends Resource
                                     ->collapsible()
                                     ->collapsed()
                                     ->schema([
-                                        \Filament\Infolists\Components\Grid::make(6)
+                                        \Filament\Infolists\Components\Grid::make(2)
                                             ->schema([
-                                                \Filament\Infolists\Components\TextEntry::make('product.name')
-                                                    ->label('Product')
-                                                    ->getStateUsing(fn($record) => $record->product ? "({$record->product->sku}) {$record->product->name}" : '-')
-                                                    ->columnSpan(2),
-                                                \Filament\Infolists\Components\TextEntry::make('product.uom.abbreviation')
-                                                    ->label('Satuan')
-                                                    ->default('-')
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('quantity')
-                                                    ->label('Qty')
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('item_cabang')
-                                                    ->label('Cabang')
-                                                    ->getStateUsing(function ($record) {
+                                                \Filament\Infolists\Components\Group::make([
+                                                    self::detailColumnEntry(
+                                                        'product_column',
+                                                        'Produk',
+                                                        [
+                                                            ['Product', fn($record) => $record->product ? "({$record->product->sku}) {$record->product->name}" : '-'],
+                                                            ['Satuan', fn($record) => $record->product?->uom?->abbreviation ?? $record->product?->uom?->name ?? '-'],
+                                                            ['Qty', fn($record) => $record->quantity],
+                                                            ['Cabang', function ($record) {
                                                         $refer = $record->referItemModel;
                                                         $cabang = $refer?->cabang ?? $record->purchaseOrder?->cabang ?? $record->product?->cabang;
 
@@ -2890,70 +2939,51 @@ class PurchaseOrderResource extends Resource
                                                         }
 
                                                         return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
-                                                    })
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('refer_item')
-                                                    ->label('Refer Item')
-                                                    ->getStateUsing(function ($record) {
+                                                            }],
+                                                            ['Refer Item', function ($record) {
                                                         $refer = $record->referItemModel;
                                                         if (! $refer) {
                                                             return '-';
                                                         }
 
                                                         return class_basename($record->refer_item_model_type) . ' #' . ($refer->id ?? $record->refer_item_model_id);
-                                                    })
-                                                    ->columnSpan(1),
-                                            ]),
-                                        \Filament\Infolists\Components\Grid::make(6)
-                                            ->schema([
-                                                \Filament\Infolists\Components\TextEntry::make('currency.code')
-                                                    ->label('Mata Uang')
-                                                    ->default('-')
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('unit_price')
-                                                    ->label('Unit Price')
-                                                    ->getStateUsing(function ($record) {
+                                                            }],
+                                                            ['Qty Received', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_received')],
+                                                            ['Qty Accepted', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_accepted')],
+                                                            ['Qty Rejected', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_rejected')],
+                                                            ['Sisa Qty Belum Diterima', fn($record) => max(0, (float) ($record->quantity ?? 0) - (float) $record->purchaseReceiptItem()->sum('qty_accepted'))],
+                                                        ]
+                                                    ),
+                                                ])
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                                \Filament\Infolists\Components\Group::make([
+                                                    self::detailColumnEntry(
+                                                        'price_column',
+                                                        'Price',
+                                                        [
+                                                            ['Mata Uang', fn($record) => $record->currency?->code ?? '-'],
+                                                            ['Unit Price', function ($record) {
                                                         $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
 
                                                         return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($record->unit_price ?? 0, $currencyId);
-                                                    })
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('discount')
-                                                    ->label('Discount')
-                                                    ->getStateUsing(fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%')
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('discount_nominal')
-                                                    ->label('Nominal Discount')
-                                                    ->getStateUsing(function ($record) {
+                                                            }],
+                                                            ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
+                                                            ['Nominal Discount', function ($record) {
                                                         $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
                                                         $nominal = ((float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0)) * ((float) ($record->discount ?? 0) / 100);
 
                                                         return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($nominal, $currencyId);
-                                                    })
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('total')
-                                                    ->label('Total (Harga x Qty)')
-                                                    ->getStateUsing(function ($record) {
+                                                            }],
+                                                            ['Total (Harga x Qty)', function ($record) {
                                                         $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
                                                         $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
 
                                                         return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($total, $currencyId);
-                                                    })
-                                                    ->columnSpan(1),
-                                            ]),
-                                        \Filament\Infolists\Components\Grid::make(5)
-                                            ->schema([
-                                                \Filament\Infolists\Components\TextEntry::make('tipe_pajak')
-                                                    ->label('Tipe Pajak')
-                                                    ->getStateUsing(fn($record) => self::normalizeTaxTypeValue($record->tipe_pajak ?? null))
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('tax')
-                                                    ->label('Tax (%)')
-                                                    ->getStateUsing(fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%')
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('tax_nominal')
-                                                    ->label('Nominal Pajak')
-                                                    ->getStateUsing(function ($record) {
+                                                            }],
+                                                            ['Tipe Pajak', fn($record) => self::normalizeTaxTypeValue($record->tipe_pajak ?? null)],
+                                                            ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
+                                                            ['Nominal Pajak', function ($record) {
                                                         $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
                                                         $preview = self::calculateCurrencyPreview(
                                                             (float) ($record->quantity ?? 0),
@@ -2965,11 +2995,8 @@ class PurchaseOrderResource extends Resource
                                                         );
 
                                                         return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
-                                                    })
-                                                    ->columnSpan(1),
-                                                \Filament\Infolists\Components\TextEntry::make('subtotal')
-                                                    ->label('Subtotal')
-                                                    ->getStateUsing(function ($record) {
+                                                            }],
+                                                            ['Subtotal', function ($record) {
                                                         $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
                                                         $preview = self::calculateCurrencyPreview(
                                                             (float) ($record->quantity ?? 0),
@@ -2981,23 +3008,12 @@ class PurchaseOrderResource extends Resource
                                                         );
 
                                                         return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
-                                                    })
-                                                    ->columnSpan(1),
-                                            ]),
-                                        \Filament\Infolists\Components\Grid::make(4)
-                                            ->schema([
-                                                \Filament\Infolists\Components\TextEntry::make('qty_received')
-                                                    ->label('Qty Received')
-                                                    ->getStateUsing(fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_received')),
-                                                \Filament\Infolists\Components\TextEntry::make('qty_accepted')
-                                                    ->label('Qty Accepted')
-                                                    ->getStateUsing(fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_accepted')),
-                                                \Filament\Infolists\Components\TextEntry::make('qty_rejected')
-                                                    ->label('Qty Rejected')
-                                                    ->getStateUsing(fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_rejected')),
-                                                \Filament\Infolists\Components\TextEntry::make('qty_remaining')
-                                                    ->label('Sisa Qty Belum Diterima')
-                                                    ->getStateUsing(fn($record) => max(0, (float) ($record->quantity ?? 0) - (float) $record->purchaseReceiptItem()->sum('qty_accepted'))),
+                                                            }],
+                                                        ]
+                                                    ),
+                                                ])
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
                                             ]),
                                     ]),
                             ]),

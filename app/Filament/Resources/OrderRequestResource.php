@@ -2212,6 +2212,48 @@ class OrderRequestResource extends Resource
         return OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_receipt'];
     }
 
+    protected static function detailLineEntry(string $name, string $label, \Closure $state, int $columnSpan = 1): \Filament\Infolists\Components\TextEntry
+    {
+        return \Filament\Infolists\Components\TextEntry::make($name)
+            ->label('')
+            ->getStateUsing(fn ($record) => self::detailLineHtml($label, $state($record)))
+            ->html()
+            ->columnSpan($columnSpan);
+    }
+
+    protected static function detailLineHtml(string $label, mixed $value): string
+    {
+        $display = $value;
+
+        if ($display === null || $display === '') {
+            $display = '-';
+        }
+
+        return '<div class="flex gap-2 py-0.5 text-sm">'
+            . '<span class="w-44 shrink-0 font-medium text-gray-600 dark:text-gray-400">' . e($label) . ' :</span>'
+            . '<span class="min-w-0 flex-1 text-gray-950 dark:text-white">' . nl2br(e((string) $display)) . '</span>'
+            . '</div>';
+    }
+
+    protected static function detailColumnEntry(string $name, string $heading, array $rows): \Filament\Infolists\Components\TextEntry
+    {
+        return \Filament\Infolists\Components\TextEntry::make($name)
+            ->label('')
+            ->getStateUsing(function ($record) use ($heading, $rows) {
+                $html = '<div class="space-y-1">';
+                $html .= '<div class="mb-2 text-base font-semibold text-gray-950 dark:text-white">' . e($heading) . '</div>';
+
+                foreach ($rows as [$label, $state]) {
+                    $html .= self::detailLineHtml($label, $state($record));
+                }
+
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->html();
+    }
+
     public static function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
     {
         return $infolist
@@ -2257,9 +2299,8 @@ class OrderRequestResource extends Resource
                             ->schema([
                                 \Filament\Infolists\Components\Section::make(function ($record) {
                                     $productName = $record->product ? "({$record->product->sku}) {$record->product->name}" : '-';
-                                    $qty = (float)($record->quantity ?? 0);
+                                    $qty = (float) ($record->quantity ?? 0);
                                     $supplierName = $record->supplier ? "({$record->supplier->code}) {$record->supplier->perusahaan}" : '-';
-                                    
                                     $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
                                     $preview = self::calculateApprovalItemPreview(
                                         (float) ($record->quantity ?? 0),
@@ -2269,166 +2310,134 @@ class OrderRequestResource extends Resource
                                         self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
                                     );
                                     $subtotal = self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
-                                    
+
                                     return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal}";
                                 })
                                 ->collapsible()
                                 ->collapsed()
                                 ->schema([
-                                    \Filament\Infolists\Components\Grid::make(6)
-                                        ->schema([
-                                            \Filament\Infolists\Components\TextEntry::make('product.name')
-                                                ->label('Product')
-                                                ->columnSpan(2),
-                                            \Filament\Infolists\Components\TextEntry::make('product.uom.abbreviation')
-                                                ->label('Satuan')
-                                                ->default('-')
-                                                ->columnSpan(1),
-                                            \Filament\Infolists\Components\TextEntry::make('quantity')
-                                                ->label('Qty')
-                                                ->columnSpan(1),
-                                            \Filament\Infolists\Components\TextEntry::make('remaining_receipt_quantity')
-                                                ->label('Sisa Qty Belum Diterima')
-                                                ->getStateUsing(fn($record) => self::resolveRemainingReceiptQuantity($record))
-                                                ->columnSpan(1),
-                                            \Filament\Infolists\Components\TextEntry::make('cabang.nama')
-                                                ->label('Cabang')
-                                                ->getStateUsing(function ($record) {
-                                                    $code = $record->cabang?->kode ?? null;
-                                                    $name = $record->cabang?->nama ?? null;
-                                                    if (! $name) {
-                                                        return '-';
-                                                    }
-                                                    return $code ? "({$code}) {$name}" : $name;
-                                                })
-                                                ->columnSpan(1),
-                                        ]),
                                     \Filament\Infolists\Components\Grid::make(2)
                                         ->schema([
-                                            \Filament\Infolists\Components\TextEntry::make('supplier_display')
-                                                ->label('Supplier')
+                                            \Filament\Infolists\Components\Group::make([
+                                                    self::detailColumnEntry(
+                                                        'product_column',
+                                                        'Produk',
+                                                        [
+                                                            ['Product', function ($record) {
+                                                            if (! $record->product) {
+                                                                return '-';
+                                                            }
+
+                                                            return $record->product->sku
+                                                                ? "({$record->product->sku}) {$record->product->name}"
+                                                                : ($record->product->name ?? '-');
+                                                            }],
+                                                            ['Satuan', function ($record) {
+                                                            return $record->product?->uom?->abbreviation
+                                                                ?? $record->product?->uom?->name
+                                                                ?? '-';
+                                                            }],
+                                                            ['Qty', fn ($record) => $record->quantity],
+                                                            ['Sisa Qty Belum Diterima', fn ($record) => self::resolveRemainingReceiptQuantity($record)],
+                                                            ['Cabang', function ($record) {
+                                                            $code = $record->cabang?->kode ?? null;
+                                                            $name = $record->cabang?->nama ?? null;
+                                                            if (! $name) {
+                                                                return '-';
+                                                            }
+                                                            return $code ? "({$code}) {$name}" : $name;
+                                                            }],
+                                                            ['Supplier', function ($record) {
+                                                            if (! $record->supplier_id) {
+                                                                return '-';
+                                                            }
+                                                            $code = $record->supplier?->code ?? '-';
+                                                            $name = $record->supplier?->perusahaan ?? '-';
+                                                            return "({$code}) {$name}";
+                                                            }],
+                                                            ['Rekomendasi Supplier', function ($record) {
+                                                            $productId = $record->product_id;
+                                                            if (!$productId) {
+                                                                return '-';
+                                                            }
+                                                            $product = Product::withoutGlobalScope('product_cabang')->with('suppliers')->find($productId);
+                                                            if (!$product || $product->suppliers->isEmpty()) {
+                                                                return 'Tidak ada supplier terdaftar untuk produk ini.';
+                                                            }
+                                                            $recommended = $product->suppliers
+                                                                ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
+                                                                ->first();
+                                                            $price = (float) ($recommended?->pivot->supplier_price ?? 0);
+                                                            $itemCurrencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
+                                                            return "{$recommended->perusahaan} (" . self::resolveCurrencySymbol($itemCurrencyId) . ' ' . self::formatMoneyPreviewState($converted) . ')';
+                                                            }],
+                                                            ['Note', fn ($record) => $record->note ?? '-'],
+                                                        ]
+                                                    ),
+                                                ])
                                                 ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    if (! $record->supplier_id) {
-                                                        return '-';
-                                                    }
-                                                    $code = $record->supplier?->code ?? '-';
-                                                    $name = $record->supplier?->perusahaan ?? '-';
-                                                    return "({$code}) {$name}";
-                                                }),
-                                            \Filament\Infolists\Components\TextEntry::make('supplier_recommendation')
-                                                ->label('Rekomendasi Supplier')
+                                                ->columns(1),
+                                            \Filament\Infolists\Components\Group::make([
+                                                    self::detailColumnEntry(
+                                                        'price_column',
+                                                        'Price',
+                                                        [
+                                                            ['Mata Uang', fn ($record) => $record->currency?->code ?? $record->orderRequest?->currency?->code ?? '-'],
+                                                            ['Harga Asli (Master)', function ($record) {
+                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->original_price ?? 0);
+                                                            }],
+                                                            ['Harga Override', function ($record) {
+                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->unit_price ?? 0);
+                                                            }],
+                                                            ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
+                                                            ['Discount (Nominal)', function ($record) {
+                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            $qty = (float) ($record->quantity ?? 0);
+                                                            $unitPrice = (float) ($record->unit_price ?? 0);
+                                                            $discPct = (float) ($record->discount ?? 0);
+                                                            $nominal = round(($qty * $unitPrice) * ($discPct / 100), 2);
+                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($nominal);
+                                                            }],
+                                                            ['Total (Harga x Qty)', function ($record) {
+                                                            $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($totalCost);
+                                                            }],
+                                                            ['Tipe Pajak', function ($record) {
+                                                            return $record->tipe_pajak ?? '-';
+                                                            }],
+                                                            ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
+                                                            ['Nominal Pajak', function ($record) {
+                                                            $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
+                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            $preview = self::calculateApprovalItemPreview(
+                                                                (float) ($record->quantity ?? 0),
+                                                                (float) ($record->unit_price ?? 0),
+                                                                (float) ($record->discount ?? 0),
+                                                                (float) ($record->tax ?? 0),
+                                                                $taxType
+                                                            );
+                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['tax_nominal']);
+                                                            }],
+                                                            ['Subtotal', function ($record) {
+                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                            $preview = self::calculateApprovalItemPreview(
+                                                                (float) ($record->quantity ?? 0),
+                                                                (float) ($record->unit_price ?? 0),
+                                                                (float) ($record->discount ?? 0),
+                                                                (float) ($record->tax ?? 0),
+                                                                self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
+                                                            );
+                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
+                                                            }],
+                                                        ]
+                                                    ),
+                                                ])
                                                 ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $productId = $record->product_id;
-                                                    if (!$productId) {
-                                                        return '-';
-                                                    }
-                                                    $product = Product::withoutGlobalScope('product_cabang')->with('suppliers')->find($productId);
-                                                    if (!$product || $product->suppliers->isEmpty()) {
-                                                        return 'Tidak ada supplier terdaftar untuk produk ini.';
-                                                    }
-                                                    $recommended = $product->suppliers
-                                                        ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
-                                                        ->first();
-                                                    $price = (float) ($recommended?->pivot->supplier_price ?? 0);
-                                                    $itemCurrencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
-                                                    return "{$recommended->perusahaan} (" . self::resolveCurrencySymbol($itemCurrencyId) . ' ' . self::formatMoneyPreviewState($converted) . ')';
-                                                }),
-                                        ]),
-                                    \Filament\Infolists\Components\Grid::make(6)
-                                        ->schema([
-                                            \Filament\Infolists\Components\TextEntry::make('currency.code')
-                                                ->label('Mata Uang')
-                                                ->columnSpan(1)
-                                                ->default(fn ($record) => $record->currency?->code ?? $record->orderRequest?->currency?->code ?? '-'),
-                                            \Filament\Infolists\Components\TextEntry::make('original_price')
-                                                ->label('Harga Asli (Master)')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->original_price ?? 0);
-                                                }),
-                                            \Filament\Infolists\Components\TextEntry::make('unit_price')
-                                                ->label('Harga Override')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->unit_price ?? 0);
-                                                }),
-                                            \Filament\Infolists\Components\TextEntry::make('discount')
-                                                ->label('Discount')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'),
-                                            \Filament\Infolists\Components\TextEntry::make('discount_nominal')
-                                                ->label('Discount (Nominal)')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    $qty = (float) ($record->quantity ?? 0);
-                                                    $unitPrice = (float) ($record->unit_price ?? 0);
-                                                    $discPct = (float) ($record->discount ?? 0);
-                                                    $nominal = round(($qty * $unitPrice) * ($discPct / 100), 2);
-                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($nominal);
-                                                }),
-                                            \Filament\Infolists\Components\TextEntry::make('total_cost')
-                                                ->label('Total (Harga x Qty)')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
-                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($totalCost);
-                                                }),
-                                        ]),
-                                    \Filament\Infolists\Components\Grid::make(4)
-                                        ->schema([
-                                            \Filament\Infolists\Components\TextEntry::make('tipe_pajak')
-                                                ->label('Tipe Pajak')
-                                                ->columnSpan(2)
-                                                ->getStateUsing(function ($record) {
-                                                    return $record->tipe_pajak ?? '-';
-                                                }),
-                                            \Filament\Infolists\Components\TextEntry::make('tax')
-                                                ->label('Tax (%)')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'),
-                                            \Filament\Infolists\Components\TextEntry::make('tax_nominal')
-                                                ->label('Nominal Pajak')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
-                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    $preview = self::calculateApprovalItemPreview(
-                                                        (float) ($record->quantity ?? 0),
-                                                        (float) ($record->unit_price ?? 0),
-                                                        (float) ($record->discount ?? 0),
-                                                        (float) ($record->tax ?? 0),
-                                                        $taxType
-                                                    );
-                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['tax_nominal']);
-                                                }),
-                                        ]),
-                                    \Filament\Infolists\Components\Grid::make(3)
-                                        ->schema([
-                                            \Filament\Infolists\Components\TextEntry::make('subtotal')
-                                                ->label('Subtotal')
-                                                ->columnSpan(1)
-                                                ->getStateUsing(function ($record) {
-                                                    $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                    $preview = self::calculateApprovalItemPreview(
-                                                        (float) ($record->quantity ?? 0),
-                                                        (float) ($record->unit_price ?? 0),
-                                                        (float) ($record->discount ?? 0),
-                                                        (float) ($record->tax ?? 0),
-                                                        self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
-                                                    );
-                                                    return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
-                                                }),
-                                            \Filament\Infolists\Components\TextEntry::make('note')
-                                                ->label('Note')
-                                                ->columnSpan(2)
-                                                ->placeholder('-'),
+                                                ->columns(1),
                                         ]),
                                 ]),
                             ]),

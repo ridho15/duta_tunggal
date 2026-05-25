@@ -2,6 +2,7 @@
 
 use App\Models\BillOfMaterial;
 use App\Models\BillOfMaterialItem;
+use App\Models\Cabang;
 use App\Models\ManufacturingOrder;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
@@ -24,19 +25,23 @@ beforeEach(function () {
 
 function buildManufacturingStartGuardFixture(): array
 {
+    $branch = Cabang::factory()->create();
     $uom = UnitOfMeasure::factory()->create();
 
     $finishedProduct = Product::factory()->create([
         'is_manufacture' => true,
         'uom_id' => $uom->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $rawMaterial = Product::factory()->create([
         'is_raw_material' => true,
         'uom_id' => $uom->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $bom = BillOfMaterial::factory()->create([
+        'cabang_id' => $branch->id,
         'product_id' => $finishedProduct->id,
         'is_active' => true,
     ]);
@@ -49,6 +54,7 @@ function buildManufacturingStartGuardFixture(): array
     ]);
 
     $productionPlan = ProductionPlan::factory()->create([
+        'cabang_id' => $branch->id,
         'product_id' => $finishedProduct->id,
         'bill_of_material_id' => $bom->id,
         'quantity' => 4,
@@ -56,11 +62,12 @@ function buildManufacturingStartGuardFixture(): array
     ]);
 
     $manufacturingOrder = ManufacturingOrder::factory()->create([
+        'cabang_id' => $branch->id,
         'production_plan_id' => $productionPlan->id,
         'status' => 'draft',
     ]);
 
-    $user = User::factory()->create();
+    $user = User::factory()->create(['cabang_id' => $branch->id]);
     $user->givePermissionTo('request manufacturing order');
 
     return compact('uom', 'finishedProduct', 'rawMaterial', 'bom', 'productionPlan', 'manufacturingOrder', 'user');

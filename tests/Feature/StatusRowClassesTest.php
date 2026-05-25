@@ -64,6 +64,16 @@ test('quotation index renders status row classes', function () {
     $response->assertSee('bg-blue-100');
 });
 
+test('quotation resource includes a status color legend', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/QuotationResource.php'));
+
+    expect($resource)->toContain('Legenda Warna Status Baris Data')
+        ->and($resource)->toContain('Putih (Draft)')
+        ->and($resource)->toContain('Abu-abu (Request Approve)')
+        ->and($resource)->toContain('Biru (Approved)')
+        ->and($resource)->toContain('Merah (Reject)');
+});
+
 test('order request index renders status row classes', function () {
     $orderRequest = OrderRequest::factory()->create([
         'cabang_id' => $this->cabang->id,

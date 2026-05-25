@@ -716,6 +716,8 @@ it('views order request details on the Filament view page', function () {
     OrderRequestItem::factory()->create([
         'order_request_id' => $or->id,
         'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
         'quantity' => 3,
         'fulfilled_quantity' => 1,
         'original_price' => 100000,
@@ -725,6 +727,7 @@ it('views order request details on the Filament view page', function () {
         'tipe_pajak' => 'eklusif',
         'subtotal' => 333000,
         'currency_id' => $usd->id,
+        'note' => 'Item note view test',
     ]);
 
     $item = $or->orderRequestItem()->latest('id')->first();
@@ -739,12 +742,22 @@ it('views order request details on the Filament view page', function () {
     Livewire::actingAs($this->user)
         ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
         ->assertSee('Informasi Order Request')
+        ->assertSee('Detail Item Order Request')
         ->assertSee($or->request_number)
+        ->assertSee('Product :')
+        ->assertSee($this->product->name)
+        ->assertSee('Satuan :')
+        ->assertSee('Qty :')
+        ->assertSee('Cabang :')
+        ->assertSee($this->cabang->nama)
+        ->assertSee('Supplier :')
+        ->assertSee($this->supplier->perusahaan)
         ->assertSee('eklusif')
         ->assertSee($expectedRate)
         ->assertSee($expectedTotal)
         ->assertSee($expectedTax)
         ->assertSee($expectedSubtotal)
+        ->assertSee('Item note view test')
         ->assertSee('Qty Diterima (Penerimaan Barang)')
         ->assertSee('Sisa Qty Belum Diterima');
 });

@@ -297,12 +297,43 @@ test('purchase order form uses collapsed product item repeater and disabled fiel
         ->and($resource)->toContain('->addable(fn (Get $get) => $get(\'refer_model_type\') !== \'App\\\\Models\\\\OrderRequest\')')
         ->and($resource)->toContain('->collapsed(function')
         ->and($resource)->toContain('->itemLabel(function (array $state)')
+        ->and($resource)->toContain('->columns(10)')
         ->and($resource)->toContain('bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400')
         ->and($resource)->toContain('background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;')
         ->and($resource)->toContain("TextInput::make('unit')")
         ->and($resource)->toContain("TextInput::make('total')")
         ->and($resource)->toContain("TextInput::make('tax_nominal')")
         ->and($resource)->toContain("TextInput::make('subtotal')");
+
+    $repeaterStart = strpos($resource, "Repeater::make('purchaseOrderItem')");
+    $taxBreakdownStart = strpos($resource, "Placeholder::make('tax_breakdown')", $repeaterStart);
+    $purchaseOrderItemSchema = substr($resource, $repeaterStart, $taxBreakdownStart - $repeaterStart);
+
+    $expectedOrder = [
+        "Select::make('product_id')",
+        "TextInput::make('unit')",
+        "TextInput::make('quantity')",
+        "Select::make('currency_id')",
+        "TextInput::make('unit_price')",
+        "TextInput::make('total')",
+        "TextInput::make('discount')",
+        "TextInput::make('discount_nominal')",
+        "Radio::make('tipe_pajak')",
+        "TextInput::make('tax')",
+        "TextInput::make('tax_nominal')",
+        "TextInput::make('subtotal')",
+    ];
+
+    $previousPosition = -1;
+
+    foreach ($expectedOrder as $field) {
+        $position = strpos($purchaseOrderItemSchema, $field);
+
+        expect($position)->not->toBeFalse()
+            ->and($position)->toBeGreaterThan($previousPosition);
+
+        $previousPosition = $position;
+    }
 });
 
 test('purchase order item fields from order request are locked and show nominal discount', function () {

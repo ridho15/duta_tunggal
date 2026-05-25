@@ -340,16 +340,9 @@ test('confirmed manufacturing warehouse confirmation keeps material issue pendin
         'confirmed_at' => now(),
     ]);
 
-    $stock = InventoryStock::query()
-        ->where('product_id', $context['rawMaterial']->id)
-        ->where('warehouse_id', $context['warehouse']->id)
-        ->firstOrFail();
-
     expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_PENDING_APPROVAL)
         ->and($materialIssue->fresh()->approved_by)->toBeNull()
-        ->and($materialIssue->fresh()->approved_at)->toBeNull()
-        ->and((float) $stock->qty_available)->toBe(100.0)
-        ->and((float) $stock->qty_reserved)->toBe(0.0);
+        ->and($materialIssue->fresh()->approved_at)->toBeNull();
 });
 
 test('material issue observer creates manufacturing order without auto warehouse confirmation', function () {

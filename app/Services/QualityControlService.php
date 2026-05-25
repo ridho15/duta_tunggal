@@ -53,6 +53,24 @@ class QualityControlService
         return $candidate;
     }
 
+    private function purchaseOrderItemReceiptLimitForQualityControl(QualityControl $qualityControl, int $purchaseOrderItemId): array
+    {
+        $excludeReceiptItemId = null;
+
+        if (filled($qualityControl->qc_number)) {
+            $excludeReceiptItemId = \App\Models\PurchaseReceiptItem::where('purchase_order_item_id', $purchaseOrderItemId)
+                ->whereHas('purchaseReceipt', function ($query) use ($qualityControl) {
+                    $query->where('notes', 'like', '%' . $qualityControl->qc_number . '%');
+                })
+                ->value('id');
+        }
+
+        return OrderRequestQuantityLock::purchaseOrderItemReceiptLimit(
+            $purchaseOrderItemId,
+            $excludeReceiptItemId ? (int) $excludeReceiptItemId : null
+        );
+    }
+
     /**
      * Create a Quality Control record from a PurchaseReceiptItem.
      * This does not create receipts immediately; when QC is completed, a receipt
@@ -207,7 +225,7 @@ class QualityControlService
         if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
             $purchaseOrderItem = $qualityControl->fromModel;
             if ($purchaseOrderItem) {
-                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+                $limit = $this->purchaseOrderItemReceiptLimitForQualityControl($qualityControl, (int) $purchaseOrderItem->id);
                 $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
                 $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
 
@@ -244,7 +262,7 @@ class QualityControlService
         if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
             $purchaseOrderItem = $qualityControl->fromModel;
             if ($purchaseOrderItem) {
-                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+                $limit = $this->purchaseOrderItemReceiptLimitForQualityControl($qualityControl, (int) $purchaseOrderItem->id);
                 $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
                 $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
 

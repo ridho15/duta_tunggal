@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\BillOfMaterial;
+use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\MaterialIssue;
@@ -33,9 +34,10 @@ beforeEach(function () {
 
 function buildLateIssueFixture(string $productionNumber): array
 {
+    $branch = Cabang::factory()->create();
     $uom = UnitOfMeasure::factory()->create();
-    $warehouse = Warehouse::factory()->create();
-    $user = User::factory()->create();
+    $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
+    $user = User::factory()->create(['cabang_id' => $branch->id]);
 
     $rawMaterialCoa = ChartOfAccount::where('code', '1-101')->firstOrFail();
     $wipCoa = ChartOfAccount::where('code', '1-201')->firstOrFail();
@@ -50,6 +52,7 @@ function buildLateIssueFixture(string $productionNumber): array
         'inventory_coa_id' => $finishedGoodsCoa->id,
         'manufacturing_labor_coa_id' => $laborCoa->id,
         'manufacturing_overhead_coa_id' => $overheadCoa->id,
+        'cabang_id' => $branch->id,
     ]);
 
     $rawMaterial = Product::factory()->create([
@@ -57,9 +60,11 @@ function buildLateIssueFixture(string $productionNumber): array
         'uom_id' => $uom->id,
         'inventory_coa_id' => $rawMaterialCoa->id,
         'cost_price' => 100,
+        'cabang_id' => $branch->id,
     ]);
 
     $bom = BillOfMaterial::factory()->create([
+        'cabang_id' => $branch->id,
         'product_id' => $finishedProduct->id,
         'is_active' => true,
         'labor_cost' => 50,
@@ -69,6 +74,7 @@ function buildLateIssueFixture(string $productionNumber): array
     ]);
 
     $plan = ProductionPlan::factory()->create([
+        'cabang_id' => $branch->id,
         'product_id' => $finishedProduct->id,
         'bill_of_material_id' => $bom->id,
         'quantity' => 4,
@@ -77,6 +83,7 @@ function buildLateIssueFixture(string $productionNumber): array
     ]);
 
     $mo = ManufacturingOrder::factory()->create([
+        'cabang_id' => $branch->id,
         'production_plan_id' => $plan->id,
         'status' => 'in_progress',
     ]);
@@ -91,6 +98,7 @@ function buildLateIssueFixture(string $productionNumber): array
     ]);
 
     $production = Production::create([
+        'cabang_id' => $branch->id,
         'manufacturing_order_id' => $mo->id,
         'production_number' => $productionNumber,
         'production_date' => now(),

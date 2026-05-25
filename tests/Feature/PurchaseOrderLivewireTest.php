@@ -188,8 +188,19 @@ test('purchase order view uses infolist sections with purchase order details', f
         ->assertSee($this->supplier->perusahaan)
         ->assertSee($this->cabang->nama)
         ->assertSee($this->product->name)
-        ->assertSee('Nominal Discount')
-        ->assertSee('Nominal Pajak')
+        ->assertSee('Product:')
+        ->assertSee('Qty:')
+        ->assertSee('Subtotal:')
+        ->assertSee('Produk')
+        ->assertSee('Price')
+        ->assertSee('Product :')
+        ->assertSee('Satuan :')
+        ->assertSee('Qty :')
+        ->assertSee('Nominal Discount :')
+        ->assertSee('Nominal Pajak :')
+        ->assertSee('Qty Accepted :')
+        ->assertSee('Sisa Qty Belum Diterima :')
+        ->assertSee('Subtotal :')
         ->assertSee('Status Penerimaan');
 });
 
