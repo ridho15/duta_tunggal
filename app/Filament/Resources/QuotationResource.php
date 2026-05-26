@@ -28,7 +28,6 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -101,6 +100,58 @@ class QuotationResource extends Resource
         }
 
         return number_format((float) HelperController::parseIndonesianMoney($amount), 0, ',', '.');
+    }
+
+    protected static function readOnlyGrayInputAttributes(): array
+    {
+        return [
+            'class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400',
+            'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;',
+        ];
+    }
+
+    protected static function recalculateQuotationItemState(callable $set, callable $get, $livewire): void
+    {
+        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+        $qty = (float) ($get('quantity') ?? 0);
+        $discPct = (float) ($get('discount') ?? 0);
+        $taxType = static::normalizeTaxTypeValue($get('tax_type') ?? 'None');
+        $taxPct = $taxType === 'None' ? 0 : (float) ($get('tax') ?? 0);
+
+        // total = unit_price * quantity (no discount)
+        $total = $qty * $numericUnit;
+        $set('total_price', number_format($total, 0, ',', '.'));
+
+        // discount nominal = total * discount%
+        $discountNominal = $total * ($discPct / 100);
+        $set('discount_nominal', number_format($discountNominal, 0, ',', '.'));
+
+        // subtotal = with discount + tax
+        $subtotalValue = HelperController::hitungSubtotal((int) $qty, $numericUnit, (int) $discPct, (int) $taxPct, $taxType);
+        $set('subtotal', number_format((float) $subtotalValue, 0, ',', '.'));
+
+        $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
+        try {
+            $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
+            $set('tax_nominal', number_format((float) $_n_r['ppn'], 0, ',', '.'));
+        } catch (\Throwable $e) {
+            $set('tax_nominal', '0');
+        }
+
+        // Recalculate overall total_amount
+        $items = $livewire->data['quotationItem'] ?? [];
+        $grandTotal = 0;
+        foreach ($items as $item) {
+            $grandTotal += (float) HelperController::hitungSubtotal(
+                (float) ($item['quantity'] ?? 0),
+                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
+                (float) ($item['discount'] ?? 0),
+                (float) ($item['tax'] ?? 0),
+                static::normalizeTaxTypeValue($item['tax_type'] ?? 'None')
+            );
+        }
+
+        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
     }
     
     public static function quotationStatusLabel(?string $status): string
@@ -253,9 +304,11 @@ class QuotationResource extends Resource
         return $form
             ->schema([
                 Fieldset::make('Form Quotation')
+                    ->columns(3)
                     ->schema([
                         Placeholder::make('status')
                             ->label('Status')
+                            ->columnSpanFull()
                             ->content(function ($record) {
                                 if (!$record) {
                                     return '-';
@@ -278,6 +331,7 @@ class QuotationResource extends Resource
                         TextInput::make('quotation_number')
                             ->required()
                             ->label('Quotation Number')
+                            ->columnSpan(1)
                             ->reactive()
                             ->validationMessages([
                                 'required' => 'Quotation number tidak boleh kosong',
@@ -294,6 +348,7 @@ class QuotationResource extends Resource
                             ->maxLength(255),
                         Select::make('customer_id')
                             ->label('Customer')
+                            ->columnSpan(1)
                             ->searchable()
                             ->preload()
                             ->reactive()
@@ -431,7 +486,7 @@ class QuotationResource extends Resource
                                             ]),
                                         Checkbox::make('isSpecial')
                                             ->label('Spesial (Ya / Tidak)'),
-                                        Textarea::make('keterangan')
+                                        TextInput::make('keterangan')
                                             ->label('Keterangan')
                                             ->nullable(),
                                     ]),
@@ -446,23 +501,9 @@ class QuotationResource extends Resource
                                 }
                             })
                             ->required(),
-                        DatePicker::make('date')
-                            ->label('Tanggal')
-                            ->validationMessages([
-                                'required' => 'Tanggal wajib dipilih'
-                            ])
-                            ->required(),
-                        DatePicker::make('valid_until'),
-                        TextInput::make('tempo_pembayaran')
-                            ->label('Tempo Pembayaran (Hari)')
-                            ->numeric()
-                            ->nullable()
-                            ->minValue(0)
-                            ->helperText('Masukkan jumlah hari tempo pembayaran khusus untuk quotation ini. Jika kosong, menggunakan default customer. Nilai ini akan diajukan untuk disetujui bersama discount.')
-                            ->placeholder('Contoh: 30')
-                            ->suffix('Hari'),
                         Select::make('cabang_id')
                             ->label('Cabang')
+                            ->columnSpan(1)
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
@@ -479,11 +520,32 @@ class QuotationResource extends Resource
                             ->searchable()
                             ->preload()
                             ->nullable(),
+                        DatePicker::make('date')
+                            ->label('Tanggal')
+                            ->columnSpan(1)
+                            ->validationMessages([
+                                'required' => 'Tanggal wajib dipilih'
+                            ])
+                            ->required(),
+                        DatePicker::make('valid_until')
+                            ->label('Valid Until')
+                            ->columnSpan(1),
+                        TextInput::make('tempo_pembayaran')
+                            ->label('Tempo Pembayaran (Hari)')
+                            ->columnSpan(1)
+                            ->numeric()
+                            ->nullable()
+                            ->minValue(0)
+                            ->helperText('Masukkan jumlah hari tempo pembayaran khusus untuk quotation ini. Jika kosong, menggunakan default customer. Nilai ini akan diajukan untuk disetujui bersama discount.')
+                            ->placeholder('Contoh: 30')
+                            ->suffix('Hari'),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
                             ->readOnly()
+                            ->columnSpan(1)
                             ->reactive()
                             ->indonesianMoney()
+                            ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                             ->default(0)
                             ->helperText('Total dihitung otomatis dari semua item')
                             ->afterStateHydrated(function ($component, $record) {
@@ -503,6 +565,7 @@ class QuotationResource extends Resource
                             }),
                         FileUpload::make('po_file_path')
                             ->label('File')
+                            ->columnSpan(1)
                             ->directory('quotation')
                             ->downloadable()
                             ->acceptedFileTypes([
@@ -512,19 +575,53 @@ class QuotationResource extends Resource
                                 'image/*',                   // Semua jenis gambar (jpeg, png, webp, dll)
                             ])
                             ->maxSize('5120'),
-                        Textarea::make('notes')
-                            ->label('Notes'),
+                        TextInput::make('notes')
+                            ->label('Notes')
+                            ->columnSpan(1),
                         Repeater::make('quotationItem')
                             ->relationship()
                             ->columnSpanFull()
-                            ->columns(3)
+                            ->columns(12)
                             ->minItems(1)
+                            ->collapsible()
+                            ->itemLabel(function (array $state): ?string {
+                                $sku = trim((string) ($state['product_sku'] ?? ''));
+                                $name = trim((string) ($state['product_name'] ?? ''));
+                                $qty = (float) ($state['quantity'] ?? 0);
+                                $subtotal = trim((string) ($state['subtotal'] ?? '0'));
+
+                                $productLabel = $name !== '' ? $name : ($sku !== '' ? $sku : 'Item baru');
+                                return sprintf('%s | Qty: %s | Subtotal: Rp %s', $productLabel, $qty, $subtotal);
+                            })
+                            ->collapsed(function (?string $operation, ?\Filament\Forms\ComponentContainer $item, Repeater $component): bool {
+                                if (! $item) {
+                                    return false;
+                                }
+
+                                $state = $component->getState() ?? [];
+                                if (empty($state)) {
+                                    return false;
+                                }
+
+                                $keys = array_keys($state);
+                                $lastKey = end($keys);
+                                $statePathParts = explode('.', $item->getStatePath());
+                                $itemKey = end($statePathParts);
+
+                                $itemState = $state[$itemKey] ?? [];
+                                if ($operation !== 'create' && filled($itemState['id'] ?? null)) {
+                                    return true;
+                                }
+
+                                return $itemKey !== $lastKey;
+                            })
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
                                 return $data;
                             })
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
+                                    ->columnSpan(4)
                                     ->preload()
                                     ->searchable()
                                     ->validationMessages([
@@ -535,194 +632,125 @@ class QuotationResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
                                         $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
-                                            // Format unit_price as Indonesian money for proper display
-                                            $numericUnit = (float)$product->sell_price;
+                                            $numericUnit = (float) $product->sell_price;
                                             $set('unit_price', number_format($numericUnit, 0, ',', '.'));
-                                            // F2: auto-fill unit/satuan from product UOM
                                             $set('unit', $product->uom?->abbreviation ?? '-');
-                                            $taxType = $get('tax_type') ?? 'None';
+                                            $set('product_name', $product->name);
+                                            $set('product_sku', $product->sku);
+
+                                            $taxType = static::normalizeTaxTypeValue($get('tax_type') ?? 'None');
                                             $taxRate = TaxDefaultResolver::resolveForProductId((int) $state, $taxType);
                                             $set('tax', $taxType === 'None' ? 0 : $taxRate);
-                                            $qty = (float)($get('quantity') ?? 0);
-                                            $discPct = (float)($get('discount') ?? 0);
-                                            $taxPct = $taxType === 'None' ? 0 : $taxRate;
-                                            // total = unit_price * quantity (no discount)
-                                            $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
-                                            // subtotal = with discount + tax (formatted)
-                                            $subtotalValue = HelperController::hitungSubtotal((int)$qty, $numericUnit, (int)$discPct, (int)$taxPct, $taxType);
-                                            $set('subtotal', number_format((float)$subtotalValue, 0, ',', '.'));
-                                            $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
-                                            try {
-                                                $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
-                                                $set('tax_nominal', number_format((float)$_n_r['ppn'], 0, ',', '.'));
-                                            } catch (\Throwable $e) { $set('tax_nominal', '0'); }
                                         }
-                                        // Recalculate overall total_amount
-                                        $items = $livewire->data['quotationItem'] ?? [];
-                                        $grandTotal = 0;
-                                        foreach ($items as $item) {
-                                            $grandTotal += (float) HelperController::hitungSubtotal(
-                                                (float)($item['quantity'] ?? 0),
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                                (float)($item['discount'] ?? 0),
-                                                (float)($item['tax'] ?? 0),
-                                                $item['tax_type'] ?? 'None'
-                                            );
-                                        }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
+
+                                        static::recalculateQuotationItemState($set, $get, $livewire);
                                     })
                                     ->relationship('product', 'name')
-                                    ->searchable()
                                     ->getSearchResultsUsing(function (string $search) {
-                                        // Return array of id => label to satisfy Filament Select expectations
                                         return Product::query()
                                             ->where('name', 'like', "%{$search}%")
                                             ->orWhere('sku', 'like', "%{$search}%")
                                             ->limit(50)
                                             ->get()
                                             ->mapWithKeys(function (Product $p) {
-                                                $label = "({$p->sku}) {$p->name}";
-                                                return [$p->id => $label];
+                                                return [$p->id => "({$p->sku}) {$p->name}"];
                                             })->toArray();
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
                                         return "({$product->sku}) {$product->name}";
                                     }),
-                                // F2: satuan produk (read-only, auto-filled from product)
+                                Hidden::make('product_name')
+                                    ->dehydrated(false),
+                                Hidden::make('product_sku')
+                                    ->dehydrated(false),
                                 TextInput::make('unit')
                                     ->label('Satuan')
+                                    ->columnSpan(2)
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default('-')
-                                    ->extraAttributes(['title' => 'Satuan produk (otomatis)'])
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record?->product) {
                                             $component->state($record->product->uom?->abbreviation ?? '-');
                                         }
                                     }),
+                                TextInput::make('quantity')
+                                    ->label('Qty')
+                                    ->columnSpan(2)
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Quantity wajib diisi'
+                                    ])
+                                    ->reactive()
+                                    ->default(1)
+                                    ->afterStateUpdated(function ($set, $get, $state, $livewire) {
+                                        static::recalculateQuotationItemState($set, $get, $livewire);
+                                    }),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
+                                    ->columnSpan(2)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Unit price wajib diisi'
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                        $numericUnit = HelperController::parseIndonesianMoney($state);
-                                        $qty = (float)($get('quantity') ?? 0);
-                                        $discPct = (float)($get('discount') ?? 0);
-                                        $taxPct = (float)($get('tax') ?? 0);
-                                        $taxType = $get('tax_type') ?? 'None';
-                                        // total = unit_price * quantity (no discount)
-                                        $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
-                                        // subtotal = with discount + tax (formatted)
-                                        $subtotalValue = HelperController::hitungSubtotal((int)$qty, $numericUnit, (int)$discPct, (int)$taxPct, $taxType);
-                                        $set('subtotal', number_format((float)$subtotalValue, 0, ',', '.'));
-                                        $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
-                                        try {
-                                            $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
-                                            $set('tax_nominal', number_format((float)$_n_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
-                                        // Recalculate overall total_amount
-                                        $items = $livewire->data['quotationItem'] ?? [];
-                                        $grandTotal = 0;
-                                        foreach ($items as $item) {
-                                            $grandTotal += (float) HelperController::hitungSubtotal(
-                                                (float)($item['quantity'] ?? 0),
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                                (float)($item['discount'] ?? 0),
-                                                (float)($item['tax'] ?? 0),
-                                                $item['tax_type'] ?? 'None'
-                                            );
-                                        }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
+                                        static::recalculateQuotationItemState($set, $get, $livewire);
                                     })
                                     ->indonesianMoney(),
-                                TextInput::make('quantity')
-                                    ->label('Quantity')
+                                TextInput::make('total_price')
+                                    ->label('Total (Harga x Qty)')
+                                    ->columnSpan(2)
+                                    ->readOnly()
                                     ->required()
-                                    ->validationMessages([
-                                        'required' => 'Quantity wajib diisi'
-                                    ])
-                                    ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $qty = (float)($state ?? 0);
-                                        $discPct = (float)($get('discount') ?? 0);
-                                        $taxPct = (float)($get('tax') ?? 0);
-                                        $taxType = $get('tax_type') ?? 'None';
-                                        // total = unit_price * quantity (no discount)
-                                        $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
-                                        // subtotal = with discount + tax (formatted)
-                                        $subtotalValue = HelperController::hitungSubtotal((int)$qty, $numericUnit, (int)$discPct, (int)$taxPct, $taxType);
-                                        $set('subtotal', number_format((float)$subtotalValue, 0, ',', '.'));
-                                        $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
-                                        try {
-                                            $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
-                                            $set('tax_nominal', number_format((float)$_n_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
-                                        // Recalculate overall total_amount
-                                        $items = $livewire->data['quotationItem'] ?? [];
-                                        $grandTotal = 0;
-                                        foreach ($items as $item) {
-                                            $grandTotal += (float) HelperController::hitungSubtotal(
-                                                (float)($item['quantity'] ?? 0),
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                                (float)($item['discount'] ?? 0),
-                                                (float)($item['tax'] ?? 0),
-                                                $item['tax_type'] ?? 'None'
-                                            );
+                                    ->default(0)
+                                    ->indonesianMoney()
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $total = (float) $record->quantity * (float) $record->unit_price;
+                                            $component->state(number_format($total, 0, ',', '.'));
                                         }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
-                                    })
-                                    ->reactive()
-                                    ->default(1),
+                                    }),
                                 TextInput::make('discount')
                                     ->label('Discount (%)')
+                                    ->columnSpan(2)
                                     ->numeric()
                                     ->minValue(0)
-                                    ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $discPct = (float)($state ?? 0);
-                                        $qty = (float)($get('quantity') ?? 0);
-                                        $taxPct = (float)($get('tax') ?? 0);
-                                        $taxType = $get('tax_type') ?? 'None';
-                                        // total = unit_price * quantity (no discount)
-                                        $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
-                                        // subtotal uses hitungSubtotal (with discount + tax, formatted)
-                                        $subtotalValue = HelperController::hitungSubtotal((int)$qty, $numericUnit, (int)$discPct, (int)$taxPct, $taxType);
-                                        $set('subtotal', number_format((float)$subtotalValue, 0, ',', '.'));
-                                        $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
-                                        try {
-                                            $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
-                                            $set('tax_nominal', number_format((float)$_n_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
-                                        // Recalculate overall total_amount
-                                        $items = $livewire->data['quotationItem'] ?? [];
-                                        $grandTotal = 0;
-                                        foreach ($items as $item) {
-                                            $grandTotal += (float) HelperController::hitungSubtotal(
-                                                (float)($item['quantity'] ?? 0),
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                                (float)($item['discount'] ?? 0),
-                                                (float)($item['tax'] ?? 0),
-                                                $item['tax_type'] ?? 'None'
-                                            );
-                                        }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
-                                    })
-                                    ->reactive()
                                     ->maxValue(100)
                                     ->default(0)
-                                    ->suffix('%'),
-                                Select::make('tax_type')
+                                    ->suffix('%')
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($set, $get, $state, $livewire) {
+                                        static::recalculateQuotationItemState($set, $get, $livewire);
+                                    }),
+                                TextInput::make('discount_nominal')
+                                    ->label('Discount (Nominal)')
+                                    ->columnSpan(2)
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->indonesianMoney()
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $base = (float) $record->quantity * (float) $record->unit_price;
+                                            $nominal = $base * ((float) $record->discount / 100);
+                                            $component->state(number_format($nominal, 0, ',', '.'));
+                                        }
+                                    }),
+                                Radio::make('tax_type')
                                     ->label('Tipe Pajak')
+                                    ->columnSpan(4)
+                                    ->inline()
+                                    ->reactive()
+                                    ->required()
                                     ->default('None')
                                     ->options(static::taxTypeOptions())
-                                    ->nullable()
                                     ->afterStateHydrated(function ($component, $state) {
                                         $component->state(static::normalizeTaxTypeValue($state));
                                     })
-                                    ->live()
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $livewire) {
                                         $state = static::normalizeTaxTypeValue($state);
                                         $defaultTax = TaxDefaultResolver::resolveForProductId(
@@ -732,49 +760,23 @@ class QuotationResource extends Resource
 
                                         if ($state === 'None') {
                                             $set('tax', 0);
-                                            $set('tax_nominal', '0');
                                         } else {
                                             $set('tax', $defaultTax);
                                         }
 
-                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $qty = (float)($get('quantity') ?? 0);
-                                        $discPct = (float)($get('discount') ?? 0);
-                                        $taxPct = $state === 'None' ? 0 : $defaultTax;
-                                        $taxType = $state ?? 'None';
-                                        // total = unit_price * quantity (no discount)
-                                        $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
-                                        // subtotal = with discount + tax (formatted)
-                                        $subtotalValue = HelperController::hitungSubtotal((int)$qty, $numericUnit, (int)$discPct, (int)$taxPct, $taxType);
-                                        $set('subtotal', number_format((float)$subtotalValue, 0, ',', '.'));
-                                        $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
-                                        try {
-                                            $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
-                                            $set('tax_nominal', number_format((float)$_n_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
-                                        // Recalculate overall total_amount
-                                        $items = $livewire->data['quotationItem'] ?? [];
-                                        $grandTotal = 0;
-                                        foreach ($items as $item) {
-                                            $grandTotal += (float) HelperController::hitungSubtotal(
-                                                (float)($item['quantity'] ?? 0),
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                                (float)($item['discount'] ?? 0),
-                                                (float)($item['tax'] ?? 0),
-                                                $item['tax_type'] ?? 'None'
-                                            );
-                                        }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
+                                        static::recalculateQuotationItemState($set, $get, $livewire);
                                     })
                                     ->validationMessages([
                                         'required' => 'Tipe Pajak wajib dipilih.',
                                     ]),
                                 TextInput::make('tax')
                                     ->label('Tax')
+                                    ->columnSpan(2)
                                     ->numeric()
                                     ->reactive()
                                     ->required()
                                     ->readOnly()
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->validationMessages([
                                         'required' => 'Tax tidak boleh kosong'
                                     ])
@@ -794,90 +796,56 @@ class QuotationResource extends Resource
                                         );
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                        $numericUnit = HelperController::parseIndonesianMoney($get('unit_price'));
-                                        $qty = (float)($get('quantity') ?? 0);
-                                        $discPct = (float)($get('discount') ?? 0);
-                                        $taxType = $get('tax_type') ?? 'None';
-                                        if ($taxType === 'None') {
-                                            $state = 0;
+                                        if (($get('tax_type') ?? 'None') === 'None') {
                                             $set('tax', 0);
                                         }
-                                        $taxPct = (float)($state ?? 0);
-                                        // total = unit_price * quantity (no discount)
-                                        $set('total_price', number_format($qty * $numericUnit, 0, ',', '.'));
-                                        // subtotal = with discount + tax (formatted)
-                                        $subtotalValue = HelperController::hitungSubtotal((int)$qty, $numericUnit, (int)$discPct, (int)$taxPct, $taxType);
-                                        $set('subtotal', number_format((float)$subtotalValue, 0, ',', '.'));
-                                        $_n_base = $qty * $numericUnit * (1 - $discPct / 100);
-                                        try {
-                                            $_n_r = \App\Services\TaxService::compute($_n_base, $taxPct, $taxType);
-                                            $set('tax_nominal', number_format((float)$_n_r['ppn'], 0, ',', '.'));
-                                        } catch (\Throwable $e) { $set('tax_nominal', '0'); }
-                                        // Recalculate overall total_amount
-                                        $items = $livewire->data['quotationItem'] ?? [];
-                                        $grandTotal = 0;
-                                        foreach ($items as $item) {
-                                            $grandTotal += (float) HelperController::hitungSubtotal(
-                                                (float)($item['quantity'] ?? 0),
-                                                HelperController::parseIndonesianMoney($item['unit_price'] ?? 0),
-                                                (float)($item['discount'] ?? 0),
-                                                (float)($item['tax'] ?? 0),
-                                                $item['tax_type'] ?? 'None'
-                                            );
-                                        }
-                                        $livewire->data['total_amount'] = static::formatMoneyState($grandTotal);
+                                        static::recalculateQuotationItemState($set, $get, $livewire);
                                     })
-                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->suffix('%'),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak (Rp)')
-                                    ->prefix('Rp')
+                                    ->columnSpan(2)
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
-                                    ->afterStateHydrated(function ($component, $record) {
-                                        if ($record) {
-                                            $base = (float)$record->quantity
-                                                * (float)\App\Http\Controllers\HelperController::parseIndonesianMoney($record->unit_price ?? 0)
-                                                * (1 - (float)$record->discount / 100);
-                                            try {
-                                                $r = \App\Services\TaxService::compute($base, (float)$record->tax, $record->tax_type ?? 'None');
-                                                $component->state(number_format($r['ppn'], 0, ',', '.'));
-                                            } catch (\Throwable $e) { $component->state('0'); }
-                                        }
-                                    }),
-                                TextInput::make('total_price')
-                                    ->label('Total (Harga × Qty)')
-                                    ->reactive()
-                                    ->required()
-                                    ->default(0)
                                     ->indonesianMoney()
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
-                                            $total = (float)$record->quantity * (float)$record->unit_price;
-                                            $component->state(number_format($total, 0, ',', '.'));
+                                            $base = (float) $record->quantity
+                                                * (float) \App\Http\Controllers\HelperController::parseIndonesianMoney($record->unit_price ?? 0)
+                                                * (1 - (float) $record->discount / 100);
+                                            try {
+                                                $r = \App\Services\TaxService::compute($base, (float) $record->tax, $record->tax_type ?? 'None');
+                                                $component->state(number_format((float) $r['ppn'], 0, ',', '.'));
+                                            } catch (\Throwable $e) {
+                                                $component->state('0');
+                                            }
                                         }
                                     }),
                                 TextInput::make('subtotal')
                                     ->label(fn ($get) => static::subtotalLabelForTaxType($get('tax_type') ?? 'None'))
+                                    ->columnSpan(2)
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
                                     ->indonesianMoney()
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $subtotal = HelperController::hitungSubtotal(
                                                 $record->quantity,
-                                                (float)$record->unit_price,
+                                                (float) $record->unit_price,
                                                 $record->discount,
                                                 $record->tax,
                                                 $record->tax_type ?? 'None'
                                             );
-                                            $component->state(number_format((float)$subtotal, 0, ',', '.'));
+                                            $component->state(number_format((float) $subtotal, 0, ',', '.'));
                                         }
                                     }),
-                                Textarea::make('notes')
+                                TextInput::make('notes')
                                     ->label('Notes')
+                                    ->columnSpanFull()
                                     ->nullable(),
 
                             ])
