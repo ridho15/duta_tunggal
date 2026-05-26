@@ -153,6 +153,55 @@ test('purchase order edit and view pages show supplier code and name', function 
         ->assertSee('(SUP-PO-001) PT Supplier Purchase Order');
 });
 
+test('purchase order edit page pre-fills cabang from related items when raw cabang_id is null', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'created_by' => $this->user->id,
+        'status' => 'approved',
+    ]);
+
+    $orderRequestItem = OrderRequestItem::create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 2,
+        'unit_price' => 12500,
+        'original_price' => 12500,
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-CABANG-FILL-001',
+        'order_date' => Carbon::now()->toDateString(),
+        'status' => 'draft',
+        'expected_date' => Carbon::now()->addDays(3)->toDateString(),
+        'total_amount' => 0,
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'note' => 'PO cabang fallback test',
+        'created_by' => $this->user->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'cabang_id' => null,
+    ]);
+
+    $purchaseOrder->purchaseOrderItem()->create([
+        'product_id' => $this->product->id,
+        'quantity' => 2,
+        'unit_price' => 12500,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'eklusif',
+        'currency_id' => $this->currency->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItem->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->assertSet('data.cabang_id', $this->cabang->id);
+});
+
 test('purchase order view uses infolist sections with purchase order details', function () {
     $purchaseOrder = PurchaseOrder::create([
         'supplier_id' => $this->supplier->id,

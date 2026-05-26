@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Cabang;
+use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\Currency;
+use App\Models\InventoryStock;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\Product;
@@ -11,6 +14,7 @@ use App\Models\QuotationItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\StockReservation;
+use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\Rak;
@@ -19,6 +23,7 @@ use App\Services\QuotationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -26,20 +31,49 @@ beforeEach(function () {
     $this->salesOrderService = app(SalesOrderService::class);
     $this->quotationService = app(QuotationService::class);
 
+    foreach ([
+        ['code' => '1120', 'name' => 'Piutang Dagang', 'type' => 'Asset'],
+        ['code' => '4000', 'name' => 'Penjualan', 'type' => 'Revenue'],
+        ['code' => '4111', 'name' => 'Penjualan Jasa', 'type' => 'Revenue'],
+        ['code' => '1140.01', 'name' => 'Persediaan Barang', 'type' => 'Asset'],
+        ['code' => '1140.10', 'name' => 'Persediaan Barang Dagangan', 'type' => 'Asset'],
+        ['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset'],
+        ['code' => '4100.10', 'name' => 'Penjualan Produk', 'type' => 'Revenue'],
+        ['code' => '4110.10', 'name' => 'Diskon Penjualan Produk', 'type' => 'Expense'],
+        ['code' => '4120.10', 'name' => 'Retur Penjualan Produk', 'type' => 'Expense'],
+        ['code' => '5100.10', 'name' => 'HPP Barang Dagangan', 'type' => 'Expense'],
+        ['code' => '2100.10', 'name' => 'Pembelian Belum Tertagih', 'type' => 'Liability'],
+        ['code' => '1400.01', 'name' => 'Persediaan Sementara', 'type' => 'Asset'],
+    ] as $account) {
+        ChartOfAccount::firstOrCreate(['code' => $account['code']], array_merge($account, ['is_active' => true]));
+    }
+
+    $this->cabang = Cabang::create([
+        'nama' => 'Cabang Sales Test',
+        'kode' => 'CST',
+        'alamat' => 'Jl. Sales Test',
+        'telepon' => '021-SALES',
+    ]);
+
+    $this->uom = UnitOfMeasure::create([
+        'name' => 'Piece',
+        'abbreviation' => 'pcs',
+    ]);
+
     // Create test data
     $this->productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'code' => 'TC001',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
     ]);
 
     $this->warehouse = Warehouse::create([
         'name' => 'Main Warehouse',
         'code' => 'WH001',
         'kode' => 'WH001',
-        'cabang_id' => 1,
-        'branch_id' => 1,
+        'cabang_id' => $this->cabang->id,
+        'branch_id' => $this->cabang->id,
         'address' => 'Jl. Test No. 123',
         'location' => 'Jakarta',
     ]);
@@ -75,12 +109,12 @@ test('can create sales order from quotation', function () {
     $product = Product::create([
         'name' => 'Test Product',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $this->productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -160,12 +194,12 @@ test('can create sales order directly', function () {
     $product = Product::create([
         'name' => 'Direct Product',
         'sku' => 'PROD002',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $this->productCategory->id,
         'sell_price' => 200000,
         'cost_price' => 160000,
         'kode_merk' => 'DIRECT',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -238,7 +272,7 @@ test('createPurchaseOrder only includes selected SO items that are not linked to
         'sell_price' => 110000,
         'cost_price' => 90000,
         'kode_merk' => 'G6',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -252,7 +286,7 @@ test('createPurchaseOrder only includes selected SO items that are not linked to
         'sell_price' => 125000,
         'cost_price' => 95000,
         'kode_merk' => 'G6',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -368,7 +402,7 @@ test('createPurchaseOrder throws when selected SO items are already linked to PO
         'sell_price' => 130000,
         'cost_price' => 100000,
         'kode_merk' => 'G6',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -424,7 +458,7 @@ test('createPurchaseOrder throws when selected SO items are already linked to PO
         'warehouse_id' => $this->warehouse->id,
         'expected_date' => now()->addDays(8)->toDateString(),
         'tempo_hutang' => 21,
-    ]))->toThrow(RuntimeException::class);
+    ]))->toThrow(ValidationException::class);
 });
 
 test('sales order approval workflow works correctly', function () {
@@ -522,12 +556,12 @@ test('sales order can calculate total amount correctly', function () {
     $product1 = Product::create([
         'name' => 'Product A',
         'sku' => 'PRODA',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $this->productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'A',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -536,12 +570,12 @@ test('sales order can calculate total amount correctly', function () {
     $product2 = Product::create([
         'name' => 'Product B',
         'sku' => 'PRODB',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $this->productCategory->id,
         'sell_price' => 200000,
         'cost_price' => 160000,
         'kode_merk' => 'B',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -557,7 +591,7 @@ test('sales order can calculate total amount correctly', function () {
         'created_by' => 1,
     ]);
 
-    // Item 1: 2 × 100000 = 200000, discount 10% = 180000, tax 11% (inklusif) = 180000
+    // Item 1: 2 × 100000 = 200000, discount 10% = 180000, tax 11% exclusive = 199800
     $item1 = SaleOrderItem::create([
         'sale_order_id' => $salesOrder->id,
         'product_id' => $product1->id,
@@ -569,7 +603,7 @@ test('sales order can calculate total amount correctly', function () {
         'rak_id' => $this->rak->id,
     ]);
 
-    // Item 2: 1 × 200000 = 200000, discount 5% = 190000, tax 11% (inklusif) = 190000
+    // Item 2: 1 × 200000 = 200000, discount 5% = 190000, tax 11% exclusive = 210900
     $item2 = SaleOrderItem::create([
         'sale_order_id' => $salesOrder->id,
         'product_id' => $product2->id,
@@ -581,12 +615,12 @@ test('sales order can calculate total amount correctly', function () {
         'rak_id' => $this->rak->id,
     ]);
 
-    // Calculate total: 180000 + 190000 = 370000 (inklusif tax)
+    // Calculate total: 199800 + 210900 = 410700
     $this->salesOrderService->updateTotalAmount($salesOrder);
 
     $salesOrder->refresh();
     // DB stores totals as decimal strings; compare numerically to avoid formatting differences
-    expect((float) $salesOrder->total_amount)->toBe(370000.0);
+    expect((float) $salesOrder->total_amount)->toBe(410700.0);
 });
 
 test('sales order can be confirmed by warehouse', function () {
@@ -646,11 +680,38 @@ test('sales order can be completed', function () {
     $salesOrder = SaleOrder::create([
         'so_number' => 'SO-20251101-0007',
         'customer_id' => $customer->id,
+        'cabang_id' => $this->cabang->id,
         'order_date' => now(),
         'delivery_date' => now()->addDays(5),
         'status' => 'confirmed',
         'tipe_pengiriman' => 'Kirim Langsung',
         'created_by' => 1,
+    ]);
+
+    $product = Product::create([
+        'name' => 'Complete Product',
+        'sku' => 'PRODCOMP',
+        'cabang_id' => $this->cabang->id,
+        'product_category_id' => $this->productCategory->id,
+        'sell_price' => 150000,
+        'cost_price' => 100000,
+        'kode_merk' => 'COMP',
+        'uom_id' => $this->uom->id,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
+    SaleOrderItem::create([
+        'sale_order_id' => $salesOrder->id,
+        'product_id' => $product->id,
+        'quantity' => 2,
+        'unit_price' => 150000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'eklusif',
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => $this->rak->id,
     ]);
 
     // Complete the sales order
@@ -738,26 +799,26 @@ test('sales order reserves stock', function () {
     $product = Product::create([
         'name' => 'Reserve Product',
         'sku' => 'PRODRES',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $this->productCategory->id,
         'sell_price' => 150000,
         'cost_price' => 120000,
         'kode_merk' => 'RESERVE',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
     ]);
 
     // Create inventory stock for the product
-    \App\Models\InventoryStock::create([
+    InventoryStock::updateOrCreate([
         'product_id' => $product->id,
         'warehouse_id' => $this->warehouse->id,
-        'rak_id' => $this->rak->id,
+        'rak_id' => null,
+    ], [
         'qty_available' => 10,
         'qty_reserved' => 0,
-        'qty_on_hand' => 10,
-        'last_stock_update' => now(),
+        'qty_min' => 0,
     ]);
 
     $salesOrder = SaleOrder::create([

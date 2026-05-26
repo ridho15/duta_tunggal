@@ -31,6 +31,11 @@ use Illuminate\Support\Facades\Log;
 class ViewQuotation extends ViewRecord
 {
     protected static string $resource = QuotationResource::class;
+    
+    public function getTitle(): string
+    {
+        return 'View Quotation - ' . QuotationResource::quotationStatusLabel($this->record?->status);
+    }
 
     protected function getActions(): array
     {

@@ -102,6 +102,99 @@ class QuotationResource extends Resource
 
         return number_format((float) HelperController::parseIndonesianMoney($amount), 0, ',', '.');
     }
+    
+    public static function quotationStatusLabel(?string $status): string
+    {
+        return match ($status) {
+            'draft' => 'Draft',
+            'request_approve' => 'Request Approve',
+            'approve' => 'Approved',
+            'reject' => 'Rejected',
+            default => '-',
+        };
+    }
+    
+    protected static function quotationStatusColor(?string $status): string
+    {
+        return match ($status) {
+            'draft' => 'gray',
+            'request_approve' => 'gray',
+            'approve' => 'info',
+            'reject' => 'danger',
+            default => 'gray',
+        };
+    }
+    
+    protected static function quotationStatusBadge(?string $status): HtmlString
+    {
+        $label = static::quotationStatusLabel($status);
+        
+        $palette = match ($status) {
+            'draft' => ['bg' => '#ffffff', 'border' => '#9ca3af', 'text' => '#4b5563'],
+            'request_approve' => ['bg' => '#e5e7eb', 'border' => '#d1d5db', 'text' => '#374151'],
+            'approve' => ['bg' => '#dbeafe', 'border' => '#bfdbfe', 'text' => '#1e40af'],
+            'reject' => ['bg' => '#fee2e2', 'border' => '#fecaca', 'text' => '#991b1b'],
+            default => ['bg' => '#f3f4f6', 'border' => '#d1d5db', 'text' => '#4b5563'],
+        };
+        
+        return new HtmlString(sprintf(
+            '<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9999px;border:1px solid %s;background-color:%s;color:%s;font-size:12px;font-weight:700;line-height:1;">%s</span>',
+            $palette['border'],
+            $palette['bg'],
+            $palette['text'],
+            e($label),
+        ));
+    }
+
+    protected static function quotationMoney(mixed $amount): string
+    {
+        return \App\Helpers\MoneyHelper::rupiah((float) HelperController::parseIndonesianMoney($amount ?? 0));
+    }
+
+    protected static function quotationItemSubtotal($item): float
+    {
+        return (float) HelperController::hitungSubtotal(
+            (float) ($item->quantity ?? 0),
+            (float) ($item->unit_price ?? 0),
+            (float) ($item->discount ?? 0),
+            (float) ($item->tax ?? 0),
+            static::normalizeTaxTypeValue($item->tax_type ?? null)
+        );
+    }
+
+    protected static function quotationItemTaxNominal($item): float
+    {
+        return (float) HelperController::hitungTaxNominal(
+            (float) ($item->quantity ?? 0),
+            (float) ($item->unit_price ?? 0),
+            (float) ($item->discount ?? 0),
+            (float) ($item->tax ?? 0),
+            static::normalizeTaxTypeValue($item->tax_type ?? null)
+        );
+    }
+
+    protected static function quotationDetailColumnEntry(string $name, string $heading, array $rows): \Filament\Infolists\Components\TextEntry
+    {
+        return \Filament\Infolists\Components\TextEntry::make($name)
+            ->label('')
+            ->getStateUsing(function ($record) use ($heading, $rows) {
+                $html = '<div class="space-y-1">';
+                $html .= '<div class="mb-2 text-base font-semibold text-gray-950 dark:text-white">' . e($heading) . '</div>';
+
+                foreach ($rows as [$label, $state]) {
+                    $value = $state instanceof \Closure ? $state($record) : $state;
+                    $html .= '<div class="flex gap-2 py-0.5 text-sm">';
+                    $html .= '<span class="w-44 shrink-0 font-medium text-gray-600 dark:text-gray-400">' . e($label) . ' :</span>';
+                    $html .= '<span class="min-w-0 flex-1 text-gray-950 dark:text-white">' . e((string) ($value ?? '-')) . '</span>';
+                    $html .= '</div>';
+                }
+
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->html();
+    }
 
     protected static function quotationStatusLegend(): HtmlString
     {
@@ -167,13 +260,20 @@ class QuotationResource extends Resource
                                 if (!$record) {
                                     return '-';
                                 }
-                                return match ($record->status) {
-                                    'draft' => 'Draft',
-                                    'request_approve' => 'Request Approve',
-                                    'approve' => 'Approved',
-                                    'reject' => 'Rejected',
-                                    default => '-'
-                                };
+                                return new HtmlString(
+                                    '<div class="space-y-2">' .
+                                    static::quotationStatusBadge($record->status) .
+                                    '<p class="text-xs text-gray-500">' .
+                                    match ($record->status) {
+                                        'draft' => 'Quotation masih draft dan belum diajukan.',
+                                        'request_approve' => 'Quotation menunggu persetujuan.',
+                                        'approve' => 'Quotation sudah disetujui dan siap dipakai.',
+                                        'reject' => 'Quotation ditolak dan perlu revisi.',
+                                        default => 'Status quotation belum ditentukan.',
+                                    } .
+                                    '</p>' .
+                                    '</div>'
+                                );
                             }),
                         TextInput::make('quotation_number')
                             ->required()
@@ -814,20 +914,10 @@ class QuotationResource extends Resource
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'draft' => Str::upper('draft'),
-                            'request_approve' => Str::upper('request approve'),
-                            'approve' => Str::upper('Approved'),
-                            'reject' => Str::upper('Rejected'),
-                        };
+                        return Str::upper(static::quotationStatusLabel($state));
                     })
                     ->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'request_approve' => 'gray',
-                            'approve' => 'info',
-                            'reject' => 'danger',
-                        };
+                        return static::quotationStatusColor($state);
                     }),
 
                 TextColumn::make('po_file_path')
@@ -1455,6 +1545,159 @@ class QuotationResource extends Resource
         }
 
         return $query;
+    }
+
+    public static function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
+    {
+        return $infolist
+            ->schema([
+                \Filament\Infolists\Components\Section::make('Informasi Quotation')
+                    ->columns(3)
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('quotation_number')
+                            ->label('Quotation Number'),
+                        \Filament\Infolists\Components\TextEntry::make('customer.name')
+                            ->label('Customer')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('cabang.nama')
+                            ->label('Cabang')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('status')
+                            ->label('Status')
+                            ->formatStateUsing(fn($state) => static::quotationStatusLabel($state))
+                            ->color(fn($state) => static::quotationStatusColor($state))
+                            ->badge(),
+                        \Filament\Infolists\Components\TextEntry::make('date')
+                            ->label('Date')
+                            ->date('d/m/Y'),
+                        \Filament\Infolists\Components\TextEntry::make('valid_until')
+                            ->label('Valid Until')
+                            ->date('d/m/Y')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('tempo_pembayaran')
+                            ->label('Tempo Pembayaran')
+                            ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
+                        \Filament\Infolists\Components\TextEntry::make('total_amount')
+                            ->label('Total Amount')
+                            ->formatStateUsing(fn($state) => static::quotationMoney($state)),
+                        \Filament\Infolists\Components\TextEntry::make('createdBy.name')
+                            ->label('Created By')
+                            ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('notes')
+                            ->label('Notes')
+                            ->placeholder('-')
+                            ->columnSpan(2),
+                        \Filament\Infolists\Components\TextEntry::make('po_file_path')
+                            ->label('PO File')
+                            ->placeholder('-'),
+                    ]),
+                \Filament\Infolists\Components\Section::make('Ringkasan Quotation')
+                    ->columns(3)
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('items_count')
+                            ->label('Jumlah Item')
+                            ->getStateUsing(fn($record) => $record->quotationItem->count()),
+                        \Filament\Infolists\Components\TextEntry::make('total_quantity')
+                            ->label('Total Qty')
+                            ->getStateUsing(fn($record) => (float) $record->quotationItem->sum('quantity')),
+                        \Filament\Infolists\Components\TextEntry::make('total_discount_nominal')
+                            ->label('Total Discount (Nominal)')
+                            ->getStateUsing(function ($record) {
+                                $total = $record->quotationItem->sum(function ($item) {
+                                    return ((float) ($item->quantity ?? 0) * (float) ($item->unit_price ?? 0))
+                                        * ((float) ($item->discount ?? 0) / 100);
+                                });
+
+                                return static::quotationMoney($total);
+                            }),
+                        \Filament\Infolists\Components\TextEntry::make('total_tax_nominal')
+                            ->label('Total Nominal Pajak')
+                            ->getStateUsing(fn($record) => static::quotationMoney(
+                                $record->quotationItem->sum(fn($item) => static::quotationItemTaxNominal($item))
+                            )),
+                        \Filament\Infolists\Components\TextEntry::make('summary_total_amount')
+                            ->label('Total Quotation')
+                            ->getStateUsing(fn($record) => static::quotationMoney($record->total_amount)),
+                    ]),
+                \Filament\Infolists\Components\Section::make('Detail Item Quotation')
+                    ->columnSpanFull()
+                    ->schema([
+                        \Filament\Infolists\Components\RepeatableEntry::make('quotationItem')
+                            ->label('')
+                            ->columnSpanFull()
+                            ->schema([
+                                \Filament\Infolists\Components\Section::make(function ($record) {
+                                    $productName = $record->product
+                                        ? "({$record->product->sku}) {$record->product->name}"
+                                        : '-';
+                                    $qty = (float) ($record->quantity ?? 0);
+                                    $subtotal = static::quotationMoney(static::quotationItemSubtotal($record));
+
+                                    return "Product: {$productName} | Qty: {$qty} | Subtotal: {$subtotal}";
+                                })
+                                    ->collapsible()
+                                    ->collapsed()
+                                    ->schema([
+                                        \Filament\Infolists\Components\Grid::make(2)
+                                            ->schema([
+                                                \Filament\Infolists\Components\Group::make([
+                                                    static::quotationDetailColumnEntry(
+                                                        'product_column',
+                                                        'Produk',
+                                                        [
+                                                            ['Product', function ($record) {
+                                                                if (! $record->product) {
+                                                                    return '-';
+                                                                }
+
+                                                                return $record->product->sku
+                                                                    ? "({$record->product->sku}) {$record->product->name}"
+                                                                    : ($record->product->name ?? '-');
+                                                            }],
+                                                            ['Satuan', function ($record) {
+                                                                return $record->product?->uom?->abbreviation
+                                                                    ?? $record->product?->uom?->name
+                                                                    ?? '-';
+                                                            }],
+                                                            ['Qty', fn($record) => $record->quantity],
+                                                            ['Note', fn($record) => $record->notes ?? '-'],
+                                                        ]
+                                                    ),
+                                                ])
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                                \Filament\Infolists\Components\Group::make([
+                                                    static::quotationDetailColumnEntry(
+                                                        'price_column',
+                                                        'Price',
+                                                        [
+                                                            ['Unit Price', fn($record) => static::quotationMoney($record->unit_price ?? 0)],
+                                                            ['Total (Harga x Qty)', function ($record) {
+                                                                $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+
+                                                                return static::quotationMoney($total);
+                                                            }],
+                                                            ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
+                                                            ['Discount (Nominal)', function ($record) {
+                                                                $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+                                                                $discount = $total * ((float) ($record->discount ?? 0) / 100);
+
+                                                                return static::quotationMoney($discount);
+                                                            }],
+                                                            ['Tipe Pajak', fn($record) => static::normalizeTaxTypeValue($record->tax_type ?? null)],
+                                                            ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
+                                                            ['Nominal Pajak', fn($record) => static::quotationMoney(static::quotationItemTaxNominal($record))],
+                                                            ['Subtotal', fn($record) => static::quotationMoney(static::quotationItemSubtotal($record))],
+                                                        ]
+                                                    ),
+                                                ])
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                            ]),
+                                    ]),
+                            ]),
+                    ]),
+            ]);
     }
 
     public static function getRelations(): array

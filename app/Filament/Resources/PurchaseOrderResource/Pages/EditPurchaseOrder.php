@@ -206,6 +206,10 @@ class EditPurchaseOrder extends EditRecord
         $total = 0;
 
         if ($record) {
+            if (empty($data['cabang_id'])) {
+                $data['cabang_id'] = $record->cabang_id;
+            }
+
             $record->loadMissing('purchaseOrderCurrency');
             $poCurrencies = $record->purchaseOrderCurrency->keyBy('currency_id');
 

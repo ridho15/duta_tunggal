@@ -21,6 +21,12 @@ class EditQuotation extends EditRecord
                 ->icon('heroicon-o-trash'),
         ];
     }
+    
+            public function getTitle(): string
+            {
+                return 'Edit Quotation - ' . QuotationResource::quotationStatusLabel($this->record?->status);
+            }
+
 
     protected function afterSave()
     {

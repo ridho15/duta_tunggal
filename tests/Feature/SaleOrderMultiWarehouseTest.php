@@ -25,6 +25,7 @@ use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\SaleOrderItemWarehouseAllocation;
 use App\Models\StockReservation;
+use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
@@ -53,6 +54,11 @@ function mwFixtures(): array
         'code' => 'CMW01',
         'kode' => 'CMW01',
         'cabang_id' => $cabang->id,
+    ]);
+
+    $uom = UnitOfMeasure::create([
+        'name' => 'Piece',
+        'abbreviation' => 'pcs',
     ]);
 
     $warehouse1 = Warehouse::create([
@@ -99,27 +105,31 @@ function mwFixtures(): array
         'sell_price' => 10000000,
         'cost_price' => 8000000,
         'kode_merk' => 'MW',
-        'uom_id' => 1,
+        'uom_id' => $uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
     ]);
 
     // Create inventory stock at each warehouse
-    InventoryStock::create([
+    InventoryStock::updateOrCreate([
         'product_id' => $product->id,
         'warehouse_id' => $warehouse1->id,
         'rak_id' => null,
+    ], [
         'qty_available' => 10,
         'qty_reserved' => 0,
+        'qty_min' => 0,
     ]);
 
-    InventoryStock::create([
+    InventoryStock::updateOrCreate([
         'product_id' => $product->id,
         'warehouse_id' => $warehouse2->id,
         'rak_id' => null,
+    ], [
         'qty_available' => 8,
         'qty_reserved' => 0,
+        'qty_min' => 0,
     ]);
 
     return compact('cabang', 'customer', 'product', 'warehouse1', 'warehouse2');
@@ -399,6 +409,45 @@ test('10. handleStockReductionForSelfPickup mengurangi stok per alokasi untuk Am
     // wh2 started with 8, alloc2 qty=4 → should be 4
     expect((float) $stock1->qty_available)->toBe(5.0);
     expect((float) $stock2->qty_available)->toBe(4.0);
+});
+
+test('10b. handleStockReductionForSelfPickup melepas reservation tanpa double-deduct stok', function () {
+    $f = mwFixtures();
+    $data = makeSoWithAllocations($f, 'Ambil Sendiri');
+
+    $service = new SalesOrderService();
+    $so = SaleOrder::find($data['so']->id);
+    $service->confirm($so);
+
+    $stock1AfterReservation = InventoryStock::where('product_id', $f['product']->id)
+        ->where('warehouse_id', $f['warehouse1']->id)
+        ->first();
+    $stock2AfterReservation = InventoryStock::where('product_id', $f['product']->id)
+        ->where('warehouse_id', $f['warehouse2']->id)
+        ->first();
+
+    expect((float) $stock1AfterReservation->qty_available)->toBe(5.0);
+    expect((float) $stock1AfterReservation->qty_reserved)->toBe(5.0);
+    expect((float) $stock2AfterReservation->qty_available)->toBe(4.0);
+    expect((float) $stock2AfterReservation->qty_reserved)->toBe(4.0);
+
+    $observer = new SaleOrderObserver();
+    $method = new \ReflectionMethod(SaleOrderObserver::class, 'handleStockReductionForSelfPickup');
+    $method->setAccessible(true);
+    $method->invoke($observer, SaleOrder::find($so->id));
+
+    $stock1 = InventoryStock::where('product_id', $f['product']->id)
+        ->where('warehouse_id', $f['warehouse1']->id)
+        ->first();
+    $stock2 = InventoryStock::where('product_id', $f['product']->id)
+        ->where('warehouse_id', $f['warehouse2']->id)
+        ->first();
+
+    expect((float) $stock1->qty_available)->toBe(5.0);
+    expect((float) $stock1->qty_reserved)->toBe(0.0);
+    expect((float) $stock2->qty_available)->toBe(4.0);
+    expect((float) $stock2->qty_reserved)->toBe(0.0);
+    expect(StockReservation::where('sale_order_id', $so->id)->count())->toBe(0);
 });
 
 test('11. handleStockReductionForSelfPickup bekerja untuk single-gudang pada Ambil Sendiri', function () {

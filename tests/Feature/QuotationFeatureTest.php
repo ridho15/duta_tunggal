@@ -782,6 +782,69 @@ test('quotation form prefers active setting, then product tax, then zero', funct
         ->assertSet('data.quotationItem.0.tax', 0);
     });
 
+test('view quotation renders expandable quotation item infolist', function () {
+    $user = User::factory()->create(['cabang_id' => $this->cabang->id]);
+    foreach (['view any quotation', 'view quotation'] as $permission) {
+        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+    }
+    $user->givePermissionTo(['view any quotation', 'view quotation']);
+    $this->actingAs($user);
+
+    $customer = Customer::factory()->create(['cabang_id' => $this->cabang->id]);
+    $product = Product::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'uom_id' => $this->uom->id,
+        'sku' => 'QVIEW-001',
+        'name' => 'Produk View Quotation',
+    ]);
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-VIEW-0001',
+        'customer_id' => $customer->id,
+        'cabang_id' => $this->cabang->id,
+        'date' => now(),
+        'valid_until' => now()->addDays(14),
+        'tempo_pembayaran' => 30,
+        'total_amount' => 999000,
+        'notes' => 'Catatan quotation view',
+        'status' => 'approve',
+        'created_by' => $user->id,
+    ]);
+
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id' => $product->id,
+        'quantity' => 10,
+        'unit_price' => 100000,
+        'discount' => 10,
+        'tax' => 11,
+        'tax_type' => 'PPN Excluded',
+        'notes' => 'Catatan item quotation',
+    ]);
+
+    $response = $this->get(\App\Filament\Resources\QuotationResource::getUrl('view', [
+        'record' => $quotation,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Informasi Quotation');
+    $response->assertSee('Ringkasan Quotation');
+    $response->assertSee('Detail Item Quotation');
+    $response->assertSee('Product:');
+    $response->assertSee('Qty:');
+    $response->assertSee('Subtotal:');
+    $response->assertSee('Product :', false);
+    $response->assertSee('Satuan :', false);
+    $response->assertSee('Qty :', false);
+    $response->assertSee('Unit Price :', false);
+    $response->assertSee('Discount (Nominal) :', false);
+    $response->assertSee('Nominal Pajak :', false);
+    $response->assertSee('Subtotal :', false);
+    $response->assertSee('(QVIEW-001) Produk View Quotation');
+    $response->assertSee('Catatan item quotation');
+    $response->assertSee('Rp 999.000');
+});
+
     test('quotation total amount stays formatted as rupiah on live updates and persists numerically', function () {
         $user = User::factory()->create();
         $permissions = [

@@ -115,6 +115,24 @@ class OrderRequestService
             ->filter();
     }
 
+    private function resolvePurchaseOrderCabangId($orderRequest, array $data, \Illuminate\Support\Collection $resolvedItems): ?int
+    {
+        if (! empty($data['cabang_id'])) {
+            return (int) $data['cabang_id'];
+        }
+
+        $firstItem = $resolvedItems->first();
+        if ($firstItem) {
+            $itemCabangId = $firstItem['order_request_item']->cabang_id ?? null;
+
+            if (! empty($itemCabangId)) {
+                return (int) $itemCabangId;
+            }
+        }
+
+        return ! empty($orderRequest->cabang_id) ? (int) $orderRequest->cabang_id : null;
+    }
+
     public function approve($orderRequest, $data)
     {
         $createPurchaseOrder = $data['create_purchase_order'] ?? true;
@@ -130,8 +148,7 @@ class OrderRequestService
 
             $orderRequest->load('orderRequestItem');
             $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
-            $firstItem = $resolvedItems->first();
-            $cabangId = $firstItem ? ($firstItem['order_request_item']->cabang_id ?? null) : ($orderRequest->cabang_id ?? null);
+            $cabangId = $this->resolvePurchaseOrderCabangId($orderRequest, $data, $resolvedItems);
 
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
                 'po_number'    => $data['po_number'],
@@ -233,8 +250,7 @@ class OrderRequestService
 
         $orderRequest->load('orderRequestItem');
         $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
-        $firstItem = $resolvedItems->first();
-        $cabangId = $firstItem ? ($firstItem['order_request_item']->cabang_id ?? null) : ($orderRequest->cabang_id ?? null);
+        $cabangId = $this->resolvePurchaseOrderCabangId($orderRequest, $data, $resolvedItems);
 
         $purchaseOrder = $orderRequest->purchaseOrders()->create([
             'po_number'    => $data['po_number'],

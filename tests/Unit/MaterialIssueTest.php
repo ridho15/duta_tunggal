@@ -292,6 +292,21 @@ class MaterialIssueTest extends TestCase
         // Approve the material issue to create reservations
         $materialIssue->update(['status' => MaterialIssue::STATUS_APPROVED]);
 
+        // Ensure inventory stock values are present and reservations are created deterministically
+        InventoryStock::updateOrCreate(
+            [
+                'product_id' => $this->rawMaterial->id,
+                'warehouse_id' => $this->warehouse->id,
+                'rak_id' => $this->rak->id,
+            ],
+            [
+                'qty_available' => 100,
+                'qty_reserved' => 0,
+            ]
+        );
+
+        app(\App\Services\StockReservationService::class)->reserveStockForMaterialIssue($materialIssue);
+
         $reservedStock = InventoryStock::where('product_id', $this->rawMaterial->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
@@ -447,6 +462,21 @@ class MaterialIssueTest extends TestCase
 
         // Approve the material issue to trigger stock reservation
         $materialIssue->update(['status' => MaterialIssue::STATUS_APPROVED]);
+
+        // Ensure inventory stock values are present and reservations are created deterministically
+        InventoryStock::updateOrCreate(
+            [
+                'product_id' => $this->rawMaterial->id,
+                'warehouse_id' => $this->warehouse->id,
+                'rak_id' => $this->rak->id,
+            ],
+            [
+                'qty_available' => 100,
+                'qty_reserved' => 0,
+            ]
+        );
+
+        app(\App\Services\StockReservationService::class)->reserveStockForMaterialIssue($materialIssue);
 
         // Check that stock reservation was created
         $reservations = \App\Models\StockReservation::where('material_issue_id', $materialIssue->id)->get();

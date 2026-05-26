@@ -263,14 +263,71 @@ class SaleOrderResource extends Resource
     {
         $normalizedTaxType = static::normalizeTaxTypeValue($taxType);
         $base = $quantity * $unitPrice;
-        $afterDiscount = $base - ($base * ($discount / 100));
+        $discountNominal = $base * ($discount / 100);
+        $afterDiscount = $base - $discountNominal;
         $taxNominal = round($afterDiscount * ($tax / 100), 2);
 
         return [
             'total' => $base,
+            'discount_nominal' => $discountNominal,
             'tax_nominal' => $normalizedTaxType === 'none' ? 0.0 : $taxNominal,
             'subtotal' => $normalizedTaxType === 'inklusif' ? $afterDiscount : $afterDiscount + $taxNominal,
         ];
+    }
+
+    protected static function saleOrderDetailColumnEntry(string $name, string $heading, array $rows): \Filament\Infolists\Components\TextEntry
+    {
+        return \Filament\Infolists\Components\TextEntry::make($name)
+            ->label('')
+            ->getStateUsing(function ($record) use ($heading, $rows) {
+                $html = '<div class="space-y-1">';
+                $html .= '<div class="mb-2 text-base font-semibold text-gray-950 dark:text-white">' . e($heading) . '</div>';
+
+                foreach ($rows as [$label, $state]) {
+                    $value = $state instanceof \Closure ? $state($record) : $state;
+                    $html .= '<div class="flex gap-2 py-0.5 text-sm">';
+                    $html .= '<span class="w-44 shrink-0 font-medium text-gray-600 dark:text-gray-400">' . e($label) . ' :</span>';
+                    $html .= '<span class="min-w-0 flex-1 text-gray-950 dark:text-white">' . e((string) ($value ?? '-')) . '</span>';
+                    $html .= '</div>';
+                }
+
+                $html .= '</div>';
+
+                return $html;
+            })
+            ->html();
+    }
+
+    protected static function isReferQuotationForm(Get $get): bool
+    {
+        if ((string) ($get('options_form') ?? $get('../../options_form') ?? '') === '2') {
+            return true;
+        }
+
+        return filled($get('quotation_id') ?? $get('../../quotation_id') ?? null);
+    }
+
+    protected static function lockedInputAttributes(Get $get): array
+    {
+        if (! static::isReferQuotationForm($get)) {
+            return [];
+        }
+
+        return [
+            'class' => 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+        ];
+    }
+
+    protected static function statusRowClass(?string $status): string
+    {
+        return match ($status) {
+            'request_approve' => 'bg-gray-100',
+            'approved', 'confirmed', 'received' => 'bg-blue-100',
+            'request_close' => 'bg-yellow-100',
+            'completed' => 'bg-green-100',
+            'closed', 'reject', 'rejected', 'canceled', 'cancelled' => 'bg-red-100',
+            default => '',
+        };
     }
 
     public static function normalizeFormDataForPersist(array $data): array
@@ -352,6 +409,7 @@ class SaleOrderResource extends Resource
         return $form
             ->schema([
                 Fieldset::make('Form Penjualan')
+                    ->columns(2)
                     ->schema([
                         Section::make()
                             ->columns(2)
@@ -400,6 +458,7 @@ class SaleOrderResource extends Resource
                                             'notes' => $item->notes,
                                             'warehouse_id' => null,
                                             'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
+                                            'discount_nominal' => static::formatMoneyState($item->quantity * $unitPrice * ((float) $item->discount / 100), $itemCurrencyId),
                                             'tax_nominal' => static::formatMoneyState(HelperController::hitungTaxNominal($item->quantity, $unitPrice, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
                                             'rak_id' => null,
                                             'unit' => $item->product->uom?->abbreviation ?? '-',
@@ -427,6 +486,23 @@ class SaleOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Quotation wajib dipilih'
                             ]),
+                        TextInput::make('so_number')
+                            ->label('SO Number')
+                            ->required()
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'SO number tidak boleh kosong',
+                                'unique' => 'SO Number sudah digunakan !'
+                            ])
+                            ->unique(ignoreRecord: true)
+                            ->suffixAction(ActionsAction::make('generateSoNumber')
+                                ->icon('heroicon-m-arrow-path')
+                                ->tooltip('Generate SO Number')
+                                ->action(function ($set, $get, $state) {
+                                    $salesOrderService = app(SalesOrderService::class);
+                                    $set('so_number', $salesOrderService->generateSoNumber());
+                                }))
+                            ->maxLength(255),
                         Select::make('sale_order_id')
                             ->label('Sales Order')
                             ->loadingMessage('Loading ...')
@@ -451,6 +527,7 @@ class SaleOrderResource extends Resource
                                             'tax' => $item->tax,
                                             'tipe_pajak' => $tipePajak,
                                             'subtotal' => static::formatMoneyState(HelperController::hitungSubtotal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
+                                            'discount_nominal' => static::formatMoneyState($item->quantity * (float) $item->unit_price * ((float) $item->discount / 100), $itemCurrencyId),
                                             'tax_nominal' => static::formatMoneyState(HelperController::hitungTaxNominal($item->quantity, (float) $item->unit_price, $item->discount, $item->tax, $tipePajak), $itemCurrencyId),
                                             'notes' => $item->notes,
                                         ]);
@@ -474,6 +551,9 @@ class SaleOrderResource extends Resource
                             ->label('Customer')
                             ->searchable()
                             ->reactive()
+                            ->disabled(fn(Get $get) => static::isReferQuotationForm($get))
+                            ->dehydrated(true)
+                            ->extraAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                             ->helperText(function ($state) {
                                 $customer = Customer::find($state);
                                 if (!$customer) return null;
@@ -651,6 +731,9 @@ class SaleOrderResource extends Resource
                             ]),
                         Select::make('cabang_id')
                             ->label('Cabang')
+                            ->disabled(fn(Get $get) => static::isReferQuotationForm($get))
+                            ->dehydrated(true)
+                            ->extraAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                             ->options(function () {
                                 $user = Auth::user();
                                 $manageType = $user?->manage_type ?? [];
@@ -676,23 +759,6 @@ class SaleOrderResource extends Resource
                             ->validationMessages([
                                 'required' => 'Cabang wajib dipilih'
                             ]),
-                        TextInput::make('so_number')
-                            ->label('SO Number')
-                            ->required()
-                            ->reactive()
-                            ->validationMessages([
-                                'required' => 'SO number tidak boleh kosong',
-                                'unique' => 'SO Number sudah digunakan !'
-                            ])
-                            ->unique(ignoreRecord: true)
-                            ->suffixAction(ActionsAction::make('generateSoNumber')
-                                ->icon('heroicon-m-arrow-path') // ikon reload
-                                ->tooltip('Generate SO Number')
-                                ->action(function ($set, $get, $state) {
-                                    $salesOrderService = app(SalesOrderService::class);
-                                    $set('so_number', $salesOrderService->generateSoNumber());
-                                }))
-                            ->maxLength(255),
                         DatePicker::make('order_date')
                             ->required()
                             ->validationMessages([
@@ -701,6 +767,16 @@ class SaleOrderResource extends Resource
                         DatePicker::make('delivery_date')
                             ->validationMessages([
                                 'date' => 'Format tanggal pengiriman tidak valid'
+                            ]),
+                        Radio::make('tipe_pengiriman')
+                            ->label('Tipe Pengiriman Ke Customer')
+                            ->inline()
+                            ->options([
+                                'Ambil Sendiri' => 'Customer Ambil Sendiri',
+                                'Kirim Langsung' => 'Kirim Ke Customer'
+                            ])->required()
+                            ->validationMessages([
+                                'required' => 'Tipe Pengiriman belum di pilih'
                             ]),
                         TextInput::make('shipped_to')
                             ->label('Shipped To')
@@ -716,6 +792,14 @@ class SaleOrderResource extends Resource
                         Hidden::make('exchange_rate')
                             ->default(fn () => static::resolveExchangeRate(static::resolveDefaultCurrencyId()))
                             ->dehydrated(true),
+                        \Filament\Forms\Components\TextInput::make('tempo_pembayaran')
+                            ->label('Tempo Pembayaran (Hari)')
+                            ->numeric()
+                            ->readOnly(fn(Get $get) => static::isReferQuotationForm($get))
+                            ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                            ->nullable()
+                            ->helperText('Diisi otomatis dari data customer (tempo kredit). Dapat diubah bila perlu.')
+                            ->suffix('Hari'),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
                             ->required()
@@ -762,27 +846,11 @@ class SaleOrderResource extends Resource
 
                                 return null;
                             }),
-                        Radio::make('tipe_pengiriman')
-                            ->label('Tipe Pengiriman Ke Customer')
-                            ->inline()
-                            ->options([
-                                'Ambil Sendiri' => 'Customer Ambil Sendiri',
-                                'Kirim Langsung' => 'Kirim Ke Customer'
-                            ])->required()
-                            ->validationMessages([
-                                'required' => 'Tipe Pengiriman belum di pilih'
-                            ]),
-                        \Filament\Forms\Components\TextInput::make('tempo_pembayaran')
-                            ->label('Tempo Pembayaran (Hari)')
-                            ->numeric()
-                            ->nullable()
-                            ->helperText('Diisi otomatis dari data customer (tempo kredit). Dapat diubah bila perlu.')
-                            ->suffix('Hari'),
                         Repeater::make('saleOrderItem')
                             ->relationship()
                             ->columnSpanFull()
                             ->reactive()
-                            ->columns(3)
+                            ->columns(5)
                             ->minItems(1)
                             ->rules([new \App\Rules\NoDuplicateProducts()])
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data) {
@@ -795,11 +863,32 @@ class SaleOrderResource extends Resource
                                 return $data;
                             })
                             ->addActionLabel("Add Items")
+                            ->addable(fn(Get $get) => ! static::isReferQuotationForm($get))
+                            ->deletable(fn(Get $get) => ! static::isReferQuotationForm($get))
+                            ->reorderable(fn(Get $get) => ! static::isReferQuotationForm($get))
+                            ->collapsible()
+                            ->itemLabel(function (array $state): ?string {
+                                $product = isset($state['product_id'])
+                                    ? Product::withoutGlobalScope('product_cabang')->find($state['product_id'])
+                                    : null;
+                                $productLabel = $product
+                                    ? "Product: ({$product->sku}) {$product->name}"
+                                    : 'Product: -';
+                                $qty = $state['quantity'] ?? 0;
+                                $subtotal = $state['subtotal'] ?? 0;
+                                $currencyId = static::resolveItemCurrencyId($state['currency_id'] ?? null);
+
+                                return "{$productLabel} | Qty: {$qty} | Subtotal: " . static::formatCurrencyAmount($currencyId, $subtotal);
+                            })
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
+                                    ->columnSpan(3)
                                     ->searchable(['sku', 'name'])
                                     ->reactive()
+                                    ->disabled(fn(Get $get) => static::isReferQuotationForm($get))
+                                    ->dehydrated(true)
+                                    ->extraAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
@@ -814,6 +903,7 @@ class SaleOrderResource extends Resource
                                             $set('unit', $product->uom?->abbreviation ?? '-');
                                             $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), $unitPrice, (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
                                             $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                            $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                             $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                             $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                         }
@@ -862,61 +952,23 @@ class SaleOrderResource extends Resource
                                     }),
                                 TextInput::make('unit')
                                     ->label('Satuan')
+                                    ->columnSpan(1)
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default('-')
-                                    ->extraAttributes(['title' => 'Satuan produk (otomatis)'])
+                                    ->extraInputAttributes(fn(Get $get) => array_merge(['title' => 'Satuan produk (otomatis)'], static::lockedInputAttributes($get)))
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record?->product) {
                                             $component->state($record->product->uom?->abbreviation ?? '-');
                                         }
                                     }),
-                                Select::make('currency_id')
-                                    ->label('Currency')
-                                    ->options(static::resolveCurrencyOptions())
-                                    ->default(static::resolveDefaultCurrencyId())
-                                    ->searchable()
-                                    ->preload()
-                                    ->reactive()
-                                    ->required()
-                                    ->afterStateHydrated(function ($component, $state, $record) {
-                                        $component->state($state ?: ($record?->currency_id ?? $record?->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId()));
-                                    })
-                                    ->afterStateUpdated(function ($set, $get, $state, $old) {
-                                        $newCurrencyId = static::resolveItemCurrencyId($state);
-                                        $oldCurrencyId = static::resolveItemCurrencyId($old);
-
-                                        if ($newCurrencyId === $oldCurrencyId) {
-                                            return;
-                                        }
-
-                                        $convertedUnitPrice = static::normalizeCurrencyDisplayValue(
-                                            static::convertCurrencyAmount(static::parseCurrencyState($get('unit_price') ?? 0), $oldCurrencyId, $newCurrencyId),
-                                            $newCurrencyId
-                                        );
-                                        $preview = static::calculateCurrencyPreview(
-                                            (float) ($get('quantity') ?? 0),
-                                            $convertedUnitPrice,
-                                            (float) ($get('discount') ?? 0),
-                                            (float) ($get('tax') ?? 0),
-                                            $get('tipe_pajak') ?? null,
-                                            $newCurrencyId
-                                        );
-
-                                        $set('unit_price', static::formatCurrencyInputState($convertedUnitPrice, $newCurrencyId));
-                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $newCurrencyId));
-                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $newCurrencyId));
-                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $newCurrencyId));
-                                    })
-                                    ->validationMessages([
-                                        'required' => 'Currency item wajib dipilih',
-                                    ]),
-
-
                                 TextInput::make('quantity')
-                                    ->label('Quantity')
+                                    ->label('Qty')
+                                    ->columnSpan(1)
                                     ->numeric()
                                     ->reactive()
+                                    ->readOnly(fn(Get $get) => static::isReferQuotationForm($get))
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->validationMessages([
                                         'required' => 'Quantity harus diisi',
                                         'numeric' => 'Quantity tidak valid !'
@@ -962,6 +1014,7 @@ class SaleOrderResource extends Resource
                                         $price = (float)static::parseCurrencyState($get('unit_price') ?? 0);
                                         $preview = static::calculateCurrencyPreview($qty, $price, (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
                                         $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                         $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                         $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
@@ -988,9 +1041,57 @@ class SaleOrderResource extends Resource
                                     })
                                     ->required()
                                     ->default(0),
+                                Select::make('currency_id')
+                                    ->label('Mata Uang')
+                                    ->columnSpan(1)
+                                    ->options(static::resolveCurrencyOptions())
+                                    ->default(static::resolveDefaultCurrencyId())
+                                    ->searchable()
+                                    ->preload()
+                                    ->reactive()
+                                    ->disabled(fn(Get $get) => static::isReferQuotationForm($get))
+                                    ->dehydrated(true)
+                                    ->extraAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                                    ->required()
+                                    ->afterStateHydrated(function ($component, $state, $record) {
+                                        $component->state($state ?: ($record?->currency_id ?? $record?->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId()));
+                                    })
+                                    ->afterStateUpdated(function ($set, $get, $state, $old) {
+                                        $newCurrencyId = static::resolveItemCurrencyId($state);
+                                        $oldCurrencyId = static::resolveItemCurrencyId($old);
+
+                                        if ($newCurrencyId === $oldCurrencyId) {
+                                            return;
+                                        }
+
+                                        $convertedUnitPrice = static::normalizeCurrencyDisplayValue(
+                                            static::convertCurrencyAmount(static::parseCurrencyState($get('unit_price') ?? 0), $oldCurrencyId, $newCurrencyId),
+                                            $newCurrencyId
+                                        );
+                                        $preview = static::calculateCurrencyPreview(
+                                            (float) ($get('quantity') ?? 0),
+                                            $convertedUnitPrice,
+                                            (float) ($get('discount') ?? 0),
+                                            (float) ($get('tax') ?? 0),
+                                            $get('tipe_pajak') ?? null,
+                                            $newCurrencyId
+                                        );
+
+                                        $set('unit_price', static::formatCurrencyInputState($convertedUnitPrice, $newCurrencyId));
+                                        $set('total', static::formatCurrencyPreviewState($preview['total'], $newCurrencyId));
+                                        $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $newCurrencyId));
+                                        $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $newCurrencyId));
+                                        $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $newCurrencyId));
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Currency item wajib dipilih',
+                                    ]),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
+                                    ->columnSpan(1)
                                     ->live()
+                                    ->readOnly(fn(Get $get) => static::isReferQuotationForm($get))
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->mask(\Filament\Support\RawJs::make(<<<'JS'
             $money($input, ',', '.', 10)
         JS))
@@ -1016,14 +1117,17 @@ class SaleOrderResource extends Resource
                                         $price = (float)static::parseCurrencyState($get('unit_price') ?? 0);
                                         $preview = static::calculateCurrencyPreview($qty, $price, (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
                                         $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                         $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                         $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     }),
                                 TextInput::make('total')
-                                    ->label('Total (Harga × Qty)')
+                                    ->label('Total (Harga x Qty)')
+                                    ->columnSpan(1)
                                     ->live()
                                     ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->dehydrated(false)
                                     ->default(0)
                                     ->afterStateHydrated(function ($component, $record) {
@@ -1034,10 +1138,13 @@ class SaleOrderResource extends Resource
                                         }
                                     }),
                                 TextInput::make('discount')
-                                    ->label('Discount (%)')
+                                    ->label('Discount %')
+                                    ->columnSpan(1)
                                     ->numeric()
                                     ->default(0)
                                     ->reactive()
+                                    ->readOnly(fn(Get $get) => static::isReferQuotationForm($get))
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->validationMessages([
                                         'numeric' => 'Discount harus berupa angka',
                                         'min' => 'Discount minimal 0%',
@@ -1049,15 +1156,36 @@ class SaleOrderResource extends Resource
                                         $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), static::parseCurrencyState($get('unit_price') ?? 0), (float) ($state ?? 0), (float) ($get('tax') ?? 0), $get('tipe_pajak') ?? null, $currencyId);
                                         $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                         $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                         $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
                                     ->suffix('%'),
+                                TextInput::make('discount_nominal')
+                                    ->label('Discount (Nominal)')
+                                    ->columnSpan(1)
+                                    ->live()
+                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->default(0)
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                                    ->afterStateHydrated(function ($component, $record) {
+                                        if ($record) {
+                                            $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
+                                            $preview = static::calculateCurrencyPreview((float) $record->quantity, (float) $record->unit_price, (float) $record->discount, (float) $record->tax, $record->tipe_pajak, $currencyId);
+                                            $component->state(static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
+                                        }
+                                    }),
                                 \Filament\Forms\Components\Select::make('tipe_pajak')
                                     ->label('Tipe Pajak')
+                                    ->columnSpan(1)
                                     ->options(static::taxTypeOptions())
                                     ->default('eklusif')
                                     ->reactive()
+                                    ->disabled(fn(Get $get) => static::isReferQuotationForm($get))
+                                    ->dehydrated(true)
+                                    ->extraAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->afterStateHydrated(function ($component, $state) {
                                         $component->state(static::normalizeTaxTypeValue($state));
                                     })
@@ -1074,16 +1202,19 @@ class SaleOrderResource extends Resource
                                         $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), static::parseCurrencyState($get('unit_price') ?? 0), (float) ($get('discount') ?? 0), (float) ($get('tax') ?? 0), $normalizedState, $currencyId);
                                         $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                         $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                         $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     }),
                                 TextInput::make('tax')
                                     ->label('Tax')
+                                    ->columnSpan(1)
                                     ->numeric()
                                     ->reactive()
                                     ->disabled()
                                     ->readOnly()
                                     ->dehydrated(true)
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->helperText('Dihitung otomatis dari setting global PPN dan tidak dapat diedit manual.')
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka',
@@ -1097,6 +1228,7 @@ class SaleOrderResource extends Resource
                                         $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $preview = static::calculateCurrencyPreview((float) ($get('quantity') ?? 0), static::parseCurrencyState($get('unit_price') ?? 0), (float) ($get('discount') ?? 0), (float) ($state ?? 0), $taxType, $currencyId);
                                         $set('total', static::formatCurrencyPreviewState($preview['total'], $currencyId));
+                                        $set('discount_nominal', static::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId));
                                         $set('subtotal', static::formatCurrencyPreviewState($preview['subtotal'], $currencyId));
                                         $set('tax_nominal', static::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId));
                                     })
@@ -1104,11 +1236,13 @@ class SaleOrderResource extends Resource
                                     ->suffix('%'),
                                 TextInput::make('tax_nominal')
                                     ->label('Nominal Pajak')
+                                    ->columnSpan(1)
                                     ->live()
                                     ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
@@ -1118,9 +1252,11 @@ class SaleOrderResource extends Resource
                                     }),
                                 TextInput::make('subtotal')
                                     ->label('Sub Total')
+                                    ->columnSpan(5)
                                     ->reactive()
                                     ->readOnly()
                                     ->default(0)
+                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->formatStateUsing(function ($state, Get $get) {
                                         if ($state === null || $state === '') {
@@ -1451,11 +1587,13 @@ class SaleOrderResource extends Resource
                 return $query->with(['customer', 'saleOrderItem.product']);
             })
             ->recordClasses(function (SaleOrder $record): string {
-                if ($record->status === 'completed') {
-                    return '';
+                $classes = [static::statusRowClass($record->status)];
+
+                if ($record->status !== 'completed' && $record->hasInsufficientStock()) {
+                    $classes[] = 'insufficient-stock-row';
                 }
 
-                return $record->hasInsufficientStock() ? 'insufficient-stock-row' : '';
+                return trim(implode(' ', array_filter($classes)));
             })
             ->actions([
                 ActionGroup::make([
@@ -1835,7 +1973,18 @@ class SaleOrderResource extends Resource
                     '<li><strong>Integration:</strong> Terintegrasi dengan inventory, accounting, dan bisa generate Purchase Order untuk drop shipping.</li>' .
                     '</ul>' .
                     '</div>' .
-                    '</details>'
+                    '</details>' .
+                    '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">' .
+                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Legenda Warna Status Baris Data</h4>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">' .
+                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded border border-gray-300 bg-white"></span><span>Putih (Draft)</span></div>' .
+                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-gray-100 border border-gray-300"></span><span>Abu-abu (Request Approve)</span></div>' .
+                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-blue-100 border border-blue-300"></span><span>Biru (Approved/Confirmed/Received)</span></div>' .
+                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-yellow-100 border border-yellow-300"></span><span>Kuning (Request Close)</span></div>' .
+                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-green-100 border border-green-300"></span><span>Hijau (Completed)</span></div>' .
+                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-red-100 border border-red-300"></span><span>Merah (Closed/Reject/Canceled)</span></div>' .
+                    '</div>' .
+                    '</div>'
             ));
     }
 
@@ -1884,115 +2033,205 @@ class SaleOrderResource extends Resource
                             ->label('Shipped To')
                             ->placeholder('-'),
                     ]),
-                \Filament\Infolists\Components\Section::make('Item Sales Order')
+                \Filament\Infolists\Components\Section::make('Ringkasan Sales Order')
+                    ->columns(5)
+                    ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('summary_item_count')
+                            ->label('Jumlah Item')
+                            ->getStateUsing(fn ($record) => $record->saleOrderItem->count()),
+                        \Filament\Infolists\Components\TextEntry::make('summary_total_qty')
+                            ->label('Total Qty')
+                            ->getStateUsing(fn ($record) => number_format((float) $record->saleOrderItem->sum('quantity'), 0, ',', '.')),
+                        \Filament\Infolists\Components\TextEntry::make('summary_delivered_qty')
+                            ->label('Total Qty Terkirim')
+                            ->getStateUsing(fn ($record) => number_format((float) $record->saleOrderItem->sum('delivered_quantity'), 0, ',', '.')),
+                        \Filament\Infolists\Components\TextEntry::make('summary_remaining_qty')
+                            ->label('Sisa Qty Belum Dikirim')
+                            ->getStateUsing(function ($record) {
+                                $remaining = $record->saleOrderItem->sum(function ($item) {
+                                    return (float) ($item->remaining_quantity ?? 0);
+                                });
+
+                                return number_format($remaining, 0, ',', '.');
+                            }),
+                        \Filament\Infolists\Components\TextEntry::make('summary_total_amount')
+                            ->label('Total Amount')
+                            ->getStateUsing(fn ($record) => static::formatCurrencyAmount($record?->currency_id ?? static::resolveDefaultCurrencyId(), $record?->total_amount)),
+                    ]),
+                \Filament\Infolists\Components\Section::make('Detail Item Sales Order')
                     ->columnSpanFull()
                     ->schema([
                         \Filament\Infolists\Components\RepeatableEntry::make('saleOrderItem')
                             ->label('')
                             ->columnSpanFull()
-                            ->columns(4)
                             ->schema([
-                                \Filament\Infolists\Components\TextEntry::make('product.name')
-                                    ->label('Produk')
-                                    ->columnSpan(2),
-                                \Filament\Infolists\Components\TextEntry::make('quantity')
-                                    ->label('Qty'),
-                                \Filament\Infolists\Components\TextEntry::make('unit_price')
-                                    ->label('Harga Satuan')
-                                    ->getStateUsing(fn($record) => static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, (float) ($record->unit_price ?? 0))),
-                                \Filament\Infolists\Components\TextEntry::make('line_total')
-                                    ->label('Harga Satuan x Qty')
-                                    ->getStateUsing(function ($record) {
-                                        $price = (float) ($record->unit_price ?? 0);
-                                        $qty = (float) ($record->quantity ?? 0);
-                                        return static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, $price * $qty);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('discount')
-                                    ->label('Diskon (%)')
-                                    ->formatStateUsing(fn($state) => $state . '%'),
-                                \Filament\Infolists\Components\TextEntry::make('tax')
-                                    ->label('Pajak (%)')
-                                    ->getStateUsing(function ($record) {
-                                        $taxType = static::normalizeTaxTypeValue($record->tipe_pajak);
-                                        return $record->tax . '% (' . $taxType . ')';
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('tax_nominal')
-                                    ->label('Nominal Pajak')
-                                    ->getStateUsing(function ($record) {
-                                        $unitPrice = (float) ($record->unit_price ?? 0);
-                                        $qty = (float) ($record->quantity ?? 0);
-                                        $discount = (float) ($record->discount ?? 0);
-                                        $tax = (float) ($record->tax ?? 0);
-                                        $tipePajak = $record->tipe_pajak ?? null;
-                                        $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
-                                        $preview = static::calculateCurrencyPreview($qty, $unitPrice, $discount, $tax, $tipePajak, $currencyId);
-                                        return static::formatCurrencyAmount($currencyId, $preview['tax_nominal']);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('subtotal_display')
-                                    ->label('Sub Total')
-                                    ->columnSpan(2)
-                                    ->getStateUsing(function ($record) {
-                                        $preview = static::calculateCurrencyPreview(
-                                            (float) $record->quantity,
-                                            (float) $record->unit_price,
-                                            (float) $record->discount,
-                                            (float) $record->tax,
-                                            $record->tipe_pajak ?? null,
-                                            $record?->currency_id ?? $record?->saleOrder?->currency_id
-                                        );
-                                        return static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, $preview['subtotal']);
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('stock_tersedia')
-                                    ->label('Stok Bebas (Semua Gudang)')
-                                    ->columnSpan(2)
-                                    ->getStateUsing(function ($record) {
-                                        $stocks = \App\Models\InventoryStock::where('product_id', $record->product_id)
-                                            ->with('warehouse')
-                                            ->get();
-                                        $total = $stocks->sum('free_qty');
-                                        $perWh = $stocks->groupBy('warehouse_id')
-                                            ->map(function ($s) {
-                                                $available = (float) $s->sum('free_qty');
+                                \Filament\Infolists\Components\Section::make(function ($record) {
+                                    $productName = $record->product
+                                        ? trim('(' . ($record->product->sku ?? '-') . ') ' . ($record->product->name ?? '-'))
+                                        : '-';
+                                    $qty = number_format((float) ($record->quantity ?? 0), 0, ',', '.');
+                                    $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
+                                    $preview = static::calculateCurrencyPreview(
+                                        (float) ($record->quantity ?? 0),
+                                        (float) ($record->unit_price ?? 0),
+                                        (float) ($record->discount ?? 0),
+                                        (float) ($record->tax ?? 0),
+                                        $record->tipe_pajak ?? null,
+                                        $currencyId
+                                    );
 
-                                                if ($available <= 0) {
-                                                    return null;
-                                                }
+                                    return 'Product: ' . $productName . ' | Qty: ' . $qty . ' | Subtotal: ' . static::formatCurrencyAmount($currencyId, $preview['subtotal']);
+                                })
+                                    ->collapsible()
+                                    ->collapsed()
+                                    ->schema([
+                                        \Filament\Infolists\Components\Grid::make(2)
+                                            ->schema([
+                                                \Filament\Infolists\Components\Group::make([
+                                                    static::saleOrderDetailColumnEntry(
+                                                        'product_column',
+                                                        'Produk',
+                                                        [
+                                                            ['Product', function ($record) {
+                                                                if (! $record->product) {
+                                                                    return '-';
+                                                                }
 
-                                                return ($s->first()->warehouse?->name ?? 'Wh#' . $s->first()->warehouse_id) . ': ' . number_format($available, 0, ',', '.');
-                                            })
-                                            ->filter()
-                                            ->values()->implode(' | ');
-                                        return $total > 0
-                                            ? '📦 ' . number_format((float) $total, 0, ',', '.') . ($perWh ? " ({$perWh})" : '')
-                                            : '⚠️ Habis';
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('warehouse_mode')
-                                    ->label('Mode Gudang')
-                                    ->columnSpan(2)
-                                    ->getStateUsing(function ($record) {
-                                        $allocCount = $record->warehouseAllocations()->count();
-                                        if ($allocCount > 0) {
-                                            return "📦 Multi-Gudang ({$allocCount} gudang)";
-                                        }
-                                        return $record->warehouse
-                                            ? '🏪 Single: ' . $record->warehouse->name
-                                            : '⚠️ Belum diset';
-                                    }),
-                                \Filament\Infolists\Components\TextEntry::make('warehouse_allocations_summary')
-                                    ->label('Alokasi Order (Qty per Gudang)')
-                                    ->columnSpan(2)
-                                    ->getStateUsing(function ($record) {
-                                        $allocations = $record->warehouseAllocations()->with('warehouse')->get();
-                                        if ($allocations->isEmpty()) {
-                                            return $record->warehouse
-                                                ? ($record->warehouse->name . ' — qty: ' . $record->quantity)
-                                                : '-';
-                                        }
-                                        return $allocations->map(function ($alloc) {
-                                            $wh = $alloc->warehouse?->name ?? "Gudang #{$alloc->warehouse_id}";
-                                            return "{$wh}: " . number_format((float) $alloc->quantity, 0, ',', '.');
-                                        })->implode(' | ');
-                                    }),
+                                                                return $record->product->sku
+                                                                    ? "({$record->product->sku}) {$record->product->name}"
+                                                                    : ($record->product->name ?? '-');
+                                                            }],
+                                                            ['Satuan', function ($record) {
+                                                                return $record->product?->uom?->abbreviation
+                                                                    ?? $record->product?->uom?->name
+                                                                    ?? '-';
+                                                            }],
+                                                            ['Qty', fn ($record) => number_format((float) ($record->quantity ?? 0), 0, ',', '.')],
+                                                            ['Qty Delivered', fn ($record) => number_format((float) ($record->delivered_quantity ?? 0), 0, ',', '.')],
+                                                            ['Sisa Qty Belum Dikirim', fn ($record) => number_format((float) ($record->remaining_quantity ?? 0), 0, ',', '.')],
+                                                            ['Mode Gudang', function ($record) {
+                                                                $allocCount = $record->warehouseAllocations->count();
+
+                                                                if ($allocCount > 0) {
+                                                                    return "Multi-Gudang ({$allocCount} gudang)";
+                                                                }
+
+                                                                return $record->warehouse?->name
+                                                                    ? 'Single: ' . $record->warehouse->name
+                                                                    : 'Belum diset';
+                                                            }],
+                                                            ['Alokasi Order', function ($record) {
+                                                                $allocations = $record->warehouseAllocations;
+
+                                                                if ($allocations->isEmpty()) {
+                                                                    return $record->warehouse?->name
+                                                                        ? ($record->warehouse->name . ' - qty: ' . number_format((float) ($record->quantity ?? 0), 0, ',', '.'))
+                                                                        : '-';
+                                                                }
+
+                                                                return $allocations
+                                                                    ->map(function ($alloc) {
+                                                                        $warehouse = $alloc->warehouse?->name ?? "Gudang #{$alloc->warehouse_id}";
+
+                                                                        return "{$warehouse}: " . number_format((float) $alloc->quantity, 0, ',', '.');
+                                                                    })
+                                                                    ->implode(' | ');
+                                                            }],
+                                                            ['Stok Bebas', function ($record) {
+                                                                $stocks = InventoryStock::where('product_id', $record->product_id)
+                                                                    ->with('warehouse')
+                                                                    ->get();
+                                                                $total = (float) $stocks->sum('free_qty');
+
+                                                                if ($total <= 0) {
+                                                                    return 'Habis';
+                                                                }
+
+                                                                $perWarehouse = $stocks
+                                                                    ->groupBy('warehouse_id')
+                                                                    ->map(function ($stocks) {
+                                                                        $available = (float) $stocks->sum('free_qty');
+
+                                                                        if ($available <= 0) {
+                                                                            return null;
+                                                                        }
+
+                                                                        $warehouse = $stocks->first()->warehouse?->name ?? 'Wh#' . $stocks->first()->warehouse_id;
+
+                                                                        return "{$warehouse}: " . number_format($available, 0, ',', '.');
+                                                                    })
+                                                                    ->filter()
+                                                                    ->values()
+                                                                    ->implode(' | ');
+
+                                                                return number_format($total, 0, ',', '.') . ($perWarehouse ? " ({$perWarehouse})" : '');
+                                                            }],
+                                                        ]
+                                                    ),
+                                                ])
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                                \Filament\Infolists\Components\Group::make([
+                                                    static::saleOrderDetailColumnEntry(
+                                                        'price_column',
+                                                        'Price',
+                                                        [
+                                                            ['Mata Uang', fn ($record) => $record->currency?->code ?? $record->saleOrder?->currency?->code ?? '-'],
+                                                            ['Unit Price', fn ($record) => static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, (float) ($record->unit_price ?? 0))],
+                                                            ['Total (Harga x Qty)', function ($record) {
+                                                                $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+
+                                                                return static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, $total);
+                                                            }],
+                                                            ['Discount', fn ($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
+                                                            ['Discount (Nominal)', function ($record) {
+                                                                $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
+                                                                $preview = static::calculateCurrencyPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    $record->tipe_pajak ?? null,
+                                                                    $currencyId
+                                                                );
+
+                                                                return static::formatCurrencyAmount($currencyId, $preview['discount_nominal']);
+                                                            }],
+                                                            ['Tipe Pajak', fn ($record) => static::normalizeTaxTypeValue($record->tipe_pajak ?? null)],
+                                                            ['Tax (%)', fn ($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
+                                                            ['Nominal Pajak', function ($record) {
+                                                                $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
+                                                                $preview = static::calculateCurrencyPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    $record->tipe_pajak ?? null,
+                                                                    $currencyId
+                                                                );
+
+                                                                return static::formatCurrencyAmount($currencyId, $preview['tax_nominal']);
+                                                            }],
+                                                            ['Subtotal', function ($record) {
+                                                                $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
+                                                                $preview = static::calculateCurrencyPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    $record->tipe_pajak ?? null,
+                                                                    $currencyId
+                                                                );
+
+                                                                return static::formatCurrencyAmount($currencyId, $preview['subtotal']);
+                                                            }],
+                                                        ]
+                                                    ),
+                                                ])
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                            ]),
+                                    ]),
                             ]),
                     ]),
             ]);
@@ -2004,7 +2243,11 @@ class SaleOrderResource extends Resource
             ->orderBy('created_at', 'asc')
             ->with([
                 'customer',
-                'saleOrderItem.product',
+                'currency',
+                'saleOrderItem.currency',
+                'saleOrderItem.product.uom',
+                'saleOrderItem.warehouse',
+                'saleOrderItem.warehouseAllocations.warehouse',
                 'salesInvoices',
             ])
             ->withCount('saleOrderItem');

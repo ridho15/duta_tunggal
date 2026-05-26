@@ -489,5 +489,18 @@ class SaleOrderObserver
                 );
             }
         }
+
+        $reservationCount = StockReservation::where('sale_order_id', $saleOrder->id)->count();
+        if ($reservationCount > 0) {
+            StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+                $reservation->delete();
+            });
+
+            Log::info('SaleOrderObserver: Released self-pickup reservations after stock movement', [
+                'sale_order_id' => $saleOrder->id,
+                'so_number' => $saleOrder->so_number,
+                'reservations_released' => $reservationCount,
+            ]);
+        }
     }
 }

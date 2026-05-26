@@ -3,6 +3,7 @@
 use App\Filament\Resources\OrderRequestResource;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Filament\Resources\QuotationResource;
+use App\Filament\Resources\SaleOrderResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Customer;
@@ -10,6 +11,7 @@ use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
+use App\Models\SaleOrder;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -103,3 +105,26 @@ test('purchase order index renders status row classes', function () {
     $response->assertSee($purchaseOrder->po_number);
     $response->assertSee('bg-green-100');
 });
+
+test('sale order index renders status row classes and legend', function () {
+    $saleOrder = SaleOrder::factory()->create([
+        'customer_id' => $this->customer->id,
+        'cabang_id' => $this->cabang->id,
+        'status' => 'approved',
+    ]);
+
+    $response = $this->get(SaleOrderResource::getUrl('index'));
+
+    $response->assertOk();
+    $response->assertSee($saleOrder->so_number);
+    $response->assertSee('bg-blue-100');
+    $response->assertSee('Legenda Warna Status Baris Data');
+    $response->assertSee('Biru (Approved/Confirmed/Received)');
+});
+
+test('sale order rejected and cancelled statuses map to red row class', function (string $status) {
+    $method = new ReflectionMethod(SaleOrderResource::class, 'statusRowClass');
+    $method->setAccessible(true);
+
+    expect($method->invoke(null, $status))->toBe('bg-red-100');
+})->with(['rejected', 'cancelled']);

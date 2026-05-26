@@ -144,6 +144,35 @@ test('order request approval generates purchase order and items', function () {
         ->and($poItemB->refer_item_model_id)->toBe($this->itemB->id);
 });
 
+test('explicit cabang_id payload is preserved when creating purchase order from order request', function () {
+    $branchB = Cabang::factory()->create();
+
+    $this->orderRequest->update(['cabang_id' => null]);
+    $this->itemA->update(['cabang_id' => null]);
+    $this->itemB->update(['cabang_id' => null]);
+
+    $payload = [
+        'po_number' => 'PO-CABANG-001',
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $branchB->id,
+        'order_date' => Carbon::now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'quantity' => 5,
+                'unit_price' => 15000,
+                'include' => true,
+            ],
+        ],
+    ];
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(['orderRequestItem.product']), $payload)->fresh();
+
+    expect($po->cabang_id)->toBe($branchB->id)
+        ->and($po->purchaseOrderItem)->toHaveCount(1)
+        ->and($po->purchaseOrderItem->first()->product_id)->toBe($this->productA->id);
+});
+
 test('order request rejection updates status without creating purchase order', function () {
     $this->service->reject($this->orderRequest);
 
