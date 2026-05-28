@@ -18,6 +18,7 @@ class Quotation extends Model
         'request_approve_at' => 'datetime',
         'reject_at' => 'datetime',
         'approve_at' => 'datetime',
+        'exchange_rate' => 'decimal:8',
     ];
 
     protected $fillable = [
@@ -25,6 +26,8 @@ class Quotation extends Model
         'customer_id',
         'date',
         'valid_until',
+        'currency_id',
+        'exchange_rate',
         'tempo_pembayaran',
         'total_amount',
         'status_payment',
@@ -44,6 +47,11 @@ class Quotation extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function quotationItem()

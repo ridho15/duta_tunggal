@@ -58,7 +58,24 @@ export async function chooseFixtureSupplier(page) {
 
 export async function chooseFixtureCabang(page) {
   const cabangName = getFixtureCabangName() || 'Cabang Pusat Jakarta'
+  const wrapper = page.locator('.fi-fo-field-wrp').filter({ has: page.locator('label:has-text("Cabang")') }).first()
+
+  if (!(await wrapper.isVisible().catch(() => false))) {
+    return
+  }
+
   await selectFirstChoicesOption(page, 'Cabang', cabangName)
+}
+
+export function getFixtureInvoiceId() {
+  try {
+    const output = execSync('php scripts/get_purchase_invoice_playwright_fixture.php', { encoding: 'utf8' })
+    const data = JSON.parse(output)
+
+    return data.invoice_id || null
+  } catch {
+    return null
+  }
 }
 
 export async function chooseFixtureOrderRequest(page) {

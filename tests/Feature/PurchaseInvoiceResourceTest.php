@@ -10,6 +10,7 @@ use App\Models\Cabang;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
@@ -50,6 +51,18 @@ function grantInvoicePermissions(User $user, array $permissions): void
     registerAllPermissions();
 
     $user->givePermissionTo($permissions);
+}
+
+function createPurchaseInvoiceOrderRequestItem(OrderRequest $orderRequest, Product $product, Supplier $supplier, Cabang $cabang, float $quantity = 100): OrderRequestItem
+{
+    return OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $product->id,
+        'supplier_id' => $supplier->id,
+        'cabang_id' => $cabang->id,
+        'quantity' => $quantity,
+        'currency_id' => Currency::where('code', 'IDR')->value('id') ?? Currency::query()->value('id'),
+    ]);
 }
 
 class PurchaseInvoiceResourceTest extends TestCase
@@ -456,6 +469,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             'refer_model_id' => $orderRequest->id,
         ]);
 
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $this->supplier, $this->cabang);
+
         PurchaseOrderItem::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
             'product_id' => $this->product->id,
@@ -517,6 +532,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             'cabang_id' => $this->cabang->id,
         ]);
 
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $product, $supplier, $this->cabang);
+
         $purchaseOrderItem = PurchaseOrderItem::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
             'product_id' => $product->id,
@@ -575,6 +592,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             'refer_model_id' => $orderRequest->id,
             'cabang_id' => $this->cabang->id,
         ]);
+
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $product, $supplier, $this->cabang);
 
         $purchaseOrderItem = PurchaseOrderItem::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
@@ -669,6 +688,7 @@ class PurchaseInvoiceResourceTest extends TestCase
             'status' => 'completed',
         ]);
         $product = Product::factory()->create();
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $product, $supplier, $this->cabang);
         PurchaseOrderItem::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
             'product_id' => $product->id,
@@ -978,6 +998,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             'refer_model_id' => $orderRequest->id,
         ]);
 
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $product, $supplier, $this->cabang);
+
         PurchaseOrderItem::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,
             'product_id' => $product->id,
@@ -1062,6 +1084,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             'refer_model_type' => OrderRequest::class,
             'refer_model_id' => $orderRequest->id,
         ]);
+
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $product, $supplier, $this->cabang);
 
         PurchaseOrderItem::factory()->create([
             'purchase_order_id' => $purchaseOrder->id,

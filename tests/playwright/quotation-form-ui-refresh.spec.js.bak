@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const APP_URL = 'http://127.0.0.1:8009';
+const APP_URL = 'http://127.0.0.1:8000';
 const LOGIN_URL = `${APP_URL}/admin/login`;
 const QUOTATION_CREATE_URL = `${APP_URL}/admin/quotations/create`;
 const CREDENTIALS = {
@@ -42,18 +42,18 @@ test.describe('Quotation Form UI refresh', () => {
 
     // Validate tax type now uses bullet/radio options.
     await expect(page.getByRole('radio', { name: 'Non Pajak' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: /Inklusif/i })).toBeVisible();
-    await expect(page.getByRole('radio', { name: /Eklusif/i })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /PPN Excluded/i })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /PPN Included/i })).toBeVisible();
 
     // Validate repeater is expandable/collapsible.
     await expect(page.getByRole('button', { name: /Sembunyikan/i }).first()).toBeVisible();
 
     await expect(page.getByRole('textbox', { name: /^Unit Price\*/i }).first()).toBeVisible();
     await expect(page.getByRole('textbox', { name: /^Total \(Harga x Qty\)\*/i }).first()).toBeVisible();
-    await expect(page.getByRole('spinbutton', { name: /^Discount %$/i }).first()).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: /^Discount \(%\)/i }).first()).toBeVisible();
     await expect(page.getByRole('textbox', { name: /^Discount \(Nominal\)/i }).first()).toBeVisible();
-    await expect(page.getByRole('textbox', { name: /^Nominal Pajak$/i }).first()).toBeVisible();
-    await expect(page.getByRole('textbox', { name: /^Subtotal$/i }).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /^Nominal Pajak \(Rp\)/i }).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /^Sub Total/i }).first()).toBeVisible();
 
     const states = await page.evaluate(() => {
       const readBySuffix = (suffix) => {
@@ -102,15 +102,10 @@ test.describe('Quotation Form UI refresh', () => {
     }
 
     // Guard against the previous Alpine issue on quotation page.
-    // Note: textareaFormComponent errors are pre-existing and not related to our changes
     const runtimeProblems = [...pageErrors, ...consoleWarnings].filter((line) =>
       /textareaFormComponent|state is not defined/i.test(line),
     );
 
-    // Only fail on NEW errors, not pre-existing textarea component issues
-    const newErrors = runtimeProblems.filter(line =>
-      !/textareaFormComponent|state is not defined/i.test(line)
-    );
-    expect(newErrors, newErrors.join('\n')).toHaveLength(0);
+    expect(runtimeProblems, runtimeProblems.join('\n')).toHaveLength(0);
   });
 });

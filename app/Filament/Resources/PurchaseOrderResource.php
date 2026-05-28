@@ -98,7 +98,7 @@ class PurchaseOrderResource extends Resource
     {
         return \Filament\Infolists\Components\TextEntry::make($name)
             ->label('')
-            ->getStateUsing(fn ($record) => self::detailLineHtml($label, $state($record)))
+            ->getStateUsing(fn($record) => self::detailLineHtml($label, $state($record)))
             ->html()
             ->columnSpan($columnSpan);
     }
@@ -171,7 +171,6 @@ class PurchaseOrderResource extends Resource
 
         $currencyIds = collect($data['purchaseOrderItem'] ?? [])
             ->pluck('currency_id')
-            ->merge(collect($data['purchaseOrderBiaya'] ?? [])->pluck('currency_id'))
             ->filter(fn($currencyId) => is_numeric($currencyId))
             ->map(fn($currencyId) => (int) $currencyId)
             ->unique()
@@ -1120,7 +1119,7 @@ class PurchaseOrderResource extends Resource
                             ->reactive(),
                         Repeater::make('purchaseOrderItem')
                             ->relationship()
-                            ->addable(fn (Get $get) => $get('refer_model_type') !== 'App\\Models\\OrderRequest')
+                            ->addable(fn(Get $get) => $get('refer_model_type') !== 'App\\Models\\OrderRequest')
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data): array {
                                 $currencyId = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
                                 $preview = self::calculateCurrencyPreview(
@@ -1711,22 +1710,6 @@ class PurchaseOrderResource extends Resource
                                             $total += $itemSubtotal * $itemNominal;
                                         }
 
-                                        // Add biaya amounts converted using purchaseOrderCurrency.nominal
-                                        $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
-                                        foreach ($biayas as $biaya) {
-                                            $nominal = 1.0;
-                                            if (isset($biaya['currency_id'])) {
-                                                foreach ($currencies as $c) {
-                                                    if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
-                                                        $nominal = (float)($c['nominal'] ?? 1.0);
-                                                        if ($nominal <= 0) $nominal = 1.0;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            $total += self::parseCurrencyState($biaya['total'] ?? 0) * $nominal;
-                                        }
-
                                         $livewire->data['total_amount'] = self::formatMoneyState($total);
                                     })
                                     ->columnSpan(3),
@@ -1792,6 +1775,8 @@ class PurchaseOrderResource extends Resource
                         Repeater::make('purchaseOrderBiaya')
                             ->columnSpanFull()
                             ->relationship()
+                            ->hidden()
+                            ->dehydrated(false)
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data, $get) {
                                 // Ensure 'total' is provided as a numeric value so
                                 // the ->indonesianMoney() formatter can render it.
@@ -1953,22 +1938,6 @@ class PurchaseOrderResource extends Resource
                                             $total += $itemSubtotal * $itemNominal;
                                         }
 
-                                        $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
-                                        foreach ($biayas as $biaya) {
-                                            $nominal = 1.0;
-                                            if (isset($biaya['currency_id'])) {
-                                                foreach ($currencies as $c) {
-                                                    if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
-                                                        $nominal = (float)($c['nominal'] ?? 1.0);
-                                                        if ($nominal <= 0) $nominal = 1.0;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            $biayaTotal = (float) self::parseCurrencyState($biaya['total'] ?? 0);
-                                            $total += $biayaTotal * $nominal;
-                                        }
-
                                         $livewire->data['total_amount'] = self::formatMoneyState($total);
                                     }),
                                 Radio::make('untuk_pembelian')
@@ -2079,22 +2048,6 @@ class PurchaseOrderResource extends Resource
                                             $total += $itemSubtotal * $itemNominal;
                                         }
 
-                                        $biayas = $livewire->data['purchaseOrderBiaya'] ?? [];
-                                        foreach ($biayas as $biaya) {
-                                            $nominal = 1.0;
-                                            if (isset($biaya['currency_id'])) {
-                                                foreach ($currencies as $c) {
-                                                    if (($c['currency_id'] ?? null) == $biaya['currency_id']) {
-                                                        $nominal = (float)($c['nominal'] ?? 1.0);
-                                                        if ($nominal <= 0) $nominal = 1.0;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            $biayaTotal = (float) self::parseCurrencyState($biaya['total'] ?? 0);
-                                            $total += $biayaTotal * $nominal;
-                                        }
-
                                         $livewire->data['total_amount'] = self::formatMoneyState($total);
                                     }),
                             ]),
@@ -2104,7 +2057,7 @@ class PurchaseOrderResource extends Resource
                             ->reactive()
                             ->hidden()
                             ->dehydrateStateUsing(fn($state) => self::parseCurrencyState($state ?? 0))
-                            ->helperText('Total dihitung dari item dan biaya; tampil untuk referensi saja')
+                            ->helperText('Total dihitung dari item pembelian; tampil untuk referensi saja')
                             ->afterStateHydrated(function ($component, $record) {
                                 if (! $record) {
                                     return;
@@ -2131,13 +2084,6 @@ class PurchaseOrderResource extends Resource
                                     $total += $itemSubtotal * $itemNominal;
                                 }
 
-                                foreach ($record->purchaseOrderBiaya as $biaya) {
-                                    $poCurrency = $poCurrencies->get($biaya->currency_id);
-                                    $biayaNominal = ($poCurrency && (float)$poCurrency->nominal > 0)
-                                        ? (float)$poCurrency->nominal
-                                        : CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null));
-                                    $total += (float) $biaya->total * $biayaNominal;
-                                }
                                 $component->state(self::formatMoneyState($total));
                             }),
 
@@ -2365,60 +2311,60 @@ class PurchaseOrderResource extends Resource
                 'paid' => 'bg-green-100',
                 default => '',
             })
-            ->description(new \Illuminate\Support\HtmlString(
-                '<style>.fi-ta-header:has(.dt-table-description-full-width){align-items:stretch}.fi-ta-header>.grid:has(.dt-table-description-full-width){width:100%;max-width:none;flex:1 1 100%;}.dt-table-description-full-width{width:100%;min-width:100%;max-width:none;box-sizing:border-box;}</style>' .
-                    '<div class="dt-table-description-full-width space-y-4 mb-6 w-full min-w-full max-w-none" style="width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;">' .
-                    '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff; transition: all 0.2s;">' .
-                    '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; color: #374151;">' .
-                    '<span class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px;">' .
-                    '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px; color: #3b82f6;">' .
-                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
-                    '</svg>' .
-                    'Panduan Purchase Order' .
-                    '</span>' .
-                    '<span class="transition group-open:rotate-180">' .
-                    '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
-                    '</span>' .
-                    '</summary>' .
-                    '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top: 12px; font-size: 14px; color: #4b5563; padding-left: 28px; border-left: 2px solid rgba(59, 130, 246, 0.3); display: flex; flex-direction: column; gap: 8px;">' .
-                    '<p><strong>Apa ini:</strong> Purchase Order (PO) adalah instruksi pembelian resmi ke supplier.</p>' .
-                    '<p><strong>Membuat PO:</strong> PO dapat dibuat dari Order Request atau Sales Order, atau dibuat manual lewat tombol Create PO.</p>' .
-                    '<p><strong>Alur baru (QC First):</strong> Setelah PO dibuat, lanjutkan ke <strong>Quality Control</strong> untuk inspeksi barang. Setelah QC lulus, Purchase Receipt akan dibuat otomatis dan stok diperbarui.</p>' .
-                    '<p><strong>Catatan:</strong> PO berstatus <em>Draft</em> perlu disetujui melalui tombol <em>Setujui PO</em> sebelum diproses lebih lanjut. Tindakan <em>close</em> memerlukan hak akses tertentu.</p>' .
-                    '</div>' .
-                    '</details>' .
-                    '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff;">' .
-                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">' .
-                    '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 16px; height: 16px;">' .
-                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
-                    '</svg>' .
-                    'Legenda Warna Status Baris Data' .
-                    '</h4>' .
-                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">' .
-                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #ffffff; border: 1px solid #edf2f7;">' .
-                    '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; flex-shrink: 0;"></div>' .
-                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Putih (Draft)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO masih draft</span></div>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
-                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
-                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Approved)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO sudah disetujui</span></div>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
-                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
-                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partially Received)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO diterima sebagian</span></div>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
-                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
-                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Request Close/Closed)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Diminta tutup / ditutup</span></div>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
-                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
-                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Completed/Paid)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / dibayar</span></div>' .
-                    '</div>' .
-                    '</div>' .
-                    '</div>' .
-                    '</div>'
-            ))
+                ->description(new \Illuminate\Support\HtmlString(
+                    '<style>.fi-ta-header:has(.dt-table-description-full-width){align-items:stretch}.fi-ta-header>.grid:has(.dt-table-description-full-width){width:100%;max-width:none;flex:1 1 100%;}.dt-table-description-full-width{width:100%;min-width:100%;max-width:none;box-sizing:border-box;}</style>' .
+                        '<div class="dt-table-description-full-width space-y-4 mb-6 w-full min-w-full max-w-none" style="width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;">' .
+                        '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff; transition: all 0.2s;">' .
+                        '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; color: #374151;">' .
+                        '<span class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px;">' .
+                        '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px; color: #3b82f6;">' .
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
+                        '</svg>' .
+                        'Panduan Purchase Order' .
+                        '</span>' .
+                        '<span class="transition group-open:rotate-180">' .
+                        '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
+                        '</span>' .
+                        '</summary>' .
+                        '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top: 12px; font-size: 14px; color: #4b5563; padding-left: 28px; border-left: 2px solid rgba(59, 130, 246, 0.3); display: flex; flex-direction: column; gap: 8px;">' .
+                        '<p><strong>Apa ini:</strong> Purchase Order (PO) adalah instruksi pembelian resmi ke supplier.</p>' .
+                        '<p><strong>Membuat PO:</strong> PO dapat dibuat dari Order Request atau Sales Order, atau dibuat manual lewat tombol Create PO.</p>' .
+                        '<p><strong>Alur baru (QC First):</strong> Setelah PO dibuat, lanjutkan ke <strong>Quality Control</strong> untuk inspeksi barang. Setelah QC lulus, Purchase Receipt akan dibuat otomatis dan stok diperbarui.</p>' .
+                        '<p><strong>Catatan:</strong> PO berstatus <em>Draft</em> perlu disetujui melalui tombol <em>Setujui PO</em> sebelum diproses lebih lanjut. Tindakan <em>close</em> memerlukan hak akses tertentu.</p>' .
+                        '</div>' .
+                        '</details>' .
+                        '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff;">' .
+                        '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">' .
+                        '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 16px; height: 16px;">' .
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
+                        '</svg>' .
+                        'Legenda Warna Status Baris Data' .
+                        '</h4>' .
+                        '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">' .
+                        '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #ffffff; border: 1px solid #edf2f7;">' .
+                        '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; flex-shrink: 0;"></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Putih (Draft)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO masih draft</span></div>' .
+                        '</div>' .
+                        '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
+                        '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Approved)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO sudah disetujui</span></div>' .
+                        '</div>' .
+                        '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
+                        '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partially Received)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO diterima sebagian</span></div>' .
+                        '</div>' .
+                        '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
+                        '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Request Close/Closed)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Diminta tutup / ditutup</span></div>' .
+                        '</div>' .
+                        '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
+                        '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Completed/Paid)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / dibayar</span></div>' .
+                        '</div>' .
+                        '</div>' .
+                        '</div>' .
+                        '</div>'
+                ))
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status PO')
@@ -2667,19 +2613,6 @@ class PurchaseOrderResource extends Resource
                                 ->numeric()
                                 ->maxValue(100)
                                 ->default(0),
-                            TextInput::make('other_fee')
-                                ->required()
-                                ->numeric()
-                                ->default(function ($record) {
-                                    $otherFee = 0;
-                                    foreach ($record->purchaseOrderBiaya as $biaya) {
-                                        if ($biaya->masuk_invoice == 1) {
-                                            $otherFee += ($biaya->total * CurrencyConversionResolver::resolveRate((int) ($biaya->currency_id ?? null)));
-                                        }
-                                    }
-
-                                    return $otherFee;
-                                }),
                         ])
                         ->action(function (array $data, $record) {
                             // Check invoice
@@ -2931,22 +2864,22 @@ class PurchaseOrderResource extends Resource
                                                             ['Satuan', fn($record) => $record->product?->uom?->abbreviation ?? $record->product?->uom?->name ?? '-'],
                                                             ['Qty', fn($record) => $record->quantity],
                                                             ['Cabang', function ($record) {
-                                                        $refer = $record->referItemModel;
-                                                        $cabang = $refer?->cabang ?? $record->purchaseOrder?->cabang ?? $record->product?->cabang;
+                                                                $refer = $record->referItemModel;
+                                                                $cabang = $refer?->cabang ?? $record->purchaseOrder?->cabang ?? $record->product?->cabang;
 
-                                                        if (! $cabang) {
-                                                            return '-';
-                                                        }
+                                                                if (! $cabang) {
+                                                                    return '-';
+                                                                }
 
-                                                        return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
+                                                                return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
                                                             }],
                                                             ['Refer Item', function ($record) {
-                                                        $refer = $record->referItemModel;
-                                                        if (! $refer) {
-                                                            return '-';
-                                                        }
+                                                                $refer = $record->referItemModel;
+                                                                if (! $refer) {
+                                                                    return '-';
+                                                                }
 
-                                                        return class_basename($record->refer_item_model_type) . ' #' . ($refer->id ?? $record->refer_item_model_id);
+                                                                return class_basename($record->refer_item_model_type) . ' #' . ($refer->id ?? $record->refer_item_model_id);
                                                             }],
                                                             ['Qty Received', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_received')],
                                                             ['Qty Accepted', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_accepted')],
@@ -2964,50 +2897,50 @@ class PurchaseOrderResource extends Resource
                                                         [
                                                             ['Mata Uang', fn($record) => $record->currency?->code ?? '-'],
                                                             ['Unit Price', function ($record) {
-                                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
 
-                                                        return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($record->unit_price ?? 0, $currencyId);
+                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($record->unit_price ?? 0, $currencyId);
                                                             }],
                                                             ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
                                                             ['Nominal Discount', function ($record) {
-                                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                        $nominal = ((float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0)) * ((float) ($record->discount ?? 0) / 100);
+                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                                                $nominal = ((float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0)) * ((float) ($record->discount ?? 0) / 100);
 
-                                                        return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($nominal, $currencyId);
+                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($nominal, $currencyId);
                                                             }],
                                                             ['Total (Harga x Qty)', function ($record) {
-                                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                        $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                                                $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
 
-                                                        return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($total, $currencyId);
+                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($total, $currencyId);
                                                             }],
                                                             ['Tipe Pajak', fn($record) => self::normalizeTaxTypeValue($record->tipe_pajak ?? null)],
                                                             ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
                                                             ['Nominal Pajak', function ($record) {
-                                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                        $preview = self::calculateCurrencyPreview(
-                                                            (float) ($record->quantity ?? 0),
-                                                            (float) ($record->unit_price ?? 0),
-                                                            (float) ($record->discount ?? 0),
-                                                            (float) ($record->tax ?? 0),
-                                                            self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
-                                                            $currencyId
-                                                        );
+                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                                                $preview = self::calculateCurrencyPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
+                                                                    $currencyId
+                                                                );
 
-                                                        return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
+                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
                                                             }],
                                                             ['Subtotal', function ($record) {
-                                                        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                        $preview = self::calculateCurrencyPreview(
-                                                            (float) ($record->quantity ?? 0),
-                                                            (float) ($record->unit_price ?? 0),
-                                                            (float) ($record->discount ?? 0),
-                                                            (float) ($record->tax ?? 0),
-                                                            self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
-                                                            $currencyId
-                                                        );
+                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+                                                                $preview = self::calculateCurrencyPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
+                                                                    $currencyId
+                                                                );
 
-                                                        return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
+                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
                                                             }],
                                                         ]
                                                     ),
@@ -3018,8 +2951,8 @@ class PurchaseOrderResource extends Resource
                                     ]),
                             ]),
                     ]),
-                \Filament\Infolists\Components\Section::make('Ringkasan Biaya & Total')
-                    ->columns(4)
+                \Filament\Infolists\Components\Section::make('Ringkasan Total')
+                    ->columns(3)
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('items_total')
                             ->label('Total Item')
@@ -3039,9 +2972,6 @@ class PurchaseOrderResource extends Resource
                                     return $preview['subtotal'];
                                 }));
                             }),
-                        \Filament\Infolists\Components\TextEntry::make('biaya_total')
-                            ->label('Total Biaya Tambahan')
-                            ->getStateUsing(fn($record) => self::formatMoneyState((float) $record->purchaseOrderBiaya()->sum('total'))),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
                             ->getStateUsing(fn($record) => self::formatMoneyState($record->total_amount ?? 0)),

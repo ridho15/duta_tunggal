@@ -294,7 +294,7 @@ test('purchase order form uses collapsed product item repeater and disabled fiel
         ->and($resource)->toContain("->label('TOP (Term Of Payment)')")
         ->and($resource)->toContain("->label('Masa Kredit (Hari)')")
         ->and($resource)->toContain('->disabled(fn(Get $get) => $get(\'refer_model_type\') === \'App\\\\Models\\\\OrderRequest\')')
-        ->and($resource)->toContain('->addable(fn (Get $get) => $get(\'refer_model_type\') !== \'App\\\\Models\\\\OrderRequest\')')
+        ->and($resource)->toContain('->addable(fn(Get $get) => $get(\'refer_model_type\') !== \'App\\\\Models\\\\OrderRequest\')')
         ->and($resource)->toContain('->collapsed(function')
         ->and($resource)->toContain('->itemLabel(function (array $state)')
         ->and($resource)->toContain('->columns(10)')
@@ -304,6 +304,12 @@ test('purchase order form uses collapsed product item repeater and disabled fiel
         ->and($resource)->toContain("TextInput::make('total')")
         ->and($resource)->toContain("TextInput::make('tax_nominal')")
         ->and($resource)->toContain("TextInput::make('subtotal')");
+
+    $purchaseOrderBiayaStart = strpos($resource, "Repeater::make('purchaseOrderBiaya')");
+    expect($purchaseOrderBiayaStart)->not->toBeFalse();
+    $purchaseOrderBiayaBlock = substr($resource, $purchaseOrderBiayaStart, 500);
+    expect($purchaseOrderBiayaBlock)->toContain('->hidden()')
+        ->and($purchaseOrderBiayaBlock)->toContain('->dehydrated(false)');
 
     $repeaterStart = strpos($resource, "Repeater::make('purchaseOrderItem')");
     $taxBreakdownStart = strpos($resource, "Placeholder::make('tax_breakdown')", $repeaterStart);

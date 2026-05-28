@@ -7,6 +7,8 @@ use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Quotation;
+use App\Models\QuotationItem;
 use App\Models\SaleOrderItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItemWarehouseAllocation;
@@ -175,13 +177,130 @@ test('sale order resource exposes quotation locked layout fields', function () {
         ->and($resource)->toContain("->addable(fn(Get \$get) => ! static::isReferQuotationForm(\$get))")
         ->and($resource)->toContain("->deletable(fn(Get \$get) => ! static::isReferQuotationForm(\$get))")
         ->and($resource)->toContain("->reorderable(fn(Get \$get) => ! static::isReferQuotationForm(\$get))")
-        ->and($resource)->toContain("->collapsible()");
+        ->and($resource)->toContain("->collapsible()")
+        ->and($resource)->toContain('->addAction(function (ActionsAction $action)')
+        ->and($resource)->toContain("'repeater-collapse'")
+        ->and($resource)->toContain('$component->generateUuid()')
+        ->and($resource)->toContain('protected static function readOnlyGrayInputAttributes()')
+        ->and($resource)->toContain('background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;');
+
+    expect(strpos($resource, "Select::make('quotation_id')"))->toBeLessThan(strpos($resource, "TextInput::make('so_number')"));
+    expect(strpos($resource, "Select::make('customer_id')"))->toBeLessThan(strpos($resource, "Select::make('cabang_id')"));
+    expect(strpos($resource, "DatePicker::make('order_date')"))->toBeLessThan(strpos($resource, "DatePicker::make('delivery_date')"));
+    expect(strpos($resource, "Radio::make('tipe_pengiriman')"))->toBeLessThan(strpos($resource, "TextInput::make('shipped_to')"));
+    expect(strpos($resource, "TextInput::make('tempo_pembayaran')"))->toBeLessThan(strpos($resource, "TextInput::make('total_amount')"));
 
     expect(strpos($resource, "TextInput::make('quantity')"))->toBeLessThan(strpos($resource, "Select::make('currency_id')"));
     expect(strpos($resource, "Select::make('currency_id')"))->toBeLessThan(strpos($resource, "TextInput::make('unit_price')"));
+    expect(strpos($resource, "TextInput::make('unit_price')"))->toBeLessThan(strpos($resource, "TextInput::make('total')"));
+    expect(strpos($resource, "TextInput::make('total')"))->toBeLessThan(strpos($resource, "TextInput::make('discount')"));
     expect(strpos($resource, "TextInput::make('discount')"))->toBeLessThan(strpos($resource, "TextInput::make('discount_nominal')"));
     expect(strpos($resource, "\\Filament\\Forms\\Components\\Select::make('tipe_pajak')"))->toBeLessThan(strpos($resource, "TextInput::make('tax')"));
     expect(strpos($resource, "TextInput::make('tax')"))->toBeLessThan(strpos($resource, "TextInput::make('tax_nominal')"));
+    expect(strpos($resource, "TextInput::make('tax_nominal')"))->toBeLessThan(strpos($resource, "TextInput::make('subtotal')"));
+    expect($resource)->toContain('$quotationCurrencyId')
+        ->and($resource)->toContain("\$set('currency_id', \$quotationCurrencyId)")
+        ->and($resource)->toContain("\$set('exchange_rate', static::resolveExchangeRate(\$quotationCurrencyId))")
+        ->and($resource)->toContain('CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($quotation->total_amount ?? 0), $quotationCurrencyId, false)');
+
+    foreach ([
+        "Select::make('customer_id')",
+        "Select::make('cabang_id')",
+        "TextInput::make('tempo_pembayaran')",
+        "Select::make('product_id')",
+        "Select::make('currency_id')",
+        "TextInput::make('unit_price')",
+        "TextInput::make('discount')",
+        "\\Filament\\Forms\\Components\\Select::make('tipe_pajak')",
+    ] as $field) {
+        $offset = strpos($resource, $field);
+        $window = substr($resource, $offset, 1200);
+
+        expect($window)->toContain('static::isReferQuotationForm($get)')
+            ->and($window)->toContain('static::lockedInputAttributes($get)');
+    }
+
+    foreach ([
+        "TextInput::make('total_amount')",
+        "TextInput::make('unit')",
+        "TextInput::make('total')",
+        "TextInput::make('discount_nominal')",
+        "TextInput::make('tax')",
+        "TextInput::make('tax_nominal')",
+        "TextInput::make('subtotal')",
+    ] as $field) {
+        $offset = strpos($resource, $field);
+        $window = substr($resource, $offset, 1000);
+
+        expect($window)->toContain('static::readOnlyGrayInputAttributes()');
+    }
+});
+
+test('sale order created from quotation currency stores item currency and idr total', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 16000,
+    ]);
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-SO-USD-001',
+        'customer_id' => $this->customer->id,
+        'cabang_id' => $this->cabang->id,
+        'date' => now()->toDateString(),
+        'valid_until' => now()->addDays(14)->toDateString(),
+        'currency_id' => $usd->id,
+        'exchange_rate' => 16000,
+        'total_amount' => 10,
+        'status' => 'approve',
+        'created_by' => $this->user->id,
+    ]);
+
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id' => $this->product->id,
+        'quantity' => 1,
+        'unit_price' => 10,
+        'discount' => 0,
+        'tax' => 0,
+        'tax_type' => 'none',
+    ]);
+
+    $saleOrder = SaleOrder::create([
+        'so_number' => 'SO-FROM-QO-USD-001',
+        'customer_id' => $quotation->customer_id,
+        'quotation_id' => $quotation->id,
+        'cabang_id' => $quotation->cabang_id,
+        'order_date' => now()->toDateString(),
+        'delivery_date' => now()->addDays(3)->toDateString(),
+        'status' => 'draft',
+        'tipe_pengiriman' => 'Kirim Langsung',
+        'currency_id' => $quotation->currency_id,
+        'exchange_rate' => $quotation->exchange_rate,
+        'created_by' => $this->user->id,
+    ]);
+
+    $saleOrder->saleOrderItem()->create([
+        'product_id' => $this->product->id,
+        'quantity' => 1,
+        'unit_price' => 10,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'none',
+        'currency_id' => $quotation->currency_id,
+        'warehouse_id' => $this->warehouse->id,
+    ]);
+
+    app(\App\Services\SalesOrderService::class)->updateTotalAmount($saleOrder);
+
+    $saleOrder->refresh();
+    $item = $saleOrder->saleOrderItem()->first();
+
+    expect((int) $saleOrder->currency_id)->toBe($usd->id)
+        ->and((float) $saleOrder->exchange_rate)->toBe(16000.0)
+        ->and((int) $item->currency_id)->toBe($usd->id)
+        ->and((float) $saleOrder->total_amount)->toBe(160000.0);
 });
 
 test('sale order currency preview calculates discount nominal', function () {

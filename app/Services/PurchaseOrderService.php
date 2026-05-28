@@ -29,19 +29,13 @@ class PurchaseOrderService
         self::$updatingTotalAmount = true;
 
         $total = 0;
-        $purchaseOrder->loadMissing(['purchaseOrderCurrency', 'purchaseOrderItem.currency', 'purchaseOrderBiaya.currency']);
+        $purchaseOrder->loadMissing(['purchaseOrderCurrency', 'purchaseOrderItem.currency']);
         $poCurrencies = $purchaseOrder->purchaseOrderCurrency->keyBy('currency_id');
 
         // Hitung total dari purchase order items
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
             $subtotal = HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak);
             $total += CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotal), is_numeric($item->currency_id) ? (int) $item->currency_id : null, false);
-        }
-
-        // Hitung total dari biaya lain (purchase order biaya)
-        foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
-            $biayaAmount = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($biaya->total ?? 0), is_numeric($biaya->currency_id) ? (int) $biaya->currency_id : null, false);
-            $total += $biayaAmount;
         }
 
         // Debug log for unit test investigation: capture computed total before persisting
@@ -156,31 +150,11 @@ class PurchaseOrderService
     }
 
     /**
-     * Build invoice other fees from PO biaya lines.
-     * Falls back to a single manual line when no PO biaya is marked for invoice.
+     * Build invoice other fees from an explicit action value only.
+     * Purchase-side biaya lain now belongs on Purchase Invoice, not Purchase Order.
      */
     protected function buildInvoiceOtherFees(PurchaseOrder $purchaseOrder, mixed $fallbackOtherFee = null): array
     {
-        $purchaseOrder->loadMissing('purchaseOrderBiaya.currency');
-
-        $otherFees = [];
-
-        foreach ($purchaseOrder->purchaseOrderBiaya as $biaya) {
-            if ((int) ($biaya->masuk_invoice ?? 0) !== 1) {
-                continue;
-            }
-
-            $conversionRate = (float) ($biaya->currency->to_rupiah ?? 1);
-            $otherFees[] = [
-                'name' => $biaya->nama_biaya ?? 'Biaya Lain',
-                'amount' => round(((float) ($biaya->total ?? 0)) * $conversionRate, 2),
-            ];
-        }
-
-        if (!empty($otherFees)) {
-            return $otherFees;
-        }
-
         $fallbackAmount = (float) ($fallbackOtherFee ?? 0);
         if ($fallbackAmount <= 0) {
             return [];

@@ -8,6 +8,7 @@ import {
   chooseFixtureOrderRequest,
   checkCheckboxByLabel,
   clickCheckboxByLabel,
+  getFixtureInvoiceId,
 } from './helpers/purchase-invoice-fixture'
 
 const ERR = /Fatal error|Whoops!|Something went wrong/i
@@ -82,35 +83,14 @@ test('B1-a: purchase invoice item pricing fields are read-only/disabled', async 
 })
 
 test('B1-b: ppn_rate is non-editable on edit form', async ({ page }) => {
-  await page.goto('/admin/purchase-invoices')
+  const invoiceId = getFixtureInvoiceId()
+  expect(invoiceId).toBeTruthy()
+
+  await page.goto(`/admin/purchase-invoices/${invoiceId}/edit`)
   await page.waitForLoadState('networkidle')
 
   const body = await page.textContent('body')
   expect(body).not.toMatch(ERR)
-
-  const row = page.locator('tr, .fi-ta-row').filter({ hasText: 'INV-TEST-INV-LOCKED' }).first()
-  await expect(row).toBeVisible()
-
-  const hrefs = await row.locator('a[href*="/admin/purchase-invoices/"]').evaluateAll((els) =>
-    els
-      .map((el) => el.getAttribute('href'))
-      .filter((href) => href && /\/admin\/purchase-invoices\/\d+$/.test(href))
-  )
-  expect(hrefs.length).toBeGreaterThan(0)
-
-  await page.goto(hrefs[0])
-  await page.waitForLoadState('networkidle')
-
-  if (!page.url().includes('/edit')) {
-    const editBtn = page.getByRole('button', { name: /Edit|Ubah/i }).first()
-    if (await editBtn.count()) {
-      await editBtn.click()
-      await page.waitForLoadState('networkidle')
-    } else {
-      await page.goto(`${page.url().replace(/\/$/, '')}/edit`)
-      await page.waitForLoadState('networkidle')
-    }
-  }
 
   const ppnRateInput = page.locator('input[id*="ppn_rate"]').first()
   await expect(ppnRateInput).toBeVisible()

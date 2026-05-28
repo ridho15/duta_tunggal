@@ -5,6 +5,7 @@ namespace App\Filament\Resources\QuotationResource\Pages;
 use App\Filament\Resources\QuotationResource;
 use App\Http\Controllers\HelperController;
 use App\Services\QuotationService;
+use App\Support\CurrencyConversionResolver;
 use Filament\Actions;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -54,12 +55,17 @@ class EditQuotation extends EditRecord
                     $item['tax_type'] ?? 'None'
                 );
         }
-        $data['total_amount'] = number_format((float) HelperController::parseIndonesianMoney($grand), 0, ',', '.');
+        $data['total_amount'] = QuotationResource::formatCurrencyPreviewState($grand, is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null);
         return $data;
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
+            ?? \App\Models\Currency::query()->orderBy('id')->value('id');
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : $defaultCurrencyId;
+        $data['exchange_rate'] = CurrencyConversionResolver::resolveRate($data['currency_id'] ?? null);
+
         // Normalisasi harga & kalkulasi total_price jika perlu
         $items = $data['quotationItem'] ?? [];
         $grand = 0;
@@ -69,21 +75,29 @@ class EditQuotation extends EditRecord
             }
             $rawUnit = $item['unit_price'] ?? 0;
             // Parse formatted Indonesian number to numeric
-            $numericUnit = \App\Http\Controllers\HelperController::parseIndonesianMoney($rawUnit);
+            $numericUnit = QuotationResource::parseCurrencyState($rawUnit);
+            // Use quotation header currency for anchor (header-only policy)
+            $headerCurrencyId = $data['currency_id'] ?? null;
+            $item['unit_price_idr'] = CurrencyConversionResolver::convertToIdrHighPrecision(
+                (string) $numericUnit,
+                is_numeric($headerCurrencyId) ? (int) $headerCurrencyId : null
+            );
             $qty = (int)($item['quantity'] ?? 0);
             $disc = (int)($item['discount'] ?? 0);
             $tipe = $item['tipe_pajak'] ?? $item['tax_type'] ?? null;
-            $tax = in_array($tipe, ['None', 'Non Pajak'], true) ? 0 : (int)($item['tax'] ?? 0);
+            $normalizedTipe = \App\Support\TaxTypeHelper::normalize($tipe, \App\Support\TaxTypeHelper::NONE);
+            $tax = $normalizedTipe === \App\Support\TaxTypeHelper::NONE ? 0 : (int)($item['tax'] ?? 0);
             $item['tax'] = $tax;
-            $total = \App\Http\Controllers\HelperController::hitungSubtotal($qty, $numericUnit, $disc, $tax, $tipe);
+            $item['tax_type'] = $normalizedTipe;
+            $total = \App\Http\Controllers\HelperController::hitungSubtotal($qty, $numericUnit, $disc, $tax, $normalizedTipe);
             $grand += $total;
-            // Replace with normalized numeric values (stored as integer Rupiah)
-            $item['unit_price'] = (int)$numericUnit;
-            $item['total_price'] = (int)$total;
+            // Replace with normalized numeric values in quotation header currency.
+            $item['unit_price'] = $numericUnit;
+            $item['total_price'] = $total;
             $items[$uuid] = $item;
         }
         $data['quotationItem'] = $items;
-        $data['total_amount'] = (int)$grand;
+        $data['total_amount'] = $grand;
         
         // Log data quotation yang dikirim ke backend saat update
         \Illuminate\Support\Facades\Log::info('Quotation Data Before Update:', $data);

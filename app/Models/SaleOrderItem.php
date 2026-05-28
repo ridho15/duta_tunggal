@@ -33,7 +33,7 @@ class SaleOrderItem extends Model
 
         return match ($normalized) {
             'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
-            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'inklusif', 'inclusive', 'included', 'ppn included', 'ppn-included' => 'inklusif',
             'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
             default => 'eklusif',
         };

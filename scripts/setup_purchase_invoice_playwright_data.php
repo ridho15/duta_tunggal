@@ -36,6 +36,8 @@ $existingOr = DB::table('order_requests')->where('request_number', $fixture['ord
 $existingLocked = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_locked'])->where('status', 'completed')->first();
 $existingOpen = DB::table('purchase_receipts')->where('receipt_number', $fixture['receipt_open'])->where('status', 'completed')->first();
 $existingInvoice = DB::table('invoices')->where('invoice_number', $fixture['invoice_number'])->first();
+$testUser = DB::table('users')->where('email', 'ralamzah@gmail.com')->first();
+$fixtureCabangId = $testUser?->cabang_id ?? DB::table('cabangs')->value('id') ?? 1;
 
 $openReceiptAlreadyInvoiced = false;
 if ($existingOpen) {
@@ -49,6 +51,8 @@ if ($existingOpen) {
 if ($existingOr && $existingPo && $existingLocked && $existingOpen && $existingInvoice
     && $existingLocked->purchase_order_id === $existingPo->id
     && $existingOpen->purchase_order_id === $existingPo->id
+    && (int) ($existingLocked->cabang_id ?? $fixtureCabangId) === (int) $fixtureCabangId
+    && (int) ($existingOpen->cabang_id ?? $fixtureCabangId) === (int) $fixtureCabangId
     && !$openReceiptAlreadyInvoiced) {
     echo "Fixture data already exists and is valid — skipping setup\n";
     exit(0);

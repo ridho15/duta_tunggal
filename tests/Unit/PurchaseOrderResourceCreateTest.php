@@ -181,8 +181,8 @@ it('creates purchase order with complete data through service', function () {
     $service->updateTotalAmount($purchaseOrder);
     $purchaseOrder->refresh();
 
-    // Expected total: item subtotal (104500) + biaya (25000) = 129500
-    expect($purchaseOrder->total_amount)->toBe('129500.00');
+    // Purchase Order total now excludes biaya lain; those belong on Purchase Invoice.
+    expect($purchaseOrder->total_amount)->toBe('104500.00');
 });
 
 it('validates required fields for purchase order', function () {

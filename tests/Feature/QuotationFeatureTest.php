@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Cabang;
+use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -10,7 +11,9 @@ use App\Models\TaxSetting;
 use App\Models\SaleOrder;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Http\Controllers\HelperController;
 use App\Services\QuotationService;
+use App\Support\TaxTypeHelper;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +29,195 @@ beforeEach(function () {
     // Hard-coding id=1 fails under RefreshDatabase — factories ensure the FK exists.
     $this->cabang = Cabang::factory()->create(['kode' => 'TEST']);
     $this->uom    = UnitOfMeasure::factory()->create();
+    $this->idr = Currency::factory()->create([
+        'name' => 'Rupiah',
+        'symbol' => 'Rp',
+        'code' => 'IDR',
+        'to_rupiah' => 1,
+    ]);
+});
+
+test('quotation resource exposes requested form layout and locked calculated fields', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/QuotationResource.php'));
+
+    expect($resource)->toContain("Fieldset::make('Form Quotation')")
+        ->and($resource)->toContain('->columns(6)')
+        ->and($resource)->toContain("TextInput::make('quotation_number')")
+        ->and($resource)->toContain("Select::make('customer_id')")
+        ->and($resource)->toContain("Select::make('cabang_id')")
+        ->and($resource)->toContain("DatePicker::make('date')")
+        ->and($resource)->toContain("DatePicker::make('valid_until')")
+        ->and($resource)->toContain("Select::make('currency_id')")
+        ->and($resource)->toContain("->label('Mata Uang')")
+        ->and($resource)->toContain("Hidden::make('exchange_rate')")
+        ->and($resource)->toContain("TextInput::make('tempo_pembayaran')")
+        ->and($resource)->toContain("TextInput::make('total_amount')")
+        ->and($resource)->toContain("->label('Total Amount')")
+        ->and($resource)->toContain("FileUpload::make('po_file_path')")
+        ->and($resource)->toContain("->label('Note')")
+        ->and($resource)->toContain("Repeater::make('quotationItem')")
+        ->and($resource)->toContain('->collapsible()')
+        ->and($resource)->toContain('->addAction(function (ActionsAction $action)')
+        ->and($resource)->toContain("'repeater-collapse'")
+        ->and($resource)->toContain("->icon('heroicon-o-plus-circle')")
+        ->and($resource)->toContain("return sprintf('Product: %s | Qty: %s | Subtotal: %s %s'")
+        ->and($resource)->toContain("TextInput::make('total_price')")
+        ->and($resource)->toContain("->label('Total (Harga x Qty)')")
+        ->and($resource)->toContain("TextInput::make('discount_nominal')")
+        ->and($resource)->toContain("->label('Discount (Nominal)')")
+        ->and($resource)->toContain("Radio::make('tax_type')")
+        ->and($resource)->toContain('->options(static::taxTypeOptions())')
+        ->and($resource)->not->toContain("Select::make('tax_type')")
+        ->and($resource)->toContain("TextInput::make('tax_nominal')")
+        ->and($resource)->toContain('static::resolveCurrencySymbol')
+        ->and($resource)->toContain('resolveQuotationFormCurrencyId')
+        ->and($resource)->toContain('resolveQuotationItemUnitPriceIdr')
+        ->and($resource)->toContain("Hidden::make('unit_price_idr')")
+        ->and($resource)->toContain('static::readOnlyGrayInputAttributes()');
+
+    foreach ([
+        "TextInput::make('total_amount')",
+        "TextInput::make('unit')",
+        "TextInput::make('total_price')",
+        "TextInput::make('discount_nominal')",
+        "TextInput::make('tax')",
+        "TextInput::make('tax_nominal')",
+        "TextInput::make('subtotal')",
+    ] as $field) {
+        $fieldPosition = strpos($resource, $field);
+        expect($fieldPosition)->not->toBeFalse();
+
+        $fieldBlock = substr($resource, $fieldPosition, 900);
+        expect($fieldBlock)->toContain('static::readOnlyGrayInputAttributes()');
+    }
+
+    expect(strpos($resource, "TextInput::make('quotation_number')"))->toBeLessThan(strpos($resource, "Select::make('customer_id')"));
+    expect(strpos($resource, "Select::make('customer_id')"))->toBeLessThan(strpos($resource, "Select::make('cabang_id')"));
+    expect(strpos($resource, "DatePicker::make('date')"))->toBeLessThan(strpos($resource, "DatePicker::make('valid_until')"));
+    expect(strpos($resource, "DatePicker::make('valid_until')"))->toBeLessThan(strpos($resource, "Select::make('currency_id')"));
+    expect(strpos($resource, "Select::make('currency_id')"))->toBeLessThan(strpos($resource, "TextInput::make('tempo_pembayaran')"));
+    expect(strpos($resource, "TextInput::make('tempo_pembayaran')"))->toBeLessThan(strpos($resource, "TextInput::make('total_amount')"));
+    expect(strpos($resource, "TextInput::make('total_amount')"))->toBeLessThan(strpos($resource, "FileUpload::make('po_file_path')"));
+    expect(strpos($resource, "FileUpload::make('po_file_path')"))->toBeLessThan(strpos($resource, "TextArea::make('notes')"));
+
+    expect(strpos($resource, "Select::make('product_id')"))->toBeLessThan(strpos($resource, "TextInput::make('unit')"));
+    expect(strpos($resource, "TextInput::make('unit')"))->toBeLessThan(strpos($resource, "TextInput::make('quantity')"));
+    expect(strpos($resource, "TextInput::make('unit_price')"))->toBeLessThan(strpos($resource, "TextInput::make('total_price')"));
+    expect(strpos($resource, "TextInput::make('total_price')"))->toBeLessThan(strpos($resource, "TextInput::make('discount')"));
+    expect(strpos($resource, "TextInput::make('discount')"))->toBeLessThan(strpos($resource, "TextInput::make('discount_nominal')"));
+    expect(strpos($resource, "Radio::make('tax_type')"))->toBeLessThan(strpos($resource, "TextInput::make('tax')"));
+    expect(strpos($resource, "TextInput::make('tax')"))->toBeLessThan(strpos($resource, "TextInput::make('tax_nominal')"));
+    expect(strpos($resource, "TextInput::make('tax_nominal')"))->toBeLessThan(strpos($resource, "TextInput::make('subtotal')"));
+});
+
+test('quotation tax type options follow purchase request radio values', function () {
+    expect(TaxTypeHelper::options())->toBe([
+        'none' => 'Non Pajak',
+        'inklusif' => 'Inklusif',
+        'eklusif' => 'Eklusif',
+    ]);
+});
+
+test('quotation item calculated display values follow quantity price discount and tax type', function () {
+    $qty = 5;
+    $unitPrice = 100000;
+    $discount = 10;
+    $tax = 11;
+
+    $total = $qty * $unitPrice;
+    $discountNominal = $total * ($discount / 100);
+
+    expect($total)->toBe(500000)
+        ->and($discountNominal)->toBe(50000.0)
+        ->and(HelperController::hitungTaxNominal($qty, $unitPrice, $discount, 0, 'none'))->toBe(0.0)
+        ->and(HelperController::hitungSubtotal($qty, $unitPrice, $discount, 0, 'none'))->toBe(450000.0)
+        ->and(HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, 'eklusif'))->toBe(49500.0)
+        ->and(HelperController::hitungSubtotal($qty, $unitPrice, $discount, $tax, 'eklusif'))->toBe(499500.0)
+        ->and(HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, 'inklusif'))->toBe(49500.0)
+        ->and(HelperController::hitungSubtotal($qty, $unitPrice, $discount, $tax, 'inklusif'))->toBe(450000.0);
+});
+
+test('quotation header currency converts item prices and persists exchange rate', function () {
+    $user = User::factory()->create();
+    foreach ([
+        'view any quotation',
+        'view quotation',
+        'create quotation',
+        'update quotation',
+        'delete quotation',
+        'view any customer',
+        'view any product',
+    ] as $permission) {
+        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        $user->givePermissionTo($permission);
+    }
+
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 16000,
+    ]);
+    $customer = Customer::factory()->create();
+    $productCategory = ProductCategory::create([
+        'name' => 'Currency Quotation Category',
+        'kode' => 'CQC001',
+        'cabang_id' => $this->cabang->id,
+        'kenaikan_harga' => 0,
+    ]);
+    $product = Product::create([
+        'name' => 'Currency Quotation Product',
+        'sku' => 'CQP001',
+        'cabang_id' => $this->cabang->id,
+        'product_category_id' => $productCategory->id,
+        'sell_price' => 160000,
+        'cost_price' => 100000,
+        'kode_merk' => 'CQP',
+        'uom_id' => $this->uom->id,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
+    $create = Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.quotation_number', 'QO-CURR-0001')
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.valid_until', now()->addDays(30)->toDateString())
+        ->set('data.currency_id', $this->idr->id)
+        ->set('data.quotationItem', [[
+            'quantity' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'tax_type' => 'none',
+        ]])
+        ->set('data.quotationItem.0.product_id', $product->id)
+        ->assertSet('data.quotationItem.0.unit_price', '160.000')
+        ->set('data.currency_id', $usd->id)
+        ->assertSet('data.quotationItem.0.unit_price', '10,00')
+        ->assertSet('data.quotationItem.0.total_price', '10,00')
+        ->assertSet('data.total_amount', '10,00')
+        ->assertSet('data.quotationItem.0.unit_price_idr', '160000.00')
+        ->assertSet('data.quotationItem.0.currency_symbol', '$')
+        ->set('data.currency_id', $this->idr->id)
+        ->assertSet('data.quotationItem.0.unit_price', '160.000')
+        ->assertSet('data.quotationItem.0.total_price', '160.000')
+        ->assertSet('data.total_amount', '160.000')
+        ->set('data.currency_id', $usd->id)
+        ->assertSet('data.quotationItem.0.unit_price', '10,00');
+
+    $create->call('create')->assertHasNoFormErrors();
+
+    $quotation = Quotation::where('quotation_number', 'QO-CURR-0001')->first();
+    $item = $quotation->quotationItem()->first();
+
+    expect($quotation)->not->toBeNull()
+        ->and((int) $quotation->currency_id)->toBe($usd->id)
+        ->and((float) $quotation->exchange_rate)->toBe(16000.0)
+        ->and((float) $quotation->total_amount)->toBe(10.0)
+        ->and((float) $item->unit_price)->toBe(10.0)
+        ->and((float) $item->unit_price_idr)->toBe(160000.0);
 });
 
 test('can create quotation with customer selection and auto-number generation', function () {

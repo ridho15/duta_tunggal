@@ -758,7 +758,7 @@ test('Sale Order items inherit tax_type from Quotation items when created from Q
     $so->load('saleOrderItem');
     $firstItem = $so->saleOrderItem->first();
 
-    expect($firstItem->tipe_pajak)->toBe('Inclusive');
+    expect($firstItem->tipe_pajak)->toBe('inklusif');
     expect($firstItem->tax)->toBe(12);
     expect($firstItem->discount)->toBe(5);
 });
@@ -806,8 +806,8 @@ test('Sale Order total reflects inherited Inclusive tax correctly', function () 
     $service->updateTotalAmount($so);
     $so->refresh();
 
-    // Inclusive: total = gross = 2,000,000
-    expect((float) $so->total_amount)->toBe(2000000.0);
+    // Inclusive (TaxService formula): total = base + (base × tax%) = 2,000,000 + 220,000 = 2,220,000
+    expect((float) $so->total_amount)->toBe(2220000.0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

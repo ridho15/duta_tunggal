@@ -140,7 +140,7 @@ class SaleOrderResource extends Resource
         // but return a non-rounded intermediate value for UI (rounded where needed on persist).
         return (float) \App\Support\CurrencyConversionResolver::convertBetweenCurrencies($amount, $fromCurrencyId, $toCurrencyId, false);
     }
-    
+
     public static function parseCurrencyState(mixed $value): float
     {
         if ($value === null || $value === '') {
@@ -313,8 +313,14 @@ class SaleOrderResource extends Resource
             return [];
         }
 
+        return static::readOnlyGrayInputAttributes();
+    }
+
+    protected static function readOnlyGrayInputAttributes(): array
+    {
         return [
-            'class' => 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+            'class' => 'bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400',
+            'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;',
         ];
     }
 
@@ -443,10 +449,11 @@ class SaleOrderResource extends Resource
                                 $items = [];
                                 $quotation = Quotation::find($state);
                                 if ($quotation) {
+                                    $quotationCurrencyId = is_numeric($quotation->currency_id) ? (int) $quotation->currency_id : static::resolveDefaultCurrencyId();
                                     foreach ($quotation->quotationItem as $item) {
                                         $tipePajak = static::normalizeTaxTypeValue($item->tax_type);
                                         $unitPrice = (float) static::parseCurrencyState($item->unit_price);
-                                        $itemCurrencyId = $quotation->currency_id ?? static::resolveDefaultCurrencyId();
+                                        $itemCurrencyId = $quotationCurrencyId;
                                         array_push($items, [
                                             'product_id' => $item->product_id,
                                             'quantity' => $item->quantity,
@@ -465,11 +472,14 @@ class SaleOrderResource extends Resource
                                             'total' => static::formatMoneyState($item->quantity * $unitPrice, $itemCurrencyId),
                                         ]);
                                     }
-                                    $set('total_amount', static::formatMoneyState($quotation->total_amount ?? 0, static::resolveDefaultCurrencyId()));
+                                    $set('total_amount', static::formatMoneyState(
+                                        CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($quotation->total_amount ?? 0), $quotationCurrencyId, false),
+                                        static::resolveDefaultCurrencyId()
+                                    ));
                                     $set('customer_id', $quotation->customer_id);
                                     $set('cabang_id', $quotation->cabang_id);
-                                    $set('currency_id', static::resolveDefaultCurrencyId());
-                                    $set('exchange_rate', static::resolveExchangeRate(static::resolveDefaultCurrencyId()));
+                                    $set('currency_id', $quotationCurrencyId);
+                                    $set('exchange_rate', static::resolveExchangeRate($quotationCurrencyId));
                                     $set('shipped_to', $quotation->customer->address);
                                     // Warisi tempo pembayaran dari quotation yang sudah disetujui
                                     if ($quotation->tempo_pembayaran) {
@@ -790,7 +800,7 @@ class SaleOrderResource extends Resource
                             ->default(static::resolveDefaultCurrencyId())
                             ->dehydrated(true),
                         Hidden::make('exchange_rate')
-                            ->default(fn () => static::resolveExchangeRate(static::resolveDefaultCurrencyId()))
+                            ->default(fn() => static::resolveExchangeRate(static::resolveDefaultCurrencyId()))
                             ->dehydrated(true),
                         \Filament\Forms\Components\TextInput::make('tempo_pembayaran')
                             ->label('Tempo Pembayaran (Hari)')
@@ -804,10 +814,11 @@ class SaleOrderResource extends Resource
                             ->label('Total Amount')
                             ->required()
                             ->disabled()
+                            ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                             ->reactive()
                             ->live()
                             ->default(0)
-                            ->prefix(fn () => static::resolveCurrencySymbol(static::resolveDefaultCurrencyId()))
+                            ->prefix(fn() => static::resolveCurrencySymbol(static::resolveDefaultCurrencyId()))
                             ->formatStateUsing(function ($state, Get $get) {
                                 if ($state === null || $state === '') {
                                     return '';
@@ -862,11 +873,63 @@ class SaleOrderResource extends Resource
                             ->mutateRelationshipDataBeforeSaveUsing(function (array $data) {
                                 return $data;
                             })
-                            ->addActionLabel("Add Items")
+                            ->addAction(function (ActionsAction $action) {
+                                return $action
+                                    ->color('primary')
+                                    ->icon('heroicon-o-plus-circle')
+                                    ->label('Add Items')
+                                    ->extraAttributes(fn ($component) => [
+                                        'onclick' => (function () use ($component) {
+                                            $event = 'repeater-collapse';
+                                            $statePath = $component->getStatePath();
+                                            $eventJs = 'String.fromCharCode(' . implode(',', array_map('ord', str_split($event))) . ')';
+                                            $statePathJs = 'String.fromCharCode(' . implode(',', array_map('ord', str_split($statePath))) . ')';
+
+                                            return "window.dispatchEvent(new CustomEvent({$eventJs}, { detail: {$statePathJs} }))";
+                                        })(),
+                                    ])
+                                    ->action(function (Repeater $component): void {
+                                        $newUuid = $component->generateUuid();
+                                        $items = $component->getState();
+
+                                        if ($newUuid) {
+                                            $items[$newUuid] = [];
+                                        } else {
+                                            $items[] = [];
+                                        }
+
+                                        $component->state($items);
+                                        $component->getChildComponentContainer($newUuid ?? array_key_last($items))->fill();
+                                        $component->callAfterStateUpdated();
+                                    });
+                            })
                             ->addable(fn(Get $get) => ! static::isReferQuotationForm($get))
                             ->deletable(fn(Get $get) => ! static::isReferQuotationForm($get))
                             ->reorderable(fn(Get $get) => ! static::isReferQuotationForm($get))
                             ->collapsible()
+                            ->collapsed(function (?string $operation, ?\Filament\Forms\ComponentContainer $item, Repeater $component): bool {
+                                if (! $item) {
+                                    return false;
+                                }
+
+                                $state = $component->getState() ?? [];
+                                if (empty($state)) {
+                                    return false;
+                                }
+
+                                $keys = array_keys($state);
+                                $lastKey = end($keys);
+
+                                $statePathParts = explode('.', $item->getStatePath());
+                                $itemKey = end($statePathParts);
+
+                                $itemState = $state[$itemKey] ?? [];
+                                if ($operation !== 'create' && filled($itemState['id'] ?? null)) {
+                                    return true;
+                                }
+
+                                return $itemKey !== $lastKey;
+                            })
                             ->itemLabel(function (array $state): ?string {
                                 $product = isset($state['product_id'])
                                     ? Product::withoutGlobalScope('product_cabang')->find($state['product_id'])
@@ -956,7 +1019,7 @@ class SaleOrderResource extends Resource
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default('-')
-                                    ->extraInputAttributes(fn(Get $get) => array_merge(['title' => 'Satuan produk (otomatis)'], static::lockedInputAttributes($get)))
+                                    ->extraInputAttributes(array_merge(['title' => 'Satuan produk (otomatis)'], static::readOnlyGrayInputAttributes()))
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record?->product) {
                                             $component->state($record->product->uom?->abbreviation ?? '-');
@@ -1095,7 +1158,7 @@ class SaleOrderResource extends Resource
                                     ->mask(\Filament\Support\RawJs::make(<<<'JS'
             $money($input, ',', '.', 10)
         JS))
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->prefix(fn(Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->formatStateUsing(function ($state, Get $get) {
                                         if ($state === null || $state === '') {
                                             return '';
@@ -1105,7 +1168,7 @@ class SaleOrderResource extends Resource
 
                                         return static::formatCurrencyInputState($state, $currencyId);
                                     })
-                                    ->dehydrateStateUsing(fn ($state) => static::parseCurrencyState($state ?? 0))
+                                    ->dehydrateStateUsing(fn($state) => static::parseCurrencyState($state ?? 0))
                                     ->validationMessages([
                                         'required' => 'Unit Price harus diisi',
                                         'numeric' => 'Unit Price tidak valid !'
@@ -1125,9 +1188,9 @@ class SaleOrderResource extends Resource
                                     ->label('Total (Harga x Qty)')
                                     ->columnSpan(1)
                                     ->live()
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->prefix(fn(Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
-                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->dehydrated(false)
                                     ->default(0)
                                     ->afterStateHydrated(function ($component, $record) {
@@ -1165,11 +1228,11 @@ class SaleOrderResource extends Resource
                                     ->label('Discount (Nominal)')
                                     ->columnSpan(1)
                                     ->live()
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->prefix(fn(Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
-                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
@@ -1214,7 +1277,7 @@ class SaleOrderResource extends Resource
                                     ->disabled()
                                     ->readOnly()
                                     ->dehydrated(true)
-                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->helperText('Dihitung otomatis dari setting global PPN dan tidak dapat diedit manual.')
                                     ->validationMessages([
                                         'numeric' => 'Tax harus berupa angka',
@@ -1238,11 +1301,11 @@ class SaleOrderResource extends Resource
                                     ->label('Nominal Pajak')
                                     ->columnSpan(1)
                                     ->live()
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->prefix(fn(Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->readOnly()
                                     ->dehydrated(false)
                                     ->default(0)
-                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
                                     ->afterStateHydrated(function ($component, $record) {
                                         if ($record) {
                                             $currencyId = $record->currency_id ?? $record->saleOrder?->currency_id ?? static::resolveDefaultCurrencyId();
@@ -1256,8 +1319,8 @@ class SaleOrderResource extends Resource
                                     ->reactive()
                                     ->readOnly()
                                     ->default(0)
-                                    ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
-                                    ->prefix(fn (Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
+                                    ->extraInputAttributes(static::readOnlyGrayInputAttributes())
+                                    ->prefix(fn(Get $get) => static::resolveCurrencySymbol(static::resolveItemCurrencyId($get('currency_id'))))
                                     ->formatStateUsing(function ($state, Get $get) {
                                         if ($state === null || $state === '') {
                                             return '';
@@ -1540,6 +1603,7 @@ class SaleOrderResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+
             ->filters([
                 SelectFilter::make('customer')
                     ->label('Customer')
@@ -1959,30 +2023,60 @@ class SaleOrderResource extends Resource
                 ]),
             ])
             ->description(new \Illuminate\Support\HtmlString(
-                '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Sales Order</summary>' .
-                    '<div class="mt-2 text-sm">' .
-                    '<ul class="list-disc pl-5">' .
-                    '<li><strong>Apa ini:</strong> Sale Order adalah pesanan penjualan yang dibuat dari Quotation atau langsung, memerlukan approval sebelum diproses.</li>' .
-                    '<li><strong>Status Flow:</strong> Draft → Request Approve → Approved → Confirmed → Received → Completed. Atau bisa Request Close → Closed.</li>' .
-                    '<li><strong>Tipe Pengiriman:</strong> <em>Ambil Sendiri</em> (customer datang ke gudang), <em>Kirim Langsung</em> (barang dikirim ke customer).</li>' .
-                    '<li><strong>Validasi:</strong> <em>Status Stok</em> menunjukkan apakah stok cukup. <em>Credit Limit</em> customer dicek saat approve.</li>' .
-                    '<li><strong>Stock Management:</strong> <em>Ambil Sendiri</em>: Stock berkurang saat <em>Complete</em> (manual). <em>Kirim Langsung</em>: Perlu Delivery Order completed terlebih dahulu.</li>' .
-                    '<li><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Request Close</em> (approved+), <em>Close</em> (request_close), <em>Complete</em> (approved+), <em>PDF/Kwitansi</em> (approved+), <em>Create PO</em> (untuk drop ship), <em>Sync Total</em> (update amount).</li>' .
-                    '<li><strong>Permissions:</strong> <em>request sales order</em> untuk request actions, <em>response sales order</em> untuk approve/reject/close, <em>update sales order</em> untuk complete.</li>' .
-                    '<li><strong>Integration:</strong> Terintegrasi dengan inventory, accounting, dan bisa generate Purchase Order untuk drop shipping.</li>' .
-                    '</ul>' .
+                '<style>.fi-ta-header:has(.dt-table-description-full-width){align-items:stretch}.fi-ta-header>.grid:has(.dt-table-description-full-width){width:100%;max-width:none;flex:1 1 100%;}.dt-table-description-full-width{width:100%;min-width:100%;max-width:none;box-sizing:border-box;}</style>' .
+                    '<div class="dt-table-description-full-width space-y-4 mb-6 w-full min-w-full max-w-none" style="width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;">' .
+                    '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff; transition: all 0.2s;">' .
+                    '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; color: #374151;">' .
+                    '<span class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px;">' .
+                    '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px; color: #3b82f6;">' .
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
+                    '</svg>' .
+                    'Panduan Sales Order' .
+                    '</span>' .
+                    '<span class="transition group-open:rotate-180">' .
+                    '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 20px; height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
+                    '</span>' .
+                    '</summary>' .
+                    '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top: 12px; font-size: 14px; color: #4b5563; padding-left: 28px; border-left: 2px solid rgba(59, 130, 246, 0.3); display: flex; flex-direction: column; gap: 8px;">' .
+                    '<p><strong>Apa ini:</strong> Sale Order adalah pesanan penjualan yang dibuat dari Quotation atau langsung, memerlukan approval sebelum diproses.</p>' .
+                    '<p><strong>Status Flow:</strong> Draft → Request Approve → Approved → Confirmed → Received → Completed. Atau bisa Request Close → Closed.</p>' .
+                    '<p><strong>Tipe Pengiriman:</strong> <em>Ambil Sendiri</em> (customer datang ke gudang), <em>Kirim Langsung</em> (barang dikirim ke customer).</p>' .
+                    '<p><strong>Validasi:</strong> <em>Status Stok</em> menunjukkan apakah stok cukup. <em>Credit Limit</em> customer dicek saat approve.</p>' .
+                    '<p><strong>Stock Management:</strong> <em>Ambil Sendiri</em>: Stock berkurang saat <em>Complete</em> (manual). <em>Kirim Langsung</em>: Perlu Delivery Order completed terlebih dahulu.</p>' .
+                    '<p><strong>Actions:</strong> <em>Request Approve</em> (draft), <em>Approve/Reject</em> (request_approve), <em>Request Close</em> (approved+), <em>Close</em> (request_close), <em>Complete</em> (approved+), <em>PDF/Kwitansi</em> (approved+), <em>Create PO</em> (untuk drop ship), <em>Sync Total</em> (update amount).</p>' .
+                    '<p><strong>Permissions:</strong> <em>request sales order</em> untuk request actions, <em>response sales order</em> untuk approve/reject/close, <em>update sales order</em> untuk complete.</p>' .
+                    '<p><strong>Integration:</strong> Terintegrasi dengan inventory, accounting, dan bisa generate Purchase Order untuk drop shipping.</p>' .
                     '</div>' .
                     '</details>' .
-                    '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">' .
-                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Legenda Warna Status Baris Data</h4>' .
-                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">' .
-                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded border border-gray-300 bg-white"></span><span>Putih (Draft)</span></div>' .
-                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-gray-100 border border-gray-300"></span><span>Abu-abu (Request Approve)</span></div>' .
-                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-blue-100 border border-blue-300"></span><span>Biru (Approved/Confirmed/Received)</span></div>' .
-                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-yellow-100 border border-yellow-300"></span><span>Kuning (Request Close)</span></div>' .
-                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-green-100 border border-green-300"></span><span>Hijau (Completed)</span></div>' .
-                    '<div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-red-100 border border-red-300"></span><span>Merah (Closed/Reject/Canceled)</span></div>' .
+                    '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width: 100%; max-width: none; box-sizing: border-box; border: 1px solid #edf2f7; border-radius: 12px; padding: 16px; background-color: #ffffff;">' .
+                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">' .
+                    '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 16px; height: 16px;">' .
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
+                    '</svg>' .
+                    'Legenda Warna Status Baris Data' .
+                    '</h4>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #ffffff; border: 1px solid #edf2f7;">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Putih (Draft)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SO masih draft</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Approved)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SO sudah disetujui</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partially Received)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SO diterima sebagian</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Request Close/Closed)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Diminta tutup / ditutup</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Completed/Paid)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / dibayar</span></div>' .
+                    '</div>' .
+                    '</div>' .
                     '</div>' .
                     '</div>'
             ));
@@ -2025,7 +2119,7 @@ class SaleOrderResource extends Resource
                             ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
-                            ->getStateUsing(fn ($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->total_amount)),
+                            ->getStateUsing(fn($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->total_amount)),
                         \Filament\Infolists\Components\TextEntry::make('tipe_pengiriman')
                             ->label('Tipe Pengiriman')
                             ->placeholder('-'),
@@ -2038,13 +2132,13 @@ class SaleOrderResource extends Resource
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('summary_item_count')
                             ->label('Jumlah Item')
-                            ->getStateUsing(fn ($record) => $record->saleOrderItem->count()),
+                            ->getStateUsing(fn($record) => $record->saleOrderItem->count()),
                         \Filament\Infolists\Components\TextEntry::make('summary_total_qty')
                             ->label('Total Qty')
-                            ->getStateUsing(fn ($record) => number_format((float) $record->saleOrderItem->sum('quantity'), 0, ',', '.')),
+                            ->getStateUsing(fn($record) => number_format((float) $record->saleOrderItem->sum('quantity'), 0, ',', '.')),
                         \Filament\Infolists\Components\TextEntry::make('summary_delivered_qty')
                             ->label('Total Qty Terkirim')
-                            ->getStateUsing(fn ($record) => number_format((float) $record->saleOrderItem->sum('delivered_quantity'), 0, ',', '.')),
+                            ->getStateUsing(fn($record) => number_format((float) $record->saleOrderItem->sum('delivered_quantity'), 0, ',', '.')),
                         \Filament\Infolists\Components\TextEntry::make('summary_remaining_qty')
                             ->label('Sisa Qty Belum Dikirim')
                             ->getStateUsing(function ($record) {
@@ -2056,7 +2150,7 @@ class SaleOrderResource extends Resource
                             }),
                         \Filament\Infolists\Components\TextEntry::make('summary_total_amount')
                             ->label('Total Amount')
-                            ->getStateUsing(fn ($record) => static::formatCurrencyAmount($record?->currency_id ?? static::resolveDefaultCurrencyId(), $record?->total_amount)),
+                            ->getStateUsing(fn($record) => static::formatCurrencyAmount($record?->currency_id ?? static::resolveDefaultCurrencyId(), $record?->total_amount)),
                     ]),
                 \Filament\Infolists\Components\Section::make('Detail Item Sales Order')
                     ->columnSpanFull()
@@ -2106,9 +2200,9 @@ class SaleOrderResource extends Resource
                                                                     ?? $record->product?->uom?->name
                                                                     ?? '-';
                                                             }],
-                                                            ['Qty', fn ($record) => number_format((float) ($record->quantity ?? 0), 0, ',', '.')],
-                                                            ['Qty Delivered', fn ($record) => number_format((float) ($record->delivered_quantity ?? 0), 0, ',', '.')],
-                                                            ['Sisa Qty Belum Dikirim', fn ($record) => number_format((float) ($record->remaining_quantity ?? 0), 0, ',', '.')],
+                                                            ['Qty', fn($record) => number_format((float) ($record->quantity ?? 0), 0, ',', '.')],
+                                                            ['Qty Delivered', fn($record) => number_format((float) ($record->delivered_quantity ?? 0), 0, ',', '.')],
+                                                            ['Sisa Qty Belum Dikirim', fn($record) => number_format((float) ($record->remaining_quantity ?? 0), 0, ',', '.')],
                                                             ['Mode Gudang', function ($record) {
                                                                 $allocCount = $record->warehouseAllocations->count();
 
@@ -2176,14 +2270,14 @@ class SaleOrderResource extends Resource
                                                         'price_column',
                                                         'Price',
                                                         [
-                                                            ['Mata Uang', fn ($record) => $record->currency?->code ?? $record->saleOrder?->currency?->code ?? '-'],
-                                                            ['Unit Price', fn ($record) => static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, (float) ($record->unit_price ?? 0))],
+                                                            ['Mata Uang', fn($record) => $record->currency?->code ?? $record->saleOrder?->currency?->code ?? '-'],
+                                                            ['Unit Price', fn($record) => static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, (float) ($record->unit_price ?? 0))],
                                                             ['Total (Harga x Qty)', function ($record) {
                                                                 $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
 
                                                                 return static::formatCurrencyAmount($record?->currency_id ?? $record?->saleOrder?->currency_id, $total);
                                                             }],
-                                                            ['Discount', fn ($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
+                                                            ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
                                                             ['Discount (Nominal)', function ($record) {
                                                                 $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
                                                                 $preview = static::calculateCurrencyPreview(
@@ -2197,8 +2291,8 @@ class SaleOrderResource extends Resource
 
                                                                 return static::formatCurrencyAmount($currencyId, $preview['discount_nominal']);
                                                             }],
-                                                            ['Tipe Pajak', fn ($record) => static::normalizeTaxTypeValue($record->tipe_pajak ?? null)],
-                                                            ['Tax (%)', fn ($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
+                                                            ['Tipe Pajak', fn($record) => static::normalizeTaxTypeValue($record->tipe_pajak ?? null)],
+                                                            ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
                                                             ['Nominal Pajak', function ($record) {
                                                                 $currencyId = $record?->currency_id ?? $record?->saleOrder?->currency_id;
                                                                 $preview = static::calculateCurrencyPreview(

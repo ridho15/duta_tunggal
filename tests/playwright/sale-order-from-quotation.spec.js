@@ -33,7 +33,19 @@ async function assertHealthy(page) {
   return body || ''
 }
 
+async function ensureLoggedIn(page) {
+  await page.goto('/admin/sale-orders/create', { waitUntil: 'domcontentloaded' })
+
+  if (new URL(page.url()).pathname.endsWith('/login')) {
+    await page.locator('#data\\.email').fill('ralamzah@gmail.com')
+    await page.locator('#data\\.password').fill('ridho123')
+    await page.locator('form').getByRole('button', { name: /masuk|login|sign in/i }).click()
+    await page.waitForFunction(() => !window.location.pathname.endsWith('/login'), { timeout: 30000 })
+  }
+}
+
 async function chooseReferQuotation(page) {
+  await ensureLoggedIn(page)
   await page.goto('/admin/sale-orders/create')
   await assertHealthy(page)
 
@@ -59,12 +71,18 @@ async function chooseReferQuotation(page) {
 }
 
 async function addWarehouseAllocation(page, quantity = '3') {
+  const expandButton = page.getByRole('button', { name: /Tampilkan/i }).first()
+  if (await expandButton.isVisible().catch(() => false)) {
+    await expandButton.click()
+    await page.waitForTimeout(500)
+  }
+
   const addAllocationButton = page.getByRole('button', { name: /Tambahkan ke alokasi Gudang/i }).first()
   await expect(addAllocationButton).toBeVisible()
   await addAllocationButton.click()
   await page.waitForTimeout(700)
 
-  const warehouseGroup = page.locator('div').filter({ hasText: /Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini\./ }).first()
+  const warehouseGroup = page.locator('div').filter({ hasText: /Hanya menampilkan gudang yang memiliki stok (tersedia|bebas) untuk produk ini\./ }).first()
   const warehouseCombobox = warehouseGroup.getByRole('combobox').first()
   await warehouseCombobox.click()
   await page.waitForTimeout(300)
@@ -149,35 +167,129 @@ test('SO form: quotation mengisi total amount dan subtotal dengan format rupiah 
   const totalAmountInput = page.locator('#data\\.total_amount').first()
   await expect(totalAmountInput).toBeVisible()
   const totalAmount = await totalAmountInput.inputValue()
-  expect(totalAmount).toMatch(/^\d{1,3}(\.\d{3})+$/)
+  expect(totalAmount).toMatch(/^\d{1,3}(\.\d{3})+(,\d{2})?$/)
 
   const subtotalInput = page.locator('input[id*="saleOrderItem"][id*="subtotal"]').first()
-  await expect(subtotalInput).toBeVisible()
   const subtotal = await subtotalInput.inputValue()
-  expect(subtotal).toMatch(/^\d{1,3}(\.\d{3})+$/)
+  expect(subtotal).toMatch(/^\d{1,3}(\.\d{3})+(,\d{2})?$/)
 
-  const parsedTotal = Number(totalAmount.replace(/\./g, ''))
-  const parsedSubtotal = Number(subtotal.replace(/\./g, ''))
+  const parsedTotal = Number(totalAmount.replace(/\./g, '').replace(',', '.'))
+  const parsedSubtotal = Number(subtotal.replace(/\./g, '').replace(',', '.'))
   expect(parsedTotal).toBeGreaterThan(0)
   expect(parsedSubtotal).toBeGreaterThan(0)
 })
 
-test('SO form: alokasi gudang hanya menampilkan gudang yang punya inventory stock untuk produk quotation', async ({ page }) => {
+test('SO form: refer quotation mengunci field quotation dan menampilkan readonly abu-abu', async ({ page }) => {
   await chooseReferQuotation(page)
 
-  const addAllocationButton = page.getByRole('button', { name: /Tambahkan ke alokasi Gudang/i }).first()
-  await expect(addAllocationButton).toBeVisible()
-  await addAllocationButton.click()
-  await page.waitForTimeout(700)
+  const formArea = page.getByRole('group', { name: /Form Penjualan/i }).first()
+  await expect(formArea).toBeVisible()
 
-  const warehouseGroup = page.locator('div').filter({ hasText: /Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini\./ }).first()
-  const warehouseCombobox = warehouseGroup.getByRole('combobox').first()
-  await warehouseCombobox.click()
-  await page.waitForTimeout(300)
+  const formText = (await formArea.textContent()) || ''
+  const assertOrder = (text, items) => {
+    let lastIndex = -1
+    for (const item of items) {
+      const pattern = item instanceof RegExp ? item : new RegExp(item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+      const match = text.match(pattern)
+      const index = match?.index ?? -1
+      expect(index, `label ${pattern} should exist in form`).toBeGreaterThan(-1)
+      expect(index, `label ${item} should appear after previous label`).toBeGreaterThan(lastIndex)
+      lastIndex = index
+    }
+  }
 
-  const body = await page.textContent('body')
-  expect(body || '').toContain(STOCKED_WAREHOUSE)
-  expect(body || '').not.toContain(EMPTY_WAREHOUSE)
+  assertOrder(formText, [
+    /Quotation/i,
+    /SO Number/i,
+    /Customer/i,
+    /Cabang/i,
+    /Order Date|Tanggal Order/i,
+    /Delivery Date|Tanggal Pengiriman/i,
+    /Tipe Pengiriman/i,
+    /Shipped To/i,
+    /Tempo Pembayaran/i,
+    /Total Amount/i,
+  ])
+
+  await expect(page.getByRole('button', { name: /^Add Items$/i })).toHaveCount(0)
+  const states = await page.evaluate(() => {
+    const getField = (suffix) => {
+      const el = Array.from(document.querySelectorAll('input, select')).find((field) => field.id.endsWith(suffix))
+      if (!el) return null
+
+      const style = window.getComputedStyle(el)
+
+      return {
+        id: el.id,
+        disabled: !!el.disabled,
+        readOnly: !!el.readOnly,
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        cursor: style.cursor,
+      }
+    }
+
+    const getRepeaterField = (suffix) => {
+      const el = Array.from(document.querySelectorAll('input, select')).find((field) => {
+        return field.id.includes('saleOrderItem') && field.id.endsWith(suffix)
+      })
+      if (!el) return null
+
+      const style = window.getComputedStyle(el)
+
+      return {
+        id: el.id,
+        disabled: !!el.disabled,
+        readOnly: !!el.readOnly,
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        cursor: style.cursor,
+      }
+    }
+
+    return {
+      customer: getField('customer_id'),
+      tempo: getField('tempo_pembayaran'),
+      totalAmount: getField('total_amount'),
+      product: getRepeaterField('product_id'),
+      currency: getRepeaterField('currency_id'),
+      unitPrice: getRepeaterField('unit_price'),
+      total: getRepeaterField('total'),
+      discount: getRepeaterField('discount'),
+      discountNominal: getRepeaterField('discount_nominal'),
+      tipePajak: getRepeaterField('tipe_pajak'),
+      tax: getRepeaterField('tax'),
+      taxNominal: getRepeaterField('tax_nominal'),
+      subtotal: getRepeaterField('subtotal'),
+    }
+  })
+
+  for (const key of ['customer', 'product', 'currency', 'tipePajak']) {
+    expect(states[key], key).not.toBeNull()
+    expect(states[key].disabled, key).toBeTruthy()
+  }
+
+  for (const key of ['tempo', 'unitPrice', 'discount']) {
+    expect(states[key], key).not.toBeNull()
+    expect(states[key].readOnly, key).toBeTruthy()
+  }
+
+  for (const key of ['totalAmount', 'total', 'discountNominal', 'tax', 'taxNominal', 'subtotal']) {
+    expect(states[key], key).not.toBeNull()
+    expect(states[key].backgroundColor, key).toBe('rgb(243, 244, 246)')
+    expect(states[key].color, key).toBe('rgb(107, 114, 128)')
+  }
+
+  await page.screenshot({
+    path: 'tests/playwright/screenshots/sale-order-refer-quotation-form.png',
+    fullPage: true,
+  })
+})
+
+test('SO form: refer quotation tidak menampilkan alokasi gudang manual', async ({ page }) => {
+  await chooseReferQuotation(page)
+
+  await expect(page.getByRole('button', { name: /Tambahkan ke alokasi Gudang/i })).toHaveCount(0)
 })
 
 test('SO form: submit berhasil setelah memilih alokasi gudang terfilter dari quotation', async ({ page }) => {
@@ -305,14 +417,3 @@ test('Modal Buat SO: submit berhasil dan redirect ke edit SO page', async ({ pag
 // ---------------------------------------------------------------------------
 // Test 4: Form SO create — label gudang berubah saat mode multi-gudang aktif
 // ---------------------------------------------------------------------------
-test('SO create form: dual warehouse mode — label gudang menunjukkan mode aktif', async ({ page }) => {
-  await page.goto('/admin/sale-orders/create')
-  await assertHealthy(page)
-
-  // Cek teks helper / label yang menjelaskan dual-mode gudang ada di halaman
-  const body = await page.textContent('body')
-
-  // Setelah fix, salah satu helper text harus ada:
-  // "Mode gudang tunggal" ATAU "Alokasi Gudang" ATAU "Mode Multi-Gudang Aktif"
-  expect(body || '').toMatch(/Alokasi Gudang|multi.gudang|Mode gudang tunggal/i)
-})

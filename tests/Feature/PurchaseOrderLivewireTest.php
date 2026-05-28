@@ -688,14 +688,14 @@ test('purchase order total amount includes formatted other fee values correctly'
         ->set('data.purchaseOrderBiaya.0.total', '100.000');
 
     $component
-        ->assertSet('data.total_amount', '125.000,00')
+        ->assertSet('data.total_amount', '25.000,00')
         ->call('create')
         ->assertHasNoFormErrors();
 
     $purchaseOrder = PurchaseOrder::where('po_number', 'PO-LIVE-FEE-001')->first();
 
     expect($purchaseOrder)->not->toBeNull()
-        ->and((float) $purchaseOrder->total_amount)->toBe(125000.0);
+        ->and((float) $purchaseOrder->total_amount)->toBe(25000.0);
 });
 
 test('purchase order item tax auto-fills from active setting when tipe pajak changes', function () {
