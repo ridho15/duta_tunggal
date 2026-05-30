@@ -133,21 +133,12 @@ class EditPurchaseOrder extends EditRecord
                     }
                 }),
             Action::make('cetak_pdf')
-                ->label('Cetak PDF')
+                ->label('Preview PDF')
                 ->icon('heroicon-o-document-check')
-                ->color('danger')
-                ->visible(function ($record) {
-                    return $record->status != 'draft' && $record->status != 'closed';
-                })
-                ->action(function ($record) {
-                    $pdf = Pdf::loadView('pdf.purchase-order', [
-                        'purchaseOrder' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Pembelian_' . $record->po_number . '.pdf');
-                }),
+                ->color('gray')
+                ->visible(fn ($record) => $record->status !== 'draft' && $record->status !== 'closed')
+                ->url(fn ($record) => route('pdf-stream', ['type' => 'purchase-order', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 

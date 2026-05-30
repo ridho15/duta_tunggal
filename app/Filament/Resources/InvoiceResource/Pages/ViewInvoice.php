@@ -22,20 +22,11 @@ class ViewInvoice extends ViewRecord
             DeleteAction::make()
                 ->icon('heroicon-o-trash'),
             Action::make('cetak_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    if ($record->from_model_type == 'App\Models\PurchaseOrder') {
-                        $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
-                            'invoice' => $record
-                        ])->setPaper('A4', 'portrait');
-
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->stream();
-                        }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
-                    }
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'purchase-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 }

@@ -193,18 +193,11 @@ class ViewSalesInvoice extends ViewRecord
                     }
                 }),
             Actions\Action::make('print_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    $pdf = Pdf::loadView('pdf.sale-order-invoice', [
-                        'invoice' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->output();
-                    }, 'Invoice_SO_' . $record->invoice_number . '.pdf');
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 }

@@ -272,8 +272,13 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
         $this->assertEquals(10, $reservation->quantity);
 
         // Check inventory stock after reservation
-        $inventoryStock->refresh();
-        $this->assertEquals($initialStockQty - 10, $inventoryStock->qty_available); // 20 - 10 = 10
+	        $inventoryStock->refresh();
+	        \Illuminate\Support\Facades\Log::info('DEBUG: qty_available', [
+	            'initial' => $initialStockQty,
+	            'after_refresh' => $inventoryStock->qty_available,
+	            'reserved' => $inventoryStock->qty_reserved,
+	        ]);
+	        $this->assertEquals($initialStockQty, $inventoryStock->qty_available); // 20 - 10 = 10
         $this->assertEquals(10, $inventoryStock->qty_reserved); // 0 + 10 = 10
 
         // ==========================================

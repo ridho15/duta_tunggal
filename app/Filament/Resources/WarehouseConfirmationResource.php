@@ -505,22 +505,61 @@ class WarehouseConfirmationResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
+            ->recordClasses(fn($record) => match (strtolower($record->status)) {
+                'confirmed' => 'bg-green-50',
+                'partial_confirmed' => 'bg-yellow-50',
+                'rejected' => 'bg-red-50',
+                'request' => 'bg-blue-50',
+                default => '',
+            })
             ->description(new \Illuminate\Support\HtmlString(
-                '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Konfirmasi Gudang</summary>' .
-                    '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari warehouse terhadap Sales Order atau Manufacturing Order sebelum eksekusi.</li>' .
-                            '<li><strong>Status Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected. Gudang memberikan konfirmasi kesiapan stok dan logistik.</li>' .
-                            '<li><strong>Granularitas:</strong> Untuk Delivery Order dan Material Issue, satu WC mewakili satu item request pada satu gudang sumber.</li>' .
-                            '<li><strong>Related Orders:</strong> Untuk flow DO baru, WC dibuat saat Delivery Order dibuat dan selalu diproses manual oleh gudang.</li>' .
-                            '<li><strong>Actions:</strong> Gunakan aksi <em>Approve</em> atau <em>Reject</em> untuk memproses request. Reject wajib isi alasan.</li>' .
-                            '<li><strong>Tracking:</strong> Mencatat siapa yang mengkonfirmasi (Confirmed By) dan kapan dikonfirmasi (Confirmed At).</li>' .
-                            '<li><strong>Integration:</strong> Status WC otomatis menyinkronkan status Delivery Order terkait.</li>' .
-                            '<li><strong>Notes:</strong> Field notes untuk catatan umum; alasan tolak disimpan di Rejection Reason.</li>' .
-                        '</ul>' .
+                '<style>.fi-ta-header:has(.wc-legend){align-items:stretch}.wc-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box;}</style>' .
+                '<div class="wc-legend space-y-4 mb-6 w-full min-w-full max-w-none" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;">' .
+                '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full max-w-none" style="width:100%;max-width:none;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;transition:all 0.2s;">' .
+                    '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
+                        '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
+                        '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:#3b82f6;">' .
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
+                        '</svg>' .
+                        'Panduan Konfirmasi Gudang' .
+                        '</span>' .
+                        '<span class="transition group-open:rotate-180">' .
+                        '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
+                        '</span>' .
+                    '</summary>' .
+                    '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);display:flex;flex-direction:column;gap:8px;">' .
+                    '<p><strong>Apa ini:</strong> Konfirmasi Gudang adalah proses validasi dari gudang terhadap Sales Order atau Manufacturing Order.</p>' .
+                    '<p><strong>Flow:</strong> Request → Confirmed/Partial Confirmed/Rejected.</p>' .
+                    '<p><strong>Actions:</strong> Gunakan <em style="color:#2563eb;font-weight:600;">Approve</em> atau <em style="color:#2563eb;font-weight:600;">Reject</em> untuk memproses request.</p>' .
                     '</div>' .
-                '</details>'
+                '</details>' .
+                '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width:100%;max-width:none;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;">' .
+                    '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;">' .
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
+                    '</svg>' .
+                    'Legenda Warna Status Baris Data' .
+                    '</h4>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:12px;">' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
+                    '<div style="width:16px;height:16px;border-radius:4px;background-color:#3b82f6;box-shadow:0 1px 3px rgba(59,130,246,0.4);flex-shrink:0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#1e40af;">Biru (Request)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Menunggu konfirmasi</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(220,252,231,0.4);border:1px solid rgba(187,247,208,0.8);">' .
+                    '<div style="width:16px;height:16px;border-radius:4px;background-color:#22c55e;box-shadow:0 1px 3px rgba(34,197,94,0.4);flex-shrink:0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#166534;">Hijau (Confirmed)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Sudah dikonfirmasi</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,243,199,0.4);border:1px solid rgba(253,230,138,0.8);">' .
+                    '<div style="width:16px;height:16px;border-radius:4px;background-color:#eab308;box-shadow:0 1px 3px rgba(234,179,8,0.4);flex-shrink:0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#854d0e;">Kuning (Partial)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Dikonfirmasi sebagian</span></div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
+                    '<div style="width:16px;height:16px;border-radius:4px;background-color:#ef4444;box-shadow:0 1px 3px rgba(239,68,68,0.4);flex-shrink:0;"></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#991b1b;">Merah (Rejected)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Ditolak gudang</span></div>' .
+                    '</div>' .
+                    '</div>' .
+                '</div>' .
+                '</div>'
             ));
     }
 

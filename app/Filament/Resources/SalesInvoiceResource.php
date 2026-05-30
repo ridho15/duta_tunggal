@@ -951,6 +951,12 @@ class SalesInvoiceResource extends Resource
                 ActionGroup::make([
                     ViewAction::make(),
                     EditAction::make(),
+                    Tables\Actions\Action::make('print_invoice')
+                        ->label('Preview Invoice')
+                        ->icon('heroicon-o-document-text')
+                        ->color('primary')
+                        ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                     Tables\Actions\Action::make('view_journal_entries')
                         ->label('Lihat Journal Entries')
                         ->icon('heroicon-o-book-open')

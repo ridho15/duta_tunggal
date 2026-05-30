@@ -326,21 +326,12 @@ class SuratJalanResource extends Resource
                             return response()->download(storage_path('app/public/' . $record->document_path));
                         }),
                     Action::make('download_surat_jalan')
-                        ->label('Download Surat')
+                        ->label('Preview / Download PDF')
                         ->icon('heroicon-o-clipboard-document-check')
-                        ->color('danger')
-                        ->visible(function ($record) {
-                            return $record->status == 1;
-                        })
-                        ->action(function ($record) {
-                            $pdf = Pdf::loadView('pdf.surat-jalan', [
-                                'suratJalan' => $record
-                            ])->setPaper('A4', 'portrait');
-
-                            return response()->streamDownload(function () use ($pdf) {
-                                echo $pdf->stream();
-                            }, 'Surat_Jalan_' . $record->sj_number . '.pdf');
-                        }),
+                        ->color('info')
+                        ->visible(fn ($record) => $record->status == 1)
+                        ->url(fn ($record) => route('pdf-stream', ['type' => 'surat-jalan', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                 ])
             ], position: ActionsPosition::BeforeCells)
             ->bulkActions([
@@ -348,19 +339,53 @@ class SuratJalanResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
+            ->recordClasses(fn($record) => $record->terbit ? 'bg-blue-50' : 'bg-gray-50')
             ->description(new \Illuminate\Support\HtmlString(
-                '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Surat Jalan</summary>' .
-                    '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order dalam satu perjalanan.</li>' .
-                            '<li><strong>Status:</strong> <em>Terbit</em> (otomatis saat dibuat). Surat Jalan langsung aktif dan siap digunakan untuk pengiriman.</li>' .
-                            '<li><strong>Actions:</strong> <em>Edit</em>, <em>Delete</em>, <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit).</li>' .
-                            '<li><strong>Grouping:</strong> Satu Surat Jalan dapat mencakup multiple Delivery Order untuk efisiensi pengiriman ke customer yang sama.</li>' .
-                            '<li><strong>PDF:</strong> Download PDF Surat Jalan tersedia untuk keperluan pengiriman.</li>' .
-                        '</ul>' .
+                '<style>
+                    .fi-ta-header:has(.sj-legend){align-items:stretch!important}
+                    .sj-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box}
+                    .sj-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
+                </style>' .
+                '<div class="sj-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
+                '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
+                        '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
+                        '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:#3b82f6;">' .
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
+                        '</svg>' .
+                        'Panduan Surat Jalan' .
+                        '</span>' .
+                        '<span class="transition group-open:rotate-180">' .
+                        '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
+                        '</span>' .
+                    '</summary>' .
+                    '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);">' .
+                    '<ul class="list-disc pl-0" style="list-style:none;padding-left:0;">' .
+                    '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order.</li>' .
+                    '<li><strong>Status:</strong> <em>Terbit</em> (otomatis saat dibuat).</li>' .
+                    '<li><strong>PDF:</strong> Download PDF tersedia untuk keperluan pengiriman.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                '</details>' .
+                '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;">' .
+                    '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;">' .
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
+                    '</svg>' .
+                    'Legenda Warna Status Baris Data' .
+                    '</h4>' .
+                    '<div class="grid grid-cols-2 gap-3" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;">' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:#f9fafb;border:1px solid #e5e7eb;">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #9ca3af;background-color:#ffffff;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Abu (Draft)</span>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#3b82f6;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Biru (Terbit)</span>' .
+                    '</div>' .
+                    '</div>' .
+                '</div>' .
+                '</div>'
             ));
     }
 
@@ -391,6 +416,7 @@ class SuratJalanResource extends Resource
             'index' => Pages\ListSuratJalans::route('/'),
             'create' => Pages\CreateSuratJalan::route('/create'),
             'edit' => Pages\EditSuratJalan::route('/{record}/edit'),
+            'view' => Pages\ViewSuratJalan::route('/{record}'),
         ];
     }
 }

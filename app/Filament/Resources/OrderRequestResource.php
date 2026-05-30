@@ -84,11 +84,11 @@ class OrderRequestResource extends Resource
         $base = $quantity * $unitPrice;
         $afterDisc = $base - $base * ($discountPct / 100);
         $normalizedTaxType = self::normalizeTaxTypeValue($taxType);
-        
+
         // Nominal pajak ALWAYS calculated from base amount (quantity × unitPrice)
         // This should NOT change when switching tax type
         $taxNominal = round($afterDisc * ($taxPct / 100), 2);
-        
+
         // Subtotal is what differs between tax types
         $subtotal = $normalizedTaxType === 'inklusif'
             ? $afterDisc  // Price already includes tax
@@ -320,60 +320,6 @@ class OrderRequestResource extends Resource
                     ->minValue(0)
                     ->reactive()
                     ->live()
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                     ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                     ->rules([
                         fn($get) => function ($attribute, $value, $fail) use ($get) {
@@ -548,7 +494,7 @@ class OrderRequestResource extends Resource
                 $priceLabel = '';
                 if ($productId) {
                     $price = $linkedPriceMap[(int) $supplier->id] ?? null;
-                        if ($price !== null) {
+                    if ($price !== null) {
                         $converted = self::convertIdrToCurrency((float) $price, $currencyId, false);
                         $priceLabel = ' - ' . self::formatMoneyByCurrency($currencyId, $converted);
                     }
@@ -661,8 +607,8 @@ class OrderRequestResource extends Resource
                                     ->color('primary')
                                     ->icon('heroicon-o-plus-circle')
                                     ->label('Tambah Items')
-                                    ->extraAttributes(fn ($component) => [
-                                        'onclick' => (function() use ($component) {
+                                    ->extraAttributes(fn($component) => [
+                                        'onclick' => (function () use ($component) {
                                             $event = 'repeater-collapse';
                                             $statePath = $component->getStatePath();
                                             $eventJs = 'String.fromCharCode(' . implode(',', array_map('ord', str_split($event))) . ')';
@@ -697,18 +643,22 @@ class OrderRequestResource extends Resource
                                     $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($state['product_id']);
                                     $productName = $product ? "({$product->sku}) {$product->name}" : '-';
                                 }
-                                
+
                                 $qty = $state['quantity'] ?? '0';
-                                
+
                                 $supplierName = '-';
                                 if (!empty($state['supplier_id'])) {
                                     $supplier = \App\Models\Supplier::find($state['supplier_id']);
                                     $supplierName = $supplier ? "({$supplier->code}) {$supplier->perusahaan}" : '-';
                                 }
-                                
+
                                 $subtotal = $state['subtotal'] ?? '0';
-                                
-                                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: Rp {$subtotal}";
+                                $currencyId = isset($state['currency_id']) && is_numeric($state['currency_id'])
+                                    ? (int) $state['currency_id']
+                                    : null;
+                                $currencySymbol = \App\Support\CurrencyConversionResolver::resolveSymbol($currencyId);
+
+                                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$currencySymbol} {$subtotal}";
                             })
                             ->validationMessages([
                                 'required' => 'Order request harus memiliki setidaknya satu item produk.',
@@ -1032,22 +982,26 @@ class OrderRequestResource extends Resource
                                                 if ((float) $unitPriceIdrRaw <= 0) {
                                                     $currentUnitPrice = MoneyHelper::parseHighPrecision($get('unit_price') ?? 0);
                                                     $unitPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
-                                                        $currentUnitPrice, $oldCurrencyId
+                                                        $currentUnitPrice,
+                                                        $oldCurrencyId
                                                     );
                                                 }
                                                 if ((float) $originalPriceIdrRaw <= 0) {
                                                     $currentOriginalPrice = MoneyHelper::parseHighPrecision($get('original_price') ?? 0);
                                                     $originalPriceIdrRaw  = \App\Support\CurrencyConversionResolver::convertToIdrHighPrecision(
-                                                        $currentOriginalPrice, $oldCurrencyId
+                                                        $currentOriginalPrice,
+                                                        $oldCurrencyId
                                                     );
                                                 }
 
                                                 // Convert directly from IDR anchor to new currency (no intermediate rounding)
                                                 $convertedUnitPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
-                                                    $unitPriceIdrRaw, $newCurrencyId
+                                                    $unitPriceIdrRaw,
+                                                    $newCurrencyId
                                                 );
                                                 $convertedOriginalPrice = \App\Support\CurrencyConversionResolver::convertFromIdrHighPrecision(
-                                                    $originalPriceIdrRaw, $newCurrencyId
+                                                    $originalPriceIdrRaw,
+                                                    $newCurrencyId
                                                 );
 
                                                 // For IDR display: round to whole number (no cents in Rupiah)
@@ -1608,22 +1562,13 @@ class OrderRequestResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
-                    Action::make('download_pdf')
-                        ->label('Download PDF')
-                        ->icon('heroicon-o-document')
-                        ->color('danger')
-                        ->visible(function ($record) {
-                            return $record->status == 'approved';
-                        })
-                        ->action(function ($record) {
-                            $pdf = Pdf::loadView('pdf.order-request', [
-                                'orderRequest' => $record
-                            ])->setPaper('A4', 'portrait');
-
-                            return response()->streamDownload(function () use ($pdf) {
-                                echo $pdf->stream();
-                            }, 'Order_Request_' . $record->request_number . '.pdf');
-                        }),
+                    Action::make('preview_pdf')
+                        ->label('Preview / Download PDF')
+                        ->icon('heroicon-o-document-text')
+                        ->color('info')
+                        ->visible(fn ($record) => $record->status === 'approved')
+                        ->url(fn ($record) => route('pdf-stream', ['type' => 'order-request', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                     Action::make('create_purchase_order')
                         ->label('Create Purchase Order')
                         ->color('primary')
@@ -1719,101 +1664,25 @@ class OrderRequestResource extends Resource
                         })
                         ->form([
                             Section::make('Informasi Purchase Order')
-                                ->icon('heroicon-o-document-text')
-                                ->columns(3)
+                                ->icon('heroicon-o-calendar')
                                 ->visible(fn(Get $get) => $get('create_purchase_order'))
+                                ->columns(2)
                                 ->schema([
-                                    Hidden::make('tax_type')
-                                        ->reactive()
-                                    // header-level cabang removed; per-item cabang used instead
-                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                            $normalized = self::normalizeTaxTypeValue($state ?? null);
-                                            $items = $get('selected_items') ?? [];
-                                            foreach (array_keys($items) as $idx) {
-                                                $new = $normalized === 'inklusif' ? 'inklusif' : ($normalized === 'none' ? 'none' : 'eklusif');
-                                                $set("selected_items.{$idx}.tipe_pajak", $new);
-                                                $productId = $get("selected_items.{$idx}.item_id") ?? null;
-                                                $rate = self::resolveItemTaxRate($productId, $new ?? null);
-                                                $set("selected_items.{$idx}.tax", $rate);
-                                            }
-                                        }),
-                                    // header-level cabang removed; per-item cabang used instead
-                                    Select::make('supplier_id')
-                                        ->label('Supplier (untuk PO)')
-                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
-                                        ->helperText('Supplier utama untuk Purchase Order. Setiap item memiliki supplier masing-masing (lihat di tabel item).')
-                                        ->searchable()
-                                        ->columnSpan(1)
-                                        ->options(function () {
-                                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                            });
-                                        })
-                                        ->getSearchResultsUsing(function (string $search) {
-                                            return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                                ->orWhere('code', 'like', "%{$search}%")
-                                                ->limit(50)
-                                                ->get()
-                                                ->mapWithKeys(function ($supplier) {
-                                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                                });
-                                        })
-                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
-                                        ->validationMessages([
-                                            'required' => 'Supplier wajib dipilih.',
-                                        ]),
-                                    TextInput::make('po_number')
-                                        ->label('PO Number')
-                                        ->string()
-                                        ->maxLength(255)
-                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
-                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
-                                        ->columnSpan(1)
-                                        ->suffixAction(
-                                            FormAction::make('generatePoNumber')
-                                                ->icon('heroicon-o-arrow-path')
-                                                ->tooltip('Generate PO Number')
-                                                ->action(function ($set) {
-                                                    $set('po_number', HelperController::generatePoNumber());
-                                                })
-                                        )
-                                        ->validationMessages([
-                                            'required' => 'Nomor PO wajib diisi.',
-                                            'max' => 'Nomor PO maksimal 255 karakter.',
-                                        ]),
-                                    Select::make('cabang_id')
-                                        ->label('Cabang')
-                                        ->options(function () {
-                                            return \App\Models\Cabang::query()
-                                                ->orderBy('nama')
-                                                ->get()
-                                                ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
-                                                ->all();
-                                        })
-                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
-                                        ->disabled()
-                                        ->dehydrated()
-                                        ->columnSpan(1)
-                                        ->helperText('Cabang ditarik dari item Order Request yang dipilih.'),
                                     DatePicker::make('order_date')
                                         ->label('Tanggal Pembelian')
-                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->required()
                                         ->native(false)
-                                        ->displayFormat('d M Y')
-                                        ->validationMessages([
-                                            'required' => 'Tanggal Pembelian wajib diisi.',
-                                        ]),
+                                        ->displayFormat('d M Y'),
                                     DatePicker::make('expected_date')
                                         ->label('Tanggal Diharapkan')
+                                        ->nullable()
                                         ->native(false)
-                                        ->displayFormat('d M Y')
-                                        ->nullable(),
+                                        ->displayFormat('d M Y'),
                                     Textarea::make('note')
                                         ->label('Catatan')
-                                        ->placeholder('Catatan tambahan untuk Purchase Order ini...')
+                                        ->nullable()
                                         ->rows(3)
-                                        ->columnSpanFull()
-                                        ->nullable(),
+                                        ->columnSpanFull(),
                                 ]),
                             Section::make('Pilih Item yang Akan Dibeli')
                                 ->description('Centang item yang akan dimasukkan ke dalam Purchase Order. Anda dapat mengubah quantity dan harga sebelum menyetujui.')
@@ -1881,13 +1750,29 @@ class OrderRequestResource extends Resource
                                     }
                                     HelperController::sendNotification(isSuccess: true, title: 'Berhasil', message: "{$created} Purchase Order berhasil dibuat dan otomatis disetujui.");
                                 } else {
-                                    // Single supplier mode (existing behaviour)
-                                    $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                                    // Single supplier mode
+                                    // Generate PO number automatically if not provided
+                                    $poNumber = $data['po_number'] ?? null;
+                                    if (empty($poNumber)) {
+                                        $poNumber = HelperController::generatePoNumber();
+                                        while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
+                                            $poNumber = HelperController::generatePoNumber();
+                                        }
+                                    }
+                                    // Get supplier_id from first selected item if not provided
+                                    if (empty($data['supplier_id']) && !empty($data['selected_items'])) {
+                                        $firstItem = collect($data['selected_items'])
+                                            ->filter(fn($i) => $i['include'] ?? false)
+                                            ->first();
+                                        $data['supplier_id'] = $firstItem['item_supplier_id'] ?? null;
+                                    }
+                                    $purchaseOrder = PurchaseOrder::where('po_number', $poNumber)->first();
                                     if ($purchaseOrder) {
                                         HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
                                         return;
                                     }
-                                    $orderRequestService->createPurchaseOrder($record, $data);
+                                    $poData = array_merge($data, ['po_number' => $poNumber]);
+                                    $orderRequestService->createPurchaseOrder($record, $poData);
                                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
                                 }
                             } catch (Throwable $exception) {
@@ -1996,7 +1881,7 @@ class OrderRequestResource extends Resource
                             Section::make('Opsi Persetujuan')
                                 ->icon('heroicon-o-cog-6-tooth')
                                 ->schema([
-                                    
+
                                     // header-level cabang removed; per-item cabang used instead
                                     \Filament\Forms\Components\Toggle::make('create_purchase_order')
                                         ->label('Buat Purchase Order secara otomatis?')
@@ -2012,70 +1897,25 @@ class OrderRequestResource extends Resource
                                         ->columnSpanFull(),
                                 ]),
                             Section::make('Informasi Purchase Order')
-                                ->icon('heroicon-o-document-text')
-                                ->columns(2)
+                                ->icon('heroicon-o-calendar')
                                 ->visible(fn(Get $get) => $get('create_purchase_order'))
+                                ->columns(2)
                                 ->schema([
-                                    Select::make('supplier_id')
-                                        ->label('Supplier')
-                                        ->searchable()
-                                        ->columnSpanFull()
-                                        ->options(function () {
-                                            return Supplier::select(['id', 'perusahaan', 'code'])->get()->mapWithKeys(function ($supplier) {
-                                                return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                            });
-                                        })
-                                        ->getSearchResultsUsing(function (string $search) {
-                                            return Supplier::where('perusahaan', 'like', "%{$search}%")
-                                                ->orWhere('code', 'like', "%{$search}%")
-                                                ->limit(50)
-                                                ->get()
-                                                ->mapWithKeys(function ($supplier) {
-                                                    return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                                });
-                                        })
-                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
-                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
-                                        ->validationMessages([
-                                            'required' => 'Supplier wajib dipilih.',
-                                        ]),
-                                    TextInput::make('po_number')
-                                        ->label('PO Number')
-                                        ->string()
-                                        ->maxLength(255)
-                                        ->visible(fn(Get $get) => !$get('multi_supplier'))
-                                        ->required(fn(Get $get) => $get('create_purchase_order') && !$get('multi_supplier'))
-                                        ->suffixAction(
-                                            FormAction::make('generatePoNumber')
-                                                ->icon('heroicon-o-arrow-path')
-                                                ->tooltip('Generate PO Number')
-                                                ->action(function ($set) {
-                                                    $set('po_number', HelperController::generatePoNumber());
-                                                })
-                                        )
-                                        ->validationMessages([
-                                            'required' => 'Nomor PO wajib diisi.',
-                                            'max' => 'Nomor PO maksimal 255 karakter.',
-                                        ]),
                                     DatePicker::make('order_date')
                                         ->label('Tanggal Pembelian')
-                                        ->required(fn(Get $get) => $get('create_purchase_order'))
+                                        ->required()
                                         ->native(false)
-                                        ->displayFormat('d M Y')
-                                        ->validationMessages([
-                                            'required' => 'Tanggal order wajib diisi.',
-                                        ]),
+                                        ->displayFormat('d M Y'),
                                     DatePicker::make('expected_date')
                                         ->label('Tanggal Diharapkan')
+                                        ->nullable()
                                         ->native(false)
-                                        ->displayFormat('d M Y')
-                                        ->nullable(),
+                                        ->displayFormat('d M Y'),
                                     Textarea::make('note')
                                         ->label('Catatan')
-                                        ->placeholder('Catatan tambahan untuk Purchase Order ini...')
+                                        ->nullable()
                                         ->rows(3)
-                                        ->columnSpanFull()
-                                        ->nullable(),
+                                        ->columnSpanFull(),
                                 ]),
                             Section::make('Pilih Item yang Akan Dibeli')
                                 ->description('Centang item yang akan dimasukkan ke dalam Purchase Order. Anda dapat mengubah quantity dan harga sebelum menyetujui.')
@@ -2143,12 +1983,26 @@ class OrderRequestResource extends Resource
                                         return;
                                     }
 
-                                    $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                                    // Generate PO number automatically if not provided and create_purchase_order is enabled
+                                    if (!empty($data['create_purchase_order']) && empty($data['po_number'])) {
+                                        $data['po_number'] = HelperController::generatePoNumber();
+                                        while (PurchaseOrder::where('po_number', $data['po_number'])->exists()) {
+                                            $data['po_number'] = HelperController::generatePoNumber();
+                                        }
+                                    }
+                                    // Get supplier_id from first selected item if not provided
+                                    if (empty($data['supplier_id']) && !empty($data['selected_items'])) {
+                                        $firstItem = collect($data['selected_items'])
+                                            ->filter(fn($i) => $i['include'] ?? false)
+                                            ->first();
+                                        $data['supplier_id'] = $firstItem['item_supplier_id'] ?? null;
+                                    }
+                                    $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'] ?? '')->first();
                                     if ($purchaseOrder) {
                                         HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
                                         return;
                                     }
-                                }
+                                    }
 
                                 $orderRequestService->approve($record, $data);
                                 $record->refresh();
@@ -2216,7 +2070,7 @@ class OrderRequestResource extends Resource
     {
         return \Filament\Infolists\Components\TextEntry::make($name)
             ->label('')
-            ->getStateUsing(fn ($record) => self::detailLineHtml($label, $state($record)))
+            ->getStateUsing(fn($record) => self::detailLineHtml($label, $state($record)))
             ->html()
             ->columnSpan($columnSpan);
     }
@@ -2313,133 +2167,133 @@ class OrderRequestResource extends Resource
 
                                     return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal}";
                                 })
-                                ->collapsible()
-                                ->collapsed()
-                                ->schema([
-                                    \Filament\Infolists\Components\Grid::make(2)
-                                        ->schema([
-                                            \Filament\Infolists\Components\Group::make([
+                                    ->collapsible()
+                                    ->collapsed()
+                                    ->schema([
+                                        \Filament\Infolists\Components\Grid::make(2)
+                                            ->schema([
+                                                \Filament\Infolists\Components\Group::make([
                                                     self::detailColumnEntry(
                                                         'product_column',
                                                         'Produk',
                                                         [
                                                             ['Product', function ($record) {
-                                                            if (! $record->product) {
-                                                                return '-';
-                                                            }
+                                                                if (! $record->product) {
+                                                                    return '-';
+                                                                }
 
-                                                            return $record->product->sku
-                                                                ? "({$record->product->sku}) {$record->product->name}"
-                                                                : ($record->product->name ?? '-');
+                                                                return $record->product->sku
+                                                                    ? "({$record->product->sku}) {$record->product->name}"
+                                                                    : ($record->product->name ?? '-');
                                                             }],
                                                             ['Satuan', function ($record) {
-                                                            return $record->product?->uom?->abbreviation
-                                                                ?? $record->product?->uom?->name
-                                                                ?? '-';
+                                                                return $record->product?->uom?->abbreviation
+                                                                    ?? $record->product?->uom?->name
+                                                                    ?? '-';
                                                             }],
-                                                            ['Qty', fn ($record) => $record->quantity],
-                                                            ['Sisa Qty Belum Diterima', fn ($record) => self::resolveRemainingReceiptQuantity($record)],
+                                                            ['Qty', fn($record) => $record->quantity],
+                                                            ['Sisa Qty Belum Diterima', fn($record) => self::resolveRemainingReceiptQuantity($record)],
                                                             ['Cabang', function ($record) {
-                                                            $code = $record->cabang?->kode ?? null;
-                                                            $name = $record->cabang?->nama ?? null;
-                                                            if (! $name) {
-                                                                return '-';
-                                                            }
-                                                            return $code ? "({$code}) {$name}" : $name;
+                                                                $code = $record->cabang?->kode ?? null;
+                                                                $name = $record->cabang?->nama ?? null;
+                                                                if (! $name) {
+                                                                    return '-';
+                                                                }
+                                                                return $code ? "({$code}) {$name}" : $name;
                                                             }],
                                                             ['Supplier', function ($record) {
-                                                            if (! $record->supplier_id) {
-                                                                return '-';
-                                                            }
-                                                            $code = $record->supplier?->code ?? '-';
-                                                            $name = $record->supplier?->perusahaan ?? '-';
-                                                            return "({$code}) {$name}";
+                                                                if (! $record->supplier_id) {
+                                                                    return '-';
+                                                                }
+                                                                $code = $record->supplier?->code ?? '-';
+                                                                $name = $record->supplier?->perusahaan ?? '-';
+                                                                return "({$code}) {$name}";
                                                             }],
                                                             ['Rekomendasi Supplier', function ($record) {
-                                                            $productId = $record->product_id;
-                                                            if (!$productId) {
-                                                                return '-';
-                                                            }
-                                                            $product = Product::withoutGlobalScope('product_cabang')->with('suppliers')->find($productId);
-                                                            if (!$product || $product->suppliers->isEmpty()) {
-                                                                return 'Tidak ada supplier terdaftar untuk produk ini.';
-                                                            }
-                                                            $recommended = $product->suppliers
-                                                                ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
-                                                                ->first();
-                                                            $price = (float) ($recommended?->pivot->supplier_price ?? 0);
-                                                            $itemCurrencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
-                                                            return "{$recommended->perusahaan} (" . self::resolveCurrencySymbol($itemCurrencyId) . ' ' . self::formatMoneyPreviewState($converted) . ')';
+                                                                $productId = $record->product_id;
+                                                                if (!$productId) {
+                                                                    return '-';
+                                                                }
+                                                                $product = Product::withoutGlobalScope('product_cabang')->with('suppliers')->find($productId);
+                                                                if (!$product || $product->suppliers->isEmpty()) {
+                                                                    return 'Tidak ada supplier terdaftar untuk produk ini.';
+                                                                }
+                                                                $recommended = $product->suppliers
+                                                                    ->sortBy(fn($supplier) => (float) ($supplier->pivot->supplier_price ?? PHP_FLOAT_MAX))
+                                                                    ->first();
+                                                                $price = (float) ($recommended?->pivot->supplier_price ?? 0);
+                                                                $itemCurrencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                $converted = self::convertIdrToCurrency($price, $itemCurrencyId, false);
+                                                                return "{$recommended->perusahaan} (" . self::resolveCurrencySymbol($itemCurrencyId) . ' ' . self::formatMoneyPreviewState($converted) . ')';
                                                             }],
-                                                            ['Note', fn ($record) => $record->note ?? '-'],
+                                                            ['Note', fn($record) => $record->note ?? '-'],
                                                         ]
                                                     ),
                                                 ])
-                                                ->columnSpan(1)
-                                                ->columns(1),
-                                            \Filament\Infolists\Components\Group::make([
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                                \Filament\Infolists\Components\Group::make([
                                                     self::detailColumnEntry(
                                                         'price_column',
                                                         'Price',
                                                         [
-                                                            ['Mata Uang', fn ($record) => $record->currency?->code ?? $record->orderRequest?->currency?->code ?? '-'],
+                                                            ['Mata Uang', fn($record) => $record->currency?->code ?? $record->orderRequest?->currency?->code ?? '-'],
                                                             ['Harga Asli (Master)', function ($record) {
-                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->original_price ?? 0);
+                                                                $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->original_price ?? 0);
                                                             }],
                                                             ['Harga Override', function ($record) {
-                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->unit_price ?? 0);
+                                                                $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($record->unit_price ?? 0);
                                                             }],
                                                             ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
                                                             ['Discount (Nominal)', function ($record) {
-                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            $qty = (float) ($record->quantity ?? 0);
-                                                            $unitPrice = (float) ($record->unit_price ?? 0);
-                                                            $discPct = (float) ($record->discount ?? 0);
-                                                            $nominal = round(($qty * $unitPrice) * ($discPct / 100), 2);
-                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($nominal);
+                                                                $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                $qty = (float) ($record->quantity ?? 0);
+                                                                $unitPrice = (float) ($record->unit_price ?? 0);
+                                                                $discPct = (float) ($record->discount ?? 0);
+                                                                $nominal = round(($qty * $unitPrice) * ($discPct / 100), 2);
+                                                                return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($nominal);
                                                             }],
                                                             ['Total (Harga x Qty)', function ($record) {
-                                                            $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
-                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($totalCost);
+                                                                $totalCost = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
+                                                                $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($totalCost);
                                                             }],
                                                             ['Tipe Pajak', function ($record) {
-                                                            return $record->tipe_pajak ?? '-';
+                                                                return $record->tipe_pajak ?? '-';
                                                             }],
                                                             ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
                                                             ['Nominal Pajak', function ($record) {
-                                                            $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
-                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            $preview = self::calculateApprovalItemPreview(
-                                                                (float) ($record->quantity ?? 0),
-                                                                (float) ($record->unit_price ?? 0),
-                                                                (float) ($record->discount ?? 0),
-                                                                (float) ($record->tax ?? 0),
-                                                                $taxType
-                                                            );
-                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['tax_nominal']);
+                                                                $taxType = self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null);
+                                                                $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                $preview = self::calculateApprovalItemPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    $taxType
+                                                                );
+                                                                return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['tax_nominal']);
                                                             }],
                                                             ['Subtotal', function ($record) {
-                                                            $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
-                                                            $preview = self::calculateApprovalItemPreview(
-                                                                (float) ($record->quantity ?? 0),
-                                                                (float) ($record->unit_price ?? 0),
-                                                                (float) ($record->discount ?? 0),
-                                                                (float) ($record->tax ?? 0),
-                                                                self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
-                                                            );
-                                                            return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
+                                                                $currencyId = $record->currency_id ?? $record->orderRequest?->currency_id;
+                                                                $preview = self::calculateApprovalItemPreview(
+                                                                    (float) ($record->quantity ?? 0),
+                                                                    (float) ($record->unit_price ?? 0),
+                                                                    (float) ($record->discount ?? 0),
+                                                                    (float) ($record->tax ?? 0),
+                                                                    self::taxServiceTypeFromItemTaxType($record->tipe_pajak ?? null)
+                                                                );
+                                                                return self::resolveCurrencySymbol($currencyId) . ' ' . self::formatMoneyPreviewState($preview['subtotal']);
                                                             }],
                                                         ]
                                                     ),
                                                 ])
-                                                ->columnSpan(1)
-                                                ->columns(1),
-                                        ]),
-                                ]),
+                                                    ->columnSpan(1)
+                                                    ->columns(1),
+                                            ]),
+                                    ]),
                             ]),
                     ]),
             ]);

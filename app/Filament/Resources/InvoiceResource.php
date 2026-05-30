@@ -499,28 +499,14 @@ class InvoiceResource extends Resource
                         ->color('success'),
                     DeleteAction::make(),
                     Action::make('cetak_invoice')
-                        ->label('Cetak Invoice')
+                        ->label('Preview / Download PDF')
                         ->color('primary')
                         ->icon('heroicon-o-document-text')
-                        ->action(function ($record) {
-                            if ($record->from_model_type == 'App\Models\PurchaseOrder') {
-                                $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
-                                    'invoice' => $record
-                                ])->setPaper('A4', 'portrait');
-
-                                return response()->streamDownload(function () use ($pdf) {
-                                    echo $pdf->stream();
-                                }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
-                            } elseif ($record->from_model_type == 'App\Models\SaleOrder') {
-                                $pdf = Pdf::loadView('pdf.sale-order-invoice', [
-                                    'invoice' => $record
-                                ])->setPaper('A4', 'portrait');
-
-                                return response()->streamDownload(function () use ($pdf) {
-                                    echo $pdf->stream();
-                                }, 'Invoice_SO_' . $record->invoice_number . '.pdf');
-                            }
-                        })
+                        ->url(fn ($record) => route('pdf-stream', [
+                            'type' => $record->from_model_type == 'App\\Models\\PurchaseOrder' ? 'purchase-invoice' : 'sales-invoice',
+                            'id' => $record->id
+                        ]))
+                        ->openUrlInNewTab(),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

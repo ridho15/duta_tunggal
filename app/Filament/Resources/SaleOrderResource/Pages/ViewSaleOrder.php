@@ -180,21 +180,12 @@ class ViewSaleOrder extends ViewRecord
                         }
                     }),
                 Action::make('pdf_sale_order')
-                    ->label('Download PDF')
-                    ->color('danger')
-                    ->visible(function ($record) {
-                        return $record->status == 'approved' || $record->status == 'completed' || $record->status == 'confirmed' || $record->status == 'received';
-                    })
-                    ->icon('heroicon-o-document')
-                    ->action(function ($record) {
-                        $pdf = Pdf::loadView('pdf.sales-order', [
-                            'saleOrder' => $record
-                        ])->setPaper('A4', 'portrait');
-
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->stream();
-                        }, 'Sale_Order_' . $record->so_number . '.pdf');
-                    }),
+                    ->label('Preview / Download PDF')
+                    ->color('info')
+                    ->visible(fn ($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received']))
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->url(fn ($record) => route('pdf-stream', ['type' => 'sale-order', 'id' => $record->id]))
+                    ->openUrlInNewTab(),
                 Action::make('completed')
                     ->label('Complete')
                     ->icon('heroicon-o-check-badge')

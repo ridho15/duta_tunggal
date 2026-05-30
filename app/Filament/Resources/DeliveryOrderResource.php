@@ -192,6 +192,18 @@ class DeliveryOrderResource extends Resource
                                     ->live()
                                     ->columns(2)
                                     ->columnSpanFull()
+                                    ->collapsed() // UX: collapsible items for better UX
+                                    ->addAction(fn($action) => $action->hidden()) // Hide add button: items come from Sales Order
+                                    ->itemLabel(function (array $state): string {
+                                        $productId = $state['product_id'] ?? null;
+                                        $qty = $state['quantity'] ?? '0';
+                                        $productName = '-';
+                                        if ($productId) {
+                                            $product = Product::find($productId);
+                                            $productName = $product ? "({$product->sku}) {$product->name}" : '-';
+                                        }
+                                        return "Product: {$productName} | Qty: {$qty}";
+                                    })
                                     ->defaultItems(function ($get) {
                                         $salesOrders = $get('salesOrders') ?? [];
                                         if (!empty($salesOrders)) {
@@ -286,6 +298,7 @@ class DeliveryOrderResource extends Resource
                                             ->label('Option From')
                                             ->reactive()
                                             ->inlineLabel()
+                                            ->hidden() // Hidden: auto-populated from Sales Order
                                             ->options([
                                                 '0' => 'None',
                                                 '2' => 'From Sales Order Item'
@@ -301,9 +314,7 @@ class DeliveryOrderResource extends Resource
                                             ->label('Sales Order Item')
                                             ->preload()
                                             ->reactive()
-                                            ->visible(function ($set, $get) {
-                                                return $get('options_from') == 2;
-                                            })
+                                            ->hidden() // Hidden: auto-populated from Sales Order
                                             ->afterStateUpdated(function ($set, $get, $state) {
                                                 $saleOrderItem = SaleOrderItem::find($state);
                                                 if ($saleOrderItem) {
@@ -329,6 +340,8 @@ class DeliveryOrderResource extends Resource
                                             ->preload()
                                             ->reactive()
                                             ->searchable()
+                                            ->disabled() // Non-editable: auto-populated from Sales Order
+                                            ->dehydrated(true) // Required to save disabled values
                                             ->relationship('product', 'id')
                                             ->getOptionLabelFromRecordUsing(function (Product $product) {
                                                 return "({$product->sku}) {$product->name}";
@@ -439,9 +452,10 @@ class DeliveryOrderResource extends Resource
                                                             $get('warehouse_id'),
                                                         );
                                                     })
-                                                    ->helperText('Hanya menampilkan gudang sumber yang masih memiliki stok produk ini.')
                                                     ->searchable()
                                                     ->preload()
+                                                    ->disabled() // Non-editable: auto-populated from Sales Order
+                                                    ->dehydrated(true) // Required to save disabled values
                                                     ->required(),
                                                 Select::make('rak_id')
                                                     ->label('Rak Sumber')
@@ -460,6 +474,8 @@ class DeliveryOrderResource extends Resource
                                                     })
                                                     ->searchable()
                                                     ->preload()
+                                                    ->disabled() // Non-editable: auto-populated from Sales Order
+                                                    ->dehydrated(true) // Required to save disabled values
                                                     ->nullable(),
                                                 TextInput::make('quantity')
                                                     ->label('Qty Sumber')
@@ -520,7 +536,7 @@ class DeliveryOrderResource extends Resource
                                             ->columns(3)
                                             ->columnSpanFull()
                                             ->collapsed()
-                                            ->helperText('Jika diisi, total Qty Sumber harus sama dengan Quantity item.'),
+                                            ->helperText('Gudang dan Rak non-editable (diisi otomatis dari Sales Order). Kolom: Gudang Sumber | Rak Sumber | Qty Sumber'),
                                     ])
                                     ->visible(function ($get, $context) {
                                         // Show deliveryOrderItem repeater when editing OR when creating (to enable relationship saving)
@@ -641,10 +657,13 @@ class DeliveryOrderResource extends Resource
 
                 Section::make('Status Konfirmasi Gudang')
                     ->description('Setiap kartu mewakili satu request item pada satu gudang sumber. DO di-approve otomatis jika semua request dikonfirmasi; DO ditolak otomatis jika ada satu request yang ditolak.')
+                    ->collapsible() // UX: collapsible section
+                    ->collapsed() // Starts collapsed by default
                     ->schema([
                         RepeatableEntry::make('warehouseConfirmations')
                             ->label('')
                             ->schema([
+                                // Show GROUP STRUCTURE only (not raw data details):
                                 TextEntry::make('warehouseConfirmationItems.0.warehouse.name')
                                     ->label('Gudang')
                                     ->placeholder('-')
@@ -659,33 +678,20 @@ class DeliveryOrderResource extends Resource
                                         'request'           => 'info',
                                         default             => 'gray',
                                     }),
-                                TextEntry::make('items_summary')
-                                    ->label('Detail Request')
-                                    ->getStateUsing(
-                                        fn($record) =>
-                                        $record->warehouseConfirmationItems
-                                            ->map(
-                                                fn($item) => ($item->product_name ?? '-') . ': ' .
-                                                    (int)$item->confirmed_qty . ' / ' .
-                                                    (int)$item->requested_qty . ' ' .
-                                                    ($item->status === 'confirmed' ? '✓' : ($item->status === 'rejected' ? '✗' : '…'))
-                                            )
-                                            ->join("\n")
-                                    )
-                                    ->html(false),
-                                TextEntry::make('rejection_reason')
-                                    ->label('Alasan Tolak')
-                                    ->placeholder('-')
-                                    ->color('danger'),
-                                TextEntry::make('user.name')
-                                    ->label('Diproses Oleh')
-                                    ->placeholder('Belum diproses'),
-                                TextEntry::make('confirmed_at')
-                                    ->label('Waktu Konfirmasi')
-                                    ->dateTime('d M Y H:i')
+                                TextEntry::make('warehouseConfirmationItems')
+                                    ->label('Jumlah Item')
+                                    ->getStateUsing(fn($record) => $record->warehouseConfirmationItems->count())
                                     ->placeholder('-'),
                             ])->columns(3)
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->grid(1) // One card per row
+                            ->itemLabel(function ($record): string {
+                                // Show group structure: Warehouse Name | Status | Item Count
+                                $warehouseName = $record->warehouseConfirmationItems->first()?->warehouse?->name ?? '-';
+                                $status = $record->status ?? '-';
+                                $count = $record->warehouseConfirmationItems->count();
+                                return "{$warehouseName} | Status: {$status} | {$count} item";
+                            })
                     ])
                     ->visible(fn($record) => $record->warehouseConfirmations()->exists()),
             ]);
@@ -1030,32 +1036,12 @@ class DeliveryOrderResource extends Resource
                             HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditolak. Proses selanjutnya: Tim Logistik perlu memperbaiki data Delivery Order sesuai alasan penolakan dan mengajukan kembali untuk persetujuan.");
                         }),
                     Action::make('pdf_delivery_order')
-                        ->label('Download PDF')
-                        ->color('danger')
-                        ->visible(function ($record) {
-                            return $record->status == 'approved' || $record->status == 'completed' || $record->status == 'confirmed' || $record->status == 'received';
-                        })
-                        ->icon('heroicon-o-document')
-                        ->action(function ($record) {
-                            // Load necessary relationships for PDF
-                            $record->load([
-                                'cabang',
-                                'warehouse',
-                                'driver',
-                                'vehicle',
-                                'deliveryOrderItem.product',
-                                'deliveryOrderItem.saleOrderItem',
-                                'salesOrders.customer'
-                            ]);
-
-                            $pdf = Pdf::loadView('pdf.delivery-order', [
-                                'deliveryOrder' => $record
-                            ])->setPaper('A4', 'portrait');
-
-                            return response()->streamDownload(function () use ($pdf) {
-                                echo $pdf->stream();
-                            }, 'Delivery_Order_' . $record->do_number . '.pdf');
-                        }),
+                        ->label('Preview / Download PDF')
+                        ->color('info')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->visible(fn ($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received', 'sent']))
+                        ->url(fn ($record) => route('pdf-stream', ['type' => 'delivery-order', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                     Action::make('checker_edit_quantity')
                         ->label('Checker Edit Qty')
                         ->color('warning')
@@ -1225,20 +1211,80 @@ class DeliveryOrderResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
+            ->recordClasses(fn($record) => match ($record->status) {
+                'draft' => 'bg-gray-50',
+                'request_stock' => 'bg-yellow-50',
+                'partial' => 'bg-yellow-50',
+                'sent' => 'bg-blue-50',
+                'received' => 'bg-blue-50',
+                'request_approve' => 'bg-blue-50',
+                'approved' => 'bg-blue-50',
+                'completed' => 'bg-green-50',
+                'request_close' => 'bg-yellow-50',
+                'closed' => 'bg-red-50',
+                'reject' => 'bg-red-50',
+                'delivery_failed' => 'bg-red-50',
+                default => '',
+            })
             ->description(new \Illuminate\Support\HtmlString(
-                '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Delivery Order</summary>' .
-                    '<div class="mt-2 text-sm">' .
-                    '<ul class="list-disc pl-5">' .
-                    '<li><strong>Apa ini:</strong> Delivery Order adalah dokumen pengiriman barang dari penjualan yang perlu disetujui sebelum dikirim.</li>' .
-                    '<li><strong>Flow Approval:</strong> Draft → Request Stock → Request Approve → Approved → Sent → Received → Completed. Request Stock berarti WC sudah dibuat per item dan per gudang sumber untuk diverifikasi oleh gudang.</li>' .
-                    '<li><strong>Surat Jalan:</strong> Surat Jalan bersifat dokumen pendukung DO dan tidak lagi menjadi syarat approval atau filter utama pengiriman.</li>' .
-                    '<li><strong>Actions:</strong> <em>Request Approve</em> (request_stock), <em>Approve/Reject</em> (request_approve), <em>Mark as Sent</em> (approved). Status selesai untuk DO dikelola otomatis mengikuti Delivery Schedule.</li>' .
-                    '<li><strong>Checker Edit:</strong> User dengan role Checker dapat mengedit quantity setelah approved untuk penyesuaian aktual.</li>' .
+                '<style>
+                    .fi-ta-header:has(.do-legend){align-items:stretch!important}
+                    .do-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box}
+                    .do-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
+                </style>' .
+                '<div class="do-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
+                '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
+                        '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
+                        '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:#3b82f6;">' .
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
+                        '</svg>' .
+                        'Panduan Delivery Order' .
+                        '</span>' .
+                        '<span class="transition group-open:rotate-180">' .
+                        '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
+                        '</span>' .
+                    '</summary>' .
+                    '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);">' .
+                    '<ul class="list-disc pl-0" style="list-style:none;padding-left:0;">' .
+                    '<li><strong>Apa ini:</strong> Delivery Order adalah dokumen pengiriman barang dari penjualan.</li>' .
+                    '<li><strong>Flow:</strong> Draft → Request Stock → Request Approve → Approved → Sent → Received → Completed.</li>' .
+                    '<li><strong>Checker:</strong> User dengan role Checker dapat edit quantity setelah approved.</li>' .
                     '<li><strong>PDF:</strong> Download PDF tersedia setelah status approved atau completed.</li>' .
                     '</ul>' .
                     '</div>' .
-                    '</details>'
+                '</details>' .
+                '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;">' .
+                    '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;">' .
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
+                    '</svg>' .
+                    'Legenda Warna Status Baris Data' .
+                    '</h4>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:12px;">' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:#f9fafb;border:1px solid #e5e7eb;">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #9ca3af;background-color:#ffffff;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Abu (Draft)</span>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(254,243,199,0.4);border:1px solid rgba(253,230,138,0.8);">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#eab308;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Kuning (Request Stock)</span>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#3b82f6;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Biru (Sent/Approved)</span>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(220,252,231,0.4);border:1px solid rgba(187,247,208,0.8);">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#22c55e;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Hijau (Completed)</span>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
+                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#ef4444;flex-shrink:0;"></div>' .
+                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Merah (Closed/Reject)</span>' .
+                    '</div>' .
+                    '</div>' .
+                '</div>' .
+                '</div>'
             ));
     }
 

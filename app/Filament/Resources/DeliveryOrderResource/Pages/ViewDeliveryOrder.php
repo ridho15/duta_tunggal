@@ -311,30 +311,12 @@ class ViewDeliveryOrder extends ViewRecord
                     return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan hanya untuk pencatatan dokumen DO.';
                 }),
             Action::make('pdf_delivery_order')
-                ->label('Download PDF')
-                ->color('danger')
-                ->icon('heroicon-o-document')
-                ->visible(function () {
-                    $record = $this->record;
-                    return in_array($record->status, ['approved', 'completed', 'confirmed', 'received', 'sent']);
-                })
-                ->action(function ($record) {
-                    // Load necessary relationships for PDF
-                    $record->load([
-                        'cabang',
-                        'deliveryOrderItem.product',
-                        'deliveryOrderItem.saleOrderItem',
-                        'salesOrders.customer'
-                    ]);
-
-                    $pdf = Pdf::loadView('pdf.delivery-order', [
-                        'deliveryOrder' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Delivery_Order_' . $record->do_number . '.pdf');
-                }),
+                ->label('Preview / Download PDF')
+                ->color('info')
+                ->icon('heroicon-o-document-arrow-down')
+                ->visible(fn () => in_array($this->record?->status, ['approved', 'completed', 'confirmed', 'received', 'sent']))
+                ->url(fn ($record) => route('pdf-stream', ['type' => 'delivery-order', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 }

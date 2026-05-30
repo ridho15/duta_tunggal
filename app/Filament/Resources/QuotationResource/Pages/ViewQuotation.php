@@ -106,18 +106,11 @@ class ViewQuotation extends ViewRecord
                         HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil di update");
                     }),
                 Action::make('pdf_quotation')
-                    ->label('Download PDF')
-                    ->icon('heroicon-o-document')
-                    ->color('danger')
-                    ->action(function ($record) {
-                        $pdf = Pdf::loadView('pdf.quotation', [
-                            'quotation' => $record
-                        ])->setPaper('A4', 'portrait');
-
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->stream();
-                        }, 'Quotation_' . $record->quotation_number . '.pdf');
-                    }),
+                    ->label('Preview / Download PDF')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('info')
+                    ->url(fn ($record) => route('pdf-stream', ['type' => 'quotation', 'id' => $record->id]))
+                    ->openUrlInNewTab(),
                 Action::make('create_sale_order')
                     ->label('Buat Sales Order')
                     ->icon('heroicon-o-plus')
@@ -464,5 +457,10 @@ class ViewQuotation extends ViewRecord
                     ->slideOver()
             ])->button()
         ];
+    }
+
+    public function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
+    {
+        return QuotationResource::infolist($infolist);
     }
 }

@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 20mm;
+            @bottom-right {
+                content: "Hal. " counter(page) " dari " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+
         body {
             font-family: Arial, sans-serif;
             margin: 0;

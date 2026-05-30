@@ -10,6 +10,7 @@ use App\Http\Controllers\Reports\FinancialReportPreviewController;
 use App\Http\Controllers\Reports\TrialBalancePreviewController;
 use App\Http\Controllers\Reports\CogmPreviewController;
 use App\Http\Controllers\InventoryCardController;
+use App\Http\Controllers\PdfPreviewController;
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
@@ -95,4 +96,20 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/inventory-card/print',          [InventoryCardController::class, 'printView'])->name('inventory-card.print');
     Route::get('/reports/inventory-card/download-pdf',   [InventoryCardController::class, 'downloadPdf'])->name('inventory-card.pdf');
     Route::get('/reports/inventory-card/download-excel', [InventoryCardController::class, 'downloadExcel'])->name('inventory-card.excel');
+
+    // Document PDF streaming (opens in new tab)
+    Route::get('/pdf/{type}/{id}', [PdfPreviewController::class, 'stream'])
+        ->name('pdf-stream')
+        ->where('type', 'order-request|purchase-order|purchase-invoice|quotation|sale-order|sales-invoice|delivery-order|surat-jalan');
+
+    // Customer Return PDF streaming
+    Route::get('/pdf/customer-return/{id}', function (int $id) {
+        $return = \App\Models\CustomerReturn::with([
+            'invoice', 'customer', 'cabang', 'customerReturnItems.product',
+            'receivedBy', 'qcInspectedBy', 'approvedBy'
+        ])->findOrFail($id);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.customer-return', ['return' => $return])->setPaper('a4', 'portrait');
+        return $pdf->stream("CustomerReturn_{$return->return_number}.pdf");
+    })->name('pdf-customer-return');
 });

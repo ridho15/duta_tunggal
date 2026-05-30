@@ -70,26 +70,11 @@ class ViewPurchaseInvoice extends ViewRecord
                     }
                 }),
             Actions\Action::make('print_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    // Load necessary relationships for PDF
-                    $record->load([
-                        'fromModel.supplier',
-                        'fromModel.purchaseOrderBiaya',
-                        'invoiceItem.product',
-                        'cabang'
-                    ]);
-                    
-                    $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
-                        'invoice' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'purchase-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 

@@ -44,6 +44,11 @@
         @page {
             size: A4 landscape;
             margin: 15mm 20mm;
+            @bottom-right {
+                content: "Hal. " counter(page) " dari " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
         }
 
         body {

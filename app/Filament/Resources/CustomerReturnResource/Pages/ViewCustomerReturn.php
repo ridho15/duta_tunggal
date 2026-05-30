@@ -135,28 +135,11 @@ class ViewCustomerReturn extends ViewRecord
 
             // ── PDF Print ─────────────────────────────────────────────
             Actions\Action::make('print_customer_return')
-                ->label('Cetak Form Return')
+                ->label('Preview / Download Form Return')
                 ->icon('heroicon-o-document-text')
-                ->color('secondary')
-                ->action(function () {
-                    $record = $this->record->loadMissing([
-                        'invoice',
-                        'customer',
-                        'cabang',
-                        'customerReturnItems.product',
-                        'receivedBy',
-                        'qcInspectedBy',
-                        'approvedBy',
-                    ]);
-
-                    $pdf = Pdf::loadView('pdf.customer-return', [
-                        'return' => $record,
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'CustomerReturn_' . $record->return_number . '.pdf');
-                }),
+                ->color('info')
+                ->url(fn ($record) => route('pdf-customer-return', ['id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 }

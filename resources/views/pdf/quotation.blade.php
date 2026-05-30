@@ -5,6 +5,16 @@
     <meta charset="UTF-8">
     <title>Quotation - PT Duta Tunggal</title>
     <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 20mm;
+            @bottom-right {
+                content: "Hal. " counter(page) " dari " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+
         body {
             font-family: sans-serif;
             font-size: 12px;

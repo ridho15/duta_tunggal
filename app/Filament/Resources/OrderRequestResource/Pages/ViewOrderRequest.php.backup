@@ -374,15 +374,47 @@ class ViewOrderRequest extends ViewRecord
                     ];
                 })
                 ->form([
-                    Section::make('Tanggal & Catatan')
-                        ->icon('heroicon-o-calendar')
-                        ->columns(2)
+                    Section::make('Informasi Purchase Order')
+                        ->icon('heroicon-o-document-text')
+                        ->columns(3)
+                        ->visible(fn(Get $get) => $get('multi_supplier'))
                         ->schema([
+                            Hidden::make('multi_supplier'),
+                            Placeholder::make('multi_supplier_notice')
+                                ->label('')
+                                ->content('Item dalam OR ini memiliki beberapa supplier/cabang berbeda. Sistem akan membuat PO per supplier/cabang.')
+                                ->visible(fn(Get $get) => $get('multi_supplier'))
+                                ->columnSpanFull(),
+                            TextInput::make('po_number')
+                                ->label('PO Number')
+                                ->string()
+                                ->maxLength(255)
+                                ->visible(fn(Get $get) => $get('multi_supplier'))
+                                ->columnSpan(1)
+                                ->suffixAction(
+                                    FormAction::make('generatePoNumber')
+                                        ->icon('heroicon-o-arrow-path')
+                                        ->tooltip('Generate PO Number')
+                                        ->action(fn($set) => $set('po_number', HelperController::generatePoNumber()))
+                                ),
+                            Select::make('cabang_id')
+                                ->label('Cabang')
+                                ->options(function () {
+                                    return \App\Models\Cabang::query()
+                                        ->orderBy('nama')
+                                        ->get()
+                                        ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+                                        ->all();
+                                })
+                                ->visible(fn(Get $get) => $get('multi_supplier'))
+                                ->columnSpan(1)
+                                ->helperText('Pilih cabang untuk PO.'),
                             DatePicker::make('order_date')
                                 ->label('Tanggal Pembelian')
                                 ->required()
                                 ->native(false)
-                                ->displayFormat('d M Y'),
+                                ->displayFormat('d M Y')
+                                ->validationMessages(['required' => 'Tanggal Pembelian wajib diisi.']),
                             DatePicker::make('expected_date')
                                 ->label('Tanggal Diharapkan')
                                 ->nullable()
@@ -390,9 +422,9 @@ class ViewOrderRequest extends ViewRecord
                                 ->displayFormat('d M Y'),
                             Textarea::make('note')
                                 ->label('Catatan')
-                                ->nullable()
                                 ->rows(3)
-                                ->columnSpanFull(),
+                                ->columnSpanFull()
+                                ->nullable(),
                         ]),
                     Section::make('Pilih Item yang Akan Dibeli')
                         ->description('Centang item yang akan dimasukkan ke dalam Purchase Order ini. Anda dapat mengubah harga override per item.')
