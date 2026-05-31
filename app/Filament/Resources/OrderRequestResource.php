@@ -1566,8 +1566,8 @@ class OrderRequestResource extends Resource
                         ->label('Preview / Download PDF')
                         ->icon('heroicon-o-document-text')
                         ->color('info')
-                        ->visible(fn ($record) => $record->status === 'approved')
-                        ->url(fn ($record) => route('pdf-stream', ['type' => 'order-request', 'id' => $record->id]))
+                        ->visible(fn($record) => $record->status === 'approved')
+                        ->url(fn($record) => route('pdf-stream', ['type' => 'order-request', 'id' => $record->id]))
                         ->openUrlInNewTab(),
                     Action::make('create_purchase_order')
                         ->label('Create Purchase Order')
@@ -2002,7 +2002,7 @@ class OrderRequestResource extends Resource
                                         HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
                                         return;
                                     }
-                                    }
+                                }
 
                                 $orderRequestService->approve($record, $data);
                                 $record->refresh();

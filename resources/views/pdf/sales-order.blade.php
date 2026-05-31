@@ -149,7 +149,8 @@
 
         .signature-table td {
             border: none;
-            text-align: right;
+            text-align: center;
+            width: 50%;
             vertical-align: bottom;
             padding: 0;
         }
@@ -157,15 +158,8 @@
         .signature-box {
             display: inline-block;
             width: 250px;
-            text-align: center;
         }
 
-        .signature-img {
-            height: 70px;
-            margin: 10px 0;
-            object-fit: contain;
-        }
-        
         .signature-name {
             font-weight: bold;
             border-top: 1px solid #888;
@@ -212,24 +206,36 @@
             <td class="label">Cabang</td>
             <td>: {{ $saleOrder->cabang->nama ?? '-' }}</td>
         </tr>
+        <tr>
+            <td class="label">TOP</td>
+            <td>: {{ ($saleOrder->customer->tempo_kredit ?? 30) . ' hari' }}</td>
+            <td class="label">Delivery</td>
+            <td>: {{ \Carbon\Carbon::parse($saleOrder->delivery_date)->locale('id')->format('d M Y') }}</td>
+        </tr>
     </table>
 
     <table class="items-table">
         <thead>
             <tr>
-                <th class="center" style="width: 5%;">No</th>
+                <th class="center" style="width: 4%;">No</th>
                 <th>Nama Barang</th>
-                <th class="center" style="width: 8%;">Qty</th>
-                <th class="right" style="width: 13%;">Harga Satuan</th>
-                <th class="right" style="width: 13%;">Diskon (Rp)</th>
-                <th class="center" style="width: 13%;">Tipe Pajak</th>
-                <th class="right" style="width: 8%;">Tax (%)</th>
-                <th class="right" style="width: 12%;">Tax (Rp)</th>
-                <th class="right" style="width: 15%;">Subtotal</th>
+                <th class="center" style="width: 7%;">Satuan</th>
+                <th class="center" style="width: 6%;">Qty</th>
+                <th class="right" style="width: 11%;">Harga Satuan</th>
+                <th class="right" style="width: 7%;">Disc (%)</th>
+                <th class="center" style="width: 9%;">Tipe Pajak</th>
+                <th class="right" style="width: 7%;">Tax (%)</th>
+                <th class="right" style="width: 10%;">DPP</th>
+                <th class="right" style="width: 8%;">PPN</th>
+                <th class="right" style="width: 12%;">Subtotal</th>
             </tr>
         </thead>
         <tbody>
-            @php $total = 0; @endphp
+            @php
+                $total = 0;
+                $totalDpp = 0;
+                $totalPpn = 0;
+            @endphp
             @foreach ($saleOrder->saleOrderItem as $index => $item)
                 @php
                     // compute using TaxService for accuracy (handles inclusive/exclusive)
@@ -238,24 +244,40 @@
                     $afterDiscount = $lineBase - $discountAmount;
                     $taxType = \App\Services\TaxService::normalizeType($item->tipe_pajak ?? 'PPN Excluded');
                     $taxResult = \App\Services\TaxService::compute($afterDiscount, (float)$item->tax, $taxType);
+                    $itemDpp = $taxResult['dpp'];
                     $taxAmount = $taxResult['ppn'];
                     $subtotal = $taxResult['total'];
+
                     $total += $subtotal;
+                    $totalDpp += $itemDpp;
+                    $totalPpn += $taxAmount;
                 @endphp
                 <tr>
                     <td class="center">{{ $index + 1 }}</td>
                     <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
-                    <td class="center">{{ $item->quantity }}</td>
+                    <td class="center">{{ $item->product->uom->name ?? '-' }}</td>
+                    <td class="center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
                     <td class="right">{{ $formatMoney($item->unit_price) }}</td>
-                    <td class="right">{{ $formatMoney($discountAmount) }}</td>
+                    <td class="right">{{ number_format($item->discount, 2, ',', '.') }}%</td>
                     <td class="center">{{ $taxType }}</td>
                     <td class="right">{{ number_format($item->tax, 2, ',', '.') }}%</td>
+                    <td class="right">{{ $formatMoney($itemDpp) }}</td>
                     <td class="right">{{ $formatMoney($taxAmount) }}</td>
                     <td class="right">{{ $formatMoney($subtotal) }}</td>
                 </tr>
             @endforeach
+
+            {{-- Summary Rows --}}
+            <tr class="summary-row">
+                <td colspan="10" class="right"><strong>DPP (Dasar Pengenaan Pajak)</strong></td>
+                <td class="right"><strong>{{ $formatMoney($totalDpp) }}</strong></td>
+            </tr>
+            <tr class="summary-row">
+                <td colspan="10" class="right"><strong>PPN (Pajak Pertambahan Nilai)</strong></td>
+                <td class="right"><strong>{{ $formatMoney($totalPpn) }}</strong></td>
+            </tr>
             <tr class="summary-row total">
-                <td colspan="8" class="right">GRAND TOTAL</td>
+                <td colspan="10" class="right">GRAND TOTAL</td>
                 <td class="right">{{ $formatMoney($total) }}</td>
             </tr>
         </tbody>
@@ -274,13 +296,18 @@
                             Jakarta, {{ \Carbon\Carbon::parse($saleOrder->approve_at ?? now())->locale('id')->format('d M Y') }}<br>
                             Hormat kami,
                         </p>
-                        @if ($saleOrder->approveBy->signature ?? null)
-                            <img src="{{ public_path('storage' . $saleOrder->approveBy->signature) }}" class="signature-img" alt="Signature">
-                        @else
-                            <div style="height: 70px; margin: 10px 0;"></div>
-                        @endif
+                        <div style="height: 70px; margin: 10px 0;"></div>
                         <div class="signature-name">
                             {{ $saleOrder->approveBy->name ?? 'PT DUTA TUNGGAL' }}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="signature-box">
+                        <p style="margin-bottom: 10px;">Disetujui Oleh,</p>
+                        <div style="height: 70px; margin: 10px 0;"></div>
+                        <div class="signature-name">
+                            {{ $saleOrder->customer->name ?? 'Customer' }}
                         </div>
                     </div>
                 </td>

@@ -249,7 +249,7 @@ it('handles biaya relationships correctly', function () {
         ->and($biaya->coa->code)->toBe('6000.01');
 });
 
-it('calculates total amount correctly with items and biaya', function () {
+it('calculates total amount correctly with items only (biaya not included in PO total)', function () {
     $this->actingAs($this->user);
 
     // Create purchase order without triggering observer
@@ -270,6 +270,7 @@ it('calculates total amount correctly with items and biaya', function () {
     });
 
     // Create item: 5 * 20000 - 5% discount + 10% tax (eklusif) = 104500
+    // Calculation: (5 * 20000) = 100000, -5% = 95000, +10% tax = 104500
     $purchaseOrder->purchaseOrderItem()->create([
         'product_id' => $this->product->id,
         'quantity' => 5,
@@ -280,7 +281,7 @@ it('calculates total amount correctly with items and biaya', function () {
         'tipe_pajak' => 'Eklusif',
     ]);
 
-    // Create biaya: 25000
+    // Create biaya: 25000 (NOT included in PO total - biaya goes to Invoice)
     $purchaseOrder->purchaseOrderBiaya()->create([
         'nama_biaya' => 'Biaya Transport',
         'currency_id' => $this->currency->id,
@@ -296,6 +297,7 @@ it('calculates total amount correctly with items and biaya', function () {
     $service->updateTotalAmount($purchaseOrder);
     $purchaseOrder->refresh();
 
-    // Expected: 104500 (item after 5% discount and 10% tax) + 25000 (biaya) = 129500
-    expect($purchaseOrder->total_amount)->toBe('129500.00');
+    // PO total only includes items (104500), biaya is NOT included
+    // Biaya belongs on the Invoice, not on the Purchase Order
+    expect($purchaseOrder->total_amount)->toBe('104500.00');
 });

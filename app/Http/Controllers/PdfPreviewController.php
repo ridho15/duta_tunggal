@@ -29,7 +29,7 @@ class PdfPreviewController extends Controller
             'purchase-order' => [
                 'model'       => PurchaseOrder::class,
                 'blade'       => 'pdf.purchase-order',
-                'bladeVar'    => 'record',
+                'bladeVar'    => 'purchaseOrder',
                 'paper'       => 'a4',
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Purchase_Order_{$r->po_number}.pdf",
@@ -47,7 +47,7 @@ class PdfPreviewController extends Controller
             'quotation' => [
                 'model'       => Quotation::class,
                 'blade'       => 'pdf.quotation',
-                'bladeVar'    => 'record',
+                'bladeVar'    => 'quotation',
                 'paper'       => 'a4',
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Quotation_{$r->quotation_number}.pdf",
@@ -56,7 +56,7 @@ class PdfPreviewController extends Controller
             'sale-order' => [
                 'model'       => SaleOrder::class,
                 'blade'       => 'pdf.sales-order',
-                'bladeVar'    => 'record',
+                'bladeVar'    => 'saleOrder',
                 'paper'       => 'a4',
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Sales_Order_{$r->so_number}.pdf",
@@ -65,7 +65,7 @@ class PdfPreviewController extends Controller
             'sales-invoice' => [
                 'model'       => Invoice::class,
                 'blade'       => 'pdf.sale-order-invoice',
-                'bladeVar'    => 'record',
+                'bladeVar'    => 'invoice',
                 'paper'       => 'a4',
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Invoice_Penjualan_{$r->invoice_number}.pdf",

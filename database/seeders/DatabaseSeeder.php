@@ -68,6 +68,7 @@ class DatabaseSeeder extends Seeder
             CompleteSalesFlowSeeder::class, // ✅ TAMBAHKAN: Complete sales flow with approved quotation, SO, and DO
             
             // Operations
+            DeliveryScheduleSeeder::class, // ✅ TAMBAHKAN: Delivery schedules
             DeliveryOrderSeeder::class,
             SuratJalanSeeder::class,
             ReturnProductSeeder::class, // ✅ TAMBAHKAN: Product returns

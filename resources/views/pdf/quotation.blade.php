@@ -2,11 +2,14 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <title>Quotation - PT Duta Tunggal</title>
+    @php
+        $formatMoney = function (float $amount) {
+            return 'Rp ' . number_format($amount, 0, ',', '.');
+        };
+    @endphp
     <style>
         @page {
-            size: A4 portrait;
+            size: A4 landscape;
             margin: 15mm 20mm;
             @bottom-right {
                 content: "Hal. " counter(page) " dari " counter(pages);
@@ -16,115 +19,304 @@
         }
 
         body {
-            font-family: sans-serif;
-            font-size: 12px;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 11px;
+            color: #333;
+            line-height: 1.4;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
+        .header-table {
+            width: 100%;
+            border: none;
+            margin-bottom: 5px;
+        }
+
+        .header-table td {
+            border: none;
+            padding: 0;
+            vertical-align: top;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #222;
+        }
+
+        .company-info {
+            font-size: 11px;
+            color: #555;
         }
 
         .logo {
-            width: 100px;
+            height: 50px;
+            object-fit: contain;
         }
 
-        table {
+        .title-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: inline-block;
+            border-bottom: 2px solid #222;
+            padding-bottom: 3px;
+        }
+
+        .info-table {
+            width: 100%;
+            border: none;
+            margin-bottom: 15px;
+        }
+
+        .info-table td {
+            border: none;
+            padding: 4px 8px;
+            vertical-align: top;
+        }
+
+        .info-table td.label {
+            font-weight: bold;
+            width: 130px;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-bottom: 20px;
         }
 
-        th,
-        td {
-            border: 1px solid #000;
+        .items-table th,
+        .items-table td {
             padding: 8px;
+            border: 1px solid #ddd;
             text-align: left;
+            vertical-align: middle;
         }
 
-        .signature {
-            margin-top: 50px;
-            text-align: right;
+        .items-table th {
+            background-color: #f4f6f8;
+            font-weight: bold;
+            color: #444;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        h1 {
-            margin: 0;
+        .right {
+            text-align: right !important;
+        }
+
+        .center {
+            text-align: center !important;
+        }
+
+        .summary-row td {
+            border-top: none;
+            border-bottom: none;
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+
+        .summary-row.total td {
+            border-top: 1px solid #222;
+            border-bottom: 2px solid #222;
+            background-color: #f4f6f8;
+            font-size: 12px;
+            font-weight: bold;
+            color: #111;
+        }
+
+        .signature-section {
+            margin-top: 40px;
+            width: 100%;
+        }
+
+        .signature-table {
+            width: 100%;
+            border: none;
+        }
+
+        .signature-table td {
+            border: none;
+            text-align: center;
+            width: 50%;
+            vertical-align: bottom;
+            padding: 0;
+        }
+
+        .signature-box {
+            display: inline-block;
+            width: 250px;
+        }
+
+        .signature-name {
+            font-weight: bold;
+            border-top: 1px solid #888;
+            padding-top: 5px;
+            width: 80%;
+            margin: 0 auto;
         }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
-        <h2>PT DUTA TUNGGAL</h2>
-        <p>Alamat Perusahaan | Telp: 021-123456 | Email: info@dutatunggal.co.id</p>
+
+    <table class="header-table">
+        <tr>
+            <td style="width: 70%;">
+                <div class="company-name">PT DUTA TUNGGAL</div>
+                <div class="company-info">
+                    Jl. Contoh No. 123<br>
+                    Jakarta, Indonesia<br>
+                    Telp: (021) 12345678<br>
+                    Email: admin@dutatunggal.co.id
+                </div>
+            </td>
+            <td class="right">
+                <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
+            </td>
+        </tr>
+    </table>
+
+    <div class="title-container">
+        <div class="title">QUOTATION</div>
     </div>
 
-    <h3>QUOTATION</h3>
+    <table class="info-table">
+        <tr>
+            <td class="label">No. Quotation</td>
+            <td>: <strong>{{ $quotation->quotation_number }}</strong></td>
+            <td class="label">Tanggal</td>
+            <td>: {{ \Carbon\Carbon::parse($quotation->date)->format('d/m/Y') }}</td>
+        </tr>
+        <tr>
+            <td class="label">Customer</td>
+            <td>: <strong>{{ $quotation->customer->name ?? '-' }}</strong></td>
+            <td class="label">Valid Until</td>
+            <td>: {{ $quotation->valid_until ? \Carbon\Carbon::parse($quotation->valid_until)->format('d/m/Y') : '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Cabang</td>
+            <td>: {{ $quotation->cabang->nama ?? '-' }}</td>
+            <td class="label">TOP</td>
+            <td>: {{ $quotation->top_type ?? ($quotation->customer->tempo_kredit ?? 30) . ' hari' }}</td>
+        </tr>
+    </table>
 
-    <p><strong>Date:</strong> {{ Carbon\Carbon::parse($quotation->date)->locale('id')->format('D, d M Y') }}</p>
-    <p><strong>Valid Until:</strong> {{ $quotation->valid_until ?
-        Carbon\Carbon::parse($quotation->valid_until)->locale('id')->format('D, d M Y') : '-' }}</p>
-    <p><strong>To:</strong> {{ $quotation->customer->name }}</p>
-
-    <table>
+    <table class="items-table">
         <thead>
             <tr>
-                <th>#</th>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Discount (%)</th>
-                <th>Tax (%)</th>
-                <th>Tax Type</th>
-                <th>Tax Amount</th>
-                <th>Subtotal</th>
+                <th class="center" style="width: 4%;">No</th>
+                <th>Nama Barang</th>
+                <th class="center" style="width: 7%;">Satuan</th>
+                <th class="center" style="width: 6%;">Qty</th>
+                <th class="right" style="width: 11%;">Harga Satuan</th>
+                <th class="right" style="width: 7%;">Disc (%)</th>
+                <th class="center" style="width: 9%;">Tipe Pajak</th>
+                <th class="right" style="width: 7%;">Tax (%)</th>
+                <th class="right" style="width: 10%;">DPP</th>
+                <th class="right" style="width: 8%;">PPN</th>
+                <th class="right" style="width: 12%;">Subtotal</th>
             </tr>
         </thead>
         <tbody>
-            @foreach ($quotation->quotationItem as $index => $item)
             @php
-                $lineBase       = $item['quantity'] * $item['unit_price'];
-                $discountAmount = $lineBase * ($item['discount'] / 100);
-                $afterDiscount  = $lineBase - $discountAmount;
-                $taxType        = $item['tax_type'] ?? 'PPN Excluded';
-                $normalizedTaxType = \App\Services\TaxService::normalizeType($taxType);
-                $displayTaxType = match ($normalizedTaxType) {
-                    'Inklusif' => 'PPN Included',
-                    'Eksklusif' => 'PPN Excluded',
-                    default => 'Non Pajak',
-                };
-                $taxResult      = \App\Services\TaxService::compute($afterDiscount, (float)$item['tax'], $taxType);
-                $taxAmount      = $taxResult['ppn'];
-                $lineSubtotal   = $taxResult['total'];
+                $grandTotal = 0;
+                $totalDpp = 0;
+                $totalPpn = 0;
             @endphp
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
-                <td>{{ $item['quantity'] }}</td>
-                <td>Rp.{{ number_format($item['unit_price'], 0, ',', '.') }}</td>
-                <td>{{ number_format($item['discount'], 2) }}%</td>
-                <td>{{ number_format($item['tax'], 2) }}%</td>
-                <td>{{ $displayTaxType }}</td>
-                <td>Rp.{{ number_format($taxAmount, 0, ',', '.') }}</td>
-                <td>Rp.{{ number_format($lineSubtotal, 0, ',', '.') }}</td>
-            </tr>
+            @foreach ($quotation->quotationItem as $index => $item)
+                @php
+                    $lineBase = $item->quantity * $item->unit_price;
+                    $discountAmount = $lineBase * ($item->discount / 100);
+                    $afterDiscount = $lineBase - $discountAmount;
+                    $taxType = \App\Services\TaxService::normalizeType($item->tax_type ?? 'PPN Excluded');
+                    $displayTaxType = match ($taxType) {
+                        'Inklusif' => 'PPN Included',
+                        'Eksklusif' => 'PPN Excluded',
+                        default => 'Non Pajak',
+                    };
+                    $taxResult = \App\Services\TaxService::compute($afterDiscount, (float) $item->tax, $taxType);
+                    $itemDpp = $taxResult['dpp'];
+                    $taxAmount = $taxResult['ppn'];
+                    $lineSubtotal = $taxResult['total'];
+
+                    $totalDpp += $itemDpp;
+                    $totalPpn += $taxAmount;
+                    $grandTotal += $lineSubtotal;
+                @endphp
+                <tr>
+                    <td class="center">{{ $index + 1 }}</td>
+                    <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
+                    <td class="center">{{ $item->product->uom->name ?? '-' }}</td>
+                    <td class="center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
+                    <td class="right">{{ $formatMoney($item->unit_price) }}</td>
+                    <td class="right">{{ number_format($item->discount, 2, ',', '.') }}%</td>
+                    <td class="center">{{ $displayTaxType }}</td>
+                    <td class="right">{{ number_format($item->tax, 2, ',', '.') }}%</td>
+                    <td class="right">{{ $formatMoney($itemDpp) }}</td>
+                    <td class="right">{{ $formatMoney($taxAmount) }}</td>
+                    <td class="right">{{ $formatMoney($lineSubtotal) }}</td>
+                </tr>
             @endforeach
-            <tr>
-                <td colspan="8" style="text-align: right;"><strong>Total</strong></td>
-                <td><strong>Rp.{{ number_format($quotation->total_amount, 0, ',', '.') }}</strong></td>
+
+            {{-- Summary Rows --}}
+            <tr class="summary-row">
+                <td colspan="9" class="right"><strong>DPP (Dasar Pengenaan Pajak)</strong></td>
+                <td class="right"><strong>{{ $formatMoney($totalDpp) }}</strong></td>
+            </tr>
+            <tr class="summary-row">
+                <td colspan="9" class="right"><strong>PPN (Pajak Pertambahan Nilai)</strong></td>
+                <td class="right"><strong>{{ $formatMoney($totalPpn) }}</strong></td>
+            </tr>
+            <tr class="summary-row total">
+                <td colspan="10" class="right">GRAND TOTAL</td>
+                <td class="right">{{ $formatMoney($grandTotal) }}</td>
             </tr>
         </tbody>
     </table>
 
-    <p><strong>Notes:</strong></p>
-    <p>{{ $quotation->notes }}</p>
-
-    <div class="signature">
-        <p>Hormat Kami,</p>
-        <img src="{{ public_path('storage' . $quotation->approveBy->signature) }}" alt="" style="height: 75px; width: 130px; object-fit: contain">
-        <p><strong>PT DUTA TUNGGAL</strong></p>
+    @if ($quotation->notes)
+    <div style="margin-top: 15px;">
+        <p><strong>Notes:</strong></p>
+        <p>{{ $quotation->notes }}</p>
     </div>
+    @endif
+
+    <div class="signature-section">
+        <table class="signature-table">
+            <tr>
+                <td>
+                    <div class="signature-box">
+                        <p style="margin-bottom: 10px;">Hormat Kami,</p>
+                        <div style="height: 70px; margin: 10px 0;"></div>
+                        <div class="signature-name">
+                            {{ $quotation->createdBy->name ?? 'Staff Penjualan' }}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="signature-box">
+                        <p style="margin-bottom: 10px;">Disetujui Oleh,</p>
+                        <div style="height: 70px; margin: 10px 0;"></div>
+                        <div class="signature-name">
+                            {{ $quotation->customer->name ?? 'Customer' }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
 </body>
 
 </html>

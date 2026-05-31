@@ -339,12 +339,14 @@ class SuratJalanResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->recordClasses(fn($record) => $record->terbit ? 'bg-blue-50' : 'bg-gray-50')
+            ->recordClasses(fn($record) => $record->terbit ? 'bg-blue-100' : 'bg-gray-100')
             ->description(new \Illuminate\Support\HtmlString(
                 '<style>
-                    .fi-ta-header:has(.sj-legend){align-items:stretch!important}
-                    .sj-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box}
+                    .fi-ta-header:has(.sj-legend){display:block!important;width:100%}
+                    .fi-ta-description:has(.sj-legend){display:block!important;width:100%;margin-bottom:16px}
+                    .sj-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box;display:block}
                     .sj-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
+                    .fi-ta-description .sj-legend{margin-bottom:0}
                 </style>' .
                 '<div class="sj-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
                 '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
@@ -374,14 +376,20 @@ class SuratJalanResource extends Resource
                     '</svg>' .
                     'Legenda Warna Status Baris Data' .
                     '</h4>' .
-                    '<div class="grid grid-cols-2 gap-3" style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;">' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:#f9fafb;border:1px solid #e5e7eb;">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #9ca3af;background-color:#ffffff;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Abu (Draft)</span>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #f9fafb; border: 1px solid #e5e7eb;">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; box-shadow: 0 1px 3px rgba(156, 163, 175, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Abu (Draft)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Belum terbit</span>' .
                     '</div>' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#3b82f6;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Biru (Terbit)</span>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Terbit)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SJ sudah terbit</span>' .
+                    '</div>' .
                     '</div>' .
                     '</div>' .
                 '</div>' .

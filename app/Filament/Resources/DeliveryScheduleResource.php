@@ -398,6 +398,7 @@ class DeliveryScheduleResource extends Resource
                 .ds-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
             </style>' .
             '<div class="ds-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
+            // Panduan Penjadwalan
             '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
                 '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
                     '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
@@ -411,40 +412,61 @@ class DeliveryScheduleResource extends Resource
                     '</span>' .
                 '</summary>' .
                 '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);">' .
-                '<ul class="list-disc pl-0" style="list-style:none;padding-left:0;">' .
+                '<ul class="list-disc pl-0 space-y-1" style="list-style:none;padding-left:0;">' .
                 '<li><strong>Apa ini:</strong> Penjadwalan Pengiriman adalah dokumen untuk mengatur jadwal pengiriman barang.</li>' .
                 '<li><strong>Flow:</strong> Pending → On The Way → Delivered/Failed. Status otomatis berubah saat DO terkait di-update.</li>' .
                 '<li><strong>Driver:</strong> Untuk metode internal/kurir, wajib assign driver. Untuk ekspedisi, opsional.</li>' .
                 '</ul>' .
                 '</div>' .
             '</details>' .
-            '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+            // Legenda Warna Status
+            '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width:100%;max-width:none;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
                 '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;">' .
                 '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;">' .
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
                 '</svg>' .
                 'Legenda Warna Status Baris Data' .
                 '</h4>' .
-                '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));gap:12px;">' .
-                '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(254,243,199,0.4);border:1px solid rgba(253,230,138,0.8);">' .
-                '<div style="width:14px;height:14px;border-radius:3px;background-color:#eab308;flex-shrink:0;"></div>' .
-                '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Kuning (Pending)</span>' .
+                '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:12px;">' .
+                // Kuning (Pending)
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,243,199,0.4);border:1px solid rgba(253,230,138,0.8);">' .
+                '<div style="width:16px;height:16px;border-radius:4px;background-color:#eab308;box-shadow:0 1px 3px rgba(234,179,8,0.4);flex-shrink:0;"></div>' .
+                '<div class="leading-tight">' .
+                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#854d0e;">Kuning (Pending)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Menunggu keberangkatan</span>' .
                 '</div>' .
-                '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
-                '<div style="width:14px;height:14px;border-radius:3px;background-color:#3b82f6;flex-shrink:0;"></div>' .
-                '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Biru (On The Way)</span>' .
                 '</div>' .
-                '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(220,252,231,0.4);border:1px solid rgba(187,247,208,0.8);">' .
-                '<div style="width:14px;height:14px;border-radius:3px;background-color:#22c55e;flex-shrink:0;"></div>' .
-                '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Hijau (Delivered)</span>' .
+                // Biru (On The Way)
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
+                '<div style="width:16px;height:16px;border-radius:4px;background-color:#3b82f6;box-shadow:0 1px 3px rgba(59,130,246,0.4);flex-shrink:0;"></div>' .
+                '<div class="leading-tight">' .
+                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#1e40af;">Biru (On The Way)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Sedang dalam perjalanan</span>' .
                 '</div>' .
-                '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
-                '<div style="width:14px;height:14px;border-radius:3px;background-color:#ef4444;flex-shrink:0;"></div>' .
-                '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Merah (Failed)</span>' .
                 '</div>' .
-                '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:#f3f4f6;border:1px solid #e5e7eb;">' .
-                '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #9ca3af;background-color:#ffffff;flex-shrink:0;"></div>' .
-                '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Abu (Cancelled)</span>' .
+                // Hijau (Delivered)
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(220,252,231,0.4);border:1px solid rgba(187,247,208,0.8);">' .
+                '<div style="width:16px;height:16px;border-radius:4px;background-color:#22c55e;box-shadow:0 1px 3px rgba(34,197,94,0.4);flex-shrink:0;"></div>' .
+                '<div class="leading-tight">' .
+                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#166534;">Hijau (Delivered)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Selesai / terkirim</span>' .
+                '</div>' .
+                '</div>' .
+                // Merah (Failed)
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
+                '<div style="width:16px;height:16px;border-radius:4px;background-color:#ef4444;box-shadow:0 1px 3px rgba(239,68,68,0.4);flex-shrink:0;"></div>' .
+                '<div class="leading-tight">' .
+                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#991b1b;">Merah (Failed)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Pengiriman gagal</span>' .
+                '</div>' .
+                '</div>' .
+                // Abu (Cancelled)
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(243,244,246,0.6);border:1px solid rgba(229,231,235,0.9);">' .
+                '<div style="width:16px;height:16px;border-radius:4px;background-color:#6b7280;box-shadow:0 1px 3px rgba(107,114,128,0.4);flex-shrink:0;"></div>' .
+                '<div class="leading-tight">' .
+                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#374151;">Abu (Cancelled)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Jadwal dibatalkan</span>' .
+                '</div>' .
                 '</div>' .
                 '</div>' .
             '</div>' .
@@ -627,10 +649,10 @@ class DeliveryScheduleResource extends Resource
             ])
             ->description(static::deliveryScheduleStatusLegend())
             ->recordClasses(fn($record) => match ($record->status) {
-                'pending' => 'bg-yellow-50',
-                'on_the_way' => 'bg-blue-50',
-                'delivered' => 'bg-green-50',
-                'failed' => 'bg-red-50',
+                'pending' => 'bg-yellow-100',
+                'on_the_way' => 'bg-blue-100',
+                'delivered' => 'bg-green-100',
+                'failed' => 'bg-red-100',
                 'cancelled' => 'bg-gray-100',
                 default => '',
             })

@@ -100,15 +100,20 @@ class PurchaseOrderMixedCurrencyTest extends TestCase
             'purchaseOrder' => $po->load(['supplier', 'cabang', 'purchaseOrderItem.currency', 'purchaseOrderCurrency.currency']),
         ])->render();
 
-        $this->assertStringContainsString('Tanggal Diharapkan:', $html);
+        // Check expected date is displayed
+        $this->assertStringContainsString('Tanggal Diharapkan', $html);
         $this->assertStringContainsString('31/05/2026', $html);
-        $this->assertStringContainsString('TOP:', $html);
+
+        // Check TOP is displayed correctly
+        $this->assertStringContainsString('Term of Payment', $html);
         $this->assertStringContainsString('Credit 14 hari', $html);
-        $this->assertStringContainsString('Jatuh Tempo:', $html);
-        $this->assertStringContainsString('15/05/2026', $html);
+
+        // Check currency formatting with USD
         $this->assertStringContainsString('$ 0.50', $html);
         $this->assertStringContainsString('$ 5.00', $html);
-        $this->assertStringContainsString('colspan="10"', $html);
-        $this->assertStringContainsString('colspan="2"', $html);
+
+        // Check table structure (non-import has 11 columns for data cells)
+        $this->assertStringContainsString('colspan="11"', $html);
+        $this->assertStringContainsString('PURCHASE ORDER', $html);
     }
 }

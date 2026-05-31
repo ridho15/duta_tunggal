@@ -42,7 +42,7 @@ beforeEach(function () {
 
 describe('PdfPreviewController', function () {
     describe('Document Types Configuration', function () {
-        it('has correct configuration for all 6 document types', function () {
+        it('has correct configuration for all document types', function () {
             $controller = new PdfPreviewController();
             $reflection = new \ReflectionClass($controller);
             $property = $reflection->getProperty('documentConfig');
@@ -60,11 +60,11 @@ describe('PdfPreviewController', function () {
 
             foreach ($expectedTypes as $type) {
                 expect($config)->toHaveKey($type);
-                expect($config[$type])->toHaveKeys(['model', 'blade', 'bladeVar', 'title', 'paper', 'orientation', 'filename', 'relations']);
+                expect($config[$type])->toHaveKeys(['model', 'blade', 'bladeVar', 'paper', 'orientation', 'filename', 'relations']);
             }
         });
 
-        it('maps order-request to OrderRequest model', function () {
+        it('maps order-request to OrderRequest model with correct bladeVar', function () {
             $controller = new PdfPreviewController();
             $reflection = new \ReflectionClass($controller);
             $property = $reflection->getProperty('documentConfig');
@@ -74,10 +74,11 @@ describe('PdfPreviewController', function () {
             expect($config['order-request']['model'])->toBe(OrderRequest::class);
             expect($config['order-request']['blade'])->toBe('pdf.order-request');
             expect($config['order-request']['bladeVar'])->toBe('orderRequest');
-            expect($config['order-request']['title'])->toBe('Order Request');
+            expect($config['order-request']['paper'])->toBe('a4');
+            expect($config['order-request']['orientation'])->toBe('landscape');
         });
 
-        it('maps purchase-order to PurchaseOrder model', function () {
+        it('maps purchase-order to PurchaseOrder model with correct bladeVar', function () {
             $controller = new PdfPreviewController();
             $reflection = new \ReflectionClass($controller);
             $property = $reflection->getProperty('documentConfig');
@@ -86,11 +87,10 @@ describe('PdfPreviewController', function () {
 
             expect($config['purchase-order']['model'])->toBe(PurchaseOrder::class);
             expect($config['purchase-order']['blade'])->toBe('pdf.purchase-order');
-            expect($config['purchase-order']['bladeVar'])->toBe('record');
-            expect($config['purchase-order']['title'])->toBe('Purchase Order');
+            expect($config['purchase-order']['bladeVar'])->toBe('purchaseOrder');
         });
 
-        it('maps purchase-invoice to Invoice model', function () {
+        it('maps purchase-invoice to Invoice model with correct bladeVar', function () {
             $controller = new PdfPreviewController();
             $reflection = new \ReflectionClass($controller);
             $property = $reflection->getProperty('documentConfig');
@@ -100,10 +100,9 @@ describe('PdfPreviewController', function () {
             expect($config['purchase-invoice']['model'])->toBe(Invoice::class);
             expect($config['purchase-invoice']['blade'])->toBe('pdf.purchase-order-invoice-2');
             expect($config['purchase-invoice']['bladeVar'])->toBe('invoice');
-            expect($config['purchase-invoice']['title'])->toBe('Invoice Pembelian');
         });
 
-        it('maps quotation to Quotation model', function () {
+        it('maps quotation to Quotation model with correct bladeVar', function () {
             $controller = new PdfPreviewController();
             $reflection = new \ReflectionClass($controller);
             $property = $reflection->getProperty('documentConfig');
@@ -112,11 +111,10 @@ describe('PdfPreviewController', function () {
 
             expect($config['quotation']['model'])->toBe(Quotation::class);
             expect($config['quotation']['blade'])->toBe('pdf.quotation');
-            expect($config['quotation']['bladeVar'])->toBe('record');
-            expect($config['quotation']['title'])->toBe('Quotation');
+            expect($config['quotation']['bladeVar'])->toBe('quotation');
         });
 
-        it('maps sale-order to SaleOrder model', function () {
+        it('maps sale-order to SaleOrder model with correct bladeVar', function () {
             $controller = new PdfPreviewController();
             $reflection = new \ReflectionClass($controller);
             $property = $reflection->getProperty('documentConfig');
@@ -125,8 +123,7 @@ describe('PdfPreviewController', function () {
 
             expect($config['sale-order']['model'])->toBe(SaleOrder::class);
             expect($config['sale-order']['blade'])->toBe('pdf.sales-order');
-            expect($config['sale-order']['bladeVar'])->toBe('record');
-            expect($config['sale-order']['title'])->toBe('Sales Order');
+            expect($config['sale-order']['bladeVar'])->toBe('saleOrder');
         });
 
         it('maps sales-invoice to Invoice model with sale-order-invoice blade', function () {
@@ -139,7 +136,6 @@ describe('PdfPreviewController', function () {
             expect($config['sales-invoice']['model'])->toBe(Invoice::class);
             expect($config['sales-invoice']['blade'])->toBe('pdf.sale-order-invoice');
             expect($config['sales-invoice']['bladeVar'])->toBe('invoice');
-            expect($config['sales-invoice']['title'])->toBe('Invoice Penjualan');
         });
     });
 

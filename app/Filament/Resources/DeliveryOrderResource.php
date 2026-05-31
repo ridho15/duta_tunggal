@@ -731,23 +731,38 @@ class DeliveryOrderResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
+                        return match ($state) {
+                            'draft' => 'DRAFT',
+                            'request_stock' => 'REQUEST STOCK',
+                            'request_approve' => 'REQUEST APPROVE',
+                            'approved' => 'APPROVED',
+                            'partial' => 'PARTIAL',
+                            'sent' => 'SENT',
+                            'received' => 'RECEIVED',
+                            'completed' => 'COMPLETED',
+                            'request_close' => 'REQUEST CLOSE',
+                            'closed' => 'CLOSED',
+                            'reject' => 'REJECTED',
+                            'delivery_failed' => 'DELIVERY FAILED',
+                            'supplier' => 'SUPPLIER',
+                            default => Str::upper($state),
+                        };
                     })
                     ->color(function ($state) {
                         return match ($state) {
                             'draft' => 'gray',
                             'request_stock' => 'warning',
+                            'request_approve' => 'gray',
+                            'approved' => 'info',
                             'partial' => 'warning',
                             'sent' => 'primary',
                             'received' => 'info',
-                            'supplier' => 'warning',
                             'completed' => 'success',
-                            'request_approve' => 'primary',
-                            'approved' => 'primary',
                             'request_close' => 'warning',
                             'closed' => 'danger',
                             'reject' => 'danger',
                             'delivery_failed' => 'danger',
+                            'supplier' => 'warning',
                             default => 'gray',
                         };
                     })
@@ -1212,28 +1227,31 @@ class DeliveryOrderResource extends Resource
                 ]),
             ])
             ->recordClasses(fn($record) => match ($record->status) {
-                'draft' => 'bg-gray-50',
-                'request_stock' => 'bg-yellow-50',
-                'partial' => 'bg-yellow-50',
-                'sent' => 'bg-blue-50',
-                'received' => 'bg-blue-50',
-                'request_approve' => 'bg-blue-50',
-                'approved' => 'bg-blue-50',
-                'completed' => 'bg-green-50',
-                'request_close' => 'bg-yellow-50',
-                'closed' => 'bg-red-50',
-                'reject' => 'bg-red-50',
-                'delivery_failed' => 'bg-red-50',
+                'draft' => 'bg-gray-100',
+                'request_stock' => 'bg-yellow-100',
+                'partial' => 'bg-yellow-100',
+                'sent' => 'bg-blue-100',
+                'received' => 'bg-blue-100',
+                'request_approve' => 'bg-blue-100',
+                'approved' => 'bg-blue-100',
+                'completed' => 'bg-green-100',
+                'request_close' => 'bg-yellow-100',
+                'closed' => 'bg-red-100',
+                'reject' => 'bg-red-100',
+                'delivery_failed' => 'bg-red-100',
+                'supplier' => 'bg-yellow-100',
                 default => '',
             })
             ->description(new \Illuminate\Support\HtmlString(
                 '<style>
-                    .fi-ta-header:has(.do-legend){align-items:stretch!important}
-                    .do-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box}
+                    .fi-ta-header:has(.do-legend){display:block!important;width:100%}
+                    .fi-ta-description:has(.do-legend){display:block!important;width:100%;margin-bottom:16px}
+                    .do-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box;display:block}
                     .do-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
+                    .fi-ta-description .do-legend{margin-bottom:0}
                 </style>' .
-                '<div class="do-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
-                '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                '<div class="do-legend mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
+                '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;margin-bottom:16px;">' .
                     '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
                         '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
                         '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:#3b82f6;">' .
@@ -1261,29 +1279,48 @@ class DeliveryOrderResource extends Resource
                     '</svg>' .
                     'Legenda Warna Status Baris Data' .
                     '</h4>' .
-                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:12px;">' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:#f9fafb;border:1px solid #e5e7eb;">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #9ca3af;background-color:#ffffff;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Abu (Draft)</span>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(254,243,199,0.4);border:1px solid rgba(253,230,138,0.8);">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#eab308;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Kuning (Request Stock)</span>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#3b82f6;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Biru (Sent/Approved)</span>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(220,252,231,0.4);border:1px solid rgba(187,247,208,0.8);">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#22c55e;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Hijau (Completed)</span>' .
-                    '</div>' .
-                    '<div class="flex items-center gap-2 p-2 rounded-lg" style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
-                    '<div style="width:14px;height:14px;border-radius:3px;background-color:#ef4444;flex-shrink:0;"></div>' .
-                    '<span class="text-xs font-medium" style="font-size:11px;font-weight:500;">Merah (Closed/Reject)</span>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;">' .
+                    '<!-- Abu (Draft) -->' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #f9fafb; border: 1px solid #e5e7eb;">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; box-shadow: 0 1px 3px rgba(156, 163, 175, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Abu (Draft)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Baru dibuat</span>' .
                     '</div>' .
                     '</div>' .
-                '</div>' .
+                    '<!-- Kuning (Request Stock) -->' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Request Stock)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Menunggu stock</span>' .
+                    '</div>' .
+                    '</div>' .
+                    '<!-- Biru (Sent/Approved) -->' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Sent/Approved)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Disetujui/dikirim</span>' .
+                    '</div>' .
+                    '</div>' .
+                    '<!-- Hijau (Completed) -->' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Completed)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai diterima</span>' .
+                    '</div>' .
+                    '</div>' .
+                    '<!-- Merah (Closed/Reject) -->' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Closed/Reject)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Ditolak/ditutup</span>' .
+                    '</div>' .
+                    '</div>' .
+                    '</div>' .
                 '</div>'
             ));
     }
