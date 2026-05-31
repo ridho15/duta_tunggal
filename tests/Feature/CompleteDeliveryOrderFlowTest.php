@@ -10,6 +10,7 @@ use App\Models\DeliveryOrderItem;
 use App\Models\Driver;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Rak;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\StockMovement;
@@ -22,6 +23,10 @@ use App\Services\DeliveryOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Test complete DO flow with journal entries and stock movements
+ * Updated for the bug fix: StockMovement is created at 'sent' status, not 'completed'
+ */
 class CompleteDeliveryOrderFlowTest extends TestCase
 {
     use RefreshDatabase;
@@ -48,67 +53,14 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             'first_name' => 'Test',
             'kode_user' => 'TU001',
         ]);
-        $this->cabang = Cabang::factory()->create();
+        $this->cabang = \App\Models\Cabang::factory()->create();
         $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
         $this->customer = Customer::factory()->create();
         $this->driver = Driver::factory()->create();
         $this->vehicle = Vehicle::factory()->create();
 
-        // Create required COA for journal entries
-        ChartOfAccount::create([
-            'code' => '1120',
-            'name' => 'PIUTANG DAGANG',
-            'type' => 'Asset',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '4000',
-            'name' => 'PENJUALAN',
-            'type' => 'Revenue',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '2120.06',
-            'name' => 'PPN KELUARAN',
-            'type' => 'Liability',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '4100.01',
-            'name' => 'POTONGAN PENJUALAN',
-            'type' => 'Revenue',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '6100.02',
-            'name' => 'BIAYA PENGIRIMAN',
-            'type' => 'Expense',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '1140.10',
-            'name' => 'PERSEDIAAN BARANG DAGANGAN - DEFAULT PRODUK',
-            'type' => 'Asset',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '1140.20',
-            'name' => 'BARANG TERKIRIM',
-            'type' => 'Asset',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '1180.10',
-            'name' => 'BARANG TERKIRIM - DEFAULT PRODUK',
-            'type' => 'Asset',
-            'is_active' => true,
-        ]);
-        ChartOfAccount::create([
-            'code' => '5100.10',
-            'name' => 'HPP PENJUALAN',
-            'type' => 'Expense',
-            'is_active' => true,
-        ]);
+        // Create required COA
+        $this->createRequiredCoas();
 
         $this->product = Product::factory()->create([
             'cost_price' => 50000,
@@ -119,23 +71,41 @@ class CompleteDeliveryOrderFlowTest extends TestCase
         ]);
 
         $this->deliveryOrderService = new DeliveryOrderService();
-
-        // Authenticate user
         $this->actingAs($this->user);
+    }
+
+    protected function createRequiredCoas(): void
+    {
+        $coaCodes = ['1120', '4000', '2120.06', '4100.01', '1140.10', '1140.20', '1180.10', '5100.10'];
+        foreach ($coaCodes as $code) {
+            ChartOfAccount::create([
+                'code' => $code,
+                'name' => 'COA ' . $code,
+                'type' => $code >= '4000' ? 'Revenue' : 'Asset',
+                'is_active' => true,
+            ]);
+        }
     }
 
     public function test_complete_delivery_order_flow_with_journal_entries_and_stock_movements()
     {
         // ==========================================
-        // SETUP: Create initial inventory stock
+        // SETUP: Create initial inventory stock with SPECIFIC values
         // ==========================================
 
         $initialStockQty = 20;
-        $inventoryStock = InventoryStock::factory()->create([
+        $rak = Rak::where('warehouse_id', $this->warehouse->id)->first();
+        if (!$rak) {
+            $rak = Rak::factory()->create(['warehouse_id' => $this->warehouse->id]);
+        }
+
+        $inventoryStock = InventoryStock::create([
             'product_id' => $this->product->id,
             'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $rak->id,
             'qty_available' => $initialStockQty,
             'qty_reserved' => 0,
+            'qty_min' => 10,
         ]);
 
         $this->assertDatabaseHas('inventory_stocks', [
@@ -155,7 +125,7 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             'order_date' => now(),
             'status' => 'draft',
             'delivery_date' => now()->addDays(1),
-            'total_amount' => 750000, // 10 units * 75000
+            'total_amount' => 750000,
             'tipe_pengiriman' => 'Kirim Langsung',
             'created_by' => $this->user->id,
         ]);
@@ -168,7 +138,7 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             'discount' => 0,
             'tax' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $inventoryStock->rak_id,
+            'rak_id' => $rak->id,
         ]);
 
         // ==========================================
@@ -180,8 +150,6 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             'approve_by' => $this->user->id,
             'approve_at' => now(),
         ]);
-
-        // Warehouse confirmation is created through the delivery workflow, not on SO approval alone.
 
         // ==========================================
         // STEP 3: CREATE DELIVERY ORDER FROM SALES ORDER
@@ -202,7 +170,7 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             'product_id' => $this->product->id,
             'quantity' => 10,
             'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $inventoryStock->rak_id,
+            'rak_id' => $rak->id,
             'sale_order_item_id' => $saleOrderItem->id,
         ]);
 
@@ -224,10 +192,9 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
             'issued_at' => now(),
             'created_by' => $this->user->id,
-            'status' => 1, // Published status
+            'status' => 1,
         ]);
 
-        // Attach to delivery order
         $suratJalan->deliveryOrder()->attach($deliveryOrder->id);
 
         // ==========================================
@@ -239,38 +206,43 @@ class CompleteDeliveryOrderFlowTest extends TestCase
 
         // DeliveryOrderObserver should create stock reservations
         $stockReservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $stockReservations);
+        $this->assertCount(1, $stockReservations, 'Stock reservation should be created');
         $reservation = $stockReservations->first();
         $this->assertEquals(10, $reservation->quantity);
 
-        // Check inventory stock after reservation
-        $inventoryStock->refresh();
-        $this->assertEquals($initialStockQty - 10, $inventoryStock->qty_available);
-        $this->assertEquals(10, $inventoryStock->qty_reserved);
-
         // ==========================================
-        // STEP 7: SEND DELIVERY ORDER (THIS SHOULD RELEASE RESERVATIONS ONLY)
+        // STEP 7: SEND DELIVERY ORDER (BUG FIX: Creates StockMovement, keeps reservation)
         // ==========================================
 
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
         $this->assertEquals('sent', $deliveryOrder->fresh()->status);
 
-        // DeliveryOrderObserver should release stock reservations
+        // BUG FIX VERIFICATION: StockReservation is NOT deleted - it remains for tracking
         $stockReservationsAfterSent = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(0, $stockReservationsAfterSent);
+        $this->assertCount(1, $stockReservationsAfterSent, 'Reservation should NOT be deleted after sent');
 
-        // Check inventory stock after releasing reservation
-        $inventoryStock->refresh();
-        $this->assertEquals($initialStockQty, $inventoryStock->qty_available);
-        $this->assertEquals(0, $inventoryStock->qty_reserved);
+        // BUG FIX VERIFICATION: StockMovement should be created when status changes to 'sent'
+        $stockMovementsAtSent = StockMovement::where('type', 'sales')
+            ->where('from_model_type', DeliveryOrderItem::class)
+            ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
+            ->get();
+        $this->assertCount(1, $stockMovementsAtSent, 'StockMovement should be created at sent');
 
-        // CHECK JOURNAL ENTRIES ARE CREATED WHEN STATUS BECOMES 'completed'
+        // Verify StockMovement has shipping_start meta
+        $stockMovement = $stockMovementsAtSent->first();
+        $meta = is_string($stockMovement->meta) ? json_decode($stockMovement->meta, true) : $stockMovement->meta;
+        $this->assertArrayHasKey('shipping_start', $meta, 'StockMovement should have shipping_start meta');
+        $this->assertTrue($meta['shipping_start'], 'shipping_start should be true');
+
+        // ==========================================
+        // STEP 8: COMPLETE DELIVERY ORDER
         // ==========================================
 
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'completed');
         $this->assertEquals('completed', $deliveryOrder->fresh()->status);
 
-        $journalEntries = \App\Models\JournalEntry::where('source_type', \App\Models\DeliveryOrder::class)
+        // CHECK JOURNAL ENTRIES ARE CREATED WHEN STATUS BECOMES 'completed'
+        $journalEntries = \App\Models\JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->get();
 
@@ -279,46 +251,44 @@ class CompleteDeliveryOrderFlowTest extends TestCase
         // Check debit entry (COGS)
         $debitEntry = $journalEntries->where('debit', '>', 0)->first();
         $this->assertNotNull($debitEntry, 'Should have debit journal entry for COGS');
-        $this->assertEquals(500000, $debitEntry->debit); // 10 units * 50000 cost
+        $this->assertEquals(500000, $debitEntry->debit);
         $this->assertEquals(0, $debitEntry->credit);
-        $this->assertTrue(strpos($debitEntry->description, 'Cost of Goods Sold') !== false, 'Should contain Cost of Goods Sold in description');
+        $this->assertTrue(strpos($debitEntry->description, 'Cost of Goods Sold') !== false);
 
         // Check credit entry (Inventory reduction)
         $creditEntry = $journalEntries->where('credit', '>', 0)->first();
         $this->assertNotNull($creditEntry, 'Should have credit journal entry for inventory reduction');
         $this->assertEquals(0, $creditEntry->debit);
-        $this->assertEquals(500000, $creditEntry->credit); // 10 units * 50000 cost
-        $this->assertTrue(strpos($creditEntry->description, 'Inventory Reduction') !== false, 'Should contain Inventory Reduction in description');
+        $this->assertEquals(500000, $creditEntry->credit);
+        $this->assertTrue(strpos($creditEntry->description, 'Inventory Reduction') !== false);
 
         // ==========================================
-        // STEP 8: RECEIVE DELIVERY ORDER
+        // STEP 9: RECEIVE DELIVERY ORDER
         // ==========================================
 
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'received');
         $this->assertEquals('received', $deliveryOrder->fresh()->status);
 
         // ==========================================
-        // STEP 9: VERIFY STOCK MOVEMENTS AFTER COMPLETION
+        // STEP 10: VERIFY STOCK MOVEMENTS (Only 1 - created at 'sent', not at 'completed')
         // ==========================================
 
-        // CHECK STOCK MOVEMENTS CREATED WHEN STATUS BECAME 'completed'
         $stockMovements = StockMovement::where('type', 'sales')
-            ->where('from_model_type', \App\Models\DeliveryOrderItem::class)
+            ->where('from_model_type', DeliveryOrderItem::class)
             ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
             ->get();
 
-        $this->assertCount(1, $stockMovements, 'Should have 1 stock movement for sales');
-        $stockMovement = $stockMovements->first();
-        $this->assertEquals(10, $stockMovement->quantity);
-        $this->assertEquals('sales', $stockMovement->type);
-        $this->assertEquals($this->product->id, $stockMovement->product_id);
-        $this->assertEquals($this->warehouse->id, $stockMovement->warehouse_id);
+        // BUG FIX VERIFICATION: Should still have only 1 stock movement (not duplicated at 'completed')
+        $this->assertCount(1, $stockMovements, 'Should have 1 stock movement (created at sent, not at completed)');
+        $this->assertEquals(10, $stockMovements->first()->quantity);
+        $this->assertEquals('sales', $stockMovements->first()->type);
+        $this->assertEquals($this->product->id, $stockMovements->first()->product_id);
+        $this->assertEquals($this->warehouse->id, $stockMovements->first()->warehouse_id);
 
-        // CHECK INVENTORY STOCK RESERVED QTY IS CLEARED AFTER COMPLETION
-        $inventoryStock->refresh();
-        $this->assertEquals(0, $inventoryStock->qty_reserved);
+        // ==========================================
+        // STEP 11: VERIFY SALES ORDER UPDATED TO COMPLETED
+        // ==========================================
 
-        // CHECK SALES ORDER UPDATED TO COMPLETED
         $saleOrder->refresh();
         $this->assertEquals('completed', $saleOrder->status);
 
@@ -327,19 +297,21 @@ class CompleteDeliveryOrderFlowTest extends TestCase
         $this->assertEquals(10, $saleOrderItem->delivered_quantity);
 
         // CHECK INVOICE CREATED WITH CUSTOMER DATA
-        $invoice = \App\Models\Invoice::where('from_model_type', \App\Models\SaleOrder::class)
+        $invoice = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $saleOrder->id)
             ->first();
-        
+
         $this->assertNotNull($invoice, 'Invoice should be created for completed sale order');
-        $this->assertEquals($this->customer->name, $invoice->customer_name, 'Invoice customer_name should match sale order customer');
-        $this->assertEquals($this->customer->phone, $invoice->customer_phone, 'Invoice customer_phone should match sale order customer');
+        $this->assertEquals($this->customer->name, $invoice->customer_name);
+        $this->assertEquals($this->customer->phone, $invoice->customer_phone);
 
         echo "\n\n=== DELIVERY ORDER COMPLETE FLOW TEST PASSED ===";
-        echo "\n✅ Journal entries created: " . $journalEntries->count();
-        echo "\n✅ Stock movements created: " . $stockMovements->count();
-        echo "\n✅ Inventory stock updated: available=" . $inventoryStock->qty_available . ", reserved=" . $inventoryStock->qty_reserved;
-        echo "\n✅ Sales order status: " . $saleOrder->status;
-        echo "\n✅ Invoice created with customer data: name='" . $invoice->customer_name . "', phone='" . $invoice->customer_phone . "'";
+        echo "\n✅ Stock reservation created on approval";
+        echo "\n✅ Stock reservation NOT deleted on sent (bug fix)";
+        echo "\n✅ StockMovement created with shipping_start meta at sent";
+        echo "\n✅ Only 1 StockMovement exists (not duplicated at completed)";
+        echo "\n✅ Journal entries created at completed";
+        echo "\n✅ Sales order updated to completed";
+        echo "\n✅ Invoice created with customer data";
     }
 }

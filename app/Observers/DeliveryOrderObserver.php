@@ -119,7 +119,9 @@ class DeliveryOrderObserver
 
     /**
      * Handle when Delivery Order enters the reservation-release stage.
-     * Release qty_reserved by deleting stock reservations.
+     * Create stock movements to reduce qty_available (barang sudah keluar gudang).
+     * NOTE: StockReservation is NOT deleted - qty_reserved remains for tracking
+     * until delivery is completed.
      */
     protected function handleReservationReleaseStatus(DeliveryOrder $deliveryOrder): void
     {
@@ -128,13 +130,17 @@ class DeliveryOrderObserver
             'do_number' => $deliveryOrder->do_number,
         ]);
 
-        // Hapus stock reservations yang terkait dengan delivery order ini
-        $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
+        // =========================================================
+        // MODIFIKASI: Buat StockMovement untuk mengurangi qty_available
+        // saat barang mulai dikirim (status = 'sent')
+        // =========================================================
+        $this->createStockMovementsForShippingStart($deliveryOrder);
 
-        foreach ($reservations as $reservation) {
-            // Hapus reservation, yang akan trigger observer untuk mengembalikan qty_available
-            $reservation->delete();
-        }
+        // =========================================================
+        // JANGAN hapus StockReservation - biarkan untuk tracking
+        // qty_reserved tetap ada sampai delivery selesai
+        // Ini memastikan free_qty tidak berubah secara tidak sengaja
+        // =========================================================
 
         // Update delivered_quantity untuk semua sale order items yang terkait.
         // Wrapped in a transaction with lockForUpdate to prevent race conditions
@@ -164,8 +170,93 @@ class DeliveryOrderObserver
     }
 
     /**
+     * Buat StockMovement untuk mengurangi qty_available
+     * saat DO mulai dikirim (status = 'sent')
+     *
+     * Ini memastikan:
+     * - qty_available (stok fisik) BERKURANG saat barang meninggalkan gudang
+     * - qty_reserved TETAP ADA (untuk tracking sampai delivery selesai)
+     * - free_qty = qty_available - qty_reserved (tidak berubah secara tidak sengaja)
+     */
+    protected function createStockMovementsForShippingStart(DeliveryOrder $deliveryOrder): void
+    {
+        $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
+
+        $date = $deliveryOrder->delivery_date ?? now()->toDateString();
+
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            $qtyToShip = max(0, $item->quantity ?? 0);
+            if ($qtyToShip <= 0) {
+                continue;
+            }
+
+            $product = $item->product;
+            if (!$product) {
+                continue;
+            }
+
+            $productService = app(\App\Services\ProductService::class);
+
+            // Handle multi-warehouse sources
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $source->warehouse_id,
+                        quantity: $sourceQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Shipping start for DO {$deliveryOrder->do_number}",
+                        rak_id: $source->rak_id,
+                        fromModel: $item,
+                        value: $product->cost_price * $sourceQty,
+                        meta: [
+                            'delivery_status' => 'sent',
+                            'shipping_start' => true,
+                            'source' => 'delivery_order_observer',
+                        ]
+                    );
+                }
+                continue;
+            }
+
+            // Single warehouse
+            if (!$deliveryOrder->warehouse_id) {
+                continue;
+            }
+
+            $productService->createStockMovement(
+                product_id: $product->id,
+                warehouse_id: $deliveryOrder->warehouse_id,
+                quantity: $qtyToShip,
+                type: 'sales',
+                date: $date,
+                notes: "Shipping start for DO {$deliveryOrder->do_number}",
+                rak_id: $item->rak_id,
+                fromModel: $item,
+                value: $product->cost_price * $qtyToShip,
+                meta: [
+                    'delivery_status' => 'sent',
+                    'shipping_start' => true,
+                    'source' => 'delivery_order_observer',
+                ]
+            );
+        }
+    }
+
+    /**
      * Handle when Delivery Order status becomes 'completed'
      * Update all related sales orders to completed status and create stock movements
+     *
+     * NOTE: StockMovement for qty_available reduction is now created in
+     * handleReservationReleaseStatus() when status changes to 'sent'.
+     * This method only handles journal entries and sale order updates.
      */
     protected function handleCompletedStatus(DeliveryOrder $deliveryOrder): void
     {
@@ -176,67 +267,11 @@ class DeliveryOrderObserver
 
         $this->createJournalEntriesForDelivery($deliveryOrder);
 
-        // Load delivery order items with related data for stock movements
-        $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
-
-        $date = $deliveryOrder->delivery_date ?? now()->toDateString();
-
-        // Create stock movements for physical inventory reduction
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            $qtyDelivered = max(0, $item->quantity ?? 0);
-            if ($qtyDelivered <= 0) {
-                continue;
-            }
-
-            $product = $item->product;
-            if (!$product) {
-                continue;
-            }
-
-            $sources = $item->warehouseSources;
-            if ($sources->isNotEmpty()) {
-                foreach ($sources as $source) {
-                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
-                    if ($sourceQty <= 0 || !$source->warehouse_id) {
-                        continue;
-                    }
-
-                    $productService = app(\App\Services\ProductService::class);
-                    $productService->createStockMovement(
-                        product_id: $product->id,
-                        warehouse_id: $source->warehouse_id,
-                        quantity: $sourceQty,
-                        type: 'sales',
-                        date: $date,
-                        notes: "Sales delivery for DO {$deliveryOrder->do_number}",
-                        rak_id: $source->rak_id,
-                        fromModel: $item,
-                        value: $product->cost_price * $sourceQty
-                    );
-                }
-
-                continue;
-            }
-
-            // Skip if warehouse_id is null
-            if (!$deliveryOrder->warehouse_id) {
-                continue;
-            }
-
-            // Create sales stock movement to reduce physical inventory
-            $productService = app(\App\Services\ProductService::class);
-            $productService->createStockMovement(
-                product_id: $product->id,
-                warehouse_id: $deliveryOrder->warehouse_id,
-                quantity: $qtyDelivered,
-                type: 'sales',
-                date: $date,
-                notes: "Sales delivery for DO {$deliveryOrder->do_number}",
-                rak_id: $item->rak_id,
-                fromModel: $item,
-                value: $product->cost_price * $qtyDelivered
-            );
-        }
+        // =========================================================
+        // MODIFIKASI: Skip StockMovement creation here
+        // StockMovement sudah dibuat saat status berubah ke 'sent'
+        // di handleReservationReleaseStatus()
+        // =========================================================
 
         // Get all sales orders related to this delivery order
         $salesOrders = $deliveryOrder->salesOrders;
