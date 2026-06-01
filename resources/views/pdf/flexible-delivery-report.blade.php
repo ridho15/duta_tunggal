@@ -191,7 +191,7 @@
 <body>
 
     <div class="header">
-        <h2>PT. DUTA TUNGGAL</h2>
+        <h2>PT DUTA TUNGGAL</h2>
         <div class="title">REKAP PENGIRIMAN FLEKSIBEL</div>
     </div>
 

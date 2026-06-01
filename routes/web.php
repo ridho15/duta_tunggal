@@ -100,7 +100,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     // Document PDF streaming (opens in new tab)
     Route::get('/pdf/{type}/{id}', [PdfPreviewController::class, 'stream'])
         ->name('pdf-stream')
-        ->where('type', 'order-request|purchase-order|purchase-invoice|quotation|sale-order|sales-invoice|delivery-order|surat-jalan');
+        ->where('type', 'order-request|purchase-order|purchase-invoice|quotation|sale-order|sales-invoice|delivery-order|delivery-schedule|surat-jalan');
 
     // Customer Return PDF streaming
     Route::get('/pdf/customer-return/{id}', function (int $id) {

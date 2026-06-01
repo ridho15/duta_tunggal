@@ -118,9 +118,9 @@ class DeliveryScheduleResource extends Resource
                             ->label('Cabang')
                             ->searchable()
                             ->preload()
-                            ->options(Cabang::all()->mapWithKeys(fn ($c) => [$c->id => "({$c->kode}) {$c->nama}"]))
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->options(Cabang::all()->mapWithKeys(fn($c) => [$c->id => "({$c->kode}) {$c->nama}"]))
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
                             ->live()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $set('suratJalan', []);
@@ -147,14 +147,14 @@ class DeliveryScheduleResource extends Resource
 
                                 $selectedIds = collect($get('suratJalan') ?? [])
                                     ->filter()
-                                    ->map(fn ($id) => (int) $id)
+                                    ->map(fn($id) => (int) $id)
                                     ->values()
                                     ->all();
 
                                 $assignedIds = DB::table('delivery_schedule_surat_jalans')
                                     ->distinct()
                                     ->pluck('surat_jalan_id')
-                                    ->map(fn ($id) => (int) $id)
+                                    ->map(fn($id) => (int) $id)
                                     ->values()
                                     ->all();
 
@@ -163,7 +163,7 @@ class DeliveryScheduleResource extends Resource
                                 $query->withoutGlobalScopes()
                                     ->where('cabang_id', $cabangId)
                                     ->where('status', 1)
-                                    ->when(! empty($excludedIds), fn (Builder $query) => $query->whereNotIn('surat_jalans.id', $excludedIds))
+                                    ->when(! empty($excludedIds), fn(Builder $query) => $query->whereNotIn('surat_jalans.id', $excludedIds))
                                     ->orderBy('sj_number');
                             })
                             ->helperText(fn($get) => empty($get('cabang_id')) ? 'Pilih Cabang terlebih dahulu untuk menampilkan Surat Jalan.' : 'Pilih satu atau lebih Surat Jalan untuk jadwal ini')
@@ -173,14 +173,14 @@ class DeliveryScheduleResource extends Resource
                             ->schema([
                                 Placeholder::make('selected_surat_jalan_preview')
                                     ->label('Surat Jalan Terpilih')
-                                    ->content(fn (Get $get) => new HtmlString(static::getSelectedSuratJalanPreviewContent($get('suratJalan') ?? [], $get('cabang_id'))))
+                                    ->content(fn(Get $get) => new HtmlString(static::getSelectedSuratJalanPreviewContent($get('suratJalan') ?? [], $get('cabang_id'))))
                                     ->columnSpanFull()
-                                    ->visible(fn (Get $get) => filled($get('suratJalan'))),
+                                    ->visible(fn(Get $get) => filled($get('suratJalan'))),
                                 Placeholder::make('selected_delivery_order_preview')
                                     ->label('Delivery Order Terkait')
-                                    ->content(fn (Get $get) => new HtmlString(static::getSelectedDeliveryOrderPreviewContent($get('suratJalan') ?? [], $get('cabang_id'))))
+                                    ->content(fn(Get $get) => new HtmlString(static::getSelectedDeliveryOrderPreviewContent($get('suratJalan') ?? [], $get('cabang_id'))))
                                     ->columnSpanFull()
-                                    ->visible(fn (Get $get) => filled($get('suratJalan'))),
+                                    ->visible(fn(Get $get) => filled($get('suratJalan'))),
                             ])
                             ->columnSpanFull(),
 
@@ -211,8 +211,8 @@ class DeliveryScheduleResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('driver', 'name')
-                            ->visible(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
-                            ->required(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
+                            ->visible(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
+                            ->required(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->validationMessages(['required' => 'Driver wajib dipilih']),
 
                         Select::make('vehicle_id')
@@ -220,25 +220,25 @@ class DeliveryScheduleResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('vehicle', 'plate')
-                            ->visible(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
-                            ->required(fn ($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
+                            ->visible(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
+                            ->required(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->validationMessages(['required' => 'Kendaraan wajib dipilih']),
 
                         TextInput::make('driver_name')
                             ->label('Nama Driver / Ekspedisi')
                             ->maxLength(255)
-                            ->visible(fn ($get) => $get('delivery_method') === 'ekspedisi')
-                            ->required(fn ($get) => $get('delivery_method') === 'ekspedisi')
+                            ->visible(fn($get) => $get('delivery_method') === 'ekspedisi')
+                            ->required(fn($get) => $get('delivery_method') === 'ekspedisi')
                             ->helperText('Nama driver atau nama ekspedisi')
                             ->validationMessages(['required' => 'Nama driver/ekspedisi wajib diisi']),
 
                         TextInput::make('vehicle_info')
                             ->label('Info Kendaraan / Resi')
                             ->maxLength(255)
-                            ->visible(fn ($get) => $get('delivery_method') === 'ekspedisi')
+                            ->visible(fn($get) => $get('delivery_method') === 'ekspedisi')
                             ->helperText('Plat kendaraan, nama ekspedisi, atau nomor resi'),
 
-                        
+
 
                         Select::make('status')
                             ->label('Status')
@@ -260,7 +260,7 @@ class DeliveryScheduleResource extends Resource
                             ->columnSpanFull(),
 
                         Hidden::make('created_by')
-                            ->default(fn () => Auth::id()),
+                            ->default(fn() => Auth::id()),
                     ])
                     ->columns(2),
             ]);
@@ -274,11 +274,11 @@ class DeliveryScheduleResource extends Resource
 
         $assignedIds = $excludeAlreadyAssigned
             ? DB::table('delivery_schedule_surat_jalans')
-                ->distinct()
-                ->pluck('surat_jalan_id')
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all()
+            ->distinct()
+            ->pluck('surat_jalan_id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->all()
             : [];
 
         return SuratJalan::withoutGlobalScopes()
@@ -286,7 +286,7 @@ class DeliveryScheduleResource extends Resource
             ->where('status', 1)
             ->when(
                 ! empty($assignedIds),
-                fn (Builder $query) => $query->whereNotIn('surat_jalans.id', $assignedIds)
+                fn(Builder $query) => $query->whereNotIn('surat_jalans.id', $assignedIds)
             )
             ->orderBy('sj_number')
             ->pluck('sj_number', 'id')
@@ -325,7 +325,7 @@ class DeliveryScheduleResource extends Resource
 
     public static function getSelectedSuratJalanPreviewContent(array $suratJalanIds, ?int $cabangId): string
     {
-        $suratJalanIds = collect($suratJalanIds)->filter()->map(fn ($id) => (int) $id)->values()->all();
+        $suratJalanIds = collect($suratJalanIds)->filter()->map(fn($id) => (int) $id)->values()->all();
 
         if (empty($suratJalanIds) || ! $cabangId) {
             return 'Pilih Surat Jalan untuk melihat detail.';
@@ -357,7 +357,7 @@ class DeliveryScheduleResource extends Resource
 
     public static function getSelectedDeliveryOrderPreviewContent(array $suratJalanIds, ?int $cabangId): string
     {
-        $suratJalanIds = collect($suratJalanIds)->filter()->map(fn ($id) => (int) $id)->values()->all();
+        $suratJalanIds = collect($suratJalanIds)->filter()->map(fn($id) => (int) $id)->values()->all();
 
         if (empty($suratJalanIds) || ! $cabangId) {
             return 'Pilih Surat Jalan terlebih dahulu untuk melihat Delivery Order terkait.';
@@ -368,7 +368,7 @@ class DeliveryScheduleResource extends Resource
             ->whereIn('id', $suratJalanIds)
             ->with('deliveryOrder')
             ->get()
-            ->flatMap(fn (SuratJalan $suratJalan) => $suratJalan->deliveryOrder)
+            ->flatMap(fn(SuratJalan $suratJalan) => $suratJalan->deliveryOrder)
             ->unique('id')
             ->values();
 
@@ -393,13 +393,15 @@ class DeliveryScheduleResource extends Resource
     {
         return new \Illuminate\Support\HtmlString(
             '<style>
-                .fi-ta-header:has(.ds-legend){align-items:stretch!important}
-                .ds-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box}
+                .fi-ta-header:has(.ds-legend){display:block!important;width:100%}
+                .fi-ta-description:has(.ds-legend){display:block!important;width:100%;margin-bottom:16px}
+                .ds-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box;display:block}
                 .ds-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
+                .fi-ta-description .ds-legend{margin-bottom:0}
             </style>' .
-            '<div class="ds-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
+            '<div class="ds-legend mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
             // Panduan Penjadwalan
-            '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+            '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;margin-bottom:16px;">' .
                 '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
                     '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
                     '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:#3b82f6;">' .
@@ -412,7 +414,7 @@ class DeliveryScheduleResource extends Resource
                     '</span>' .
                 '</summary>' .
                 '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);">' .
-                '<ul class="list-disc pl-0 space-y-1" style="list-style:none;padding-left:0;">' .
+                '<ul class="list-disc pl-0" style="list-style:none;padding-left:0;">' .
                 '<li><strong>Apa ini:</strong> Penjadwalan Pengiriman adalah dokumen untuk mengatur jadwal pengiriman barang.</li>' .
                 '<li><strong>Flow:</strong> Pending → On The Way → Delivered/Failed. Status otomatis berubah saat DO terkait di-update.</li>' .
                 '<li><strong>Driver:</strong> Untuk metode internal/kurir, wajib assign driver. Untuk ekspedisi, opsional.</li>' .
@@ -420,52 +422,52 @@ class DeliveryScheduleResource extends Resource
                 '</div>' .
             '</details>' .
             // Legenda Warna Status
-            '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full max-w-none" style="width:100%;max-width:none;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+            '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
                 '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;">' .
                 '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;">' .
                 '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
                 '</svg>' .
                 'Legenda Warna Status Baris Data' .
                 '</h4>' .
-                '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:12px;">' .
+                '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">' .
                 // Kuning (Pending)
-                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,243,199,0.4);border:1px solid rgba(253,230,138,0.8);">' .
-                '<div style="width:16px;height:16px;border-radius:4px;background-color:#eab308;box-shadow:0 1px 3px rgba(234,179,8,0.4);flex-shrink:0;"></div>' .
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
+                '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#854d0e;">Kuning (Pending)</span>' .
-                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Menunggu keberangkatan</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Pending)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Menunggu keberangkatan</span>' .
                 '</div>' .
                 '</div>' .
                 // Biru (On The Way)
-                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
-                '<div style="width:16px;height:16px;border-radius:4px;background-color:#3b82f6;box-shadow:0 1px 3px rgba(59,130,246,0.4);flex-shrink:0;"></div>' .
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
+                '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#1e40af;">Biru (On The Way)</span>' .
-                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Sedang dalam perjalanan</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (On The Way)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Sedang dalam perjalanan</span>' .
                 '</div>' .
                 '</div>' .
                 // Hijau (Delivered)
-                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(220,252,231,0.4);border:1px solid rgba(187,247,208,0.8);">' .
-                '<div style="width:16px;height:16px;border-radius:4px;background-color:#22c55e;box-shadow:0 1px 3px rgba(34,197,94,0.4);flex-shrink:0;"></div>' .
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
+                '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#166534;">Hijau (Delivered)</span>' .
-                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Selesai / terkirim</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Delivered)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / terkirim</span>' .
                 '</div>' .
                 '</div>' .
                 // Merah (Failed)
-                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
-                '<div style="width:16px;height:16px;border-radius:4px;background-color:#ef4444;box-shadow:0 1px 3px rgba(239,68,68,0.4);flex-shrink:0;"></div>' .
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
+                '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#991b1b;">Merah (Failed)</span>' .
-                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Pengiriman gagal</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Failed)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Pengiriman gagal</span>' .
                 '</div>' .
                 '</div>' .
                 // Abu (Cancelled)
-                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(243,244,246,0.6);border:1px solid rgba(229,231,235,0.9);">' .
-                '<div style="width:16px;height:16px;border-radius:4px;background-color:#6b7280;box-shadow:0 1px 3px rgba(107,114,128,0.4);flex-shrink:0;"></div>' .
+                '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(243, 244, 246, 0.6); border: 1px solid rgba(229, 231, 235, 0.9);">' .
+                '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #6b7280; box-shadow: 0 1px 3px rgba(107, 114, 128, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#374151;">Abu (Cancelled)</span>' .
-                '<span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Jadwal dibatalkan</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #374151;">Abu (Cancelled)</span>' .
+                '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Jadwal dibatalkan</span>' .
                 '</div>' .
                 '</div>' .
                 '</div>' .
@@ -484,7 +486,7 @@ class DeliveryScheduleResource extends Resource
                         TextEntry::make('scheduled_date')->label('Tanggal Keberangkatan')->dateTime('d/m/Y H:i'),
                         TextEntry::make('delivery_method')
                             ->label('Metode Pengiriman')
-                            ->formatStateUsing(fn ($state) => match ($state) {
+                            ->formatStateUsing(fn($state) => match ($state) {
                                 'internal'       => 'Internal (Driver Perusahaan)',
                                 'kurir_internal' => 'Kurir Internal',
                                 'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
@@ -493,33 +495,33 @@ class DeliveryScheduleResource extends Resource
                         TextEntry::make('driver.name')
                             ->label('Driver')
                             ->placeholder('-')
-                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+                            ->visible(fn($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
 
                         TextEntry::make('driver.license')
                             ->label('Kode Driver')
                             ->placeholder('-')
-                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+                            ->visible(fn($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
                         TextEntry::make('vehicle.plate')
                             ->label('Kendaraan (Plat)')
                             ->placeholder('-')
-                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+                            ->visible(fn($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
 
                         TextEntry::make('vehicle.type')
                             ->label('Tipe Kendaraan')
                             ->placeholder('-')
-                            ->visible(fn ($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
+                            ->visible(fn($record) => in_array($record?->delivery_method, ['internal', 'kurir_internal', null, ''])),
                         TextEntry::make('driver_name')
                             ->label('Nama Driver / Ekspedisi')
                             ->placeholder('-')
-                            ->visible(fn ($record) => $record?->delivery_method === 'ekspedisi'),
+                            ->visible(fn($record) => $record?->delivery_method === 'ekspedisi'),
                         TextEntry::make('vehicle_info')
                             ->label('Info Kendaraan / Resi')
                             ->placeholder('-')
-                            ->visible(fn ($record) => $record?->delivery_method === 'ekspedisi'),
+                            ->visible(fn($record) => $record?->delivery_method === 'ekspedisi'),
                         TextEntry::make('status')
                             ->label('Status')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match ($state) {
                                 'pending'           => 'warning',
                                 'on_the_way'        => 'info',
                                 'delivered'         => 'success',
@@ -527,7 +529,7 @@ class DeliveryScheduleResource extends Resource
                                 'cancelled'         => 'gray',
                                 default             => 'gray',
                             })
-                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                            ->formatStateUsing(fn(string $state): string => match ($state) {
                                 'pending'           => 'Menunggu Keberangkatan',
                                 'on_the_way'        => 'Sedang Berjalan',
                                 'delivered'         => 'Selesai / Terkirim',
@@ -540,22 +542,22 @@ class DeliveryScheduleResource extends Resource
                         TextEntry::make('notes')->label('Catatan')->placeholder('-'),
                         TextEntry::make('surat_jalan_count')
                             ->label('Jumlah Surat Jalan')
-                            ->getStateUsing(fn (DeliverySchedule $record): int => $record->relatedSuratJalanCount())
+                            ->getStateUsing(fn(DeliverySchedule $record): int => $record->relatedSuratJalanCount())
                             ->badge()
                             ->color('primary'),
                         TextEntry::make('surat_jalan_summary')
                             ->label('Surat Jalan Dipilih')
-                            ->getStateUsing(fn (DeliverySchedule $record): string => $record->relatedSuratJalanSummary())
+                            ->getStateUsing(fn(DeliverySchedule $record): string => $record->relatedSuratJalanSummary())
                             ->columnSpanFull()
                             ->placeholder('-'),
                         TextEntry::make('delivery_order_count')
                             ->label('Jumlah Delivery Order')
-                            ->getStateUsing(fn (DeliverySchedule $record): int => $record->relatedDeliveryOrderCount())
+                            ->getStateUsing(fn(DeliverySchedule $record): int => $record->relatedDeliveryOrderCount())
                             ->badge()
                             ->color('info'),
                         TextEntry::make('delivery_order_summary')
                             ->label('Delivery Order dari Surat Jalan')
-                            ->getStateUsing(fn (DeliverySchedule $record): string => $record->relatedDeliveryOrderSummary())
+                            ->getStateUsing(fn(DeliverySchedule $record): string => $record->relatedDeliveryOrderSummary())
                             ->columnSpanFull()
                             ->placeholder('-'),
                     ])
@@ -587,12 +589,12 @@ class DeliveryScheduleResource extends Resource
                 TextColumn::make('delivery_method')
                     ->label('Metode')
                     ->badge()
-                    ->color(fn ($state) => match ($state) {
+                    ->color(fn($state) => match ($state) {
                         'ekspedisi' => 'warning',
                         'kurir_internal' => 'info',
                         default => 'primary',
                     })
-                    ->formatStateUsing(fn ($state) => match ($state) {
+                    ->formatStateUsing(fn($state) => match ($state) {
                         'internal'       => 'Internal',
                         'kurir_internal' => 'Kurir Internal',
                         'ekspedisi'      => 'Ekspedisi',
@@ -601,7 +603,7 @@ class DeliveryScheduleResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('surat_jalan_summary')
                     ->label('Surat Jalan Dipilih')
-                    ->getStateUsing(fn (DeliverySchedule $record): string => $record->relatedSuratJalanSummary())
+                    ->getStateUsing(fn(DeliverySchedule $record): string => $record->relatedSuratJalanSummary())
                     ->wrap()
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('suratJalan', function (Builder $query) use ($search) {
@@ -610,7 +612,7 @@ class DeliveryScheduleResource extends Resource
                     }),
                 TextColumn::make('delivery_order_summary')
                     ->label('Delivery Order dari Surat Jalan')
-                    ->getStateUsing(fn (DeliverySchedule $record): string => $record->relatedDeliveryOrderSummary())
+                    ->getStateUsing(fn(DeliverySchedule $record): string => $record->relatedDeliveryOrderSummary())
                     ->wrap()
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('suratJalan.deliveryOrder', function (Builder $query) use ($search) {
@@ -620,7 +622,7 @@ class DeliveryScheduleResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'pending'           => 'warning',
                         'on_the_way'        => 'info',
                         'delivered'         => 'success',
@@ -628,7 +630,7 @@ class DeliveryScheduleResource extends Resource
                         'cancelled'         => 'gray',
                         default             => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'pending'           => 'Menunggu Keberangkatan',
                         'on_the_way'        => 'Sedang Berjalan',
                         'delivered'         => 'Selesai / Terkirim',
@@ -685,8 +687,15 @@ class DeliveryScheduleResource extends Resource
                         ->label('Print Surat Kerja')
                         ->icon('heroicon-o-printer')
                         ->color('primary')
-                        ->visible(fn (DeliverySchedule $record) => in_array($record->delivery_method, ['internal', 'kurir_internal']))
-                        ->action(fn (DeliverySchedule $record) => static::streamWorkOrderPdf($record)),
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->delivery_method, ['internal', 'kurir_internal']))
+                        ->action(fn(DeliverySchedule $record) => static::streamWorkOrderPdf($record)),
+                    Action::make('preview_pdf')
+                        ->label('Preview / Download PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('info')
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->delivery_method, ['internal', 'kurir_internal', 'ekspedisi']))
+                        ->url(fn($record) => route('pdf-stream', ['type' => 'delivery-schedule', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                     // Quick status change actions
                     Action::make('set_on_the_way')
                         ->label('Mulai Pengiriman')
@@ -695,8 +704,8 @@ class DeliveryScheduleResource extends Resource
                         ->requiresConfirmation()
                         ->modalHeading('Mulai Pengiriman')
                         ->modalDescription('Ubah status jadwal ini menjadi "Sedang Berjalan"?')
-                        ->visible(fn (DeliverySchedule $record) => in_array($record->status, ['pending']))
-                        ->action(fn (DeliverySchedule $record) => $record->update(['status' => 'on_the_way'])),
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['pending']))
+                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'on_the_way'])),
                     Action::make('set_delivered')
                         ->label('Tandai Selesai')
                         ->icon('heroicon-o-check-circle')
@@ -704,8 +713,8 @@ class DeliveryScheduleResource extends Resource
                         ->requiresConfirmation()
                         ->modalHeading('Tandai Selesai')
                         ->modalDescription('Tandai jadwal pengiriman ini sebagai selesai/terkirim?')
-                        ->visible(fn (DeliverySchedule $record) => in_array($record->status, ['on_the_way', 'pending']))
-                        ->action(fn (DeliverySchedule $record) => $record->update(['status' => 'delivered'])),
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['on_the_way', 'pending']))
+                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'delivered'])),
                     Action::make('set_failed')
                         ->label('Tandai Gagal')
                         ->icon('heroicon-o-x-circle')
@@ -713,15 +722,15 @@ class DeliveryScheduleResource extends Resource
                         ->requiresConfirmation()
                         ->modalHeading('Tandai Pengiriman Gagal')
                         ->modalDescription('Tandai jadwal pengiriman ini sebagai gagal?')
-                        ->visible(fn (DeliverySchedule $record) => in_array($record->status, ['on_the_way', 'pending']))
-                        ->action(fn (DeliverySchedule $record) => $record->update(['status' => 'failed'])),
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['on_the_way', 'pending']))
+                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'failed'])),
                     Action::make('set_cancelled')
                         ->label('Batalkan')
                         ->icon('heroicon-o-no-symbol')
                         ->color('gray')
                         ->requiresConfirmation()
-                        ->visible(fn (DeliverySchedule $record) => in_array($record->status, ['pending']))
-                        ->action(fn (DeliverySchedule $record) => $record->update(['status' => 'cancelled'])),
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['pending']))
+                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'cancelled'])),
                     DeleteAction::make(),
                 ]),
             ], position: ActionsPosition::BeforeColumns)
@@ -738,7 +747,7 @@ class DeliveryScheduleResource extends Resource
                     ->label('Rekap per Driver')
                     ->icon('heroicon-o-document-chart-bar')
                     ->color('info')
-                    ->visible(fn () => Auth::user()?->can('rekap delivery schedule') ?? false)
+                    ->visible(fn() => Auth::user()?->can('rekap delivery schedule') ?? false)
                     ->form([
                         Select::make('driver_ids')
                             ->label('Driver')
@@ -775,8 +784,8 @@ class DeliveryScheduleResource extends Resource
                             $schedules = DeliverySchedule::withoutGlobalScopes()
                                 ->with(['driver', 'vehicle', 'suratJalan.deliveryOrder'])
                                 ->whereIn('driver_id', $driverIds)
-                                ->when($dateFrom, fn ($q) => $q->whereDate('scheduled_date', '>=', $dateFrom))
-                                ->when($dateTo,   fn ($q) => $q->whereDate('scheduled_date', '<=', $dateTo))
+                                ->when($dateFrom, fn($q) => $q->whereDate('scheduled_date', '>=', $dateFrom))
+                                ->when($dateTo,   fn($q) => $q->whereDate('scheduled_date', '<=', $dateTo))
                                 ->orderBy('driver_id')
                                 ->orderBy('scheduled_date')
                                 ->get();
@@ -791,7 +800,7 @@ class DeliveryScheduleResource extends Resource
                             ])->setPaper('a4', 'landscape');
 
                             return response()->streamDownload(
-                                fn () => print($pdf->output()),
+                                fn() => print($pdf->output()),
                                 'rekap-jadwal-pengiriman-' . now()->format('Ymd-His') . '.pdf'
                             );
                         }
@@ -832,7 +841,7 @@ class DeliveryScheduleResource extends Resource
         ])->setPaper('a4', 'portrait');
 
         return response()->streamDownload(
-            fn () => print($pdf->output()),
+            fn() => print($pdf->output()),
             'surat-kerja-' . ($record->schedule_number ?? 'delivery-schedule') . '.pdf'
         );
     }

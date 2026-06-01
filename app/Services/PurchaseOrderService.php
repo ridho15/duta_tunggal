@@ -155,6 +155,23 @@ class PurchaseOrderService
      */
     protected function buildInvoiceOtherFees(PurchaseOrder $purchaseOrder, mixed $fallbackOtherFee = null): array
     {
+        $purchaseOrder->loadMissing('purchaseOrderBiaya.currency');
+
+        $receiptFees = $purchaseOrder->purchaseOrderBiaya
+            ->filter(fn ($fee) => (int) ($fee->masuk_invoice ?? 0) === 1)
+            ->map(function ($fee) {
+                return [
+                    'name' => $fee->nama_biaya ?: 'Biaya Lain',
+                    'amount' => round((float) ($fee->total ?? 0), 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        if (! empty($receiptFees)) {
+            return $receiptFees;
+        }
+
         $fallbackAmount = (float) ($fallbackOtherFee ?? 0);
         if ($fallbackAmount <= 0) {
             return [];

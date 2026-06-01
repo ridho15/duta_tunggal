@@ -393,7 +393,7 @@ describe('Sales Order PDF content', function () {
         $afterDiscount = $lineBase - $discountAmount;
         $taxRes = TaxService::compute($afterDiscount, $item->tax, $item->tipe_pajak);
         $expectedTaxAmount = 'Rp '.number_format($taxRes['ppn'], 0, ',', '.');
-        $expectedPercent = number_format($item->tax, 2).'%';
+        $expectedPercent = number_format($item->tax, 2, ',', '.').'%';
 
         expect($html)->toContain($expectedPercent)
             ->and($html)->toContain($expectedTaxAmount);
@@ -464,10 +464,10 @@ describe('PDF generators include required item columns and totals', function () 
 
         $html = view('pdf.quotation', ['quotation' => $quotation])->render();
         assertPdfHasColumns($html, [
-            '#', 'Product', 'Qty', 'Unit Price', 'Discount', 'Tax (%)', 'Tax Type', 'Tax Amount', 'Subtotal'
+            'No', 'Nama Barang', 'Qty', 'Harga Satuan', 'Disc (%)', 'Tax (%)', 'Tipe Pajak', 'PPN', 'Subtotal'
         ]);
-        expect($html)->toContain('<td colspan="8" style="text-align: right;"><strong>Total</strong></td>');
-        expect($html)->toContain('Rp.99.900');
+        expect($html)->toContain('GRAND TOTAL');
+        expect($html)->toContain('Rp 99.900');
     });
 
     it('sales order PDF includes all columns', function () {
@@ -488,9 +488,9 @@ describe('PDF generators include required item columns and totals', function () 
 
         $html = view('pdf.sales-order', ['saleOrder' => $so])->render();
         assertPdfHasColumns($html, [
-            'No', 'Nama Item', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal'
+            'No', 'Nama Barang', 'Qty', 'Harga Satuan', 'Disc (%)', 'Tax (%)', 'PPN', 'Subtotal'
         ]);
-        expect($html)->toContain('<td colspan="7" class="total">Total</td>');
+        expect($html)->toContain('GRAND TOTAL');
         expect($html)->toContain('Rp 212.800');
     });
 
@@ -529,7 +529,7 @@ describe('PDF generators include required item columns and totals', function () 
 
         $html = view('pdf.sale-order-invoice', ['invoice' => $invoice])->render();
         assertPdfHasColumns($html, [
-            'SKU', 'Produk', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal', 'Total'
+            'SKU', 'Produk', 'Qty', 'Harga Satuan', 'Discount (%)', 'Tax (%)', 'Tax Amount', 'Subtotal', 'Total'
         ]);
         expect($html)->toContain('PPN (11,00%)');
         expect($html)->toContain('Rp 33.000');

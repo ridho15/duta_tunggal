@@ -129,6 +129,7 @@ class LedgerPostingService
                     'description' => 'Purchase invoice - ' . ($hasReceipts ? 'unbilled purchase' : 'inventory') . ' for ' . $invoice->invoice_number,
                     'debit' => $subtotal,
                     'credit' => 0,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'purchase',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -173,6 +174,7 @@ class LedgerPostingService
                     'description' => 'PPN Masukan for ' . $invoice->invoice_number,
                     'debit' => $ppnAmount,
                     'credit' => 0,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'purchase',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -208,6 +210,7 @@ class LedgerPostingService
                     'description' => 'Biaya lainnya (termasuk dari purchase receipt) untuk ' . $invoice->invoice_number,
                     'debit' => $totalOtherFees,
                     'credit' => 0,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'purchase',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -227,6 +230,7 @@ class LedgerPostingService
                     'description' => 'Accounts payable for ' . $invoice->invoice_number,
                     'debit' => 0,
                     'credit' => $totalAmount,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'purchase',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -946,18 +950,24 @@ class LedgerPostingService
     {
         $debitOrig = (float) ($data['debit'] ?? 0);
         $creditOrig = (float) ($data['credit'] ?? 0);
+        $amountsAreIdr = (bool) ($data['amounts_are_idr'] ?? false);
+
+        unset($data['amounts_are_idr']);
 
         // Convert amounts to IDR for the ledger
-        if ($currencyId && $exchangeRate > 1.0) {
+        if (! $amountsAreIdr && $currencyId && $exchangeRate > 1.0) {
             $debitIdr = round($debitOrig * $exchangeRate, 2);
             $creditIdr = round($creditOrig * $exchangeRate, 2);
             $originalAmount = max($debitOrig, $creditOrig);
         } else {
             $debitIdr = $debitOrig;
             $creditIdr = $creditOrig;
-            $originalAmount = max($debitOrig, $creditOrig);
+            $originalAmount = $amountsAreIdr && $currencyId && $exchangeRate > 1.0
+                ? round(max($debitOrig, $creditOrig) / $exchangeRate, 4)
+                : max($debitOrig, $creditOrig);
+
             $currencyId = $currencyId ?: \App\Support\CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
-            $exchangeRate = 1.0;
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
         }
 
         $entryData = array_merge($data, [

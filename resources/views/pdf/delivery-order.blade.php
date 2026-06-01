@@ -50,8 +50,8 @@
 
     <div class="header">
         <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
-        <h2>PT. DUTA TUNGGAL</h2>
-        <p>Alamat Perusahaan</p>
+        <h2>PT DUTA TUNGGAL</h2>
+        <p>Jl. Contoh No. 123, Jakarta, Indonesia<br>Telp: (021) 12345678 | Email: admin@dutatunggal.co.id</p>
         <div class="title">DELIVERY ORDER</div>
     </div>
 
@@ -199,7 +199,7 @@
             </td>
             <td style="border: none; text-align: center;">
                 Hormat kami, <br><br><br><br>
-                <strong>PT. DUTA TUNGGAL</strong><br>
+                <strong>PT DUTA TUNGGAL</strong><br>
                 (____________________)
             </td>
         </tr>

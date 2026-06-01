@@ -1008,6 +1008,7 @@ class SalesInvoiceResource extends Resource
     {
         return parent::getEloquentQuery()
             ->where('from_model_type', 'App\Models\SaleOrder')
+            ->orderByDesc('created_at')
             ->with([
                 'invoiceItem.product',
                 'fromModel',

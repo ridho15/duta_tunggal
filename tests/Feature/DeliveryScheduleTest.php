@@ -620,4 +620,159 @@ class DeliveryScheduleTest extends TestCase
         // But withTrashed() should find it
         $this->assertNotNull(DeliverySchedule::withoutGlobalScopes()->withTrashed()->find($id));
     }
+
+    #[Test]
+    public function it_has_delivery_schedule_pdf_route_in_preview_controller(): void
+    {
+        // Verify PdfPreviewController has delivery-schedule config
+        $controller = new \App\Http\Controllers\PdfPreviewController();
+        $reflection = new \ReflectionClass($controller);
+        $property = $reflection->getProperty('documentConfig');
+        $property->setAccessible(true);
+        $config = $property->getValue($controller);
+
+        // Verify delivery-schedule type exists
+        $this->assertArrayHasKey('delivery-schedule', $config, 'delivery-schedule type should exist in PdfPreviewController');
+
+        // Verify config structure
+        $this->assertArrayHasKey('model', $config['delivery-schedule']);
+        $this->assertArrayHasKey('blade', $config['delivery-schedule']);
+        $this->assertArrayHasKey('bladeVar', $config['delivery-schedule']);
+        $this->assertArrayHasKey('paper', $config['delivery-schedule']);
+        $this->assertArrayHasKey('orientation', $config['delivery-schedule']);
+        $this->assertArrayHasKey('filename', $config['delivery-schedule']);
+        $this->assertArrayHasKey('relations', $config['delivery-schedule']);
+
+        // Verify model is DeliverySchedule
+        $this->assertEquals(DeliverySchedule::class, $config['delivery-schedule']['model']);
+
+        // Verify blade template
+        $this->assertEquals('pdf.delivery-schedule-work-order', $config['delivery-schedule']['blade']);
+    }
+
+    #[Test]
+    public function it_can_generate_pdf_for_delivery_schedule(): void
+    {
+        // Create a delivery schedule
+        $schedule = DeliverySchedule::withoutGlobalScopes()->create([
+            'schedule_number'  => 'SCH-PDF-TEST-001',
+            'scheduled_date'   => now(),
+            'driver_id'         => $this->driver->id,
+            'vehicle_id'        => $this->vehicle->id,
+            'delivery_method'   => 'internal',
+            'status'            => 'pending',
+            'cabang_id'         => $this->cabang->id,
+            'created_by'        => $this->user->id,
+        ]);
+
+        // Verify the schedule can be loaded with relations
+        $loadedSchedule = DeliverySchedule::with([
+            'driver',
+            'vehicle',
+            'cabang',
+            'suratJalan.deliveryOrder.deliveryOrderItem.product.uom',
+            'suratJalan.deliveryOrder.salesOrders.customer'
+        ])->find($schedule->id);
+
+        $this->assertNotNull($loadedSchedule);
+        $this->assertEquals('SCH-PDF-TEST-001', $loadedSchedule->schedule_number);
+    }
+
+    #[Test]
+    public function it_renders_delivery_schedule_pdf_without_view_warnings(): void
+    {
+        $schedule = DeliverySchedule::withoutGlobalScopes()->create([
+            'schedule_number'  => 'SCH-PDF-RENDER-001',
+            'scheduled_date'   => now(),
+            'driver_id'        => $this->driver->id,
+            'vehicle_id'       => $this->vehicle->id,
+            'delivery_method'  => 'internal',
+            'status'           => 'pending',
+            'cabang_id'        => $this->cabang->id,
+            'created_by'       => $this->user->id,
+        ]);
+
+        set_error_handler(function (int $severity, string $message, string $file, int $line) {
+            if (in_array($severity, [E_WARNING, E_NOTICE, E_USER_WARNING, E_USER_NOTICE], true)) {
+                throw new \ErrorException($message, 0, $severity, $file, $line);
+            }
+
+            return false;
+        });
+
+        try {
+            $response = app(\App\Http\Controllers\PdfPreviewController::class)->stream('delivery-schedule', $schedule->id);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
+    }
+
+    #[Test]
+    public function it_preview_pdf_action_visible_for_all_delivery_methods(): void
+    {
+        // Create schedules with different delivery methods
+        $scheduleInternal = DeliverySchedule::withoutGlobalScopes()->create([
+            'schedule_number'  => 'SCH-METHOD-INT-001',
+            'scheduled_date'   => now(),
+            'driver_id'         => $this->driver->id,
+            'vehicle_id'        => $this->vehicle->id,
+            'delivery_method'   => 'internal',
+            'status'            => 'pending',
+            'cabang_id'         => $this->cabang->id,
+            'created_by'        => $this->user->id,
+        ]);
+
+        $scheduleEkspedisi = DeliverySchedule::withoutGlobalScopes()->create([
+            'schedule_number'  => 'SCH-METHOD-EKS-001',
+            'scheduled_date'   => now(),
+            'driver_id'        => null,
+            'vehicle_id'       => null,
+            'delivery_method'  => 'ekspedisi',
+            'status'           => 'pending',
+            'cabang_id'        => $this->cabang->id,
+            'created_by'       => $this->user->id,
+            'driver_name'      => 'Test Ekspedisi',
+            'vehicle_info'     => 'Resi: TEST123',
+        ]);
+
+        // Verify all methods can be loaded
+        $this->assertNotNull($scheduleInternal->fresh());
+        $this->assertNotNull($scheduleEkspedisi->fresh());
+
+        // Verify the delivery_method values
+        $this->assertEquals('internal', $scheduleInternal->delivery_method);
+        $this->assertEquals('ekspedisi', $scheduleEkspedisi->delivery_method);
+
+        // Verify routes are accessible for all methods
+        $routeInternal = route('pdf-stream', ['type' => 'delivery-schedule', 'id' => $scheduleInternal->id]);
+        $routeEkspedisi = route('pdf-stream', ['type' => 'delivery-schedule', 'id' => $scheduleEkspedisi->id]);
+
+        $this->assertStringContainsString('/pdf/delivery-schedule/', $routeInternal);
+        $this->assertStringContainsString('/pdf/delivery-schedule/', $routeEkspedisi);
+    }
+
+    #[Test]
+    public function it_can_access_pdf_route_for_delivery_schedule(): void
+    {
+        // Create a delivery schedule
+        $schedule = DeliverySchedule::withoutGlobalScopes()->create([
+            'schedule_number'  => 'SCH-ROUTE-TEST-001',
+            'scheduled_date'   => now(),
+            'driver_id'         => $this->driver->id,
+            'vehicle_id'        => $this->vehicle->id,
+            'delivery_method'   => 'ekspedisi',
+            'status'            => 'delivered',
+            'cabang_id'         => $this->cabang->id,
+            'created_by'        => $this->user->id,
+            'driver_name'       => 'Test Ekspedisi',
+            'vehicle_info'      => 'Resi: TEST123456',
+        ]);
+
+        // Verify route exists and generates correct URL
+        $routeUrl = route('pdf-stream', ['type' => 'delivery-schedule', 'id' => $schedule->id]);
+        $this->assertStringContainsString('/pdf/delivery-schedule/' . $schedule->id, $routeUrl);
+    }
 }

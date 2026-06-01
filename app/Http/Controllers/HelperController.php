@@ -959,7 +959,7 @@ class HelperController extends Controller
 
     public static function terbilang($number)
     {
-        $number = abs($number);
+        $number = abs((int) round($number)); // Ensure integer to fix deprecated warnings
         $words = [
             "",
             "satu",
@@ -981,21 +981,21 @@ class HelperController extends Controller
         } else if ($number < 20) {
             $temp = static::terbilang($number - 10) . " belas ";
         } else if ($number < 100) {
-            $temp = static::terbilang($number / 10) . " puluh " . static::terbilang($number % 10);
+            $temp = static::terbilang((int) ($number / 10)) . " puluh " . static::terbilang($number % 10);
         } else if ($number < 200) {
             $temp = " seratus " . static::terbilang($number - 100);
         } else if ($number < 1000) {
-            $temp = static::terbilang($number / 100) . " ratus " . static::terbilang($number % 100);
+            $temp = static::terbilang((int) ($number / 100)) . " ratus " . static::terbilang($number % 100);
         } else if ($number < 2000) {
             $temp = " seribu" . static::terbilang($number - 1000);
         } else if ($number < 1000000) {
-            $temp = static::terbilang($number / 1000) . " ribu " . static::terbilang($number % 1000);
+            $temp = static::terbilang((int) ($number / 1000)) . " ribu " . static::terbilang($number % 1000);
         } else if ($number < 1000000000) {
-            $temp = static::terbilang($number / 1000000) . " juta " . static::terbilang($number % 1000000);
+            $temp = static::terbilang((int) ($number / 1000000)) . " juta " . static::terbilang($number % 1000000);
         } else if ($number < 1000000000000) {
-            $temp = static::terbilang($number / 1000000000) . " milyar " . static::terbilang(fmod($number, 1000000000));
+            $temp = static::terbilang((int) ($number / 1000000000)) . " milyar " . static::terbilang((int) fmod($number, 1000000000));
         } else if ($number < 1000000000000000) {
-            $temp = static::terbilang($number / 1000000000000) . " triliun " . static::terbilang(fmod($number, 1000000000000));
+            $temp = static::terbilang((int) ($number / 1000000000000)) . " triliun " . static::terbilang((int) fmod($number, 1000000000000));
         }
 
         return trim($temp);

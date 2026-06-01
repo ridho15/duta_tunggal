@@ -170,11 +170,11 @@
 
     <div class="header clearfix">
         <div class="company-info">
-            <h2>PT.DUTA TUNGGAL</h2>
-            <p>Jl. Raya Bogor KM 36, Cibinong, Bogor<br>
-                Cibinong, Jawa Barat 16911<br>
-                Telp: (021) 875-1234<br>
-                Email: info@dutatunggal.com</p>
+            <h2>PT DUTA TUNGGAL</h2>
+            <p>Jl. Contoh No. 123<br>
+                Jakarta, Indonesia<br>
+                Telp: (021) 12345678<br>
+                Email: admin@dutatunggal.co.id</p>
             @if($invoice->cabang)
             <p style="margin-top: 10px; font-size: 11px; color: #666;">
                 <strong>Cabang: {{ $invoice->cabang->nama }}</strong><br>
@@ -349,17 +349,17 @@
             <p style="font-size: 11px; line-height: 1.5;">
                 • Invoice ini dibuat berdasarkan Purchase Order No: {{ $invoice->fromModel->po_number ?? 'N/A' }}<br>
                 • Pembayaran mohon ditransfer ke rekening:<br>
-                  &nbsp;&nbsp;&nbsp;BCA: 123-456-7890 a/n PT. DUTA TUNGGAL<br>
-                  &nbsp;&nbsp;&nbsp;BRI: 098-765-4321 a/n PT. DUTA TUNGGAL<br>
+                  &nbsp;&nbsp;&nbsp;BCA: 123-456-7890 a/n PT DUTA TUNGGAL<br>
+                  &nbsp;&nbsp;&nbsp;BRI: 098-765-4321 a/n PT DUTA TUNGGAL<br>
                 • Pembayaran dianggap sah setelah diterima konfirmasi dari pihak kami
             </p>
         </div>
-        
+
         <div style="text-align: center; margin-top: 30px;">
             <p><strong>Terima kasih atas kepercayaan Anda berbisnis dengan kami!</strong></p>
             <p style="margin-top: 20px;">
                 Hormat kami,<br>
-                <strong>PT. DUTA TUNGGAL</strong>
+                <strong>PT DUTA TUNGGAL</strong>
             </p>
         </div>
         

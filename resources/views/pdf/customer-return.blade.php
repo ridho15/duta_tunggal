@@ -136,7 +136,7 @@
     {{-- ── Header ───────────────────────────────────────────────── --}}
     <div class="header clearfix">
         <div class="company-info">
-            <h2 style="margin:0 0 4px;">PT. DUTA TUNGGAL</h2>
+            <h2 style="margin:0 0 4px;">PT DUTA TUNGGAL</h2>
             <p style="margin:0; line-height:1.6; color:#555;">
                 Distributor &amp; Manufacturer<br>
                 Telp: (021) xxx-xxxx

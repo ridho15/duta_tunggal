@@ -1052,12 +1052,12 @@ class PurchaseReceiptService
             $qty = $receiptItem->qty_accepted;
             $lineGross = round($unitPrice * $qty, 2);
             $rate = (float)($poItem->tax ?? 0);
-            $tipe = $poItem->tipe_pajak ?? ($receiptItem->product->tipe_pajak ?? 'Non Pajak');
+            $tipe = Str::lower(trim((string) ($poItem->tipe_pajak ?? ($receiptItem->product->tipe_pajak ?? 'Non Pajak'))));
 
-            if ($tipe === 'Non Pajak') {
+            if (in_array($tipe, ['non pajak', 'non-pajak', 'none', 'non'], true)) {
                 $dppLine = $lineGross;
                 $taxLine = 0.0;
-            } elseif (in_array($tipe, ['Eksklusif', 'Eklusif'], true)) {
+            } elseif (in_array($tipe, ['eksklusif', 'eklusif', 'exclusive'], true)) {
                 // unitPrice is net, tax computed on top
                 $dppLine = $lineGross;
                 $taxLine = round($dppLine * ($rate / 100), 2);

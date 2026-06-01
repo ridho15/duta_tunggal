@@ -37,6 +37,11 @@ class PurchaseReceiptItem extends Model
         };
     }
 
+    public function getIsSentAttribute(): int
+    {
+        return ($this->status === 'completed' || $this->resolvedQualityControl()?->status == 1) ? 1 : 0;
+    }
+
     public function isCompleted(): bool
     {
         return $this->status === 'completed';

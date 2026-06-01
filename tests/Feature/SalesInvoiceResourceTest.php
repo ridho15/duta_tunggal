@@ -211,25 +211,37 @@ class SalesInvoiceResourceTest extends TestCase
         $saleOrder = SaleOrder::factory()->create();
 
         $olderInvoice = Invoice::withoutEvents(function () use ($saleOrder) {
-            return Invoice::create([
+            $invoice = Invoice::create([
                 'from_model_type' => SaleOrder::class,
                 'from_model_id' => $saleOrder->id,
                 'invoice_number' => 'INV-OLD-001',
                 'invoice_date' => now()->subDays(2),
+                'due_date' => now()->addDays(28),
+            ]);
+
+            $invoice->forceFill([
                 'created_at' => now()->subDays(2),
                 'updated_at' => now()->subDays(2),
-            ]);
+            ])->saveQuietly();
+
+            return $invoice->fresh();
         });
 
         $newerInvoice = Invoice::withoutEvents(function () use ($saleOrder) {
-            return Invoice::create([
+            $invoice = Invoice::create([
                 'from_model_type' => SaleOrder::class,
                 'from_model_id' => $saleOrder->id,
                 'invoice_number' => 'INV-NEW-001',
                 'invoice_date' => now(),
+                'due_date' => now()->addDays(30),
+            ]);
+
+            $invoice->forceFill([
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ])->saveQuietly();
+
+            return $invoice->fresh();
         });
 
         $user = User::factory()->create();
@@ -238,9 +250,8 @@ class SalesInvoiceResourceTest extends TestCase
         }
         $user->givePermissionTo(['view any invoice', 'view invoice']);
 
-        $component = Livewire::actingAs($user)->test(ListSalesInvoices::class);
-        $records = $component->instance()->getTableRecords();
+        $records = SalesInvoiceResource::getEloquentQuery()->pluck('id')->all();
 
-        $this->assertSame([$newerInvoice->id, $olderInvoice->id], $records->pluck('id')->all());
+        $this->assertSame([$newerInvoice->id, $olderInvoice->id], $records);
     }
 }

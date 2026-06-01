@@ -19,22 +19,22 @@ class PurchaseReceiptFactory extends Factory
      */
     public function definition(): array
     {
-        // Create a PurchaseOrder with a Supplier to ensure cabang consistency
-        $supplier = Supplier::factory()->create();
-        $purchaseOrder = PurchaseOrder::factory()->create([
-            'supplier_id' => $supplier->id,
-        ]);
-
         return [
             'receipt_number' => 'RN-' . strtoupper(Str::random(6)),
-            'purchase_order_id' => $purchaseOrder->id,
+            'purchase_order_id' => PurchaseOrder::factory()->state(function () {
+                $supplier = Supplier::factory()->create();
+
+                return [
+                    'supplier_id' => $supplier->id,
+                ];
+            }),
             'receipt_date' => now(),
             'received_by' => 1,
             'notes' => $this->faker->optional()->sentence(),
             'currency_id' => 1,
             'other_cost' => $this->faker->numberBetween(0, 10000),
             'status' => 'completed',
-            'cabang_id' => $supplier->cabang_id,
+            'cabang_id' => null,
         ];
     }
 }

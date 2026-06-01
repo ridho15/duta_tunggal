@@ -313,7 +313,7 @@ describe('PdfPreviewController', function () {
             expect($config['purchase-order']['orientation'])->toBe('portrait');
 
             expect($config['quotation']['paper'])->toBe('a4');
-            expect($config['quotation']['orientation'])->toBe('portrait');
+            expect($config['quotation']['orientation'])->toBe('landscape');
 
             expect($config['sale-order']['paper'])->toBe('a4');
             expect($config['sale-order']['orientation'])->toBe('portrait');

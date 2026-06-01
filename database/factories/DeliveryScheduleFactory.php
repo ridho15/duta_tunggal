@@ -23,9 +23,9 @@ class DeliveryScheduleFactory extends Factory
      */
     public function definition(): array
     {
-        $cabang =Cabang::factory()->create();
-        $driver = Driver::factory()->create();
-        $vehicle = Vehicle::factory()->create();
+        $cabang = \App\Models\Cabang::inRandomOrder()->first() ?? \App\Models\Cabang::factory()->create();
+        $driver = \App\Models\Driver::inRandomOrder()->first() ?? \App\Models\Driver::factory()->create();
+        $vehicle = \App\Models\Vehicle::inRandomOrder()->first() ?? \App\Models\Vehicle::factory()->create();
 
         $deliveryMethods = ['internal', 'kurir_internal', 'ekspedisi'];
         $method = $this->faker->randomElement($deliveryMethods);
@@ -41,10 +41,10 @@ class DeliveryScheduleFactory extends Factory
             'vehicle_id' => in_array($method, ['internal', 'kurir_internal']) ? $vehicle->id : null,
             'driver_name' => $method === 'ekspedisi' ? $this->faker->name() : null,
             'vehicle_info' => $method === 'ekspedisi' ? $this->faker->randomElement([
-                $this->faker->vehicleRegistration(),
-                'JNE - ' . $this->faker->trackingNumber(),
-                'SiCepat - ' . $this->faker->trackingNumber(),
-                'J&T - ' . $this->faker->trackingNumber(),
+                'BP ' . $this->faker->numerify('####-####'),
+                'JNE - ' . $this->faker->numerify('JN########'),
+                'SiCepat - ' . $this->faker->numerify('SC########'),
+                'J&T - ' . $this->faker->numerify('JT########'),
             ]) : null,
             'status' => $status,
             'notes' => $this->faker->optional(0.7)->sentence(),

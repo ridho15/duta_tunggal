@@ -149,7 +149,7 @@ class SalesReportService
                     'Harga Satuan' => MoneyHelper::rupiah($item->unit_price ?? 0),
                     'Discount (%)' => number_format($discountPct, 2),
                     'Tax Rate (%)' => number_format($taxRate, 2),
-                    'Tipe Pajak' => $item->tipe_pajak ?? '-',
+                    'Tipe Pajak' => \App\Services\TaxService::normalizeType($item->tipe_pajak),
                     'DPP' => MoneyHelper::rupiah($taxResult['dpp'] ?? 0),
                     'PPN Amount' => MoneyHelper::rupiah($taxResult['ppn'] ?? 0),
                     'Item Subtotal' => MoneyHelper::rupiah($taxResult['total'] ?? 0),

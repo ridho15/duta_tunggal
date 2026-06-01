@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeliveryOrder;
+use App\Models\DeliverySchedule;
 use App\Models\Invoice;
 use App\Models\OrderRequest;
 use App\Models\PurchaseOrder;
@@ -49,9 +50,9 @@ class PdfPreviewController extends Controller
                 'blade'       => 'pdf.quotation',
                 'bladeVar'    => 'quotation',
                 'paper'       => 'a4',
-                'orientation' => 'portrait',
+                'orientation' => 'landscape',
                 'filename'    => fn($r) => "Quotation_{$r->quotation_number}.pdf",
-                'relations'   => ['customer', 'quotationItem.product.uom', 'cabang'],
+                'relations'   => ['customer', 'quotationItem.product.uom', 'cabang', 'createdBy', 'approveBy'],
             ],
             'sale-order' => [
                 'model'       => SaleOrder::class,
@@ -69,7 +70,7 @@ class PdfPreviewController extends Controller
                 'paper'       => 'a4',
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Invoice_Penjualan_{$r->invoice_number}.pdf",
-                'relations'   => ['customer', 'invoiceItem.product.uom', 'cabang'],
+                'relations'   => ['invoiceItem.product.uom', 'cabang'],
             ],
             'delivery-order' => [
                 'model'       => DeliveryOrder::class,
@@ -79,6 +80,15 @@ class PdfPreviewController extends Controller
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Delivery_Order_{$r->do_number}.pdf",
                 'relations'   => ['cabang', 'deliveryOrderItem.product.uom', 'salesOrders.customer'],
+            ],
+            'delivery-schedule' => [
+                'model'       => DeliverySchedule::class,
+                'blade'       => 'pdf.delivery-schedule-work-order',
+                'bladeVar'    => 'schedule',
+                'paper'       => 'a4',
+                'orientation' => 'portrait',
+                'filename'    => fn($r) => "Jadwal_Pengiriman_{$r->schedule_number}.pdf",
+                'relations'   => ['driver', 'vehicle', 'suratJalan.deliveryOrder.deliveryOrderItem.product.uom', 'suratJalan.deliveryOrder.salesOrders.customer', 'cabang'],
             ],
             'surat-jalan' => [
                 'model'       => \App\Models\SuratJalan::class,
@@ -101,7 +111,13 @@ class PdfPreviewController extends Controller
         $config = $this->resolveConfig($type);
         $record = $this->resolveRecord($config, $id);
 
-        $pdf = Pdf::loadView($config['blade'], [$config['bladeVar'] => $record])
+        $viewData = [$config['bladeVar'] => $record];
+
+        if ($type === 'delivery-schedule') {
+            $viewData['deliveryOrders'] = $record->relatedDeliveryOrders();
+        }
+
+        $pdf = Pdf::loadView($config['blade'], $viewData)
             ->setPaper($config['paper'], $config['orientation']);
 
         return $pdf->stream($config['filename']($record));

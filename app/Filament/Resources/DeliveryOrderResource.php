@@ -685,13 +685,6 @@ class DeliveryOrderResource extends Resource
                             ])->columns(3)
                             ->columnSpanFull()
                             ->grid(1) // One card per row
-                            ->itemLabel(function ($record): string {
-                                // Show group structure: Warehouse Name | Status | Item Count
-                                $warehouseName = $record->warehouseConfirmationItems->first()?->warehouse?->name ?? '-';
-                                $status = $record->status ?? '-';
-                                $count = $record->warehouseConfirmationItems->count();
-                                return "{$warehouseName} | Status: {$status} | {$count} item";
-                            })
                     ])
                     ->visible(fn($record) => $record->warehouseConfirmations()->exists()),
             ]);

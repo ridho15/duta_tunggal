@@ -163,11 +163,11 @@
 
     <div class="header clearfix">
         <div class="company-info">
-            <h2>PT.DUTA TUNGGAL</h2>
-            <p>Alamat Perusahaan<br>
-                Kota Perusahaan<br>
-                Telp: Phone Perusahaan<br>
-                Email: email@perusahaan.com</p>
+            <h2>PT DUTA TUNGGAL</h2>
+            <p>Jl. Contoh No. 123<br>
+                Jakarta, Indonesia<br>
+                Telp: (021) 12345678<br>
+                Email: admin@dutatunggal.co.id</p>
         </div>
         <div class="invoice-title">
             <h1>INVOICE</h1>

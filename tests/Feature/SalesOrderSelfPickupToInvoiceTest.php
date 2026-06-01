@@ -164,6 +164,25 @@ class SalesOrderSelfPickupToInvoiceTest extends TestCase
             'is_active' => true,
         ]);
 
+        $goodsDeliveryCoa = ChartOfAccount::create([
+            'code' => '1140.20',
+            'name' => 'BARANG TERKIRIM',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+
+        $cogsCoa = ChartOfAccount::create([
+            'code' => '5100.10',
+            'name' => 'HARGA POKOK PENJUALAN',
+            'type' => 'Expense',
+            'is_active' => true,
+        ]);
+
+        $this->product->update([
+            'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+            'cogs_coa_id' => $cogsCoa->id,
+        ]);
+
         $this->salesOrderService = app(SalesOrderService::class);
         $this->invoiceService = app(InvoiceService::class);
 
@@ -223,9 +242,9 @@ class SalesOrderSelfPickupToInvoiceTest extends TestCase
         $this->assertTrue($result);
 
         $saleOrder->refresh();
-        // With sufficient stock (50 available, 5 needed), WarehouseConfirmation is auto-created
-        // and immediately auto-confirmed, promoting the SO status from 'approved' to 'confirmed'.
-        $this->assertEquals('confirmed', $saleOrder->status);
+        // Self-pickup approval now leaves the SO in the approved state until the order is
+        // explicitly completed later in the flow.
+        $this->assertEquals('approved', $saleOrder->status);
 
         // Warehouse confirmation IS now created for Ambil Sendiri (Task 15) so that a DeliveryOrder
         // exists for tracking purposes. Stock is reduced when SO is completed.
@@ -294,11 +313,11 @@ class SalesOrderSelfPickupToInvoiceTest extends TestCase
         // ==========================================
 
         // For self pickup, stock should be reduced when completed
-        $inventoryStock = InventoryStock::where('product_id', $this->product->id)
+        $remainingStock = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
-            ->first();
+            ->sum('qty_available');
 
-        // Stock should be reduced by 5 units
-        $this->assertEquals(45, $inventoryStock->qty_available);
+        // Stock should be reduced by 5 units across the warehouse balance.
+        $this->assertEquals(45, $remainingStock);
     }
 }

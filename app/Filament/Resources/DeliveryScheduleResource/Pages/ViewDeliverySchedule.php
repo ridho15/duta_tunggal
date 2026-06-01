@@ -23,6 +23,13 @@ class ViewDeliverySchedule extends ViewRecord
                     ->color('primary')
                     ->visible(fn() => in_array($this->record->delivery_method, ['internal', 'kurir_internal']))
                     ->action(fn() => DeliveryScheduleResource::streamWorkOrderPdf($this->record)),
+                Action::make('pdf_delivery_order')
+                    ->label('Preview / Download PDF')
+                    ->color('info')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->visible(fn($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received', 'sent']))
+                    ->url(fn($record) => route('pdf-stream', ['type' => 'delivery-order', 'id' => $this->record->id]))
+                    ->openUrlInNewTab(),
                 Action::make('set_on_the_way')
                     ->label('Mulai Pengiriman')
                     ->icon('heroicon-o-truck')

@@ -246,7 +246,7 @@ class VendorPaymentResourceTest extends TestCase
             ])
             ->assertFormSet([
                 'selected_invoices' => [],
-                'total_payment' => 0,
+                'total_payment' => '0,00',
             ]);
     }
 

@@ -205,10 +205,30 @@
             <td>: {{ $quotation->valid_until ? \Carbon\Carbon::parse($quotation->valid_until)->format('d/m/Y') : '-' }}</td>
         </tr>
         <tr>
-            <td class="label">Cabang</td>
-            <td>: {{ $quotation->cabang->nama ?? '-' }}</td>
+            <td class="label">Alamat</td>
+            <td>: {{ $quotation->customer->address ?? '-' }}</td>
             <td class="label">TOP</td>
             <td>: {{ $quotation->top_type ?? ($quotation->customer->tempo_kredit ?? 30) . ' hari' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Telepon</td>
+            <td>: {{ $quotation->customer->phone ?? $quotation->customer->telp ?? '-' }}</td>
+            <td class="label">Dibuat Oleh</td>
+            <td>: {{ $quotation->createdBy->name ?? 'Staff Penjualan' }}</td>
+        </tr>
+        @if ($quotation->approve_at)
+        <tr>
+            <td class="label">Disetujui Oleh</td>
+            <td>: {{ $quotation->approveBy->name ?? '-' }}</td>
+            <td class="label">Tgl. Approval</td>
+            <td>: {{ \Carbon\Carbon::parse($quotation->approve_at)->format('d/m/Y H:i') }}</td>
+        </tr>
+        @endif
+        <tr>
+            <td class="label">Cabang</td>
+            <td>: {{ $quotation->cabang->nama ?? '-' }}</td>
+            <td></td>
+            <td></td>
         </tr>
     </table>
 
@@ -271,11 +291,11 @@
 
             {{-- Summary Rows --}}
             <tr class="summary-row">
-                <td colspan="9" class="right"><strong>DPP (Dasar Pengenaan Pajak)</strong></td>
+                <td colspan="10" class="right"><strong>DPP (Dasar Pengenaan Pajak)</strong></td>
                 <td class="right"><strong>{{ $formatMoney($totalDpp) }}</strong></td>
             </tr>
             <tr class="summary-row">
-                <td colspan="9" class="right"><strong>PPN (Pajak Pertambahan Nilai)</strong></td>
+                <td colspan="10" class="right"><strong>PPN (Pajak Pertambahan Nilai)</strong></td>
                 <td class="right"><strong>{{ $formatMoney($totalPpn) }}</strong></td>
             </tr>
             <tr class="summary-row total">
@@ -292,15 +312,22 @@
     </div>
     @endif
 
+    <div style="margin-top: 15px; font-size: 11px;">
+        <strong>Terbilang:</strong> <em>{{ \App\Http\Controllers\HelperController::terbilang($grandTotal) }} Rupiah</em>
+    </div>
+
     <div class="signature-section">
         <table class="signature-table">
             <tr>
                 <td>
                     <div class="signature-box">
-                        <p style="margin-bottom: 10px;">Hormat Kami,</p>
+                        <p style="margin-bottom: 10px;">
+                            Jakarta, {{ \Carbon\Carbon::parse($quotation->approve_at ?? now())->format('d/m/Y') }}<br>
+                            Hormat kami,
+                        </p>
                         <div style="height: 70px; margin: 10px 0;"></div>
                         <div class="signature-name">
-                            {{ $quotation->createdBy->name ?? 'Staff Penjualan' }}
+                            {{ $quotation->approveBy->name ?? 'PT DUTA TUNGGAL' }}
                         </div>
                     </div>
                 </td>
