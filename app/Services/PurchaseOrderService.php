@@ -28,45 +28,96 @@ class PurchaseOrderService
 
         self::$updatingTotalAmount = true;
 
-        $total = 0;
-        $purchaseOrder->loadMissing(['purchaseOrderCurrency', 'purchaseOrderItem.currency']);
-        $poCurrencies = $purchaseOrder->purchaseOrderCurrency->keyBy('currency_id');
-
-        // Hitung total dari purchase order items
-        foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            $subtotal = HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak);
-            $total += CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotal), is_numeric($item->currency_id) ? (int) $item->currency_id : null, false);
-        }
-
-        // Debug log for unit test investigation: capture computed total before persisting
         try {
-            \Illuminate\Support\Facades\Log::debug('PurchaseOrderService::updateTotalAmount computed total', ['po_id' => $purchaseOrder->id, 'total_raw' => $total]);
-        } catch (\Throwable $e) {
-            // ignore logging failures in test environments
-        }
-        // Also write to a temp file for CI-less debugging
-        try {
-            $dump = json_encode(['po_id' => $purchaseOrder->id, 'total_raw' => $total]) . PHP_EOL;
-            @file_put_contents('/tmp/po_total_debug.txt', $dump, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $e) {
-            // ignore
-        }
+            $total = $this->calculateTotalAmount($purchaseOrder);
 
-        $purchaseOrder->update([
-            'total_amount' => number_format((float) $total, 2, '.', '')
-        ]);
-
-        try {
-            $after = $purchaseOrder->fresh();
-            $dump2 = json_encode(['po_id' => $after->id, 'total_saved' => $after->total_amount]) . PHP_EOL;
-            @file_put_contents('/tmp/po_total_saved_debug.txt', $dump2, FILE_APPEND | LOCK_EX);
-        } catch (\Throwable $e) {
-            // ignore
+            $purchaseOrder->update([
+                'total_amount' => number_format((float) $total, 2, '.', '')
+            ]);
+        } finally {
+            self::$updatingTotalAmount = false;
         }
-
-        self::$updatingTotalAmount = false;
 
         return $purchaseOrder;
+    }
+
+    public function calculateTotalAmount(PurchaseOrder $purchaseOrder): float
+    {
+        $summary = $this->calculateTotalSummary($purchaseOrder);
+
+        return (float) $summary['total_idr'];
+    }
+
+    public function calculateTotalSummary(PurchaseOrder $purchaseOrder): array
+    {
+        $purchaseOrder->loadMissing(['purchaseOrderCurrency.currency', 'purchaseOrderItem.currency']);
+        $poCurrencies = $purchaseOrder->purchaseOrderCurrency->keyBy('currency_id');
+
+        $totalIdr = 0.0;
+        $items = [];
+        $currencyTotals = [];
+
+        foreach ($purchaseOrder->purchaseOrderItem as $item) {
+            $currencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
+            $subtotal = (float) HelperController::hitungSubtotal(
+                (float) ($item->quantity ?? 0),
+                (float) ($item->unit_price ?? 0),
+                (float) ($item->discount ?? 0),
+                (float) ($item->tax ?? 0),
+                $item->tipe_pajak
+            );
+
+            $rate = $this->resolvePurchaseOrderItemRate($poCurrencies, $currencyId);
+            $subtotalIdr = (float) bcmul((string) MoneyHelper::parseHighPrecision($subtotal), (string) $rate, 10);
+            $totalIdr += $subtotalIdr;
+
+            $currencyCode = $item->currency?->code ?: 'IDR';
+            $currencySymbol = $item->currency?->symbol ?: 'Rp';
+
+            if (! isset($currencyTotals[$currencyCode])) {
+                $currencyTotals[$currencyCode] = [
+                    'currency_id' => $currencyId,
+                    'currency_code' => $currencyCode,
+                    'currency_symbol' => $currencySymbol,
+                    'subtotal' => 0.0,
+                    'subtotal_idr' => 0.0,
+                    'rate' => $rate,
+                ];
+            }
+
+            $currencyTotals[$currencyCode]['subtotal'] += $subtotal;
+            $currencyTotals[$currencyCode]['subtotal_idr'] += $subtotalIdr;
+
+            $items[] = [
+                'item_id' => $item->id,
+                'currency_id' => $currencyId,
+                'currency_code' => $currencyCode,
+                'currency_symbol' => $currencySymbol,
+                'subtotal' => $subtotal,
+                'rate' => $rate,
+                'subtotal_idr' => $subtotalIdr,
+            ];
+        }
+
+        return [
+            'total_idr' => round($totalIdr, 2),
+            'items' => $items,
+            'currency_totals' => array_values($currencyTotals),
+        ];
+    }
+
+    protected function resolvePurchaseOrderItemRate($poCurrencies, ?int $currencyId): float
+    {
+        if (! $currencyId) {
+            return 1.0;
+        }
+
+        $poCurrency = $poCurrencies->get($currencyId);
+        if ($poCurrency && (float) ($poCurrency->nominal ?? 0) > 0) {
+            return (float) $poCurrency->nominal;
+        }
+
+        return CurrencyConversionResolver::resolveRate($currencyId);
     }
 
     /**

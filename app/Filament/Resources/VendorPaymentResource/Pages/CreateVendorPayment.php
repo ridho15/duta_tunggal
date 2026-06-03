@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VendorPaymentResource\Pages;
 
 use App\Filament\Resources\VendorPaymentResource;
+use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
@@ -127,8 +128,21 @@ class CreateVendorPayment extends CreateRecord
                 return;
             }
 
-            $paidSoFar = (float) VendorPayment::where('payment_request_id', $paymentRequestId)
-                ->sum('total_payment');
+            $paidSoFar = VendorPayment::where('payment_request_id', $paymentRequestId)
+                ->get()
+                ->sum(function (VendorPayment $payment) {
+                    $selectedInvoices = is_string($payment->selected_invoices)
+                        ? json_decode($payment->selected_invoices, true)
+                        : $payment->selected_invoices;
+
+                    $invoice = is_array($selectedInvoices) && !empty($selectedInvoices)
+                        ? Invoice::find((int) reset($selectedInvoices))
+                        : null;
+
+                    return $invoice
+                        ? PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $payment->total_payment)
+                        : MoneyHelper::safeParse($payment->total_payment ?? 0);
+                });
             $requestTotal = MoneyHelper::safeParse($pr->total_amount ?? 0);
 
             if ($paidSoFar >= ($requestTotal - 0.01)) {

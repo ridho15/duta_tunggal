@@ -876,6 +876,51 @@ it('approves an order request from the view page action and updates status', fun
     expect($or->fresh()->purchaseOrders()->count())->toBe(0);
 });
 
+it('approves an order request from the view page action and auto-generates a purchase order number', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->callAction('approve', data: [
+            'create_purchase_order' => true,
+            'multi_supplier' => false,
+            'order_date' => now()->toDateString(),
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 3,
+                'unit_price' => 1000,
+                'include' => true,
+            ]],
+        ])
+        ->assertHasNoActionErrors();
+
+    $purchaseOrder = $or->fresh()->purchaseOrders()->first();
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect($purchaseOrder)->not->toBeNull();
+    expect($purchaseOrder->po_number)->toStartWith('PO-' . now()->format('Ymd') . '-');
+    expect($purchaseOrder->supplier_id)->toBe($this->supplier->id);
+    expect($purchaseOrder->cabang_id)->toBe($this->cabang->id);
+});
+
 it('approves an order request from the list table action without creating purchase order', function () {
     $or = OrderRequest::factory()->create([
         'status' => 'request_approve',
@@ -945,7 +990,7 @@ it('approves an order request from the list table action and creates a single pu
 
     expect($or->fresh()->status)->toBe('approved');
     expect($or->fresh()->purchaseOrders)->toHaveCount(1);
-    expect($or->fresh()->purchaseOrders->first()->po_number)->toBe('PO-LIST-APPROVE-001');
+    expect($or->fresh()->purchaseOrders->first()->po_number)->toStartWith('PO-' . now()->format('Ymd') . '-');
 });
 
 it('approves an order request from the list table action and creates grouped purchase orders', function () {

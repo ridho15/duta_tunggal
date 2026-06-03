@@ -13,6 +13,8 @@ use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
+use App\Support\CurrencyConversionResolver;
+use App\Support\JournalCurrencyAmountResolver;
 use App\Support\OrderRequestQuantityLock;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -39,6 +41,7 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -70,6 +73,65 @@ class QualityControlPurchaseResource extends Resource
     public static function canChooseInspector(): bool
     {
         return Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
+    }
+
+    public static function formatQcPurchaseOriginalMoney(mixed $amount, ?int $currencyId): string
+    {
+        return CurrencyConversionResolver::formatAmount($currencyId, (float) $amount, 2);
+    }
+
+    public static function qcPurchaseMoneySummary(?QualityControl $qualityControl): array
+    {
+        $purchaseOrderItem = $qualityControl?->fromModel instanceof PurchaseOrderItem
+            ? $qualityControl->fromModel
+            : null;
+
+        if (! $purchaseOrderItem) {
+            return [
+                'unit_price' => '-',
+                'currency' => '-',
+                'exchange_rate' => '-',
+                'unit_price_idr' => '-',
+                'accepted_value' => '-',
+                'accepted_value_idr' => '-',
+            ];
+        }
+
+        $purchaseOrderItem->loadMissing([
+            'currency',
+            'purchaseOrder.purchaseOrderCurrency.currency',
+        ]);
+
+        $currencyId = is_numeric($purchaseOrderItem->currency_id ?? null)
+            ? (int) $purchaseOrderItem->currency_id
+            : null;
+        $poCurrency = $currencyId
+            ? $purchaseOrderItem->purchaseOrder?->purchaseOrderCurrency?->firstWhere('currency_id', $currencyId)
+            : null;
+        $resolved = JournalCurrencyAmountResolver::resolve(
+            $purchaseOrderItem->unit_price ?? 0,
+            $currencyId,
+            is_numeric($poCurrency?->nominal ?? null) ? (float) $poCurrency->nominal : null
+        );
+
+        $unitOriginal = (float) ($purchaseOrderItem->unit_price ?? 0);
+        $acceptedQty = (float) ($qualityControl?->passed_quantity ?? 0);
+        $acceptedOriginal = $unitOriginal * $acceptedQty;
+        $exchangeRate = (float) ($resolved['exchange_rate'] ?? 1);
+
+        return [
+            'unit_price' => static::formatQcPurchaseOriginalMoney($unitOriginal, $currencyId),
+            'currency' => $purchaseOrderItem->currency?->code ?? '-',
+            'exchange_rate' => \App\Helpers\MoneyHelper::rupiah($exchangeRate),
+            'unit_price_idr' => \App\Helpers\MoneyHelper::rupiah($resolved['amount_idr'] ?? 0),
+            'accepted_value' => sprintf(
+                '%s x %s = %s',
+                rtrim(rtrim(number_format($acceptedQty, 2, ',', '.'), '0'), ','),
+                static::formatQcPurchaseOriginalMoney($unitOriginal, $currencyId),
+                static::formatQcPurchaseOriginalMoney($acceptedOriginal, $currencyId)
+            ),
+            'accepted_value_idr' => \App\Helpers\MoneyHelper::rupiah($acceptedOriginal * $exchangeRate),
+        ];
     }
 
     public static function resolveQcPurchaseCabangId(?PurchaseOrderItem $purchaseOrderItem = null, ?PurchaseOrder $purchaseOrder = null): ?int
@@ -138,6 +200,110 @@ class QualityControlPurchaseResource extends Resource
     public static function getQcPurchaseEligiblePurchaseOrderStatuses(): array
     {
         return ['approved', 'partially_received'];
+    }
+
+    public static function queryPurchaseOrderId(): ?int
+    {
+        $purchaseOrderId = request()->query('purchase_order_id');
+
+        return is_numeric($purchaseOrderId) ? (int) $purchaseOrderId : null;
+    }
+
+    public static function eligiblePurchaseOrderItems(?int $purchaseOrderId = null): Collection
+    {
+        return PurchaseOrderItem::with([
+            'purchaseOrder.supplier',
+            'purchaseOrder.referModel',
+            'product.uom',
+            'qualityControls',
+            'referItemModel',
+        ])
+            ->when($purchaseOrderId, fn(Builder $query) => $query->where('purchase_order_id', $purchaseOrderId))
+            ->whereHas('purchaseOrder', function (Builder $query): void {
+                $query->whereIn('status', static::getQcPurchaseEligiblePurchaseOrderStatuses());
+            })
+            ->get()
+            ->filter(function (PurchaseOrderItem $item): bool {
+                if (! $item->purchaseOrder || ! $item->purchaseOrder->supplier || ! $item->product) {
+                    return false;
+                }
+
+                return static::purchaseOrderItemQcRemaining($item)['remaining'] > 0;
+            })
+            ->values();
+    }
+
+    public static function defaultPurchaseOrderItemForQuery(): ?PurchaseOrderItem
+    {
+        $purchaseOrderId = static::queryPurchaseOrderId();
+
+        if (! $purchaseOrderId) {
+            return null;
+        }
+
+        $items = static::eligiblePurchaseOrderItems($purchaseOrderId);
+
+        return $items->count() === 1 ? $items->first() : null;
+    }
+
+    public static function purchaseOrderItemOptionLabel(PurchaseOrderItem $item): string
+    {
+        $po = $item->purchaseOrder;
+        $supplier = $po?->supplier;
+        $product = $item->product;
+        $poNumber = $po?->po_number ?? 'N/A';
+        $supplierName = $supplier?->perusahaan ?? 'N/A';
+        $productName = $product?->name ?? 'N/A';
+        $ordered = $item->quantity ?? 0;
+        $progress = static::purchaseOrderItemQcProgressSummary($item);
+        $qcRemaining = static::purchaseOrderItemQcRemaining($item);
+        $accepted = $qcRemaining['accepted'];
+        $remaining = $qcRemaining['remaining'];
+        $statusLabel = $progress['status_label'];
+
+        return "PO: {$poNumber} - {$supplierName} - {$productName}"
+            . " (Status QC: {$statusLabel} | Ordered: {$ordered} | Accepted: {$accepted} | Sisa: {$remaining})";
+    }
+
+    public static function formStateForPurchaseOrderItem(PurchaseOrderItem $item): array
+    {
+        $item->loadMissing([
+            'product.uom',
+            'qualityControls',
+            'referItemModel',
+            'purchaseOrder.supplier',
+            'purchaseOrder.referModel',
+        ]);
+
+        $purchaseOrder = $item->purchaseOrder;
+        $cabangId = static::resolveQcPurchaseCabangId($item, $purchaseOrder);
+        $warehouseId = $purchaseOrder?->warehouse_id;
+        $remainingQty = static::purchaseOrderItemQcRemaining($item)['remaining'];
+
+        return [
+            'from_model_id' => $item->id,
+            'from_model_type' => PurchaseOrderItem::class,
+            'product_name' => $item->product?->name ?? '',
+            'sku' => $item->product?->sku ?? '',
+            'uom' => $item->product?->uom?->name ?? '',
+            'product_id' => $item->product_id,
+            'cabang_id' => $cabangId,
+            'warehouse_id' => static::warehouseMatchesQcPurchaseCabang($warehouseId ? (int) $warehouseId : null, $cabangId)
+                ? (int) $warehouseId
+                : null,
+            'rak_id' => null,
+            'quantity_received' => $remainingQty,
+            'passed_quantity' => $remainingQty,
+            'rejected_quantity' => 0,
+            'total_inspected' => $remainingQty,
+        ];
+    }
+
+    public static function applyPurchaseOrderItemStateToForm(PurchaseOrderItem $item, callable $set): void
+    {
+        foreach (static::formStateForPurchaseOrderItem($item) as $field => $value) {
+            $set($field, $value);
+        }
     }
 
     public static function getQcPurchasePurchaseOrderOptions(): array
@@ -348,6 +514,82 @@ class QualityControlPurchaseResource extends Resource
         }
     }
 
+    public static function validateQcQuantityAgainstPurchaseOrderItem(callable $get, \Closure $fail, mixed $value, string $field, ?QualityControl $currentQualityControl = null): void
+    {
+        $purchaseOrderItemId = $get('from_model_id');
+
+        if (! $purchaseOrderItemId) {
+            return;
+        }
+
+        $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
+
+        if (! $item) {
+            return;
+        }
+
+        $remainingQty = static::purchaseOrderItemQcRemaining($item, $currentQualityControl)['remaining'];
+        $numericValue = (float) ($value ?? 0);
+
+        if ($numericValue > $remainingQty) {
+            $label = match ($field) {
+                'quantity_received' => 'Quantity Received',
+                'passed_quantity' => 'Passed quantity',
+                default => 'Quantity',
+            };
+
+            $fail("{$label} ({$numericValue}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
+        }
+    }
+
+    public static function validateQcPurchaseCreateQuantities(array $data): array
+    {
+        $purchaseOrderItemId = $data['from_model_id'] ?? null;
+
+        if (! is_numeric($purchaseOrderItemId)) {
+            return $data;
+        }
+
+        $item = PurchaseOrderItem::with('qualityControls')->find((int) $purchaseOrderItemId);
+
+        if (! $item) {
+            return $data;
+        }
+
+        $remainingQty = static::purchaseOrderItemQcRemaining($item)['remaining'];
+        $quantityReceived = (float) ($data['quantity_received'] ?? 0);
+        $passedQuantity = (float) ($data['passed_quantity'] ?? 0);
+        $rejectedQuantity = (float) ($data['rejected_quantity'] ?? 0);
+        $totalInspected = $passedQuantity + $rejectedQuantity;
+        $messages = [];
+
+        if ($quantityReceived > $remainingQty) {
+            $messages['quantity_received'] = "Quantity Received ({$quantityReceived}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).";
+        }
+
+        if ($passedQuantity > $quantityReceived) {
+            $messages['passed_quantity'] = "Passed quantity ({$passedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).";
+        }
+
+        if ($passedQuantity > $remainingQty) {
+            $messages['passed_quantity'] = "Passed quantity ({$passedQuantity}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).";
+        }
+
+        if ($totalInspected > $quantityReceived) {
+            $messages['rejected_quantity'] = "Total passed dan rejected ({$totalInspected}) tidak boleh melebihi Qty Received ({$quantityReceived}).";
+        }
+
+        if ($totalInspected > $remainingQty) {
+            $messages['passed_quantity'] = "Total inspected ({$totalInspected}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).";
+        }
+
+        if ($messages !== []) {
+            throw ValidationException::withMessages($messages);
+        }
+
+        return $data;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -362,46 +604,17 @@ class QualityControlPurchaseResource extends Resource
                                 Select::make('from_model_id')
                                     ->label('Purchase Order Item')
                                     ->options(function ($context, $get) {
-                                        $query = PurchaseOrderItem::with(['purchaseOrder.supplier', 'product', 'qualityControls']);
-
                                         if ($context === 'create') {
-                                            // Tampilkan item dari PO yang masih punya sisa QC, termasuk PO partially_received
-                                            $query->whereHas('purchaseOrder', function ($q) {
-                                                $q->whereIn('status', static::getQcPurchaseEligiblePurchaseOrderStatuses());
-                                            });
+                                            return static::eligiblePurchaseOrderItems(static::queryPurchaseOrderId())
+                                                ->mapWithKeys(fn(PurchaseOrderItem $item) => [$item->id => static::purchaseOrderItemOptionLabel($item)])
+                                                ->all();
                                         }
-                                        // Saat edit, tampilkan semua item dari PO
 
-                                        return $query->get()
-                                            ->filter(function ($item) use ($context) {
-                                                // Filter out items with missing relationships to prevent errors
-                                                if (!$item->purchaseOrder || !$item->purchaseOrder->supplier || !$item->product) {
-                                                    return false;
-                                                }
-                                                // Saat create: hanya tampilkan jika masih ada sisa qty yang perlu diinspeksi
-                                                if ($context === 'create') {
-                                                    return static::purchaseOrderItemQcRemaining($item)['remaining'] > 0;
-                                                }
-                                                return true;
-                                            })
-                                            ->mapWithKeys(function ($item) {
-                                                $po           = $item->purchaseOrder;
-                                                $supplier     = $po->supplier;
-                                                $product      = $item->product;
-                                                $poNumber     = $po->po_number ?? 'N/A';
-                                                $supplierName = $supplier->perusahaan ?? 'N/A';
-                                                $productName  = $product->name ?? 'N/A';
-                                                $ordered      = $item->quantity ?? 0;
-                                                $progress     = static::purchaseOrderItemQcProgressSummary($item);
-                                                $qcRemaining  = static::purchaseOrderItemQcRemaining($item);
-                                                $accepted     = $qcRemaining['accepted'];
-                                                $remaining    = $qcRemaining['remaining'];
-                                                $statusLabel  = $progress['status_label'];
-
-                                                $label = "PO: {$poNumber} - {$supplierName} - {$productName}"
-                                                    . " (Status QC: {$statusLabel} | Ordered: {$ordered} | Accepted: {$accepted} | Sisa: {$remaining})";
-                                                return [$item->id => $label];
-                                            });
+                                        return PurchaseOrderItem::with(['purchaseOrder.supplier', 'product', 'qualityControls'])
+                                            ->get()
+                                            ->filter(fn(PurchaseOrderItem $item) => $item->purchaseOrder && $item->purchaseOrder->supplier && $item->product)
+                                            ->mapWithKeys(fn(PurchaseOrderItem $item) => [$item->id => static::purchaseOrderItemOptionLabel($item)])
+                                            ->all();
                                     })
                                     ->searchable()
                                     ->reactive()
@@ -423,33 +636,7 @@ class QualityControlPurchaseResource extends Resource
                                                 'purchaseOrder.referModel',
                                             ])->find($purchaseOrderItemId);
                                             if ($item) {
-                                                // Populate product information fields
-                                                $set('product_name', $item->product->name ?? '');
-                                                $set('sku', $item->product->sku ?? '');
-                                                $set('uom', $item->product->uom->name ?? '');
-                                                $set('product_id', $item->product_id ?? null);
-
-                                                $purchaseOrder = $item->purchaseOrder;
-                                                $cabangId = static::resolveQcPurchaseCabangId($item, $purchaseOrder);
-                                                $warehouseId = $purchaseOrder->warehouse_id ?? null;
-                                                $set('cabang_id', $cabangId);
-                                                $set(
-                                                    'warehouse_id',
-                                                    static::warehouseMatchesQcPurchaseCabang($warehouseId ? (int) $warehouseId : null, $cabangId)
-                                                        ? (int) $warehouseId
-                                                        : null
-                                                );
-                                                $set('rak_id', null);
-
-                                                // Calculate remaining qty based on existing QC records (partial QC support)
-                                                $remainingQty = static::purchaseOrderItemQcRemaining($item)['remaining'];
-
-                                                // Show remaining as "quantity to inspect this time"
-                                                $set('quantity_received', $remainingQty);
-                                                // Auto-fill passed_quantity with remaining so user just confirms
-                                                $set('passed_quantity', $remainingQty);
-                                                $set('rejected_quantity', 0);
-                                                $set('total_inspected', $remainingQty);
+                                                static::applyPurchaseOrderItemStateToForm($item, $set);
                                             }
                                         } else {
                                             $set('total_inspected', 0);
@@ -524,6 +711,13 @@ class QualityControlPurchaseResource extends Resource
                                         static::syncQcQuantityAgainstReceived($set, $get, 'quantity_received');
                                     })
                                     ->helperText('Jumlah barang yang datang/diterima dari supplier')
+                                    ->rules([
+                                        function ($get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get): void {
+                                                static::validateQcQuantityAgainstPurchaseOrderItem($get, $fail, $value, 'quantity_received');
+                                            };
+                                        },
+                                    ])
                                     ->validationMessages([
                                         'required' => 'Quantity Received wajib diisi',
                                         'numeric'  => 'Quantity Received harus berupa angka',
@@ -590,17 +784,11 @@ class QualityControlPurchaseResource extends Resource
                                             return function (string $attribute, $value, \Closure $fail) use ($get, $livewire) {
                                                 $purchaseOrderItemId = $get('from_model_id');
                                                 if ($purchaseOrderItemId) {
-                                                    $item = PurchaseOrderItem::with('qualityControls')->find($purchaseOrderItemId);
-                                                    if ($item) {
-                                                        $currentQualityControl = $livewire->record instanceof QualityControl
-                                                            ? $livewire->record
-                                                            : null;
-                                                        $remainingQty = static::purchaseOrderItemQcRemaining($item, $currentQualityControl)['remaining'];
+                                                    $currentQualityControl = $livewire->record instanceof QualityControl
+                                                        ? $livewire->record
+                                                        : null;
 
-                                                        if ((float) $value > $remainingQty) {
-                                                            $fail("Passed quantity ({$value}) melebihi sisa qty yang perlu diinspeksi ({$remainingQty}).");
-                                                        }
-                                                    }
+                                                    static::validateQcQuantityAgainstPurchaseOrderItem($get, $fail, $value, 'passed_quantity', $currentQualityControl);
                                                 }
 
                                                 static::validateQcQuantityAgainstReceived($get, $fail, $value);
@@ -1138,7 +1326,24 @@ class QualityControlPurchaseResource extends Resource
                         TextEntry::make('fromModel.purchaseOrder.po_number')->label('PO Number'),
                         TextEntry::make('fromModel.purchaseOrder.supplier.perusahaan')->label('Supplier'),
                         TextEntry::make('fromModel.quantity')->label('Ordered Quantity'),
-                        TextEntry::make('fromModel.unit_price')->label('Unit Price')->formatStateUsing(fn($state) => \App\Helpers\MoneyHelper::rupiah($state))
+                        TextEntry::make('qc_purchase_unit_price')
+                            ->label('Unit Price')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['unit_price']),
+                        TextEntry::make('qc_purchase_currency')
+                            ->label('Currency')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['currency']),
+                        TextEntry::make('qc_purchase_exchange_rate')
+                            ->label('Exchange Rate')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['exchange_rate']),
+                        TextEntry::make('qc_purchase_unit_price_idr')
+                            ->label('Unit Price (IDR)')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['unit_price_idr']),
+                        TextEntry::make('qc_purchase_accepted_value')
+                            ->label('QC Accepted Value')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['accepted_value']),
+                        TextEntry::make('qc_purchase_accepted_value_idr')
+                            ->label('QC Accepted Value (IDR)')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['accepted_value_idr']),
                     ])->columns(2),
                 InfolistSection::make('Quality Control Results')
                     ->schema([

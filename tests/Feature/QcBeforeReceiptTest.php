@@ -20,6 +20,7 @@ use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Services\BalanceSheetService;
 use App\Services\QualityControlService;
 use Database\Seeders\ChartOfAccountSeeder;
@@ -271,6 +272,7 @@ class QcBeforeReceiptTest extends TestCase
 
         $receipt = PurchaseReceipt::where('purchase_order_id', $po->id)->first();
         $this->assertNotNull($receipt);
+        $this->assertEquals($usd->id, (int) $receipt->currency_id);
 
         $receiptItem = PurchaseReceiptItem::where('purchase_receipt_id', $receipt->id)
             ->where('product_id', $this->product->id)
@@ -291,6 +293,179 @@ class QcBeforeReceiptTest extends TestCase
             'credit' => 80000,
             'currency_id' => $usd->id,
         ]);
+    }
+
+    #[Test]
+    public function qc_purchase_money_summary_displays_original_currency_and_idr_equivalent()
+    {
+        $usd = Currency::factory()->create([
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'code' => 'USD',
+            'to_rupiah' => 15000,
+        ]);
+
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        PurchaseOrderCurrency::create([
+            'purchase_order_id' => $po->id,
+            'currency_id' => $usd->id,
+            'nominal' => 15000,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 50.67,
+            'discount' => 0,
+            'tax' => 11,
+            'tipe_pajak' => 'eklusif',
+            'currency_id' => $usd->id,
+        ]);
+
+        $qc = QualityControl::factory()->create([
+            'from_model_type' => PurchaseOrderItem::class,
+            'from_model_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'quantity_received' => 5,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 1,
+        ]);
+
+        $summary = QualityControlPurchaseResource::qcPurchaseMoneySummary($qc->fresh());
+
+        $this->assertSame('$ 50,67', $summary['unit_price']);
+        $this->assertNotSame('Rp 50,67', $summary['unit_price']);
+        $this->assertSame('USD', $summary['currency']);
+        $this->assertSame('Rp 15.000,00', $summary['exchange_rate']);
+        $this->assertSame('Rp 760.050,00', $summary['unit_price_idr']);
+        $this->assertSame('5 x $ 50,67 = $ 253,35', $summary['accepted_value']);
+        $this->assertSame('Rp 3.800.250,00', $summary['accepted_value_idr']);
+    }
+
+    #[Test]
+    public function repair_qc_receipt_currencies_command_dry_runs_and_applies_mismatches()
+    {
+        $usd = Currency::factory()->create([
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'code' => 'USD',
+            'to_rupiah' => 15000,
+        ]);
+
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $this->product->id,
+            'quantity' => 5,
+            'unit_price' => 50.67,
+            'currency_id' => $usd->id,
+        ]);
+
+        $qc = QualityControl::factory()->create([
+            'qc_number' => 'QC-P-REPAIR-001',
+            'from_model_type' => PurchaseOrderItem::class,
+            'from_model_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'quantity_received' => 5,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 1,
+        ]);
+
+        $receipt = PurchaseReceipt::create([
+            'receipt_number' => 'RN-QC-REPAIR-001',
+            'purchase_order_id' => $po->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'notes' => 'Auto-created from QC: ' . $qc->qc_number,
+            'currency_id' => $this->currency->id,
+            'status' => 'completed',
+        ]);
+
+        PurchaseReceiptItem::create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 5,
+            'qty_accepted' => 5,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 'completed',
+        ]);
+
+        $manualReceipt = PurchaseReceipt::create([
+            'receipt_number' => 'RN-QC-MANUAL-001',
+            'purchase_order_id' => $po->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'notes' => 'Manual receipt with mismatched currency',
+            'currency_id' => $this->currency->id,
+            'status' => 'completed',
+        ]);
+
+        PurchaseReceiptItem::create([
+            'purchase_receipt_id' => $manualReceipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 1,
+            'qty_accepted' => 1,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 'completed',
+        ]);
+
+        $multiItemReceipt = PurchaseReceipt::create([
+            'receipt_number' => 'RN-QC-MULTI-001',
+            'purchase_order_id' => $po->id,
+            'receipt_date' => now(),
+            'received_by' => $this->user->id,
+            'notes' => 'Auto-created from QC: ' . $qc->qc_number,
+            'currency_id' => $this->currency->id,
+            'status' => 'completed',
+        ]);
+
+        foreach ([1, 2] as $index) {
+            PurchaseReceiptItem::create([
+                'purchase_receipt_id' => $multiItemReceipt->id,
+                'purchase_order_item_id' => $poItem->id,
+                'product_id' => $this->product->id,
+                'qty_received' => $index,
+                'qty_accepted' => $index,
+                'qty_rejected' => 0,
+                'warehouse_id' => $this->warehouse->id,
+                'status' => 'completed',
+            ]);
+        }
+
+        $this->artisan('procurement:repair-qc-receipt-currencies', ['--qc' => $qc->id])
+            ->expectsOutputToContain('Dry run only')
+            ->assertSuccessful();
+
+        $this->assertEquals($this->currency->id, (int) $receipt->fresh()->currency_id);
+        $this->assertEquals($this->currency->id, (int) $manualReceipt->fresh()->currency_id);
+        $this->assertEquals($this->currency->id, (int) $multiItemReceipt->fresh()->currency_id);
+
+        $this->artisan('procurement:repair-qc-receipt-currencies', ['--qc' => $qc->id, '--apply' => true])
+            ->expectsOutputToContain('Updated 1 receipt currency header')
+            ->assertSuccessful();
+
+        $this->assertEquals($usd->id, (int) $receipt->fresh()->currency_id);
+        $this->assertEquals($this->currency->id, (int) $manualReceipt->fresh()->currency_id);
+        $this->assertEquals($this->currency->id, (int) $multiItemReceipt->fresh()->currency_id);
     }
 
     #[Test]

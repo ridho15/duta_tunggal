@@ -14,6 +14,11 @@ class ViewPurchaseInvoice extends ViewRecord
 {
     protected static string $resource = PurchaseInvoiceResource::class;
 
+    protected function canManageStatus(): bool
+    {
+        return PurchaseInvoiceResource::canManuallySetStatus();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -43,7 +48,7 @@ class ViewPurchaseInvoice extends ViewRecord
                 ->label('Mark as Sent')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('warning')
-                ->visible(fn ($record) => $record->status === 'draft')
+                ->visible(fn ($record) => $record->status === 'draft' && $this->canManageStatus())
                 ->requiresConfirmation()
                 ->modalHeading('Mark Invoice as Sent')
                 ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')

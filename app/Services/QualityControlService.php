@@ -8,6 +8,7 @@ use App\Models\QualityControl;
 use App\Models\JournalEntry;
 use App\Models\StockMovement;
 use App\Models\ChartOfAccount;
+use App\Models\Currency;
 use App\Services\ReturnProductService;
 use App\Support\JournalCurrencyAmountResolver;
 use App\Support\OrderRequestQuantityLock;
@@ -23,6 +24,27 @@ class QualityControlService
     public function resolveQcJournalUnitPriceIdr(mixed $unitPrice, ?int $currencyId = null, ?float $historicalRate = null): array
     {
         return JournalCurrencyAmountResolver::resolve($unitPrice, $currencyId, $historicalRate);
+    }
+
+    protected function resolveAutoReceiptCurrencyId($purchaseOrderItem, ?PurchaseOrder $purchaseOrder = null): ?int
+    {
+        if (is_numeric($purchaseOrderItem?->currency_id ?? null)) {
+            return (int) $purchaseOrderItem->currency_id;
+        }
+
+        $purchaseOrder?->loadMissing('purchaseOrderCurrency');
+
+        $poCurrencyId = $purchaseOrder?->purchaseOrderCurrency?->first()?->currency_id;
+        if (is_numeric($poCurrencyId)) {
+            return (int) $poCurrencyId;
+        }
+
+        $idrCurrencyId = Currency::whereRaw('UPPER(code) = ?', ['IDR'])->value('id');
+        if (is_numeric($idrCurrencyId)) {
+            return (int) $idrCurrencyId;
+        }
+
+        return Currency::query()->value('id') ?: 1;
     }
 
     public function generateQcNumber()
@@ -1033,7 +1055,7 @@ class QualityControlService
             'receipt_date' => now(),
             'received_by' => Auth::id() ?? $data['received_by'] ?? 1,
             'notes' => 'Auto-created from QC: ' . $qualityControl->qc_number,
-            'currency_id' => $purchaseOrder->purchaseOrderCurrency->first()?->currency_id ?? 1,
+            'currency_id' => $this->resolveAutoReceiptCurrencyId($purchaseOrderItem, $purchaseOrder),
             'status' => 'completed',
             'cabang_id' => $purchaseOrder->cabang_id,
         ]);

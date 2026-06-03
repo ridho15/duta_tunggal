@@ -11,8 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('order_request_items')) {
+            return;
+        }
+
         Schema::table('order_request_items', function (Blueprint $table) {
-            $table->decimal('fulfilled_quantity', 15, 2)->default(0)->after('quantity');
+            if (! Schema::hasColumn('order_request_items', 'fulfilled_quantity')) {
+                $table->decimal('fulfilled_quantity', 15, 2)->default(0)->after('quantity');
+            }
         });
     }
 
@@ -21,8 +27,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('order_request_items')) {
+            return;
+        }
+
         Schema::table('order_request_items', function (Blueprint $table) {
-            $table->dropColumn('fulfilled_quantity');
+            if (Schema::hasColumn('order_request_items', 'fulfilled_quantity')) {
+                $table->dropColumn('fulfilled_quantity');
+            }
         });
     }
 };

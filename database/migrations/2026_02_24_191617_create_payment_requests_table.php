@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('payment_requests')) {
+            return;
+        }
+
         Schema::create('payment_requests', function (Blueprint $table) {
             $table->id();
             $table->string('request_number')->unique()->comment('Auto-generated PR number');

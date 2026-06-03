@@ -287,3 +287,114 @@ test('mixed currency scenario: one item IDR, one item USD', function () {
     expect((float)$item1->unit_price)->toBe(150000.0);
     expect((float)$item2->unit_price)->toBe(10.0);
 });
+
+test('order request save preserves IDR anchor instead of recalculating from rounded USD display', function () {
+    $data = OrderRequestResource::mutateFormDataBeforeSave([
+        'orderRequestItem' => [[
+            'product_id' => $this->product->id,
+            'supplier_id' => $this->supplier->id,
+            'quantity' => 1,
+            'currency_id' => $this->currencyUsd->id,
+            'unit_price' => '117,33',
+            'original_price' => '117,33',
+            'unit_price_idr' => '1760000',
+            'original_price_idr' => '1760000',
+            'discount' => 0,
+            'tipe_pajak' => 'none',
+        ]],
+    ]);
+
+    $item = $data['orderRequestItem'][0];
+
+    expect((float) $item['unit_price_idr'])->toBe(1760000.0);
+    expect((float) $item['original_price_idr'])->toBe(1760000.0);
+    expect((float) $item['unit_price'])->toBeGreaterThan(117.3333);
+    expect((float) $item['unit_price'])->toBeLessThan(117.3334);
+});
+
+test('order request item model does not overwrite existing anchors on save', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'created_by' => $this->user->id,
+        'currency_id' => $this->currencyUsd->id,
+        'request_date' => now()->toDateString(),
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'quantity' => 1,
+        'currency_id' => $this->currencyUsd->id,
+        'unit_price' => 117.33,
+        'original_price' => 117.33,
+        'unit_price_idr' => 1760000,
+        'original_price_idr' => 1760000,
+        'discount' => 0,
+        'tipe_pajak' => 'none',
+    ]);
+
+    $item->note = 'saved without price change';
+    $item->save();
+    $item->refresh();
+
+    expect((float) $item->unit_price_idr)->toBe(1760000.0);
+    expect((float) $item->original_price_idr)->toBe(1760000.0);
+});
+
+test('explicit USD override updates anchor from the user entered USD amount', function () {
+    $anchor = OrderRequestResource::resolveOverrideAnchorFromInput('117,33', $this->currencyUsd->id);
+
+    expect((float) $anchor)->toBe(1759950.0);
+});
+
+test('repair order request currency anchors command is dry-run by default and applies manual anchors when requested', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'created_by' => $this->user->id,
+        'currency_id' => $this->currencyUsd->id,
+        'request_date' => now()->toDateString(),
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'quantity' => 1,
+        'currency_id' => $this->currencyUsd->id,
+        'unit_price' => 117.33,
+        'original_price' => 117.33,
+        'unit_price_idr' => 1759950,
+        'original_price_idr' => 1759950,
+        'discount' => 0,
+        'tipe_pajak' => 'none',
+    ]);
+
+    $this->artisan('procurement:repair-order-request-currency-anchors', [
+        '--item' => $item->id,
+        '--unit-idr' => '1760000',
+        '--original-idr' => '1760000',
+    ])->assertSuccessful();
+
+    $item->refresh();
+    expect((float) $item->unit_price_idr)->toBe(1759950.0);
+
+    $this->artisan('procurement:repair-order-request-currency-anchors', [
+        '--item' => $item->id,
+        '--unit-idr' => '1760000',
+        '--original-idr' => '1760000',
+        '--apply' => true,
+    ])->assertSuccessful();
+
+    $item->refresh();
+    expect((float) $item->unit_price_idr)->toBe(1760000.0);
+    expect((float) $item->original_price_idr)->toBe(1760000.0);
+    expect((float) $item->unit_price)->toBeGreaterThan(117.3333);
+    expect((float) $item->unit_price)->toBeLessThan(117.3334);
+
+    $supplierPrice = $this->product->suppliers()
+        ->where('suppliers.id', $this->supplier->id)
+        ->first()
+        ->pivot
+        ->supplier_price;
+
+    expect((float) $supplierPrice)->toBe(120000.0);
+});

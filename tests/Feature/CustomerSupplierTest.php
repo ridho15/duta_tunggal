@@ -89,6 +89,37 @@ it('can create customer with credit limit', function () {
         ->and($customer->tempo_kredit)->toBe(30);
 });
 
+it('can create customer with international contact numbers', function () {
+    $customerData = [
+        'code' => 'CUST-INTL001',
+        'name' => 'International Customer',
+        'perusahaan' => 'International Company',
+        'nik_npwp' => '1234567890123456',
+        'address' => 'Global Address',
+        'telephone' => ' (+62) 830 9787 333 ',
+        'phone' => '+62 812 3456 7890',
+        'email' => 'international-customer@example.com',
+        'fax' => '+1 (439) 328-8356',
+        'tempo_kredit' => 30,
+        'kredit_limit' => 1000000,
+        'tipe_pembayaran' => 'Kredit',
+        'tipe' => 'PKP',
+        'isSpecial' => false,
+    ];
+
+    Livewire::test(CreateCustomer::class)
+        ->fillForm($customerData)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $this->assertDatabaseHas('customers', [
+        'code' => 'CUST-INTL001',
+        'telephone' => '(+62) 830 9787 333',
+        'phone' => '+62 812 3456 7890',
+        'fax' => '+1 (439) 328-8356',
+    ]);
+});
+
 it('can create supplier with payment terms', function () {
     $cabang = \App\Models\Cabang::factory()->create();
     
@@ -117,6 +148,34 @@ it('can create supplier with payment terms', function () {
     expect($supplier)
         ->not->toBeNull()
         ->and($supplier->tempo_hutang)->toBe(45);
+});
+
+it('can create supplier with international contact numbers', function () {
+    $supplierData = [
+        'code' => 'SUP-INTL001',
+        'perusahaan' => 'International Supplier Company',
+        'kontak_person' => 'Jane Doe',
+        'npwp' => '1234567890123456',
+        'address' => 'Global Supplier Address',
+        'phone' => ' (+62) 830 9787 333 ',
+        'handphone' => '+62 812 3456 7890',
+        'email' => 'international-supplier@example.com',
+        'fax' => '+1 (439) 328-8356',
+        'tempo_hutang' => 45,
+        'keterangan' => 'International supplier',
+    ];
+
+    Livewire::test(CreateSupplier::class)
+        ->fillForm($supplierData)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $this->assertDatabaseHas('suppliers', [
+        'code' => 'SUP-INTL001',
+        'phone' => '(+62) 830 9787 333',
+        'handphone' => '+62 812 3456 7890',
+        'fax' => '+1 (439) 328-8356',
+    ]);
 });
 
 it('validates customer contact information', function () {

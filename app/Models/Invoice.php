@@ -35,6 +35,8 @@ class Invoice extends Model
         'invoice_number',
         'from_model_type',
         'from_model_id',
+        'currency_id',
+        'exchange_rate',
         'invoice_date',
         'subtotal',
         'tax',
@@ -69,6 +71,8 @@ class Invoice extends Model
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
+        'currency_id' => 'integer',
+        'exchange_rate' => 'decimal:8',
         'pph22_amount' => 'float',
         'bea_masuk_amount' => 'float',
     ];
@@ -193,6 +197,16 @@ class Invoice extends Model
         $this->attributes['bea_masuk_amount'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
     }
 
+    public function setCurrencyIdAttribute(mixed $value): void
+    {
+        $this->attributes['currency_id'] = is_numeric($value) ? (int) $value : null;
+    }
+
+    public function setExchangeRateAttribute(mixed $value): void
+    {
+        $this->attributes['exchange_rate'] = $this->normalizeMoneyAttribute($value) ?? 1.0;
+    }
+
     public function setPpnRateAttribute(mixed $value): void
     {
         $this->attributes['ppn_rate'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
@@ -255,6 +269,31 @@ class Invoice extends Model
     public function getTaxTypeDisplayAttribute(): string
     {
         return TaxService::normalizeType($this->tipe_pajak ?? null);
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
+    }
+
+    public function getDisplayCurrencyAttribute(): ?Currency
+    {
+        if ($this->currency?->exists) {
+            return $this->currency;
+        }
+
+        if ($this->fromModel && method_exists($this->fromModel, 'currency')) {
+            return $this->fromModel->currency()->first();
+        }
+
+        return $this->fromModel?->currency ?? null;
+    }
+
+    public function getDisplayCurrencyIdAttribute(): ?int
+    {
+        return is_numeric($this->currency_id ?? null)
+            ? (int) $this->currency_id
+            : (is_numeric($this->fromModel?->currency_id ?? null) ? (int) $this->fromModel->currency_id : null);
     }
 
     public function getEffectivePpnRateAttribute(): float

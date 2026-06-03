@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
+use App\Rules\InternationalPhoneNumber;
 use App\Services\AssetService;
 use App\Services\InvoiceService;
 use App\Services\PurchaseOrderService;
@@ -311,6 +312,56 @@ class PurchaseOrderResource extends Resource
             'tax_nominal' => $normalizedTaxType === 'none' ? 0.0 : $taxNominal,
             'subtotal' => $normalizedTaxType === 'inklusif' ? $afterDiscount : $afterDiscount + $taxNominal,
         ];
+    }
+
+    public static function purchaseOrderTotalSummary(PurchaseOrder $record): array
+    {
+        return app(PurchaseOrderService::class)->calculateTotalSummary($record);
+    }
+
+    public static function formatPurchaseOrderIdrAmount(mixed $amount): string
+    {
+        return 'Rp ' . self::formatMoneyState($amount, null);
+    }
+
+    public static function renderPurchaseOrderItemsTotalSummary(PurchaseOrder $record): string
+    {
+        $summary = self::purchaseOrderTotalSummary($record);
+        $currencyTotals = collect($summary['currency_totals'] ?? []);
+
+        if ($currencyTotals->isEmpty()) {
+            return '-';
+        }
+
+        $lines = $currencyTotals->map(function (array $row): string {
+            $currencyId = is_numeric($row['currency_id'] ?? null) ? (int) $row['currency_id'] : null;
+            $currencyAmount = e(($row['currency_symbol'] ?? 'Rp') . ' ' . self::formatCurrencyPreviewState($row['subtotal'] ?? 0, $currencyId));
+            $idrAmount = e(self::formatPurchaseOrderIdrAmount($row['subtotal_idr'] ?? 0));
+
+            if (self::isIdrCurrency($currencyId)) {
+                return '<div>' . $idrAmount . '</div>';
+            }
+
+            return '<div>' . $currencyAmount . ' -&gt; ' . $idrAmount . '</div>';
+        })->implode('');
+
+        return '<div class="space-y-1">' . $lines . '</div>';
+    }
+
+    public static function renderPurchaseOrderTotalAmountSummary(PurchaseOrder $record): string
+    {
+        $summary = self::purchaseOrderTotalSummary($record);
+        $computedTotal = (float) ($summary['total_idr'] ?? 0);
+        $storedTotal = (float) ($record->total_amount ?? 0);
+
+        if ($storedTotal <= 0 && $computedTotal > 0) {
+            return '<div class="space-y-1">'
+                . '<div class="font-medium text-warning-600 dark:text-warning-400">' . e(self::formatPurchaseOrderIdrAmount($computedTotal)) . '</div>'
+                . '<div class="text-xs text-warning-600 dark:text-warning-400">Perlu sync: header total masih 0.</div>'
+                . '</div>';
+        }
+
+        return e(self::formatPurchaseOrderIdrAmount($storedTotal));
     }
 
     public static function isOrderRequestBackedItem(Get $get): bool
@@ -1054,7 +1105,12 @@ class PurchaseOrderResource extends Resource
                                     ->rows(3),
                                 Forms\Components\TextInput::make('phone')
                                     ->label('Telepon')
-                                    ->tel(),
+                                    ->tel()
+                                    ->telRegex('/^[0-9+\s().-]*$/')
+                                    ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                                    ->helperText('Contoh : (+62) 830 9787 333, +62 21 12345678, 07512345678')
+                                    ->rules([new InternationalPhoneNumber()])
+                                    ->maxLength(50),
                                 Forms\Components\TextInput::make('email')
                                     ->label('Email')
                                     ->email(),
@@ -2947,25 +3003,12 @@ class PurchaseOrderResource extends Resource
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('items_total')
                             ->label('Total Item')
-                            ->getStateUsing(function ($record) {
-                                $record->loadMissing('purchaseOrderItem');
-
-                                return self::formatMoneyState($record->purchaseOrderItem->sum(function ($item) {
-                                    $preview = self::calculateCurrencyPreview(
-                                        (float) ($item->quantity ?? 0),
-                                        (float) ($item->unit_price ?? 0),
-                                        (float) ($item->discount ?? 0),
-                                        (float) ($item->tax ?? 0),
-                                        self::normalizeTaxTypeValue($item->tipe_pajak ?? null),
-                                        is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null
-                                    );
-
-                                    return $preview['subtotal'];
-                                }));
-                            }),
+                            ->getStateUsing(fn($record) => self::renderPurchaseOrderItemsTotalSummary($record))
+                            ->html(),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
-                            ->getStateUsing(fn($record) => self::formatMoneyState($record->total_amount ?? 0)),
+                            ->getStateUsing(fn($record) => self::renderPurchaseOrderTotalAmountSummary($record))
+                            ->html(),
                         \Filament\Infolists\Components\TextEntry::make('currency_rates')
                             ->label('Currency / Rate')
                             ->getStateUsing(function ($record) {

@@ -7,6 +7,7 @@ use App\Filament\Resources\UserResource\Pages\ViewUser;
 use App\Models\Cabang;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Rules\InternationalPhoneNumber;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -77,8 +78,13 @@ class UserResource extends Resource
                         TextInput::make('telepon')
                             ->label('Telepon')
                             ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                            ->rules([new InternationalPhoneNumber()])
+                            ->maxLength(50)
                             ->validationMessages([
-                                'tel' => 'Format telepon tidak valid'
+                                'max' => 'Nomor telepon terlalu panjang'
                             ]),
                         TextInput::make('password')
                             ->password()

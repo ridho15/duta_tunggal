@@ -127,6 +127,31 @@ test('user can be created successfully with correct properties', function () {
         ->and(Hash::check('secret123', $user->password))->toBeTrue();
 });
 
+test('user can be created with an international phone number', function () {
+    Livewire::actingAs($this->admin)
+        ->test(CreateUser::class)
+        ->fillForm([
+            'username' => 'intluser',
+            'email' => 'intluser@example.com',
+            'password' => 'secret123',
+            'konfirmasi_password' => 'secret123',
+            'manage_type' => ['cabang'],
+            'cabang_id' => $this->branch->id,
+            'first_name' => 'Intl',
+            'last_name' => 'User',
+            'telepon' => ' (+62) 830 9787 333 ',
+            'posisi' => 'Staff',
+            'status' => true,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $this->assertDatabaseHas('users', [
+        'username' => 'intluser',
+        'telepon' => '(+62) 830 9787 333',
+    ]);
+});
+
 test('user creation handles null last_name safely', function () {
     Livewire::actingAs($this->admin)
         ->test(CreateUser::class)

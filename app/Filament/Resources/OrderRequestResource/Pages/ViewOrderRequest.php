@@ -231,19 +231,20 @@ class ViewOrderRequest extends ViewRecord
                     try {
                         $orderRequestService = app(OrderRequestService::class);
                         if ($data['create_purchase_order']) {
-                            if (!empty($data['multi_supplier'])) {
-                                $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
-                                if ($includedItems->isEmpty()) {
-                                    HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
-                                    return;
-                                }
+                            $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                            if ($includedItems->isEmpty()) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                return;
+                            }
 
-                                $groups = $includedItems->groupBy(function ($item) {
-                                    return implode('|', [
-                                        (string) ($item['item_supplier_id'] ?? ''),
-                                        (string) ($item['item_cabang_id'] ?? ''),
-                                    ]);
-                                });
+                            $groups = $includedItems->groupBy(function ($item) {
+                                return implode('|', [
+                                    (string) ($item['item_supplier_id'] ?? ''),
+                                    (string) ($item['item_cabang_id'] ?? ''),
+                                ]);
+                            });
+
+                            if (!empty($data['multi_supplier']) || $groups->count() > 1) {
                                 $created = 0;
                                 foreach ($groups as $groupItems) {
                                     $firstItem = $groupItems->first();
@@ -252,14 +253,11 @@ class ViewOrderRequest extends ViewRecord
                                     if (empty($supplierId) || empty($cabangId)) {
                                         continue;
                                     }
-                                    $poNumber = HelperController::generatePoNumber();
-                                    while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
-                                        $poNumber = HelperController::generatePoNumber();
-                                    }
 
                                     $poData = array_merge($data, [
                                         'supplier_id'    => $supplierId,
-                                        'po_number'      => $poNumber,
+                                        'cabang_id'      => $cabangId,
+                                        'po_number'      => self::generateUniquePoNumber(),
                                         'selected_items' => $groupItems->values()->toArray(),
                                         'multi_supplier' => false,
                                     ]);
@@ -273,6 +271,10 @@ class ViewOrderRequest extends ViewRecord
                                 HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                                 return;
                             }
+
+                            $data['po_number'] = self::generateUniquePoNumber();
+                            $data['supplier_id'] = $data['supplier_id'] ?? self::resolveFirstIncludedSupplierId($includedItems);
+                            $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? null);
 
                             $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                             if ($purchaseOrder) {
@@ -413,19 +415,20 @@ class ViewOrderRequest extends ViewRecord
                 })
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
-                    if (!empty($data['multi_supplier'])) {
-                        $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
-                        if ($includedItems->isEmpty()) {
-                            HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
-                            return;
-                        }
+                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                    if ($includedItems->isEmpty()) {
+                        HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                        return;
+                    }
 
-                        $groups = $includedItems->groupBy(function ($item) {
-                            return implode('|', [
-                                (string) ($item['item_supplier_id'] ?? ''),
-                                (string) ($item['item_cabang_id'] ?? ''),
-                            ]);
-                        });
+                    $groups = $includedItems->groupBy(function ($item) {
+                        return implode('|', [
+                            (string) ($item['item_supplier_id'] ?? ''),
+                            (string) ($item['item_cabang_id'] ?? ''),
+                        ]);
+                    });
+
+                    if (!empty($data['multi_supplier']) || $groups->count() > 1) {
                         $created = 0;
                         foreach ($groups as $groupItems) {
                             $firstItem = $groupItems->first();
@@ -434,15 +437,11 @@ class ViewOrderRequest extends ViewRecord
                             if (empty($supplierId) || empty($cabangId)) {
                                 continue;
                             }
-                            $poNumber = HelperController::generatePoNumber();
-                            while (PurchaseOrder::where('po_number', $poNumber)->exists()) {
-                                $poNumber = HelperController::generatePoNumber();
-                            }
 
                             $poData = array_merge($data, [
                                 'supplier_id'    => $supplierId,
                                 'cabang_id'      => $cabangId,
-                                'po_number'      => $poNumber,
+                                'po_number'      => self::generateUniquePoNumber(),
                                 'selected_items' => $groupItems->values()->toArray(),
                                 'multi_supplier' => false,
                             ]);
@@ -455,6 +454,10 @@ class ViewOrderRequest extends ViewRecord
                         return;
                     }
 
+                    $data['po_number'] = $data['po_number'] ?? self::generateUniquePoNumber();
+                    $data['supplier_id'] = $data['supplier_id'] ?? self::resolveFirstIncludedSupplierId($includedItems);
+                    $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? null);
+
                     $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                     if ($purchaseOrder) {
                         HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
@@ -465,5 +468,21 @@ class ViewOrderRequest extends ViewRecord
                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
                 })
         ];
+    }
+
+    private static function generateUniquePoNumber(): string
+    {
+        do {
+            $poNumber = HelperController::generatePoNumber();
+        } while (PurchaseOrder::where('po_number', $poNumber)->exists());
+
+        return $poNumber;
+    }
+
+    private static function resolveFirstIncludedSupplierId($includedItems): ?int
+    {
+        $supplierId = $includedItems->first()['item_supplier_id'] ?? null;
+
+        return $supplierId ? (int) $supplierId : null;
     }
 }

@@ -7,6 +7,7 @@ use App\Filament\Resources\WarehouseResource\Pages\ViewWarehouse;
 use App\Filament\Resources\WarehouseResource\RelationManagers;
 use App\Models\Cabang;
 use App\Models\Warehouse;
+use App\Rules\InternationalPhoneNumber;
 use App\Services\WarehouseService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
@@ -115,16 +116,17 @@ class WarehouseResource extends Resource
                             ->label('Alamat'),
                         TextInput::make('telepon')
                             ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
                             ->label('Telepon')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
                                 'required' => 'Nomor Telepon tidak boleh kosong',
-                                'regex' => 'Nomor Telepon tidak valid !',
                                 'max' => 'Nomor telepon terlalu panjang'
                             ])
-                            ->helperText('Contoh : 07512345678')
-                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 07512345678')
+                            ->rules([new InternationalPhoneNumber()])
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(50),
                         Checkbox::make('status')
                             ->label('Status (Aktif / Tidak Aktif)')
                             ->default(false),

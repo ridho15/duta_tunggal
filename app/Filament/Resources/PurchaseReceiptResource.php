@@ -28,10 +28,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\Alignment;
 use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -68,6 +64,16 @@ class PurchaseReceiptResource extends Resource
      * Pembuatan manual di-nonaktifkan untuk menegakkan flow: PO → QC → Receipt.
      */
     public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
     {
         return false;
     }
@@ -713,16 +719,9 @@ class PurchaseReceiptResource extends Resource
                 ActionGroup::make([
                     ViewAction::make()
                         ->color('primary'),
-                    EditAction::make()
-                        ->color('success'),
-                    DeleteAction::make()
                 ])
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array
@@ -746,7 +745,6 @@ class PurchaseReceiptResource extends Resource
         return [
             'index' => Pages\ListPurchaseReceipts::route('/'),
             'view' => ViewPurchaseReceipt::route('/{record}'),
-            'edit' => Pages\EditPurchaseReceipt::route('/{record}/edit'),
         ];
     }
 }

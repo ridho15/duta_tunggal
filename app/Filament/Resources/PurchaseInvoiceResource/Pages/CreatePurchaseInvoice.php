@@ -3,7 +3,10 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Models\Invoice;
 use App\Models\PurchaseOrder;
+use App\Services\PurchaseInvoiceAccountingService;
+use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
@@ -25,76 +28,27 @@ class CreatePurchaseInvoice extends CreateRecord
             ]);
         }
 
-        // Preserve selected_order_request for later fallback, then remove temp fields
-        $selectedOrderRequest = $data['selected_order_request'] ?? null;
         unset($data['selected_supplier']);
         unset($data['selected_order_request']); // Task 14: remove OR filter field
         
         // Task 14: Move selected POs to purchase_order_ids, remove form temp fields
         $data['purchase_order_ids'] = $data['selected_purchase_orders'] ?? [];
 
-        // Enforce branch inheritance from selected Purchase Order (first PO as source)
-        if (!empty($data['purchase_order_ids']) && is_array($data['purchase_order_ids'])) {
-            $firstPoId = collect($data['purchase_order_ids'])->filter()->first();
-            if ($firstPoId) {
-                $purchaseOrder = PurchaseOrder::find($firstPoId);
-                if ($purchaseOrder) {
-                    if (!empty($purchaseOrder->cabang_id)) {
-                        $data['cabang_id'] = $purchaseOrder->cabang_id;
-                    } else {
-                        // Try to inherit cabang from the referenced model (OrderRequest/SaleOrder)
-                        try {
-                            $referType = $purchaseOrder->refer_model_type ?? null;
-                            $referId = $purchaseOrder->refer_model_id ?? null;
-                            if (!empty($referType) && $referId) {
-                                $referModel = $referType::find($referId);
-                                if ($referModel && !empty($referModel->cabang_id)) {
-                                    $data['cabang_id'] = $referModel->cabang_id;
-                                }
-                            }
-                        } catch (\Throwable $e) {
-                            // ignore resolution errors
-                        }
-                    }
-                }
-                
-            }
-            // If selected_order_request exists, prefer its cabang as the source of truth
-            if (!empty($selectedOrderRequest)) {
-                $orderRequest = \App\Models\OrderRequest::find($selectedOrderRequest);
-                \Illuminate\Support\Facades\Log::debug('CreatePurchaseInvoice: selectedOrderRequest lookup', [
-                    'selectedOrderRequest' => $selectedOrderRequest,
-                    'found' => $orderRequest ? true : false,
-                    'orderRequestCabang' => $orderRequest->cabang_id ?? null,
-                ]);
-                if ($orderRequest) {
-                    if (!empty($orderRequest->cabang_id)) {
-                        $data['cabang_id'] = $orderRequest->cabang_id;
-                    } else {
-                        // Fallback: use order request creator's cabang or the warehouse's cabang
-                        try {
-                            $creator = \App\Models\User::find($orderRequest->created_by ?? null);
-                            if ($creator && !empty($creator->cabang_id)) {
-                                $data['cabang_id'] = $creator->cabang_id;
-                            } elseif (!empty($orderRequest->warehouse_id)) {
-                                $warehouse = \App\Models\Warehouse::find($orderRequest->warehouse_id);
-                                if ($warehouse && !empty($warehouse->cabang_id)) {
-                                    $data['cabang_id'] = $warehouse->cabang_id;
-                                }
-                            }
-                        } catch (\Throwable $e) {
-                            // ignore any lookup errors
-                        }
-                    }
-                }
-            }
+        if (!empty($data['purchase_order_ids'])) {
+            $firstPo = PurchaseOrder::find(collect($data['purchase_order_ids'])->filter()->first());
+            $poCurrency = $firstPo?->purchaseOrderCurrency()->first();
+            $data['currency_id'] = $poCurrency?->currency_id ?? $firstPo?->currency_id ?? null;
+            $data['exchange_rate'] = $poCurrency?->nominal ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null);
         }
 
         unset($data['selected_purchase_orders']);
         unset($data['selected_purchase_receipts']);
         
-        // Ensure status is set to 'paid' for automatic journal posting
-        $data['status'] = $data['status'] ?? 'paid';
+        if (! PurchaseInvoiceResource::canManuallySetStatus()) {
+            $data['status'] = Invoice::STATUS_DRAFT;
+        } else {
+            $data['status'] = $data['status'] ?? Invoice::STATUS_DRAFT;
+        }
 
         // Ensure COA fields are set with defaults if not provided
         $data['accounts_payable_coa_id'] = $data['accounts_payable_coa_id'] ?? \App\Models\ChartOfAccount::where('code', config('coa.accounts_payable', '2110'))->first()?->id;
@@ -102,44 +56,12 @@ class CreatePurchaseInvoice extends CreateRecord
         $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
         $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
 
-        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($data['subtotal'] ?? 0);
-        $data['subtotal'] = $subtotal;
-        $ppnRate = (float) ($data['ppn_rate'] ?? 0);
-        $ppnAmount = round($subtotal * $ppnRate / 100, 2);
-        $data['tax'] = $ppnRate;
-        $data['ppn_amount'] = $ppnAmount;
-
-        $otherFees = [];
-        if (isset($data['other_fees']) && is_array($data['other_fees'])) {
-            $otherFees = array_merge($otherFees, $data['other_fees']);
-        }
-
-        if (isset($data['receiptBiayaItems']) && is_array($data['receiptBiayaItems'])) {
-            $otherFees = array_merge($otherFees, $data['receiptBiayaItems']);
-        }
-
-        $data['other_fee'] = collect($otherFees)->map(function ($fee) {
-            $amount = (float) \App\Helpers\MoneyHelper::safeParse($fee['total'] ?? $fee['amount'] ?? 0);
-
-            if ($amount <= 0) {
-                return null;
-            }
-
-            return [
-                'name' => $fee['nama_biaya'] ?? $fee['name'] ?? 'Biaya Lain',
-                'amount' => $amount,
-            ];
-        })->filter()->values()->toArray();
+        $data = app(PurchaseInvoiceAccountingService::class)->normalizeFormData($data);
 
         unset($data['other_fees'], $data['receiptBiayaItems']);
 
-        // Always parse total in case it comes in as an Indonesian-formatted string (e.g. '17.000.000')
-        $parsedTotal = (float) \App\Helpers\MoneyHelper::safeParse($data['total'] ?? 0);
-        if ($parsedTotal === 0.0) {
-            $otherFeeTotal = (float) collect($data['other_fee'] ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-            $parsedTotal = $subtotal + $otherFeeTotal + $ppnAmount;
-        }
-        $data['total'] = $parsedTotal;
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? 1.0);
 
         return $data;
     }
@@ -148,13 +70,13 @@ class CreatePurchaseInvoice extends CreateRecord
     {
         try {
             if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-                foreach ($this->data['invoiceItem'] as $item) {
-                    $item['price']    = (float) \App\Helpers\MoneyHelper::safeParse($item['price'] ?? 0);
-                    $item['total']    = (float) \App\Helpers\MoneyHelper::safeParse($item['total'] ?? 0);
-                    $item['quantity'] = (float) ($item['quantity'] ?? 0);
+                $items = app(PurchaseInvoiceAccountingService::class)->normalizeInvoiceItems($this->data['invoiceItem']);
+                foreach ($items as $item) {
                     $this->record->invoiceItem()->create($item);
                 }
             }
+
+            app(PurchaseInvoiceAccountingService::class)->finaliseInvoice($this->record);
         } catch (Throwable $exception) {
             Log::error('CreatePurchaseInvoice afterCreate failed', [
                 'invoice_id' => $this->record?->id,
@@ -173,7 +95,9 @@ class CreatePurchaseInvoice extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         try {
-            return parent::handleRecordCreation($data);
+            return PurchaseInvoiceAccountingService::withoutObserverPosting(
+                fn () => parent::handleRecordCreation($data)
+            );
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (Throwable $exception) {

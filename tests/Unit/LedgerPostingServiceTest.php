@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\ChartOfAccount;
+use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\Product;
@@ -150,6 +151,79 @@ class LedgerPostingServiceTest extends TestCase
         $apEntry = $entries->where('credit', 111000)->first();
         $this->assertNotNull($apEntry);
         $this->assertEquals('2110', $apEntry->coa->code);
+    }
+
+    #[Test]
+    public function post_invoice_with_foreign_currency_persists_idr_ledger_amounts()
+    {
+        $supplier = Supplier::factory()->create();
+        $usd = Currency::factory()->create([
+            'code' => 'USD',
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'to_rupiah' => 16000,
+        ]);
+
+        $product = Product::factory()->create([
+            'inventory_coa_id' => ChartOfAccount::where('code', '1140.01')->first()->id,
+        ]);
+
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'total_amount' => 100,
+        ]);
+
+        PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => 100,
+            'currency_id' => $usd->id,
+        ]);
+
+        $po->purchaseOrderCurrency()->create([
+            'currency_id' => $usd->id,
+            'nominal' => 16000,
+        ]);
+
+        PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $po->id,
+            'cabang_id' => \App\Models\Cabang::first()->id,
+            'currency_id' => $usd->id,
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'from_model_type' => 'App\\Models\\PurchaseOrder',
+            'from_model_id' => $po->id,
+            'currency_id' => $usd->id,
+            'exchange_rate' => 16000,
+            'subtotal' => 100,
+            'tax' => 0,
+            'ppn_rate' => 0,
+            'total' => 100,
+        ]);
+
+        $result = app(LedgerPostingService::class)->postInvoice($invoice);
+
+        $this->assertEquals('posted', $result['status']);
+
+        $entries = JournalEntry::where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->get();
+
+        $this->assertCount(2, $entries);
+
+        $debitEntry = $entries->where('debit', 1600000)->first();
+        $this->assertNotNull($debitEntry);
+        $this->assertSame($usd->id, (int) $debitEntry->currency_id);
+        $this->assertSame(16000.0, (float) $debitEntry->exchange_rate);
+        $this->assertSame(100.0, (float) $debitEntry->amount_original_currency);
+
+        $creditEntry = $entries->where('credit', 1600000)->first();
+        $this->assertNotNull($creditEntry);
+        $this->assertSame($usd->id, (int) $creditEntry->currency_id);
+        $this->assertSame(16000.0, (float) $creditEntry->exchange_rate);
+        $this->assertSame(100.0, (float) $creditEntry->amount_original_currency);
     }
 
     #[Test]

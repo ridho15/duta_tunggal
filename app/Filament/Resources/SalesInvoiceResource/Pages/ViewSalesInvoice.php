@@ -14,6 +14,7 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
+use App\Support\CurrencyConversionResolver;
 
 class ViewSalesInvoice extends ViewRecord
 {
@@ -41,6 +42,9 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('invoice_number')
                                     ->label('Invoice Number'),
+                                TextEntry::make('currency_display')
+                                    ->label('Mata Uang')
+                                    ->state(fn ($record) => $record->displayCurrency?->code ? ($record->displayCurrency?->symbol . ' ' . $record->displayCurrency?->code) : '-'),
                                 TextEntry::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->date(),
@@ -79,10 +83,10 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('dpp')
                                     ->label('DPP')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                 TextEntry::make('tax_type_display')
                                     ->label('Tipe Pajak')
                                     ->badge()
@@ -101,14 +105,14 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('ppn_amount')
                                     ->label('Nominal PPN (Rp)')
-                                    ->rupiah()
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state))
                                     ->visible(fn ($record) => (float) ($record->ppn_amount ?? 0) > 0),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                 TextEntry::make('total')
                                     ->label('Grand Total')
-                                    ->rupiah()
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state))
                                     ->weight('bold')
                                     ->size('lg'),
                             ]),
@@ -146,10 +150,10 @@ class ViewSalesInvoice extends ViewRecord
                                             ->label('Quantity'),
                                         TextEntry::make('price')
                                             ->label('Price')
-                                            ->rupiah(),
+                                            ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                         TextEntry::make('total')
                                             ->label('Total')
-                                            ->rupiah(),
+                                            ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                     ]),
                             ])
                             ->columnSpanFull(),

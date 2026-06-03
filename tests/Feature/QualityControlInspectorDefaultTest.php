@@ -88,7 +88,7 @@ function createQualityControlPurchaseContext(float $quantity = 5): array
         'currency_id' => $currency->id,
     ]);
 
-    return compact('user', 'otherUser', 'warehouse', 'product', 'purchaseOrder', 'purchaseOrderItem');
+    return compact('cabang', 'user', 'otherUser', 'warehouse', 'product', 'currency', 'purchaseOrder', 'purchaseOrderItem');
 }
 
 function createQualityControlPurchaseOrderRequestBranchContext(): array
@@ -226,6 +226,126 @@ test('quality control purchase create rejects warehouse from another cabang', fu
         ])
         ->call('create')
         ->assertHasFormErrors(['warehouse_id']);
+});
+
+test('quality control purchase create query preselects one eligible purchase order item and fills remaining quantity', function () {
+    $context = createQualityControlPurchaseContext(10);
+
+    Livewire::withQueryParams(['purchase_order_id' => $context['purchaseOrder']->id])
+        ->actingAs($context['user'])
+        ->test(CreateQualityControlPurchase::class)
+        ->assertFormSet([
+            'from_model_id' => $context['purchaseOrderItem']->id,
+            'from_model_type' => PurchaseOrderItem::class,
+            'product_id' => $context['product']->id,
+            'product_name' => $context['product']->name,
+            'sku' => $context['product']->sku,
+            'cabang_id' => $context['purchaseOrder']->cabang_id,
+            'quantity_received' => 10.0,
+            'passed_quantity' => 10.0,
+            'rejected_quantity' => 0,
+            'total_inspected' => 10.0,
+        ]);
+});
+
+test('quality control purchase create query submits default remaining quantity successfully', function () {
+    $context = createQualityControlPurchaseContext(10);
+
+    Livewire::withQueryParams(['purchase_order_id' => $context['purchaseOrder']->id])
+        ->actingAs($context['user'])
+        ->test(CreateQualityControlPurchase::class)
+        ->fillForm([
+            'qc_number' => 'QC-P-QUERY-PREFILL-001',
+            'warehouse_id' => $context['warehouse']->id,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $qualityControl = QualityControl::where('qc_number', 'QC-P-QUERY-PREFILL-001')->firstOrFail();
+
+    expect($qualityControl->from_model_type)->toBe(PurchaseOrderItem::class)
+        ->and($qualityControl->from_model_id)->toBe($context['purchaseOrderItem']->id)
+        ->and((float) $qualityControl->quantity_received)->toBe(10.0)
+        ->and((float) $qualityControl->passed_quantity)->toBe(10.0)
+        ->and((float) $qualityControl->rejected_quantity)->toBe(0.0);
+});
+
+test('quality control purchase create query returns form errors when quantity exceeds remaining purchase order item quantity', function () {
+    $context = createQualityControlPurchaseContext(10);
+
+    Livewire::withQueryParams(['purchase_order_id' => $context['purchaseOrder']->id])
+        ->actingAs($context['user'])
+        ->test(CreateQualityControlPurchase::class)
+        ->fillForm([
+            'qc_number' => 'QC-P-QUERY-OVER-001',
+            'warehouse_id' => $context['warehouse']->id,
+            'quantity_received' => 100,
+            'passed_quantity' => 100,
+            'rejected_quantity' => 0,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['quantity_received', 'passed_quantity']);
+
+    expect(QualityControl::where('qc_number', 'QC-P-QUERY-OVER-001')->exists())->toBeFalse();
+});
+
+test('quality control purchase create query filters multiple eligible items to selected purchase order', function () {
+    $context = createQualityControlPurchaseContext(10);
+
+    $secondProduct = Product::factory()->forCabang($context['cabang'])->create([
+        'supplier_id' => $context['purchaseOrder']->supplier_id,
+    ]);
+    $secondItem = PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $context['purchaseOrder']->id,
+        'product_id' => $secondProduct->id,
+        'quantity' => 7,
+        'unit_price' => 1000,
+        'currency_id' => $context['currency']->id,
+    ]);
+
+    $otherContext = createQualityControlPurchaseContext(3);
+
+    $eligibleItems = QualityControlPurchaseResource::eligiblePurchaseOrderItems($context['purchaseOrder']->id)
+        ->pluck('id')
+        ->all();
+
+    expect($eligibleItems)->toContain($context['purchaseOrderItem']->id)
+        ->and($eligibleItems)->toContain($secondItem->id)
+        ->and($eligibleItems)->not->toContain($otherContext['purchaseOrderItem']->id);
+
+    Livewire::withQueryParams(['purchase_order_id' => $context['purchaseOrder']->id])
+        ->actingAs($context['user'])
+        ->test(CreateQualityControlPurchase::class)
+        ->assertFormSet([
+            'from_model_id' => null,
+        ]);
+});
+
+test('quality control purchase create query does not auto select purchase order without remaining qc quantity', function () {
+    $context = createQualityControlPurchaseContext(10);
+
+    QualityControl::factory()->create([
+        'qc_number' => 'QC-P-EXHAUSTED-001',
+        'from_model_type' => PurchaseOrderItem::class,
+        'from_model_id' => $context['purchaseOrderItem']->id,
+        'product_id' => $context['product']->id,
+        'warehouse_id' => $context['warehouse']->id,
+        'quantity_received' => 10,
+        'passed_quantity' => 10,
+        'rejected_quantity' => 0,
+        'status' => 1,
+        'inspected_by' => $context['user']->id,
+        'cabang_id' => $context['purchaseOrder']->cabang_id,
+    ]);
+
+    expect(QualityControlPurchaseResource::eligiblePurchaseOrderItems($context['purchaseOrder']->id))->toHaveCount(0);
+
+    Livewire::withQueryParams(['purchase_order_id' => $context['purchaseOrder']->id])
+        ->actingAs($context['user'])
+        ->test(CreateQualityControlPurchase::class)
+        ->assertFormSet([
+            'from_model_id' => null,
+        ]);
 });
 
 test('quality control purchase returns no warehouse options when cabang cannot be resolved', function () {

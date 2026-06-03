@@ -186,6 +186,86 @@ class OrderRequestResource extends Resource
         return $currencyCode === 'IDR' ? round($amount, 2) : $amount;
     }
 
+    public static function isIdrCurrency(?int $currencyId): bool
+    {
+        $currencyCode = Currency::find($currencyId)?->code;
+
+        return strtoupper((string) $currencyCode) === 'IDR';
+    }
+
+    public static function resolveIdrAnchorFromDisplay(mixed $anchor, mixed $displayValue, ?int $currencyId): string
+    {
+        $anchorValue = MoneyHelper::parseHighPrecision($anchor ?? 0);
+        if ((float) $anchorValue > 0) {
+            return number_format((float) $anchorValue, 2, '.', '');
+        }
+
+        return CurrencyConversionResolver::convertToIdrHighPrecision(
+            MoneyHelper::parseHighPrecision($displayValue ?? 0),
+            $currencyId
+        );
+    }
+
+    public static function convertIdrAnchorToCurrency(string|float $anchorIdr, ?int $currencyId): string
+    {
+        if (static::isIdrCurrency($currencyId)) {
+            return bcadd((string) $anchorIdr, '0', 2);
+        }
+
+        return CurrencyConversionResolver::convertFromIdrHighPrecision($anchorIdr, $currencyId);
+    }
+
+    public static function resolveOverrideAnchorFromInput(mixed $displayValue, ?int $currencyId): string
+    {
+        $price = MoneyHelper::parseHighPrecision($displayValue ?? 0);
+
+        if (static::isIdrCurrency($currencyId)) {
+            return number_format((float) $price, 2, '.', '');
+        }
+
+        return CurrencyConversionResolver::convertToIdrHighPrecision($price, $currencyId);
+    }
+
+    public static function normalizeOrderRequestItemMoneyForSave(array $item, ?int $defaultCurrencyId = null): array
+    {
+        $currencyId = is_numeric($item['currency_id'] ?? null)
+            ? (int) $item['currency_id']
+            : $defaultCurrencyId;
+
+        $unitAnchor = static::resolveIdrAnchorFromDisplay(
+            $item['unit_price_idr'] ?? 0,
+            $item['unit_price'] ?? 0,
+            $currencyId
+        );
+        $originalAnchor = static::resolveIdrAnchorFromDisplay(
+            $item['original_price_idr'] ?? 0,
+            $item['original_price'] ?? ($item['unit_price'] ?? 0),
+            $currencyId
+        );
+
+        $item['currency_id'] = $currencyId;
+        $item['unit_price_idr'] = $unitAnchor;
+        $item['original_price_idr'] = $originalAnchor;
+        $item['unit_price'] = static::convertIdrAnchorToCurrency($unitAnchor, $currencyId);
+        $item['original_price'] = static::convertIdrAnchorToCurrency($originalAnchor, $currencyId);
+
+        $qty = (float) ($item['quantity'] ?? 0);
+        $price = (float) $item['unit_price'];
+        $disc = (float) ($item['discount'] ?? 0);
+        $itemTaxType = self::normalizeItemTaxType($item['tipe_pajak'] ?? null);
+        $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
+        $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
+        $tax = self::resolveItemTaxRate($productId, $itemTaxType);
+
+        $item['tipe_pajak'] = $itemTaxType;
+        $item['tax'] = $tax;
+
+        $preview = self::calculateApprovalItemPreview($qty, $price, $disc, $tax, $taxType);
+        $item['subtotal'] = round((float) $preview['subtotal'], 2);
+
+        return $item;
+    }
+
     public static function parseCurrencyState(mixed $value): float
     {
         if ($value === null || $value === '') {
@@ -1093,6 +1173,10 @@ class OrderRequestResource extends Resource
                                                 $taxType   = self::taxServiceTypeFromItemTaxType($itemTaxType);
                                                 $quantity  = (float) ($get('quantity') ?? 0);
                                                 $unitPrice = self::parseCurrencyState($state ?? 0);
+                                                $itemCurrencyId = is_numeric($get('currency_id'))
+                                                    ? (int) $get('currency_id')
+                                                    : (is_numeric($get('../../currency_id')) ? (int) $get('../../currency_id') : null);
+                                                $set('unit_price_idr', self::resolveOverrideAnchorFromInput($state, $itemCurrencyId));
                                                 $discPct   = (float) ($get('discount') ?? 0);
                                                 $taxPct    = (float) ($get('tax') ?? 0);
                                                 $base      = $quantity * $unitPrice;
@@ -2316,27 +2400,7 @@ class OrderRequestResource extends Resource
         // Recalculate subtotals server-side (same as mutateFormDataBeforeSave)
         if (isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
             foreach ($data['orderRequestItem'] as &$item) {
-                $qty   = (float) ($item['quantity'] ?? 0);
-                $price = \App\Helpers\MoneyHelper::safeParse($item['unit_price'] ?? 0);
-                $disc  = (float) ($item['discount'] ?? 0);
-                $itemTaxType = self::normalizeItemTaxType($item['tipe_pajak'] ?? null);
-                $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
-                $tax = self::resolveItemTaxRate($productId, $itemTaxType);
-
-                $item['tipe_pajak'] = $itemTaxType;
-                $item['tax'] = $tax;
-                $item['currency_id'] = is_numeric($item['currency_id'] ?? null)
-                    ? (int) $item['currency_id']
-                    : $defaultCurrencyId;
-                $item['unit_price'] = $price;
-                $item['original_price'] = \App\Helpers\MoneyHelper::safeParse($item['original_price'] ?? $price);
-
-                $base      = $qty * $price;
-                $afterDisc = $base - $base * ($disc / 100);
-
-                $preview = self::calculateApprovalItemPreview($qty, $price, $disc, $tax, $taxType);
-                $item['subtotal'] = round((float) $preview['subtotal'], 2);
+                $item = self::normalizeOrderRequestItemMoneyForSave($item, $defaultCurrencyId);
             }
             unset($item);
         }
@@ -2356,27 +2420,7 @@ class OrderRequestResource extends Resource
         // Recalculate subtotals server-side and ignore any client-provided values
         if (isset($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
             foreach ($data['orderRequestItem'] as &$item) {
-                $qty   = (float) ($item['quantity'] ?? 0);
-                $price = \App\Helpers\MoneyHelper::safeParse($item['unit_price'] ?? 0);
-                $disc  = (float) ($item['discount'] ?? 0);
-                $itemTaxType = self::normalizeItemTaxType($item['tipe_pajak'] ?? null);
-                $taxType = self::taxServiceTypeFromItemTaxType($itemTaxType);
-                $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
-                $tax = self::resolveItemTaxRate($productId, $itemTaxType);
-
-                $item['tipe_pajak'] = $itemTaxType;
-                $item['tax'] = $tax;
-                $item['currency_id'] = is_numeric($item['currency_id'] ?? null)
-                    ? (int) $item['currency_id']
-                    : $defaultCurrencyId;
-                $item['unit_price'] = $price;
-                $item['original_price'] = \App\Helpers\MoneyHelper::safeParse($item['original_price'] ?? $price);
-
-                $base      = $qty * $price;
-                $afterDisc = $base - $base * ($disc / 100);
-
-                $preview = self::calculateApprovalItemPreview($qty, $price, $disc, $tax, $taxType);
-                $item['subtotal'] = round((float) $preview['subtotal'], 2);
+                $item = self::normalizeOrderRequestItemMoneyForSave($item, $defaultCurrencyId);
             }
             unset($item);
         }

@@ -8,6 +8,7 @@ use App\Models\AccountReceivable;
 use App\Models\Invoice;
 use App\Helpers\MoneyHelper;
 use App\Services\LedgerPostingService;
+use App\Services\PurchaseInvoiceAccountingService;
 use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
 use Carbon\Carbon;
@@ -35,6 +36,13 @@ class InvoiceObserver
 
         // Create AP or AR depending on source
         if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
+            if (PurchaseInvoiceAccountingService::isPostingDeferred()) {
+                Log::info('InvoiceObserver: purchase invoice posting deferred until items are saved', [
+                    'invoice_id' => $invoice->id,
+                ]);
+                return;
+            }
+
             $fromModel = $invoice->fromModel;
             if (! $fromModel) {
                 Log::warning('InvoiceObserver: fromModel is null for purchase invoice, skipping AP creation', [
@@ -147,7 +155,7 @@ class InvoiceObserver
         }
 
         // If invoice already paid on creation, post to ledger
-        if (strtolower($invoice->status) === Invoice::STATUS_PAID) {
+        if (strtolower($invoice->status) === Invoice::STATUS_PAID && ! PurchaseInvoiceAccountingService::isPostingDeferred()) {
             try {
                 $this->ledger->postInvoice($invoice);
             } catch (Throwable $exception) {
@@ -168,6 +176,13 @@ class InvoiceObserver
 
     public function updated(Invoice $invoice)
     {
+        if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder' && PurchaseInvoiceAccountingService::isPostingDeferred()) {
+            Log::info('InvoiceObserver: purchase invoice update posting deferred until items are saved', [
+                'invoice_id' => $invoice->id,
+            ]);
+            return;
+        }
+
         Log::info('InvoiceObserver: updated method called', [
             'invoice_id' => $invoice->id,
             'customer_name_before' => $invoice->getOriginal('customer_name'),

@@ -81,8 +81,10 @@ class PurchaseOrderItemObserver
     {
         $purchaseOrder = $purchaseOrderItem->purchaseOrder;
 
-        // When a PO item is saved, sync the parent PO's journal entries
-        if ($purchaseOrder) {
+        if ($purchaseOrder && $purchaseOrder->exists) {
+            app(\App\Services\PurchaseOrderService::class)->updateTotalAmount($purchaseOrder);
+
+            // When a PO item is saved, sync the parent PO's journal entries
             $observer = new PurchaseOrderObserver(app(\App\Services\PurchaseOrderService::class));
             $observer->syncJournalEntriesPublic($purchaseOrder);
         }
@@ -95,7 +97,9 @@ class PurchaseOrderItemObserver
     {
         // When a PO item is deleted, sync the parent PO's journal entries
         $purchaseOrder = $purchaseOrderItem->purchaseOrder;
-        if ($purchaseOrder) {
+        if ($purchaseOrder && $purchaseOrder->exists) {
+            app(\App\Services\PurchaseOrderService::class)->updateTotalAmount($purchaseOrder);
+
             $observer = new PurchaseOrderObserver(app(\App\Services\PurchaseOrderService::class));
             $observer->syncJournalEntriesPublic($purchaseOrder);
         }

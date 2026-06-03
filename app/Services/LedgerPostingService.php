@@ -21,15 +21,22 @@ class LedgerPostingService
     /**
      * Post invoice to general ledger. Creates JournalEntry rows linked to the invoice.
      */
-    public function postInvoice(Invoice $invoice): array
+    public function postInvoice(Invoice $invoice, bool $allowRepostAfterReversal = false): array
     {
         // Atomic duplicate-posting guard: lock a sentinel row (or gap lock) so that two
         // concurrent requests cannot both pass the exists() check before either commits.
-        $alreadyPosted = DB::transaction(function () use ($invoice) {
-            return JournalEntry::where('source_type', Invoice::class)
+        $alreadyPosted = DB::transaction(function () use ($invoice, $allowRepostAfterReversal) {
+            $query = JournalEntry::withoutGlobalScopes()
+                ->where('source_type', Invoice::class)
                 ->where('source_id', $invoice->id)
-                ->lockForUpdate()
-                ->exists();
+                ->lockForUpdate();
+
+            if ($allowRepostAfterReversal) {
+                $query->where('is_reversal', false)
+                    ->whereNull('reversal_of_transaction_id');
+            }
+
+            return $query->exists();
         });
         if ($alreadyPosted) {
             Log::info('Invoice already posted, skipping', ['invoice_id' => $invoice->id]);
@@ -75,10 +82,22 @@ class LedgerPostingService
         // Use fixed asset COA if it's asset purchase, otherwise inventory
         $debitCoa = $isAssetPurchase ? $fixedAssetCoa : $inventoryCoa;
 
-        // Totals
-        $subtotal = (float) $invoice->subtotal;
-        $tax = (float) $invoice->tax;
-        $total = (float) $invoice->total;
+        // Totals are stored on the invoice in the invoice's source currency.
+        // Convert once here so journal entries and financial reports stay in IDR.
+        $subtotalOriginal = (float) $invoice->subtotal;
+        $taxOriginal = (float) $invoice->tax;
+        $totalOriginal = (float) $invoice->total;
+
+        $isForeignCurrencyInvoice = $currencyId && $exchangeRate > 1.0;
+        $subtotal = $isForeignCurrencyInvoice
+            ? round($subtotalOriginal * $exchangeRate, 2)
+            : $subtotalOriginal;
+        $tax = $isForeignCurrencyInvoice
+            ? round($taxOriginal * $exchangeRate, 2)
+            : $taxOriginal;
+        $total = $isForeignCurrencyInvoice
+            ? round($totalOriginal * $exchangeRate, 2)
+            : $totalOriginal;
 
         $entries = [];
 
@@ -149,9 +168,18 @@ class LedgerPostingService
             // Fall back to legacy `tax` field for older records that stored it as a rate or absolute amount.
             $ppnAmount = 0;
             $actualPpnAmount = 0; // Track actual PPN amount that gets posted
-            $subtotalAmount = (float) ($invoice->subtotal ?? 0);
+            $subtotalAmount = $subtotal;
+            $invoice->loadMissing('invoiceItem');
+            $ppnOriginalFromItems = (float) $invoice->invoiceItem->sum('tax_amount');
             $ppnRateVal = (float) ($invoice->ppn_rate ?? 0);
-            if ($ppnRateVal > 0) {
+            if ($ppnOriginalFromItems > 0) {
+                // Purchase invoices can store an effective rate derived from rounded
+                // line-level tax amounts. Post the stored nominal tax to avoid
+                // reintroducing rounding drift in IDR journals.
+                $ppnAmount = $isForeignCurrencyInvoice
+                    ? round($ppnOriginalFromItems * $exchangeRate, 2)
+                    : round($ppnOriginalFromItems, 2);
+            } elseif ($ppnRateVal > 0) {
                 // Primary: ppn_rate stores the percentage (e.g. 11 for 11%)
                 $ppnAmount = round($subtotalAmount * ($ppnRateVal / 100), 2);
             } elseif ((float) ($invoice->tax ?? 0) > 0) {
@@ -159,8 +187,11 @@ class LedgerPostingService
                 $taxValue = (float) $invoice->tax;
                 $expectedByRate = round($subtotalAmount * ($taxValue / 100), 2);
                 $otherFeeAmount = (float) ($invoice->other_fee_total ?? 0);
+                if ($isForeignCurrencyInvoice) {
+                    $otherFeeAmount = round($otherFeeAmount * $exchangeRate, 2);
+                }
                 $looksLikeLegacyRate = $taxValue <= 100
-                    && abs(((float) $invoice->total) - ($subtotalAmount + $otherFeeAmount + $expectedByRate)) < 1;
+                    && abs($total - ($subtotalAmount + $otherFeeAmount + $expectedByRate)) < 1;
                 $ppnAmount = $looksLikeLegacyRate ? $expectedByRate : $taxValue;
             }
 
@@ -190,6 +221,9 @@ class LedgerPostingService
             // while still allowing legacy invoices without structured fees to fall
             // back to the stored grand total difference.
             $normalizedOtherFeeTotal = (float) $invoice->getOtherFeeTotalAttribute();
+            if ($isForeignCurrencyInvoice) {
+                $normalizedOtherFeeTotal = round($normalizedOtherFeeTotal * $exchangeRate, 2);
+            }
             if ($normalizedOtherFeeTotal > 0) {
                 $totalOtherFees = $normalizedOtherFeeTotal;
             } else {
@@ -893,9 +927,11 @@ class LedgerPostingService
                 ? \Carbon\Carbon::parse($reversalDate)->toDateString()
                 : now()->toDateString();
 
-            $originals = JournalEntry::where('source_type', Invoice::class)
+            $originals = JournalEntry::withoutGlobalScopes()
+                ->where('source_type', Invoice::class)
                 ->where('source_id', $invoice->id)
                 ->where('is_reversal', false)
+                ->whereNull('reversal_of_transaction_id')
                 ->get();
 
             if ($originals->isEmpty()) {
@@ -927,9 +963,11 @@ class LedgerPostingService
                 $reversals->push($reversal);
             }
 
-            JournalEntry::where('source_type', Invoice::class)
+            JournalEntry::withoutGlobalScopes()
+                ->where('source_type', Invoice::class)
                 ->where('source_id', $invoice->id)
                 ->where('is_reversal', false)
+                ->whereNull('reversal_of_transaction_id')
                 ->update(['reversal_of_transaction_id' => $reversalTransactionId]);
 
             Log::info('LedgerPostingService: invoice journal reversal created', [

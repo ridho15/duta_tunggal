@@ -6,6 +6,7 @@ use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\SaleOrder;
 use App\Services\SalesInvoiceTaxResolver;
+use App\Support\CurrencyConversionResolver;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -24,6 +25,11 @@ class CreateSalesInvoice extends CreateRecord
             }
 
             if ($saleOrder) {
+                $data['currency_id'] = $saleOrder->currency_id ?? null;
+                $data['exchange_rate'] = (float) ($saleOrder->exchange_rate ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null));
+            }
+
+            if ($saleOrder) {
                 $taxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
                 $data['tax'] = $taxData['tax'];
                 $data['ppn_rate'] = $taxData['ppn_rate'];
@@ -35,6 +41,9 @@ class CreateSalesInvoice extends CreateRecord
         unset($data['selected_customer']);
         unset($data['selected_sale_order']);
         unset($data['selected_delivery_orders']);
+
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? 1.0);
         
         return $data;
     }

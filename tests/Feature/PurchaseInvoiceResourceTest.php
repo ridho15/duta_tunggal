@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\PurchaseInvoiceResource\Pages\ViewPurchaseInvoice;
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Filament\Resources\PurchaseReceiptResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
 use App\Models\Cabang;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\JournalEntry;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
@@ -191,6 +193,210 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame(Invoice::STATUS_DRAFT, $data['status']);
     }
 
+    public function test_purchase_invoice_create_data_persists_source_currency_context()
+    {
+        $usd = Currency::factory()->create([
+            'code' => 'USD',
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'to_rupiah' => 15000,
+        ]);
+
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $po->purchaseOrderCurrency()->create([
+            'currency_id' => $usd->id,
+            'nominal' => 16000,
+        ]);
+
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+        $po->update([
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        $page = new class extends \App\Filament\Resources\PurchaseInvoiceResource\Pages\CreatePurchaseInvoice {
+            public function setTestData(array $data): array
+            {
+                $this->data = $data;
+                $method = new \ReflectionMethod($this, 'mutateFormDataBeforeCreate');
+                $method->setAccessible(true);
+
+                return $method->invoke($this, $data);
+            }
+        };
+
+        $data = $page->setTestData([
+            'selected_order_request' => $orderRequest->id,
+            'selected_purchase_orders' => [$po->id],
+            'subtotal' => '100.000,00',
+            'ppn_rate' => 11,
+            'total' => '111.000,00',
+            'invoiceItem' => [],
+        ]);
+
+        $this->assertSame($usd->id, $data['currency_id']);
+        $this->assertSame(16000.0, (float) $data['exchange_rate']);
+    }
+
+    public function test_purchase_invoice_formats_foreign_source_amount_with_idr_equivalent(): void
+    {
+        $usd = Currency::factory()->create([
+            'code' => 'USD',
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'to_rupiah' => 15000,
+        ]);
+
+        $invoice = Invoice::factory()->make([
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+        ]);
+
+        $this->assertSame(
+            'Rp 8.879.400,00 / USD 591.96',
+            PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, 591.96)
+        );
+        $this->assertSame(8879400.0, PurchaseInvoiceResource::invoiceAmountToIdr($invoice, 591.96));
+    }
+
+    public function test_purchase_invoice_edit_data_clears_import_charge_state_for_non_import_purchase_order()
+    {
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+            'is_import' => false,
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $po->id,
+            'cabang_id' => $this->cabang->id,
+            'subtotal' => 100000,
+            'pph22_amount' => 5000,
+            'bea_masuk_amount' => 7000,
+            'other_fee' => [
+                ['name' => 'PPH 22', 'amount' => 5000],
+                ['name' => 'Bea Masuk', 'amount' => 7000],
+                ['name' => 'Biaya Lain', 'amount' => 3000],
+            ],
+        ]);
+
+        $page = new class extends \App\Filament\Resources\PurchaseInvoiceResource\Pages\EditPurchaseInvoice {
+            public function setTestRecord($record): void
+            {
+                $this->record = $record;
+            }
+        };
+        $page->setTestRecord($invoice);
+
+        $method = new \ReflectionMethod($page, 'mutateFormDataBeforeFill');
+        $method->setAccessible(true);
+        $data = $method->invoke($page, []);
+
+        $this->assertSame(0.0, (float) $data['pph22_amount']);
+        $this->assertSame(0.0, (float) $data['bea_masuk_amount']);
+        $this->assertCount(1, $data['other_fees']);
+        $this->assertSame('Biaya Lain', $data['other_fees'][0]['name']);
+    }
+
+    public function test_purchase_invoice_view_uses_stored_currency_display()
+    {
+        $usd = Currency::factory()->create([
+            'code' => 'USD',
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'to_rupiah' => 15000,
+        ]);
+
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $po->purchaseOrderCurrency()->create([
+            'currency_id' => $usd->id,
+            'nominal' => 16000,
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $po->id,
+            'currency_id' => $usd->id,
+            'exchange_rate' => 16000,
+            'subtotal' => 100,
+            'ppn_rate' => 11,
+            'total' => 111,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $this->assertSame('$', $invoice->displayCurrency->symbol);
+        $this->assertSame('USD', $invoice->displayCurrency->code);
+        $this->assertSame($usd->id, $invoice->display_currency_id);
+    }
+
+    public function test_purchase_invoice_create_preserves_idr_currency_for_idr_po()
+    {
+        $idr = Currency::factory()->create([
+            'code' => 'IDR',
+            'name' => 'Rupiah',
+            'symbol' => 'Rp',
+            'to_rupiah' => 1,
+        ]);
+
+        $po = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $po->purchaseOrderCurrency()->create([
+            'currency_id' => $idr->id,
+            'nominal' => 1,
+        ]);
+
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+        $po->update([
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        $page = new class extends \App\Filament\Resources\PurchaseInvoiceResource\Pages\CreatePurchaseInvoice {
+            public function setTestData(array $data): array
+            {
+                $this->data = $data;
+                $method = new \ReflectionMethod($this, 'mutateFormDataBeforeCreate');
+                $method->setAccessible(true);
+
+                return $method->invoke($this, $data);
+            }
+        };
+
+        $data = $page->setTestData([
+            'selected_order_request' => $orderRequest->id,
+            'selected_purchase_orders' => [$po->id],
+            'subtotal' => '100.000,00',
+            'ppn_rate' => 11,
+            'total' => '111.000,00',
+            'invoiceItem' => [],
+        ]);
+
+        $this->assertSame($idr->id, $data['currency_id']);
+        $this->assertSame(1.0, (float) $data['exchange_rate']);
+    }
+
     public function test_mark_as_sent_action_shows_friendly_notification_when_update_fails()
     {
         $purchaseOrder = PurchaseOrder::factory()->create([
@@ -222,6 +428,9 @@ class PurchaseInvoiceResourceTest extends TestCase
             'price' => 20000,
             'total' => 100000,
         ]);
+
+        $this->user->syncRoles(['Super Admin']);
+        $this->actingAs($this->user);
 
         Invoice::updating(function () {
             throw new RuntimeException('simulated invoice update failure');
@@ -655,7 +864,8 @@ class PurchaseInvoiceResourceTest extends TestCase
 
     public function test_tax_and_other_fees_calculations()
     {
-        // Test ppn-only behavior: ppn_rate and tax are stored as the same percentage rate.
+        // PPN is no longer manually editable from the invoice form.
+        // Source-backed create flows set tax/ppn from PO items when receipts are selected.
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'invoice_number' => 'PINV-TAX-TEST-001',
@@ -664,7 +874,7 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'ppn_rate' => 11,
             ])
             ->assertFormSet([
-                'tax' => 11,
+                'tax' => 0,
                 'ppn_rate' => 11,
             ]);
     }
@@ -738,6 +948,376 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame(11.0, (float) $saved->ppn_rate);
         $this->assertSame(1100000.0, (float) $saved->ppn_amount);
         $this->assertSame(11200000.0, (float) $saved->total);
+    }
+
+    public function test_purchase_invoice_from_receipt_persists_full_nominal_branch_ap_and_journals(): void
+    {
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $this->supplier, $this->cabang, 10);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 720000,
+            'discount' => 0,
+            'tax' => 11,
+            'tipe_pajak' => 'eklusif',
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 'completed',
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+                'invoice_number' => 'PINV-FULL-NOMINAL-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'ppn_rate' => 5,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $invoice = Invoice::where('invoice_number', 'PINV-FULL-NOMINAL-001')
+            ->with('invoiceItem', 'accountPayable')
+            ->firstOrFail();
+
+        $this->assertSame(7200000.0, (float) $invoice->subtotal);
+        $this->assertSame(7200000.0, (float) $invoice->dpp);
+        $this->assertSame(7992000.0, (float) $invoice->total);
+        $this->assertSame(11.0, round((float) $invoice->ppn_rate, 2));
+        $this->assertSame(792000.0, (float) $invoice->ppn_amount);
+        $this->assertSame($this->cabang->id, (int) $invoice->cabang_id);
+        $this->assertSame(7200000.0, (float) $invoice->invoiceItem->first()->total);
+        $this->assertSame(11.0, (float) $invoice->invoiceItem->first()->tax_rate);
+        $this->assertSame(792000.0, (float) $invoice->invoiceItem->first()->tax_amount);
+        $this->assertSame(7992000.0, (float) $invoice->accountPayable->total);
+        $this->assertSame(7992000.0, (float) $invoice->accountPayable->remaining);
+        $this->assertSame($this->cabang->id, (int) $invoice->accountPayable->cabang_id);
+
+        $journals = JournalEntry::withoutGlobalScopes()
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->where('is_reversal', false)
+            ->get();
+
+        $this->assertSame(7992000.0, (float) $journals->sum('debit'));
+        $this->assertSame(7992000.0, (float) $journals->sum('credit'));
+        $this->assertTrue($journals->contains(fn (JournalEntry $entry) => (float) $entry->debit === 7200000.0));
+        $this->assertTrue($journals->contains(fn (JournalEntry $entry) => (float) $entry->debit === 792000.0));
+        $this->assertTrue($journals->contains(fn (JournalEntry $entry) => (float) $entry->credit === 7992000.0));
+        $this->assertTrue($journals->every(fn (JournalEntry $entry) => (int) $entry->cabang_id === $this->cabang->id));
+    }
+
+    public function test_purchase_invoice_ignores_manual_ppn_for_mixed_tax_receipts(): void
+    {
+        $secondProduct = Product::factory()->create(['cabang_id' => $this->cabang->id]);
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $this->supplier, $this->cabang, 10);
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $secondProduct, $this->supplier, $this->cabang, 10);
+
+        $taxedPoItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 100000,
+            'discount' => 0,
+            'tax' => 11,
+            'tipe_pajak' => 'eklusif',
+        ]);
+        $nonTaxPoItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $secondProduct->id,
+            'quantity' => 10,
+            'unit_price' => 100000,
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'none',
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        foreach ([[$taxedPoItem, $this->product], [$nonTaxPoItem, $secondProduct]] as [$poItem, $product]) {
+            PurchaseReceiptItem::factory()->create([
+                'purchase_receipt_id' => $receipt->id,
+                'purchase_order_item_id' => $poItem->id,
+                'product_id' => $product->id,
+                'qty_received' => 10,
+                'qty_accepted' => 10,
+                'qty_rejected' => 0,
+                'warehouse_id' => $this->warehouse->id,
+                'status' => 'completed',
+            ]);
+        }
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+                'invoice_number' => 'PINV-MIXED-TAX-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'ppn_rate' => 20,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $invoice = Invoice::where('invoice_number', 'PINV-MIXED-TAX-001')
+            ->with('invoiceItem', 'accountPayable')
+            ->firstOrFail();
+
+        $this->assertSame(2000000.0, (float) $invoice->subtotal);
+        $this->assertSame(110000.0, (float) $invoice->ppn_amount);
+        $this->assertSame(2110000.0, (float) $invoice->total);
+        $this->assertSame(5.5, round((float) $invoice->ppn_rate, 2));
+        $this->assertSame(110000.0, (float) $invoice->invoiceItem->sum('tax_amount'));
+    }
+
+    public function test_purchase_receipt_resource_is_not_manually_creatable_or_editable(): void
+    {
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => PurchaseOrder::factory()->create([
+                'supplier_id' => $this->supplier->id,
+                'cabang_id' => $this->cabang->id,
+            ])->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $this->assertFalse(PurchaseReceiptResource::canCreate());
+        $this->assertFalse(PurchaseReceiptResource::canEdit($receipt));
+        $this->assertFalse(PurchaseReceiptResource::canDelete($receipt));
+        $this->assertArrayNotHasKey('create', PurchaseReceiptResource::getPages());
+        $this->assertArrayNotHasKey('edit', PurchaseReceiptResource::getPages());
+    }
+
+    public function test_purchase_invoice_uses_receipt_branch_when_order_request_creator_has_different_branch(): void
+    {
+        $creatorBranch = Cabang::factory()->create();
+        $creator = User::factory()->create(['cabang_id' => $creatorBranch->id]);
+
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => null,
+            'created_by' => $creator->id,
+            'status' => 'approved',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $this->supplier, $this->cabang, 1);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'tax' => 0,
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 1,
+            'qty_accepted' => 1,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 'completed',
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+                'invoice_number' => 'PINV-BRANCH-SOURCE-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+                'ppn_rate' => 0,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $invoice = Invoice::where('invoice_number', 'PINV-BRANCH-SOURCE-001')
+            ->with('accountPayable')
+            ->firstOrFail();
+
+        $this->assertSame($this->cabang->id, (int) $invoice->cabang_id);
+        $this->assertNotSame($creatorBranch->id, (int) $invoice->cabang_id);
+        $this->assertSame($this->cabang->id, (int) $invoice->accountPayable->cabang_id);
+    }
+
+    public function test_purchase_invoice_audit_command_dry_runs_and_repairs_with_reversal(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 720000,
+            'tax' => 11,
+        ]);
+
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 'completed',
+        ]);
+
+        $invoice = Invoice::withoutEvents(function () use ($purchaseOrder, $receipt) {
+            return Invoice::factory()->create([
+                'invoice_number' => 'PINV-BROKEN-REPAIR-001',
+                'from_model_type' => PurchaseOrder::class,
+                'from_model_id' => $purchaseOrder->id,
+                'invoice_date' => now(),
+                'due_date' => now()->addDays(30),
+                'subtotal' => 7200,
+                'dpp' => 7200,
+                'ppn_rate' => 11,
+                'tax' => 11,
+                'total' => 7992,
+                'status' => Invoice::STATUS_DRAFT,
+                'cabang_id' => $this->cabang->id,
+                'purchase_receipts' => [$receipt->id],
+            ]);
+        });
+
+        InvoiceItem::factory()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'price' => 720000,
+            'total' => 7200000,
+        ]);
+
+        $invoice->accountPayable()->create([
+            'supplier_id' => $this->supplier->id,
+            'total' => 7992,
+            'paid' => 0,
+            'remaining' => 7992,
+            'status' => \App\Enums\PaymentStatus::UNPAID->value,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        foreach ([[7200, 0], [792, 0], [0, 7992]] as [$debit, $credit]) {
+            JournalEntry::create([
+                'coa_id' => \App\Models\ChartOfAccount::query()->first()->id,
+                'date' => now(),
+                'reference' => $invoice->invoice_number,
+                'description' => 'Broken purchase invoice journal',
+                'debit' => $debit,
+                'credit' => $credit,
+                'journal_type' => 'purchase',
+                'source_type' => Invoice::class,
+                'source_id' => $invoice->id,
+                'cabang_id' => $this->cabang->id,
+            ]);
+        }
+
+        $this->artisan('procurement:audit-purchase-invoices', ['--invoice' => $invoice->id])
+            ->expectsOutputToContain('Dry-run only')
+            ->assertSuccessful();
+
+        $this->assertSame(7992.0, (float) $invoice->fresh()->total);
+
+        $this->artisan('procurement:audit-purchase-invoices', [
+            '--invoice' => $invoice->id,
+            '--repair' => true,
+        ])->assertSuccessful();
+
+        $invoice = $invoice->fresh(['accountPayable']);
+        $this->assertSame(7200000.0, (float) $invoice->subtotal);
+        $this->assertSame(7992000.0, (float) $invoice->total);
+        $this->assertSame(7992000.0, (float) $invoice->accountPayable->total);
+
+        $this->assertGreaterThan(0, JournalEntry::withoutGlobalScopes()
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->where('is_reversal', true)
+            ->count());
+
+        $activeJournals = JournalEntry::withoutGlobalScopes()
+            ->where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->where('is_reversal', false)
+            ->whereNull('reversal_of_transaction_id')
+            ->get();
+
+        $this->assertSame(7992000.0, (float) $activeJournals->sum('debit'));
+        $this->assertSame(7992000.0, (float) $activeJournals->sum('credit'));
     }
 
     public function test_purchase_invoice_pdf_renders_ppn_once_without_legacy_tax_row()

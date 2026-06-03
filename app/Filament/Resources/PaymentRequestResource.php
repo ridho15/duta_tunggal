@@ -124,8 +124,8 @@ class PaymentRequestResource extends Resource
                                                     $dueDate = '-';
                                                     $isOverdue = false;
                                                 }
-                                                $total = number_format($invoice->total, 0, ',', '.');
-                                                $label = "{$invoice->invoice_number} - Rp {$total} (Due: {$dueDate})";
+                                                $total = PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $invoice->total);
+                                                $label = "{$invoice->invoice_number} - {$total} (Due: {$dueDate})";
                                                 if ($isOverdue) $label .= ' ⚠ TERLAMBAT';
                                                 return [$invoice->id => $label];
                                             });
@@ -144,7 +144,9 @@ class PaymentRequestResource extends Resource
                                             $set('cabang_id', $invoice->cabang_id);
                                         }
 
-                                        $total = Invoice::whereIn('id', $state)->sum('total');
+                                        $total = Invoice::whereIn('id', $state)
+                                            ->get()
+                                            ->sum(fn (Invoice $invoice) => PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $invoice->total));
                                         $set('total_amount', number_format((float) $total, 0, ',', '.'));
                                     }),
                             ]),

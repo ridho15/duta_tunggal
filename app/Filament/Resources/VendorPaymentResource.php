@@ -189,7 +189,10 @@ class VendorPaymentResource extends Resource
 
                                                 $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
                                                 $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-';
-                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: " . MoneyHelper::rupiah($invoice->total) . " - Sisa: " . MoneyHelper::rupiah($remaining) . " - Due: {$dueDate}" . $statusText;
+                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: "
+                                                    . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $invoice->total)
+                                                    . " - Sisa: " . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $remaining)
+                                                    . " - Due: {$dueDate}" . $statusText;
                                             }
 
                                             $set('has_invoices', !empty($options));
@@ -393,22 +396,24 @@ class VendorPaymentResource extends Resource
                                             ->readonly()
                                             ->columnSpan(1),
                                         TextInput::make('total_invoice')
-                                            ->label('Total Invoice')
+                                            ->label('Total Invoice Source')
                                             ->readonly()
                                             ->indonesianMoney()
+                                            ->helperText(fn ($get) => $get('total_invoice_display') ?: null)
                                             ->columnSpan(1),
                                         TextInput::make('remaining_amount')
-                                            ->label('Sisa Hutang')
+                                            ->label('Sisa Hutang Source')
                                             ->readonly()
                                             ->indonesianMoney()
+                                            ->helperText(fn ($get) => $get('remaining_amount_display') ?: null)
                                             ->columnSpan(1),
                                         TextInput::make('payment_amount')
-                                            ->label('Jumlah Pembayaran')
+                                            ->label('Jumlah Pembayaran Source')
                                             ->indonesianMoney()
                                             ->reactive()
                                             ->required()
                                             ->helperText(fn ($get) => $get('remaining_amount')
-                                                ? 'Maks: ' . MoneyHelper::rupiah($get('remaining_amount') ?? 0)
+                                                ? 'Maks: ' . ($get('remaining_amount_display') ?: MoneyHelper::rupiah($get('remaining_amount') ?? 0))
                                                 : null
                                             )
                                             ->rules([function (Get $get) {
@@ -416,7 +421,7 @@ class VendorPaymentResource extends Resource
                                                     $remaining = \App\Helpers\MoneyHelper::safeParse($get('remaining_amount') ?? 0);
                                                     $paid = \App\Helpers\MoneyHelper::safeParse($value ?? 0);
                                                     if ($paid > $remaining + 0.01) { // 0.01 tolerance for float rounding
-                                                        $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (' . MoneyHelper::rupiah($remaining) . ').');
+                                                        $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (' . ($get('remaining_amount_display') ?: MoneyHelper::rupiah($remaining)) . ').');
                                                     }
                                                 };
                                             }])
@@ -459,6 +464,8 @@ class VendorPaymentResource extends Resource
                                             })
                                             ->columnSpan(1),
                                         Hidden::make('invoice_id'),
+                                        Hidden::make('total_invoice_display')->dehydrated(false),
+                                        Hidden::make('remaining_amount_display')->dehydrated(false),
                                     ])
                                     ->columns(1)
                                     ->columnSpanFull()
@@ -548,7 +555,7 @@ class VendorPaymentResource extends Resource
                                     ->columnSpan(1),
 
                                 TextInput::make('total_payment')
-                                    ->label('Total Pembayaran')
+                                    ->label('Total Pembayaran Source')
                                     ->required()
                                     ->indonesianMoney()
                                     ->reactive()
@@ -559,7 +566,16 @@ class VendorPaymentResource extends Resource
                                         'class' => 'auto-calculated-field',
                                         'data-field' => 'total_payment'
                                     ])
-                                    ->helperText('Total ini dihitung otomatis berdasarkan invoice yang dipilih'),
+                                    ->helperText(function ($get) {
+                                        $invoiceIds = $get('selected_invoices');
+                                        $invoice = is_array($invoiceIds) && !empty($invoiceIds)
+                                            ? Invoice::find((int) reset($invoiceIds))
+                                            : null;
+
+                                        return $invoice
+                                            ? 'Total ini dihitung otomatis: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('total_payment'))
+                                            : 'Total ini dihitung otomatis berdasarkan invoice yang dipilih';
+                                    }),
 
                                 Select::make('coa_id')
                                     ->label('COA')
@@ -674,6 +690,25 @@ class VendorPaymentResource extends Resource
         return number_format((float) MoneyHelper::safeParse($value ?? 0), 2, ',', '.');
     }
 
+    protected static function formatVendorPaymentTotal(?VendorPayment $payment, mixed $amount): string
+    {
+        $invoice = null;
+        $selectedInvoices = $payment?->selected_invoices;
+        $invoiceIds = is_string($selectedInvoices) ? json_decode($selectedInvoices, true) : $selectedInvoices;
+
+        if (is_array($invoiceIds) && !empty($invoiceIds)) {
+            $invoice = Invoice::find((int) reset($invoiceIds));
+        }
+
+        if (! $invoice && $payment?->relationLoaded('vendorPaymentDetail')) {
+            $invoice = $payment->vendorPaymentDetail->first()?->invoice;
+        }
+
+        return $invoice
+            ? PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $amount)
+            : MoneyHelper::rupiah($amount);
+    }
+
     public static function calculateSelectedInvoiceTotal($invoices): float
     {
         return self::buildInvoicePaymentSnapshot($invoices)->sum('remaining_amount');
@@ -744,6 +779,8 @@ class VendorPaymentResource extends Resource
                 'total_invoice' => self::formatMoneyState($snapshot['total_amount']),
                 'remaining_amount' => self::formatMoneyState($remainingAmount),
                 'payment_amount' => self::formatMoneyState($remainingAmount),
+                'total_invoice_display' => PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $snapshot['total_amount']),
+                'remaining_amount_display' => PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $remainingAmount),
             ];
         })->toArray();
     }
@@ -866,8 +903,8 @@ class VendorPaymentResource extends Resource
                     ->placeholder('-'),
 
                 TextColumn::make('total_payment')
-                    ->label('Total Pembayaran')
-                    ->rupiah()
+                    ->label('Total Pembayaran (Rp / Source)')
+                    ->formatStateUsing(fn ($state, VendorPayment $record) => self::formatVendorPaymentTotal($record, $state))
                     ->sortable(),
 
                 TextColumn::make('payment_method')

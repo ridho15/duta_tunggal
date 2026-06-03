@@ -13,6 +13,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
 use App\Models\Cabang;
 use App\Services\InvoiceService;
+use App\Support\CurrencyConversionResolver;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -59,6 +60,141 @@ class PurchaseInvoiceResource extends Resource
         return number_format((float) MoneyHelper::safeParse($value), 2, ',', '.');
     }
 
+    public static function sourceCurrencyContextFromPurchaseOrders(mixed $purchaseOrderIds): array
+    {
+        $firstPoId = collect((array) $purchaseOrderIds)
+            ->map(fn ($value, $key) => is_bool($value) ? $key : $value)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->first();
+
+        $currencyId = null;
+        $exchangeRate = 1.0;
+
+        if ($firstPoId) {
+            $purchaseOrder = PurchaseOrder::withoutGlobalScopes()
+                ->with('purchaseOrderCurrency.currency')
+                ->find($firstPoId);
+
+            $poCurrency = $purchaseOrder?->purchaseOrderCurrency->first();
+            $currencyId = is_numeric($poCurrency?->currency_id ?? null)
+                ? (int) $poCurrency->currency_id
+                : (is_numeric($purchaseOrder?->currency_id ?? null) ? (int) $purchaseOrder->currency_id : null);
+
+            $exchangeRate = (float) ($poCurrency?->nominal ?? CurrencyConversionResolver::resolveRate($currencyId));
+        }
+
+        $currency = $currencyId ? CurrencyConversionResolver::resolveCurrency($currencyId) : null;
+        $code = strtoupper((string) ($currency?->code ?? 'IDR'));
+        $symbol = $currency?->symbol ?: ($code === 'IDR' ? 'Rp' : $code);
+
+        if ($exchangeRate <= 0) {
+            $exchangeRate = CurrencyConversionResolver::resolveRate($currencyId);
+        }
+
+        return [
+            'currency_id' => $currencyId,
+            'currency_code' => $code,
+            'currency_symbol' => $symbol,
+            'exchange_rate' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+            'is_foreign' => $code !== 'IDR' && $exchangeRate > 1.0,
+        ];
+    }
+
+    public static function sourceCurrencyContextFromInvoice(?Invoice $invoice): array
+    {
+        if (! $invoice) {
+            return static::sourceCurrencyContextFromPurchaseOrders([]);
+        }
+
+        $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : $invoice->display_currency_id;
+        $exchangeRate = (float) ($invoice->exchange_rate ?? CurrencyConversionResolver::resolveRate($currencyId));
+        $currency = $currencyId ? CurrencyConversionResolver::resolveCurrency($currencyId) : null;
+        $code = strtoupper((string) ($currency?->code ?? 'IDR'));
+        $symbol = $currency?->symbol ?: ($code === 'IDR' ? 'Rp' : $code);
+
+        return [
+            'currency_id' => $currencyId,
+            'currency_code' => $code,
+            'currency_symbol' => $symbol,
+            'exchange_rate' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+            'is_foreign' => $code !== 'IDR' && $exchangeRate > 1.0,
+        ];
+    }
+
+    public static function formatSourceCurrencyAmount(mixed $amount, array $context): string
+    {
+        $numeric = (float) MoneyHelper::safeParse($amount ?? 0);
+        $code = strtoupper((string) ($context['currency_code'] ?? 'IDR'));
+
+        if ($code === 'IDR') {
+            return MoneyHelper::rupiah($numeric);
+        }
+
+        return $code . ' ' . number_format($numeric, 2, '.', ',');
+    }
+
+    public static function formatSourceCurrencyPair(mixed $amount, array $context): string
+    {
+        $numeric = (float) MoneyHelper::safeParse($amount ?? 0);
+        $source = static::formatSourceCurrencyAmount($numeric, $context);
+
+        if (! ($context['is_foreign'] ?? false)) {
+            return $source;
+        }
+
+        $idr = MoneyHelper::rupiah(round($numeric * (float) ($context['exchange_rate'] ?? 1), 2));
+
+        return $idr . ' / ' . $source;
+    }
+
+    public static function formatInvoiceCurrencyPair(?Invoice $invoice, mixed $amount): string
+    {
+        return static::formatSourceCurrencyPair($amount, static::sourceCurrencyContextFromInvoice($invoice));
+    }
+
+    public static function invoiceAmountToIdr(?Invoice $invoice, mixed $amount): float
+    {
+        $context = static::sourceCurrencyContextFromInvoice($invoice);
+        $numeric = (float) MoneyHelper::safeParse($amount ?? 0);
+
+        return round($numeric * (float) ($context['exchange_rate'] ?? 1), 2);
+    }
+
+    protected static function formatStateCurrencyPair(mixed $get, mixed $amount): string
+    {
+        return static::formatSourceCurrencyPair($amount, static::sourceCurrencyContextFromPurchaseOrders($get('selected_purchase_orders') ?? []));
+    }
+
+    protected static function createCurrencySummaryText(mixed $purchaseOrderIds): string
+    {
+        $context = static::sourceCurrencyContextFromPurchaseOrders($purchaseOrderIds);
+
+        if (empty(array_filter((array) $purchaseOrderIds))) {
+            return 'Pilih Purchase Order untuk melihat mata uang dan rate invoice.';
+        }
+
+        return 'Mata uang invoice: ' . $context['currency_code']
+            . ' | Rate: ' . MoneyHelper::rupiah($context['exchange_rate'])
+            . ' | Nominal invoice disimpan dalam ' . $context['currency_code'] . ', tampilan utama menampilkan ekuivalen IDR.';
+    }
+
+    protected static function resolvePurchaseOrderItemForReceiptItem($receiptItem, PurchaseOrder $purchaseOrder): ?\App\Models\PurchaseOrderItem
+    {
+        if ($receiptItem?->purchaseOrderItem?->exists) {
+            return $receiptItem->purchaseOrderItem;
+        }
+
+        if (is_numeric($receiptItem?->purchase_order_item_id ?? null)) {
+            $item = $purchaseOrder->purchaseOrderItem->firstWhere('id', (int) $receiptItem->purchase_order_item_id);
+            if ($item) {
+                return $item;
+            }
+        }
+
+        return $purchaseOrder->purchaseOrderItem->firstWhere('product_id', $receiptItem?->product_id);
+    }
+
     protected static function purchaseOrderSelectionIsImport(mixed $purchaseOrderIds): bool
     {
         $normalizedPurchaseOrderIds = array_values(array_filter(array_map('intval', (array) $purchaseOrderIds)));
@@ -76,6 +212,21 @@ class PurchaseInvoiceResource extends Resource
     {
         return (float) MoneyHelper::safeParse($get('pph22_amount') ?? 0)
             + (float) MoneyHelper::safeParse($get('bea_masuk_amount') ?? 0);
+    }
+
+    protected static function readonlyInputAttributes(): array
+    {
+        return [
+            'class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400',
+            'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;',
+        ];
+    }
+
+    public static function canManuallySetStatus(): bool
+    {
+        $user = Auth::user();
+
+        return $user?->hasRole(['Super Admin', 'Owner']) === true;
     }
 
     public static function form(Form $form): Form
@@ -208,6 +359,8 @@ class PurchaseInvoiceResource extends Resource
                                         $set('invoiceItem', []);
                                         $set('receiptBiayaItems', []);
                                         $set('subtotal', 0);
+                                        $set('dpp', self::formatMoneyState(0));
+                                        $set('ppn_amount', self::formatMoneyState(0));
                                         $set('total', 0);
 
                                         // Auto-set due date based on first PO TOP
@@ -227,6 +380,11 @@ class PurchaseInvoiceResource extends Resource
                                             }
                                         }
                                     }),
+                                Placeholder::make('purchase_invoice_currency_summary')
+                                    ->label('Mata Uang / Rate')
+                                    ->content(fn ($get) => self::createCurrencySummaryText($get('selected_purchase_orders')))
+                                    ->columnSpanFull()
+                                    ->visible(fn ($get) => ! empty($get('selected_purchase_orders'))),
                             ]),
 
                         // Invoice Info Section
@@ -294,6 +452,7 @@ class PurchaseInvoiceResource extends Resource
                                     }),
 
                                 Section::make('Pajak Impor (Opsional)')
+                                    ->visible(fn ($get) => static::purchaseOrderSelectionIsImport($get('selected_purchase_orders')))
                                     ->schema([
                                         TextInput::make('pph22_amount')
                                             ->label('PPh 22 Impor')
@@ -328,7 +487,7 @@ class PurchaseInvoiceResource extends Resource
                                         $purchaseOrderIds = $get('selected_purchase_orders');
                                         if (!$purchaseOrderIds || empty($purchaseOrderIds)) return [];
 
-                                        $purchaseOrders = PurchaseOrder::with('purchaseOrderItem')
+                                        $purchaseOrders = PurchaseOrder::with(['purchaseOrderItem.currency', 'purchaseOrderCurrency.currency'])
                                             ->whereIn('id', $purchaseOrderIds)->get()->keyBy('id');
                                         if ($purchaseOrders->isEmpty()) return [];
 
@@ -348,8 +507,7 @@ class PurchaseInvoiceResource extends Resource
                                                 $isInvoiced = in_array($receipt->id, $invoicedReceiptIds);
 
                                                 $total = $receipt->purchaseReceiptItem->sum(function ($item) use ($purchaseOrder) {
-                                                    $purchaseOrderItem = $purchaseOrder->purchaseOrderItem
-                                                        ->firstWhere('product_id', $item->product_id);
+                                                    $purchaseOrderItem = self::resolvePurchaseOrderItemForReceiptItem($item, $purchaseOrder);
                                                     if ($purchaseOrderItem) {
                                                         $subtotal = $purchaseOrderItem->unit_price * $item->qty_accepted;
                                                         $discountAmount = $subtotal * ($purchaseOrderItem->discount / 100);
@@ -358,7 +516,8 @@ class PurchaseInvoiceResource extends Resource
                                                     return 0;
                                                 }) + $receipt->purchaseReceiptBiaya->sum(fn($biaya) => (float) \App\Helpers\MoneyHelper::safeParse($biaya->total ?? 0));
 
-                                                $label = "[{$purchaseOrder->po_number}] {$receipt->receipt_number} - " . \App\Helpers\MoneyHelper::rupiah($total);
+                                                $context = self::sourceCurrencyContextFromPurchaseOrders([$purchaseOrder->id]);
+                                                $label = "[{$purchaseOrder->po_number}] {$receipt->receipt_number} - " . self::formatSourceCurrencyPair($total, $context);
                                                 if ($isInvoiced) $label .= ' (Sudah di-invoice)';
                                                 $options[$receipt->id] = $label;
                                             }
@@ -403,12 +562,12 @@ class PurchaseInvoiceResource extends Resource
                                         if (!$purchaseOrderIds || empty($purchaseOrderIds) || !$supplierId) return;
 
                                         // Task 14: Load ALL selected POs, keyed by ID for quick lookup
-                                        $purchaseOrders = PurchaseOrder::with('supplier', 'purchaseOrderItem')
+                                        $purchaseOrders = PurchaseOrder::with(['supplier', 'purchaseOrderItem.currency', 'purchaseOrderCurrency.currency'])
                                             ->whereIn('id', $purchaseOrderIds)->get()->keyBy('id');
 
                                         if ($purchaseOrders->isEmpty()) return;
 
-                                        $purchaseReceipts = PurchaseReceipt::with('purchaseReceiptItem', 'purchaseReceiptBiaya')->whereIn('id', $state)->get();
+                                        $purchaseReceipts = PurchaseReceipt::with('purchaseReceiptItem.purchaseOrderItem.currency', 'purchaseReceiptBiaya')->whereIn('id', $state)->get();
 
                                         // Set supplier info from first PO
                                         $firstPo = $purchaseOrders->first();
@@ -437,8 +596,7 @@ class PurchaseInvoiceResource extends Resource
                                             $receiptPo = $purchaseOrders->get($receipt->purchase_order_id) ?? $firstPo;
 
                                             foreach ($receipt->purchaseReceiptItem as $item) {
-                                                $purchaseOrderItem = $receiptPo->purchaseOrderItem
-                                                    ->firstWhere('product_id', $item->product_id);
+                                                $purchaseOrderItem = self::resolvePurchaseOrderItemForReceiptItem($item, $receiptPo);
 
                                                 if ($purchaseOrderItem) {
                                                     // B2: DPP must be pre-tax base to avoid double PPN
@@ -464,7 +622,12 @@ class PurchaseInvoiceResource extends Resource
                                                         'product_id' => $item->product_id,
                                                         'quantity' => $item->qty_accepted,
                                                         'price' => $dppUnitPrice,
-                                                        'total' => $total
+                                                        'price_display' => self::formatSourceCurrencyPair($dppUnitPrice, self::sourceCurrencyContextFromPurchaseOrders([$receiptPo->id])),
+                                                        'subtotal' => $total,
+                                                        'total' => $total,
+                                                        'total_display' => self::formatSourceCurrencyPair($total, self::sourceCurrencyContextFromPurchaseOrders([$receiptPo->id])),
+                                                        'tax_rate' => $taxRate,
+                                                        'tax_amount' => $itemTaxAmount,
                                                     ];
 
                                                     $subtotal += $total; // Accumulate DPP (pre-tax subtotal)
@@ -480,6 +643,7 @@ class PurchaseInvoiceResource extends Resource
                                                     'receipt_id' => $receipt->id,
                                                     'nama_biaya' => $biaya->nama_biaya,
                                                     'total' => $biaya->total,
+                                                    'total_display' => self::formatSourceCurrencyPair($biaya->total, self::sourceCurrencyContextFromPurchaseOrders([$receiptPo->id])),
                                                 ];
                                             }
                                         }
@@ -504,6 +668,7 @@ class PurchaseInvoiceResource extends Resource
                                                         'receipt_id' => $receipt->id,
                                                         'nama_biaya' => $biaya->nama_biaya,
                                                         'total' => $biaya->total,
+                                                        'total_display' => self::formatSourceCurrencyPair($biaya->total, self::sourceCurrencyContextFromPurchaseOrders([$receipt->purchase_order_id ?? collect($get('selected_purchase_orders') ?? [])->first()])),
                                                     ];
                                                 }
                                             }
@@ -563,25 +728,43 @@ class PurchaseInvoiceResource extends Resource
                                             ->disabled()
                                             ->dehydrated(true),
                                         TextInput::make('price')
-                                            ->label('Harga')
+                                            ->label('Harga Source')
                                             ->indonesianMoney()
                                             ->required()
                                             ->validationMessages([
                                                 'required' => 'Harga tidak boleh kosong',
                                             ])
                                             ->dehydrated(true)
-                                            ->readOnly(),
+                                            ->readOnly()
+                                            ->extraInputAttributes(static::readonlyInputAttributes()),
+                                        TextInput::make('price_display')
+                                            ->label('Harga (Rp / Source)')
+                                            ->readOnly()
+                                            ->dehydrated(false)
+                                            ->extraInputAttributes(static::readonlyInputAttributes()),
                                         TextInput::make('total')
-                                            ->label('Total')
+                                            ->label('Total Source')
                                             ->indonesianMoney()
                                             ->required()
                                             ->validationMessages([
                                                 'required' => 'Total tidak boleh kosong',
                                             ])
                                             ->dehydrated(true)
-                                            ->readOnly(),
+                                            ->readOnly()
+                                            ->extraInputAttributes(static::readonlyInputAttributes()),
+                                        TextInput::make('total_display')
+                                            ->label('Total (Rp / Source)')
+                                            ->readOnly()
+                                            ->dehydrated(false)
+                                            ->extraInputAttributes(static::readonlyInputAttributes()),
+                                        \Filament\Forms\Components\Hidden::make('tax_rate')
+                                            ->default(0)
+                                            ->dehydrated(true),
+                                        \Filament\Forms\Components\Hidden::make('tax_amount')
+                                            ->default(0)
+                                            ->dehydrated(true),
                                     ])
-                                    ->columns(4)
+                                    ->columns(6)
                                     ->disableItemCreation()
                                     ->disableItemDeletion()
                                     ->disableItemMovement()
@@ -631,14 +814,25 @@ class PurchaseInvoiceResource extends Resource
                                         'required' => 'Nama biaya tidak boleh kosong'
                                     ]),
                                 TextInput::make('total')
-                                    ->label('Total')
+                                    ->label('Total Source')
                                     ->indonesianMoney()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, $set, $get) {
+                                        $set('total_display', self::formatSourceCurrencyPair(
+                                            $state,
+                                            self::sourceCurrencyContextFromPurchaseOrders($get('../../selected_purchase_orders') ?? [])
+                                        ));
+                                    })
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Total tidak boleh kosong',
                                     ]),
+                                TextInput::make('total_display')
+                                    ->label('Total (Rp / Source)')
+                                    ->readOnly()
+                                    ->dehydrated(false),
                             ])
-                            ->columns(2)
+                            ->columns(3)
                             ->defaultItems(0)
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
@@ -715,9 +909,11 @@ class PurchaseInvoiceResource extends Resource
                             ->columns(3)
                             ->schema([
                                 TextInput::make('dpp')
-                                    ->label('Dasar Pengenaan Pajak')
+                                    ->label('Dasar Pengenaan Pajak Source')
                                     ->indonesianMoney()
-                                    ->readonly(),
+                                    ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
+                                    ->helperText(fn ($get) => self::formatStateCurrencyPair($get, $get('dpp'))),
 
                                 \Filament\Forms\Components\Hidden::make('tax')
                                     ->default(0),
@@ -730,35 +926,17 @@ class PurchaseInvoiceResource extends Resource
                                     ])
                                     ->suffix('%')
                                     ->default(fn() => \App\Models\TaxSetting::activeRate('PPN'))
-                                    ->reactive()
-                                    ->disabled(fn($operation) => $operation === 'edit')
-                                    ->dehydrated(fn($operation) => $operation !== 'edit')
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
-                                        $otherFees = $get('other_fees') ?? [];
-                                        $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-
-                                        // Include receipt biaya in total calculation
-                                        $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['total'] ?? 0));
-                                        $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
-                                        $importChargeTotal = self::importChargeTotalFromState($get);
-                                        $taxRate = (float) \App\Helpers\MoneyHelper::safeParse($state);
-                                        $taxAmount = $subtotal * ($taxRate / 100);
-
-                                        $finalTotal = $subtotal + $totalOtherFee + $importChargeTotal + $taxAmount;
-                                        $set('total', self::formatMoneyState($finalTotal));
-                                        $set('other_fee', $totalOtherFee);
-                                        $set('tax', $taxRate);
-
-                                        // Update PPN amount display
-                                        $set('ppn_amount', self::formatMoneyState($taxAmount));
-                                    }),
+                                    ->disabled()
+                                    ->dehydrated(true)
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
+                                    ->helperText('PPN otomatis mengikuti Purchase Order / Order Request terkait.'),
 
                                 TextInput::make('ppn_amount')
-                                    ->label('Nilai PPN (Rp)')
+                                    ->label('Nilai PPN Source')
                                     ->indonesianMoney()
                                     ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
+                                    ->helperText(fn ($get) => self::formatStateCurrencyPair($get, $get('ppn_amount')))
                                     ->placeholder('0'),
                             ]),
 
@@ -766,17 +944,26 @@ class PurchaseInvoiceResource extends Resource
                         Section::make('Grand Total Invoice')
                             ->schema([
                                 TextInput::make('total')
-                                    ->label('')
+                                    ->label('Grand Total Source')
                                     ->indonesianMoney()
                                     ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
+                                    ->helperText(fn ($get) => self::formatStateCurrencyPair($get, $get('total')))
                                     ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
 
                         // Status Invoice
                         Section::make('Status Invoice')
                             ->schema([
+                                Select::make('status')
+                                    ->label('Status')
+                                    ->options(Invoice::getStatusOptions())
+                                    ->default(Invoice::STATUS_DRAFT)
+                                    ->visible(fn () => static::canManuallySetStatus())
+                                    ->disabled(fn () => !static::canManuallySetStatus()),
                                 Hidden::make('status')
-                                    ->default(Invoice::STATUS_DRAFT),
+                                    ->default(Invoice::STATUS_DRAFT)
+                                    ->visible(fn () => !static::canManuallySetStatus()),
                             ]),
 
                         // COA Selection
@@ -894,8 +1081,8 @@ class PurchaseInvoiceResource extends Resource
                                         '%s: %s x %s = %s',
                                         $productName,
                                         number_format($item->quantity, 2, ',', '.'),
-                                        \App\Helpers\MoneyHelper::rupiah($item->price),
-                                        \App\Helpers\MoneyHelper::rupiah($item->total)
+                                        self::formatInvoiceCurrencyPair($record, $item->price),
+                                        self::formatInvoiceCurrencyPair($record, $item->total)
                                     );
                                 }
                                 return $items;
@@ -906,6 +1093,9 @@ class PurchaseInvoiceResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('invoice_number')
                             ->label('Invoice Number'),
+                        Infolists\Components\TextEntry::make('display_currency')
+                            ->label('Mata Uang')
+                            ->state(fn (Invoice $record) => $record->displayCurrency?->code ? ($record->displayCurrency?->symbol . ' ' . $record->displayCurrency?->code) : '-'),
                         Infolists\Components\TextEntry::make('invoice_date')
                             ->label('Invoice Date')
                             ->date(),
@@ -914,10 +1104,7 @@ class PurchaseInvoiceResource extends Resource
                             ->date(),
                         Infolists\Components\TextEntry::make('subtotal')
                             ->label('Subtotal')
-                            ->formatStateUsing(function ($state, $record) {
-                                $currencyId = $record->from_model?->currency_id ?? null;
-                                return \App\Filament\Resources\PurchaseOrderResource::formatCurrencyPreviewState($state, $currencyId);
-                            }),
+                            ->formatStateUsing(fn ($state, Invoice $record) => self::formatInvoiceCurrencyPair($record, $state)),
                         Infolists\Components\TextEntry::make('ppn_rate')
                             ->label('PPN Rate (%)')
                             ->state(function (Invoice $record) {
@@ -925,25 +1112,16 @@ class PurchaseInvoiceResource extends Resource
                             }),
                         Infolists\Components\TextEntry::make('dpp')
                             ->label('DPP')
-                            ->formatStateUsing(function ($state, $record) {
-                                $currencyId = $record->from_model?->currency_id ?? null;
-                                return \App\Filament\Resources\PurchaseOrderResource::formatMoneyState($state, $currencyId);
-                            }),
+                            ->formatStateUsing(fn ($state, Invoice $record) => self::formatInvoiceCurrencyPair($record, $state)),
                         Infolists\Components\TextEntry::make('other_fee_total')
                             ->label('Other Fees')
-                            ->formatStateUsing(function ($state, $record) {
-                                $currencyId = $record->from_model?->currency_id ?? null;
-                                return \App\Filament\Resources\PurchaseOrderResource::formatMoneyState($state, $currencyId);
-                            })
+                            ->formatStateUsing(fn ($state, Invoice $record) => self::formatInvoiceCurrencyPair($record, $state))
                             ->state(function (Invoice $record) {
                                 return $record->getOtherFeeTotalAttribute();
                             }),
                         Infolists\Components\TextEntry::make('total')
                             ->label('Invoice Total')
-                            ->formatStateUsing(function ($state, $record) {
-                                $currencyId = $record->from_model?->currency_id ?? null;
-                                return \App\Filament\Resources\PurchaseOrderResource::formatMoneyState($state, $currencyId);
-                            }),
+                            ->formatStateUsing(fn ($state, Invoice $record) => self::formatInvoiceCurrencyPair($record, $state)),
                         Infolists\Components\TextEntry::make('status')
                             ->label('Status')
                             ->badge(),
@@ -1048,8 +1226,8 @@ class PurchaseInvoiceResource extends Resource
                     ->sortable(),
 
                 TextColumn::make('total')
-                    ->label('Total')
-                    ->rupiah()
+                    ->label('Total (Rp / Source)')
+                    ->formatStateUsing(fn ($state, Invoice $record) => self::formatInvoiceCurrencyPair($record, $state))
                     ->sortable(),
 
                 BadgeColumn::make('status')
@@ -1224,6 +1402,14 @@ class PurchaseInvoiceResource extends Resource
 
         // Remove temporary fields
         unset($data['other_fees'], $data['receiptBiayaItems']);
+
+        if (isset($data['invoiceItem']) && is_array($data['invoiceItem'])) {
+            $data['invoiceItem'] = array_map(function ($item) {
+                unset($item['price_display'], $item['total_display']);
+
+                return $item;
+            }, $data['invoiceItem']);
+        }
 
         // Calculate totals if not set - use PPN only (no separate tax)
         $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($data['subtotal'] ?? 0);

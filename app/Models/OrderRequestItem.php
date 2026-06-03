@@ -80,20 +80,24 @@ class OrderRequestItem extends Model
             $item->tax = $tax;
 
             // ── IDR Anchor ─────────────────────────────────────────────────────────
-            // Always persist unit_price and original_price converted to IDR so that
-            // subsequent currency switches can round-trip without precision drift.
-            // Example drift without anchor: 1.000.000 → $66.67 → 1.000.050 (wrong)
+            // Preserve existing anchors when present. Form code updates these anchors
+            // when a user explicitly edits a price, so recalculating here from a
+            // rounded foreign-currency display would reintroduce drift.
             $currencyId = $item->currency_id ?? null;
 
-            $item->unit_price_idr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
-                MoneyHelper::parseHighPrecision($item->unit_price ?? 0),
-                $currencyId ? (int) $currencyId : null
-            );
+            if ((float) ($item->unit_price_idr ?? 0) <= 0) {
+                $item->unit_price_idr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
+                    MoneyHelper::parseHighPrecision($item->unit_price ?? 0),
+                    $currencyId ? (int) $currencyId : null
+                );
+            }
 
-            $item->original_price_idr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
-                MoneyHelper::parseHighPrecision($item->original_price ?? 0),
-                $currencyId ? (int) $currencyId : null
-            );
+            if ((float) ($item->original_price_idr ?? 0) <= 0) {
+                $item->original_price_idr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
+                    MoneyHelper::parseHighPrecision($item->original_price ?? 0),
+                    $currencyId ? (int) $currencyId : null
+                );
+            }
             // ───────────────────────────────────────────────────────────────────────
 
             $base      = $quantity * $unitPrice;

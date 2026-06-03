@@ -49,6 +49,91 @@ class QualityControlCompleteTest extends TestCase
     }
 
     #[Test]
+    public function qc_purchase_complete_auto_creates_purchase_receipt_from_po_item()
+    {
+        foreach ([
+            ['1140.01', 'Persediaan Barang', 'asset'],
+            ['2100.10', 'Penerimaan Barang Belum Tertagih', 'liability'],
+            ['1400.01', 'Temporary Procurement', 'asset'],
+        ] as [$code, $name, $type]) {
+            ChartOfAccount::firstOrCreate(
+                ['code' => $code],
+                ['name' => $name, 'type' => $type, 'is_active' => 1]
+            );
+        }
+
+        $supplier = Supplier::first();
+        $warehouse = Warehouse::first() ?? Warehouse::factory()->create();
+        $currency = Currency::first();
+        $cabangId = Cabang::first()->id;
+        $product = Product::factory()->create([
+            'cabang_id' => $cabangId,
+        ]);
+
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'po_number' => 'PO-QC-RC-' . strtoupper(uniqid()),
+            'order_date' => now(),
+            'status' => 'approved',
+            'total_amount' => 7200000,
+            'cabang_id' => $cabangId,
+            'warehouse_id' => $warehouse->id,
+            'created_by' => $this->user->id,
+            'tempo_hutang' => 30,
+            'is_asset' => 0,
+            'is_import' => false,
+        ]);
+
+        $poItem = PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $product->id,
+            'quantity' => 10,
+            'unit_price' => 720000,
+            'discount' => 0,
+            'tax' => 11,
+            'tipe_pajak' => 'eklusif',
+            'currency_id' => $currency->id,
+        ]);
+
+        $qc = QualityControl::withoutEvents(fn () => QualityControl::create([
+            'qc_number' => 'QC-P-' . date('Ymd') . '-AUTO',
+            'passed_quantity' => 8,
+            'rejected_quantity' => 2,
+            'quantity_received' => 10,
+            'status' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $product->id,
+            'from_model_type' => PurchaseOrderItem::class,
+            'from_model_id' => $poItem->id,
+            'cabang_id' => $cabangId,
+        ]));
+
+        app(QualityControlService::class)->completeQualityControl($qc, []);
+
+        $qc->refresh();
+        $receipt = PurchaseReceipt::withoutGlobalScopes()
+            ->where('purchase_order_id', $po->id)
+            ->with('purchaseReceiptItem')
+            ->first();
+
+        $this->assertSame(1, (int) $qc->status);
+        $this->assertNotNull($receipt);
+        $this->assertSame($po->id, (int) $receipt->purchase_order_id);
+        $this->assertStringContainsString($qc->qc_number, (string) $receipt->notes);
+        $this->assertSame($cabangId, (int) $receipt->cabang_id);
+        $this->assertSame('completed', $receipt->status);
+
+        $receiptItem = $receipt->purchaseReceiptItem->first();
+        $this->assertNotNull($receiptItem);
+        $this->assertSame($poItem->id, (int) $receiptItem->purchase_order_item_id);
+        $this->assertSame(10.0, (float) $receiptItem->qty_received);
+        $this->assertSame(8.0, (float) $receiptItem->qty_accepted);
+        $this->assertSame(2.0, (float) $receiptItem->qty_rejected);
+        $this->assertSame($warehouse->id, (int) $receiptItem->warehouse_id);
+    }
+
+    #[Test]
     public function qc_complete_with_rejected_products_creates_return_product()
     {
         // Create purchase order and receipt

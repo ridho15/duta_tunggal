@@ -166,6 +166,33 @@ describe('Cabang (Branch) CRUD', function () {
         ]);
     });
 
+    it('accepts international phone number on cabang form', function () {
+        Livewire::test(CreateCabang::class)
+            ->fillForm([
+                'kode'                  => 'CBG-INTL01',
+                'nama'                  => 'Cabang International',
+                'alamat'                => 'Jl. Global No. 1',
+                'telepon'               => ' (+62) 830 9787 333 ',
+                'kenaikan_harga'        => 0,
+                'tipe_penjualan'        => 'Semua',
+                'warna_background'      => '#3b82f6',
+                'status'                => true,
+                'kode_invoice_pajak'        => 'INV-PJK-I01',
+                'kode_invoice_non_pajak'    => 'INV-NPJK-I01',
+                'kode_invoice_pajak_walkin' => 'INV-WPJK-I01',
+                'nama_kwitansi'         => 'Kwitansi International',
+                'label_invoice_pajak'   => 'Label Pajak',
+                'label_invoice_non_pajak' => 'Label Non Pajak',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('cabangs', [
+            'kode' => 'CBG-INTL01',
+            'telepon' => '(+62) 830 9787 333',
+        ]);
+    });
+
     it('validates required fields when creating cabang', function () {
         Livewire::test(CreateCabang::class)
             ->fillForm([])
@@ -677,6 +704,26 @@ describe('Warehouse CRUD', function () {
         ]);
     });
 
+    it('accepts international phone number on warehouse form', function () {
+        Livewire::test(CreateWarehouse::class)
+            ->fillForm([
+                'kode'             => 'GDG-INTL01',
+                'name'             => 'Gudang International',
+                'cabang_id'        => $this->cabang->id,
+                'tipe'             => 'Besar',
+                'location'         => 'Jl. Global Warehouse No. 1',
+                'telepon'          => ' (+62) 830 9787 333 ',
+                'status'           => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('warehouses', [
+            'kode' => 'GDG-INTL01',
+            'telepon' => '(+62) 830 9787 333',
+        ]);
+    });
+
     it('validates required fields when creating warehouse', function () {
         Livewire::test(CreateWarehouse::class)
             ->fillForm([])
@@ -744,6 +791,23 @@ describe('Driver CRUD', function () {
         $this->assertDatabaseHas('drivers', [
             'name'  => 'Ahmad Sopir',
             'phone' => '08199999999',
+        ]);
+    });
+
+    it('accepts international phone number on driver form', function () {
+        Livewire::test(CreateDriver::class)
+            ->fillForm([
+                'name'      => 'Sopir International',
+                'phone'     => ' (+62) 830 9787 333 ',
+                'license'   => 'SIM A No. 7654321',
+                'cabang_id' => $this->cabang->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('drivers', [
+            'name'  => 'Sopir International',
+            'phone' => '(+62) 830 9787 333',
         ]);
     });
 

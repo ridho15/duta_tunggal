@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
+use App\Rules\InternationalPhoneNumber;
 use App\Services\CustomerService;
 use App\Services\QuotationService;
 use App\Services\SalesOrderService;
@@ -637,25 +638,29 @@ class QuotationResource extends Resource
                                             TextInput::make('telephone')
                                                 ->label('Telepon')
                                                 ->tel()
+                                                ->telRegex('/^[0-9+\s().-]*$/')
+                                                ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                                                 ->validationMessages([
-                                                    'regex' => 'Telepon tidak valid !'
+                                                    'max' => 'Telepon terlalu panjang'
                                                 ])
-                                                ->placeholder('Contoh: 0211234567')
-                                                ->regex('/^0[2-9][0-9]{1,3}[0-9]{5,8}$/')
-                                                ->helperText('Hanya nomor telepon rumah/kantor, bukan nomor HP.')
+                                                ->placeholder('Contoh: (+62) 830 9787 333')
+                                                ->rules([new InternationalPhoneNumber()])
+                                                ->helperText('Contoh : (+62) 830 9787 333, +62 21 12345678, 0211234567')
                                                 ->required()
-                                                ->maxLength(255),
+                                                ->maxLength(50),
                                             TextInput::make('phone')
                                                 ->label('Handphone')
                                                 ->tel()
+                                                ->telRegex('/^[0-9+\s().-]*$/')
+                                                ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                                                 ->validationMessages([
                                                     'required' => 'Nomor handphone tidak boleh kosong',
-                                                    'regex' => 'Nomor handphone tidak valid !'
+                                                    'max' => 'Nomor handphone terlalu panjang'
                                                 ])
-                                                ->maxLength(15)
-                                                ->rules(['regex:/^08[0-9]{8,12}$/'])
+                                                ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                                                ->rules([new InternationalPhoneNumber()])
                                                 ->required()
-                                                ->maxLength(255),
+                                                ->maxLength(50),
                                             TextInput::make('email')
                                                 ->email()
                                                 ->required()
@@ -666,9 +671,16 @@ class QuotationResource extends Resource
                                                 ->maxLength(255),
                                             TextInput::make('fax')
                                                 ->label('Fax')
+                                                ->tel()
+                                                ->telRegex('/^[0-9+\s().-]*$/')
                                                 ->required()
+                                                ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                                                ->rules([new InternationalPhoneNumber()])
+                                                ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789')
+                                                ->maxLength(50)
                                                 ->validationMessages([
-                                                    'required' => 'Fax tidak boleh kosong'
+                                                    'required' => 'Fax tidak boleh kosong',
+                                                    'max' => 'Fax terlalu panjang'
                                                 ]),
                                             TextInput::make('tempo_kredit')
                                                 ->numeric()

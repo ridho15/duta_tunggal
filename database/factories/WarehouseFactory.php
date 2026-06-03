@@ -20,7 +20,7 @@ class WarehouseFactory extends Factory
         return [
             'kode' => 'GDG-' . $this->faker->unique()->numerify('###'),
             'name' => 'Gudang ' . $this->faker->word,
-            'cabang_id' => Cabang::query()->value('id') ?? Cabang::factory()->create()->id,
+            'cabang_id' => Cabang::inRandomOrder()->first()->id ?? Cabang::factory()->create()->id,
             'tipe' => $this->faker->randomElement(['Kecil', 'Besar']),
             'location' => $this->faker->address,
             'telepon' => $this->faker->phoneNumber,

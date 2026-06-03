@@ -11,6 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('invoices')) {
+            return;
+        }
+
+        if (Schema::hasColumn('invoices', 'purchase_order_ids')) {
+            return;
+        }
+
         Schema::table('invoices', function (Blueprint $table) {
             // Support for multiple Purchase Orders per invoice (Task 14)
             $table->json('purchase_order_ids')->nullable()->after('purchase_receipts')
@@ -23,8 +31,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('invoices')) {
+            return;
+        }
+
         Schema::table('invoices', function (Blueprint $table) {
-            $table->dropColumn('purchase_order_ids');
+            if (Schema::hasColumn('invoices', 'purchase_order_ids')) {
+                $table->dropColumn('purchase_order_ids');
+            }
         });
     }
 };

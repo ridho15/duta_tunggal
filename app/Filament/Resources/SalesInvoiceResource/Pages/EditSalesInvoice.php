@@ -5,6 +5,7 @@ namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\DeliveryOrder;
+use App\Support\CurrencyConversionResolver;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -30,6 +31,9 @@ class EditSalesInvoice extends EditRecord
             $data['selected_sale_order'] = $this->record->from_model_id ?? null;
             $data['selected_delivery_orders'] = $this->record->delivery_orders ?? [];
         }
+
+        $data['currency_id'] = $this->record->currency_id ?? $this->record->fromModel?->currency_id;
+        $data['exchange_rate'] = (float) ($this->record->exchange_rate ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null));
 
         // Load invoice items
         $this->record->load('invoiceItem.product');
@@ -91,6 +95,9 @@ class EditSalesInvoice extends EditRecord
         unset($data['selected_sale_order']);
         unset($data['selected_delivery_orders']);
         unset($data['delivery_order_items']);
+
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? 1.0);
         
         return $data;
     }

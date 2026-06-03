@@ -8,6 +8,7 @@ use App\Filament\Resources\SupplierResource\RelationManagers\PurchaseOrderRelati
 use App\Filament\Resources\SupplierResource\RelationManagers\ProductsRelationManager;
 use App\Models\Cabang;
 use App\Models\Supplier;
+use App\Rules\InternationalPhoneNumber;
 use App\Services\SupplierService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Fieldset;
@@ -104,31 +105,30 @@ class SupplierResource extends Resource
                             ->maxLength(255),
                         TextInput::make('phone')
                             ->tel()
-                            // allow full international format with parentheses anywhere
-                            ->telRegex('/^[\+]?[0-9][0-9\s\-\(\)]{6,19}$/')
+                            ->telRegex('/^[0-9+\s().-]*$/')
                             ->label('Telepon')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
                                 'required' => 'Nomor Telepon tidak boleh kosong',
-                                'regex' => 'Nomor Telepon tidak valid !',
                                 'max' => 'Nomor telepon terlalu panjang'
                             ])
-                            ->helperText('Contoh : +62 21 12345678, 07512345678, +1 234 567 8900')
-                            ->rules(['regex:/^[\+]?[\d\s\-\(\)]{7,20}$/'])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 12345678, 07512345678')
+                            ->rules([new InternationalPhoneNumber()])
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(50),
                         TextInput::make('handphone')
                             ->tel()
-                            ->telRegex('/^[\+]?[0-9][0-9\s\-\(\)]{6,19}$/')
+                            ->telRegex('/^[0-9+\s().-]*$/')
                             ->label('Handphone')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
                                 'required' => 'Nomor Handphone tidak boleh kosong',
-                                'regex' => 'Nomor handphone tidak valid !',
                                 'max' => 'Nomor handphone terlalu panjang'
                             ])
-                            ->helperText('Contoh : +62 81234567890, 081234567890, +1 234 567 8900')
-                            ->rules(['regex:/^[\+]?[\d\s\-\(\)]{7,20}$/'])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                            ->rules([new InternationalPhoneNumber()])
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(50),
                         TextInput::make('email')
                             ->email()
                             ->validationMessages([
@@ -141,13 +141,15 @@ class SupplierResource extends Resource
                         TextInput::make('fax')
                             ->label('Fax')
                             ->tel()
-                            ->telRegex('/^[\+]?[0-9][0-9\s\-\(\)]{6,19}$/')
-                            ->rules(['regex:/^[\+]?[\d\s\-\(\)]{7,20}$/'])
+                            ->telRegex('/^[0-9+\s().-]*$/')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                            ->rules([new InternationalPhoneNumber()])
                             ->required()
-                            ->helperText('Contoh : +62 21 1234567, 0213456789, +1 234 567 8900')
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789')
+                            ->maxLength(50)
                             ->validationMessages([
                                 'required' => 'Fax tidak boleh kosong',
-                                'regex' => 'Fax tidak valid !'
+                                'max' => 'Fax terlalu panjang'
                             ]),
                         TextInput::make('tempo_hutang')
                             ->label('Tempo Hutang')

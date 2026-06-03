@@ -51,6 +51,14 @@ class SalesInvoiceResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    protected static function readonlyInputAttributes(): array
+    {
+        return [
+            'class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400',
+            'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;',
+        ];
+    }
+
     protected static function resolveCoaIdByCodes(array $codes): ?int
     {
         $codes = array_values(array_unique(array_filter($codes)));
@@ -184,6 +192,7 @@ class SalesInvoiceResource extends Resource
                                     ->disabled()
                                     ->placeholder('Auto calculated')
                                     ->dehydrated(false)
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
                                     ->afterStateHydrated(function ($component, $state, $get) {
                                         $due = $get('due_date');
                                         $invoice = $get('invoice_date') ?? now();
@@ -533,15 +542,18 @@ class SalesInvoiceResource extends Resource
                                         TextInput::make('do_number')
                                             ->label('No. DO')
                                             ->disabled()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(1),
                                         TextInput::make('product_name')
                                             ->label('Product')
                                             ->disabled()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(2),
                                         TextInput::make('original_quantity')
                                             ->label('Qty DO Asli')
                                             ->disabled()
                                             ->numeric()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(1),
                                         TextInput::make('invoice_quantity')
                                             ->label('Qty untuk Invoice')
@@ -572,6 +584,7 @@ class SalesInvoiceResource extends Resource
                                             ->indonesianMoney()
                                             ->required()
                                             ->readOnly()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->default(function ($get) {
                                                 return $get('original_price') ?? 0;
                                             })
@@ -592,6 +605,7 @@ class SalesInvoiceResource extends Resource
                                             ->label('Total')
                                             ->indonesianMoney()
                                             ->disabled()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(1),
                                         Hidden::make('coa_id')
                                             ->default(function ($get) {
@@ -697,7 +711,8 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'DPP harus berupa angka'
                                     ])
                                     ->default(0)
-                                    ->readonly(),
+                                    ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes()),
 
                                 \Filament\Forms\Components\Hidden::make('tax')
                                     ->default(0),
@@ -763,6 +778,7 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'Total harus berupa angka'
                                     ])
                                     ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
                                     ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
 

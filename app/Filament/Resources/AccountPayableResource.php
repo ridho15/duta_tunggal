@@ -89,6 +89,7 @@ class AccountPayableResource extends Resource
                             })
                             ->relationship('supplier', 'perusahaan'),
                         TextInput::make('total')
+                            ->label('Total Source')
                             ->required()
                             ->indonesianMoney()
                             ->validationMessages([
@@ -105,8 +106,15 @@ class AccountPayableResource extends Resource
                                 $paid = (float) \App\Helpers\MoneyHelper::safeParse($get('paid'));
                                 $set('remaining', $total - $paid);
                             })
-                            ->helperText('Total akan terisi otomatis berdasarkan invoice yang dipilih'),
+                            ->helperText(function ($get) {
+                                $invoice = Invoice::find($get('invoice_id'));
+
+                                return $invoice
+                                    ? 'Total invoice: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('total'))
+                                    : 'Total akan terisi otomatis berdasarkan invoice yang dipilih';
+                            }),
                         TextInput::make('paid')
+                            ->label('Paid Source')
                             ->required()
                             ->indonesianMoney()
                             ->validationMessages([
@@ -120,8 +128,16 @@ class AccountPayableResource extends Resource
                                 $total = (float) \App\Helpers\MoneyHelper::safeParse($get('total'));
                                 $paid = (float) \App\Helpers\MoneyHelper::safeParse($state);
                                 $set('remaining', $total - $paid);
+                            })
+                            ->helperText(function ($get) {
+                                $invoice = Invoice::find($get('invoice_id'));
+
+                                return $invoice
+                                    ? 'Dibayar: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('paid'))
+                                    : null;
                             }),
                         TextInput::make('remaining')
+                            ->label('Remaining Source')
                             ->required()
                             ->indonesianMoney()
                             ->validationMessages([
@@ -130,7 +146,13 @@ class AccountPayableResource extends Resource
                             ])
                             ->reactive()
                             ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
-                            ->helperText('Sisa pembayaran akan terisi otomatis berdasarkan total invoice'),
+                            ->helperText(function ($get) {
+                                $invoice = Invoice::find($get('invoice_id'));
+
+                                return $invoice
+                                    ? 'Sisa hutang: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('remaining'))
+                                    : 'Sisa pembayaran akan terisi otomatis berdasarkan total invoice';
+                            }),
                         Hidden::make('status')
                             ->default(PaymentStatus::UNPAID->value)
                             ->dehydrated(fn (string $context): bool => $context === 'create')
@@ -200,38 +222,23 @@ class AccountPayableResource extends Resource
                     }),
                     
                 TextColumn::make('total')
-                    ->label('Total Amount')
+                    ->label('Total Amount (Rp / Source)')
                     ->sortable()
                     ->searchable()
-                    ->rupiah()
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->rupiah()
-                            ->label('Total Outstanding')
-                    ]),
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $state)),
                     
                 TextColumn::make('paid')
-                    ->label('Paid Amount')
+                    ->label('Paid Amount (Rp / Source)')
                     ->sortable()
-                    ->rupiah()
-                    ->color('success')
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->rupiah()
-                            ->label('Total Paid')
-                    ]),
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $state))
+                    ->color('success'),
                     
                 TextColumn::make('remaining')
-                    ->label('Outstanding')
+                    ->label('Outstanding (Rp / Source)')
                     ->sortable()
-                    ->rupiah()
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $state))
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
-                    ->weight('bold')
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->rupiah()
-                            ->label('Total Outstanding')
-                    ]),
+                    ->weight('bold'),
                     
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
