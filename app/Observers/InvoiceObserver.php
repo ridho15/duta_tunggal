@@ -53,12 +53,22 @@ class InvoiceObserver
                 return;
             }
             // Create Account Payable
+            $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : null;
+            $exchangeRate = (float) ($invoice->exchange_rate ?? CurrencyConversionResolver::resolveRate($currencyId));
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+            $totalOriginal = (float) MoneyHelper::safeParse($invoice->total ?? 0);
+            $totalIdr = round($totalOriginal * $exchangeRate, 2);
             $data = [
                 'invoice_id' => $invoice->id,
                 'supplier_id' => $fromModel->supplier_id,
-                'total' => $invoice->total,
+                'currency_id' => $currencyId,
+                'exchange_rate' => $exchangeRate,
+                'total_original' => $totalOriginal,
+                'paid_original' => 0,
+                'remaining_original' => $totalOriginal,
+                'total' => $totalIdr,
                 'paid' => 0,
-                'remaining' => $invoice->total,
+                'remaining' => $totalIdr,
                 'status' => PaymentStatus::UNPAID->value,
             ];
             // branch column may not exist on older installs; include only when present

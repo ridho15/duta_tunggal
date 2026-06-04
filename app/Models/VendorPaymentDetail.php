@@ -16,13 +16,25 @@ class VendorPaymentDetail extends Model
     protected $fillable = [
         'vendor_payment_id',
         'invoice_id',
+        'currency_id',
+        'exchange_rate',
         'method',
         'amount',
+        'amount_idr',
         'adjustment_amount',
         'balance_amount',
         'coa_id',
         'payment_date',
         'notes'
+    ];
+
+    protected $casts = [
+        'currency_id' => 'integer',
+        'exchange_rate' => 'decimal:8',
+        'amount' => 'float',
+        'amount_idr' => 'float',
+        'adjustment_amount' => 'float',
+        'balance_amount' => 'float',
     ];
 
     public function vendorPayment()
@@ -33,6 +45,11 @@ class VendorPaymentDetail extends Model
     public function invoice()
     {
         return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function coa()

@@ -35,9 +35,12 @@ class VendorPayment extends Model
         'supplier_id',
         'selected_invoices',
         'invoice_receipts',
+        'currency_id',
+        'exchange_rate',
         'payment_date',
         'ntpn',
         'total_payment',
+        'total_payment_idr',
         'coa_id',
         'payment_method',
         'notes',
@@ -53,6 +56,9 @@ class VendorPayment extends Model
     protected $casts = [
         'selected_invoices' => 'array',
         'invoice_receipts' => 'array',
+        'currency_id' => 'integer',
+        'exchange_rate' => 'decimal:8',
+        'total_payment_idr' => 'float',
         'ppn_import_amount' => 'float',
         'pph22_amount' => 'float',
         'bea_masuk_amount' => 'float',
@@ -136,6 +142,11 @@ class VendorPayment extends Model
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function journalEntries()

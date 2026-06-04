@@ -127,6 +127,8 @@ class VendorPaymentTest extends TestCase
             'invoice_number' => 'INV-TEST-001',
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
+            'currency_id' => $this->currency->id,
+            'exchange_rate' => 1,
             'supplier_name' => $this->supplier->perusahaan,
             'subtotal' => 110000,
             'tax' => 0,
@@ -703,6 +705,77 @@ class VendorPaymentTest extends TestCase
         $this->assertEquals('Lunas', $accountPayable->status);
     }
 
+    public function test_vendor_payment_detail_without_selected_invoices_posts_foreign_currency_in_idr()
+    {
+        $usd = Currency::factory()->create([
+            'code' => 'USD',
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'to_rupiah' => 15000,
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $purchaseOrder->id,
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+            'subtotal' => 100,
+            'tax' => 0,
+            'total' => 100,
+            'status' => Invoice::STATUS_SENT,
+        ]);
+
+        AccountPayable::create([
+            'invoice_id' => $invoice->id,
+            'supplier_id' => $this->supplier->id,
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+            'total_original' => 100,
+            'paid_original' => 0,
+            'remaining_original' => 100,
+            'total' => 1500000,
+            'paid' => 0,
+            'remaining' => 1500000,
+            'status' => PaymentStatus::UNPAID->value,
+            'created_by' => $this->user->id,
+        ]);
+
+        $payment = VendorPayment::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'selected_invoices' => [],
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+            'total_payment' => 100,
+            'payment_method' => 'Cash',
+            'coa_id' => $this->chartOfAccount->id,
+            'status' => 'Draft',
+        ]);
+
+        VendorPaymentDetail::factory()->create([
+            'vendor_payment_id' => $payment->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'Cash',
+            'amount' => 100,
+            'coa_id' => $this->chartOfAccount->id,
+        ]);
+
+        app(LedgerPostingService::class)->postVendorPayment($payment->fresh());
+
+        $entries = JournalEntry::where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->get();
+
+        $this->assertEquals(1500000.0, (float) $entries->sum('debit'));
+        $this->assertEquals(1500000.0, (float) $entries->sum('credit'));
+        $this->assertTrue($entries->every(fn (JournalEntry $entry) => (float) $entry->exchange_rate === 15000.0));
+        $this->assertEquals(1500000.0, (float) $payment->fresh()->total_payment_idr);
+    }
+
     public function test_account_payable_status_is_normalized_from_legacy_values()
     {
         $invoice = $this->createTestInvoice();
@@ -836,6 +909,11 @@ class VendorPaymentTest extends TestCase
         AccountPayable::factory()->create([
             'invoice_id' => $invoice->id,
             
+            'currency_id' => $this->currency->id,
+            'exchange_rate' => 1,
+            'total_original' => 110000,
+            'paid_original' => 0,
+            'remaining_original' => 110000,
             'total' => 110000,
             'paid' => 0,
             'remaining' => 110000,

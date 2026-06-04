@@ -72,6 +72,7 @@ class CreateVendorPayment extends CreateRecord
         // Determine payment status based on total payment vs total invoice amounts
         $totalPayment = MoneyHelper::safeParse($data['total_payment'] ?? 0);
         $data['total_payment'] = $totalPayment;
+        $exchangeRate = 1.0;
 
         if ($totalPayment > 0) {
             // If we have selected_invoices, calculate based on remaining amounts
@@ -84,6 +85,23 @@ class CreateVendorPayment extends CreateRecord
                     $invoices = Invoice::whereIn('id', $selectedInvoices)
                         ->with('accountPayable')
                         ->get();
+                    $currencyKeys = $invoices
+                        ->map(fn (Invoice $invoice) => ($invoice->currency_id ?? 'null') . ':' . number_format((float) ($invoice->exchange_rate ?? 1), 8, '.', ''))
+                        ->unique();
+
+                    if ($currencyKeys->count() > 1) {
+                        throw ValidationException::withMessages([
+                            'selected_invoices' => 'Pembayaran vendor hanya boleh mencakup invoice dengan satu mata uang dan satu rate.',
+                        ]);
+                    }
+
+                    $firstInvoice = $invoices->first();
+                    if ($firstInvoice) {
+                        $data['currency_id'] = is_numeric($firstInvoice->currency_id ?? null) ? (int) $firstInvoice->currency_id : null;
+                        $exchangeRate = (float) ($firstInvoice->exchange_rate ?? 1);
+                        $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+                        $data['exchange_rate'] = $exchangeRate;
+                    }
                     $totalInvoiceAmount = VendorPaymentResource::calculateSelectedInvoiceTotal($invoices);
 
                     // Debug logging
@@ -111,6 +129,9 @@ class CreateVendorPayment extends CreateRecord
             // No payment amount
             $data['status'] = 'Draft';
         }
+
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? $exchangeRate);
+        $data['total_payment_idr'] = round($totalPayment * (float) ($data['exchange_rate'] ?: 1), 2);
 
         return $data;
     }

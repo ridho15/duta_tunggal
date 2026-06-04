@@ -9,8 +9,10 @@ use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
+use App\Support\CurrencyConversionResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PurchaseInvoiceAccountingService
 {
@@ -56,8 +58,22 @@ class PurchaseInvoiceAccountingService
                 $data['cabang_id'] = $receiptBacked['cabang_id'];
             }
 
+            if (! empty($receiptBacked['currency_id'])) {
+                $data['currency_id'] = $receiptBacked['currency_id'];
+                $data['exchange_rate'] = $receiptBacked['exchange_rate'] ?? 1.0;
+            }
+
             if (! empty($receiptBacked['receipt_fees']) && empty($data['receiptBiayaItems'])) {
                 $data['receiptBiayaItems'] = $receiptBacked['receipt_fees'];
+            }
+        } else {
+            $poCurrencyContext = $this->currencyContextFromPurchaseOrderIds(
+                $data['purchase_order_ids'] ?? $data['selected_purchase_orders'] ?? (! empty($data['from_model_id']) && ($data['from_model_type'] ?? null) === PurchaseOrder::class ? [$data['from_model_id']] : [])
+            );
+
+            if ($poCurrencyContext !== null) {
+                $data['currency_id'] = $poCurrencyContext['currency_id'];
+                $data['exchange_rate'] = $poCurrencyContext['exchange_rate'];
             }
         }
 
@@ -113,7 +129,7 @@ class PurchaseInvoiceAccountingService
                 'purchaseOrder.purchaseOrderItem.currency',
                 'purchaseOrder.purchaseOrderCurrency.currency',
                 'purchaseReceiptItem.purchaseOrderItem.currency',
-                'purchaseReceiptBiaya',
+                'purchaseReceiptBiaya.currency',
             ])
             ->whereIn('id', $receiptIds)
             ->get();
@@ -126,6 +142,7 @@ class PurchaseInvoiceAccountingService
         $receiptFees = [];
         $subtotal = 0.0;
         $taxAmount = 0.0;
+        $currencySnapshots = collect();
 
         foreach ($receipts as $receipt) {
             $purchaseOrder = $receipt->purchaseOrder;
@@ -146,6 +163,8 @@ class PurchaseInvoiceAccountingService
                 $items[] = $line;
                 $subtotal += (float) $line['total'];
                 $taxAmount += (float) $line['tax_amount'];
+
+                $currencySnapshots->push($this->resolvePurchaseOrderItemCurrencySnapshot($purchaseOrderItem, $purchaseOrder));
             }
 
             foreach ($receipt->purchaseReceiptBiaya as $fee) {
@@ -154,16 +173,28 @@ class PurchaseInvoiceAccountingService
                     continue;
                 }
 
+                $feeCurrencyId = is_numeric($fee->currency_id ?? null) ? (int) $fee->currency_id : null;
+                $feeExchangeRate = $this->resolvePurchaseOrderCurrencyRate($purchaseOrder, $feeCurrencyId);
+                $currencySnapshots->push([
+                    'currency_id' => $feeCurrencyId,
+                    'exchange_rate' => $feeExchangeRate,
+                ]);
+
                 $receiptFees[] = [
                     'receipt_id' => $receipt->id,
                     'nama_biaya' => $fee->nama_biaya,
                     'name' => $fee->nama_biaya ?: 'Biaya Lain',
                     'amount' => $amount,
                     'total' => $amount,
+                    'currency_id' => $feeCurrencyId,
+                    'exchange_rate' => $feeExchangeRate,
+                    'amount_original' => $amount,
+                    'amount_idr' => round($amount * $feeExchangeRate, 2),
                 ];
             }
         }
 
+        $currencyContext = $this->assertSingleCurrencyContext($currencySnapshots);
         $subtotal = round($subtotal, 2);
         $taxAmount = round($taxAmount, 2);
         $otherFeeTotal = round((float) collect($receiptFees)->sum(fn (array $fee) => (float) ($fee['amount'] ?? 0)), 2);
@@ -175,6 +206,8 @@ class PurchaseInvoiceAccountingService
             'cabang_id' => $receipts->pluck('cabang_id')->filter()->first(),
             'invoice_items' => $items,
             'receipt_fees' => $receiptFees,
+            'currency_id' => $currencyContext['currency_id'],
+            'exchange_rate' => $currencyContext['exchange_rate'],
             'subtotal' => $subtotal,
             'dpp' => $subtotal,
             'ppn_amount' => $taxAmount,
@@ -214,7 +247,7 @@ class PurchaseInvoiceAccountingService
                     'dpp' => (float) $invoice->dpp,
                     'ppn_rate' => (float) $invoice->ppn_rate,
                     'total' => (float) $invoice->total,
-                    'account_payable_total' => (float) ($invoice->accountPayable?->total ?? 0),
+                    'account_payable_total' => (float) ($invoice->accountPayable?->total_original ?? $invoice->accountPayable?->total ?? 0),
                 ],
                 'expected' => null,
             ];
@@ -258,7 +291,7 @@ class PurchaseInvoiceAccountingService
                 || abs((float) $invoice->dpp - (float) $expected['dpp']) > 0.01
                 || abs((float) $invoice->ppn_rate - (float) $expected['ppn_rate']) > 0.01
                 || abs($currentTotal - $expectedTotal) > 0.01
-                || abs((float) ($invoice->accountPayable?->total ?? 0) - $expectedTotal) > 0.01,
+                || abs((float) ($invoice->accountPayable?->total_original ?? $invoice->accountPayable?->total ?? 0) - $expectedTotal) > 0.01,
             'current_items' => $currentItems,
             'expected_items' => $expectedItems,
             'current' => [
@@ -267,8 +300,8 @@ class PurchaseInvoiceAccountingService
                 'ppn_rate' => (float) $invoice->ppn_rate,
                 'ppn_amount' => (float) $invoice->ppn_amount,
                 'total' => $currentTotal,
-                'account_payable_total' => (float) ($invoice->accountPayable?->total ?? 0),
-                'account_payable_remaining' => (float) ($invoice->accountPayable?->remaining ?? 0),
+                'account_payable_total' => (float) ($invoice->accountPayable?->total_original ?? $invoice->accountPayable?->total ?? 0),
+                'account_payable_remaining' => (float) ($invoice->accountPayable?->remaining_original ?? $invoice->accountPayable?->remaining ?? 0),
             ],
             'expected' => [
                 'subtotal' => (float) $expected['subtotal'],
@@ -317,6 +350,8 @@ class PurchaseInvoiceAccountingService
                     'from_model_type' => PurchaseOrder::class,
                     'from_model_id' => $expected['from_model_id'] ?? $invoice->from_model_id,
                     'purchase_order_ids' => $expected['purchase_order_ids'],
+                    'currency_id' => $expected['currency_id'] ?? $invoice->currency_id,
+                    'exchange_rate' => $expected['exchange_rate'] ?? $invoice->exchange_rate ?? 1,
                     'subtotal' => $expected['subtotal'],
                     'dpp' => $expected['dpp'],
                     'tax' => $expected['ppn_rate'],
@@ -646,6 +681,85 @@ class PurchaseInvoiceAccountingService
         ];
     }
 
+    protected function resolvePurchaseOrderItemCurrencySnapshot(\App\Models\PurchaseOrderItem $item, ?PurchaseOrder $purchaseOrder): array
+    {
+        $currencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
+
+        return [
+            'currency_id' => $currencyId,
+            'exchange_rate' => $this->resolvePurchaseOrderCurrencyRate($purchaseOrder, $currencyId),
+        ];
+    }
+
+    protected function resolvePurchaseOrderCurrencyRate(?PurchaseOrder $purchaseOrder, ?int $currencyId): float
+    {
+        if (! $currencyId) {
+            return 1.0;
+        }
+
+        $purchaseOrder?->loadMissing('purchaseOrderCurrency');
+        $poCurrency = $purchaseOrder?->purchaseOrderCurrency?->firstWhere('currency_id', $currencyId);
+        $rate = (float) ($poCurrency?->nominal ?? CurrencyConversionResolver::resolveRate($currencyId));
+
+        return $rate > 0 ? $rate : 1.0;
+    }
+
+    protected function assertSingleCurrencyContext(\Illuminate\Support\Collection $snapshots): array
+    {
+        $normalized = $snapshots
+            ->map(function (array $snapshot): array {
+                $currencyId = is_numeric($snapshot['currency_id'] ?? null) ? (int) $snapshot['currency_id'] : null;
+                $exchangeRate = (float) ($snapshot['exchange_rate'] ?? CurrencyConversionResolver::resolveRate($currencyId));
+
+                return [
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+                ];
+            })
+            ->unique(fn (array $snapshot) => ($snapshot['currency_id'] ?? 'null') . ':' . number_format((float) $snapshot['exchange_rate'], 8, '.', ''))
+            ->values();
+
+        if ($normalized->count() > 1) {
+            throw ValidationException::withMessages([
+                'currency_id' => 'Purchase invoice hanya boleh berisi satu mata uang dan satu rate. Pisahkan receipt/PO multi-currency ke invoice berbeda.',
+            ]);
+        }
+
+        return $normalized->first() ?? [
+            'currency_id' => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'),
+            'exchange_rate' => 1.0,
+        ];
+    }
+
+    public function currencyContextFromPurchaseOrderIds($purchaseOrderIds): ?array
+    {
+        $purchaseOrderIds = collect($purchaseOrderIds)
+            ->map(fn ($id) => is_numeric($id) ? (int) $id : null)
+            ->filter()
+            ->values();
+
+        if ($purchaseOrderIds->isEmpty()) {
+            return null;
+        }
+
+        $purchaseOrders = PurchaseOrder::withoutGlobalScopes()
+            ->with(['purchaseOrderItem', 'purchaseOrderCurrency'])
+            ->whereIn('id', $purchaseOrderIds)
+            ->get();
+
+        if ($purchaseOrders->isEmpty()) {
+            return null;
+        }
+
+        $snapshots = $purchaseOrders->flatMap(function (PurchaseOrder $purchaseOrder) {
+            return $purchaseOrder->purchaseOrderItem->map(
+                fn ($item) => $this->resolvePurchaseOrderItemCurrencySnapshot($item, $purchaseOrder)
+            );
+        });
+
+        return $this->assertSingleCurrencyContext($snapshots);
+    }
+
     protected function sourceTaxLinesFromPurchaseOrderIds($purchaseOrderIds): \Illuminate\Support\Collection
     {
         $purchaseOrderIds = collect($purchaseOrderIds)
@@ -741,15 +855,31 @@ class PurchaseInvoiceAccountingService
         }
 
         $accountPayable = AccountPayable::firstOrNew(['invoice_id' => $invoice->id]);
-        $paid = (float) ($accountPayable->paid ?? 0);
-        $remaining = max(0, $total - $paid);
+        $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
+        $exchangeRate = (float) ($invoice->exchange_rate ?? CurrencyConversionResolver::resolveRate($currencyId));
+        $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+
+        $totalOriginal = round($total, 4);
+        $paidOriginal = $accountPayable->exists
+            ? (float) ($accountPayable->paid_original ?? (($accountPayable->paid ?? 0) / $exchangeRate))
+            : 0.0;
+        $remainingOriginal = max(0, $totalOriginal - $paidOriginal);
+
+        $totalIdr = round($totalOriginal * $exchangeRate, 2);
+        $paidIdr = round($paidOriginal * $exchangeRate, 2);
+        $remainingIdr = max(0, round($remainingOriginal * $exchangeRate, 2));
 
         $accountPayable->fill([
             'supplier_id' => $supplierId,
-            'total' => $total,
-            'paid' => $paid,
-            'remaining' => $remaining,
-            'status' => $remaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+            'total_original' => $totalOriginal,
+            'paid_original' => $paidOriginal,
+            'remaining_original' => $remainingOriginal,
+            'total' => $totalIdr,
+            'paid' => $paidIdr,
+            'remaining' => $remainingIdr,
+            'status' => $remainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
             'cabang_id' => $cabangId,
         ]);
         $accountPayable->save();

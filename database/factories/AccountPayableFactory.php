@@ -37,6 +37,11 @@ class AccountPayableFactory extends Factory
             'total' => $total,
             'paid' => $paid,
             'remaining' => $remaining,
+            'currency_id' => null,
+            'exchange_rate' => 1,
+            'total_original' => $total,
+            'paid_original' => $paid,
+            'remaining_original' => $remaining,
             'status' => $remaining > 0 ? 'Belum Lunas' : 'Lunas',
             'created_by' => User::factory(),
         ];

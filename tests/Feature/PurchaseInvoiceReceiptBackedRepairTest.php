@@ -166,9 +166,14 @@ function createReceiptBackedPurchaseInvoiceRepairFixture(): array
     AccountPayable::create([
         'invoice_id' => $invoice->id,
         'supplier_id' => $supplier->id,
-        'total' => 29894.13,
+        'currency_id' => $usd->id,
+        'exchange_rate' => 15000,
+        'total_original' => 29894.13,
+        'paid_original' => 0,
+        'remaining_original' => 29894.13,
+        'total' => 448411950,
         'paid' => 0,
-        'remaining' => 29894.13,
+        'remaining' => 448411950,
         'status' => PaymentStatus::UNPAID->value,
         'cabang_id' => $cabang->id,
     ]);
@@ -215,8 +220,10 @@ it('applies receipt backed purchase invoice repair and reposts journals in idr',
         ->and(round((float) $invoice->ppn_rate, 2))->toBe(11.0)
         ->and((float) $invoice->ppn_amount)->toBe(58.66)
         ->and((float) $invoice->total)->toBe(591.96)
-        ->and((float) $invoice->accountPayable->total)->toBe(591.96)
-        ->and((float) $invoice->accountPayable->remaining)->toBe(591.96);
+        ->and((float) $invoice->accountPayable->total_original)->toBe(591.96)
+        ->and((float) $invoice->accountPayable->remaining_original)->toBe(591.96)
+        ->and((float) $invoice->accountPayable->total)->toBe(8879400.0)
+        ->and((float) $invoice->accountPayable->remaining)->toBe(8879400.0);
 
     $items = $invoice->invoiceItem()->orderBy('id')->get();
     expect($items)->toHaveCount(2);
@@ -241,6 +248,21 @@ it('applies receipt backed purchase invoice repair and reposts journals in idr',
         ->where('source_id', $invoice->id)
         ->where('is_reversal', true)
         ->count())->toBe(3);
+});
+
+it('keeps account payable ageing amounts in idr while retaining source currency', function () {
+    ['invoice' => $invoice] = createReceiptBackedPurchaseInvoiceRepairFixture();
+
+    app(PurchaseInvoiceAccountingService::class)->repairReceiptBackedInvoice($invoice);
+
+    $invoice = $invoice->fresh('accountPayable');
+    $report = app(\App\Services\Reports\AgeingReportService::class)->generate([
+        'report_type' => 'payables',
+    ]);
+
+    expect((float) $invoice->accountPayable->remaining_original)->toBe(591.96)
+        ->and((float) $invoice->accountPayable->remaining)->toBe(8879400.0)
+        ->and((float) array_sum($report['apSummary']))->toBe(8879400.0);
 });
 
 it('normalizes malformed receipt backed invoice item prices from purchase order items', function () {
@@ -271,3 +293,44 @@ it('normalizes malformed receipt backed invoice item prices from purchase order 
         ->and((float) $data['subtotal'])->toBe(533.3)
         ->and((float) $data['total'])->toBe(591.96);
 });
+
+it('rejects receipt backed purchase invoice with mixed currencies', function () {
+    ['invoice' => $invoice, 'po' => $po, 'receipts' => $receipts] = createReceiptBackedPurchaseInvoiceRepairFixture();
+
+    $idr = Currency::where('code', 'IDR')->firstOrFail();
+    $product = Product::factory()->create(['cabang_id' => $po->cabang_id]);
+    $poItem = PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $po->id,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'unit_price' => 100000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'none',
+        'currency_id' => $idr->id,
+    ]);
+
+    PurchaseOrderCurrency::firstOrCreate([
+        'purchase_order_id' => $po->id,
+        'currency_id' => $idr->id,
+    ], [
+        'nominal' => 1,
+    ]);
+
+    PurchaseReceiptItem::factory()->create([
+        'purchase_receipt_id' => $receipts->first()->id,
+        'purchase_order_item_id' => $poItem->id,
+        'product_id' => $product->id,
+        'qty_received' => 1,
+        'qty_accepted' => 1,
+        'qty_rejected' => 0,
+        'status' => 'completed',
+    ]);
+
+    app(PurchaseInvoiceAccountingService::class)->normalizeFormData([
+        'from_model_type' => PurchaseOrder::class,
+        'from_model_id' => $invoice->from_model_id,
+        'purchase_receipts' => $invoice->purchase_receipts,
+        'invoiceItem' => [],
+    ]);
+})->throws(\Illuminate\Validation\ValidationException::class);

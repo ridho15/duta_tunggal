@@ -1094,11 +1094,14 @@ class PurchaseReceiptService
         }
 
         $supplier = $receipt->purchaseOrder->supplier ?? null;
+        $idrCurrencyId = \App\Support\CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
 
         $invoice = \App\Models\Invoice::create([
             'invoice_number' => $invoiceService->generateInvoiceNumber(),
             'from_model_type' => \App\Models\PurchaseReceipt::class,
             'from_model_id' => $receipt->id,
+            'currency_id' => $idrCurrencyId,
+            'exchange_rate' => 1,
             'invoice_date' => now()->toDateString(),
             'subtotal' => $subtotal,
             'tax' => $tax,
@@ -1128,6 +1131,11 @@ class PurchaseReceiptService
         // Create account payable
         \App\Models\AccountPayable::create([
             'invoice_id' => $invoice->id,
+            'currency_id' => $idrCurrencyId,
+            'exchange_rate' => 1,
+            'total_original' => $total,
+            'paid_original' => $total,
+            'remaining_original' => 0,
             'total' => $total,
             'paid' => $total, // Mark as fully paid since invoice is paid
             'remaining' => 0,

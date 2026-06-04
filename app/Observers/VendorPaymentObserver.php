@@ -139,31 +139,36 @@ class VendorPaymentObserver
             }
 
             // Recalculate paid and remaining based on all payment details for this invoice
-            $totalPaidForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+            $totalPaidOriginalForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
                 ->whereHas('vendorPayment', function($query) {
                     $query->whereIn('status', ['partial', 'paid']);
                 })
                 ->sum('amount');
 
-            $totalAdjustmentForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+            $totalAdjustmentOriginalForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
                 ->whereHas('vendorPayment', function($query) {
                     $query->whereIn('status', ['partial', 'paid']);
                 })
                 ->sum('adjustment_amount');
 
-            $newPaid = min($totalPaidForInvoice, $accountPayable->total);
-            $newRemaining = max(0, $accountPayable->total - $newPaid - $totalAdjustmentForInvoice);
+            $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+            $totalOriginal = (float) ($accountPayable->total_original ?? ((float) $accountPayable->total / $exchangeRate));
+            $newPaidOriginal = min((float) $totalPaidOriginalForInvoice, $totalOriginal);
+            $newRemainingOriginal = max(0, $totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice);
 
-            $accountPayable->paid = $newPaid;
-            $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+            $accountPayable->paid_original = $newPaidOriginal;
+            $accountPayable->remaining_original = $newRemainingOriginal;
+            $accountPayable->paid = round($newPaidOriginal * $exchangeRate, 2);
+            $accountPayable->remaining = round($newRemainingOriginal * $exchangeRate, 2);
+            $accountPayable->status = $newRemainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01
+                $accountPayable->invoice->status = $newRemainingOriginal <= 0.01
                     ? Invoice::STATUS_PAID
-                    : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : $accountPayable->invoice->status);
+                    : ($newPaidOriginal > 0 ? Invoice::STATUS_PARTIALLY_PAID : $accountPayable->invoice->status);
                 $accountPayable->invoice->save();
             }
         }
@@ -185,20 +190,25 @@ class VendorPaymentObserver
                 continue; // Skip if AP not found
             }
 
-            // Subtract the payment amount directly from paid and add to remaining
-            $newPaid = max(0, $accountPayable->paid - $paidAmount);
-            $newRemaining = min($accountPayable->total, $accountPayable->remaining + $paidAmount + $adjustmentAmount);
+            $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+            $totalOriginal = (float) ($accountPayable->total_original ?? ((float) $accountPayable->total / $exchangeRate));
 
-            $accountPayable->paid = $newPaid;
-            $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+            $newPaidOriginal = max(0, (float) ($accountPayable->paid_original ?? 0) - $paidAmount);
+            $newRemainingOriginal = min($totalOriginal, (float) ($accountPayable->remaining_original ?? 0) + $paidAmount + $adjustmentAmount);
+
+            $accountPayable->paid_original = $newPaidOriginal;
+            $accountPayable->remaining_original = $newRemainingOriginal;
+            $accountPayable->paid = round($newPaidOriginal * $exchangeRate, 2);
+            $accountPayable->remaining = round($newRemainingOriginal * $exchangeRate, 2);
+            $accountPayable->status = $newRemainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01
+                $accountPayable->invoice->status = $newRemainingOriginal <= 0.01
                     ? Invoice::STATUS_PAID
-                    : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
+                    : ($newPaidOriginal > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
             }
         }
@@ -248,7 +258,9 @@ class VendorPaymentObserver
             ->with('accountPayable')
             ->get()
             ->sum(function ($invoice) {
-                return $invoice->accountPayable->remaining ?? $invoice->total;
+                return $invoice->accountPayable?->remaining_original
+                    ?? $invoice->accountPayable?->remaining
+                    ?? $invoice->total;
             });
 
         // Check if payment amount exceeds total remaining balance
@@ -314,13 +326,21 @@ class VendorPaymentObserver
         foreach ($invoices as $invoice) {
             if ($remainingPayment <= 0) break;
 
-            $remainingAmount = $invoice->accountPayable->remaining ?? $invoice->total;
+            $remainingAmount = $invoice->accountPayable?->remaining_original
+                ?? $invoice->accountPayable?->remaining
+                ?? $invoice->total;
             $paymentAmount = min($remainingAmount, $remainingPayment);
+            $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : null;
+            $exchangeRate = (float) ($invoice->exchange_rate ?? 1);
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
 
             \App\Models\VendorPaymentDetail::create([
                 'vendor_payment_id' => $payment->id,
                 'invoice_id' => $invoice->id,
+                'currency_id' => $currencyId,
+                'exchange_rate' => $exchangeRate,
                 'amount' => $paymentAmount,
+                'amount_idr' => round($paymentAmount * $exchangeRate, 2),
                 'method' => $payment->payment_method ?? 'Cash',
                 'payment_date' => $payment->payment_date,
                 'coa_id' => $payment->coa_id,

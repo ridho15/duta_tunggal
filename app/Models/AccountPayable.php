@@ -17,6 +17,11 @@ class AccountPayable extends Model
         'total' => 'float',
         'paid' => 'float',
         'remaining' => 'float',
+        'currency_id' => 'integer',
+        'exchange_rate' => 'decimal:8',
+        'total_original' => 'float',
+        'paid_original' => 'float',
+        'remaining_original' => 'float',
     ];
 
     public function getStatusAttribute($value): ?string
@@ -56,6 +61,11 @@ class AccountPayable extends Model
         'total',
         'paid',
         'remaining',
+        'currency_id',
+        'exchange_rate',
+        'total_original',
+        'paid_original',
+        'remaining_original',
         'status', //Lunas / Belum Lunas
         'cabang_id',
         'created_by'
@@ -69,6 +79,11 @@ class AccountPayable extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'supplier_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function createdBy()

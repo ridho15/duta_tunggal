@@ -65,8 +65,15 @@ class AccountPayableResource extends Resource
                                 $invoice = Invoice::find($state);
                                 if ($invoice) {
                                     $set('supplier_id', $invoice->fromModel->supplier_id);
-                                    $set('total', (float) $invoice->total);
-                                    $set('remaining', (float) $invoice->total);
+                                    $rate = (float) ($invoice->exchange_rate ?? 1);
+                                    $rate = $rate > 0 ? $rate : 1.0;
+                                    $set('currency_id', $invoice->currency_id);
+                                    $set('exchange_rate', $rate);
+                                    $set('total_original', (float) $invoice->total);
+                                    $set('paid_original', 0);
+                                    $set('remaining_original', (float) $invoice->total);
+                                    $set('total', round((float) $invoice->total * $rate, 2));
+                                    $set('remaining', round((float) $invoice->total * $rate, 2));
                                 }
                             })
                             ->validationMessages([
@@ -155,7 +162,12 @@ class AccountPayableResource extends Resource
                             }),
                         Hidden::make('status')
                             ->default(PaymentStatus::UNPAID->value)
-                            ->dehydrated(fn (string $context): bool => $context === 'create')
+                            ->dehydrated(fn (string $context): bool => $context === 'create'),
+                        Hidden::make('currency_id'),
+                        Hidden::make('exchange_rate')->default(1),
+                        Hidden::make('total_original'),
+                        Hidden::make('paid_original')->default(0),
+                        Hidden::make('remaining_original'),
                     ])
             ]);
     }
@@ -225,18 +237,18 @@ class AccountPayableResource extends Resource
                     ->label('Total Amount (Rp / Source)')
                     ->sortable()
                     ->searchable()
-                    ->formatStateUsing(fn ($state, AccountPayable $record) => PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $state)),
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->total_original ?? $record->invoice?->total ?? $state)),
                     
                 TextColumn::make('paid')
                     ->label('Paid Amount (Rp / Source)')
                     ->sortable()
-                    ->formatStateUsing(fn ($state, AccountPayable $record) => PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $state))
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->paid_original ?? 0))
                     ->color('success'),
                     
                 TextColumn::make('remaining')
                     ->label('Outstanding (Rp / Source)')
                     ->sortable()
-                    ->formatStateUsing(fn ($state, AccountPayable $record) => PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $state))
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->remaining_original ?? $record->invoice?->total ?? $state))
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
                     ->weight('bold'),
                     

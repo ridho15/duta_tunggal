@@ -79,24 +79,10 @@ it('normalizes purchase receipt invoice amounts to idr when po item is in usd', 
         'status' => 'completed',
     ]);
 
-    // Refresh and load relations BEFORE calling service
     $receipt->refresh();
     $receipt->load('purchaseReceiptItem.purchaseOrderItem', 'purchaseOrder');
-    
-    dump('Before service - Receipt items count (after load):', $receipt->purchaseReceiptItem->count());
-    foreach ($receipt->purchaseReceiptItem as $item) {
-        dump('Item check before service:', $item->id, 'qty_accepted:', (float)$item->qty_accepted);
-    }
 
     $result = app(PurchaseReceiptService::class)->createAutomaticInvoiceFromReceipt($receipt);
-    
-    dump('Service result:', $result);
-    dump('Receipt ID:', $receipt->id);
-    
-    // Check receipt items - make sure we can load them
-    $fresh = $receipt->fresh()->load(['purchaseReceiptItem', 'purchaseOrder']);
-    dump('Fresh receipt items via fresh():', $fresh->purchaseReceiptItem->count());
-    dump('Fresh receipt items via fresh().all():', $fresh->purchaseReceiptItem()->get()->count());
 
     $invoice = Invoice::where('from_model_type', PurchaseReceipt::class)
         ->where('from_model_id', $receipt->id)

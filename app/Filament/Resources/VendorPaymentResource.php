@@ -704,8 +704,10 @@ class VendorPaymentResource extends Resource
             $invoice = $payment->vendorPaymentDetail->first()?->invoice;
         }
 
+        $sourceAmount = $payment?->total_payment ?? $amount;
+
         return $invoice
-            ? PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $amount)
+            ? PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $sourceAmount)
             : MoneyHelper::rupiah($amount);
     }
 
@@ -719,11 +721,11 @@ class VendorPaymentResource extends Resource
         $accountPayable = $invoice->accountPayable;
 
         if ($invoice->relationLoaded('accountPayable') && $accountPayable?->getKey()) {
-            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining ?? 0));
+            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining_original ?? $accountPayable->remaining ?? 0));
         }
 
         if ($accountPayable?->getKey()) {
-            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining ?? 0));
+            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining_original ?? $accountPayable->remaining ?? 0));
         }
 
         $paidTotal = (float) VendorPaymentDetail::query()
@@ -753,7 +755,7 @@ class VendorPaymentResource extends Resource
             $totalAmount = (float) MoneyHelper::safeParse($invoice->total ?? 0);
             $accountPayable = $invoice->accountPayable;
             $remainingAmount = $accountPayable?->getKey()
-                ? max(0, (float) MoneyHelper::safeParse($accountPayable->remaining ?? 0))
+                ? max(0, (float) MoneyHelper::safeParse($accountPayable->remaining_original ?? $accountPayable->remaining ?? 0))
                 : max(0, $totalAmount - (float) ($fallbackPaidTotals[$invoice->id] ?? 0));
 
             return [

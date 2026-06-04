@@ -429,9 +429,10 @@ class LedgerPostingService
             $rawPaymentDate = $payment->payment_date; // goes through accessor → Carbon or null
             $date = ($rawPaymentDate instanceof \Carbon\Carbon ? $rawPaymentDate->toDateString() : null)
                 ?? Carbon::now()->toDateString();
-            $details = $payment->vendorPaymentDetail()->get();
+            $details = $payment->vendorPaymentDetail()->with('invoice')->get();
+            $detailSnapshots = $this->syncVendorPaymentCurrencySnapshots($payment, $details);
 
-            $total = (float) ($details->sum('amount') ?: $payment->total_payment);
+            $total = (float) ($detailSnapshots->sum('amount_idr') ?: $payment->total_payment_idr ?: $payment->total_payment);
 
             if ($total <= 0) {
                 return ['status' => 'skipped', 'message' => 'VendorPayment has no amount to post'];
@@ -462,6 +463,7 @@ class LedgerPostingService
                     'description' => 'Payment to supplier for payment id ' . $payment->id,
                     'debit' => $total,
                     'credit' => 0,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'payment',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -471,9 +473,9 @@ class LedgerPostingService
                 ], $currencyId, $exchangeRate);
             }
 
-            $depositDetailsAmount = $details->filter(function ($detail) {
+            $depositDetailsAmount = $detailSnapshots->filter(function ($detail) {
                 return strtolower($detail->method ?? '') === 'deposit';
-            })->sum('amount');
+            })->sum('amount_idr');
 
             $paymentMarkedDeposit = strtolower($payment->payment_method ?? '') === 'deposit';
             if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
@@ -502,6 +504,7 @@ class LedgerPostingService
                     'description' => 'Deposit / Uang Muka usage for payment id ' . $payment->id,
                     'debit' => 0,
                     'credit' => $depositAmount,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'payment',
                     'cabang_id' => $branchId,
                     'department_id' => $departmentId,
@@ -511,7 +514,7 @@ class LedgerPostingService
                 ], $currencyId, $exchangeRate);
             }
 
-            $nonDepositDetails = $details->filter(function ($detail) {
+            $nonDepositDetails = $detailSnapshots->filter(function ($detail) {
                 return strtolower($detail->method ?? '') !== 'deposit';
             });
 
@@ -521,7 +524,7 @@ class LedgerPostingService
                 });
 
                 foreach ($grouped as $coaKey => $group) {
-                    $amount = (float) $group->sum('amount');
+                    $amount = (float) $group->sum('amount_idr');
                     if ($amount <= 0) {
                         continue;
                     }
@@ -549,6 +552,7 @@ class LedgerPostingService
                         'description' => 'Bank/Cash for payment id ' . $payment->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
                         'debit' => 0,
                         'credit' => $amount,
+                        'amounts_are_idr' => true,
                         'journal_type' => 'payment',
                         'cabang_id' => $branchId,
                         'department_id' => $departmentId,
@@ -568,6 +572,7 @@ class LedgerPostingService
                         'description' => 'Bank/Cash for payment id ' . $payment->id,
                         'debit' => 0,
                         'credit' => $cashBankAmount,
+                        'amounts_are_idr' => true,
                         'journal_type' => 'payment',
                         'cabang_id' => $branchId,
                         'department_id' => $departmentId,
@@ -618,6 +623,7 @@ class LedgerPostingService
                         'description' => $definition['description'] . ' payment id ' . $payment->id,
                         'debit' => $amount,
                         'credit' => 0,
+                        'amounts_are_idr' => true,
                         'journal_type' => 'payment',
                         'cabang_id' => $branchId,
                         'department_id' => $departmentId,
@@ -633,6 +639,7 @@ class LedgerPostingService
                         'description' => 'Kas/Bank ' . strtolower($definition['description']) . ' payment id ' . $payment->id,
                         'debit' => 0,
                         'credit' => $amount,
+                        'amounts_are_idr' => true,
                         'journal_type' => 'payment',
                         'cabang_id' => $branchId,
                         'department_id' => $departmentId,
@@ -670,6 +677,88 @@ class LedgerPostingService
         }
 
         return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
+    }
+
+    protected function syncVendorPaymentCurrencySnapshots(VendorPayment $payment, \Illuminate\Support\Collection $details): \Illuminate\Support\Collection
+    {
+        if ($details->isEmpty()) {
+            $context = $this->resolveVendorPaymentCurrencyAndRate($payment);
+            $rate = (float) ($context['exchange_rate'] ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+            $amountOriginal = (float) ($payment->total_payment ?? 0);
+            $amountIdr = round($amountOriginal * $rate, 2);
+
+            $payment->forceFill([
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+                'total_payment_idr' => $amountIdr,
+            ])->saveQuietly();
+
+            return collect([(object) [
+                'method' => $payment->payment_method,
+                'coa_id' => $payment->coa_id,
+                'amount' => $amountOriginal,
+                'amount_idr' => $amountIdr,
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+            ]]);
+        }
+
+        $snapshots = $details->map(function ($detail) {
+            $context = $detail->invoice?->exists
+                ? $this->resolveInvoiceCurrencyAndRate($detail->invoice)
+                : [
+                    'currency_id' => is_numeric($detail->currency_id ?? null) ? (int) $detail->currency_id : null,
+                    'exchange_rate' => (float) ($detail->exchange_rate ?? 1),
+                ];
+
+            $rate = (float) ($context['exchange_rate'] ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+            $amountOriginal = (float) ($detail->amount ?? 0);
+            $amountIdr = round($amountOriginal * $rate, 2);
+
+            $detail->forceFill([
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+                'amount_idr' => $amountIdr,
+            ])->saveQuietly();
+
+            return (object) [
+                'method' => $detail->method,
+                'coa_id' => $detail->coa_id,
+                'amount' => $amountOriginal,
+                'amount_idr' => $amountIdr,
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+            ];
+        });
+
+        $uniqueCurrencies = $snapshots
+            ->unique(fn ($snapshot) => ($snapshot->currency_id ?? 'null') . ':' . number_format((float) $snapshot->exchange_rate, 8, '.', ''));
+
+        if ($uniqueCurrencies->count() > 1) {
+            throw new \RuntimeException('Vendor payment hanya boleh membayar invoice dengan satu mata uang dan satu rate. Pisahkan pembayaran multi-currency.');
+        }
+
+        $first = $snapshots->first();
+        $payment->forceFill([
+            'currency_id' => $first?->currency_id,
+            'exchange_rate' => (float) ($first?->exchange_rate ?? 1),
+            'total_payment_idr' => round((float) $snapshots->sum('amount_idr'), 2),
+        ])->saveQuietly();
+
+        return $snapshots;
+    }
+
+    protected function validCurrencyId(mixed $currencyId): ?int
+    {
+        if (! is_numeric($currencyId)) {
+            return null;
+        }
+
+        $currencyId = (int) $currencyId;
+
+        return \App\Models\Currency::whereKey($currencyId)->exists() ? $currencyId : null;
     }
 
     public function postCustomerReceipt(\App\Models\CustomerReceipt $receipt): array
@@ -1027,13 +1116,16 @@ class LedgerPostingService
         $currencyId = null;
         $exchangeRate = 1.0;
 
-        if ($invoice->from_model_type === 'App\\Models\\PurchaseOrder' || $invoice->from_model_type === 'App\Models\PurchaseOrder') {
+        if (is_numeric($invoice->currency_id ?? null)) {
+            $currencyId = (int) $invoice->currency_id;
+            $exchangeRate = (float) ($invoice->exchange_rate ?? 1.0);
+        } elseif ($invoice->from_model_type === 'App\\Models\\PurchaseOrder' || $invoice->from_model_type === 'App\Models\PurchaseOrder') {
             $po = $invoice->fromModel;
             if ($po) {
-                $poCurrency = $po->purchaseOrderCurrency()->first();
-                if ($poCurrency) {
-                    $currencyId = $poCurrency->currency_id;
-                    $exchangeRate = (float) ($poCurrency->nominal ?? 1.0);
+                $context = app(PurchaseInvoiceAccountingService::class)->currencyContextFromPurchaseOrderIds([$po->id]);
+                if ($context) {
+                    $currencyId = $context['currency_id'];
+                    $exchangeRate = (float) ($context['exchange_rate'] ?? 1.0);
                 }
             }
         } elseif ($invoice->from_model_type === 'App\\Models\\PurchaseReceipt' || $invoice->from_model_type === 'App\Models\PurchaseReceipt') {
@@ -1078,11 +1170,26 @@ class LedgerPostingService
             ->map(fn ($item) => is_array($item) ? ($item['invoice_id'] ?? null) : $item)
             ->filter()->values();
 
+        if ($invoiceIds->isEmpty()) {
+            $invoiceIds = $payment->vendorPaymentDetail()
+                ->whereNotNull('invoice_id')
+                ->pluck('invoice_id')
+                ->filter()
+                ->values();
+        }
+
         if ($invoiceIds->isNotEmpty()) {
             $invoice = \App\Models\Invoice::find($invoiceIds->first());
             if ($invoice) {
                 return $this->resolveInvoiceCurrencyAndRate($invoice);
             }
+        }
+
+        if (is_numeric($payment->currency_id ?? null)) {
+            return [
+                'currency_id' => (int) $payment->currency_id,
+                'exchange_rate' => (float) ($payment->exchange_rate ?? 1),
+            ];
         }
 
         return [

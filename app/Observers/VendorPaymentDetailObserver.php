@@ -15,6 +15,15 @@ class VendorPaymentDetailObserver
 {
     public function creating(VendorPaymentDetail $vendorPaymentDetail): void
     {
+        $invoice = $vendorPaymentDetail->invoice;
+        if ($invoice?->exists) {
+            $rate = (float) ($invoice->exchange_rate ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+            $vendorPaymentDetail->currency_id = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : null;
+            $vendorPaymentDetail->exchange_rate = $rate;
+            $vendorPaymentDetail->amount_idr = round((float) ($vendorPaymentDetail->amount ?? 0) * $rate, 2);
+        }
+
         $this->guardDepositRequirements($vendorPaymentDetail);
     }
 
@@ -69,13 +78,18 @@ class VendorPaymentDetailObserver
 
         $accountPayable = AccountPayable::where('invoice_id', $vendorPaymentDetail->invoice_id)->first();
         if ($accountPayable) {
-            $totalReduction = $vendorPaymentDetail->amount + ($vendorPaymentDetail->adjustment_amount ?? 0);
-            $newPaid = min($accountPayable->paid + $vendorPaymentDetail->amount, $accountPayable->total);
-            $newRemaining = max(0, $accountPayable->remaining - $totalReduction);
+            $exchangeRate = (float) ($accountPayable->exchange_rate ?? $vendorPaymentDetail->exchange_rate ?? 1);
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+            $totalOriginal = (float) ($accountPayable->total_original ?? ((float) $accountPayable->total / $exchangeRate));
+            $totalReductionOriginal = (float) $vendorPaymentDetail->amount + (float) ($vendorPaymentDetail->adjustment_amount ?? 0);
+            $newPaidOriginal = min((float) ($accountPayable->paid_original ?? 0) + (float) $vendorPaymentDetail->amount, $totalOriginal);
+            $newRemainingOriginal = max(0, (float) ($accountPayable->remaining_original ?? $totalOriginal) - $totalReductionOriginal);
             $accountPayable->update([
-                'paid' => $newPaid,
-                'remaining' => $newRemaining,
-                'status' => $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+                'paid_original' => $newPaidOriginal,
+                'remaining_original' => $newRemainingOriginal,
+                'paid' => round($newPaidOriginal * $exchangeRate, 2),
+                'remaining' => round($newRemainingOriginal * $exchangeRate, 2),
+                'status' => $newRemainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
             ]);
         }
 
