@@ -773,9 +773,10 @@ class LedgerPostingService
             }
 
             $date = $receipt->payment_date ?? Carbon::now()->toDateString();
-            $details = $receipt->customerReceiptItem()->get();
+            $details = $receipt->customerReceiptItem()->with('invoice')->get();
+            $detailSnapshots = $this->syncCustomerReceiptCurrencySnapshots($receipt, $details);
 
-            $total = (float) ($details->sum('amount') ?: $receipt->total_payment);
+            $total = (float) ($detailSnapshots->sum('amount_idr') ?: $receipt->total_payment_idr ?: $receipt->total_payment);
 
             if ($total <= 0) {
                 return ['status' => 'skipped', 'message' => 'CustomerReceipt has no amount to post'];
@@ -799,15 +800,16 @@ class LedgerPostingService
                     'description' => 'Customer receipt for receipt id ' . $receipt->id,
                     'debit' => 0,
                     'credit' => $total,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'receipt',
                     'source_type' => \App\Models\CustomerReceipt::class,
                     'source_id' => $receipt->id,
                 ], $currencyId, $exchangeRate);
             }
 
-            $depositDetailsAmount = $details->filter(function ($detail) {
+            $depositDetailsAmount = $detailSnapshots->filter(function ($detail) {
                 return strtolower($detail->method ?? '') === 'deposit';
-            })->sum('amount');
+            })->sum('amount_idr');
 
             $paymentMarkedDeposit = strtolower($receipt->payment_method ?? '') === 'deposit';
             if ($depositDetailsAmount <= 0 && $paymentMarkedDeposit) {
@@ -836,13 +838,14 @@ class LedgerPostingService
                     'description' => 'Deposit / Uang Muka usage for receipt id ' . $receipt->id,
                     'debit' => $depositAmount,
                     'credit' => 0,
+                    'amounts_are_idr' => true,
                     'journal_type' => 'receipt',
                     'source_type' => \App\Models\CustomerReceipt::class,
                     'source_id' => $receipt->id,
                 ], $currencyId, $exchangeRate);
             }
 
-            $nonDepositDetails = $details->filter(function ($detail) {
+            $nonDepositDetails = $detailSnapshots->filter(function ($detail) {
                 return strtolower($detail->method ?? '') !== 'deposit';
             });
 
@@ -852,7 +855,7 @@ class LedgerPostingService
                 });
 
                 foreach ($grouped as $coaKey => $group) {
-                    $amount = (float) $group->sum('amount');
+                    $amount = (float) $group->sum('amount_idr');
                     if ($amount <= 0) {
                         continue;
                     }
@@ -880,6 +883,7 @@ class LedgerPostingService
                         'description' => 'Bank/Cash for receipt id ' . $receipt->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
                         'debit' => $amount,
                         'credit' => 0,
+                        'amounts_are_idr' => true,
                         'journal_type' => 'receipt',
                         'source_type' => \App\Models\CustomerReceipt::class,
                         'source_id' => $receipt->id,
@@ -896,6 +900,7 @@ class LedgerPostingService
                         'description' => 'Bank/Cash for receipt id ' . $receipt->id,
                         'debit' => $cashBankAmount,
                         'credit' => 0,
+                        'amounts_are_idr' => true,
                         'journal_type' => 'receipt',
                         'source_type' => \App\Models\CustomerReceipt::class,
                         'source_id' => $receipt->id,
@@ -912,6 +917,75 @@ class LedgerPostingService
 
             return ['status' => 'success', 'message' => 'CustomerReceipt posted to ledger', 'entries' => $entries];
         });
+    }
+
+    protected function syncCustomerReceiptCurrencySnapshots(\App\Models\CustomerReceipt $receipt, \Illuminate\Support\Collection $details): \Illuminate\Support\Collection
+    {
+        if ($details->isEmpty()) {
+            $context = $this->resolveCustomerReceiptCurrencyAndRate($receipt);
+            $rate = (float) ($context['exchange_rate'] ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+            $amountIdr = (float) ($receipt->total_payment_idr ?: ($receipt->total_payment ?? 0));
+
+            $receipt->forceFill([
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+                'total_payment_idr' => round($amountIdr, 2),
+            ])->saveQuietly();
+
+            return collect([(object) [
+                'method' => $receipt->payment_method,
+                'coa_id' => $receipt->coa_id,
+                'amount' => $amountIdr,
+                'amount_idr' => round($amountIdr, 2),
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+            ]]);
+        }
+
+        $snapshots = $details->map(function ($detail) {
+            $context = $detail->invoice?->exists
+                ? $this->resolveInvoiceCurrencyAndRate($detail->invoice)
+                : [
+                    'currency_id' => is_numeric($detail->currency_id ?? null) ? (int) $detail->currency_id : null,
+                    'exchange_rate' => (float) ($detail->exchange_rate ?? 1),
+                ];
+
+            $rate = (float) ($context['exchange_rate'] ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+            $amountIdr = (float) ($detail->amount_idr ?: ($detail->amount ?? 0));
+
+            $detail->forceFill([
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+                'amount_idr' => round($amountIdr, 2),
+            ])->saveQuietly();
+
+            return (object) [
+                'method' => $detail->method,
+                'coa_id' => $detail->coa_id,
+                'amount' => (float) ($detail->amount ?? 0),
+                'amount_idr' => round($amountIdr, 2),
+                'currency_id' => $this->validCurrencyId($context['currency_id'] ?? null),
+                'exchange_rate' => $rate,
+            ];
+        });
+
+        $uniqueCurrencies = $snapshots
+            ->unique(fn ($snapshot) => ($snapshot->currency_id ?? 'null') . ':' . number_format((float) $snapshot->exchange_rate, 8, '.', ''));
+
+        if ($uniqueCurrencies->count() > 1) {
+            throw new \RuntimeException('Customer receipt hanya boleh membayar invoice dengan satu mata uang dan satu rate. Pisahkan penerimaan multi-currency.');
+        }
+
+        $first = $snapshots->first();
+        $receipt->forceFill([
+            'currency_id' => $first?->currency_id,
+            'exchange_rate' => (float) ($first?->exchange_rate ?? 1),
+            'total_payment_idr' => round((float) $snapshots->sum('amount_idr'), 2),
+        ])->saveQuietly();
+
+        return $snapshots;
     }
 
     private function resolveDepositCoaForCustomer(\App\Models\CustomerReceipt $receipt): ?ChartOfAccount
@@ -1210,6 +1284,14 @@ class LedgerPostingService
             ->map(fn ($item) => is_array($item) ? ($item['invoice_id'] ?? null) : $item)
             ->filter()->values();
 
+        if ($invoiceIds->isEmpty()) {
+            $invoiceIds = $receipt->customerReceiptItem()
+                ->whereNotNull('invoice_id')
+                ->pluck('invoice_id')
+                ->filter()
+                ->values();
+        }
+
         if ($invoiceIds->isNotEmpty()) {
             $invoice = \App\Models\Invoice::find($invoiceIds->first());
             if ($invoice) {
@@ -1222,6 +1304,13 @@ class LedgerPostingService
             if ($invoice) {
                 return $this->resolveInvoiceCurrencyAndRate($invoice);
             }
+        }
+
+        if (is_numeric($receipt->currency_id ?? null)) {
+            return [
+                'currency_id' => (int) $receipt->currency_id,
+                'exchange_rate' => (float) ($receipt->exchange_rate ?? 1),
+            ];
         }
 
         return [

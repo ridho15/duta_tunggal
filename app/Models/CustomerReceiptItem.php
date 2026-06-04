@@ -16,8 +16,11 @@ class CustomerReceiptItem extends Model
     protected $fillable = [
         'customer_receipt_id',
         'invoice_id',
+        'currency_id',
+        'exchange_rate',
         'method',
         'amount',
+        'amount_idr',
         'coa_id',
         'payment_date',
         'selected_invoices',
@@ -25,6 +28,9 @@ class CustomerReceiptItem extends Model
 
     protected $casts = [
         'selected_invoices' => 'array',
+        'exchange_rate' => 'float',
+        'amount' => 'float',
+        'amount_idr' => 'float',
     ];
 
     public function customerReceipt()
@@ -35,6 +41,11 @@ class CustomerReceiptItem extends Model
     public function invoice()
     {
         return $this->belongsTo(Invoice::class, 'invoice_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function coa()

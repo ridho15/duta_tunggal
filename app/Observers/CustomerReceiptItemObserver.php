@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\Log;
 
 class CustomerReceiptItemObserver
 {
+    public function creating(CustomerReceiptItem $customerReceiptItem): void
+    {
+        if ($customerReceiptItem->invoice_id) {
+            $invoice = \App\Models\Invoice::find($customerReceiptItem->invoice_id);
+            $rate = (float) ($invoice?->exchange_rate ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+
+            $customerReceiptItem->currency_id = is_numeric($invoice?->currency_id ?? null) ? (int) $invoice->currency_id : null;
+            $customerReceiptItem->exchange_rate = $rate;
+        } else {
+            $customerReceiptItem->exchange_rate = (float) ($customerReceiptItem->exchange_rate ?? 1) ?: 1;
+        }
+
+        $customerReceiptItem->amount_idr = (float) ($customerReceiptItem->amount_idr ?: $customerReceiptItem->amount);
+    }
+
     public function created(CustomerReceiptItem $customerReceiptItem): void
     {
         $customerReceipt = $customerReceiptItem->customerReceipt;

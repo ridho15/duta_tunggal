@@ -102,11 +102,19 @@ class SaleOrderObserver
         $subtotal = 0;
         $tax = 0;
         $invoiceItems = [];
+        $currencySnapshots = collect();
         $invoiceTaxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
         foreach ($saleOrder->saleOrderItem as $item) {
             // Prefer explicit item currency; fall back to the sale order currency when absent
             $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : (is_numeric($saleOrder->currency_id ?? null) ? (int) $saleOrder->currency_id : null);
-            $itemExchangeRate = CurrencyConversionResolver::resolveRate($itemCurrencyId);
+            $itemExchangeRate = $itemCurrencyId && (int) $itemCurrencyId === (int) ($saleOrder->currency_id ?? 0)
+                ? (float) ($saleOrder->exchange_rate ?? CurrencyConversionResolver::resolveRate($itemCurrencyId))
+                : CurrencyConversionResolver::resolveRate($itemCurrencyId);
+            $itemExchangeRate = $itemExchangeRate > 0 ? $itemExchangeRate : 1.0;
+            $currencySnapshots->push([
+                'currency_id' => $itemCurrencyId,
+                'exchange_rate' => $itemExchangeRate,
+            ]);
 
             // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
             // which also defaults to 'Exclusive' (normalises to 'Eksklusif').
@@ -191,6 +199,26 @@ class SaleOrderObserver
         $tipePajak = $invoiceTaxData['tipe_pajak'];
 
         $total = $subtotal + $taxMonetaryAmount + $additionalCosts;
+        $normalizedCurrencies = $currencySnapshots
+            ->map(function (array $snapshot): array {
+                $currencyId = is_numeric($snapshot['currency_id'] ?? null) ? (int) $snapshot['currency_id'] : null;
+                $exchangeRate = (float) ($snapshot['exchange_rate'] ?? CurrencyConversionResolver::resolveRate($currencyId));
+
+                return [
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+                ];
+            })
+            ->filter(fn (array $snapshot) => ! empty($snapshot['currency_id']))
+            ->unique(fn (array $snapshot) => ($snapshot['currency_id'] ?? 'null') . ':' . number_format((float) $snapshot['exchange_rate'], 8, '.', ''))
+            ->values();
+
+        $invoiceCurrency = $normalizedCurrencies->count() === 1
+            ? $normalizedCurrencies->first()
+            : [
+                'currency_id' => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'),
+                'exchange_rate' => 1.0,
+            ];
 
         // Load customer data
         $saleOrder->load('customer');
@@ -224,6 +252,8 @@ class SaleOrderObserver
             'tipe_pajak' => $tipePajak,
             'dpp' => $subtotal,        // FIX #1a: DPP = subtotal (sum of DPP amounts)
             'total' => $total,
+            'currency_id' => $invoiceCurrency['currency_id'],
+            'exchange_rate' => $invoiceCurrency['exchange_rate'],
             'other_fee' => $otherFees, // Tambahkan biaya tambahan dari delivery orders
             'delivery_orders' => $saleOrder->deliveryOrder->pluck('id')->toArray(), // Tambahkan delivery order IDs
             'cabang_id' => $saleOrder->cabang_id, // FIX #5: propagate branch scope

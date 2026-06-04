@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ChartOfAccount;
+use App\Models\AccountReceivable;
 use App\Models\Currency;
 use App\Models\CustomerReceipt;
 use App\Models\Invoice;
@@ -201,6 +202,15 @@ class CurrencyFiveDollarVerificationTest extends TestCase
             ->firstOrFail();
 
         $this->assertEquals($expectedIdr, (float) $invoice->total);
+        $this->assertEquals($this->usd->id, $invoice->currency_id);
+        $this->assertEquals(16000.0, (float) $invoice->exchange_rate);
+
+        $accountReceivable = AccountReceivable::where('invoice_id', $invoice->id)->firstOrFail();
+        $this->assertEquals($expectedIdr, (float) $accountReceivable->total);
+        $this->assertEquals(5.0, (float) $accountReceivable->total_original);
+        $this->assertEquals(5.0, (float) $accountReceivable->remaining_original);
+        $this->assertEquals($this->usd->id, $accountReceivable->currency_id);
+        $this->assertEquals(16000.0, (float) $accountReceivable->exchange_rate);
 
         $invoiceEntries = JournalEntry::where('source_type', Invoice::class)
             ->where('source_id', $invoice->id)
@@ -211,8 +221,9 @@ class CurrencyFiveDollarVerificationTest extends TestCase
         $arEntry = $invoiceEntries->firstWhere('coa_id', $arCoa->id);
         $this->assertNotNull($arEntry, 'Sales invoice should create an Accounts Receivable entry');
         $this->assertEquals($expectedIdr, (float) $arEntry->debit);
-        $this->assertEquals($this->idr->id, $arEntry->currency_id);
-        $this->assertEquals($expectedIdr, (float) $arEntry->amount_original_currency);
+        $this->assertEquals($this->usd->id, $arEntry->currency_id);
+        $this->assertEquals(16000.0, (float) $arEntry->exchange_rate);
+        $this->assertEquals(5.0, (float) $arEntry->amount_original_currency);
 
         $receipt = CustomerReceipt::create([
             'invoice_id' => $invoice->id,
@@ -236,7 +247,19 @@ class CurrencyFiveDollarVerificationTest extends TestCase
         $cashEntry = $receiptEntries->firstWhere('coa_id', $bankCoa->id);
         $this->assertNotNull($cashEntry, 'Customer receipt should create a cash/bank entry');
         $this->assertEquals($expectedIdr, (float) $cashEntry->debit);
-        $this->assertEquals($this->idr->id, $cashEntry->currency_id);
-        $this->assertEquals($expectedIdr, (float) $cashEntry->amount_original_currency);
+        $this->assertEquals($this->usd->id, $cashEntry->currency_id);
+        $this->assertEquals(16000.0, (float) $cashEntry->exchange_rate);
+        $this->assertEquals(5.0, (float) $cashEntry->amount_original_currency);
+
+        $receipt = $receipt->fresh();
+        $this->assertEquals($this->usd->id, $receipt->currency_id);
+        $this->assertEquals(16000.0, (float) $receipt->exchange_rate);
+        $this->assertEquals($expectedIdr, (float) $receipt->total_payment_idr);
+
+        $accountReceivable = $accountReceivable->fresh();
+        $this->assertEquals($expectedIdr, (float) $accountReceivable->paid);
+        $this->assertEquals(0.0, (float) $accountReceivable->remaining);
+        $this->assertEquals(5.0, (float) $accountReceivable->paid_original);
+        $this->assertEquals(0.0, (float) $accountReceivable->remaining_original);
     }
 }

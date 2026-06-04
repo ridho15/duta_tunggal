@@ -4,9 +4,7 @@ namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Models\Invoice;
-use App\Models\PurchaseOrder;
 use App\Services\PurchaseInvoiceAccountingService;
-use App\Support\CurrencyConversionResolver;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
@@ -35,10 +33,13 @@ class CreatePurchaseInvoice extends CreateRecord
         $data['purchase_order_ids'] = $data['selected_purchase_orders'] ?? [];
 
         if (!empty($data['purchase_order_ids'])) {
-            $firstPo = PurchaseOrder::find(collect($data['purchase_order_ids'])->filter()->first());
-            $poCurrency = $firstPo?->purchaseOrderCurrency()->first();
-            $data['currency_id'] = $poCurrency?->currency_id ?? $firstPo?->currency_id ?? null;
-            $data['exchange_rate'] = $poCurrency?->nominal ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null);
+            $poCurrencyContext = app(PurchaseInvoiceAccountingService::class)
+                ->currencyContextFromPurchaseOrderIds($data['purchase_order_ids']);
+
+            if ($poCurrencyContext !== null) {
+                $data['currency_id'] = $poCurrencyContext['currency_id'];
+                $data['exchange_rate'] = $poCurrencyContext['exchange_rate'];
+            }
         }
 
         unset($data['selected_purchase_orders']);

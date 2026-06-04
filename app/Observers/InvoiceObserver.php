@@ -118,13 +118,23 @@ class InvoiceObserver
                 return;
             }
             // Create Account Receivable
+            $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : null;
+            $exchangeRate = (float) ($invoice->exchange_rate ?? CurrencyConversionResolver::resolveRate($currencyId));
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+            $totalIdr = (float) MoneyHelper::safeParse($invoice->total ?? 0);
+            $totalOriginal = round($totalIdr / $exchangeRate, 4);
             $accountReceivable = AccountReceivable::firstOrCreate(
                 ['invoice_id' => $invoice->id],
                 [
                     'customer_id' => $fromModel->customer_id,
-                    'total' => $invoice->total,
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $exchangeRate,
+                    'total_original' => $totalOriginal,
+                    'paid_original' => 0,
+                    'remaining_original' => $totalOriginal,
+                    'total' => $totalIdr,
                     'paid' => 0,
-                    'remaining' => $invoice->total,
+                    'remaining' => $totalIdr,
                     'status' => PaymentStatus::UNPAID->value,
                     'cabang_id' => $invoice->cabang_id, // FIX #5: propagate branch scope so AR is visible to branch users
                 ]
@@ -133,8 +143,13 @@ class InvoiceObserver
             if ($accountReceivable->wasRecentlyCreated === false) {
                 $accountReceivable->forceFill([
                     'customer_id' => $fromModel->customer_id,
-                    'total' => $invoice->total,
-                    'remaining' => $invoice->total - (float) $accountReceivable->paid,
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $exchangeRate,
+                    'total_original' => $totalOriginal,
+                    'paid_original' => round((float) $accountReceivable->paid / $exchangeRate, 4),
+                    'remaining_original' => round(max(0, $totalIdr - (float) $accountReceivable->paid) / $exchangeRate, 4),
+                    'total' => $totalIdr,
+                    'remaining' => $totalIdr - (float) $accountReceivable->paid,
                     'status' => PaymentStatus::UNPAID->value,
                     'cabang_id' => $invoice->cabang_id,
                 ])->save();
@@ -399,7 +414,7 @@ class InvoiceObserver
             'source_type' => Invoice::class,
             'source_id' => $invoice->id,
             'cabang_id' => $invoice->cabang_id,
-        ]);
+        ] + $this->salesJournalCurrencyPayload($invoice, (float) $grandTotal));
 
         // Create detailed CREDIT entries for each invoice item
         foreach ($invoiceItems as $item) {
@@ -435,7 +450,7 @@ class InvoiceObserver
                     'source_type' => Invoice::class,
                     'source_id' => $invoice->id,
                     'cabang_id' => $invoice->cabang_id,
-                ]);
+                ] + $this->salesJournalCurrencyPayload($invoice, (float) round($lineSubtotal, 2)));
                 $totalRevenue += round($lineSubtotal, 2);
             }
 
@@ -469,7 +484,7 @@ class InvoiceObserver
                 'source_type' => Invoice::class,
                 'source_id' => $invoice->id,
                 'cabang_id' => $invoice->cabang_id,
-            ]);
+            ] + $this->salesJournalCurrencyPayload($invoice, (float) $totalTaxAmount));
         }
 
         // CREDIT: Biaya Pengiriman (shipping/other costs)
@@ -485,7 +500,7 @@ class InvoiceObserver
                 'source_type' => Invoice::class,
                 'source_id' => $invoice->id,
                 'cabang_id' => $invoice->cabang_id,
-            ]);
+            ] + $this->salesJournalCurrencyPayload($invoice, (float) $otherFeeTotal));
         }
 
         Log::info('postSalesInvoice: journal entries created', [
@@ -498,6 +513,21 @@ class InvoiceObserver
         ]);
 
         $this->postCostOfSalesEntries($invoice, $date);
+    }
+
+    private function salesJournalCurrencyPayload(Invoice $invoice, float $amountIdr): array
+    {
+        $currencyId = is_numeric($invoice->currency_id ?? null)
+            ? (int) $invoice->currency_id
+            : CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
+        $exchangeRate = (float) ($invoice->exchange_rate ?? CurrencyConversionResolver::resolveRate($currencyId));
+        $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+
+        return [
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+            'amount_original_currency' => round($amountIdr / $exchangeRate, 4),
+        ];
     }
 
     private function getConfiguredSalesCoaCodes(string $configKey, array $fallbacks = []): array

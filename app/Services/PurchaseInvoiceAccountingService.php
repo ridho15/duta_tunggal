@@ -164,7 +164,9 @@ class PurchaseInvoiceAccountingService
                 $subtotal += (float) $line['total'];
                 $taxAmount += (float) $line['tax_amount'];
 
-                $currencySnapshots->push($this->resolvePurchaseOrderItemCurrencySnapshot($purchaseOrderItem, $purchaseOrder));
+                $currencySnapshots = $currencySnapshots->merge(
+                    $this->resolvePurchaseOrderItemCurrencySnapshots($purchaseOrderItem, $purchaseOrder)
+                );
             }
 
             foreach ($receipt->purchaseReceiptBiaya as $fee) {
@@ -681,14 +683,41 @@ class PurchaseInvoiceAccountingService
         ];
     }
 
-    protected function resolvePurchaseOrderItemCurrencySnapshot(\App\Models\PurchaseOrderItem $item, ?PurchaseOrder $purchaseOrder): array
+    protected function resolvePurchaseOrderItemCurrencySnapshots(\App\Models\PurchaseOrderItem $item, ?PurchaseOrder $purchaseOrder): \Illuminate\Support\Collection
     {
         $currencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : null;
 
-        return [
-            'currency_id' => $currencyId,
-            'exchange_rate' => $this->resolvePurchaseOrderCurrencyRate($purchaseOrder, $currencyId),
-        ];
+        $purchaseOrder?->loadMissing('purchaseOrderCurrency');
+        $poCurrencySnapshots = $purchaseOrder?->purchaseOrderCurrency
+            ?->map(fn ($poCurrency) => [
+                'currency_id' => is_numeric($poCurrency->currency_id ?? null) ? (int) $poCurrency->currency_id : null,
+                'exchange_rate' => (float) ($poCurrency->nominal ?? 1),
+            ])
+            ->filter(fn (array $snapshot) => ! empty($snapshot['currency_id']))
+            ->values() ?? collect();
+
+        if ($poCurrencySnapshots->isNotEmpty()) {
+            if ($currencyId && CurrencyConversionResolver::resolveCurrency($currencyId) && ! $poCurrencySnapshots->contains(fn (array $snapshot) => (int) $snapshot['currency_id'] === $currencyId)) {
+                $poCurrencySnapshots->push([
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $this->resolvePurchaseOrderCurrencyRate($purchaseOrder, $currencyId),
+                ]);
+            }
+
+            return $poCurrencySnapshots;
+        }
+
+        if ($currencyId && CurrencyConversionResolver::resolveCurrency($currencyId)) {
+            return collect([[
+                'currency_id' => $currencyId,
+                'exchange_rate' => $this->resolvePurchaseOrderCurrencyRate($purchaseOrder, $currencyId),
+            ]]);
+        }
+
+        return collect([[
+            'currency_id' => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'),
+            'exchange_rate' => 1.0,
+        ]]);
     }
 
     protected function resolvePurchaseOrderCurrencyRate(?PurchaseOrder $purchaseOrder, ?int $currencyId): float
@@ -752,8 +781,18 @@ class PurchaseInvoiceAccountingService
         }
 
         $snapshots = $purchaseOrders->flatMap(function (PurchaseOrder $purchaseOrder) {
-            return $purchaseOrder->purchaseOrderItem->map(
-                fn ($item) => $this->resolvePurchaseOrderItemCurrencySnapshot($item, $purchaseOrder)
+            if ($purchaseOrder->purchaseOrderItem->isEmpty() && $purchaseOrder->purchaseOrderCurrency->isNotEmpty()) {
+                return $purchaseOrder->purchaseOrderCurrency
+                    ->map(fn ($poCurrency) => [
+                        'currency_id' => is_numeric($poCurrency->currency_id ?? null) ? (int) $poCurrency->currency_id : null,
+                        'exchange_rate' => (float) ($poCurrency->nominal ?? 1),
+                    ])
+                    ->filter(fn (array $snapshot) => ! empty($snapshot['currency_id']))
+                    ->values();
+            }
+
+            return $purchaseOrder->purchaseOrderItem->flatMap(
+                fn ($item) => $this->resolvePurchaseOrderItemCurrencySnapshots($item, $purchaseOrder)
             );
         });
 

@@ -15,6 +15,7 @@ use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Throwable;
 
@@ -147,6 +148,15 @@ class CreateCustomerReceipt extends CreateRecord
 
         // Validate and fix data consistency
         $this->validateAndFixDataConsistency($data);
+        $currencyInvoiceIds = ! empty($data['invoice_receipts'])
+            ? array_keys($data['invoice_receipts'])
+            : ($data['selected_invoices'] ?? []);
+        $currencyContext = $this->resolveReceiptCurrencyContext($currencyInvoiceIds);
+        if ($currencyContext !== null) {
+            $data['currency_id'] = $currencyContext['currency_id'];
+            $data['exchange_rate'] = $currencyContext['exchange_rate'];
+        }
+        $data['total_payment_idr'] = (float) ($data['total_payment'] ?? 0);
 
         return $data;
     }
@@ -238,6 +248,8 @@ class CreateCustomerReceipt extends CreateRecord
             }
         }
 
+        $this->resolveReceiptCurrencyContext(array_keys($data['invoice_receipts'] ?? []));
+
         // Validate total consistency
         $calculatedTotal = 0;
         if (!empty($data['invoice_receipts'])) {
@@ -252,6 +264,40 @@ class CreateCustomerReceipt extends CreateRecord
         }
         
         // Final validation log
+    }
+
+    private function resolveReceiptCurrencyContext(array $invoiceIds): ?array
+    {
+        $invoiceIds = collect($invoiceIds)
+            ->map(fn ($id) => is_numeric($id) ? (int) $id : null)
+            ->filter()
+            ->values();
+
+        if ($invoiceIds->isEmpty()) {
+            return null;
+        }
+
+        $invoices = Invoice::whereIn('id', $invoiceIds)->get();
+        $snapshots = $invoices
+            ->map(function (Invoice $invoice) {
+                $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : null;
+                $rate = (float) ($invoice->exchange_rate ?? 1);
+
+                return [
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $rate > 0 ? $rate : 1.0,
+                ];
+            })
+            ->unique(fn (array $snapshot) => ($snapshot['currency_id'] ?? 'null') . ':' . number_format((float) $snapshot['exchange_rate'], 8, '.', ''))
+            ->values();
+
+        if ($snapshots->count() > 1) {
+            throw ValidationException::withMessages([
+                'selected_invoices' => 'Customer receipt hanya boleh mencakup invoice dengan satu mata uang dan satu rate.',
+            ]);
+        }
+
+        return $snapshots->first();
     }
 
     protected function afterCreate(): void
@@ -300,12 +346,20 @@ class CreateCustomerReceipt extends CreateRecord
         if (!empty($invoiceReceipts)) {
             foreach ($invoiceReceipts as $invoiceId => $paymentAmount) {
                 if ($paymentAmount > 0) {
+                    $invoice = Invoice::find($invoiceId);
+                    $currencyId = is_numeric($invoice?->currency_id ?? null) ? (int) $invoice->currency_id : null;
+                    $exchangeRate = (float) ($invoice?->exchange_rate ?? 1);
+                    $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+
                     // Create CustomerReceiptItem
                     CustomerReceiptItem::create([
                         'customer_receipt_id' => $record->id,
                         'invoice_id' => $invoiceId,
+                        'currency_id' => $currencyId,
+                        'exchange_rate' => $exchangeRate,
                         'method' => $record->payment_method ?? 'Cash',
                         'amount' => $paymentAmount, // Use 'amount' instead of 'payment_amount'
+                        'amount_idr' => $paymentAmount,
                         'coa_id' => $record->coa_id, // Use coa_id from receipt
                         'payment_date' => now(),
                         'created_at' => now(),
@@ -321,10 +375,14 @@ class CreateCustomerReceipt extends CreateRecord
                     if ($accountReceivable) {
                         $newPaid      = $accountReceivable->paid + $paymentAmount;
                         $newRemaining = $accountReceivable->remaining - $paymentAmount;
+                        $arExchangeRate = (float) ($accountReceivable->exchange_rate ?? $exchangeRate);
+                        $arExchangeRate = $arExchangeRate > 0 ? $arExchangeRate : 1.0;
 
                         $accountReceivable->update([
                             'paid'      => $newPaid,
                             'remaining' => max(0, $newRemaining),
+                            'paid_original' => round($newPaid / $arExchangeRate, 4),
+                            'remaining_original' => round(max(0, $newRemaining) / $arExchangeRate, 4),
                         ]);
 
                         // Sync invoice and AR status

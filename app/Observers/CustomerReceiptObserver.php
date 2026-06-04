@@ -25,6 +25,12 @@ class CustomerReceiptObserver
         $this->ledger = new LedgerPostingService();
     }
 
+    public function creating(CustomerReceipt $receipt): void
+    {
+        $receipt->exchange_rate = (float) ($receipt->exchange_rate ?? 1) ?: 1;
+        $receipt->total_payment_idr = (float) ($receipt->total_payment_idr ?: $receipt->total_payment);
+    }
+
     /**
      * Called by CreateCustomerReceipt::afterCreate() once AR has been updated
      * in the page handler. Prevents the observer from double-counting.
@@ -69,12 +75,22 @@ class CustomerReceiptObserver
             if (!$receipt->journalEntries()->exists()) {
                 $this->ledger->postCustomerReceipt($receipt);
             }
+
+            $this->updateAccountReceivables($receipt->fresh());
+            self::markArUpdatedInCreate($receipt->id);
         }
     }
 
     private function updateAccountReceivables(CustomerReceipt $receipt)
     {
-        foreach ($receipt->customerReceiptItem as $item) {
+        $items = $receipt->customerReceiptItem;
+
+        if ($items->isEmpty()) {
+            $this->updateAccountReceivablesFromReceiptHeader($receipt);
+            return;
+        }
+
+        foreach ($items as $item) {
             // If selected_invoices exists, update AR for each invoice
             if (!empty($item->selected_invoices)) {
                 $selectedInvoiceIds = array_values(array_unique(array_filter(array_map(
@@ -85,8 +101,13 @@ class CustomerReceiptObserver
                 foreach ($selectedInvoiceIds as $invoiceId) {
                     $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
                     if ($accountReceivable) {
-                        $accountReceivable->paid      = $accountReceivable->paid + $item->amount;
-                        $accountReceivable->remaining = $accountReceivable->remaining - $item->amount;
+                        $amountIdr = (float) ($item->amount_idr ?: $item->amount);
+                        $exchangeRate = (float) ($accountReceivable->exchange_rate ?? $item->exchange_rate ?? 1);
+                        $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+                        $accountReceivable->paid      = $accountReceivable->paid + $amountIdr;
+                        $accountReceivable->remaining = $accountReceivable->remaining - $amountIdr;
+                        $accountReceivable->paid_original = round((float) $accountReceivable->paid / $exchangeRate, 4);
+                        $accountReceivable->remaining_original = round(max(0, (float) $accountReceivable->remaining) / $exchangeRate, 4);
                         $accountReceivable->save();
 
                         // Update invoice and AR status
@@ -99,13 +120,65 @@ class CustomerReceiptObserver
                 $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
 
                 if ($accountReceivable) {
-                    $accountReceivable->paid      = $accountReceivable->paid + $item->amount;
-                    $accountReceivable->remaining = $accountReceivable->remaining - $item->amount;
+                    $amountIdr = (float) ($item->amount_idr ?: $item->amount);
+                    $exchangeRate = (float) ($accountReceivable->exchange_rate ?? $item->exchange_rate ?? 1);
+                    $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+                    $accountReceivable->paid      = $accountReceivable->paid + $amountIdr;
+                    $accountReceivable->remaining = $accountReceivable->remaining - $amountIdr;
+                    $accountReceivable->paid_original = round((float) $accountReceivable->paid / $exchangeRate, 4);
+                    $accountReceivable->remaining_original = round(max(0, (float) $accountReceivable->remaining) / $exchangeRate, 4);
                     $accountReceivable->save();
 
                     $this->syncArStatus($accountReceivable);
                 }
             }
+        }
+    }
+
+    private function updateAccountReceivablesFromReceiptHeader(CustomerReceipt $receipt): void
+    {
+        $invoiceIds = collect($receipt->selected_invoices ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($invoiceIds->isEmpty() && $receipt->invoice_id) {
+            $invoiceIds = collect([(int) $receipt->invoice_id]);
+        }
+
+        if ($invoiceIds->isEmpty()) {
+            return;
+        }
+
+        $remainingPayment = (float) ($receipt->total_payment_idr ?: $receipt->total_payment);
+
+        foreach ($invoiceIds as $invoiceId) {
+            if ($remainingPayment <= 0) {
+                break;
+            }
+
+            $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
+            if (!$accountReceivable) {
+                continue;
+            }
+
+            $amountIdr = min($remainingPayment, max(0, (float) $accountReceivable->remaining));
+            if ($amountIdr <= 0) {
+                continue;
+            }
+
+            $exchangeRate = (float) ($accountReceivable->exchange_rate ?? $receipt->exchange_rate ?? 1);
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+
+            $accountReceivable->paid = (float) $accountReceivable->paid + $amountIdr;
+            $accountReceivable->remaining = (float) $accountReceivable->remaining - $amountIdr;
+            $accountReceivable->paid_original = round((float) $accountReceivable->paid / $exchangeRate, 4);
+            $accountReceivable->remaining_original = round(max(0, (float) $accountReceivable->remaining) / $exchangeRate, 4);
+            $accountReceivable->save();
+
+            $this->syncArStatus($accountReceivable);
+            $remainingPayment -= $amountIdr;
         }
     }
 

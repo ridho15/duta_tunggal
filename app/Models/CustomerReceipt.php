@@ -21,6 +21,7 @@ class CustomerReceipt extends Model
         'payment_date',
         'ntpn',
         'total_payment',
+        'total_payment_idr',
         'notes',
         'diskon',
         'payment_adjustment',
@@ -28,12 +29,17 @@ class CustomerReceipt extends Model
         'coa_id',
         'status', // 'Draft','Partial','Paid'
         'created_by',
-        'cabang_id'
+        'cabang_id',
+        'currency_id',
+        'exchange_rate',
     ];
 
     protected $casts = [
         'selected_invoices' => 'json',
         'invoice_receipts' => 'json',
+        'total_payment' => 'float',
+        'total_payment_idr' => 'float',
+        'exchange_rate' => 'float',
     ];
 
     public function invoice()
@@ -54,6 +60,11 @@ class CustomerReceipt extends Model
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function journalEntries()
