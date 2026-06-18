@@ -7,11 +7,13 @@ use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\OrderRequest;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Support\CurrencyConversionResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class PurchaseInvoiceAccountingService
@@ -63,9 +65,8 @@ class PurchaseInvoiceAccountingService
                 $data['exchange_rate'] = $receiptBacked['exchange_rate'] ?? 1.0;
             }
 
-            if (! empty($receiptBacked['receipt_fees']) && empty($data['receiptBiayaItems'])) {
-                $data['receiptBiayaItems'] = $receiptBacked['receipt_fees'];
-            }
+            $data['other_fees'] = [];
+            $data['receiptBiayaItems'] = $receiptBacked['receipt_fees'];
         } else {
             $poCurrencyContext = $this->currencyContextFromPurchaseOrderIds(
                 $data['purchase_order_ids'] ?? $data['selected_purchase_orders'] ?? (! empty($data['from_model_id']) && ($data['from_model_type'] ?? null) === PurchaseOrder::class ? [$data['from_model_id']] : [])
@@ -108,6 +109,163 @@ class PurchaseInvoiceAccountingService
         return $data;
     }
 
+    /**
+     * Validate a receipt-backed purchase invoice and replace all source fields
+     * with values resolved from the database.
+     */
+    public function validateReceiptBackedCreateData(array $data, bool $lockForUpdate = false): array
+    {
+        $selectedPurchaseOrderIds = collect($data['selected_purchase_orders'] ?? $data['purchase_order_ids'] ?? [])
+            ->map(fn ($id) => is_numeric($id) ? (int) $id : null)
+            ->filter()
+            ->unique()
+            ->values();
+        $selectedReceiptIds = collect($data['selected_purchase_receipts'] ?? $data['purchase_receipts'] ?? [])
+            ->map(fn ($id) => is_numeric($id) ? (int) $id : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($selectedPurchaseOrderIds->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_purchase_orders' => 'Minimal satu Purchase Order harus dipilih.',
+            ]);
+        }
+
+        if ($selectedReceiptIds->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_purchase_receipts' => 'Minimal satu Purchase Receipt harus dipilih.',
+            ]);
+        }
+
+        $receiptQuery = PurchaseReceipt::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->whereIn('id', $selectedReceiptIds);
+        if ($lockForUpdate) {
+            $receiptQuery->lockForUpdate();
+        }
+
+        $receiptsById = $receiptQuery->get()->keyBy('id');
+        if ($receiptsById->count() !== $selectedReceiptIds->count()) {
+            throw ValidationException::withMessages([
+                'selected_purchase_receipts' => 'Satu atau lebih Purchase Receipt tidak ditemukan atau sudah tidak tersedia.',
+            ]);
+        }
+
+        $receipts = $selectedReceiptIds->map(fn (int $id) => $receiptsById->get($id));
+        if ($receipts->contains(fn (PurchaseReceipt $receipt) => ! in_array(strtolower((string) $receipt->status), ['partial', 'completed'], true))) {
+            throw ValidationException::withMessages([
+                'selected_purchase_receipts' => 'Purchase Receipt harus berstatus partial atau completed.',
+            ]);
+        }
+
+        $receiptPurchaseOrderIds = $receipts
+            ->pluck('purchase_order_id')
+            ->map(fn ($id) => is_numeric($id) ? (int) $id : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($receiptPurchaseOrderIds->count() !== $selectedPurchaseOrderIds->count()
+            || $receiptPurchaseOrderIds->diff($selectedPurchaseOrderIds)->isNotEmpty()
+            || $selectedPurchaseOrderIds->diff($receiptPurchaseOrderIds)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_purchase_receipts' => 'Setiap receipt harus berasal dari Purchase Order yang dipilih, dan setiap Purchase Order harus memiliki receipt terpilih.',
+            ]);
+        }
+
+        $purchaseOrderQuery = PurchaseOrder::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->with('supplier')
+            ->whereIn('id', $receiptPurchaseOrderIds);
+        if ($lockForUpdate) {
+            $purchaseOrderQuery->lockForUpdate();
+        }
+
+        $purchaseOrders = $purchaseOrderQuery->get()->keyBy('id');
+        if ($purchaseOrders->count() !== $receiptPurchaseOrderIds->count()) {
+            throw ValidationException::withMessages([
+                'selected_purchase_orders' => 'Satu atau lebih Purchase Order tidak ditemukan atau sudah tidak tersedia.',
+            ]);
+        }
+
+        if ($purchaseOrders->contains(fn (PurchaseOrder $purchaseOrder) => ! in_array(strtolower((string) $purchaseOrder->status), ['approved', 'partially_received', 'completed'], true))) {
+            throw ValidationException::withMessages([
+                'selected_purchase_orders' => 'Purchase Order harus berstatus approved, partially received, atau completed.',
+            ]);
+        }
+
+        $supplierId = is_numeric($data['selected_supplier'] ?? null) ? (int) $data['selected_supplier'] : null;
+        if (! $supplierId || $purchaseOrders->contains(fn (PurchaseOrder $purchaseOrder) => (int) $purchaseOrder->supplier_id !== $supplierId)) {
+            throw ValidationException::withMessages([
+                'selected_supplier' => 'Supplier tidak sesuai dengan Purchase Order yang dipilih.',
+            ]);
+        }
+
+        $orderRequestId = is_numeric($data['selected_order_request'] ?? null) ? (int) $data['selected_order_request'] : null;
+        if (! $orderRequestId || $purchaseOrders->contains(fn (PurchaseOrder $purchaseOrder) => $purchaseOrder->refer_model_type !== OrderRequest::class || (int) $purchaseOrder->refer_model_id !== $orderRequestId)) {
+            throw ValidationException::withMessages([
+                'selected_order_request' => 'Order Request tidak sesuai dengan Purchase Order yang dipilih.',
+            ]);
+        }
+
+        $requestedCabangId = is_numeric($data['cabang_id'] ?? null) ? (int) $data['cabang_id'] : null;
+        $sourceCabangIds = $receipts->pluck('cabang_id')
+            ->merge($purchaseOrders->map(fn (PurchaseOrder $purchaseOrder) => $purchaseOrder->cabang_id))
+            ->map(fn ($id) => is_numeric($id) ? (int) $id : null)
+            ->filter()
+            ->unique()
+            ->values();
+        if ($sourceCabangIds->count() !== 1) {
+            throw ValidationException::withMessages([
+                'cabang_id' => 'Purchase Order dan Purchase Receipt harus berasal dari satu cabang yang sama.',
+            ]);
+        }
+
+        $cabangId = (int) $sourceCabangIds->first();
+        if ($requestedCabangId && $requestedCabangId !== $cabangId) {
+            throw ValidationException::withMessages([
+                'cabang_id' => 'Cabang invoice harus sama dengan cabang Purchase Order dan Purchase Receipt.',
+            ]);
+        }
+
+        $user = Auth::user();
+        $canManageAllCabang = in_array('all', (array) ($user?->manage_type ?? []), true);
+        if ($user && ! $canManageAllCabang && (int) $user->cabang_id !== $cabangId) {
+            throw ValidationException::withMessages([
+                'cabang_id' => 'Anda tidak memiliki akses untuk membuat invoice pada cabang sumber receipt.',
+            ]);
+        }
+
+        $alreadyInvoicedReceiptIds = Invoice::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->where('from_model_type', PurchaseOrder::class)
+            ->whereNotNull('purchase_receipts')
+            ->get(['purchase_receipts'])
+            ->pluck('purchase_receipts')
+            ->flatten()
+            ->map(fn ($id) => (int) $id)
+            ->intersect($selectedReceiptIds);
+        if ($alreadyInvoicedReceiptIds->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_purchase_receipts' => 'Satu atau lebih Purchase Receipt sudah digunakan pada invoice pembelian lain.',
+            ]);
+        }
+
+        $orderedPurchaseOrderIds = $receipts->pluck('purchase_order_id')->map(fn ($id) => (int) $id)->unique()->values();
+        $firstPurchaseOrder = $purchaseOrders->get($orderedPurchaseOrderIds->first());
+
+        return array_merge($data, [
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $orderedPurchaseOrderIds->first(),
+            'purchase_order_ids' => $orderedPurchaseOrderIds->all(),
+            'purchase_receipts' => $selectedReceiptIds->all(),
+            'supplier_name' => $firstPurchaseOrder?->supplier?->perusahaan,
+            'supplier_phone' => $firstPurchaseOrder?->supplier?->phone ?? '',
+            'cabang_id' => $cabangId,
+        ]);
+    }
+
     public function expectedReceiptBackedInvoiceData(Invoice $invoice): ?array
     {
         return $this->expectedReceiptBackedInvoiceDataFromReceiptIds($invoice->purchase_receipts ?? []);
@@ -133,6 +291,11 @@ class PurchaseInvoiceAccountingService
             ])
             ->whereIn('id', $receiptIds)
             ->get();
+
+        $receiptOrder = $receiptIds->flip();
+        $receipts = $receipts
+            ->sortBy(fn (PurchaseReceipt $receipt) => $receiptOrder->get($receipt->id, PHP_INT_MAX))
+            ->values();
 
         if ($receipts->isEmpty()) {
             return null;

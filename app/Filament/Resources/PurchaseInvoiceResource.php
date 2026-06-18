@@ -222,6 +222,28 @@ class PurchaseInvoiceResource extends Resource
         ];
     }
 
+    protected static function clearDerivedPurchaseInvoiceState(mixed $set): void
+    {
+        $set('selected_purchase_receipts', []);
+        $set('invoiceItem', []);
+        $set('receiptBiayaItems', []);
+        $set('from_model_type', PurchaseOrder::class);
+        $set('from_model_id', null);
+        $set('purchase_order_ids', []);
+        $set('purchase_receipts', []);
+        $set('supplier_name', null);
+        $set('supplier_phone', null);
+        $set('other_fees', []);
+        $set('other_fee', []);
+        $set('pph22_amount', static::formatMoneyState(0));
+        $set('bea_masuk_amount', static::formatMoneyState(0));
+        $set('subtotal', 0);
+        $set('dpp', static::formatMoneyState(0));
+        $set('tax', 0);
+        $set('ppn_amount', static::formatMoneyState(0));
+        $set('total', 0);
+    }
+
     public static function canManuallySetStatus(): bool
     {
         $user = Auth::user();
@@ -255,13 +277,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_order_request', null);
                                         $set('selected_purchase_orders', []);
-                                        $set('selected_purchase_receipts', []);
-                                        $set('invoiceItem', []);
-                                        $set('receiptBiayaItems', []);
-                                        $set('pph22_amount', self::formatMoneyState(0));
-                                        $set('bea_masuk_amount', self::formatMoneyState(0));
-                                        $set('subtotal', 0);
-                                        $set('total', 0);
+                                        self::clearDerivedPurchaseInvoiceState($set);
                                     }),
 
                                 Select::make('cabang_id')
@@ -294,13 +310,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->helperText('Pilih Order Request terlebih dahulu. Purchase Order akan muncul setelah OR dipilih.')
                                     ->afterStateUpdated(function ($set) {
                                         $set('selected_purchase_orders', []);
-                                        $set('selected_purchase_receipts', []);
-                                        $set('invoiceItem', []);
-                                        $set('receiptBiayaItems', []);
-                                        $set('pph22_amount', self::formatMoneyState(0));
-                                        $set('bea_masuk_amount', self::formatMoneyState(0));
-                                        $set('subtotal', 0);
-                                        $set('total', 0);
+                                        self::clearDerivedPurchaseInvoiceState($set);
                                     }),
 
                                 // Task 14: Multiple PO selection filtered by OR
@@ -354,14 +364,14 @@ class PurchaseInvoiceResource extends Resource
                                     ->columns(2)
                                     ->bulkToggleable()
                                     ->reactive()
+                                    ->required()
+                                    ->minItems(1)
+                                    ->validationMessages([
+                                        'required' => 'Minimal satu Purchase Order harus dipilih.',
+                                        'min' => 'Minimal satu Purchase Order harus dipilih.',
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('selected_purchase_receipts', []);
-                                        $set('invoiceItem', []);
-                                        $set('receiptBiayaItems', []);
-                                        $set('subtotal', 0);
-                                        $set('dpp', self::formatMoneyState(0));
-                                        $set('ppn_amount', self::formatMoneyState(0));
-                                        $set('total', 0);
+                                        self::clearDerivedPurchaseInvoiceState($set);
 
                                         // Auto-set due date based on first PO TOP
                                         if ($state && count($state) > 0) {
@@ -538,21 +548,15 @@ class PurchaseInvoiceResource extends Resource
                                     })
                                     ->columns(1)
                                     ->reactive()
+                                    ->required()
+                                    ->minItems(1)
+                                    ->validationMessages([
+                                        'required' => 'Minimal satu Purchase Receipt harus dipilih.',
+                                        'min' => 'Minimal satu Purchase Receipt harus dipilih.',
+                                    ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
-                                            $set('invoiceItem', []);
-                                            $set('receiptBiayaItems', []);
-                                            $set('subtotal', 0);
-                                            $set('dpp', self::formatMoneyState(0));
-                                            $set('tax', 0);
-                                            $set('ppn_amount', self::formatMoneyState(0));
-
-                                            // Recalculate total with manual other_fees only
-                                            $otherFees = $get('other_fees') ?? [];
-                                            $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-                                            $finalTotal = $manualOtherFeeTotal + self::importChargeTotalFromState($get);
-                                            $set('total', self::formatMoneyState($finalTotal));
-                                            $set('other_fee', $manualOtherFeeTotal);
+                                            self::clearDerivedPurchaseInvoiceState($set);
                                             return;
                                         }
 

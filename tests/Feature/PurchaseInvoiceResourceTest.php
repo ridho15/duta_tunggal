@@ -22,8 +22,10 @@ use App\Models\PurchaseReceiptItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\PurchaseInvoiceAccountingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use RuntimeException;
 use Spatie\Permission\Models\Permission;
@@ -172,6 +174,63 @@ class PurchaseInvoiceResourceTest extends TestCase
         ]);
     }
 
+    private function createReceiptBackedSource(
+        ?Supplier $supplier = null,
+        ?OrderRequest $orderRequest = null,
+        ?Cabang $cabang = null,
+        string $receiptStatus = 'completed'
+    ): array {
+        $supplier ??= $this->supplier;
+        $cabang ??= $this->cabang;
+        $orderRequest ??= OrderRequest::factory()->create([
+            'cabang_id' => $cabang->id,
+            'status' => 'approved',
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'cabang_id' => $cabang->id,
+            'status' => 'completed',
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $supplier, $cabang, 1);
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'discount' => 0,
+            'tax' => 0,
+        ]);
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'cabang_id' => $cabang->id,
+            'status' => $receiptStatus,
+        ]);
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 1,
+            'qty_accepted' => 1,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        return compact('supplier', 'orderRequest', 'purchaseOrder', 'receipt');
+    }
+
+    private function assertReceiptSourceValidationError(array $data, string $field): void
+    {
+        try {
+            app(PurchaseInvoiceAccountingService::class)->validateReceiptBackedCreateData($data);
+            $this->fail("Expected validation error for {$field}.");
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey($field, $exception->errors());
+        }
+    }
+
     public function test_purchase_invoice_resource_can_render_list_page()
     {
         Livewire::test(PurchaseInvoiceResource\Pages\ListPurchaseInvoices::class)
@@ -221,6 +280,29 @@ class PurchaseInvoiceResourceTest extends TestCase
             'refer_model_type' => OrderRequest::class,
             'refer_model_id' => $orderRequest->id,
         ]);
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $this->supplier, $this->cabang, 1);
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $this->product->id,
+            'currency_id' => $usd->id,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'tax' => 0,
+        ]);
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $po->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 1,
+            'qty_accepted' => 1,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
 
         $page = new class extends \App\Filament\Resources\PurchaseInvoiceResource\Pages\CreatePurchaseInvoice {
             public function setTestData(array $data): array
@@ -234,8 +316,11 @@ class PurchaseInvoiceResourceTest extends TestCase
         };
 
         $data = $page->setTestData([
+            'selected_supplier' => $this->supplier->id,
             'selected_order_request' => $orderRequest->id,
             'selected_purchase_orders' => [$po->id],
+            'selected_purchase_receipts' => [$receipt->id],
+            'cabang_id' => $this->cabang->id,
             'subtotal' => '100.000,00',
             'ppn_rate' => 11,
             'total' => '111.000,00',
@@ -372,6 +457,29 @@ class PurchaseInvoiceResourceTest extends TestCase
             'refer_model_type' => OrderRequest::class,
             'refer_model_id' => $orderRequest->id,
         ]);
+        createPurchaseInvoiceOrderRequestItem($orderRequest, $this->product, $this->supplier, $this->cabang, 1);
+        $poItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $po->id,
+            'product_id' => $this->product->id,
+            'currency_id' => $idr->id,
+            'quantity' => 1,
+            'unit_price' => 100000,
+            'tax' => 0,
+        ]);
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $po->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 1,
+            'qty_accepted' => 1,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
 
         $page = new class extends \App\Filament\Resources\PurchaseInvoiceResource\Pages\CreatePurchaseInvoice {
             public function setTestData(array $data): array
@@ -385,8 +493,11 @@ class PurchaseInvoiceResourceTest extends TestCase
         };
 
         $data = $page->setTestData([
+            'selected_supplier' => $this->supplier->id,
             'selected_order_request' => $orderRequest->id,
             'selected_purchase_orders' => [$po->id],
+            'selected_purchase_receipts' => [$receipt->id],
+            'cabang_id' => $this->cabang->id,
             'subtotal' => '100.000,00',
             'ppn_rate' => 11,
             'total' => '111.000,00',
@@ -947,7 +1058,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame(11.0, (float) $saved->tax);
         $this->assertSame(11.0, (float) $saved->ppn_rate);
         $this->assertSame(1100000.0, (float) $saved->ppn_amount);
-        $this->assertSame(11200000.0, (float) $saved->total);
+        $this->assertSame(11100000.0, (float) $saved->total);
+        $this->assertSame([], $saved->other_fee);
     }
 
     public function test_purchase_invoice_from_receipt_persists_full_nominal_branch_ap_and_journals(): void
@@ -1410,6 +1522,218 @@ class PurchaseInvoiceResourceTest extends TestCase
             ])
             ->call('create')
             ->assertHasFormErrors(['selected_order_request' => 'required']);
+    }
+
+    public function test_purchase_invoice_requires_purchase_order_and_receipt_before_submit(): void
+    {
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'invoice_number' => 'PINV-SOURCE-REQUIRED-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+            ])
+            ->call('create')
+            ->assertHasFormErrors([
+                'selected_purchase_orders' => 'required',
+                'selected_purchase_receipts' => 'required',
+            ]);
+    }
+
+    public function test_purchase_invoice_requires_receipt_after_purchase_order_is_selected(): void
+    {
+        $source = $this->createReceiptBackedSource();
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $source['supplier']->id,
+                'selected_order_request' => $source['orderRequest']->id,
+                'selected_purchase_orders' => [$source['purchaseOrder']->id],
+                'invoice_number' => 'PINV-RECEIPT-REQUIRED-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['selected_purchase_receipts' => 'required']);
+    }
+
+    public function test_purchase_invoice_derives_source_from_receipt_and_ignores_hidden_source_state(): void
+    {
+        $source = $this->createReceiptBackedSource();
+        $unrelatedPurchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $source['supplier']->id,
+                'selected_order_request' => $source['orderRequest']->id,
+                'selected_purchase_orders' => [$source['purchaseOrder']->id],
+                'selected_purchase_receipts' => [$source['receipt']->id],
+                'from_model_type' => PurchaseOrder::class,
+                'from_model_id' => $unrelatedPurchaseOrder->id,
+                'purchase_order_ids' => [$unrelatedPurchaseOrder->id],
+                'invoice_number' => 'PINV-CANONICAL-SOURCE-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $invoice = Invoice::where('invoice_number', 'PINV-CANONICAL-SOURCE-001')->firstOrFail();
+        $this->assertSame($source['purchaseOrder']->id, (int) $invoice->from_model_id);
+        $this->assertSame([$source['purchaseOrder']->id], array_map('intval', $invoice->purchase_order_ids));
+        $this->assertSame([$source['receipt']->id], array_map('intval', $invoice->purchase_receipts));
+    }
+
+    public function test_purchase_invoice_source_state_is_cleared_when_purchase_order_is_removed(): void
+    {
+        $source = $this->createReceiptBackedSource();
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $source['supplier']->id,
+                'selected_order_request' => $source['orderRequest']->id,
+                'selected_purchase_orders' => [$source['purchaseOrder']->id],
+                'selected_purchase_receipts' => [$source['receipt']->id],
+            ])
+            ->assertSet('data.from_model_id', $source['purchaseOrder']->id)
+            ->set('data.selected_purchase_orders', [])
+            ->assertSet('data.from_model_id', null)
+            ->assertSet('data.purchase_order_ids', [])
+            ->assertSet('data.purchase_receipts', [])
+            ->assertSet('data.selected_purchase_receipts', [])
+            ->assertSet('data.invoiceItem', []);
+    }
+
+    public function test_purchase_invoice_rejects_invalid_receipt_source_relationships(): void
+    {
+        $source = $this->createReceiptBackedSource();
+        $otherSource = $this->createReceiptBackedSource();
+        $base = [
+            'selected_supplier' => $source['supplier']->id,
+            'selected_order_request' => $source['orderRequest']->id,
+            'selected_purchase_orders' => [$source['purchaseOrder']->id],
+            'selected_purchase_receipts' => [$otherSource['receipt']->id],
+            'cabang_id' => $this->cabang->id,
+        ];
+
+        $this->assertReceiptSourceValidationError(array_merge($base, [
+            'selected_purchase_receipts' => [PHP_INT_MAX],
+        ]), 'selected_purchase_receipts');
+
+        $this->assertReceiptSourceValidationError($base, 'selected_purchase_receipts');
+
+        $this->assertReceiptSourceValidationError(array_merge($base, [
+            'selected_purchase_orders' => [$otherSource['purchaseOrder']->id],
+            'selected_purchase_receipts' => [$otherSource['receipt']->id],
+            'selected_supplier' => Supplier::factory()->create()->id,
+        ]), 'selected_supplier');
+
+        $this->assertReceiptSourceValidationError(array_merge($base, [
+            'selected_purchase_orders' => [$source['purchaseOrder']->id],
+            'selected_purchase_receipts' => [$source['receipt']->id],
+            'selected_order_request' => $otherSource['orderRequest']->id,
+        ]), 'selected_order_request');
+
+        $otherCabang = Cabang::factory()->create();
+        $this->assertReceiptSourceValidationError(array_merge($base, [
+            'selected_purchase_orders' => [$source['purchaseOrder']->id],
+            'selected_purchase_receipts' => [$source['receipt']->id],
+            'cabang_id' => $otherCabang->id,
+        ]), 'cabang_id');
+
+        $source['receipt']->update(['status' => 'draft']);
+        $this->assertReceiptSourceValidationError(array_merge($base, [
+            'selected_purchase_receipts' => [$source['receipt']->id],
+        ]), 'selected_purchase_receipts');
+    }
+
+    public function test_purchase_invoice_rejects_receipt_already_used_by_another_invoice(): void
+    {
+        $source = $this->createReceiptBackedSource();
+        Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $source['purchaseOrder']->id,
+            'purchase_order_ids' => [$source['purchaseOrder']->id],
+            'purchase_receipts' => [$source['receipt']->id],
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $this->assertReceiptSourceValidationError([
+            'selected_supplier' => $source['supplier']->id,
+            'selected_order_request' => $source['orderRequest']->id,
+            'selected_purchase_orders' => [$source['purchaseOrder']->id],
+            'selected_purchase_receipts' => [$source['receipt']->id],
+            'cabang_id' => $this->cabang->id,
+        ], 'selected_purchase_receipts');
+    }
+
+    public function test_purchase_invoice_multi_po_source_is_derived_from_selected_receipts(): void
+    {
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+        $first = $this->createReceiptBackedSource(orderRequest: $orderRequest);
+        $second = $this->createReceiptBackedSource(orderRequest: $orderRequest);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$first['purchaseOrder']->id, $second['purchaseOrder']->id],
+                'selected_purchase_receipts' => [$first['receipt']->id, $second['receipt']->id],
+                'invoice_number' => 'PINV-MULTI-PO-SOURCE-001',
+                'invoice_date' => now()->format('Y-m-d'),
+                'due_date' => now()->addDays(30)->format('Y-m-d'),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $invoice = Invoice::where('invoice_number', 'PINV-MULTI-PO-SOURCE-001')->firstOrFail();
+        $this->assertSame($first['purchaseOrder']->id, (int) $invoice->from_model_id);
+        $this->assertSame(
+            [$first['purchaseOrder']->id, $second['purchaseOrder']->id],
+            array_map('intval', $invoice->purchase_order_ids)
+        );
+    }
+
+    public function test_purchase_invoice_creation_rolls_back_when_finalisation_fails(): void
+    {
+        $source = $this->createReceiptBackedSource();
+        $this->partialMock(PurchaseInvoiceAccountingService::class, function ($mock): void {
+            $mock->shouldReceive('finaliseInvoice')
+                ->once()
+                ->andThrow(new RuntimeException('Forced finalisation failure'));
+        });
+
+        try {
+            Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+                ->fillForm([
+                    'selected_supplier' => $source['supplier']->id,
+                    'selected_order_request' => $source['orderRequest']->id,
+                    'selected_purchase_orders' => [$source['purchaseOrder']->id],
+                    'selected_purchase_receipts' => [$source['receipt']->id],
+                    'invoice_number' => 'PINV-ROLLBACK-001',
+                    'invoice_date' => now()->format('Y-m-d'),
+                    'due_date' => now()->addDays(30)->format('Y-m-d'),
+                ])
+                ->call('create');
+            $this->fail('Expected finalisation failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Forced finalisation failure', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('invoices', ['invoice_number' => 'PINV-ROLLBACK-001']);
     }
 
     public function test_form_validation_requires_invoice_date()
