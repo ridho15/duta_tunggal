@@ -7,6 +7,8 @@ use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
@@ -37,6 +39,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Schema;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\ViewEntry;
@@ -251,6 +254,50 @@ class PurchaseInvoiceResource extends Resource
         return $user?->hasRole(['Super Admin', 'Owner']) === true;
     }
 
+    public static function getSupplierOptions(): array
+    {
+        $recentSupplierIds = PurchaseReceipt::query()
+            ->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_receipts.purchase_order_id')
+            ->join('suppliers', 'suppliers.id', '=', 'purchase_orders.supplier_id')
+            ->whereNull('purchase_orders.deleted_at')
+            ->whereNull('suppliers.deleted_at')
+            ->select('purchase_orders.supplier_id')
+            ->selectRaw('MAX(purchase_receipts.receipt_date) as latest_receipt_date')
+            ->selectRaw('MAX(purchase_receipts.created_at) as latest_receipt_created_at')
+            ->groupBy('purchase_orders.supplier_id')
+            ->orderByDesc('latest_receipt_date')
+            ->orderByDesc('latest_receipt_created_at')
+            ->orderBy('purchase_orders.supplier_id')
+            ->limit(5)
+            ->get()
+            ->pluck('supplier_id')
+            ->map(fn ($supplierId) => (int) $supplierId);
+
+        $recentSuppliersById = Supplier::query()
+            ->whereIn('id', $recentSupplierIds)
+            ->get()
+            ->keyBy('id');
+
+        $recentSuppliers = $recentSupplierIds
+            ->map(fn (int $supplierId) => $recentSuppliersById->get($supplierId))
+            ->filter()
+            ->values();
+
+        $alphabeticalSuppliers = Supplier::query()
+            ->whereNotIn('id', $recentSupplierIds)
+            ->orderBy('perusahaan')
+            ->orderBy('id')
+            ->limit(50 - $recentSuppliers->count())
+            ->get();
+
+        return $recentSuppliers
+            ->concat($alphabeticalSuppliers)
+            ->mapWithKeys(fn (Supplier $supplier) => [
+                $supplier->id => "({$supplier->code}) {$supplier->perusahaan}",
+            ])
+            ->toArray();
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -264,9 +311,7 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 Select::make('selected_supplier')
                                     ->label('Supplier')
-                                    ->options(Supplier::orderBy('perusahaan')->limit(50)->get()->mapWithKeys(function ($supplier) {
-                                        return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
-                                    }))
+                                    ->options(fn () => self::getSupplierOptions())
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
@@ -276,42 +321,45 @@ class PurchaseInvoiceResource extends Resource
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_order_request', null);
+                                        $set('cabang_id', null);
+                                        $set('selected_cabang_label', null);
                                         $set('selected_purchase_orders', []);
                                         self::clearDerivedPurchaseInvoiceState($set);
                                     }),
-
-                                Select::make('cabang_id')
-                                    ->label('Cabang')
-                                    ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
-                                        return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
-                                    ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
-                                    ->required()
-                                    ->helperText('Diisi otomatis dari PO/Receipt yang dipilih. Dapat diubah bila perlu.')
-                                    ->validationMessages([
-                                        'required' => 'Cabang harus dipilih'
-                                    ]),
 
                                 // Task 14: Select Order Request to filter POs
                                 Select::make('selected_order_request')
                                     ->label('Order Request (OR)')
                                     ->options(function ($get) {
                                         return self::getOrderRequestOptions(
-                                            $get('selected_supplier'),
-                                            $get('cabang_id')
+                                            $get('selected_supplier')
                                         );
                                     })
                                     ->searchable()
                                     ->reactive()
                                     ->required()
                                     ->helperText('Pilih Order Request terlebih dahulu. Purchase Order akan muncul setelah OR dipilih.')
-                                    ->afterStateUpdated(function ($set) {
+                                    ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_purchase_orders', []);
                                         self::clearDerivedPurchaseInvoiceState($set);
+
+                                        $cabangContext = self::getOrderRequestCabangContext($state, $get('selected_supplier'));
+                                        $set('cabang_id', $cabangContext['id']);
+                                        $set('selected_cabang_label', $cabangContext['label']);
                                     }),
+
+                                Hidden::make('cabang_id')
+                                    ->required()
+                                    ->validationMessages([
+                                        'required' => 'Cabang harus dipilih otomatis dari Order Request.'
+                                    ]),
+
+                                TextInput::make('selected_cabang_label')
+                                    ->label('Cabang')
+                                    ->readOnly()
+                                    ->dehydrated(false)
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
+                                    ->helperText('Diisi otomatis setelah Order Request dipilih.'),
 
                                 // Task 14: Multiple PO selection filtered by OR
                                 Forms\Components\CheckboxList::make('selected_purchase_orders')
@@ -387,6 +435,7 @@ class PurchaseInvoiceResource extends Resource
 
                                             if ($po && $po->cabang_id) {
                                                 $set('cabang_id', $po->cabang_id);
+                                                $set('selected_cabang_label', self::formatCabangLabel($po->cabang));
                                             }
                                         }
                                     }),
@@ -1513,19 +1562,34 @@ class PurchaseInvoiceResource extends Resource
         return filled($user?->cabang_id) ? (int) $user->cabang_id : (filled($selectedCabangId) ? (int) $selectedCabangId : null);
     }
 
+    protected static function orderRequestsHaveCabangColumn(): bool
+    {
+        return Schema::hasColumn('order_requests', 'cabang_id');
+    }
+
     public static function getOrderRequestOptions(mixed $supplierId, mixed $selectedCabangId = null): array
     {
         $supplierId = filled($supplierId) ? (int) $supplierId : null;
         $cabangId = self::resolveInvoiceCabangId($selectedCabangId);
 
-        if (!$supplierId || !$cabangId) {
+        if (!$supplierId) {
             return [];
         }
 
-        return \App\Models\OrderRequest::where(function ($query) use ($cabangId) {
-            $query->whereHas('orderRequestItem', fn($itemQuery) => $itemQuery->where('cabang_id', $cabangId))
-                ->orWhereHas('purchaseOrders', fn($purchaseOrderQuery) => $purchaseOrderQuery->whereHas('purchaseReceipt', fn($receiptQuery) => $receiptQuery->where('cabang_id', $cabangId)));
-        })
+        return OrderRequest::query()
+            ->when($cabangId, function ($query) use ($cabangId) {
+                $query->where(function ($branchQuery) use ($cabangId) {
+                    if (self::orderRequestsHaveCabangColumn()) {
+                        $branchQuery->where('cabang_id', $cabangId);
+                    } else {
+                        $branchQuery->whereHas('orderRequestItem', fn($itemQuery) => $itemQuery->where('cabang_id', $cabangId));
+                    }
+
+                    $branchQuery
+                        ->orWhereHas('orderRequestItem', fn($itemQuery) => $itemQuery->where('cabang_id', $cabangId))
+                        ->orWhereHas('purchaseOrders', fn($purchaseOrderQuery) => $purchaseOrderQuery->whereHas('purchaseReceipt', fn($receiptQuery) => $receiptQuery->where('cabang_id', $cabangId)));
+                });
+            })
             ->where(function ($q) use ($supplierId) {
                 $q->whereHas('orderRequestItem', fn($iq) => $iq->where('supplier_id', $supplierId))
                     ->orWhereHas('purchaseOrders', fn($pq) => $pq->where('supplier_id', $supplierId));
@@ -1538,6 +1602,60 @@ class PurchaseInvoiceResource extends Resource
             ->get()
             ->mapWithKeys(fn($or) => [$or->id => $or->request_number])
             ->toArray();
+    }
+
+    protected static function formatCabangLabel(?Cabang $cabang): ?string
+    {
+        if (! $cabang || ! $cabang->exists) {
+            return null;
+        }
+
+        return "({$cabang->kode}) {$cabang->nama}";
+    }
+
+    public static function getOrderRequestCabangContext(mixed $orderRequestId, mixed $supplierId = null): array
+    {
+        $orderRequestId = filled($orderRequestId) ? (int) $orderRequestId : null;
+        $supplierId = filled($supplierId) ? (int) $supplierId : null;
+
+        if (! $orderRequestId) {
+            return ['id' => null, 'label' => null];
+        }
+
+        $orderRequest = OrderRequest::query()->find($orderRequestId);
+        $cabangId = self::orderRequestsHaveCabangColumn() && filled($orderRequest?->cabang_id)
+            ? (int) $orderRequest->cabang_id
+            : null;
+
+        if (! $cabangId) {
+            $cabangId = OrderRequestItem::query()
+                ->where('order_request_id', $orderRequestId)
+                ->when($supplierId, fn($query) => $query->where('supplier_id', $supplierId))
+                ->whereNotNull('cabang_id')
+                ->orderBy('id')
+                ->value('cabang_id');
+        }
+
+        if (! $cabangId) {
+            $cabangId = PurchaseReceipt::withoutGlobalScopes()
+                ->whereNotNull('cabang_id')
+                ->whereHas('purchaseOrder', function ($purchaseOrderQuery) use ($orderRequestId, $supplierId) {
+                    $purchaseOrderQuery
+                        ->withoutGlobalScopes()
+                        ->where('refer_model_type', OrderRequest::class)
+                        ->where('refer_model_id', $orderRequestId)
+                        ->when($supplierId, fn($query) => $query->where('supplier_id', $supplierId));
+                })
+                ->orderBy('id')
+                ->value('cabang_id');
+        }
+
+        $cabang = $cabangId ? Cabang::query()->find($cabangId) : null;
+
+        return [
+            'id' => $cabang?->id,
+            'label' => self::formatCabangLabel($cabang),
+        ];
     }
 
     public static function getPurchaseOrderOptions(mixed $supplierId, mixed $orderRequestId, mixed $selectedCabangId = null): array

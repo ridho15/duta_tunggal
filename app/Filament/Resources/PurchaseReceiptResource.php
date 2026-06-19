@@ -273,11 +273,11 @@ class PurchaseReceiptResource extends Resource
                                         $user = Auth::user();
                                         $manageType = $user?->manage_type ?? [];
                                         $query = Warehouse::where('status', 1);
-                                        
+
                                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                             $query->where('cabang_id', $user?->cabang_id);
                                         }
-                                        
+
                                         return $query->get()->mapWithKeys(function ($warehouse) {
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
@@ -291,14 +291,14 @@ class PurchaseReceiptResource extends Resource
                                         $manageType = $user?->manage_type ?? [];
                                         $query = Warehouse::where('status', 1)
                                             ->where(function ($q) use ($search) {
-                                                                                $q->where('name', 'like', "%{$search}%")
-                                                  ->orWhere('kode', 'like', "%{$search}%");
+                                                $q->where('name', 'like', "%{$search}%")
+                                                    ->orWhere('kode', 'like', "%{$search}%");
                                             });
-                                        
+
                                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                             $query->where('cabang_id', $user?->cabang_id);
                                         }
-                                        
+
                                         return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
@@ -549,6 +549,21 @@ class PurchaseReceiptResource extends Resource
                 TextColumn::make('receipt_number')
                     ->label('Receipt Number')
                     ->searchable(),
+                TextColumn::make('supplier_name')
+                    ->label('Supplier')
+                    ->getStateUsing(function ($record) {
+                        $supplier = $record->purchaseOrder?->supplier;
+
+                        return $supplier?->id
+                            ? "({$supplier->code}) " . ($supplier->perusahaan ?? 'N/A')
+                            : 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('purchaseOrder.supplier', function (Builder $query) use ($search) {
+                            return $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('perusahaan', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('cabang')
                     ->label('Cabang')
                     ->formatStateUsing(function ($state) {
@@ -671,15 +686,15 @@ class PurchaseReceiptResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Purchase Receipt</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Alur Baru (QC First)</strong>: Purchase Receipt dibuat <strong>otomatis</strong> oleh sistem setelah Quality Control Purchase disetujui (status Passed). Jangan buat receipt manual.</li>' .
-                            '<li><strong>Alur</strong>: Purchase Order → Quality Control Purchase → Purchase Receipt (otomatis).</li>' .
-                            '<li><strong>QC Status</strong>: Menampilkan status Quality Control terkait receipt ini.</li>' .
-                            '<li><strong>Stok</strong>: Stok ditambahkan ke inventory otomatis saat QC disetujui dan receipt dibuat.</li>' .
-                            '<li><strong>🔄 Sinkronisasi Retur:</strong> Jika qty_rejected diubah atau dihapus, Purchase Return akan otomatis terupdate atau terhapus untuk menjaga konsistensi data.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Alur Baru (QC First)</strong>: Purchase Receipt dibuat <strong>otomatis</strong> oleh sistem setelah Quality Control Purchase disetujui (status Passed). Jangan buat receipt manual.</li>' .
+                    '<li><strong>Alur</strong>: Purchase Order → Quality Control Purchase → Purchase Receipt (otomatis).</li>' .
+                    '<li><strong>QC Status</strong>: Menampilkan status Quality Control terkait receipt ini.</li>' .
+                    '<li><strong>Stok</strong>: Stok ditambahkan ke inventory otomatis saat QC disetujui dan receipt dibuat.</li>' .
+                    '<li><strong>🔄 Sinkronisasi Retur:</strong> Jika qty_rejected diubah atau dihapus, Purchase Return akan otomatis terupdate atau terhapus untuk menjaga konsistensi data.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ))
             ->filters([
                 SelectFilter::make('status')

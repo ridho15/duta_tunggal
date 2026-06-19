@@ -30,6 +30,19 @@ $fixture = [
     'invoice_number' => 'INV-TEST-INV-LOCKED',
 ];
 
+if (DB::connection()->getDriverName() === 'mysql') {
+    $lockName = 'purchase_invoice_playwright_fixture';
+    $lock = DB::selectOne('SELECT GET_LOCK(?, 30) AS fixture_lock', [$lockName]);
+
+    if ((int) ($lock->fixture_lock ?? 0) !== 1) {
+        throw new RuntimeException('Unable to acquire purchase invoice fixture setup lock.');
+    }
+
+    register_shutdown_function(function () use ($lockName) {
+        DB::select('SELECT RELEASE_LOCK(?)', [$lockName]);
+    });
+}
+
 // Skip setup if all fixture data already exists with correct state (idempotent guard)
 $existingPo = DB::table('purchase_orders')->where('po_number', $fixture['po_number'])->where('status', 'completed')->first();
 $existingOr = DB::table('order_requests')->where('request_number', $fixture['order_request_number'])->first();
@@ -38,6 +51,7 @@ $existingOpen = DB::table('purchase_receipts')->where('receipt_number', $fixture
 $existingInvoice = DB::table('invoices')->where('invoice_number', $fixture['invoice_number'])->first();
 $testUser = DB::table('users')->where('email', 'ralamzah@gmail.com')->first();
 $fixtureCabangId = $testUser?->cabang_id ?? DB::table('cabangs')->value('id') ?? 1;
+$fixtureSupplierId = DB::table('suppliers')->where('code', $fixture['supplier_code'])->value('id');
 
 $openReceiptAlreadyInvoiced = false;
 if ($existingOpen) {
@@ -49,6 +63,9 @@ if ($existingOpen) {
 }
 
 if ($existingOr && $existingPo && $existingLocked && $existingOpen && $existingInvoice
+    && (int) $existingPo->supplier_id === (int) $fixtureSupplierId
+    && $existingPo->refer_model_type === 'App\\Models\\OrderRequest'
+    && (int) $existingPo->refer_model_id === (int) $existingOr->id
     && $existingLocked->purchase_order_id === $existingPo->id
     && $existingOpen->purchase_order_id === $existingPo->id
     && (int) ($existingLocked->cabang_id ?? $fixtureCabangId) === (int) $fixtureCabangId

@@ -14,6 +14,39 @@ export function ensurePurchaseInvoiceFixture() {
   execSync('php scripts/setup_purchase_invoice_playwright_data.php', { stdio: 'inherit' })
 }
 
+function getFixtureData() {
+  const output = execSync('php scripts/get_purchase_invoice_playwright_fixture.php', { encoding: 'utf8' })
+  return JSON.parse(output)
+}
+
+async function setLivewireFormField(page, field, value) {
+  await page.evaluate(async ({ field, value }) => {
+    const wireEl = document.querySelector('form')?.closest('[wire\\:id]')
+      ?? document.querySelector('main [wire\\:id]')
+    if (!wireEl) {
+      throw new Error('Livewire component not found')
+    }
+
+    const component = window.Livewire.find(wireEl.getAttribute('wire:id'))
+    const wire = component?.$wire
+
+    if (component && typeof component.set === 'function') {
+      component.set(`data.${field}`, value)
+      return
+    }
+
+    if (wire && typeof wire.$set === 'function') {
+      wire.$set(`data.${field}`, value)
+      return
+    }
+
+    throw new Error('Livewire set API is not available')
+  }, { field, value })
+
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(500)
+}
+
 function getFixtureCabangName() {
   try {
     const output = execSync('php scripts/debug_purchase_invoice_fixture.php', { encoding: 'utf8' })
@@ -39,11 +72,19 @@ async function selectFirstChoicesOption(page, labelText, searchTerm = '') {
     await page.waitForTimeout(600)
   }
 
-  const firstItem = wrapper.locator('.choices__list--dropdown .choices__item--choice:not(.choices__placeholder):not(.is-disabled)').first()
+  const firstItem = wrapper
+    .locator('.choices__list--dropdown .choices__item--choice:not(.choices__placeholder):not(.is-disabled)')
+    .filter({ hasText: searchTerm || undefined })
+    .first()
   await expect(firstItem).toBeVisible({ timeout: 10000 })
-  await firstItem.click()
+  await firstItem.click({ force: true })
 
   await page.waitForTimeout(500)
+
+  if (await wrapper.locator('.choices__list--dropdown').isVisible().catch(() => false)) {
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(500)
+  }
 }
 
 export async function openCreatePage(page) {
@@ -53,18 +94,19 @@ export async function openCreatePage(page) {
 }
 
 export async function chooseFixtureSupplier(page) {
-  await selectFirstChoicesOption(page, 'Supplier', FIXTURE.supplierCode)
+  const fixture = getFixtureData()
+  await setLivewireFormField(page, 'selected_supplier', fixture.supplier_id)
 }
 
 export async function chooseFixtureCabang(page) {
-  const cabangName = getFixtureCabangName() || 'Cabang Pusat Jakarta'
   const wrapper = page.locator('.fi-fo-field-wrp').filter({ has: page.locator('label:has-text("Cabang")') }).first()
 
   if (!(await wrapper.isVisible().catch(() => false))) {
     return
   }
 
-  await selectFirstChoicesOption(page, 'Cabang', cabangName)
+  const fixture = getFixtureData()
+  await setLivewireFormField(page, 'cabang_id', fixture.cabang_id)
 }
 
 export function getFixtureInvoiceId() {

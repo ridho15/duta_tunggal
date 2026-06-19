@@ -231,6 +231,25 @@ class PurchaseInvoiceResourceTest extends TestCase
         }
     }
 
+    private function createSupplierReceipt(
+        Supplier $supplier,
+        Cabang $cabang,
+        string $receiptDate,
+        ?string $createdAt = null
+    ): PurchaseReceipt {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'cabang_id' => $cabang->id,
+        ]);
+
+        return PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'cabang_id' => $cabang->id,
+            'receipt_date' => $receiptDate,
+            'created_at' => $createdAt ?? $receiptDate,
+        ]);
+    }
+
     public function test_purchase_invoice_resource_can_render_list_page()
     {
         Livewire::test(PurchaseInvoiceResource\Pages\ListPurchaseInvoices::class)
@@ -666,6 +685,9 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertFormExists()
             ->assertFormFieldExists('invoice_number')
             ->assertFormFieldExists('selected_supplier')
+            ->assertFormFieldExists('selected_order_request')
+            ->assertFormFieldExists('cabang_id')
+            ->assertFormFieldExists('selected_cabang_label')
             ->assertFormFieldExists('selected_purchase_orders')
             ->assertFormFieldExists('selected_purchase_receipts')
             ->assertFormFieldExists('invoice_date')
@@ -675,6 +697,121 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertFormFieldExists('tax')
             ->assertFormFieldExists('ppn_rate')
             ->assertFormFieldExists('other_fees');
+    }
+
+    public function test_purchase_invoice_source_fields_put_cabang_after_order_request_as_readonly_display(): void
+    {
+        $resourceSource = file_get_contents(app_path('Filament/Resources/PurchaseInvoiceResource.php'));
+
+        $supplierPosition = strpos($resourceSource, "Select::make('selected_supplier')");
+        $orderRequestPosition = strpos($resourceSource, "Select::make('selected_order_request')");
+        $hiddenCabangPosition = strpos($resourceSource, "Hidden::make('cabang_id')");
+        $visibleCabangPosition = strpos($resourceSource, "TextInput::make('selected_cabang_label')");
+        $purchaseOrderPosition = strpos($resourceSource, "CheckboxList::make('selected_purchase_orders')");
+
+        $this->assertNotFalse($supplierPosition);
+        $this->assertNotFalse($orderRequestPosition);
+        $this->assertNotFalse($hiddenCabangPosition);
+        $this->assertNotFalse($visibleCabangPosition);
+        $this->assertNotFalse($purchaseOrderPosition);
+        $this->assertStringNotContainsString("Select::make('cabang_id')", $resourceSource);
+        $this->assertTrue($supplierPosition < $orderRequestPosition);
+        $this->assertTrue($orderRequestPosition < $hiddenCabangPosition);
+        $this->assertTrue($hiddenCabangPosition < $visibleCabangPosition);
+        $this->assertTrue($visibleCabangPosition < $purchaseOrderPosition);
+    }
+
+    public function test_supplier_options_prioritize_five_unique_recent_receipt_suppliers(): void
+    {
+        $recentSuppliers = collect([
+            ['name' => 'Zulu Terbaru', 'date' => '2026-06-19 09:00:00', 'created_at' => '2026-06-19 11:00:00'],
+            ['name' => 'Yankee Kedua', 'date' => '2026-06-19 09:00:00', 'created_at' => '2026-06-19 10:00:00'],
+            ['name' => 'Xray Ketiga', 'date' => '2026-06-17 09:00:00', 'created_at' => '2026-06-17 09:00:00'],
+            ['name' => 'Whiskey Keempat', 'date' => '2026-06-16 09:00:00', 'created_at' => '2026-06-16 09:00:00'],
+            ['name' => 'Victor Kelima', 'date' => '2026-06-15 09:00:00', 'created_at' => '2026-06-15 09:00:00'],
+            ['name' => 'Alpha Keenam', 'date' => '2026-06-14 09:00:00', 'created_at' => '2026-06-14 09:00:00'],
+        ])->map(function (array $data) {
+            $supplier = Supplier::factory()->create(['perusahaan' => $data['name']]);
+            $this->createSupplierReceipt($supplier, $this->cabang, $data['date'], $data['created_at']);
+
+            return $supplier;
+        });
+
+        $this->createSupplierReceipt(
+            $recentSuppliers->first(),
+            $this->cabang,
+            '2026-01-01 09:00:00'
+        );
+
+        $otherCabang = Cabang::factory()->create();
+        $otherBranchSupplier = Supplier::factory()->create(['perusahaan' => 'Supplier Cabang Lain']);
+        $this->createSupplierReceipt(
+            $otherBranchSupplier,
+            $otherCabang,
+            '2026-06-20 09:00:00'
+        );
+
+        $deletedReceiptSupplier = Supplier::factory()->create(['perusahaan' => 'Supplier Receipt Terhapus']);
+        $deletedReceipt = $this->createSupplierReceipt(
+            $deletedReceiptSupplier,
+            $this->cabang,
+            '2026-06-21 09:00:00'
+        );
+        DB::table('purchase_receipts')
+            ->where('id', $deletedReceipt->id)
+            ->update(['deleted_at' => now()]);
+
+        $deletedOrderSupplier = Supplier::factory()->create(['perusahaan' => 'Supplier PO Terhapus']);
+        $deletedOrderReceipt = $this->createSupplierReceipt(
+            $deletedOrderSupplier,
+            $this->cabang,
+            '2026-06-22 09:00:00'
+        );
+        DB::table('purchase_orders')
+            ->where('id', $deletedOrderReceipt->purchase_order_id)
+            ->update(['deleted_at' => now()]);
+
+        $options = PurchaseInvoiceResource::getSupplierOptions();
+        $optionIds = array_map('intval', array_keys($options));
+        $expectedRecentIds = $recentSuppliers->take(5)->pluck('id')->all();
+
+        $this->assertSame($expectedRecentIds, array_slice($optionIds, 0, 5));
+        $this->assertSame($optionIds, array_values(array_unique($optionIds)));
+        $this->assertNotContains($otherBranchSupplier->id, array_slice($optionIds, 0, 5));
+        $this->assertNotContains($deletedReceiptSupplier->id, array_slice($optionIds, 0, 5));
+        $this->assertNotContains($deletedOrderSupplier->id, array_slice($optionIds, 0, 5));
+
+        $expectedAlphabeticalIds = Supplier::query()
+            ->whereNotIn('id', $expectedRecentIds)
+            ->orderBy('perusahaan')
+            ->orderBy('id')
+            ->limit(45)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->assertSame($expectedAlphabeticalIds, array_slice($optionIds, 5));
+    }
+
+    public function test_supplier_options_fall_back_to_alphabetical_order_and_limit_fifty(): void
+    {
+        foreach (range(1, 55) as $number) {
+            Supplier::factory()->create([
+                'perusahaan' => sprintf('Supplier %03d', $number),
+            ]);
+        }
+
+        $options = PurchaseInvoiceResource::getSupplierOptions();
+        $expectedIds = Supplier::query()
+            ->orderBy('perusahaan')
+            ->orderBy('id')
+            ->limit(50)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->assertCount(50, $options);
+        $this->assertSame($expectedIds, array_map('intval', array_keys($options)));
     }
 
     public function test_supplier_selection_filters_purchase_orders()
@@ -756,6 +893,10 @@ class PurchaseInvoiceResourceTest extends TestCase
         ]);
         $this->actingAs($allAccessUser);
 
+        $allBranchOrderRequests = PurchaseInvoiceResource::getOrderRequestOptions($supplier->id);
+        $this->assertArrayHasKey($orderRequestA->id, $allBranchOrderRequests);
+        $this->assertArrayHasKey($orderRequestB->id, $allBranchOrderRequests);
+
         $branchAOrderRequests = PurchaseInvoiceResource::getOrderRequestOptions($supplier->id, $branchA->id);
         $this->assertArrayHasKey($orderRequestA->id, $branchAOrderRequests);
         $this->assertArrayNotHasKey($orderRequestB->id, $branchAOrderRequests);
@@ -772,6 +913,79 @@ class PurchaseInvoiceResourceTest extends TestCase
         $branchBOrderRequests = PurchaseInvoiceResource::getOrderRequestOptions($supplier->id);
         $this->assertArrayHasKey($orderRequestB->id, $branchBOrderRequests);
         $this->assertArrayNotHasKey($orderRequestA->id, $branchBOrderRequests);
+    }
+
+    public function test_order_request_selection_auto_fills_readonly_cabang_label(): void
+    {
+        $source = $this->createReceiptBackedSource();
+        $expectedCabangLabel = "({$this->cabang->kode}) {$this->cabang->nama}";
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $source['supplier']->id,
+            ])
+            ->fillForm([
+                'selected_order_request' => $source['orderRequest']->id,
+            ])
+            ->assertFormSet([
+                'cabang_id' => $this->cabang->id,
+                'selected_cabang_label' => $expectedCabangLabel,
+                'selected_purchase_orders' => [],
+            ]);
+
+        $purchaseOrderOptions = PurchaseInvoiceResource::getPurchaseOrderOptions(
+            $source['supplier']->id,
+            $source['orderRequest']->id,
+            $this->cabang->id
+        );
+
+        $this->assertArrayHasKey($source['purchaseOrder']->id, $purchaseOrderOptions);
+    }
+
+    public function test_order_request_cabang_context_falls_back_to_item_then_receipt(): void
+    {
+        $supplier = Supplier::factory()->create();
+        $itemCabang = Cabang::factory()->create([
+            'kode' => 'ITM',
+            'nama' => 'Cabang Item',
+        ]);
+        $receiptCabang = Cabang::factory()->create([
+            'kode' => 'RCP',
+            'nama' => 'Cabang Receipt',
+        ]);
+
+        $orderRequestWithItemBranch = OrderRequest::factory()->create([
+            'cabang_id' => null,
+            'status' => 'approved',
+        ]);
+        createPurchaseInvoiceOrderRequestItem($orderRequestWithItemBranch, $this->product, $supplier, $itemCabang, 1);
+
+        $itemContext = PurchaseInvoiceResource::getOrderRequestCabangContext($orderRequestWithItemBranch->id, $supplier->id);
+
+        $this->assertSame($itemCabang->id, $itemContext['id']);
+        $this->assertSame("(ITM) Cabang Item", $itemContext['label']);
+
+        $orderRequestWithReceiptBranch = OrderRequest::factory()->create([
+            'cabang_id' => null,
+            'status' => 'approved',
+        ]);
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+            'cabang_id' => $receiptCabang->id,
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequestWithReceiptBranch->id,
+        ]);
+        PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+            'cabang_id' => $receiptCabang->id,
+        ]);
+
+        $receiptContext = PurchaseInvoiceResource::getOrderRequestCabangContext($orderRequestWithReceiptBranch->id, $supplier->id);
+
+        $this->assertSame($receiptCabang->id, $receiptContext['id']);
+        $this->assertSame("(RCP) Cabang Receipt", $receiptContext['label']);
     }
 
     public function test_partial_purchase_receipt_can_be_selected_for_purchase_invoice()

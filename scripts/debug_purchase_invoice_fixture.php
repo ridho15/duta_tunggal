@@ -4,6 +4,7 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 // Check fixture PO
 $po = DB::table('purchase_orders')->where('po_number', 'PO-TEST-INV-B23')->first();
@@ -18,16 +19,25 @@ if (!$po) {
 $supp = DB::table('suppliers')->where('id', $po->supplier_id)->first();
 echo 'Supplier: ' . ($supp ? 'id=' . $supp->id . ' name=' . ($supp->perusahaan ?? $supp->name ?? '-') : 'NOT FOUND') . PHP_EOL;
 
-// Check cabang
-$cabang = DB::table('cabangs')->where('id', $po->cabang_id)->first();
-echo 'Cabang: ' . ($cabang ? "id={$cabang->id} kode={$cabang->kode} name={$cabang->nama}" : 'NOT FOUND') . PHP_EOL;
-
 // Check receipts
 $receipts = DB::table('purchase_receipts')->where('purchase_order_id', $po->id)->get();
 echo 'Receipts (' . count($receipts) . '):' . PHP_EOL;
 foreach ($receipts as $r) {
     echo "  id={$r->id} number={$r->receipt_number} status={$r->status}" . PHP_EOL;
 }
+
+// Check cabang. Some schemas store cabang only on purchase_receipts, and the
+// Purchase Invoice UI filters PO options by receipt cabang.
+$cabangId = Schema::hasColumn('purchase_orders', 'cabang_id')
+    ? ($po->cabang_id ?? null)
+    : null;
+
+if (!$cabangId && Schema::hasColumn('purchase_receipts', 'cabang_id')) {
+    $cabangId = $receipts->first()?->cabang_id;
+}
+
+$cabang = $cabangId ? DB::table('cabangs')->where('id', $cabangId)->first() : null;
+echo 'Cabang: ' . ($cabang ? "id={$cabang->id} kode={$cabang->kode} name={$cabang->nama}" : 'NOT FOUND') . PHP_EOL;
 
 // Check which are invoiced
 $allInvoices = DB::table('invoices')->whereNotNull('purchase_receipts')->get();
