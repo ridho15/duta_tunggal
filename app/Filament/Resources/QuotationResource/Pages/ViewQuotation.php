@@ -221,7 +221,7 @@ class ViewQuotation extends ViewRecord
                                                 'required' => 'Quantity wajib diisi',
                                                 'numeric' => 'Quantity harus berupa angka'
                                             ])
-                                            ->reactive()
+                                            ->live(onBlur: true)
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $state ?? 0;
                                                 $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
@@ -246,7 +246,7 @@ class ViewQuotation extends ViewRecord
                                                 'required' => 'Unit Price wajib diisi',
                                                 'numeric' => 'Unit Price harus berupa angka'
                                             ])
-                                            ->reactive()
+                                            ->live(debounce: 500)
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
                                                 $unitPrice = \App\Helpers\MoneyHelper::safeParse($state ?? 0);

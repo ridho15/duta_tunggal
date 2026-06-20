@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Resources\PurchaseInvoiceResource\Pages\ViewPurchaseInvoice;
 use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Filament\Resources\PurchaseReceiptResource;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
 use App\Models\Cabang;
@@ -719,6 +720,82 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertTrue($orderRequestPosition < $hiddenCabangPosition);
         $this->assertTrue($hiddenCabangPosition < $visibleCabangPosition);
         $this->assertTrue($visibleCabangPosition < $purchaseOrderPosition);
+    }
+
+    public function test_purchase_invoice_manual_money_fields_update_on_blur_to_keep_mask_stable(): void
+    {
+        $resourceSource = file_get_contents(app_path('Filament/Resources/PurchaseInvoiceResource.php'));
+
+        foreach ([
+            "TextInput::make('pph22_amount')",
+            "TextInput::make('bea_masuk_amount')",
+        ] as $fieldNeedle) {
+            $fieldPosition = strpos($resourceSource, $fieldNeedle);
+            $this->assertNotFalse($fieldPosition, "{$fieldNeedle} was not found.");
+
+            $fieldBlock = substr($resourceSource, $fieldPosition, 800);
+            $this->assertStringContainsString('->indonesianMoney()', $fieldBlock);
+            $this->assertStringContainsString('->live(onBlur: true)', $fieldBlock);
+            $this->assertStringNotContainsString('->reactive()', $fieldBlock);
+        }
+
+        foreach ([
+            ["Repeater::make('receiptBiayaItems')", "TextInput::make('total')"],
+            ["Repeater::make('other_fees')", "TextInput::make('amount')"],
+        ] as [$sectionNeedle, $fieldNeedle]) {
+            $sectionPosition = strpos($resourceSource, $sectionNeedle);
+            $this->assertNotFalse($sectionPosition, "{$sectionNeedle} was not found.");
+
+            $fieldPosition = strpos($resourceSource, $fieldNeedle, $sectionPosition);
+            $this->assertNotFalse($fieldPosition, "{$fieldNeedle} was not found after {$sectionNeedle}.");
+
+            $fieldBlock = substr($resourceSource, $fieldPosition, 800);
+            $this->assertStringContainsString('->indonesianMoney()', $fieldBlock);
+            $this->assertStringContainsString('->live(onBlur: true)', $fieldBlock);
+            $this->assertStringNotContainsString('->reactive()', $fieldBlock);
+        }
+    }
+
+    public function test_purchase_invoice_money_parser_keeps_indonesian_thousands_as_full_amount(): void
+    {
+        $this->assertSame(100000.0, MoneyHelper::safeParse('100.000'));
+        $this->assertSame(100000.0, MoneyHelper::safeParse('100.000,00'));
+        $this->assertSame(1000000.0, MoneyHelper::safeParse('1.000.000'));
+        $this->assertSame(1000000.0, MoneyHelper::safeParse('1.000.000,00'));
+    }
+
+    public function test_purchase_invoice_total_recalculation_uses_full_formatted_money_values(): void
+    {
+        $state = [
+            'subtotal' => '1.000.000',
+            'receiptBiayaItems' => [
+                ['total' => '100.000'],
+            ],
+            'other_fees' => [
+                ['name' => 'Biaya Admin', 'amount' => '100.000'],
+            ],
+            'pph22_amount' => '100.000',
+            'bea_masuk_amount' => '100.000',
+            'ppn_rate' => 11,
+        ];
+
+        $resource = new class extends PurchaseInvoiceResource {
+            public static function recalculateForTest(array &$state): void
+            {
+                static::recalculatePurchaseInvoiceTotalState(
+                    function (string $key, mixed $value) use (&$state): void {
+                        $state[$key] = $value;
+                    },
+                    fn (string $key) => $state[$key] ?? null
+                );
+            }
+        };
+
+        $resource::recalculateForTest($state);
+
+        $this->assertSame(200000.0, $state['other_fee']);
+        $this->assertSame('110.000,00', $state['ppn_amount']);
+        $this->assertSame('1.510.000,00', $state['total']);
     }
 
     public function test_supplier_options_prioritize_five_unique_recent_receipt_suppliers(): void

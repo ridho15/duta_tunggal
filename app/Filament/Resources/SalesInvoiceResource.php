@@ -683,7 +683,7 @@ class SalesInvoiceResource extends Resource
                                                 'numeric' => 'Jumlah harus berupa angka'
                                             ])
                                             ->default(0)
-                                            ->reactive(),
+                                            ->live(debounce: 500),
                                     ])
                                     ->columns(2)
                                     ->defaultItems(0)

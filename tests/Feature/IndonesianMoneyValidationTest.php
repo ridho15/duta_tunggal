@@ -271,6 +271,237 @@ describe('OrderRequestResource price field validation', function () {
             '->numeric() should not appear near ->indonesianMoney() in ViewOrderRequest'
         );
     });
+
+    it('parses formatted override prices without dropping thousands', function () {
+        expect(OrderRequestResource::parseCurrencyState('100.000'))->toBe(100000.0)
+            ->and(OrderRequestResource::parseCurrencyState('100.000,00'))->toBe(100000.0)
+            ->and(OrderRequestResource::parseCurrencyState('1.000.000'))->toBe(1000000.0)
+            ->and(OrderRequestResource::parseCurrencyState('1.000.000,00'))->toBe(1000000.0);
+    });
+
+    it('updates manual override price fields with debounce to keep live calculations stable', function () {
+        $file = file_get_contents(
+            base_path('app/Filament/Resources/OrderRequestResource.php')
+        );
+
+        $unitPricePositions = [];
+        $offset = 0;
+
+        while (($position = strpos($file, "TextInput::make('unit_price')", $offset)) !== false) {
+            $unitPricePositions[] = $position;
+            $offset = $position + 1;
+        }
+
+        expect($unitPricePositions)->not->toBeEmpty();
+
+        $moneyOverrideBlocks = collect($unitPricePositions)
+            ->map(fn (int $position) => substr($file, $position, 1400))
+            ->filter(fn (string $block) => str_contains($block, "label('Harga Override')"))
+            ->values();
+
+        expect($moneyOverrideBlocks)->toHaveCount(2);
+
+        foreach ($moneyOverrideBlocks as $block) {
+            expect($block)
+                ->toContain('$money($input,')
+                ->toContain('->live(debounce: 500)')
+                ->not->toContain('->reactive()')
+                ->not->toContain('->live()')
+                ->not->toContain('->live(onBlur: true)');
+        }
+    });
+});
+
+// ─── Livewire stability: manual money inputs use the right update mode ──────
+
+describe('Manual money inputs use debounced live updates when calculations must stay live', function () {
+
+    $targets = [
+        'app/Filament/Actions/AddDepositAction.php' => [
+            'amount' => 1,
+            'used_amount' => 1,
+        ],
+        'app/Filament/Resources/AccountPayableResource.php' => [
+            'paid' => 1,
+        ],
+        'app/Filament/Resources/VendorPaymentResource.php' => [
+            'payment_amount' => 1,
+        ],
+        'app/Filament/Resources/InvoiceResource.php' => [
+            'subtotal' => 1,
+            'dpp' => 1,
+            'amount' => 1,
+        ],
+        'app/Filament/Resources/PurchaseOrderResource/RelationManagers/PurchaseOrderItemRelationManager.php' => [
+            'unit_price' => 1,
+            'discount' => 1,
+        ],
+        'app/Filament/Resources/PurchaseOrderResource.php' => [
+            'total' => 1,
+            'nominal' => 1,
+        ],
+        'app/Filament/Resources/SalesInvoiceResource.php' => [
+            'amount' => 1,
+        ],
+        'app/Filament/Resources/SaleOrderResource.php' => [
+            'unit_price' => 1,
+        ],
+        'app/Filament/Resources/SaleOrderResource/RelationManagers/SaleOrderItemRelationManager.php' => [
+            'unit_price' => 1,
+            'discount' => 1,
+        ],
+        'app/Filament/Resources/QuotationResource.php' => [
+            'unit_price' => 2,
+        ],
+        'app/Filament/Resources/QuotationResource/Pages/ViewQuotation.php' => [
+            'unit_price' => 1,
+        ],
+        'app/Filament/Resources/QuotationResource/RelationManagers/QuotationItemRelationManager.php' => [
+            'unit_price' => 1,
+        ],
+        'app/Filament/Resources/AssetResource.php' => [
+            'purchase_cost' => 1,
+        ],
+        'app/Filament/Resources/BillOfMaterialResource.php' => [
+            'labor_cost' => 1,
+            'overhead_cost' => 1,
+        ],
+        'app/Filament/Resources/MaterialIssueResource.php' => [
+            'cost_per_unit' => 1,
+        ],
+        'app/Filament/Resources/StockAdjustmentResource/RelationManagers/StockAdjustmentItemsRelationManager.php' => [
+            'unit_cost' => 1,
+        ],
+        'app/Filament/Resources/StockOpnameResource/RelationManagers/StockOpnameItemsRelationManager.php' => [
+            'unit_cost' => 1,
+        ],
+    ];
+
+    foreach ($targets as $path => $fields) {
+        foreach ($fields as $field => $expectedDebounceCount) {
+            it("updates {$path} {$field} money input with debounce", function () use ($path, $field, $expectedDebounceCount) {
+                $lines = file(base_path($path));
+                $blocks = [];
+
+                foreach ($lines as $index => $line) {
+                    if (! str_contains($line, "TextInput::make('{$field}')")) {
+                        continue;
+                    }
+
+                    $end = count($lines);
+
+                    for ($cursor = $index + 1; $cursor < min(count($lines), $index + 140); $cursor++) {
+                        if (
+                            str_contains($lines[$cursor], 'TextInput::make(')
+                            || str_contains($lines[$cursor], 'Select::make(')
+                            || str_contains($lines[$cursor], 'Repeater::make(')
+                            || str_contains($lines[$cursor], 'Radio::make(')
+                            || str_contains($lines[$cursor], 'Placeholder::make(')
+                        ) {
+                            $end = $cursor;
+                            break;
+                        }
+                    }
+
+                    $block = implode('', array_slice($lines, $index, $end - $index));
+
+                    if (str_contains($block, '->indonesianMoney()') || str_contains($block, '$money($input')) {
+                        $blocks[] = $block;
+                    }
+                }
+
+                expect($blocks)->not->toBeEmpty("No money TextInput block found for {$field} in {$path}");
+
+                $debouncedBlocks = array_filter(
+                    $blocks,
+                    fn (string $block) => str_contains($block, '->live(debounce: 500)')
+                );
+
+                expect($debouncedBlocks)->toHaveCount($expectedDebounceCount);
+
+                foreach ($debouncedBlocks as $block) {
+                    expect($block)
+                        ->not->toContain('->live()')
+                        ->not->toContain('->live(onBlur: true)');
+                }
+            });
+        }
+    }
+});
+
+describe('Manual money inputs without live calculations stay on blur', function () {
+
+    $targets = [
+        'app/Filament/Resources/CashBankTransferResource.php' => [
+            'other_costs' => 1,
+        ],
+        'app/Filament/Resources/InvoiceResource.php' => [
+            'total' => 1,
+        ],
+        'app/Filament/Resources/JournalEntryResource.php' => [
+            'debit' => 1,
+            'credit' => 1,
+        ],
+        'app/Filament/Resources/PurchaseReceiptResource.php' => [
+            'total' => 1,
+        ],
+        'app/Filament/Resources/PurchaseInvoiceResource.php' => [
+            'pph22_amount' => 1,
+            'bea_masuk_amount' => 1,
+            'amount' => 1,
+            'total' => 1,
+        ],
+    ];
+
+    foreach ($targets as $path => $fields) {
+        foreach ($fields as $field => $expectedOnBlurCount) {
+            it("updates {$path} {$field} money input on blur", function () use ($path, $field, $expectedOnBlurCount) {
+                $lines = file(base_path($path));
+                $blocks = [];
+
+                foreach ($lines as $index => $line) {
+                    if (! str_contains($line, "TextInput::make('{$field}')")) {
+                        continue;
+                    }
+
+                    $end = count($lines);
+
+                    for ($cursor = $index + 1; $cursor < min(count($lines), $index + 140); $cursor++) {
+                        if (
+                            str_contains($lines[$cursor], 'TextInput::make(')
+                            || str_contains($lines[$cursor], 'Select::make(')
+                            || str_contains($lines[$cursor], 'Repeater::make(')
+                            || str_contains($lines[$cursor], 'Radio::make(')
+                            || str_contains($lines[$cursor], 'Placeholder::make(')
+                        ) {
+                            $end = $cursor;
+                            break;
+                        }
+                    }
+
+                    $block = implode('', array_slice($lines, $index, $end - $index));
+
+                    if (str_contains($block, '->indonesianMoney()') || str_contains($block, '$money($input')) {
+                        $blocks[] = $block;
+                    }
+                }
+
+                expect($blocks)->not->toBeEmpty("No money TextInput block found for {$field} in {$path}");
+
+                $onBlurBlocks = array_filter(
+                    $blocks,
+                    fn (string $block) => str_contains($block, '->live(onBlur: true)')
+                );
+
+                expect($onBlurBlocks)->toHaveCount($expectedOnBlurCount);
+
+                foreach ($onBlurBlocks as $block) {
+                    expect($block)
+                        ->not->toContain('->live()');
+                }
+            });
+        }
+    }
 });
 
 // ─── Targeted scan: critical files must not have numeric+indonesianMoney ─────

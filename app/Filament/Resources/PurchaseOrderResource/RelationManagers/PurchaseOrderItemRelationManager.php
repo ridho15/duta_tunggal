@@ -158,7 +158,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->numeric(),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->mask(\Filament\Support\RawJs::make(<<<'JS'
             $money($input, ',', '.', 2)
         JS))
@@ -185,7 +185,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             }),
                         TextInput::make('discount')
                             ->label('Discount')
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),

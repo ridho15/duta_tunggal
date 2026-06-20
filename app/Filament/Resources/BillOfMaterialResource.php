@@ -341,13 +341,13 @@ class BillOfMaterialResource extends Resource
                                     ->helperText('Biaya tenaga kerja untuk memproduksi produk ini')
                                     ->indonesianMoney()
                                     ->default(0)
-                                    ->reactive()
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(fn($set, $get) => self::updateTotalCost($set, $get)),
                                 TextInput::make('overhead_cost')
                                     ->label('Biaya Overhead')
                                     ->default(0)
-                                    ->reactive()
                                     ->indonesianMoney()
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(fn($state, $set, $get) => self::updateTotalCost($set, $get)),
                                 Placeholder::make('material_cost_display')
                                     ->label('Biaya Material')

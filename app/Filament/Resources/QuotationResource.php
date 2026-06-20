@@ -1066,7 +1066,7 @@ class QuotationResource extends Resource
                                         ->validationMessages([
                                             'required' => 'Unit price wajib diisi'
                                         ])
-                                        ->reactive()
+                                        ->live(debounce: 500)
                                         ->indonesianMoney()
                                         ->prefix(fn(Get $get) => static::resolveCurrencySymbol(static::resolveQuotationFormCurrencyId($get)))
                                         ->formatStateUsing(function ($state, Get $get) {
@@ -1628,7 +1628,7 @@ class QuotationResource extends Resource
                                                     'required' => 'Quantity wajib diisi',
                                                     'numeric' => 'Quantity harus berupa angka'
                                                 ])
-                                                ->reactive()
+                                                ->live(onBlur: true)
                                                 ->afterStateUpdated(function ($state, $set, $get) {
                                                     $quantity = $state ?? 0;
                                                     $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
@@ -1656,7 +1656,7 @@ class QuotationResource extends Resource
                                                     'required' => 'Unit Price wajib diisi',
                                                     'numeric' => 'Unit Price harus berupa angka'
                                                 ])
-                                                ->reactive()
+                                                ->live(debounce: 500)
                                                 ->afterStateUpdated(function ($state, $set, $get) {
                                                     $quantity = $get('quantity') ?? 0;
                                                     $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();

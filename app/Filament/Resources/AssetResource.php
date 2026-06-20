@@ -203,7 +203,7 @@ class AssetResource extends Resource
                             ->indonesianMoney()
                             ->stripCharacters(',')
                             ->helperText('Biaya perolehan aset = harga pembelian + biaya pengiriman + biaya instalasi + biaya lainnya. Akan diisi otomatis dari Purchase Order jika tersedia.')
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->validationMessages([
                                 'required' => 'Biaya aset wajib diisi',
                                 'numeric' => 'Biaya aset harus berupa angka'

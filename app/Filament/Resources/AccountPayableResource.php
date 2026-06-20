@@ -129,7 +129,7 @@ class AccountPayableResource extends Resource
                                 'numeric' => 'Jumlah pembayaran harus berupa angka'
                             ])
                             ->default(0.00)
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $total = (float) \App\Helpers\MoneyHelper::safeParse($get('total'));

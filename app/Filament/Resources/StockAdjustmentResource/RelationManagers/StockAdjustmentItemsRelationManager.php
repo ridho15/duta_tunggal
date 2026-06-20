@@ -95,7 +95,7 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                     ->label('Harga Satuan')
                     ->indonesianMoney()
                     ->default(0)
-                    ->live()
+                    ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
                         $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);

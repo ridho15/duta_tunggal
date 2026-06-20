@@ -32,7 +32,7 @@ class AddDepositAction
                             ->indonesianMoney()
                             ->required()
                             ->default(0)
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $usedAmount = $get('used_amount') ?? 0;
                                 $parsed     = \App\Helpers\MoneyHelper::safeParse($state);
@@ -44,7 +44,7 @@ class AddDepositAction
                             ->label('Already Used Amount')
                             ->indonesianMoney()
                             ->default(0)
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $totalAmount = $get('amount') ?? 0;
                                 $parsedTotal = \App\Helpers\MoneyHelper::safeParse($totalAmount);

@@ -72,7 +72,7 @@ class CashBankTransferResource extends Resource
                             ->default(0)
                             ->indonesianMoney()
                             ->columnSpan(3)
-                            ->live()
+                            ->live(onBlur: true)
                             ->helperText('Biaya admin bank atau biaya transfer lainnya'),
                         TextInput::make('reference')->label('Referensi')->columnSpan(4),
                         Select::make('from_coa_id')->label('Dari Kas/Bank (COA)')

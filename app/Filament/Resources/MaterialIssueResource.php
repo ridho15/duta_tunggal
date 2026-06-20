@@ -309,7 +309,7 @@ class MaterialIssueResource extends Resource
                                         'numeric' => 'Cost Price harus berupa angka.',
                                         'min' => 'Cost Price minimal 0.',
                                     ])
-                                    ->reactive()
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(function ($set, $get) {
                                         $qty = (float) $get('quantity');
                                         $cost = \App\Helpers\MoneyHelper::safeParse($get('cost_per_unit') ?? '0');

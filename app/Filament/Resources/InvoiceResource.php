@@ -233,7 +233,7 @@ class InvoiceResource extends Resource
                             ->validationMessages([
                                 'required' => 'Subtotal tidak boleh kosong',
                             ])
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
                             })
@@ -247,7 +247,7 @@ class InvoiceResource extends Resource
                                 'required' => 'DPP tidak boleh kosong',
                                 'numeric' => 'DPP tidak valid !'
                             ])
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($set, $get) {
                                 $set('total', static::hitungTotal($get));
                             })
@@ -264,7 +264,7 @@ class InvoiceResource extends Resource
                                     ->label('Jumlah')
                                     ->minValue(0)
                                     ->indonesianMoney()
-                                    ->reactive()
+                                    ->live(debounce: 500)
                             ])
                             ->default([])
                             ->addActionLabel('Tambah Biaya')
@@ -294,7 +294,7 @@ class InvoiceResource extends Resource
                         TextInput::make('total')
                             ->required()
                             ->indonesianMoney()
-                            ->reactive(),
+                            ->live(onBlur: true),
                         Repeater::make('invoiceItem')
                             ->columnSpanFull()
                             ->relationship()

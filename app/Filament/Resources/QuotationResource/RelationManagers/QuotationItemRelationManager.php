@@ -48,7 +48,7 @@ class QuotationItemRelationManager extends RelationManager
                             }),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $state, $get('discount'), $get('tax')));
                             })

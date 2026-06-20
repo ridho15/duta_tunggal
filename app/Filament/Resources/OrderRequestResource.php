@@ -443,8 +443,7 @@ class OrderRequestResource extends Resource
 
                         return self::parseCurrencyState($state);
                     })
-                    ->reactive()
-                    ->live()
+                    ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                         $taxType = self::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
                         $preview = self::calculateApprovalItemPreview(
@@ -1150,8 +1149,7 @@ class OrderRequestResource extends Resource
                                         TextInput::make('unit_price')
                                             ->label('Harga Override')
                                             ->columnSpan(1)
-                                            ->reactive()
-                                            ->live()
+                                            ->live(debounce: 500)
                                             ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
                                                 is_numeric($get('currency_id'))
                                                     ? (int) $get('currency_id')

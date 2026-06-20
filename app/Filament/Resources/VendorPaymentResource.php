@@ -410,7 +410,7 @@ class VendorPaymentResource extends Resource
                                         TextInput::make('payment_amount')
                                             ->label('Jumlah Pembayaran Source')
                                             ->indonesianMoney()
-                                            ->reactive()
+                                            ->live(debounce: 500)
                                             ->required()
                                             ->helperText(fn ($get) => $get('remaining_amount')
                                                 ? 'Maks: ' . ($get('remaining_amount_display') ?: MoneyHelper::rupiah($get('remaining_amount') ?? 0))

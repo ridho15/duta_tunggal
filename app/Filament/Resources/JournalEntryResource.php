@@ -333,7 +333,7 @@ class JournalEntryResource extends Resource
                                         'required' => 'Jumlah debit harus diisi.',
                                         'numeric' => 'Jumlah debit harus berupa angka.',
                                     ])
-                                    ->live()
+                                    ->live(onBlur: true)
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $context) {
                                         if ($context === 'create' && $state > 0) {
                                             $set('credit', 0);
@@ -350,7 +350,7 @@ class JournalEntryResource extends Resource
                                         'required' => 'Jumlah credit harus diisi.',
                                         'numeric' => 'Jumlah credit harus berupa angka.',
                                     ])
-                                    ->live()
+                                    ->live(onBlur: true)
                                     ->afterStateUpdated(function ($state, callable $get, callable $set, $context) {
                                         if ($context === 'create' && $state > 0) {
                                             $set('debit', 0);

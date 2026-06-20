@@ -1954,7 +1954,7 @@ class PurchaseOrderResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->reactive()
+                                    ->live(debounce: 500)
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
                                         if ($currency) {
@@ -2067,7 +2067,7 @@ class PurchaseOrderResource extends Resource
                                 TextInput::make('nominal')
                                     ->label('Nominal (Kurs ke IDR)')
                                     ->helperText('Nilai tukar mata uang terhadap IDR. Otomatis terisi dari master, bisa disesuaikan.')
-                                    ->reactive()
+                                    ->live(debounce: 500)
                                     ->indonesianMoney()
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));

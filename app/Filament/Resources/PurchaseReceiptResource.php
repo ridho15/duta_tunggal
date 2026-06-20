@@ -200,7 +200,7 @@ class PurchaseReceiptResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->reactive()
+                                    ->live(onBlur: true)
                                     ->indonesianMoney()
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));

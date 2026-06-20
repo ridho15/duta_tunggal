@@ -1164,7 +1164,7 @@ class SaleOrderResource extends Resource
                                 TextInput::make('unit_price')
                                     ->label('Unit Price')
                                     ->columnSpan(1)
-                                    ->live()
+                                    ->live(debounce: 500)
                                     ->readOnly(fn(Get $get) => static::isReferQuotationForm($get))
                                     ->extraInputAttributes(fn(Get $get) => static::lockedInputAttributes($get))
                                     ->mask(\Filament\Support\RawJs::make(<<<'JS'
@@ -1185,7 +1185,6 @@ class SaleOrderResource extends Resource
                                         'required' => 'Unit Price harus diisi',
                                         'numeric' => 'Unit Price tidak valid !'
                                     ])
-                                    ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $qty = (float)($get('quantity') ?? 0);

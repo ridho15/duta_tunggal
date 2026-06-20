@@ -217,6 +217,33 @@ class PurchaseInvoiceResource extends Resource
             + (float) MoneyHelper::safeParse($get('bea_masuk_amount') ?? 0);
     }
 
+    protected static function recalculatePurchaseInvoiceTotalState(mixed $set, mixed $get, array $overrides = []): void
+    {
+        $subtotal = (float) MoneyHelper::safeParse($overrides['subtotal'] ?? $get('subtotal') ?? 0);
+        $receiptBiayaItems = $overrides['receiptBiayaItems'] ?? $get('receiptBiayaItems') ?? [];
+        $otherFees = $overrides['otherFees'] ?? $get('other_fees') ?? [];
+
+        $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) MoneyHelper::safeParse($fee['amount'] ?? 0));
+        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn ($row) => (float) MoneyHelper::safeParse($row['total'] ?? 0));
+        $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
+        $importChargeTotal = self::importChargeTotalFromState($get);
+
+        $ppnRate = (float) MoneyHelper::safeParse($overrides['ppnRate'] ?? $get('ppn_rate') ?? 0);
+        $taxAmount = array_key_exists('taxAmount', $overrides)
+            ? (float) MoneyHelper::safeParse($overrides['taxAmount'])
+            : $subtotal * $ppnRate / 100;
+        $finalTotal = $subtotal + $totalOtherFee + $importChargeTotal + $taxAmount;
+
+        $set('other_fee', $totalOtherFee);
+        $set('total', self::formatMoneyState($finalTotal));
+        $set('tax', $ppnRate);
+        $set('ppn_amount', self::formatMoneyState($taxAmount));
+
+        if (($overrides['syncPpnRate'] ?? false) === true) {
+            $set('ppn_rate', $ppnRate);
+        }
+    }
+
     protected static function readonlyInputAttributes(): array
     {
         return [
@@ -517,7 +544,8 @@ class PurchaseInvoiceResource extends Resource
                                             ->label('PPh 22 Impor')
                                             ->indonesianMoney()
                                             ->default(0)
-                                            ->reactive()
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(fn ($set, $get) => self::recalculatePurchaseInvoiceTotalState($set, $get))
                                             ->visible(function ($get) {
                                                 return static::purchaseOrderSelectionIsImport($get('selected_purchase_orders'));
                                             }),
@@ -526,7 +554,8 @@ class PurchaseInvoiceResource extends Resource
                                             ->label('Bea Masuk')
                                             ->indonesianMoney()
                                             ->default(0)
-                                            ->reactive()
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(fn ($set, $get) => self::recalculatePurchaseInvoiceTotalState($set, $get))
                                             ->visible(function ($get) {
                                                 return static::purchaseOrderSelectionIsImport($get('selected_purchase_orders'));
                                             }),
@@ -729,22 +758,15 @@ class PurchaseInvoiceResource extends Resource
 
                                         $set('receiptBiayaItems', $updatedBiaya);
 
-                                        // Calculate total including receipt biaya and manual other_fees
-                                        $existingOtherFees = $get('other_fees') ?? [];
-                                        $receiptBiayaTotal = (float) collect($updatedBiaya)->sum(fn($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['total'] ?? 0));
-                                        $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-                                        $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
-                                        $importChargeTotal = self::importChargeTotalFromState($get);
                                         $effectivePpnRate = $subtotal > 0 ? ($taxAmount / $subtotal) * 100 : 0;
 
-                                        // Calculate total using tax amount derived from PO item tax
-                                        $finalTotal = $subtotal + $totalOtherFee + $importChargeTotal + $taxAmount;
-                                        $set('total', self::formatMoneyState($finalTotal));
-                                        $set('tax', $effectivePpnRate);
-                                        $set('ppn_rate', $effectivePpnRate);
-
-                                        // Update PPN amount display
-                                        $set('ppn_amount', self::formatMoneyState($taxAmount));
+                                        self::recalculatePurchaseInvoiceTotalState($set, $get, [
+                                            'subtotal' => $subtotal,
+                                            'receiptBiayaItems' => $updatedBiaya,
+                                            'taxAmount' => $taxAmount,
+                                            'ppnRate' => $effectivePpnRate,
+                                            'syncPpnRate' => true,
+                                        ]);
                                     }),
                             ]),
 
@@ -836,22 +858,9 @@ class PurchaseInvoiceResource extends Resource
                                         }
                                         $set('subtotal', $subtotal);
                                         $set('dpp', self::formatMoneyState($subtotal));
-                                        // Recalculate total with other fees using PPN only
-                                        $otherFees = $get('other_fees') ?? [];
-                                        $manualOtherFeeTotal = (float) collect($otherFees)->sum(fn($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-                                        $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['total'] ?? 0));
-                                        $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
-                                        $importChargeTotal = self::importChargeTotalFromState($get);
-
-                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
-                                        $taxAmount = $subtotal * $ppnRate / 100;
-                                        $finalTotal = $subtotal + $totalOtherFee + $importChargeTotal + $taxAmount;
-                                        $set('total', self::formatMoneyState($finalTotal));
-                                        $set('tax', $ppnRate);
-
-                                        // Update PPN amount display
-                                        $set('ppn_amount', self::formatMoneyState($taxAmount));
+                                        self::recalculatePurchaseInvoiceTotalState($set, $get, [
+                                            'subtotal' => $subtotal,
+                                        ]);
                                     }),
                             ]),
 
@@ -869,7 +878,7 @@ class PurchaseInvoiceResource extends Resource
                                 TextInput::make('total')
                                     ->label('Total Source')
                                     ->indonesianMoney()
-                                    ->reactive()
+                                    ->live(onBlur: true)
                                     ->afterStateUpdated(function ($state, $set, $get) {
                                         $set('total_display', self::formatSourceCurrencyPair(
                                             $state,
@@ -888,21 +897,9 @@ class PurchaseInvoiceResource extends Resource
                             ->columns(3)
                             ->defaultItems(0)
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
-                                $receiptBiayaItems = $state ?? [];
-                                $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['total'] ?? 0));
-                                $existingOtherFees = $get('other_fees') ?? [];
-                                $manualOtherFeeTotal = (float) collect($existingOtherFees)->sum(fn($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-                                $totalOtherFee = $receiptBiayaTotal + $manualOtherFeeTotal;
-                                $importChargeTotal = self::importChargeTotalFromState($get);
-
-                                $ppnRate = (float) ($get('ppn_rate') ?? 0);
-                                $taxAmount = $subtotal * $ppnRate / 100;
-                                $finalTotal = $subtotal + $totalOtherFee + $importChargeTotal + $taxAmount;
-
-                                $set('other_fee', $totalOtherFee);
-                                $set('total', self::formatMoneyState($finalTotal));
-                                $set('ppn_amount', self::formatMoneyState($taxAmount));
+                                self::recalculatePurchaseInvoiceTotalState($set, $get, [
+                                    'receiptBiayaItems' => $state ?? [],
+                                ]);
                             }),
 
                         // Biaya Lain Section
@@ -927,7 +924,7 @@ class PurchaseInvoiceResource extends Resource
                                                 'required' => 'Jumlah tidak boleh kosong',
                                             ])
                                             ->default(0)
-                                            ->reactive()
+                                            ->live(onBlur: true)
                                             ->disabled(fn($operation) => $operation === 'edit')
                                             ->dehydrated(true),
                                     ])
@@ -936,23 +933,9 @@ class PurchaseInvoiceResource extends Resource
                                     ->disableItemCreation(fn($operation) => $operation === 'edit')
                                     ->disableItemDeletion(fn($operation) => $operation === 'edit')
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $manualOtherFeeTotal = (float) collect($state ?? [])->sum(fn($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
-                                        $set('other_fee', $manualOtherFeeTotal);
-
-                                        // Include receipt biaya in total calculation
-                                        $receiptBiayaItems = $get('receiptBiayaItems') ?? [];
-                                        $receiptBiayaTotal = (float) collect($receiptBiayaItems)->sum(fn($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['total'] ?? 0));
-                                        $totalOtherFee = $manualOtherFeeTotal + $receiptBiayaTotal;
-                                        $importChargeTotal = self::importChargeTotalFromState($get);
-
-                                        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
-                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
-                                        $taxAmount = $subtotal * $ppnRate / 100;
-                                        $finalTotal = $subtotal + $totalOtherFee + $importChargeTotal + $taxAmount;
-                                        $set('total', self::formatMoneyState($finalTotal));
-
-                                        // Update PPN amount display
-                                        $set('ppn_amount', self::formatMoneyState($taxAmount));
+                                        self::recalculatePurchaseInvoiceTotalState($set, $get, [
+                                            'otherFees' => $state ?? [],
+                                        ]);
                                     })
                                     ->collapsible(),
                             ]),
