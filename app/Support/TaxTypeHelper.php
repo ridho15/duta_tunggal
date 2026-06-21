@@ -14,7 +14,7 @@ class TaxTypeHelper
 
         return match ($normalized) {
             'none', 'non pajak', 'non-pajak', 'nonpajak' => self::NONE,
-            'inklusif', 'ppn included', 'included', 'ppn-included' => self::INKLUSIF,
+            'inklusif', 'inclusive', 'ppn included', 'included', 'ppn-included' => self::INKLUSIF,
             'eklusif', 'eksklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => self::EKLUSIF,
             default => $default,
         };

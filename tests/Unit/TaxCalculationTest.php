@@ -5,6 +5,7 @@ use PHPUnit\Framework\Attributes\Test;
 
 use App\Http\Controllers\HelperController;
 use App\Services\TaxService;
+use App\Support\TaxTypeHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -49,6 +50,17 @@ class TaxCalculationTest extends TestCase
         // When tipe_pajak is null, TaxService defaults to Eksklusif
         $this->assertSame('Eksklusif', TaxService::normalizeType(null));
         $this->assertSame('Eksklusif', TaxService::normalizeType(''));
+    }
+
+    #[Test]
+    public function tax_type_helper_normalizes_inclusive_aliases_without_falling_back_to_eklusif(): void
+    {
+        foreach (['Inklusif', 'inklUsif', 'Inclusive', 'included', 'PPN Included', 'ppn-included'] as $value) {
+            $this->assertSame(TaxTypeHelper::INKLUSIF, TaxTypeHelper::normalize($value));
+        }
+
+        $this->assertSame(TaxTypeHelper::EKLUSIF, TaxTypeHelper::normalize(null));
+        $this->assertSame(TaxTypeHelper::EKLUSIF, TaxTypeHelper::normalize('tax-type-tidak-valid'));
     }
 
     // ─── TaxService::compute ─────────────────────────────────────────────────

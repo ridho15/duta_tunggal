@@ -220,7 +220,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->default(0)
                             ->readOnly(),
                         Radio::make('tipe_pajak')
-                            ->label('Tipe Pajak')
+                            ->label('Tipe Pajak per Item')
                             ->inline()
                             ->required()
                             ->options([

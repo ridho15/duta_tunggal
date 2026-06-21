@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
 use App\Support\OrderRequestQuantityLock;
+use App\Support\TaxTypeHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -33,7 +34,21 @@ class PurchaseOrderItem extends Model
     protected static function booted()
     {
         static::saving(function (PurchaseOrderItem $purchaseOrderItem) {
-            $purchaseOrderItem->tipe_pajak = OrderRequestItem::normalizeItemTaxType($purchaseOrderItem->tipe_pajak ?? null);
+            if (
+                $purchaseOrderItem->refer_item_model_type === OrderRequestItem::class
+                && ! empty($purchaseOrderItem->refer_item_model_id)
+            ) {
+                $orderRequestItem = OrderRequestItem::withoutGlobalScopes()
+                    ->find($purchaseOrderItem->refer_item_model_id);
+
+                if ($orderRequestItem) {
+                    $purchaseOrderItem->tipe_pajak = TaxTypeHelper::normalize($orderRequestItem->tipe_pajak);
+
+                    return;
+                }
+            }
+
+            $purchaseOrderItem->tipe_pajak = TaxTypeHelper::normalize($purchaseOrderItem->tipe_pajak ?? null);
         });
 
         static::creating(function (PurchaseOrderItem $purchaseOrderItem) {
@@ -69,6 +84,7 @@ class PurchaseOrderItem extends Model
 
             $purchaseOrderItem->refer_item_model_type = OrderRequestItem::class;
             $purchaseOrderItem->refer_item_model_id = $matchedItem->id;
+            $purchaseOrderItem->tipe_pajak = TaxTypeHelper::normalize($matchedItem->tipe_pajak);
         });
     }
 

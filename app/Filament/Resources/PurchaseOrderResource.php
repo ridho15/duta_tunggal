@@ -190,6 +190,45 @@ class PurchaseOrderResource extends Resource
             })
             ->all();
 
+        return self::normalizeOrderRequestBackedItemTaxTypes($data);
+    }
+
+    public static function normalizeOrderRequestBackedItemTaxTypes(array $data): array
+    {
+        if (empty($data['purchaseOrderItem']) || ! is_array($data['purchaseOrderItem'])) {
+            return $data;
+        }
+
+        foreach ($data['purchaseOrderItem'] as &$item) {
+            $referItemType = $item['refer_item_model_type'] ?? null;
+            $referItemId = $item['refer_item_model_id'] ?? null;
+
+            if ($referItemType === OrderRequestItem::class && is_numeric($referItemId)) {
+                $orderRequestItem = OrderRequestItem::withoutGlobalScopes()->find((int) $referItemId);
+
+                if ($orderRequestItem) {
+                    $item['tipe_pajak'] = TaxTypeHelper::normalize($orderRequestItem->tipe_pajak);
+                }
+            } else {
+                $item['tipe_pajak'] = TaxTypeHelper::normalize($item['tipe_pajak'] ?? null);
+            }
+
+            if (
+                array_key_exists('quantity', $item)
+                && array_key_exists('unit_price', $item)
+                && array_key_exists('tax', $item)
+            ) {
+                $item['subtotal'] = HelperController::hitungSubtotal(
+                    (float) ($item['quantity'] ?? 0),
+                    self::parseCurrencyState($item['unit_price'] ?? 0),
+                    (float) ($item['discount'] ?? 0),
+                    (float) ($item['tax'] ?? 0),
+                    $item['tipe_pajak'] ?? null
+                );
+            }
+        }
+        unset($item);
+
         return $data;
     }
 
@@ -804,14 +843,6 @@ class PurchaseOrderResource extends Resource
                                         } elseif ($get('refer_model_type') == 'App\Models\OrderRequest') {
                                             $orderRequest = OrderRequest::with(['orderRequestItem.product.uom', 'orderRequestItem.product.suppliers'])->find($state);
                                             if ($orderRequest) {
-                                                // header-level warehouse removed from OrderRequest; do not inherit
-                                                $ppnOption = match (self::normalizeTaxTypeValue($orderRequest->tax_type ?? null)) {
-                                                    'none'      => 'non_ppn',
-                                                    'inklusif'  => 'inklusif',
-                                                    default     => 'eklusif',
-                                                };
-                                                $set('ppn_option', $ppnOption);
-
                                                 $availableGroups = self::getAvailableOrderRequestItemGroups($orderRequest);
 
                                                 if (count($availableGroups) > 1) {
@@ -1610,15 +1641,18 @@ class PurchaseOrderResource extends Resource
                                     ->helperText('Nominal discount dihitung otomatis dari quantity, unit price, dan discount.')
                                     ->columnSpan(2),
                                 Radio::make('tipe_pajak')
-                                    ->label('Tipe Pajak')
+                                    ->label('Tipe Pajak per Item')
                                     ->inline()
                                     ->reactive()
                                     ->required()
                                     ->default('inklusif')
                                     ->dehydrated(true)
-                                    ->disabled(fn(Get $get) => (($get('../../ppn_option') ?? 'standard') === 'non_ppn') || self::isOrderRequestBackedItem($get))
+                                    ->disabled(fn(Get $get) => self::isOrderRequestBackedItem($get))
                                     ->extraAttributes(['class' => 'data-[disabled=true]:opacity-75'])
                                     ->options(TaxTypeHelper::options())
+                                    ->helperText(fn (Get $get) => self::isOrderRequestBackedItem($get)
+                                        ? 'Mengikuti tipe pajak dari Order Request sumber.'
+                                        : 'Pajak ditentukan untuk setiap item Purchase Order.')
                                     ->afterStateUpdated(function ($state, Get $get, Set $set) {
                                         $defaultTax = \App\Models\TaxSetting::activeRate('PPN');
                                         $normalizedState = self::normalizeTaxTypeValue($state);
@@ -2206,23 +2240,6 @@ class PurchaseOrderResource extends Resource
                     ->label('Import?')
                     ->boolean()
                     ->tooltip(fn($state) => $state ? 'Pembelian import (pajak dicatat saat pembayaran)' : 'Pembelian lokal'),
-                TextColumn::make('ppn_option')
-                    ->label('Tipe Pajak')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'non_ppn'  => 'Non Pajak',
-                            'inklusif' => 'Inklusif',
-                            'eklusif'  => 'Eklusif',
-                            default    => 'PPN',
-                        };
-                    })
-                    ->badge()
-                    ->color(fn($state) => match ($state) {
-                        'non_ppn'  => 'warning',
-                        'inklusif' => 'info',
-                        default    => 'success',
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('order_date')
                     ->date()
                     ->sortable(),
@@ -2441,14 +2458,6 @@ class PurchaseOrderResource extends Resource
                         0 => 'Non Import',
                     ])
                     ->placeholder('Semua PO'),
-                SelectFilter::make('ppn_option')
-                    ->label('Tipe Pajak')
-                    ->options([
-                        'non_ppn'  => 'Non Pajak',
-                        'inklusif' => 'Inklusif',
-                        'eklusif'  => 'Eklusif',
-                    ])
-                    ->placeholder('Semua Tipe Pajak'),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
                     ->relationship('supplier', 'perusahaan')

@@ -9,6 +9,7 @@ use App\Services\PurchaseOrderService;
 use App\Services\ProductSupplierSyncService;
 use App\Support\CurrencyConversionResolver;
 use App\Support\OrderRequestQuantityLock;
+use App\Support\TaxTypeHelper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -300,23 +301,15 @@ class OrderRequestService
     }
 
     /**
-     * Derive the PurchaseOrderItem tipe_pajak from the Order Request tax_type and item tax rate.
-     *  - tax = 0 → 'none'
-     *  - tax_type = 'inklusif' → 'inklusif'
-     *  - tax_type = 'eklusif' (default) → 'eklusif'
+     * Preserve the normalized item-level tax type when an OR creates a PO.
      */
     private function resolveTipePajak(?string $itemTaxType, float $tax): string
     {
         if ((float) $tax <= 0) {
-            return 'none';
+            return TaxTypeHelper::NONE;
         }
 
-        $normalized = strtolower(trim((string) $itemTaxType));
-        if (in_array($normalized, ['inklusif', 'ppn included', 'included'], true)) {
-            return 'inklusif';
-        }
-
-        return 'eklusif';
+        return TaxTypeHelper::normalize($itemTaxType);
     }
 
     public function reject($orderRequest)

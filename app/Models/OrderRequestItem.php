@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Helpers\MoneyHelper;
 use App\Support\CurrencyConversionResolver;
 use App\Support\TaxDefaultResolver;
+use App\Support\TaxTypeHelper;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -116,23 +117,12 @@ class OrderRequestItem extends Model
 
     public static function normalizeItemTaxType(?string $value): string
     {
-        $normalized = strtolower(trim((string) $value));
-
-        return match ($normalized) {
-            'non pajak', 'none', 'non-pajak', 'nonpajak' => 'none',
-            'inklusif', 'included', 'ppn included' => 'inklusif',
-            'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
-            default => 'eklusif',
-        };
+        return TaxTypeHelper::normalize($value);
     }
 
     public static function taxServiceTypeFromItemTaxType(?string $itemTaxType): string
     {
-        return match (static::normalizeItemTaxType($itemTaxType)) {
-            'none' => 'None',
-            'inklusif' => 'PPN Included',
-            default => 'PPN Excluded',
-        };
+        return TaxTypeHelper::serviceType($itemTaxType);
     }
 
     /**

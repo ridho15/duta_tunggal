@@ -372,6 +372,107 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame(8879400.0, PurchaseInvoiceResource::invoiceAmountToIdr($invoice, 591.96));
     }
 
+    public function test_purchase_invoice_form_currency_formatter_is_compact_and_rounds_high_precision_values(): void
+    {
+        $this->assertSame(
+            'Rp 648.608,11',
+            PurchaseInvoiceResource::formatTransactionCurrencyAmount(648608.108108, [
+                'currency_code' => 'IDR',
+                'exchange_rate' => 1,
+                'is_foreign' => false,
+            ])
+        );
+
+        $this->assertSame(
+            'USD 100.00 (≈ Rp 1.600.000,00)',
+            PurchaseInvoiceResource::formatTransactionCurrencyAmount(100, [
+                'currency_code' => 'USD',
+                'exchange_rate' => 16000,
+                'is_foreign' => true,
+            ])
+        );
+    }
+
+    public function test_purchase_invoice_form_does_not_render_duplicate_source_amount_fields(): void
+    {
+        $source = file_get_contents(app_path('Filament/Resources/PurchaseInvoiceResource.php'));
+
+        $this->assertStringNotContainsString("->label('Harga Source')", $source);
+        $this->assertStringNotContainsString("->label('Harga (Rp / Source)')", $source);
+        $this->assertStringNotContainsString("->label('Total Source')", $source);
+        $this->assertStringNotContainsString("->label('Total (Rp / Source)')", $source);
+        $this->assertStringNotContainsString("->label('Grand Total Source')", $source);
+        $this->assertStringContainsString("Placeholder::make('unit_price_preview')", $source);
+        $this->assertStringContainsString("Placeholder::make('grand_total_preview')", $source);
+    }
+
+    public function test_purchase_invoice_live_preview_uses_service_totals_without_money_mask_distortion(): void
+    {
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'status' => 'approved',
+        ]);
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+            'refer_model_type' => OrderRequest::class,
+            'refer_model_id' => $orderRequest->id,
+        ]);
+        $purchaseOrder->purchaseOrderCurrency()->create([
+            'currency_id' => $this->currency->id,
+            'nominal' => 1,
+        ]);
+        createPurchaseInvoiceOrderRequestItem(
+            $orderRequest,
+            $this->product,
+            $this->supplier,
+            $this->cabang,
+            10
+        );
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'currency_id' => $this->currency->id,
+            'quantity' => 10,
+            'unit_price' => 719955,
+            'discount' => 0,
+            'tax' => 11,
+            'tipe_pajak' => 'Inklusif',
+        ]);
+        $receipt = PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => 'completed',
+        ]);
+        PurchaseReceiptItem::factory()->create([
+            'purchase_receipt_id' => $receipt->id,
+            'purchase_order_item_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'qty_received' => 10,
+            'qty_accepted' => 10,
+            'qty_rejected' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $this->supplier->id,
+                'selected_order_request' => $orderRequest->id,
+                'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_purchase_receipts' => [$receipt->id],
+            ])
+            ->assertSet('data.invoiceItem.0.quantity', 10.0)
+            ->assertSet('data.invoiceItem.0.price', fn ($value) => abs((float) $value - 648608.108108) < 0.0001)
+            ->assertSet('data.dpp', 6486081.08)
+            ->assertSet('data.ppn_amount', 713468.92)
+            ->assertSet('data.total', 7199550.0)
+            ->assertSee('Rp 648.608,11')
+            ->assertSee('Rp 6.486.081,08')
+            ->assertSee('Rp 713.468,92')
+            ->assertSee('Rp 7.199.550,00')
+            ->assertDontSee('648.608.108.10');
+    }
+
     public function test_purchase_invoice_edit_data_clears_import_charge_state_for_non_import_purchase_order()
     {
         $po = PurchaseOrder::factory()->create([
@@ -992,7 +1093,7 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertArrayNotHasKey($orderRequestA->id, $branchBOrderRequests);
     }
 
-    public function test_order_request_selection_auto_fills_readonly_cabang_label(): void
+    public function test_order_request_selection_leaves_cabang_empty_until_purchase_order_is_selected(): void
     {
         $source = $this->createReceiptBackedSource();
         $expectedCabangLabel = "({$this->cabang->kode}) {$this->cabang->nama}";
@@ -1005,9 +1106,16 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_order_request' => $source['orderRequest']->id,
             ])
             ->assertFormSet([
+                'cabang_id' => null,
+                'selected_cabang_label' => null,
+                'selected_purchase_orders' => [],
+            ])
+            ->fillForm([
+                'selected_purchase_orders' => [$source['purchaseOrder']->id],
+            ])
+            ->assertFormSet([
                 'cabang_id' => $this->cabang->id,
                 'selected_cabang_label' => $expectedCabangLabel,
-                'selected_purchase_orders' => [],
             ]);
 
         $purchaseOrderOptions = PurchaseInvoiceResource::getPurchaseOrderOptions(
@@ -1017,6 +1125,81 @@ class PurchaseInvoiceResourceTest extends TestCase
         );
 
         $this->assertArrayHasKey($source['purchaseOrder']->id, $purchaseOrderOptions);
+    }
+
+    public function test_purchase_invoice_locks_cabang_from_first_purchase_order_and_reopens_options_when_cleared(): void
+    {
+        $supplier = Supplier::factory()->create();
+        $branchA = $this->cabang;
+        $branchB = Cabang::factory()->create([
+            'kode' => 'PI-B',
+            'nama' => 'Cabang Invoice B',
+        ]);
+        $orderRequest = OrderRequest::factory()->create([
+            'cabang_id' => $branchA->id,
+            'status' => 'approved',
+        ]);
+        $sourceA = $this->createReceiptBackedSource($supplier, $orderRequest, $branchA);
+        $sourceB = $this->createReceiptBackedSource($supplier, $orderRequest, $branchB);
+
+        $branchUserOptions = PurchaseInvoiceResource::getPurchaseOrderOptions($supplier->id, $orderRequest->id);
+        $this->assertArrayHasKey($sourceA['purchaseOrder']->id, $branchUserOptions);
+        $this->assertArrayNotHasKey($sourceB['purchaseOrder']->id, $branchUserOptions);
+
+        $this->user->update(['manage_type' => 'all']);
+        $this->actingAs($this->user);
+
+        $allBranchOptions = PurchaseInvoiceResource::getPurchaseOrderOptions($supplier->id, $orderRequest->id);
+        $this->assertArrayHasKey($sourceA['purchaseOrder']->id, $allBranchOptions);
+        $this->assertArrayHasKey($sourceB['purchaseOrder']->id, $allBranchOptions);
+        $this->assertStringContainsString("({$branchA->kode}) {$branchA->nama}", $allBranchOptions[$sourceA['purchaseOrder']->id]);
+        $this->assertStringContainsString("({$branchB->kode}) {$branchB->nama}", $allBranchOptions[$sourceB['purchaseOrder']->id]);
+
+        $page = Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
+            ->fillForm([
+                'selected_supplier' => $supplier->id,
+                'selected_order_request' => $orderRequest->id,
+            ])
+            ->assertFormSet([
+                'cabang_id' => null,
+                'selected_cabang_label' => null,
+            ])
+            ->fillForm([
+                'selected_purchase_orders' => [$sourceA['purchaseOrder']->id],
+            ])
+            ->assertFormSet([
+                'cabang_id' => $branchA->id,
+                'selected_cabang_label' => "({$branchA->kode}) {$branchA->nama}",
+            ]);
+
+        $lockedBranchOptions = PurchaseInvoiceResource::getPurchaseOrderOptions($supplier->id, $orderRequest->id, $branchA->id);
+        $this->assertArrayHasKey($sourceA['purchaseOrder']->id, $lockedBranchOptions);
+        $this->assertArrayNotHasKey($sourceB['purchaseOrder']->id, $lockedBranchOptions);
+
+        $page
+            ->fillForm([
+                'selected_purchase_orders' => [],
+            ])
+            ->assertFormSet([
+                'cabang_id' => null,
+                'selected_cabang_label' => null,
+            ])
+            ->fillForm([
+                'selected_purchase_orders' => [$sourceA['purchaseOrder']->id, $sourceB['purchaseOrder']->id],
+            ])
+            ->assertFormSet([
+                'selected_purchase_orders' => [$sourceA['purchaseOrder']->id],
+                'cabang_id' => $branchA->id,
+                'selected_cabang_label' => "({$branchA->kode}) {$branchA->nama}",
+            ]);
+
+        $this->assertReceiptSourceValidationError([
+            'selected_supplier' => $supplier->id,
+            'selected_order_request' => $orderRequest->id,
+            'selected_purchase_orders' => [$sourceA['purchaseOrder']->id, $sourceB['purchaseOrder']->id],
+            'selected_purchase_receipts' => [$sourceA['receipt']->id, $sourceB['receipt']->id],
+            'cabang_id' => $branchA->id,
+        ], 'cabang_id');
     }
 
     public function test_order_request_cabang_context_falls_back_to_item_then_receipt(): void

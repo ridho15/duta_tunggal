@@ -718,6 +718,82 @@ test('purchase order item tax auto-fills from active setting when tipe pajak cha
         ->assertSet('data.purchaseOrderItem.0.tax', 11);
 });
 
+test('purchase order create form preserves inclusive tax type from order request item even when disabled state is wrong', function () {
+    TaxSetting::factory()->ppn()->create([
+        'effective_date' => now()->subDay()->toDateString(),
+        'status' => true,
+    ]);
+
+    $orderRequest = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->currency->id,
+        'cabang_id' => $this->cabang->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'unit_price' => 111000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'Inklusif',
+        'currency_id' => $this->currency->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreatePurchaseOrder::class)
+        ->set('data.po_number', 'PO-LIVE-OR-INCLUSIVE-001')
+        ->set('data.refer_model_type', OrderRequest::class)
+        ->set('data.refer_model_id', $orderRequest->id)
+        ->set('data.supplier_id', $this->supplier->id)
+        ->set('data.cabang_id', $this->cabang->id)
+        ->set('data.tempo_hutang', $this->supplier->tempo_hutang)
+        ->set('data.order_date', now()->toDateString())
+        ->set('data.expected_date', now()->addDays(3)->toDateString())
+        ->set('data.is_asset', false)
+        ->set('data.purchaseOrderItem', [[
+            'product_id' => $this->product->id,
+            'currency_id' => $this->currency->id,
+            'quantity' => 1,
+            'unit_price' => 111000,
+            'discount' => 0,
+            'tax' => 11,
+            'subtotal' => 123210,
+            'tipe_pajak' => 'eklusif',
+            'refer_item_model_type' => OrderRequestItem::class,
+            'refer_item_model_id' => $orderRequestItem->id,
+        ]])
+        ->set('data.purchaseOrderCurrency', [[
+            'currency_id' => $this->currency->id,
+            'nominal' => 1.0,
+        ]])
+        ->set('data.purchaseOrderBiaya', [])
+        ->set('data.total_amount', 123210)
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $purchaseOrder = PurchaseOrder::where('po_number', 'PO-LIVE-OR-INCLUSIVE-001')
+        ->with('purchaseOrderItem')
+        ->first();
+
+    expect($purchaseOrder)->not->toBeNull()
+        ->and($purchaseOrder->purchaseOrderItem->first()->tipe_pajak)->toBe('inklusif')
+        ->and((float) $purchaseOrder->total_amount)->toBe(111000.0);
+});
+
+test('purchase order resource no longer uses removed header tax fields', function () {
+    $resource = file_get_contents(app_path('Filament/Resources/PurchaseOrderResource.php'));
+
+    expect($resource)
+        ->not->toContain('orderRequest->tax_type')
+        ->not->toContain("make('ppn_option')")
+        ->toContain("->label('Tipe Pajak per Item')");
+});
+
 test('scenario 1: supplier non-linked tetap tersedia pada opsi supplier untuk produk terpilih', function () {
     $nonLinkedSupplier = Supplier::factory()->create([
         'code' => 'SUP-NL-01',
