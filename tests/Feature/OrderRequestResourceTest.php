@@ -1129,6 +1129,178 @@ it('edits an order request through the Filament edit page', function () {
     expect($or->note)->toBe('New Note via Edit');
 });
 
+it('removes an unused inline order request item from edit state', function () {
+    $or = OrderRequest::factory()->create(['note' => 'Inline delete safe item']);
+    $firstItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'discount' => 0,
+        'tax' => 0,
+        'subtotal' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'discount' => 0,
+        'tax' => 0,
+        'subtotal' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(EditOrderRequest::class, ['record' => $or->getKey()]);
+
+    $items = $component->get('data.orderRequestItem');
+    $key = collect($items)->search(fn (array $item) => (int) ($item['id'] ?? 0) === (int) $firstItem->id);
+
+    expect($key)->not->toBeFalse();
+
+    $component->call('removeInlineOrderRequestItem', (string) $key);
+
+    $remainingItems = $component->get('data.orderRequestItem');
+
+    expect($remainingItems)->toHaveCount(1)
+        ->and(collect($remainingItems)->pluck('id')->map(fn ($id) => (int) $id)->all())->not->toContain((int) $firstItem->id);
+});
+
+it('adds an inline order request item through edit state and can remove it before save', function () {
+    $or = OrderRequest::factory()->create([
+        'note' => 'Inline add item',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    foreach (range(1, 120) as $index) {
+        OrderRequestItem::factory()->create([
+            'order_request_id' => $or->id,
+            'product_id' => $this->product->id,
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'quantity' => 1,
+            'fulfilled_quantity' => 0,
+            'unit_price' => 1000 + $index,
+            'discount' => 0,
+            'tax' => 0,
+            'subtotal' => 1000 + $index,
+            'currency_id' => $this->defaultCurrency->id,
+        ]);
+    }
+
+    $component = Livewire::actingAs($this->user)
+        ->test(EditOrderRequest::class, ['record' => $or->getKey()])
+        ->set('data._order_request_item_page_size', 10)
+        ->set('data._order_request_item_page', 5)
+        ->set('data._order_request_item_search', 'LARGE-DEMO-050')
+        ->set('data._order_request_item_supplier_filter', $this->supplier->id)
+        ->set('data._order_request_item_cabang_filter', $this->cabang->id)
+        ->set('data._order_request_item_tax_filter', 'inklusif');
+
+    expect($component->get('data.orderRequestItem'))->toHaveCount(120);
+
+    $component->call('addInlineOrderRequestItem');
+
+    $items = $component->get('data.orderRequestItem');
+    $newKey = collect(array_keys($items))
+        ->first(fn (string|int $key) => str_starts_with((string) $key, 'inline-'));
+
+    expect($items)->toHaveCount(121)
+        ->and($newKey)->not->toBeNull()
+        ->and(array_key_first($items))->toBe($newKey)
+        ->and($items[$newKey]['quantity'])->toBe(1)
+        ->and($items[$newKey]['tipe_pajak'])->toBe('eklusif')
+        ->and($items[$newKey]['currency_id'])->toBe($this->defaultCurrency->id)
+        ->and($component->get('data._order_request_item_page'))->toBe(1)
+        ->and($component->get('data._order_request_item_search'))->toBeNull()
+        ->and($component->get('data._order_request_item_supplier_filter'))->toBeNull()
+        ->and($component->get('data._order_request_item_cabang_filter'))->toBeNull()
+        ->and($component->get('data._order_request_item_tax_filter'))->toBeNull();
+
+    $component
+        ->call('updateInlineOrderRequestItemField', (string) $newKey, 'product_id', $this->product->id)
+        ->call('updateInlineOrderRequestItemField', (string) $newKey, 'quantity', 2)
+        ->call('updateInlineOrderRequestItemField', (string) $newKey, 'unit_price', '100.000,00');
+
+    $updatedItems = $component->get('data.orderRequestItem');
+
+    expect($updatedItems[$newKey]['product_id'])->toBe($this->product->id)
+        ->and((float) $updatedItems[$newKey]['quantity'])->toBe(2.0)
+        ->and($updatedItems[$newKey]['total'])->toBe('200.000,00')
+        ->and($updatedItems[$newKey]['subtotal'])->not->toBe('0,00');
+
+    $component->call('removeInlineOrderRequestItem', (string) $newKey);
+
+    expect($component->get('data.orderRequestItem'))->toHaveCount(120);
+});
+
+it('does not remove an inline order request item that is already referenced by purchase order', function () {
+    $or = OrderRequest::factory()->create(['note' => 'Inline delete locked item']);
+    $lockedItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'discount' => 0,
+        'tax' => 0,
+        'subtotal' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'discount' => 0,
+        'tax' => 0,
+        'subtotal' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $or->id,
+        'status' => 'approved',
+    ]);
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->product->id,
+        'quantity' => 1,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $lockedItem->id,
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(EditOrderRequest::class, ['record' => $or->getKey()]);
+
+    $items = $component->get('data.orderRequestItem');
+    $key = collect($items)->search(fn (array $item) => (int) ($item['id'] ?? 0) === (int) $lockedItem->id);
+
+    expect($key)->not->toBeFalse();
+
+    $component->call('removeInlineOrderRequestItem', (string) $key);
+
+    $remainingItems = $component->get('data.orderRequestItem');
+
+    expect($remainingItems)->toHaveCount(2)
+        ->and(collect($remainingItems)->pluck('id')->map(fn ($id) => (int) $id)->all())->toContain((int) $lockedItem->id);
+});
+
 it('deletes (soft deletes) an order request and its items', function () {
     $or = OrderRequest::factory()->create();
     $item = OrderRequestItem::factory()->create(['order_request_id' => $or->id, 'product_id' => $this->product->id, 'discount' => 0, 'tax' => 0, 'subtotal' => 0]);
