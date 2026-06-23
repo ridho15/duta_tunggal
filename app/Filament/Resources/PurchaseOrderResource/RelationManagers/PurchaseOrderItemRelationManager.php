@@ -4,7 +4,9 @@ namespace App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 
 use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Filament\Resources\PurchaseOrderResource;
+use App\Models\Cabang;
 use App\Models\Currency;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Support\OrderRequestQuantityLock;
 use Filament\Forms\Components\Fieldset;
@@ -28,6 +30,7 @@ use App\Notifications\FilamentDatabaseNotification;
 use App\Models\QualityControl;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
@@ -259,6 +262,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->recordTitleAttribute('id')
             ->columns([
                 TextColumn::make('product.sku')
@@ -282,6 +287,36 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->label('Quantity')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('source')
+                    ->label('Sumber')
+                    ->getStateUsing(fn ($record) => $record->refer_item_model_id ? 'Order Request' : 'Manual')
+                    ->badge()
+                    ->color(fn ($state) => $state === 'Order Request' ? 'info' : 'gray'),
+                TextColumn::make('item_cabang')
+                    ->label('Cabang')
+                    ->getStateUsing(function ($record) {
+                        $record->loadMissing('referItemModel.cabang', 'product.cabang');
+                        $cabang = $record->referItemModel?->cabang ?? $record->product?->cabang;
+
+                        if (! $cabang || ! $cabang->exists) {
+                            return '-';
+                        }
+
+                        return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
+                    })
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(function (Builder $branchQuery) use ($search) {
+                            $branchQuery->whereHasMorph('referItemModel', [OrderRequestItem::class], function (Builder $query) use ($search) {
+                                $query->whereHas('cabang', function (Builder $query) use ($search) {
+                                    $query->where('kode', 'like', "%{$search}%")
+                                        ->orWhere('nama', 'like', "%{$search}%");
+                                });
+                            })->orWhereHas('product.cabang', function (Builder $query) use ($search) {
+                                $query->where('kode', 'like', "%{$search}%")
+                                    ->orWhere('nama', 'like', "%{$search}%");
+                            });
+                        });
+                    }),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
                         ->formatStateUsing(function ($state, $record) {
@@ -304,7 +339,64 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->badge(),
             ])
             ->filters([
-                //
+                SelectFilter::make('tipe_pajak')
+                    ->label('Tipe Pajak')
+                    ->options([
+                        'inklusif' => 'Inklusif',
+                        'eklusif' => 'Eklusif',
+                        'none' => 'Non Pajak',
+                    ]),
+                SelectFilter::make('source')
+                    ->label('Sumber Item')
+                    ->options([
+                        'order_request' => 'Dari Order Request',
+                        'manual' => 'Manual',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return match ($data['value'] ?? null) {
+                            'order_request' => $query->whereNotNull('refer_item_model_id'),
+                            'manual' => $query->whereNull('refer_item_model_id'),
+                            default => $query,
+                        };
+                    }),
+                SelectFilter::make('cabang_id')
+                    ->label('Cabang')
+                    ->options(fn () => Cabang::orderBy('kode')->limit(100)->get()->mapWithKeys(
+                        fn (Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"]
+                    ))
+                    ->searchable()
+                    ->query(function (Builder $query, array $data): Builder {
+                        $cabangId = $data['value'] ?? null;
+
+                        if (! $cabangId) {
+                            return $query;
+                        }
+
+                        return $query->where(function (Builder $branchQuery) use ($cabangId) {
+                            $branchQuery->whereHasMorph('referItemModel', [OrderRequestItem::class], function (Builder $query) use ($cabangId) {
+                                $query->where('cabang_id', $cabangId);
+                            })->orWhereHas('product', function (Builder $query) use ($cabangId) {
+                                $query->where('cabang_id', $cabangId);
+                            });
+                        });
+                    }),
+                SelectFilter::make('receipt_qc_status')
+                    ->label('Receipt / QC')
+                    ->options([
+                        'has_receipt' => 'Sudah ada receipt',
+                        'no_receipt' => 'Belum ada receipt',
+                        'has_qc' => 'Sudah ada QC',
+                        'no_qc' => 'Belum ada QC',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return match ($data['value'] ?? null) {
+                            'has_receipt' => $query->whereHas('purchaseReceiptItem'),
+                            'no_receipt' => $query->whereDoesntHave('purchaseReceiptItem'),
+                            'has_qc' => $query->whereHas('qualityControls'),
+                            'no_qc' => $query->whereDoesntHave('qualityControls'),
+                            default => $query,
+                        };
+                    }),
             ])
             ->headerActions([])
             ->actions([

@@ -101,6 +101,34 @@ class OrderRequestResource extends Resource
         ];
     }
 
+    public static function recalculateOrderRequestItemPreviewState(array $item): array
+    {
+        $itemTaxType = self::normalizeItemTaxType($item['tipe_pajak'] ?? null);
+        $productId = is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null;
+        $taxPct = self::resolveItemTaxRate($productId, $itemTaxType);
+        $quantity = (float) ($item['quantity'] ?? 0);
+        $unitPrice = self::parseCurrencyState($item['unit_price'] ?? 0);
+        $discountPct = (float) ($item['discount'] ?? 0);
+
+        $preview = self::calculateApprovalItemPreview(
+            $quantity,
+            $unitPrice,
+            $discountPct,
+            $taxPct,
+            self::taxServiceTypeFromItemTaxType($itemTaxType)
+        );
+
+        $item['tipe_pajak'] = $itemTaxType;
+        $item['tax'] = $taxPct;
+        $item['total'] = self::formatMoneyPreviewState($preview['total_cost']);
+        $item['total_cost'] = self::formatMoneyPreviewState($preview['total_cost']);
+        $item['subtotal'] = self::formatMoneyPreviewState($preview['subtotal']);
+        $item['tax_nominal'] = self::formatMoneyPreviewState($preview['tax_nominal']);
+        $item['discount_nominal'] = self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discountPct / 100), 2));
+
+        return $item;
+    }
+
     public static function normalizeItemTaxType(?string $itemTaxType): string
     {
         return TaxTypeHelper::normalize($itemTaxType);
@@ -177,6 +205,303 @@ class OrderRequestResource extends Resource
     public static function formatMoneyPreviewState(mixed $amount): string
     {
         return number_format(MoneyHelper::safeParse($amount ?? 0), 2, ',', '.');
+    }
+
+    public static function renderLargeItemSummary(
+        array $items,
+        ?string $search = null,
+        mixed $supplierFilter = null,
+        mixed $cabangFilter = null,
+        ?string $taxFilter = null,
+        mixed $pageSize = 10,
+        mixed $currentPage = 1
+    ): \Illuminate\Contracts\View\View
+    {
+        $search = trim((string) $search);
+        $supplierFilter = filled($supplierFilter) ? (int) $supplierFilter : null;
+        $cabangFilter = filled($cabangFilter) ? (int) $cabangFilter : null;
+        $taxFilter = filled($taxFilter) ? TaxTypeHelper::normalize($taxFilter) : null;
+        $pageSize = in_array((int) $pageSize, [10, 25, 50, 100], true) ? (int) $pageSize : 10;
+        $currentPage = max(1, (int) $currentPage);
+        $productIds = collect($items)->pluck('product_id')->filter()->unique()->values();
+        $supplierIds = collect($items)->pluck('supplier_id')->filter()->unique()->values();
+        $cabangIds = collect($items)->pluck('cabang_id')->filter()->unique()->values();
+
+        $products = Product::withoutGlobalScope('product_cabang')
+            ->whereIn('id', $productIds)
+            ->with('uom:id,name,abbreviation')
+            ->withSum('inventoryStock as available_stock', 'qty_available')
+            ->get(['id', 'sku', 'name', 'uom_id'])
+            ->keyBy('id');
+        $suppliers = Supplier::whereIn('id', $supplierIds)
+            ->get(['id', 'code', 'perusahaan'])
+            ->keyBy('id');
+        $cabangs = \App\Models\Cabang::whereIn('id', $cabangIds)
+            ->get(['id', 'kode', 'nama'])
+            ->keyBy('id');
+
+        $totalItems = count($items);
+        $totalQty = collect($items)->sum(fn ($item) => (float) ($item['quantity'] ?? 0));
+        $totalSubtotal = collect($items)->sum(fn ($item) => MoneyHelper::safeParse($item['subtotal'] ?? 0));
+        $hasFilters = $search !== '' || $supplierFilter || $cabangFilter || $taxFilter;
+
+        $matchedItems = collect($items)->map(function ($item, $key) {
+            $item['_navigator_key'] = (string) $key;
+
+            return $item;
+        })->filter(function ($item) use ($search, $supplierFilter, $cabangFilter, $taxFilter, $products, $suppliers, $cabangs) {
+            if ($supplierFilter && (int) ($item['supplier_id'] ?? 0) !== $supplierFilter) {
+                return false;
+            }
+
+            if ($cabangFilter && (int) ($item['cabang_id'] ?? 0) !== $cabangFilter) {
+                return false;
+            }
+
+            if ($taxFilter && TaxTypeHelper::normalize($item['tipe_pajak'] ?? null) !== $taxFilter) {
+                return false;
+            }
+
+            if ($search === '') {
+                return true;
+            }
+
+            $product = $products->get($item['product_id'] ?? null);
+            $supplier = $suppliers->get($item['supplier_id'] ?? null);
+            $cabang = $cabangs->get($item['cabang_id'] ?? null);
+
+            $haystack = Str::lower(implode(' ', array_filter([
+                $product?->sku,
+                $product?->name,
+                $supplier?->code,
+                $supplier?->perusahaan,
+                $cabang?->kode,
+                $cabang?->nama,
+                $item['tipe_pajak'] ?? null,
+            ])));
+
+            return Str::contains($haystack, Str::lower($search));
+        })->values();
+
+        $matchedCount = $matchedItems->count();
+        $lastPage = max(1, (int) ceil($matchedCount / $pageSize));
+        $currentPage = min($currentPage, $lastPage);
+        $showingFrom = $matchedCount === 0 ? 0 : (($currentPage - 1) * $pageSize) + 1;
+        $showingTo = min($matchedCount, $currentPage * $pageSize);
+
+        $chips = [];
+        if ($search !== '') {
+            $chips[] = 'Search: ' . $search;
+        }
+        if ($supplierFilter && ($supplier = $suppliers->get($supplierFilter))) {
+            $chips[] = "Supplier: ({$supplier->code}) {$supplier->perusahaan}";
+        }
+        if ($cabangFilter && ($cabang = $cabangs->get($cabangFilter))) {
+            $chips[] = "Cabang: ({$cabang->kode}) {$cabang->nama}";
+        }
+        if ($taxFilter) {
+            $chips[] = 'Tipe Pajak: ' . Str::upper($taxFilter);
+        }
+        $activeFilterCount = count($chips);
+
+        $supplierOptions = $suppliers
+            ->sortBy('perusahaan')
+            ->map(fn (Supplier $supplier) => "({$supplier->code}) {$supplier->perusahaan}")
+            ->all();
+        $productOptions = $products
+            ->sortBy('sku')
+            ->map(fn (Product $product) => trim(($product->sku ? "({$product->sku}) " : '') . ($product->name ?? '-')))
+            ->all();
+        $cabangOptions = $cabangs
+            ->sortBy('kode')
+            ->map(fn (\App\Models\Cabang $cabang) => "({$cabang->kode}) {$cabang->nama}")
+            ->all();
+        $taxOptions = [
+            'inklusif' => 'Inklusif',
+            'eklusif' => 'Eklusif',
+            'none' => 'Non Pajak',
+        ];
+
+        $offset = ($currentPage - 1) * $pageSize;
+        $tableRows = $matchedItems
+            ->slice($offset, $pageSize)
+            ->values()
+            ->map(function ($item, $index) use ($products, $suppliers, $cabangs, $offset) {
+                $rowNumber = $offset + $index + 1;
+                $product = $products->get($item['product_id'] ?? null);
+                $supplier = $suppliers->get($item['supplier_id'] ?? null);
+                $cabang = $cabangs->get($item['cabang_id'] ?? null);
+                $productLabel = $product
+                    ? trim(($product->sku ? "({$product->sku}) " : '') . ($product->name ?? '-'))
+                    : '-';
+                $supplierLabel = $supplier
+                    ? trim("({$supplier->code}) {$supplier->perusahaan}")
+                    : '-';
+                $cabangLabel = $cabang
+                    ? trim("({$cabang->kode}) {$cabang->nama}")
+                    : '-';
+                $uom = $product?->uom?->abbreviation ?? $product?->uom?->name ?? ($item['unit'] ?? '-');
+                $qty = number_format((float) ($item['quantity'] ?? 0), 2, ',', '.');
+                $fulfilledQty = (float) ($item['fulfilled_quantity'] ?? 0);
+                $remainingQty = max(0, (float) ($item['quantity'] ?? 0) - $fulfilledQty);
+                $currencyId = isset($item['currency_id']) && is_numeric($item['currency_id']) ? (int) $item['currency_id'] : null;
+                $currencySymbol = CurrencyConversionResolver::resolveSymbol($currencyId);
+                $subtotal = trim($currencySymbol . ' ' . self::formatMoneyPreviewState(MoneyHelper::safeParse($item['subtotal'] ?? 0)));
+
+                return [
+                    'number' => $rowNumber,
+                    'key' => (string) ($item['_navigator_key'] ?? ''),
+                    'product_id' => $item['product_id'] ?? null,
+                    'supplier_id' => $item['supplier_id'] ?? null,
+                    'cabang_id' => $item['cabang_id'] ?? null,
+                    'product' => $productLabel,
+                    'supplier' => $supplierLabel,
+                    'cabang' => $cabangLabel,
+                    'qty' => $qty,
+                    'quantity_value' => $item['quantity'] ?? 0,
+                    'unit_value' => $item['unit'] ?? $uom,
+                    'unit_price_value' => self::formatMoneyInputState(MoneyHelper::safeParse($item['unit_price'] ?? $item['original_price'] ?? 0)),
+                    'original_price_value' => self::formatMoneyInputState(MoneyHelper::safeParse($item['original_price'] ?? $item['unit_price'] ?? 0)),
+                    'discount_value' => $item['discount'] ?? 0,
+                    'discount_nominal_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['discount_nominal'] ?? 0)),
+                    'tax_value' => $item['tax'] ?? 0,
+                    'tax_nominal_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['tax_nominal'] ?? 0)),
+                    'subtotal_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['subtotal'] ?? 0)),
+                    'total_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['total'] ?? $item['total_cost'] ?? 0)),
+                    'tipe_pajak_value' => self::normalizeItemTaxType($item['tipe_pajak'] ?? null),
+                    'uom' => $uom,
+                    'price' => trim($currencySymbol . ' ' . self::formatMoneyPreviewState(MoneyHelper::safeParse($item['unit_price'] ?? $item['original_price'] ?? 0))),
+                    'subtotal' => $subtotal,
+                    'tax_type' => Str::upper((string) ($item['tipe_pajak'] ?? '-')),
+                    'note' => filled($item['note'] ?? null) ? (string) $item['note'] : '-',
+                    'required_date' => '-',
+                    'note_value' => (string) ($item['note'] ?? ''),
+                    'required_date_value' => (string) ($item['required_date'] ?? ''),
+                    'available_stock' => number_format((float) ($product?->available_stock ?? 0), 2, ',', '.'),
+                    'fulfilled_qty' => number_format($fulfilledQty, 2, ',', '.'),
+                    'remaining_qty' => number_format($remainingQty, 2, ',', '.'),
+                    'detail_total' => $subtotal,
+                ];
+            });
+
+        $remaining = max(0, $matchedCount - $showingTo);
+        $pageNumbers = collect(range(1, $lastPage))
+            ->filter(fn (int $page): bool => $page === 1
+                || $page === $lastPage
+                || abs($page - $currentPage) <= 2)
+            ->values()
+            ->all();
+
+        return view('filament.forms.order-request-item-navigator', [
+            'rows' => $tableRows,
+            'chips' => $chips,
+            'hasFilters' => $hasFilters,
+            'activeFilterCount' => $activeFilterCount,
+            'totalItems' => $totalItems,
+            'totalQty' => $totalQty,
+            'supplierCount' => $supplierIds->count(),
+            'cabangCount' => $cabangIds->count(),
+            'totalSubtotal' => $totalSubtotal,
+            'matchedCount' => $matchedCount,
+            'showingFrom' => $showingFrom,
+            'showingTo' => $showingTo,
+            'currentPage' => $currentPage,
+            'lastPage' => $lastPage,
+            'pageNumbers' => $pageNumbers,
+            'pageSize' => $pageSize,
+            'remaining' => $remaining,
+            'search' => $search,
+            'supplierFilter' => $supplierFilter,
+            'cabangFilter' => $cabangFilter,
+            'taxFilter' => $taxFilter,
+            'productOptions' => $productOptions,
+            'supplierOptions' => $supplierOptions,
+            'cabangOptions' => $cabangOptions,
+            'taxOptions' => $taxOptions,
+        ]);
+    }
+
+    public static function usesLargeOrderRequestItemEditor(array $items, ?string $operation): bool
+    {
+        return $operation === 'edit' && count($items) >= 25;
+    }
+
+    public static function renderIndexSupplierSummary(OrderRequest $record, int $limit = 2): \Illuminate\Support\HtmlString
+    {
+        $items = $record->relationLoaded('orderRequestItem')
+            ? $record->orderRequestItem
+            : $record->orderRequestItem()
+                ->select(['id', 'order_request_id', 'supplier_id'])
+                ->whereNotNull('supplier_id')
+                ->with('supplier:id,code,perusahaan')
+                ->get()
+                ->unique('supplier_id')
+                ->values();
+
+        $suppliers = $items
+            ->pluck('supplier')
+            ->filter(fn ($supplier) => $supplier && $supplier->exists)
+            ->unique('id')
+            ->values();
+
+        if ($suppliers->isEmpty()) {
+            return new \Illuminate\Support\HtmlString('<span class="text-gray-500">-</span>');
+        }
+
+        $visible = $suppliers->take($limit)->map(function (Supplier $supplier) {
+            return '<span style="display:inline-flex;margin:2px 4px 2px 0;padding:3px 8px;border-radius:999px;background:#eff6ff;color:#1e40af;font-size:12px;font-weight:600;">'
+                . e("({$supplier->code}) {$supplier->perusahaan}")
+                . '</span>';
+        })->implode('');
+
+        $remaining = max(0, $suppliers->count() - $limit);
+        $more = $remaining > 0
+            ? '<span style="display:inline-flex;margin:2px 0;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:12px;font-weight:600;">+' . number_format($remaining, 0, ',', '.') . ' supplier lainnya</span>'
+            : '';
+
+        return new \Illuminate\Support\HtmlString('<div style="max-width:320px;">' . $visible . $more . '</div>');
+    }
+
+    public static function renderIndexItemSummary(OrderRequest $record, int $limit = 3): \Illuminate\Support\HtmlString
+    {
+        $items = $record->relationLoaded('orderRequestItem')
+            ? $record->orderRequestItem
+            : $record->orderRequestItem()
+                ->select(['id', 'order_request_id', 'product_id'])
+                ->whereNotNull('product_id')
+                ->with('product:id,sku,name')
+                ->limit($limit + 1)
+                ->get();
+
+        $itemCount = (int) ($record->order_request_item_count ?? $record->orderRequestItem()->count());
+        $totalQty = (float) ($record->order_request_item_sum_quantity ?? $record->orderRequestItem()->sum('quantity'));
+        $products = $items
+            ->pluck('product')
+            ->filter(fn ($product) => $product && $product->exists)
+            ->unique('id')
+            ->values();
+
+        $productPreview = $products->take($limit)->map(function (Product $product) {
+            return '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;">'
+                . e("({$product->sku}) {$product->name}")
+                . '</div>';
+        })->implode('');
+
+        $remaining = max(0, $itemCount - $limit);
+        $more = $remaining > 0
+            ? '<div style="margin-top:3px;color:#6b7280;">+' . number_format($remaining, 0, ',', '.') . ' item lainnya</div>'
+            : '';
+
+        return new \Illuminate\Support\HtmlString(sprintf(
+            '<div style="min-width:260px;">
+                <div style="font-weight:700;color:#111827;">%s items <span style="color:#6b7280;font-weight:500;">• Total Qty %s</span></div>
+                <div style="margin-top:4px;color:#374151;font-size:12px;">%s%s</div>
+            </div>',
+            number_format($itemCount, 0, ',', '.'),
+            number_format($totalQty, 2, ',', '.'),
+            $productPreview ?: '<span style="color:#6b7280;">Tidak ada item</span>',
+            $more
+        ));
     }
 
     public static function normalizeCurrencyDisplayValue(float $amount, ?int $currencyId): float
@@ -651,9 +976,47 @@ class OrderRequestResource extends Resource
                         Textarea::make('note')
                             ->label('Note')
                             ->nullable(),
+                        Hidden::make('_order_request_item_search')
+                            ->default('')
+                            ->dehydrated(false),
+                        Hidden::make('_order_request_item_supplier_filter')
+                            ->dehydrated(false),
+                        Hidden::make('_order_request_item_cabang_filter')
+                            ->dehydrated(false),
+                        Hidden::make('_order_request_item_tax_filter')
+                            ->dehydrated(false),
+                        Hidden::make('_order_request_item_page_size')
+                            ->default(10)
+                            ->dehydrated(false),
+                        Hidden::make('_order_request_item_page')
+                            ->default(1)
+                            ->dehydrated(false),
+                        Placeholder::make('_order_request_item_summary')
+                            ->label('Ringkasan Item OR')
+                            ->content(fn (Get $get) => self::renderLargeItemSummary(
+                                is_array($get('orderRequestItem')) ? $get('orderRequestItem') : [],
+                                $get('_order_request_item_search'),
+                                $get('_order_request_item_supplier_filter'),
+                                $get('_order_request_item_cabang_filter'),
+                                $get('_order_request_item_tax_filter'),
+                                $get('_order_request_item_page_size'),
+                                $get('_order_request_item_page')
+                            ))
+                            ->visible(fn (Get $get, ?string $operation): bool => self::usesLargeOrderRequestItemEditor(
+                                is_array($get('orderRequestItem')) ? $get('orderRequestItem') : [],
+                                $operation
+                            ))
+                            ->columnSpanFull(),
                         Repeater::make('orderRequestItem')
                             ->relationship()
                             ->columnSpanFull()
+                            ->extraAttributes(fn (Get $get, ?string $operation): array => self::usesLargeOrderRequestItemEditor(
+                                is_array($get('orderRequestItem')) ? $get('orderRequestItem') : [],
+                                $operation
+                            ) ? [
+                                'class' => 'dt-or-large-repeater',
+                                'data-dt-large-or-repeater' => 'true',
+                            ] : [])
                             ->hint('Tambahkan item produk yang ingin dipesan')
                             ->minItems(1)
                             ->required()
@@ -687,6 +1050,7 @@ class OrderRequestResource extends Resource
                                     ->icon('heroicon-o-plus-circle')
                                     ->label('Tambah Items')
                                     ->extraAttributes(fn($component) => [
+                                        'data-dt-or-add-item' => 'true',
                                         'onclick' => (function () use ($component) {
                                             $event = 'repeater-collapse';
                                             $statePath = $component->getStatePath();
@@ -716,11 +1080,20 @@ class OrderRequestResource extends Resource
                                         $component->callAfterStateUpdated();
                                     });
                             })
+                            ->collapseAllAction(fn ($action) => $action
+                                ->label('Collapse semua item')
+                                ->extraAttributes(['data-dt-or-bulk-toggle' => 'true']))
+                            ->expandAllAction(fn ($action) => $action
+                                ->label('Expand semua item')
+                                ->extraAttributes(['data-dt-or-bulk-toggle' => 'true']))
+                            ->itemNumbers()
                             ->itemLabel(function (array $state) {
                                 $productName = '-';
+                                $uom = '-';
                                 if (!empty($state['product_id'])) {
                                     $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($state['product_id']);
                                     $productName = $product ? "({$product->sku}) {$product->name}" : '-';
+                                    $uom = $product?->uom?->abbreviation ?? $product?->uom?->name ?? '-';
                                 }
 
                                 $qty = $state['quantity'] ?? '0';
@@ -731,13 +1104,21 @@ class OrderRequestResource extends Resource
                                     $supplierName = $supplier ? "({$supplier->code}) {$supplier->perusahaan}" : '-';
                                 }
 
+                                $cabangName = '-';
+                                if (!empty($state['cabang_id'])) {
+                                    $cabang = \App\Models\Cabang::find($state['cabang_id']);
+                                    $cabangName = $cabang ? "({$cabang->kode}) {$cabang->nama}" : '-';
+                                }
+
                                 $subtotal = $state['subtotal'] ?? '0';
+                                $price = $state['unit_price'] ?? $state['original_price'] ?? '0';
+                                $taxType = Str::upper((string) ($state['tipe_pajak'] ?? '-'));
                                 $currencyId = isset($state['currency_id']) && is_numeric($state['currency_id'])
                                     ? (int) $state['currency_id']
                                     : null;
                                 $currencySymbol = \App\Support\CurrencyConversionResolver::resolveSymbol($currencyId);
 
-                                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$currencySymbol} {$subtotal}";
+                                return "Product: {$productName} | Supplier: {$supplierName} | Cabang: {$cabangName} | Qty: {$qty} {$uom} | Price: {$currencySymbol} {$price} | Subtotal: {$currencySymbol} {$subtotal} | Tipe Pajak: {$taxType}";
                             })
                             ->validationMessages([
                                 'required' => 'Order request harus memiliki setidaknya satu item produk.',
@@ -1403,6 +1784,14 @@ class OrderRequestResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query): Builder {
+                return $query
+                    ->with([
+                        'createdBy:id,name',
+                    ])
+                    ->withCount('orderRequestItem')
+                    ->withSum('orderRequestItem', 'quantity');
+            })
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('request_number')
@@ -1449,33 +1838,26 @@ class OrderRequestResource extends Resource
                         };
                     })
                     ->badge(),
-                TextColumn::make('supplier')
-                    ->label('Supplier')
-                    ->getStateUsing(function ($record) {
-                        return $record->orderRequestItem;
-                    })
-                    ->formatStateUsing(function ($state) {
-                        $supplierCode = $state->supplier->code ?? null;
-                        $supplierName = $state->supplier->perusahaan ?? null;
-
-                        return ($supplierCode && $supplierName)
-                            ? "({$supplierCode}) {$supplierName}"
-                            : ($supplierName ?? '-');
-                    })
-                    ->badge(),
-                TextColumn::make('product')
-                    ->label('Items')
-                    ->getStateUsing(function ($record) {
-                        return $record->orderRequestItem;
-                    })
-                    ->formatStateUsing(function ($state) {
-                        $productSku = $state->product->sku ?? null;
-                        $productName = $state->product->name ?? null;
-                        return ($productSku && $productName)
-                            ? "({$productSku}) {$productName}"
-                            : ($productName ?? '-');
-                    })
-                    ->badge(),
+                TextColumn::make('order_request_item_count')
+                    ->label('Jumlah Item')
+                    ->getStateUsing(fn (OrderRequest $record) => (int) ($record->order_request_item_count ?? 0))
+                    ->formatStateUsing(fn ($state) => number_format((int) $state, 0, ',', '.'))
+                    ->alignCenter()
+                    ->sortable(),
+                TextColumn::make('order_request_item_sum_quantity')
+                    ->label('Total Qty')
+                    ->getStateUsing(fn (OrderRequest $record) => (float) ($record->order_request_item_sum_quantity ?? 0))
+                    ->formatStateUsing(fn ($state) => number_format((float) $state, 2, ',', '.'))
+                    ->alignRight()
+                    ->sortable(),
+                TextColumn::make('supplier_summary')
+                    ->label('Supplier Summary')
+                    ->getStateUsing(fn (OrderRequest $record) => self::renderIndexSupplierSummary($record))
+                    ->html(),
+                TextColumn::make('item_summary')
+                    ->label('Item Summary')
+                    ->getStateUsing(fn (OrderRequest $record) => self::renderIndexItemSummary($record))
+                    ->html(),
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->searchable(),
@@ -1601,6 +1983,23 @@ class OrderRequestResource extends Resource
                         if (!empty($data['value'])) {
                             $query->whereHas('orderRequestItem', function ($q) use ($data) {
                                 $q->where('supplier_id', $data['value']);
+                            });
+                        }
+                    }),
+                SelectFilter::make('cabang_id')
+                    ->label('Cabang Item')
+                    ->options(function () {
+                        return \App\Models\Cabang::select(['id', 'kode', 'nama'])
+                            ->orderBy('kode')
+                            ->limit(100)
+                            ->get()
+                            ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"]);
+                    })
+                    ->searchable()
+                    ->query(function (Builder $query, array $data): void {
+                        if (!empty($data['value'])) {
+                            $query->whereHas('orderRequestItem', function ($q) use ($data) {
+                                $q->where('cabang_id', $data['value']);
                             });
                         }
                     }),
@@ -1778,13 +2177,10 @@ class OrderRequestResource extends Resource
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
-                            if (!$user || !$user->hasPermissionTo('approve order request') || !in_array($record->status, ['approved', 'partial'], true)) {
-                                return false;
-                            }
-                            // Allow creating a new PO as long as some items still have unfulfilled quantity
-                            return $record->orderRequestItem->contains(
-                                fn($item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0
-                            );
+                            return $user
+                                && $user->hasPermissionTo('approve order request')
+                                && in_array($record->status, ['approved', 'partial'], true)
+                                && (int) ($record->order_request_item_count ?? 0) > 0;
                         })
                         ->action(function (array $data, $record) {
                             try {
@@ -2139,7 +2535,7 @@ class OrderRequestResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\OrderRequestResource\RelationManagers\OrderRequestItemsRelationManager::class,
         ];
     }
 
@@ -2227,11 +2623,18 @@ class OrderRequestResource extends Resource
                             )),
                     ]),
                 \Filament\Infolists\Components\Section::make('Detail Item Order Request')
+                    ->description('Detail item besar ditampilkan pada tabel paginated di bawah halaman ini agar pencarian, filter, dan review 100+ item tetap ringan.')
                     ->columnSpanFull()
                     ->schema([
+                        \Filament\Infolists\Components\TextEntry::make('order_request_items_table_note')
+                            ->label('')
+                            ->getStateUsing(fn($record) => 'Gunakan tabel "Item Order Request" di bawah untuk melihat semua item dengan pagination, pencarian produk/supplier/cabang, dan filter tipe pajak/status qty. Total item: ' . number_format($record->orderRequestItem()->count(), 0, ',', '.'))
+                            ->badge()
+                            ->color('info'),
                         \Filament\Infolists\Components\RepeatableEntry::make('orderRequestItem')
                             ->label('')
                             ->columnSpanFull()
+                            ->visible(false)
                             ->schema([
                                 \Filament\Infolists\Components\Section::make(function ($record) {
                                     $productName = $record->product ? "({$record->product->sku}) {$record->product->name}" : '-';
