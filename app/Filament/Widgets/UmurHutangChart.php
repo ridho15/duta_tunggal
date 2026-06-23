@@ -18,9 +18,10 @@ class UmurHutangChart extends ChartWidget
                 $join->on('age.from_model_id', '=', 'ap.id')
                     ->where('age.from_model_type', '=', 'App\\Models\\AccountPayable');
             })
+            ->leftJoin('invoices as invoice', 'ap.invoice_id', '=', 'invoice.id')
             ->selectRaw("
         age.bucket,
-        SUM(ap.remaining) as total
+        SUM(ap.remaining * COALESCE(NULLIF(invoice.exchange_rate, 0), 1)) as total
     ")
             ->groupBy('age.bucket')
             ->pluck('total', 'bucket');

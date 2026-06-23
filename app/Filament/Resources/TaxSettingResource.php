@@ -24,11 +24,13 @@ class TaxSettingResource extends Resource
 {
     protected static ?string $model = TaxSetting::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 12;
+    protected static ?int $navigationSort = 13;
 
     public static function form(Form $form): Form
     {

@@ -24,13 +24,15 @@ class CurrencyResource extends Resource
 {
     protected static ?string $model = Currency::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
 
     protected static ?string $navigationGroup = 'Master Data';
 
     protected static ?string $modelLabel = 'Mata Uang';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 11;
 
     public static function form(Form $form): Form
     {
@@ -65,7 +67,6 @@ class CurrencyResource extends Resource
                                 'numeric' => 'Nilai harus berupa angka'
                             ])
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0),
                     ])
             ]);

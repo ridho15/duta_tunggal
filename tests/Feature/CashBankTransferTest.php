@@ -32,6 +32,14 @@ beforeEach(function () {
         'is_active' => true,
     ]);
 
+    ChartOfAccount::firstOrCreate([
+        'code' => '8000.01',
+    ], [
+        'name' => 'Biaya Admin Transfer',
+        'type' => 'Expense',
+        'is_active' => true,
+    ]);
+
     $this->cashBankService = app(CashBankService::class);
 });
 
@@ -144,12 +152,12 @@ test('bank transfer with admin fee but no coa creates two journal entries', func
 
     $this->cashBankService->postTransfer($transfer);
 
-    // Verify only 2 journal entries created (admin fee not posted separately)
+    // Verify the fallback admin-fee posting is included
     $journals = JournalEntry::where('source_type', CashBankTransfer::class)
         ->where('source_id', $transfer->id)
         ->get();
 
-    expect($journals)->toHaveCount(2);
+    expect($journals)->toHaveCount(3);
 
     // Credit should be total amount
     $creditEntry = $journals->where('credit', '>', 0)->first();

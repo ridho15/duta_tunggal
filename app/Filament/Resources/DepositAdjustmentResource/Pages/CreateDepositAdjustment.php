@@ -35,7 +35,7 @@ class CreateDepositAdjustment extends CreateRecord
         HelperController::sendNotification(
             isSuccess: true, 
             title: 'Success', 
-            message: "Deposit successfully created for " . $this->record->fromModel->name
+            message: "Deposit berhasil dibuat untuk " . $this->record->fromModel->name . ". Proses selanjutnya: Supervisor Finance perlu memverifikasi deposit adjustment dan menyetujui pencatatan jurnal keuangan yang terkait."
         );
     }
 

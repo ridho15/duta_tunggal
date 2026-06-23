@@ -18,4 +18,9 @@ class EditSuratJalan extends EditRecord
                 ->icon('heroicon-o-trash'),
         ];
     }
+
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return parent::mutateFormDataBeforeFill($data);
+    }
 }

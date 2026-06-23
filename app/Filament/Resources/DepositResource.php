@@ -46,9 +46,11 @@ class DepositResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-currency-pound';
 
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 5;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -128,9 +130,10 @@ class DepositResource extends Resource
                             ->live(onBlur: true)  // onBlur avoids Livewire round-trips mid-keystroke that break the Alpine.js mask
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 try {
-                                    $usedAmount = $get('used_amount') ?? 0;
-                                    $parsedAmount = MoneyHelper::parse($state);
-                                    $set('remaining_amount', $parsedAmount - $usedAmount);
+                                    $usedAmount   = $get('used_amount') ?? 0;
+                                    $parsedAmount = MoneyHelper::safeParse($state);
+                                    $parsedUsed   = MoneyHelper::safeParse($usedAmount);
+                                    $set('remaining_amount', $parsedAmount - $parsedUsed);
                                 } catch (\Exception $e) {
                                     \Illuminate\Support\Facades\Log::error('Deposit amount calculation error: ' . $e->getMessage(), [
                                         'state' => $state,
@@ -247,7 +250,7 @@ class DepositResource extends Resource
                 Hidden::make('used_amount')->default(0),
                 Hidden::make('remaining_amount')
                     ->default(function ($get) {
-                        return $get('amount') ?? 0;
+                        return \App\Helpers\MoneyHelper::safeParse($get('amount') ?? 0);
                     }),
                 Hidden::make('status')->default(true),
             ]);
@@ -476,11 +479,9 @@ class DepositResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->numeric()
                                     ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->numeric()
                                     ->indonesianMoney(),
                             ]),
                     ])
@@ -488,11 +489,11 @@ class DepositResource extends Resource
                         return $query
                             ->when(
                                 $data['amount_from'],
-                                fn(Builder $query, $amount): Builder => $query->where('amount', '>=', $amount),
+                                fn(Builder $query, $amount): Builder => $query->where('amount', '>=', \App\Helpers\MoneyHelper::safeParse($amount)),
                             )
                             ->when(
                                 $data['amount_to'],
-                                fn(Builder $query, $amount): Builder => $query->where('amount', '<=', $amount),
+                                fn(Builder $query, $amount): Builder => $query->where('amount', '<=', \App\Helpers\MoneyHelper::safeParse($amount)),
                             );
                     }),
 
@@ -538,18 +539,18 @@ class DepositResource extends Resource
                                         TextInput::make('amount')
                                             ->label('Total')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->default(0)
                                             ->required()
-                                            ->rules([
-                                                'required',
-                                                'numeric',
-                                                'min:1'
-                                            ])
+                                            ->rules([function () {
+                                                return function ($attribute, $value, $fail) {
+                                                    $parsed = \App\Helpers\MoneyHelper::safeParse($value);
+                                                    if ($parsed < 1) {
+                                                        $fail('Total penambahan saldo minimal Rp 1.');
+                                                    }
+                                                };
+                                            }])
                                             ->validationMessages([
                                                 'required' => 'Total penambahan saldo tidak boleh kosong',
-                                                'numeric' => 'Total penambahan saldo harus berupa angka',
-                                                'min' => 'Total penambahan saldo minimal :min'
                                             ]),
                                         Textarea::make('note')
                                             ->label('Catatan')
@@ -559,22 +560,24 @@ class DepositResource extends Resource
                             ];
                         })
                         ->action(function (array $data, $record) {
-                            $record->amount += $data['amount'];
-                            $record->remaining_amount += $data['amount'];
+                            $amount = \App\Helpers\MoneyHelper::safeParse($data['amount'] ?? 0);
+
+                            $record->amount += $amount;
+                            $record->remaining_amount += $amount;
                             $record->save();
 
                             $record->depositLogRef()->create([
                                 'deposit_id' => $record->id,
                                 'type' => 'add',
-                                'amount' => $data['amount'],
+                                'amount' => $amount,
                                 'note' => $data['note'],
                                 'created_by' => Auth::user()->id
                             ]);
 
                             // Create journal entries for deposit balance addition
-                            static::createDepositAdditionJournalEntries($record, $data['amount'], $data['note']);
+                            static::createDepositAdditionJournalEntries($record, $amount, $data['note']);
 
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil di tambahkan");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil ditambahkan. Proses selanjutnya: Tim Finance perlu memverifikasi saldo deposit dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         }),
                     Action::make('kurangiSaldo')
                         ->label('Kurangi Saldo')
@@ -589,18 +592,18 @@ class DepositResource extends Resource
                                         TextInput::make('amount')
                                             ->label('Total')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->default(0)
                                             ->required()
-                                            ->rules([
-                                                'required',
-                                                'numeric',
-                                                'min:1'
-                                            ])
+                                            ->rules([function () {
+                                                return function ($attribute, $value, $fail) {
+                                                    $parsed = \App\Helpers\MoneyHelper::safeParse($value);
+                                                    if ($parsed < 1) {
+                                                        $fail('Total pengurangan saldo minimal Rp 1.');
+                                                    }
+                                                };
+                                            }])
                                             ->validationMessages([
                                                 'required' => 'Total pengurangan saldo tidak boleh kosong',
-                                                'numeric' => 'Total pengurangan saldo harus berupa angka',
-                                                'min' => 'Total pengurangan saldo minimal :min'
                                             ]),
                                         Textarea::make('note')
                                             ->label('Catatan')
@@ -613,32 +616,34 @@ class DepositResource extends Resource
                             ];
                         })
                         ->action(function (array $data, $record) {
+                            $amount = \App\Helpers\MoneyHelper::safeParse($data['amount'] ?? 0);
+
                             // Validate that reduction amount doesn't exceed remaining balance
-                            if ($data['amount'] > $record->remaining_amount) {
+                            if ($amount > $record->remaining_amount) {
                                 HelperController::sendNotification(
                                     isSuccess: false,
                                     title: 'Error',
-                                    message: 'Jumlah pengurangan tidak boleh melebihi sisa saldo deposit (Rp ' . number_format($record->remaining_amount, 0, ',', '.') . ')'
+                                    message: 'Jumlah pengurangan tidak boleh melebihi sisa saldo deposit (' . MoneyHelper::rupiah($record->remaining_amount) . ')'
                                 );
                                 return;
                             }
 
-                            $record->amount -= $data['amount'];
-                            $record->remaining_amount -= $data['amount'];
+                            $record->amount -= $amount;
+                            $record->remaining_amount -= $amount;
                             $record->save();
 
                             $record->depositLogRef()->create([
                                 'deposit_id' => $record->id,
                                 'type' => 'return',
-                                'amount' => $data['amount'],
+                                'amount' => $amount,
                                 'note' => $data['note'],
                                 'created_by' => Auth::user()->id
                             ]);
 
                             // Create journal entries for deposit balance reduction
-                            static::createDepositReductionJournalEntries($record, $data['amount'], $data['note']);
+                            static::createDepositReductionJournalEntries($record, $amount, $data['note']);
 
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil di kurangi");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Saldo berhasil dikurangi. Proses selanjutnya: Tim Finance perlu memverifikasi saldo deposit dan memastikan jurnal keuangan telah dicatat dengan benar.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

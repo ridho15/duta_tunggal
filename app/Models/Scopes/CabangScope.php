@@ -28,6 +28,6 @@ class CabangScope implements Scope
         }
 
         // Filter berdasarkan cabang user
-        $builder->where('cabang_id', $user->cabang_id);
+        $builder->where($model->getTable() . '.cabang_id', $user->cabang_id);
     }
 }

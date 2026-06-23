@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\User;
 use App\Services\AssetDisposalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AssetDisposalTest extends TestCase
@@ -22,7 +23,7 @@ class AssetDisposalTest extends TestCase
         $this->disposalService = new AssetDisposalService();
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_asset_disposal_with_sale()
     {
         // Create test data
@@ -110,7 +111,7 @@ class AssetDisposalTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_asset_disposal_with_loss()
     {
         // Create test data
@@ -161,7 +162,7 @@ class AssetDisposalTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_asset_disposal_without_sale()
     {
         // Create test data
@@ -229,7 +230,7 @@ class AssetDisposalTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_transaction_rollback_on_error()
     {
         // Create test data
@@ -272,7 +273,7 @@ class AssetDisposalTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_gain_loss_correctly()
     {
         $cabang = Cabang::factory()->create();

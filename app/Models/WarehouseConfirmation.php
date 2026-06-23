@@ -13,25 +13,32 @@ use Illuminate\Support\Facades\DB;
 class WarehouseConfirmation extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
+
     protected $table = 'warehouse_confirmations';
+
     protected $fillable = [
         'sale_order_id',
-        'manufacturing_order_id',
+        'confirmable_type',
+        'confirmable_id',
         'confirmation_type',
         'note',
-        'status', // Confirmed / Rejected / Request
+        'rejection_reason',
+        'status',
         'confirmed_by',
-        'confirmed_at'
+        'confirmed_at',
     ];
 
-    public function manufacturingOrder()
-    {
-        return $this->belongsTo(ManufacturingOrder::class, 'manufacturing_order_id')->withDefault();
-    }
+    // ─────────────────────────── Relationships ───────────────────────────
 
-    public function saleOrder()
+    /**
+     * Polymorphic source of this WC:
+     *  - App\Models\SaleOrder          (legacy SO-linked flow)
+     *  - App\Models\ManufacturingOrder (MO confirmation)
+     *  - App\Models\DeliveryOrder      (DO-centric flow — default for new WCs)
+     */
+    public function confirmable()
     {
-        return $this->belongsTo(SaleOrder::class, 'sale_order_id')->withDefault();
+        return $this->morphTo();
     }
 
     public function user()
@@ -44,185 +51,368 @@ class WarehouseConfirmation extends Model
         return $this->hasMany(WarehouseConfirmationItem::class);
     }
 
-    protected static function booted()
+    public function getPrimaryItemAttribute(): ?WarehouseConfirmationItem
     {
-        static::created(function ($warehouseConfirmation) {
-            // Load relationships first
-            $warehouseConfirmation->load(['saleOrder', 'warehouseConfirmationItems.saleOrderItem.product']);
-            
-            // If warehouse confirmation is created with confirmed status, update sale order immediately
-            if ($warehouseConfirmation->status === 'confirmed' && $warehouseConfirmation->saleOrder) {
-                $warehouseConfirmation->saleOrder->update([
-                    'status' => 'confirmed',
-                    'warehouse_confirmed_at' => now()
-                ]);
+        return $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems->first()
+            : $this->warehouseConfirmationItems()->with(['warehouse', 'saleOrderItem.product', 'materialIssueItem.product', 'product'])->first();
+    }
 
-                Log::info('Sale Order status and warehouse_confirmed_at updated after warehouse confirmation auto-approval', [
-                    'sale_order_id' => $warehouseConfirmation->sale_order_id,
-                    'warehouse_confirmation_id' => $warehouseConfirmation->id
-                ]);
+    public function getItemCountAttribute(): int
+    {
+        return $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems->count()
+            : $this->warehouseConfirmationItems()->count();
+    }
 
-                // Note: Delivery order creation is now handled in SaleOrderObserver after WC items are created
-            }
-        });
+    public function getPrimaryItemSourceLabelAttribute(): string
+    {
+        return $this->primary_item?->source_item_display ?? '-';
+    }
 
-        static::updating(function ($warehouseConfirmation) {
-            $originalStatus = $warehouseConfirmation->getOriginal('status');
-            $newStatus = $warehouseConfirmation->status;
+    public function getPrimaryItemProductLabelAttribute(): string
+    {
+        return $this->primary_item?->product_display ?? '-';
+    }
 
-            // When parent status changes to confirmed, update all warehouse confirmation items
-            if ($warehouseConfirmation->isDirty('status') && $warehouseConfirmation->status === 'confirmed') {
-                // Update direct warehouse confirmation items
-                $warehouseConfirmation->warehouseConfirmationItems()->update([
-                    'status' => 'confirmed',
-                    'confirmed_qty' => DB::raw('requested_qty'),
-                ]);
+    public function getPrimaryItemWarehouseLabelAttribute(): string
+    {
+        $warehouse = $this->primary_item?->warehouse;
 
-                // Update sale order warehouse_confirmed_at if this is a sales order confirmation
-                if ($warehouseConfirmation->saleOrder) {
-                    $warehouseConfirmation->saleOrder->update([
-                        'status' => 'confirmed',
-                        'warehouse_confirmed_at' => now()
-                    ]);
+        if (! $warehouse || ! $warehouse->exists) {
+            return '-';
+        }
 
-                    Log::info('Sale Order status and warehouse_confirmed_at updated after warehouse confirmation approval', [
-                        'sale_order_id' => $warehouseConfirmation->sale_order_id,
-                        'warehouse_confirmation_id' => $warehouseConfirmation->id
-                    ]);
-                }
+        return sprintf('(%s) %s', $warehouse->kode ?? '-', $warehouse->name ?? '-');
+    }
 
-                // Create delivery order automatically for sales order confirmations (after items are updated)
-                if ($warehouseConfirmation->saleOrder) {
-                    // Refresh the model to get updated relationships
-                    $warehouseConfirmation->refresh();
-                    $warehouseConfirmation->load('warehouseConfirmationItems.saleOrderItem.product');
-                    
-                    static::createDeliveryOrderForConfirmedWarehouseConfirmation($warehouseConfirmation);
-                }
-            }
+    public function getRequestQtySummaryAttribute(): string
+    {
+        $items = $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems
+            : $this->warehouseConfirmationItems()->get(['requested_qty']);
 
-            // When status changes from confirmed to request, delete associated delivery order
-            if (strtolower($originalStatus) === 'confirmed' && strtolower($newStatus) === 'request' && $warehouseConfirmation->saleOrder) {
-                $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
-                
-                if ($existingDO) {
-                    $existingDO->delete();
-                    
-                    Log::info('Delivery Order deleted due to warehouse confirmation status change to request', [
-                        'delivery_order_id' => $existingDO->id,
-                        'warehouse_confirmation_id' => $warehouseConfirmation->id,
-                        'sale_order_id' => $warehouseConfirmation->sale_order_id
-                    ]);
-                }
-            }
-        });
+        if ($items->isEmpty()) {
+            return '-';
+        }
 
-        static::deleting(function ($warehouseConfirmation) {
-            // Delete associated delivery order when warehouse confirmation is deleted
-            if ($warehouseConfirmation->saleOrder) {
-                $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
-                
-                if ($existingDO) {
-                    $existingDO->delete();
-                    
-                    Log::info('Delivery Order deleted due to warehouse confirmation deletion', [
-                        'delivery_order_id' => $existingDO->id,
-                        'warehouse_confirmation_id' => $warehouseConfirmation->id,
-                        'sale_order_id' => $warehouseConfirmation->sale_order_id
-                    ]);
-                }
+        $totalQty = (string) $items->sum('requested_qty');
 
-                // Update sale order status back to request_approve when warehouse confirmation is deleted
-                // This requires re-approval process since warehouse confirmation was cancelled
-                $warehouseConfirmation->saleOrder->update([
-                    'status' => 'request_approve',
-                    'warehouse_confirmed_at' => null
-                ]);
-                
-                Log::info('Sale Order status updated to request_approve after warehouse confirmation deletion', [
-                    'sale_order_id' => $warehouseConfirmation->sale_order_id,
-                    'warehouse_confirmation_id' => $warehouseConfirmation->id
-                ]);
-            }
+        if ($items->count() === 1) {
+            return $totalQty;
+        }
 
-            if ($warehouseConfirmation->isForceDeleting()) {
-                $warehouseConfirmation->warehouseConfirmationItems()->forceDelete();
-            } else {
-                $warehouseConfirmation->warehouseConfirmationItems()->delete();
-            }
-        });
+        return sprintf('%d baris / qty %s', $items->count(), $totalQty);
+    }
 
-        static::restoring(function ($warehouseConfirmation) {
-            // When warehouse confirmation is restored, we might need to update sale order status
-            // But this depends on the business logic - for now, we'll leave it as is
-            // since the sale order status should be managed separately
-            
-            $warehouseConfirmation->warehouseConfirmationItems()->withTrashed()->restore();
-        });
+    public function getItemAuditSummaryAttribute(): string
+    {
+        $items = $this->relationLoaded('warehouseConfirmationItems')
+            ? $this->warehouseConfirmationItems
+            : $this->warehouseConfirmationItems()->with(['warehouse', 'saleOrderItem.product', 'materialIssueItem.product', 'product'])->get();
+
+        if ($items->isEmpty()) {
+            return '-';
+        }
+
+        if ($items->count() === 1) {
+            $item = $items->first();
+
+            return sprintf(
+                '%s | %s | Gudang %s | Qty %s',
+                $item->source_item_display,
+                $item->product_display,
+                $item->warehouse?->name ?? '-',
+                (string) $item->requested_qty
+            );
+        }
+
+        return sprintf(
+            '%d item request | Qty %s',
+            $items->count(),
+            (string) $items->sum('requested_qty')
+        );
+    }
+
+    // ─────────────────────────── Helpers ─────────────────────────────────
+
+    /** Return the linked SaleOrder when confirmable is SaleOrder, else null. */
+    public function getLinkedSaleOrder(): ?SaleOrder
+    {
+        if ($this->confirmable_type === SaleOrder::class) {
+            return $this->confirmable instanceof SaleOrder ? $this->confirmable : null;
+        }
+        return null;
+    }
+
+    /** Return the linked DeliveryOrder when confirmable is DeliveryOrder, else null. */
+    public function getLinkedDeliveryOrder(): ?DeliveryOrder
+    {
+        if ($this->confirmable_type === DeliveryOrder::class) {
+            return $this->confirmable instanceof DeliveryOrder ? $this->confirmable : null;
+        }
+        return null;
     }
 
     /**
-     * Create delivery order automatically when warehouse confirmation is approved
+     * Human-readable label for the source record shown in table columns.
+     * Accessor: $wc->source_label
      */
-    protected static function createDeliveryOrderForConfirmedWarehouseConfirmation(WarehouseConfirmation $warehouseConfirmation): void
+    public function getSourceLabelAttribute(): string
     {
-        Log::info('WarehouseConfirmation: Creating delivery order for confirmed warehouse confirmation', [
-            'warehouse_confirmation_id' => $warehouseConfirmation->id,
-            'sale_order_id' => $warehouseConfirmation->sale_order_id,
-        ]);
-
-        // Load relationships
-        $warehouseConfirmation->loadMissing('saleOrder.customer', 'warehouseConfirmationItems.saleOrderItem.product');
-
-        // Cek apakah sudah ada delivery order untuk sale order ini
-        $existingDO = $warehouseConfirmation->saleOrder->deliveryOrder()->first();
-
-        if ($existingDO) {
-            Log::info('Delivery order already exists for sale order', ['do_id' => $existingDO->id]);
-            return;
+        $model = $this->confirmable;
+        if (!$model) {
+            return '-';
         }
+        return match ($this->confirmable_type) {
+            SaleOrder::class          => $model->so_number ?? 'SO #' . $this->confirmable_id,
+            ManufacturingOrder::class => $model->mo_number ?? 'MO #' . $this->confirmable_id,
+            MaterialIssue::class      => $model->issue_number ?? 'MI #' . $this->confirmable_id,
+            DeliveryOrder::class      => $model->do_number ?? 'DO #' . $this->confirmable_id,
+            default                   => '#' . $this->confirmable_id,
+        };
+    }
 
-        // Hanya buat delivery order untuk tipe pengiriman 'Kirim Langsung'
-        if ($warehouseConfirmation->saleOrder->tipe_pengiriman !== 'Kirim Langsung') {
-            Log::info('Skipping delivery order creation - not "Kirim Langsung" type', [
-                'tipe_pengiriman' => $warehouseConfirmation->saleOrder->tipe_pengiriman
-            ]);
-            return;
-        }
+    /** Short type label: "Sales Order", "Manufacturing Order", or "Delivery Order". */
+    public function getConfirmableTypeLabelAttribute(): string
+    {
+        return match ($this->confirmable_type) {
+            SaleOrder::class          => 'Sales Order',
+            ManufacturingOrder::class => 'Manufacturing Order',
+            MaterialIssue::class      => 'Material Issue',
+            DeliveryOrder::class      => 'Delivery Order',
+            default                   => $this->confirmable_type ?? '-',
+        };
+    }
 
-        // Buat delivery order
-        $deliveryOrder = DeliveryOrder::create([
-            'do_number' => 'DO-' . $warehouseConfirmation->saleOrder->so_number . '-' . now()->format('YmdHis'),
-            'delivery_date' => now()->toDateString(),
-            'driver_id' => 1, // Default driver - should be configurable
-            'vehicle_id' => 1, // Default vehicle - should be configurable
-            'warehouse_id' => $warehouseConfirmation->warehouseConfirmationItems->first()->warehouse_id ?? null,
-            'status' => 'draft',
-            'notes' => 'Auto-generated from confirmed Warehouse Confirmation ' . $warehouseConfirmation->id,
-            'created_by' => $warehouseConfirmation->confirmed_by ?? $warehouseConfirmation->saleOrder->approve_by ?? \App\Models\User::first()->id ?? 1,
-        ]);
+    // ─────────────────────────── Model Hooks ─────────────────────────────
 
-        // Buat delivery order items dari warehouse confirmation items yang confirmed
-        foreach ($warehouseConfirmation->warehouseConfirmationItems as $wcItem) {
-            if ($wcItem->status === 'confirmed' && $wcItem->confirmed_qty > 0) {
-                DeliveryOrderItem::create([
-                    'delivery_order_id' => $deliveryOrder->id,
-                    'sale_order_item_id' => $wcItem->sale_order_item_id,
-                    'product_id' => $wcItem->saleOrderItem->product_id ?? null,
-                    'quantity' => $wcItem->confirmed_qty,
-                    'reason' => 'From warehouse confirmation'
+    protected static function booted()
+    {
+        static::creating(function (WarehouseConfirmation $wc) {
+            if (empty($wc->confirmable_type) && !empty($wc->sale_order_id)) {
+                $wc->confirmable_type = SaleOrder::class;
+                $wc->confirmable_id = $wc->sale_order_id;
+            }
+
+            if (!empty($wc->sale_order_id)) {
+                $wc->offsetUnset('sale_order_id');
+            }
+        });
+
+        static::created(function ($wc) {
+            $wc->load(['confirmable', 'warehouseConfirmationItems.saleOrderItem.product', 'warehouseConfirmationItems.materialIssueItem.product']);
+
+            // SO-linked WC created as already confirmed: update SO status immediately
+            if ($wc->status === 'confirmed' && $wc->confirmable_type === SaleOrder::class) {
+                $so = $wc->confirmable;
+                if ($so) {
+                    $so->update([
+                        'status'                 => 'confirmed',
+                        'warehouse_confirmed_at' => now(),
+                    ]);
+                    Log::info('SO status updated after WC created as confirmed', [
+                        'wc_id' => $wc->id,
+                        'so_id' => $wc->confirmable_id,
+                    ]);
+                }
+            }
+
+            if ($wc->status === 'confirmed' && $wc->confirmable_type === ManufacturingOrder::class) {
+                static::syncPendingManufacturingMaterialIssues($wc);
+            }
+
+            if (in_array(strtolower((string) $wc->status), ['confirmed', 'rejected', 'partial_confirmed'], true)) {
+                static::syncLinkedMaterialIssueItems($wc);
+                static::syncMaterialIssueStatus($wc);
+            }
+
+            if ($wc->confirmable_type === DeliveryOrder::class) {
+                static::syncLinkedDeliveryOrderItems($wc);
+            }
+        });
+
+        static::updating(function ($wc) {
+            $originalStatus = $wc->getOriginal('status');
+            $newStatus      = $wc->status;
+
+            if ($wc->isDirty('status') && $newStatus === 'confirmed') {
+                // Bulk-confirm all WC items
+                $wc->warehouseConfirmationItems()->update([
+                    'status'        => 'confirmed',
+                    'confirmed_qty' => DB::raw('requested_qty'),
+                ]);
+
+                // SO-linked WC confirmed → update SO status (legacy flow)
+                if ($wc->confirmable_type === SaleOrder::class) {
+                    $so = $wc->confirmable;
+                    if ($so) {
+                        $so->update([
+                            'status'                 => 'confirmed',
+                            'warehouse_confirmed_at' => now(),
+                        ]);
+                        Log::info('SO status updated after WC confirmed', [
+                            'wc_id' => $wc->id,
+                            'so_id' => $wc->confirmable_id,
+                        ]);
+
+                    }
+                }
+            } elseif ($wc->isDirty('status') && $newStatus === 'rejected') {
+                $wc->warehouseConfirmationItems()->update([
+                    'status'        => 'rejected',
+                    'confirmed_qty' => 0,
                 ]);
             }
+
+        });
+
+        static::deleting(function ($wc) {
+            // SO-linked WC deleted: revert SO status
+            if ($wc->confirmable_type === SaleOrder::class) {
+                $so = $wc->confirmable;
+                if ($so) {
+                    $so->update([
+                        'status'                 => 'request_approve',
+                        'warehouse_confirmed_at' => null,
+                    ]);
+                    Log::info('SO reverted to request_approve after WC deletion', [
+                        'so_id' => $wc->confirmable_id,
+                        'wc_id' => $wc->id,
+                    ]);
+                }
+            }
+
+            if ($wc->confirmable_type === DeliveryOrder::class) {
+                static::syncLinkedDeliveryOrderItems($wc, 'pending');
+            }
+
+            if ($wc->isForceDeleting()) {
+                $wc->warehouseConfirmationItems()->forceDelete();
+            } else {
+                $wc->warehouseConfirmationItems()->delete();
+            }
+        });
+
+        static::deleted(function ($wc) {
+            if ($wc->confirmable_type === DeliveryOrder::class) {
+                $do = DeliveryOrder::find($wc->confirmable_id);
+                $do?->updateStatusFromWarehouseConfirmations();
+            }
+        });
+
+        static::restoring(function ($wc) {
+            $wc->warehouseConfirmationItems()->withTrashed()->restore();
+        });
+
+        // DO-linked WC status changed → re-evaluate DO's overall status
+        static::updated(function ($wc) {
+            if ($wc->wasChanged('status')) {
+                if ($wc->confirmable_type === DeliveryOrder::class) {
+                    $do = DeliveryOrder::find($wc->confirmable_id);
+                    $do?->updateStatusFromWarehouseConfirmations();
+                    static::syncLinkedDeliveryOrderItems($wc);
+                }
+
+                if ($wc->confirmable_type === ManufacturingOrder::class && strtolower((string) $wc->status) === 'confirmed') {
+                    static::syncPendingManufacturingMaterialIssues($wc);
+                }
+
+                if ($wc->confirmable_type === MaterialIssue::class) {
+                    static::syncLinkedMaterialIssueItems($wc);
+                    static::syncMaterialIssueStatus($wc);
+                }
+            }
+        });
+    }
+
+    protected static function syncLinkedMaterialIssueItems(WarehouseConfirmation $wc): void
+    {
+        if ($wc->confirmable_type !== MaterialIssue::class) {
+            return;
         }
 
-        // Hubungkan delivery order dengan sale order melalui pivot table
-        $warehouseConfirmation->saleOrder->deliveryOrder()->attach($deliveryOrder->id);
+        $materialIssue = $wc->confirmable;
+        if (! $materialIssue instanceof MaterialIssue) {
+            return;
+        }
 
-        Log::info('Delivery order created successfully', [
-            'do_id' => $deliveryOrder->id,
-            'do_number' => $deliveryOrder->do_number,
-            'warehouse_confirmation_id' => $warehouseConfirmation->id,
-            'sale_order_id' => $warehouseConfirmation->sale_order_id,
-        ]);
+        $confirmationItems = $wc->fresh(['warehouseConfirmationItems.materialIssueItem'])?->warehouseConfirmationItems ?? collect();
+
+        foreach ($confirmationItems as $confirmationItem) {
+            $status = strtolower((string) $confirmationItem->status);
+
+            if (! $confirmationItem->material_issue_item_id || ! in_array($status, ['confirmed', 'partial_confirmed'], true)) {
+                continue;
+            }
+
+            $materialIssueItem = $confirmationItem->materialIssueItem;
+
+            if (! $materialIssueItem || ! $materialIssueItem->exists) {
+                continue;
+            }
+
+            $materialIssueItem->update([
+                'status' => MaterialIssueItem::STATUS_APPROVED,
+                'approved_by' => $wc->confirmed_by ?? $materialIssueItem->approved_by,
+                'approved_at' => $wc->confirmed_at ?? $materialIssueItem->approved_at ?? now(),
+            ]);
+        }
     }
+
+    protected static function syncMaterialIssueStatus(WarehouseConfirmation $wc): void
+    {
+        if ($wc->confirmable_type !== MaterialIssue::class) {
+            return;
+        }
+
+        $materialIssue = $wc->confirmable;
+        if (! $materialIssue instanceof MaterialIssue) {
+            return;
+        }
+
+        $materialIssue->approveFromWarehouseConfirmation($wc);
+    }
+
+    protected static function syncLinkedDeliveryOrderItems(WarehouseConfirmation $wc, ?string $overrideStatus = null): void
+    {
+        if ($wc->confirmable_type !== DeliveryOrder::class) {
+            return;
+        }
+
+        $wc = $wc->fresh(['warehouseConfirmationItems']);
+
+        if (! $wc) {
+            return;
+        }
+
+        $wc->warehouseConfirmationItems->each(function (WarehouseConfirmationItem $warehouseConfirmationItem) use ($overrideStatus) {
+            $warehouseConfirmationItem->syncLinkedDeliveryOrderItemStatus($overrideStatus);
+        });
+    }
+
+    protected static function syncPendingManufacturingMaterialIssues(WarehouseConfirmation $wc): void
+    {
+        $wc->loadMissing('confirmable');
+
+        $productionPlanId = $wc->confirmable?->production_plan_id;
+
+        MaterialIssue::query()
+            ->where('status', MaterialIssue::STATUS_PENDING_APPROVAL)
+            ->where(function ($query) use ($wc, $productionPlanId) {
+                $query->where('manufacturing_order_id', $wc->confirmable_id);
+
+                if ($productionPlanId) {
+                    $query->orWhere(function ($nestedQuery) use ($productionPlanId) {
+                        $nestedQuery->whereNull('manufacturing_order_id')
+                            ->where('production_plan_id', $productionPlanId);
+                    });
+                }
+            })
+            ->get()
+            ->each(function (MaterialIssue $materialIssue) use ($wc) {
+                $materialIssue->approveFromWarehouseConfirmation($wc);
+            });
+    }
+
 }

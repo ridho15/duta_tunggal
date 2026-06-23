@@ -8,14 +8,45 @@ use App\Models\QualityControl;
 use App\Models\JournalEntry;
 use App\Models\StockMovement;
 use App\Models\ChartOfAccount;
+use App\Models\Currency;
 use App\Services\ReturnProductService;
+use App\Support\JournalCurrencyAmountResolver;
+use App\Support\OrderRequestQuantityLock;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class QualityControlService
 {
     protected static $coaCache = [];
+
+    public function resolveQcJournalUnitPriceIdr(mixed $unitPrice, ?int $currencyId = null, ?float $historicalRate = null): array
+    {
+        return JournalCurrencyAmountResolver::resolve($unitPrice, $currencyId, $historicalRate);
+    }
+
+    protected function resolveAutoReceiptCurrencyId($purchaseOrderItem, ?PurchaseOrder $purchaseOrder = null): ?int
+    {
+        if (is_numeric($purchaseOrderItem?->currency_id ?? null)) {
+            return (int) $purchaseOrderItem->currency_id;
+        }
+
+        $purchaseOrder?->loadMissing('purchaseOrderCurrency');
+
+        $poCurrencyId = $purchaseOrder?->purchaseOrderCurrency?->first()?->currency_id;
+        if (is_numeric($poCurrencyId)) {
+            return (int) $poCurrencyId;
+        }
+
+        $idrCurrencyId = Currency::whereRaw('UPPER(code) = ?', ['IDR'])->value('id');
+        if (is_numeric($idrCurrencyId)) {
+            return (int) $idrCurrencyId;
+        }
+
+        return Currency::query()->value('id') ?: 1;
+    }
+
     public function generateQcNumber()
     {
         $date = now()->format('Ymd');
@@ -44,6 +75,24 @@ class QualityControlService
         return $candidate;
     }
 
+    private function purchaseOrderItemReceiptLimitForQualityControl(QualityControl $qualityControl, int $purchaseOrderItemId): array
+    {
+        $excludeReceiptItemId = null;
+
+        if (filled($qualityControl->qc_number)) {
+            $excludeReceiptItemId = \App\Models\PurchaseReceiptItem::where('purchase_order_item_id', $purchaseOrderItemId)
+                ->whereHas('purchaseReceipt', function ($query) use ($qualityControl) {
+                    $query->where('notes', 'like', '%' . $qualityControl->qc_number . '%');
+                })
+                ->value('id');
+        }
+
+        return OrderRequestQuantityLock::purchaseOrderItemReceiptLimit(
+            $purchaseOrderItemId,
+            $excludeReceiptItemId ? (int) $excludeReceiptItemId : null
+        );
+    }
+
     /**
      * Create a Quality Control record from a PurchaseReceiptItem.
      * This does not create receipts immediately; when QC is completed, a receipt
@@ -66,7 +115,13 @@ class QualityControlService
             throw new \Exception('Cannot create QC from receipt without associated PurchaseOrderItem');
         }
         // do not modify receipt item; receipt is purely record now
-        return $this->createQCFromPurchaseOrderItem($poItem, $data);
+        return $this->createQCFromPurchaseOrderItem($poItem, array_merge([
+            'warehouse_id' => $purchaseReceiptItem->warehouse_id ?? null,
+            'rak_id' => $purchaseReceiptItem->rak_id ?? null,
+            'quantity_received' => $purchaseReceiptItem->qty_received ?: null,
+            'passed_quantity' => $purchaseReceiptItem->qty_accepted ?: null,
+            'rejected_quantity' => $purchaseReceiptItem->qty_rejected ?: 0,
+        ], $data));
     }
 
     /**
@@ -79,23 +134,45 @@ class QualityControlService
      */
     public function createQCFromPurchaseOrderItem($purchaseOrderItem, $data)
     {
+        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+
         // Validate passed_quantity doesn't exceed ordered quantity
-        $passedQuantity = $data['passed_quantity'] ?? $purchaseOrderItem->quantity;
+        $passedQuantity = $data['passed_quantity'] ?? min((float) $purchaseOrderItem->quantity, (float) $limit['remaining_accepted']);
+        $rejectedQuantity = $data['rejected_quantity'] ?? 0;
         if ($passedQuantity > $purchaseOrderItem->quantity) {
             throw new \Exception("QC passed quantity ({$passedQuantity}) cannot exceed ordered quantity ({$purchaseOrderItem->quantity}) in purchase order.");
         }
 
+        $inspectedQuantity = (float) $passedQuantity + (float) $rejectedQuantity;
+        $quantityReceived = $data['quantity_received'] ?? $inspectedQuantity;
+        if ((float) $passedQuantity > (float) $quantityReceived) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+        }
+
+        if ($inspectedQuantity > (float) $quantityReceived) {
+            throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+        }
+        if ($inspectedQuantity > $limit['remaining_received']) {
+            throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+        }
+        if ((float) $passedQuantity > $limit['remaining_accepted']) {
+            throw new \Exception("QC passed quantity ({$passedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+        }
+
         $qualityControl = QualityControl::create([
-            'qc_number' => $this->generateQcNumber(),
-            'passed_quantity' => $passedQuantity,
-            'rejected_quantity' => $data['rejected_quantity'] ?? 0,
-            'status' => 0,
-            'inspected_by' => $data['inspected_by'] ?? null,
-            'warehouse_id' => $data['warehouse_id'] ?? $purchaseOrderItem->purchaseOrder->warehouse_id,
-            'product_id' => $purchaseOrderItem->product_id,
-            'rak_id' => $data['rak_id'] ?? null,
-            'from_model_type' => \App\Models\PurchaseOrderItem::class,
-            'from_model_id' => $purchaseOrderItem->id,
+            'qc_number'         => $this->generateQcNumber(),
+            'passed_quantity'   => $passedQuantity,
+            'rejected_quantity' => $rejectedQuantity,
+            'quantity_received' => $quantityReceived,
+            'notes'             => $data['notes'] ?? null,
+            'status'            => 0,
+            'inspected_by'      => $data['inspected_by'] ?? null,
+            'warehouse_id'      => $data['warehouse_id'] ?? $purchaseOrderItem->purchaseOrder->warehouse_id,
+            'product_id'        => $purchaseOrderItem->product_id,
+            'rak_id'            => $data['rak_id'] ?? null,
+            'from_model_type'   => \App\Models\PurchaseOrderItem::class,
+            'from_model_id'     => $purchaseOrderItem->id,
+            'cabang_id'         => $purchaseOrderItem->purchaseOrder->cabang_id ?? Auth::user()?->cabang_id,
         ]);
 
         return $qualityControl;
@@ -125,6 +202,7 @@ class QualityControlService
             'from_model_type' => \App\Models\Production::class,
             'from_model_id' => $production->id,
             'date_send_stock' => Carbon::now(),
+            'cabang_id' => $manufacturingOrder->cabang_id ?? Auth::user()?->cabang_id,
         ]);
 
         return $qualityControl;
@@ -134,11 +212,97 @@ class QualityControlService
     {
         $productService = app(ProductService::class);
 
+        $qualityControl->loadMissing(['fromModel', 'product']);
+
+        if ($qualityControl->from_model_type === 'App\\Models\\Production') {
+            $qualityControl->fromModel->loadMissing('manufacturingOrder.productionPlan');
+        }
+
+        $updatedAttributes = [];
+        foreach (['passed_quantity', 'rejected_quantity', 'quantity_received', 'warehouse_id', 'rak_id', 'reason_reject', 'inspected_by'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $updatedAttributes[$field] = $data[$field];
+            }
+        }
+
+        if (!empty($updatedAttributes)) {
+            $qualityControl->fill($updatedAttributes);
+        }
+
+        if ($qualityControl->from_model_type === 'App\Models\Production') {
+            $production = $qualityControl->fromModel;
+            $targetQuantity = (float) ($production?->quantity_produced ?? $production?->manufacturingOrder?->productionPlan?->quantity ?? 0);
+            $passedQuantity = (float) ($qualityControl->passed_quantity ?? 0);
+            $rejectedQuantity = (float) ($qualityControl->rejected_quantity ?? 0);
+
+            if ($passedQuantity < 0 || $rejectedQuantity < 0) {
+                throw new \Exception('Passed quantity dan rejected quantity tidak boleh bernilai negatif.');
+            }
+
+            if ($targetQuantity > 0 && ($passedQuantity + $rejectedQuantity) > $targetQuantity) {
+                throw new \Exception("Total passed dan rejected ({$passedQuantity} + {$rejectedQuantity}) tidak boleh melebihi quantity produksi ({$targetQuantity}).");
+            }
+        }
+
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $purchaseOrderItem = $qualityControl->fromModel;
+            if ($purchaseOrderItem) {
+                $limit = $this->purchaseOrderItemReceiptLimitForQualityControl($qualityControl, (int) $purchaseOrderItem->id);
+                $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+
+                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $limit['remaining_received']) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                }
+
+                if ((float) $qualityControl->passed_quantity > $limit['remaining_accepted']) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                }
+            }
+        }
+
+        if ($qualityControl->isDirty()) {
+            $qualityControl->save();
+        }
+
         // Validate QC passed quantity against receipt quantity for PurchaseReceiptItem
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
             $purchaseReceiptItem = $qualityControl->fromModel;
             if ($purchaseReceiptItem && $qualityControl->passed_quantity > $purchaseReceiptItem->qty_received) {
                 throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed received quantity ({$purchaseReceiptItem->qty_received}) in purchase receipt.");
+            }
+        }
+
+        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
+            $purchaseOrderItem = $qualityControl->fromModel;
+            if ($purchaseOrderItem) {
+                $limit = $this->purchaseOrderItemReceiptLimitForQualityControl($qualityControl, (int) $purchaseOrderItem->id);
+                $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+
+                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $limit['remaining_received']) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                }
+
+                if ((float) $qualityControl->passed_quantity > $limit['remaining_accepted']) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                }
             }
         }
 
@@ -171,9 +335,10 @@ class QualityControlService
         if ($qualityControl->from_model_type == 'App\Models\Production') {
             $qualityControl->fromModel->load('manufacturingOrder.productionPlan');
 
-            if ($qualityControl->passed_quantity >= $qualityControl->fromModel->manufacturingOrder->productionPlan->quantity) {
-                echo "passed_quantity: {$qualityControl->passed_quantity}, plan_quantity: {$qualityControl->fromModel->manufacturingOrder->productionPlan->quantity}\n";
-                echo "Completing MO: passed_quantity {$qualityControl->passed_quantity} >= plan_quantity {$qualityControl->fromModel->manufacturingOrder->productionPlan->quantity}\n";
+            $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+            $targetQuantity = (float) ($qualityControl->fromModel->quantity_produced ?? $qualityControl->fromModel->manufacturingOrder->productionPlan->quantity ?? 0);
+
+            if ($targetQuantity > 0 && $inspectedQuantity >= $targetQuantity) {
                 $qualityControl->fromModel->manufacturingOrder->update([
                     'status' => 'completed'
                 ]);
@@ -201,9 +366,9 @@ class QualityControlService
         // Create journal entries and inventory stock for passed QC items from PurchaseOrderItem or PurchaseReceiptItem
         // For PurchaseReceiptItem QC (legacy flow), journal entries are created when the receipt is posted
         // For PurchaseOrderItem QC (new flow), journal entries are created here since receipt posting happens later
-        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
-            $this->createJournalEntriesAndInventoryForQC($qualityControl);
-        }
+        // if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
+        //     $this->createJournalEntriesAndInventoryForQC($qualityControl);
+        // }
 
         // Handle Purchase Receipt and Purchase Order completion based on QC results
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
@@ -298,11 +463,20 @@ class QualityControlService
         $product = $qualityControl->product;
         $passedQuantity = $qualityControl->passed_quantity;
 
-        // Get unit price based on model type
+        // Get unit price in IDR based on model type
         if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
-            $unitPrice = $fromModel?->unit_price ?? 0;
+            $purchaseOrderCurrency = $fromModel?->purchaseOrder?->purchaseOrderCurrency?->firstWhere('currency_id', $fromModel?->currency_id);
+            $resolved = $this->resolveQcJournalUnitPriceIdr(
+                $fromModel?->unit_price ?? 0,
+                is_numeric($fromModel?->currency_id ?? null) ? (int) $fromModel->currency_id : null,
+                is_numeric($purchaseOrderCurrency?->nominal ?? null)
+                    ? (float) $purchaseOrderCurrency->nominal
+                    : null
+            );
+            $unitPrice = $resolved['amount_idr'] ?? 0;
         } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
-            $unitPrice = $fromModel?->purchaseOrderItem?->unit_price ?? 0;
+            $resolved = JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($fromModel);
+            $unitPrice = $resolved['unit_price_idr'] ?? 0;
         } else {
             $unitPrice = 0;
         }
@@ -313,61 +487,88 @@ class QualityControlService
 
         $amount = round($passedQuantity * $unitPrice, 2);
 
-        // Get COA accounts
-        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
-        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        // Get COA accounts.  Note that the product relation uses withDefault(),
+        // which will return an empty ChartOfAccount instance with no id when the
+        // foreign key is null.  We only treat the relation as valid when an id is
+        // present; otherwise fall back to the hardcoded codes.
+        $inventoryCoa = $product->resolveInventoryCoaOrDefault();
+        $temporaryProcurementCoa = $product->resolveTemporaryProcurementCoaOrDefault();
+        $unbilledPurchaseCoa = $product->resolveUnbilledPurchaseCoaOrDefault();
 
-        if (!$inventoryCoa || !$temporaryProcurementCoa || !$unbilledPurchaseCoa) {
-            // Skip posting if required COA accounts are not available (e.g., in test environment)
-            return;
+        // The relation may still produce a ChartOfAccount with an empty id, or the
+        // fallback resolver may return null if none of the codes exist. Fail hard so
+        // stock cannot move without the matching journal entry.
+        if (!$inventoryCoa || !$inventoryCoa->id || !$temporaryProcurementCoa || !$temporaryProcurementCoa->id || !$unbilledPurchaseCoa || !$unbilledPurchaseCoa->id) {
+            Log::error('QC journal posting blocked due to missing COA', [
+                'qc_number' => $qualityControl->qc_number,
+                'inventory_coa' => $inventoryCoa?->id,
+                'temporary_procurement_coa' => $temporaryProcurementCoa?->id,
+                'unbilled_purchase_coa' => $unbilledPurchaseCoa?->id,
+            ]);
+
+            throw new \RuntimeException(
+                'QC journal posting gagal karena COA persediaan, temporary procurement, atau unbilled purchase belum dikonfigurasi lengkap.'
+            );
         }
 
-        $date = now()->toDateString();
+        $date = now();
         $reference = $qualityControl->qc_number;
 
-        // Prevent duplicate posting
-        if (JournalEntry::where('source_type', QualityControl::class)
-            ->where('source_id', $qualityControl->id)
-            ->where('description', 'like', '%QC Inventory%')
-            ->exists()) {
-            return;
-        }
+        DB::transaction(function () use (
+            $amount,
+            $date,
+            $fromModel,
+            $inventoryCoa,
+            $passedQuantity,
+            $product,
+            $qualityControl,
+            $reference,
+            $temporaryProcurementCoa,
+            $unitPrice
+        ) {
+            $alreadyPosted = JournalEntry::where('source_type', QualityControl::class)
+                ->where('source_id', $qualityControl->id)
+                ->where('journal_type', 'inventory')
+                ->lockForUpdate()
+                ->exists();
 
-        $entries = [];
+            if ($alreadyPosted) {
+                return;
+            }
 
-        // Debit inventory account
-        $entries[] = JournalEntry::create([
-            'coa_id' => $inventoryCoa->id,
-            'date' => $date,
-            'reference' => $reference,
-            'description' => 'QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number,
-            'debit' => $amount,
-            'credit' => 0,
-            'journal_type' => 'inventory',
-            'source_type' => QualityControl::class,
-            'source_id' => $qualityControl->id,
-        ]);
+            JournalEntry::create([
+                'coa_id' => $inventoryCoa->id,
+                'date' => $date,
+                'reference' => $reference,
+                'description' => 'QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number,
+                'debit' => $amount,
+                'credit' => 0,
+                'journal_type' => 'inventory',
+                'source_type' => QualityControl::class,
+                'source_id' => $qualityControl->id,
+            ]);
 
-        // Credit temporary procurement position
-        $entries[] = JournalEntry::create([
-            'coa_id' => $temporaryProcurementCoa->id,
-            'date' => $date,
-            'reference' => $reference,
-            'description' => 'QC Inventory - Credit temporary procurement for QC passed items: ' . $qualityControl->qc_number,
-            'debit' => 0,
-            'credit' => $amount,
-            'journal_type' => 'inventory',
-            'source_type' => QualityControl::class,
-            'source_id' => $qualityControl->id,
-        ]);
+            JournalEntry::create([
+                'coa_id' => $temporaryProcurementCoa->id,
+                'date' => $date,
+                'reference' => $reference,
+                'description' => 'QC Inventory - Credit temporary procurement for QC passed items: ' . $qualityControl->qc_number,
+                'debit' => 0,
+                'credit' => $amount,
+                'journal_type' => 'inventory',
+                'source_type' => QualityControl::class,
+                'source_id' => $qualityControl->id,
+            ]);
 
-        // Create stock movement to update inventory
-        $existingMovement = StockMovement::where('from_model_type', QualityControl::class)
-            ->where('from_model_id', $qualityControl->id)
-            ->first();
+            $existingMovement = StockMovement::where('from_model_type', QualityControl::class)
+                ->where('from_model_id', $qualityControl->id)
+                ->lockForUpdate()
+                ->first();
 
-        if (!$existingMovement) {
+            if ($existingMovement) {
+                return;
+            }
+
             $meta = [
                 'source' => 'quality_control',
                 'qc_id' => $qualityControl->id,
@@ -396,7 +597,7 @@ class QualityControlService
                 'from_model_type' => QualityControl::class,
                 'from_model_id' => $qualityControl->id,
             ]);
-        }
+        });
     }
 
     protected function resolveCoaByCodes(array $codes): ?\App\Models\ChartOfAccount
@@ -464,14 +665,12 @@ class QualityControlService
 
         Log::info('checkPenerimaanBarang: PO ' . $purchaseOrder->id . ' - Dibutuhkan: ' . $totalQuantityDibutuhkan . ', Diterima: ' . $totalQuantityYangDiterima);
 
-        if ($totalQuantityDibutuhkan == $totalQuantityYangDiterima) {
-            Log::info('checkPenerimaanBarang: Completing PO ' . $purchaseOrder->id);
-            $purchaseOrder->update([
-                'status' => 'completed',
-                'completed_by' => Auth::user()->id,
-                'completed_at' => Carbon::now()
-            ]);
+        $previousStatus = $purchaseOrder->status;
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
+        $purchaseOrder->refresh();
 
+        if ($previousStatus !== 'completed' && $purchaseOrder->status === 'completed') {
+            Log::info('checkPenerimaanBarang: Completing PO ' . $purchaseOrder->id);
             HelperController::sendNotification(isSuccess: true, message: 'Purchase Order Completed', title: 'Information');
         } else {
             Log::info('checkPenerimaanBarang: PO ' . $purchaseOrder->id . ' not completed yet');
@@ -540,8 +739,6 @@ class QualityControlService
             // Complete the purchase receipt
             $purchaseReceipt->update([
                 'status' => 'completed',
-                'completed_by' => Auth::id(),
-                'completed_at' => Carbon::now()
             ]);
 
             // Post the receipt so journals and inventory are posted via PurchaseReceiptService
@@ -554,15 +751,12 @@ class QualityControlService
             Log::info("Completed Purchase Receipt {$purchaseReceipt->id} due to QC completion");
         }
 
-        // Check if the entire purchase order is complete
-        if ($allItemsComplete && $totalOrdered == $totalReceived) {
-            // Complete the purchase order
-            $purchaseOrder->update([
-                'status' => 'completed',
-                'completed_by' => Auth::id(),
-                'completed_at' => Carbon::now()
-            ]);
+        // Check if the entire purchase order is complete using the same receipt status shown in the PO list.
+        $previousStatus = $purchaseOrder->status;
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
+        $purchaseOrder->refresh();
 
+        if ($previousStatus !== 'completed' && $purchaseOrder->status === 'completed') {
             Log::info("Completed Purchase Order {$purchaseOrder->id} due to QC completion");
 
             HelperController::sendNotification(
@@ -579,12 +773,8 @@ class QualityControlService
             ]);
 
             // Note: Receipt posting is already done in completeQualityControl via createJournalEntriesAndInventoryForQC
-        } elseif ($totalReceived > 0) {
-            // Set purchase order to partially_received if some items received but not all
-            if ($purchaseOrder->status === 'approved') {
-                $purchaseOrder->update(['status' => 'partially_received']);
-                Log::info("Set Purchase Order {$purchaseOrder->id} to partially_received");
-            }
+        } elseif ($purchaseOrder->status === 'partially_received') {
+            Log::info("Set Purchase Order {$purchaseOrder->id} to partially_received");
         }
     }
 
@@ -593,58 +783,76 @@ class QualityControlService
      */
     protected function calculateManufacturingOrderBDPTotal(\App\Models\ManufacturingOrder $mo): float
     {
-        // Get BOM from ProductionPlan
+        // Primary: read WIP (1-201) debit balance from manufacturing_wip journal entries
+        $wipCoa = $this->resolveCoaByCodes(['1-201']);
+        if ($wipCoa) {
+            $productionIds = \App\Models\Production::where('manufacturing_order_id', $mo->id)->pluck('id');
+            if ($productionIds->isNotEmpty()) {
+                $wipBalance = \App\Models\JournalEntry::where('coa_id', $wipCoa->id)
+                    ->where('journal_type', 'manufacturing_wip')
+                    ->where('source_type', \App\Models\Production::class)
+                    ->whereIn('source_id', $productionIds)
+                    ->sum('debit');
+                if ($wipBalance > 0) {
+                    return (float) $wipBalance;
+                }
+            }
+        }
+
+        // Fallback: actual material issues for this MO (older flow, no in-progress WIP journal)
+        $issuesTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($mo, 'issue');
+        $returnsTotal = $this->sumCompletedMaterialIssueTotalForManufacturingOrder($mo, 'return');
+        $actualMaterialCost = (float)$issuesTotal - (float)$returnsTotal;
+
+        if ($actualMaterialCost <= 0 && $mo->production_plan_id) {
+            // Also check legacy plan-only issues that were not yet linked to a manufacturing order.
+            $issuesTotal = \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+                ->where('production_plan_id', $mo->production_plan_id)
+                ->where('status', 'completed')
+                ->where('type', 'issue')
+                ->sum('total_cost');
+            $returnsTotal = \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+                ->where('production_plan_id', $mo->production_plan_id)
+                ->where('status', 'completed')
+                ->where('type', 'return')
+                ->sum('total_cost');
+            $actualMaterialCost = (float)$issuesTotal - (float)$returnsTotal;
+        }
+
+        if ($actualMaterialCost > 0) {
+            return $actualMaterialCost;
+        }
+
+        // Ultimate fallback: standard BOM cost
         $bom = $mo->productionPlan?->billOfMaterial;
-
         if (!$bom || !$bom->is_active) {
-            return 0; // Return 0 instead of throwing exception
+            return 0;
         }
-
         $bom->loadMissing('items.product');
+        $materialCost  = $bom->items->sum(fn ($i) => (float)$i->quantity * (float)($i->product->cost_price ?? 0));
+        $laborCost     = (float)($bom->labor_cost ?? 0);
+        $overheadCost  = (float)($bom->overhead_cost ?? 0);
+        return max(0, ($materialCost + $laborCost + $overheadCost) * (float)$mo->productionPlan->quantity);
+    }
 
-        // Calculate standard costs from BOM
-        $materialCost = $bom->items->sum(function ($item) {
-            return (float) $item->quantity * (float) ($item->product->cost_price ?? 0);
-        });
-
-        $laborCost = (float) ($bom->labor_cost ?? 0);
-        $overheadCost = (float) ($bom->overhead_cost ?? 0);
-
-        // Standard total cost = (BB + TKL + BOP) × quantity
-        $standardTotalCost = ($materialCost + $laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
-
-        // Adjust with actual material issues and returns
-        $issuesTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
+    protected function sumCompletedMaterialIssueTotalForManufacturingOrder(
+        \App\Models\ManufacturingOrder $mo,
+        string $type
+    ): float {
+        $issuesTotal = \App\Models\MaterialIssue::where('manufacturing_order_id', $mo->id)
             ->where('status', 'completed')
-            ->where('type', 'issue')
+            ->where('type', $type)
             ->sum('total_cost');
 
-        $returnsTotal = \App\Models\MaterialIssue::where('production_plan_id', $mo->production_plan_id)
-            ->where('status', 'completed')
-            ->where('type', 'return')
-            ->sum('total_cost');
-
-        // Use actual material cost if available, otherwise use standard
-        $actualMaterialCost = $issuesTotal - $returnsTotal;
-        $materialCostToUse = $actualMaterialCost > 0 ? $actualMaterialCost : $materialCost * (float) $mo->productionPlan->quantity;
-
-        // If using actual material cost, don't add labor/overhead again as they should be allocated separately
-        // If using standard cost, include labor and overhead
-        $additionalCosts = $actualMaterialCost > 0 ? 0 : ($laborCost + $overheadCost) * (float) $mo->productionPlan->quantity;
-
-        // Sum labor & overhead allocations posted to BDP and linked to this MO via source_type/source_id
-        $bdpCoa = $this->resolveCoaByCodes(['1140.02', '1140.03', '1140']);
-        $allocationsTotal = 0;
-        if ($bdpCoa) {
-            $allocationsTotal = \App\Models\JournalEntry::where('coa_id', $bdpCoa->id)
-                ->where('journal_type', 'manufacturing_allocation')
-                ->where('source_type', \App\Models\ManufacturingOrder::class)
-                ->where('source_id', $mo->id)
-                ->sum('debit');
+        if ($issuesTotal > 0 || ! $mo->production_plan_id) {
+            return (float) $issuesTotal;
         }
 
-        // Final total = Material Cost + Additional Costs + Allocations
-        return max(0, $materialCostToUse + $additionalCosts + $allocationsTotal);
+        return (float) \App\Models\MaterialIssue::whereNull('manufacturing_order_id')
+            ->where('production_plan_id', $mo->production_plan_id)
+            ->where('status', 'completed')
+            ->where('type', $type)
+            ->sum('total_cost');
     }
 
     /**
@@ -658,24 +866,54 @@ class QualityControlService
         $product = $qualityControl->product;
         $passedQuantity = $qualityControl->passed_quantity;
 
-        // Calculate total cost from BDP (Barang Dalam Proses)
+        // Labor/overhead are already captured in the manufacturing_wip journal
+        // (posted by ProductionObserver::created via generateJournalForProductionInProgress).
+        // No separate syncLaborAndOverheadAllocations call is needed here.
+
+        // Calculate total cost from WIP or fallback sources
         $totalCost = $this->calculateManufacturingOrderBDPTotal($manufacturingOrder);
 
         if ($totalCost <= 0 || $passedQuantity <= 0) {
             return;
         }
 
-        // Get COA accounts
-        $bom = $productionPlan->billOfMaterial;
-        $bdpCoa = $bom->workInProgressCoa ?? $this->resolveCoaByCodes(['1140.02']); // Barang Dalam Proses
-        $barangJadiCoa = $bom->finishedGoodsCoa ?? $this->resolveCoaByCodes(['1140.03']); // Persediaan Barang Jadi
+        // Determine credit COA: prefer 1-201 WIP Inventory if in-progress WIP journal exists,
+        // otherwise fall back to 1400.04 Pos Sementara Produksi (old flow)
+        $wipInventoryCoa = $this->resolveCoaByCodes(['1-201']);
+        $posSementaraCoa = $this->resolveCoaByCodes(['1400.04', '1150', '1140']);
 
-        if (!$bdpCoa || !$barangJadiCoa) {
+        $creditCoa = null;
+        if ($wipInventoryCoa) {
+            $productionIds = \App\Models\Production::where('manufacturing_order_id', $manufacturingOrder->id)->pluck('id');
+            if ($productionIds->isNotEmpty()) {
+                $wipBalance = \App\Models\JournalEntry::where('coa_id', $wipInventoryCoa->id)
+                    ->where('journal_type', 'manufacturing_wip')
+                    ->where('source_type', \App\Models\Production::class)
+                    ->whereIn('source_id', $productionIds)
+                    ->sum('debit');
+                if ($wipBalance > 0) {
+                    $creditCoa = $wipInventoryCoa;
+                }
+            }
+        }
+        if (!$creditCoa) {
+            $creditCoa = $posSementaraCoa;
+        }
+
+        $barangJadiCoa = $product->resolveInventoryCoaOrDefault()
+            ?? $this->resolveCoaByCodes(['1140.02']);
+
+        if (!$creditCoa || !$barangJadiCoa) {
             return;
         }
 
-        $date = now()->toDateString();
-        $reference = $qualityControl->qc_number;
+        $branchResolver = app(\App\Services\JournalBranchResolver::class);
+        $branchId = $branchResolver->resolve($qualityControl) ?? $branchResolver->resolve($production) ?? $branchResolver->resolve($manufacturingOrder);
+        $departmentId = $branchResolver->resolveDepartment($qualityControl) ?? $branchResolver->resolveDepartment($production) ?? $branchResolver->resolveDepartment($manufacturingOrder);
+        $projectId = $branchResolver->resolveProject($qualityControl) ?? $branchResolver->resolveProject($production) ?? $branchResolver->resolveProject($manufacturingOrder);
+
+        $date = $qualityControl->date_send_stock ?? now();
+        $reference = $production->production_number ?: $qualityControl->qc_number;
 
         // Prevent duplicate posting
         if (\App\Models\JournalEntry::where('source_type', QualityControl::class)
@@ -697,19 +935,25 @@ class QualityControlService
             'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $product->name . ')',
             'debit' => $amount,
             'credit' => 0,
-            'journal_type' => 'finished_goods_completion',
+            'journal_type' => 'manufacturing_completion',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => QualityControl::class,
             'source_id' => $qualityControl->id,
         ]);
 
         \App\Models\JournalEntry::create([
-            'coa_id' => $bdpCoa->id,
+            'coa_id' => $creditCoa->id,
             'date' => $date,
             'reference' => $reference,
             'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $product->name . ')',
             'debit' => 0,
             'credit' => $amount,
-            'journal_type' => 'finished_goods_completion',
+            'journal_type' => 'manufacturing_completion',
+            'cabang_id' => $branchId,
+            'department_id' => $departmentId,
+            'project_id' => $projectId,
             'source_type' => QualityControl::class,
             'source_id' => $qualityControl->id,
         ]);
@@ -749,7 +993,10 @@ class QualityControlService
         }
 
         // Update production status to finished only if all quantity passed QC
-        if ($passedQuantity >= $production->quantity_produced) {
+        $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+        $targetQuantity = (float) ($production->quantity_produced ?? $productionPlan->quantity ?? 0);
+
+        if ($targetQuantity > 0 && $inspectedQuantity >= $targetQuantity) {
             $production->status = 'finished';
             $production->save();
         }
@@ -766,8 +1013,11 @@ class QualityControlService
             return;
         }
 
-        $purchaseOrder = $purchaseOrderItem->purchaseOrder;
-        if (!$purchaseOrder) {
+        $purchaseOrder = \App\Models\PurchaseOrder::withoutGlobalScopes()
+            ->with('purchaseOrderCurrency')
+            ->find($purchaseOrderItem->purchase_order_id);
+
+        if (!$purchaseOrder || !$purchaseOrder->id) {
             return;
         }
 
@@ -783,6 +1033,18 @@ class QualityControlService
             return;
         }
 
+        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+        $qtyReceived = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+        $qtyAccepted = (float) $qualityControl->passed_quantity;
+
+        if ($qtyReceived > $limit['remaining_received']) {
+            throw new \Exception("Quantity Received dari QC tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+        }
+
+        if ($qtyAccepted > $limit['remaining_accepted']) {
+            throw new \Exception("Quantity Accepted dari QC tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+        }
+
         // Generate receipt number
         $receiptNumber = $this->generateReceiptNumber();
 
@@ -793,7 +1055,7 @@ class QualityControlService
             'receipt_date' => now(),
             'received_by' => Auth::id() ?? $data['received_by'] ?? 1,
             'notes' => 'Auto-created from QC: ' . $qualityControl->qc_number,
-            'currency_id' => $purchaseOrder->purchaseOrderCurrency->first()?->currency_id ?? 1,
+            'currency_id' => $this->resolveAutoReceiptCurrencyId($purchaseOrderItem, $purchaseOrder),
             'status' => 'completed',
             'cabang_id' => $purchaseOrder->cabang_id,
         ]);
@@ -803,14 +1065,17 @@ class QualityControlService
             'purchase_receipt_id'    => $purchaseReceipt->id,
             'purchase_order_item_id' => $purchaseOrderItem->id,
             'product_id'             => $qualityControl->product_id,
-            'qty_received'           => $qualityControl->passed_quantity + $qualityControl->rejected_quantity,
-            'qty_accepted'           => $qualityControl->passed_quantity,
+            'qty_received'           => $qtyReceived,
+            'qty_accepted'           => $qtyAccepted,
             'qty_rejected'           => $qualityControl->rejected_quantity,
             'reason_rejected'        => $qualityControl->rejected_quantity > 0 ? 'Failed QC inspection' : null,
             'warehouse_id'           => $qualityControl->warehouse_id,
             'rak_id'                 => $qualityControl->rak_id,
             'status'                 => 'completed', // QC already done
         ]);
+
+        app(\App\Services\PurchaseReceiptService::class)
+            ->copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $purchaseReceipt);
 
         Log::info('Auto-created Purchase Receipt from QC', [
             'qc_number' => $qualityControl->qc_number,
@@ -855,8 +1120,8 @@ class QualityControlService
             return;
         }
 
-        // Don't auto-complete if already completed or closed
-        if (in_array($purchaseOrder->status, ['completed', 'closed', 'paid'])) {
+        // Don't auto-complete if already closed or paid
+        if (in_array($purchaseOrder->status, ['closed', 'paid'])) {
             return;
         }
 
@@ -866,31 +1131,12 @@ class QualityControlService
         // Load all items with their receipts
         $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
 
-        $allItemsReceived = true;
-        
-        foreach ($purchaseOrder->purchaseOrderItem as $item) {
-            // Sum all received quantities from receipt items for this PO item
-            $totalReceived = $item->purchaseReceiptItem->sum('qty_received');
-            
-            // If any item has not been fully received, don't complete
-            if ($totalReceived < $item->quantity) {
-                $allItemsReceived = false;
-                Log::info('PO item not fully received', [
-                    'po_item_id' => $item->id,
-                    'ordered_qty' => $item->quantity,
-                    'received_qty' => $totalReceived,
-                ]);
-                break;
-            }
-        }
+        $previousStatus = $purchaseOrder->status;
+        $summary = $purchaseOrder->receiptFulfillmentSummary();
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id() ?? 1);
+        $purchaseOrder->refresh();
 
-        if ($allItemsReceived && !in_array($purchaseOrder->status, ['completed', 'closed', 'paid'])) {
-            $purchaseOrder->update([
-                'status' => 'completed',
-                'completed_by' => Auth::id() ?? 1,
-                'completed_at' => now(),
-            ]);
-
+        if ($previousStatus !== 'completed' && $purchaseOrder->status === 'completed') {
             Log::info('Auto-completed Purchase Order', [
                 'po_id' => $purchaseOrder->id,
                 'po_number' => $purchaseOrder->po_number,
@@ -902,6 +1148,14 @@ class QualityControlService
                 title: 'Purchase Order Completed',
                 message: 'PO ' . $purchaseOrder->po_number . ' has been automatically completed.'
             );
+        } elseif ($summary['status_label'] !== 'Semua Diterima') {
+            Log::info('PO item not fully accepted', [
+                'po_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+                'ordered_qty' => $summary['total_ordered'],
+                'received_qty' => $summary['total_received'],
+                'accepted_qty' => $summary['total_accepted'],
+            ]);
         }
     }
 }

@@ -65,6 +65,11 @@ class CreateJournalEntry extends CreateRecord
                 'data' => $data,
                 'trace' => $e->getTraceAsString()
             ]);
+            \Filament\Notifications\Notification::make()
+                ->title('Gagal Membuat Jurnal')
+                ->body('Terjadi kesalahan saat menyimpan jurnal: ' . $e->getMessage())
+                ->danger()
+                ->send();
             throw $e;
         }
     }

@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 
+use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\DeliveryOrder;
+use App\Support\CurrencyConversionResolver;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -21,12 +23,17 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
+
         // Load related data for form
         if ($this->record->from_model_type === 'App\Models\SaleOrder') {
             $data['selected_customer'] = $this->record->fromModel->customer_id ?? null;
             $data['selected_sale_order'] = $this->record->from_model_id ?? null;
             $data['selected_delivery_orders'] = $this->record->delivery_orders ?? [];
         }
+
+        $data['currency_id'] = $this->record->currency_id ?? $this->record->fromModel?->currency_id;
+        $data['exchange_rate'] = (float) ($this->record->exchange_rate ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null));
 
         // Load invoice items
         $this->record->load('invoiceItem.product');
@@ -81,11 +88,16 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
+
         // Remove temporary fields
         unset($data['selected_customer']);
         unset($data['selected_sale_order']);
         unset($data['selected_delivery_orders']);
         unset($data['delivery_order_items']);
+
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? 1.0);
         
         return $data;
     }
@@ -94,12 +106,25 @@ class EditSalesInvoice extends EditRecord
     {
         // Sync invoice items
         if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            // Delete existing items
+            // Soft-delete existing items before recreating
             $this->record->invoiceItem()->delete();
-            
-            // Create new items
+
             foreach ($this->data['invoiceItem'] as $item) {
-                $this->record->invoiceItem()->create($item);
+                $quantity = (float) ($item['quantity'] ?? 0);
+                $price    = (float) MoneyHelper::safeParse($item['price'] ?? 0);
+
+                // Ensure all NOT NULL columns are provided even when the
+                // Repeater only captured the 4 visible fields.
+                $itemData = array_merge($item, [
+                    'price'      => $price,
+                    'subtotal'   => (float) MoneyHelper::safeParse($item['subtotal'] ?? ($quantity * $price)),
+                    'discount'   => (float) MoneyHelper::safeParse($item['discount'] ?? 0),
+                    'tax_rate'   => (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0),
+                    'tax_amount' => (float) MoneyHelper::safeParse($item['tax_amount'] ?? 0),
+                    'total'      => (float) MoneyHelper::safeParse($item['total'] ?? ($quantity * $price)),
+                ]);
+
+                $this->record->invoiceItem()->create($itemData);
             }
         }
     }

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\DeliveryOrderResource\Pages;
 
 use App\Filament\Resources\DeliveryOrderResource;
 use App\Models\DeliveryOrder;
+use App\Models\InventoryStock;
 use App\Services\DeliveryOrderItemService;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -20,7 +21,8 @@ class EditDeliveryOrder extends EditRecord
         return DeliveryOrder::with([
             'salesOrders',
             'deliveryOrderItem.saleOrderItem.product',
-            'deliveryOrderItem.product'
+            'deliveryOrderItem.product',
+            'deliveryOrderItem.warehouseSources'
         ])->findOrFail($key);
     }
 
@@ -144,6 +146,38 @@ class EditDeliveryOrder extends EditRecord
                     $validator = Validator::make([], []);
                     $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$adjustedRemainingQty}).");
                     throw new ValidationException($validator);
+                }
+
+                $warehouseSources = collect($item['warehouseSources'] ?? []);
+                if ($warehouseSources->isNotEmpty()) {
+                    $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                        return (float) ($source['quantity'] ?? 0);
+                    });
+
+                    if (abs($sourceQty - $quantity) > 0.0001) {
+                        $validator = Validator::make([], []);
+                        $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Total qty sumber gudang harus sama dengan quantity item.");
+                        throw new ValidationException($validator);
+                    }
+
+                    foreach ($warehouseSources as $sourceIndex => $source) {
+                        $sourceWarehouseId = $source['warehouse_id'] ?? null;
+                        $sourceQtyItem = (float) ($source['quantity'] ?? 0);
+
+                        if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: gudang dan qty > 0 wajib diisi.");
+                            throw new ValidationException($validator);
+                        }
+
+                        $availableStock = InventoryStock::freeQtyFor($item['product_id'] ?? null, $sourceWarehouseId);
+
+                        if ((float) $availableStock < $sourceQtyItem) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: stok tidak mencukupi di gudang sumber.");
+                            throw new ValidationException($validator);
+                        }
+                    }
                 }
             }
 

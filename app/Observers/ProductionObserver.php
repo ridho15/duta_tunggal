@@ -3,7 +3,9 @@
 namespace App\Observers;
 
 use App\Models\Production;
+use App\Services\ManufacturingJournalService;
 use App\Services\QualityControlService;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
 class ProductionObserver
@@ -20,23 +22,35 @@ class ProductionObserver
             // Create Quality Control automatically when production is finished
             $this->createQualityControlForProduction($production);
             Log::info("ProductionObserver: QC creation completed for production {$production->id}");
-
-            // Journal and stock movement will be created during Quality Control completion
-            // $this->generateJournalForProductionCompletion($production);
-            $this->checkAndUpdateProductionPlanCompletion($production);
         }
     }
 
     /**
      * Handle the Production "created" event.
+     *
+     * Posts the "Produksi In Progress" WIP journal:
+     *   Dr. 1-201  Persediaan Barang Dalam Proses - WIP INVENTORY
+     *       Cr. 1400.04 Pos Sementara Produksi  (material cost)
+     *       Cr. 5230   Biaya Tenaga Kerja Proses Produksi  (labor + overhead)
      */
     public function created(Production $production): void
     {
-        // If created directly as finished, generate journal
+        // Post WIP journal whenever production work begins
+        try {
+            app(ManufacturingJournalService::class)->generateJournalForProductionInProgress($production);
+            Log::info("ProductionObserver: WIP journal posted for production {$production->id}");
+        } catch (\Exception $e) {
+            Log::warning("ProductionObserver: Could not post WIP journal for production {$production->id}: " . $e->getMessage());
+
+            Notification::make()
+                ->title('Gagal Membuat Jurnal Produksi')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+
         if ($production->status === 'finished') {
-            // Journal and stock movement will be created during Quality Control completion
-            // $this->generateJournalForProductionCompletion($production);
-            $this->checkAndUpdateProductionPlanCompletion($production);
+            $this->createQualityControlForProduction($production);
         }
     }
 
@@ -60,36 +74,12 @@ class ProductionObserver
 
         } catch (\Exception $e) {
             Log::error("Failed to create QC for production ID: {$production->id}. Error: " . $e->getMessage());
-        }
-    }
 
-    /**
-     * Check if all Productions in ManufacturingOrder are finished and update ProductionPlan accordingly
-     */
-    protected function checkAndUpdateProductionPlanCompletion(Production $production): void
-    {
-        $manufacturingOrder = $production->manufacturingOrder;
-        if (!$manufacturingOrder) {
-            return;
-        }
-
-        $productionPlan = $manufacturingOrder->productionPlan;
-        if (!$productionPlan) {
-            return;
-        }
-
-        // Get all productions for this manufacturing order
-        $productions = $manufacturingOrder->productions;
-
-        // Check if all productions are finished
-        $allFinished = $productions->every(function ($prod) {
-            return $prod->status === 'finished';
-        });
-
-        // If all productions are finished, mark ManufacturingOrder as completed
-        if ($allFinished && $manufacturingOrder->status !== 'completed') {
-            $manufacturingOrder->update(['status' => 'completed']);
-            // The ManufacturingOrder observer will handle updating ProductionPlan status
+            Notification::make()
+                ->title('Gagal Membuat QC Produksi')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
         }
     }
 }

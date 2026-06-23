@@ -100,13 +100,14 @@ it('creates sales invoice journal entries with shipping costs when delivery orde
 
     // Calculate expected values
     $expectedSubtotal = '1200000.00'; // 1.200.000
-    $expectedTaxAmount = 132000; // 1.200.000 * 11% (integer for invoice)
+    $expectedTaxRate = 11; // invoice.tax stores the canonical PPN percentage rate
     $expectedTaxAmountJournal = '132000.00'; // 1.200.000 * 11% (string for journal)
     $expectedShippingCost = 50000; // 50.000
     $expectedTotal = '1382000.00'; // 1.382.000
 
     expect($invoice->subtotal)->toBe($expectedSubtotal);
-    expect($invoice->tax)->toBe($expectedTaxAmount);
+    expect((float) $invoice->tax)->toBe(11.0);
+    expect((float) $invoice->ppn_rate)->toBe(11.0);
     expect($invoice->getOtherFeeTotalAttribute())->toBe($expectedShippingCost);
     expect($invoice->total)->toBe($expectedTotal);
 

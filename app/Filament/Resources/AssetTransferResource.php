@@ -15,11 +15,14 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 
 class AssetTransferResource extends Resource
 {
     protected static ?string $model = AssetTransfer::class;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
 
@@ -109,9 +112,9 @@ class AssetTransferResource extends Resource
                             ->required()
                             ->rules([
                                 'required',
-                                function () {
-                                    return function (string $attribute, $value, \Closure $fail) {
-                                        $fromCabangId = request()->input('from_cabang_id');
+                                function (Forms\Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $fromCabangId = $get('from_cabang_id');
                                         if ($fromCabangId && $value == $fromCabangId) {
                                             $fail('Cabang tujuan harus berbeda dengan cabang asal.');
                                         }
@@ -236,8 +239,30 @@ class AssetTransferResource extends Resource
                         ->visible(fn($record) => $record->status === 'pending')
                         ->requiresConfirmation()
                         ->action(function ($record) {
-                            $transferService = app(\App\Services\AssetTransferService::class);
-                            $transferService->approveTransfer($record);
+                            try {
+                                $transferService = app(\App\Services\AssetTransferService::class);
+                                $transferService->approveTransfer($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Transfer Aset Disetujui')
+                                    ->body('Transfer aset berhasil disetujui dan siap diproses lebih lanjut.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Throwable $e) {
+                                Log::error('AssetTransfer approve failed', [
+                                    'asset_transfer_id' => $record->id,
+                                    'asset_id' => $record->asset_id,
+                                    'from_cabang_id' => $record->from_cabang_id,
+                                    'to_cabang_id' => $record->to_cabang_id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Menyetujui Transfer Aset')
+                                    ->body('Persetujuan transfer aset gagal diproses. Silakan coba lagi atau hubungi tim IT.')
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                     Tables\Actions\Action::make('complete')
                         ->label('Complete Transfer')
@@ -246,8 +271,30 @@ class AssetTransferResource extends Resource
                         ->visible(fn($record) => $record->status === 'approved')
                         ->requiresConfirmation()
                         ->action(function ($record) {
-                            $transferService = app(\App\Services\AssetTransferService::class);
-                            $transferService->completeTransfer($record);
+                            try {
+                                $transferService = app(\App\Services\AssetTransferService::class);
+                                $transferService->completeTransfer($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Transfer Aset Selesai')
+                                    ->body('Transfer aset berhasil diselesaikan dan lokasi aset sudah diperbarui.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Throwable $e) {
+                                Log::error('AssetTransfer complete failed', [
+                                    'asset_transfer_id' => $record->id,
+                                    'asset_id' => $record->asset_id,
+                                    'from_cabang_id' => $record->from_cabang_id,
+                                    'to_cabang_id' => $record->to_cabang_id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Menyelesaikan Transfer')
+                                    ->body('Penyelesaian transfer aset gagal. Silakan periksa data transfer dan coba kembali.')
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                     Tables\Actions\Action::make('cancel')
                         ->label('Cancel')
@@ -272,8 +319,29 @@ class AssetTransferResource extends Resource
                                 ]),
                         ])
                         ->action(function ($record, array $data) {
-                            $transferService = app(\App\Services\AssetTransferService::class);
-                            $transferService->cancelTransfer($record, $data['cancel_reason']);
+                            try {
+                                $transferService = app(\App\Services\AssetTransferService::class);
+                                $transferService->cancelTransfer($record, $data['cancel_reason']);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Transfer Aset Dibatalkan')
+                                    ->body('Transfer aset berhasil dibatalkan sesuai alasan yang diberikan.')
+                                    ->warning()
+                                    ->send();
+                            } catch (\Throwable $e) {
+                                Log::error('AssetTransfer cancel failed', [
+                                    'asset_transfer_id' => $record->id,
+                                    'asset_id' => $record->asset_id,
+                                    'status' => $record->status,
+                                    'cancel_reason' => $data['cancel_reason'] ?? null,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Membatalkan Transfer')
+                                    ->body('Pembatalan transfer aset gagal diproses. Silakan coba lagi.')
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)

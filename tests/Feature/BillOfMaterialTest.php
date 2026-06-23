@@ -10,6 +10,7 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Services\BillOfMaterialService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BillOfMaterialTest extends TestCase
@@ -66,7 +67,7 @@ class BillOfMaterialTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function bom_creation_with_components()
     {
         // Arrange
@@ -138,7 +139,7 @@ class BillOfMaterialTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function multi_level_bom_support()
     {
         // Arrange - Create a sub-assembly BOM first
@@ -191,7 +192,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertEquals(4.00, $mainBomItem->quantity);
     }
 
-    /** @test */
+    #[Test]
     public function bom_cost_calculation()
     {
         // Arrange
@@ -237,7 +238,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertEquals(1585.00, $bom->fresh()->total_cost);
     }
 
-    /** @test */
+    #[Test]
     public function bom_version_update()
     {
         // Arrange
@@ -278,7 +279,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertEquals(2, $bom->items()->count());
     }
 
-    /** @test */
+    #[Test]
     public function bom_code_generation()
     {
         // Arrange
@@ -308,7 +309,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertTrue(str_contains($code2, $expectedDate));
     }
 
-    /** @test */
+    #[Test]
     public function bom_relationships()
     {
         // Arrange
@@ -341,7 +342,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertEquals($this->componentProduct1->id, $item->product->id);
     }
 
-    /** @test */
+    #[Test]
     public function bom_soft_delete_cascade()
     {
         // Arrange
@@ -385,7 +386,7 @@ class BillOfMaterialTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function bom_active_status_filtering()
     {
         // Arrange
@@ -412,7 +413,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertEquals(1, $inactiveBoms);
     }
 
-    /** @test */
+    #[Test]
     public function bom_item_subtotal_calculation()
     {
         // Arrange
@@ -438,7 +439,7 @@ class BillOfMaterialTest extends TestCase
         $this->assertEquals(75.00, $item->quantity * $item->unit_price);
     }
 
-    /** @test */
+    #[Test]
     public function bom_with_zero_costs()
     {
         // Arrange

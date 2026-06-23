@@ -33,7 +33,7 @@ class VendorCustomerSummaryPage extends Page
 
     protected static ?string $navigationLabel = 'Laporan Vendor/Customer Summary';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public function mount(): void
     {

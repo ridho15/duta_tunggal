@@ -6,12 +6,27 @@ use App\Models\SaleOrder;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
 use App\Models\InvoiceItem;
+use App\Models\StockReservation;
 use App\Models\WarehouseConfirmation;
 use App\Models\WarehouseConfirmationItem;
+use App\Services\SalesInvoiceTaxResolver;
+use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Illuminate\Support\Facades\Log;
 
 class SaleOrderObserver
 {
+    /**
+     * Handle the SaleOrder "created" event.
+     * Diperlukan untuk menangani SO yang dibuat langsung dengan status 'approved'
+     * (misalnya SO dari Quotation yang sudah approved).
+     */
+    public function created(SaleOrder $saleOrder): void
+    {
+        // WC and DO are no longer auto-created on SO approval.
+        // They are created manually by the user when creating a Delivery Order.
+    }
+
     /**
      * Handle the SaleOrder "updated" event.
      */
@@ -20,10 +35,7 @@ class SaleOrderObserver
         $originalStatus = $saleOrder->getOriginal('status');
         $newStatus = $saleOrder->status;
 
-        // Jika status berubah ke 'approved', buat warehouse confirmation otomatis
-        if ($originalStatus !== 'approved' && $newStatus === 'approved') {
-            $this->createWarehouseConfirmationForApprovedSaleOrder($saleOrder);
-        }
+        // WC and DO creation is triggered when a Delivery Order is created.
 
         // Jika status berubah ke 'completed', buat invoice otomatis dan kurangi stock untuk Ambil Sendiri
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
@@ -35,6 +47,32 @@ class SaleOrderObserver
         if ($saleOrder->wasChanged('total_amount')) {
             $this->syncJournalEntries($saleOrder);
         }
+
+        // Jika status berubah ke 'canceled', lepaskan semua stock reservation
+        if ($originalStatus !== 'canceled' && $newStatus === 'canceled') {
+            $this->releaseStockReservations($saleOrder);
+        }
+    }
+
+    /**
+     * Release all stock reservations for a cancelled sale order.
+     */
+    protected function releaseStockReservations(SaleOrder $saleOrder): void
+    {
+        $count = StockReservation::where('sale_order_id', $saleOrder->id)->count();
+        if ($count === 0) {
+            return;
+        }
+
+        StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+            $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available & decrements qty_reserved
+        });
+
+        Log::info('SaleOrderObserver: Released stock reservations for canceled SO', [
+            'sale_order_id' => $saleOrder->id,
+            'so_number' => $saleOrder->so_number,
+            'reservations_released' => $count,
+        ]);
     }
 
     /**
@@ -48,7 +86,7 @@ class SaleOrderObserver
         ]);
 
         // Load relationships
-        $saleOrder->loadMissing('saleOrderItem.product', 'deliveryOrder', 'customer');
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.currency', 'deliveryOrder', 'customer');
 
         // Cek apakah sudah ada invoice untuk sale order ini
         $existingInvoice = Invoice::where('from_model_type', SaleOrder::class)
@@ -64,16 +102,33 @@ class SaleOrderObserver
         $subtotal = 0;
         $tax = 0;
         $invoiceItems = [];
-
+        $currencySnapshots = collect();
+        $invoiceTaxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($saleOrder);
         foreach ($saleOrder->saleOrderItem as $item) {
+            // Prefer explicit item currency; fall back to the sale order currency when absent
+            $itemCurrencyId = is_numeric($item->currency_id ?? null) ? (int) $item->currency_id : (is_numeric($saleOrder->currency_id ?? null) ? (int) $saleOrder->currency_id : null);
+            $itemExchangeRate = $itemCurrencyId && (int) $itemCurrencyId === (int) ($saleOrder->currency_id ?? 0)
+                ? (float) ($saleOrder->exchange_rate ?? CurrencyConversionResolver::resolveRate($itemCurrencyId))
+                : CurrencyConversionResolver::resolveRate($itemCurrencyId);
+            $itemExchangeRate = $itemExchangeRate > 0 ? $itemExchangeRate : 1.0;
+            $currencySnapshots->push([
+                'currency_id' => $itemCurrencyId,
+                'exchange_rate' => $itemExchangeRate,
+            ]);
+
+            // FIX: Use 'Eksklusif' as the null default to match SalesOrderService::updateTotalAmount
+            // which also defaults to 'Exclusive' (normalises to 'Eksklusif').
+            // Keeping both paths consistent prevents SO total_amount diverging from invoice total.
+            $tipePajak = $item->tipe_pajak ?? 'Eksklusif';
+
             // Calculate subtotal using HelperController for consistency
-            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $item->tipe_pajak ?? null);
+            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $tipePajak);
             // Use TaxService to get correct breakdown
             $taxService = \App\Services\TaxService::class;
             $baseAmount = $item->quantity * $item->unit_price * (1 - $item->discount / 100);
             
             try {
-                $taxResult = $taxService::compute($baseAmount, $item->tax, $item->tipe_pajak ?? null);
+                $taxResult = $taxService::compute($baseAmount, $item->tax, $tipePajak);
                 $lineTax = $taxResult['ppn'];
                 $subtotalBeforeTax = $taxResult['dpp'];
             } catch (\Throwable $e) {
@@ -87,16 +142,22 @@ class SaleOrderObserver
                 $lineTax = 0;
                 $subtotalBeforeTax = $baseAmount;
             }
+
+            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotalBeforeTax), $itemCurrencyId, false);
+            $lineTaxIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($lineTax), $itemCurrencyId, false);
+            $lineTotalIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($lineSubtotal), $itemCurrencyId, false);
             
-            $subtotal += $subtotalBeforeTax;
-            $tax += $lineTax;
+            $subtotal += $subtotalBeforeTaxIdr;
+            $tax += $lineTaxIdr;
 
             Log::info('SaleOrderObserver: Calculated values', [
                 'item_id' => $item->id,
                 'base_amount' => $baseAmount,
                 'tax_result' => $taxResult ?? 'error',
-                'subtotal_before_tax' => $subtotalBeforeTax,
-                'line_subtotal' => $lineSubtotal,
+                'subtotal_before_tax' => $subtotalBeforeTaxIdr,
+                'line_subtotal' => $lineTotalIdr,
+                'currency_id' => $itemCurrencyId,
+                'exchange_rate' => $itemExchangeRate,
             ]);
 
             // Get sales COA from product
@@ -105,12 +166,12 @@ class SaleOrderObserver
             $invoiceItems[] = [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
-                'price' => $item->unit_price,
+                'price' => CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($item->unit_price), $itemCurrencyId, false),
                 'discount' => $item->discount,
                 'tax_rate' => $item->tax,
-                'tax_amount' => $lineTax,
-                'subtotal' => $subtotalBeforeTax,
-                'total' => $lineSubtotal,
+                'tax_amount' => $lineTaxIdr,
+                'subtotal' => $subtotalBeforeTaxIdr,
+                'total' => $lineTotalIdr,
                 'coa_id' => $salesCoaId, // Add sales COA ID from product
             ];
         }
@@ -131,7 +192,33 @@ class SaleOrderObserver
             }
         }
 
-        $total = $subtotal + $tax + $additionalCosts;
+        // FIX #1a: store the invoice-level tax metadata derived from the SO items.
+        // `tax` and `ppn_rate` hold the rate, while the monetary PPN is calculated separately.
+        $taxMonetaryAmount = $tax;
+        $ppnRate = (float) $invoiceTaxData['ppn_rate'];
+        $tipePajak = $invoiceTaxData['tipe_pajak'];
+
+        $total = $subtotal + $taxMonetaryAmount + $additionalCosts;
+        $normalizedCurrencies = $currencySnapshots
+            ->map(function (array $snapshot): array {
+                $currencyId = is_numeric($snapshot['currency_id'] ?? null) ? (int) $snapshot['currency_id'] : null;
+                $exchangeRate = (float) ($snapshot['exchange_rate'] ?? CurrencyConversionResolver::resolveRate($currencyId));
+
+                return [
+                    'currency_id' => $currencyId,
+                    'exchange_rate' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+                ];
+            })
+            ->filter(fn (array $snapshot) => ! empty($snapshot['currency_id']))
+            ->unique(fn (array $snapshot) => ($snapshot['currency_id'] ?? 'null') . ':' . number_format((float) $snapshot['exchange_rate'], 8, '.', ''))
+            ->values();
+
+        $invoiceCurrency = $normalizedCurrencies->count() === 1
+            ? $normalizedCurrencies->first()
+            : [
+                'currency_id' => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'),
+                'exchange_rate' => 1.0,
+            ];
 
         // Load customer data
         $saleOrder->load('customer');
@@ -144,19 +231,32 @@ class SaleOrderObserver
             'customer_object' => $saleOrder->customer,
         ]);
 
+        // FIX #4: Use InvoiceService for proper sequential invoice number generation.
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
+
         $invoiceData = [
-            'invoice_number' => 'INV-' . $saleOrder->so_number . '-' . now()->format('YmdHis'),
+            'invoice_number' => $invoiceNumber,
             'from_model_type' => SaleOrder::class,
             'from_model_id' => $saleOrder->id,
             'customer_name' => $saleOrder->customer?->name,
             'customer_phone' => $saleOrder->customer?->phone,
             'invoice_date' => now()->toDateString(),
-            'due_date' => now()->addDays(30)->toDateString(), // Default 30 hari
+            'due_date' => now()->addDays(
+                $saleOrder->tempo_pembayaran
+                    ?? $saleOrder->customer?->tempo_kredit
+                    ?? 30
+            )->toDateString(), // Gunakan tempo_pembayaran SO jika ada, lalu default customer, lalu 30 hari
             'subtotal' => $subtotal,
-            'tax' => $tax,
+            'tax' => $ppnRate,         // FIX #1a: store rate (int, e.g. 11), not monetary amount
+            'ppn_rate' => $ppnRate,    // FIX #1a: also populate dedicated ppn_rate field
+            'tipe_pajak' => $tipePajak,
+            'dpp' => $subtotal,        // FIX #1a: DPP = subtotal (sum of DPP amounts)
             'total' => $total,
+            'currency_id' => $invoiceCurrency['currency_id'],
+            'exchange_rate' => $invoiceCurrency['exchange_rate'],
             'other_fee' => $otherFees, // Tambahkan biaya tambahan dari delivery orders
             'delivery_orders' => $saleOrder->deliveryOrder->pluck('id')->toArray(), // Tambahkan delivery order IDs
+            'cabang_id' => $saleOrder->cabang_id, // FIX #5: propagate branch scope
             'status' => 'unpaid', // Atau sesuai logic
             'notes' => 'Auto-generated from completed Sale Order ' . $saleOrder->so_number,
         ];
@@ -194,28 +294,31 @@ class SaleOrderObserver
         ]);
 
         // Load relationships
-        $saleOrder->loadMissing('saleOrderItem.product');
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
 
         // Cek apakah sudah ada warehouse confirmation untuk sale order ini
-        $existingWC = WarehouseConfirmation::where('sale_order_id', $saleOrder->id)->first();
+        $existingWC = WarehouseConfirmation::where('confirmable_type', SaleOrder::class)
+            ->where('confirmable_id', $saleOrder->id)
+            ->first();
 
         if ($existingWC) {
             Log::info('Warehouse confirmation already exists for sale order', ['wc_id' => $existingWC->id]);
             return;
         }
 
-        // Hanya buat warehouse confirmation untuk tipe pengiriman 'Kirim Langsung'
-        if ($saleOrder->tipe_pengiriman !== 'Kirim Langsung') {
-            Log::info('Skipping warehouse confirmation creation - not "Kirim Langsung" type', [
+        // Hanya buat warehouse confirmation untuk tipe pengiriman yang memerlukan DO
+        // Baik 'Kirim Langsung' maupun 'Ambil Sendiri' sekarang memerlukan DO untuk keperluan tracking
+        if (!in_array($saleOrder->tipe_pengiriman, ['Kirim Langsung', 'Ambil Sendiri'])) {
+            Log::info('Skipping warehouse confirmation creation - unrecognized delivery type', [
                 'tipe_pengiriman' => $saleOrder->tipe_pengiriman
             ]);
             return;
         }
 
-        // Cek apakah stock mencukupi untuk semua items
+        // Warehouse confirmation must always be processed manually by warehouse.
         $hasInsufficientStock = $saleOrder->hasInsufficientStock();
-        $wcStatus = $hasInsufficientStock ? 'request' : 'confirmed';
-        $itemStatus = $hasInsufficientStock ? 'request' : 'confirmed';
+        $wcStatus = 'request';
+        $itemStatus = 'request';
 
         Log::info('SaleOrderObserver: Stock check result', [
             'sale_order_id' => $saleOrder->id,
@@ -224,24 +327,46 @@ class SaleOrderObserver
             'item_status' => $itemStatus,
         ]);
 
-        // Buat warehouse confirmation dengan status sesuai stock availability
+        // Buat warehouse confirmation dengan status sesuai stock availability (polymorphic confirmable)
         $warehouseConfirmation = WarehouseConfirmation::create([
-            'sale_order_id' => $saleOrder->id,
+            'confirmable_type'  => SaleOrder::class,
+            'confirmable_id'    => $saleOrder->id,
             'confirmation_type' => 'sales_order',
-            'status' => $wcStatus,
-            'note' => 'Auto-generated from approved Sale Order ' . $saleOrder->so_number,
-            'confirmed_by' => $hasInsufficientStock ? null : $saleOrder->approve_by, // Set confirmed_by jika auto-approved
-            'confirmed_at' => $hasInsufficientStock ? null : now(),
+            'status'            => $wcStatus,
+            'note'              => 'Auto-generated from approved Sale Order ' . $saleOrder->so_number,
+            'confirmed_by'      => null,
+            'confirmed_at'      => null,
         ]);
 
         // Buat warehouse confirmation items
+        $skippedProducts = [];
         foreach ($saleOrder->saleOrderItem as $item) {
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                foreach ($allocations as $allocation) {
+                    WarehouseConfirmationItem::create([
+                        'warehouse_confirmation_id' => $warehouseConfirmation->id,
+                        'sale_order_item_id' => $item->id,
+                        'product_name' => $item->product->name ?? 'Unknown Product',
+                        'requested_qty' => $allocation->quantity,
+                        'confirmed_qty' => $allocation->quantity,
+                        'warehouse_id' => $allocation->warehouse_id,
+                        'rak_id' => null,
+                        'status' => $itemStatus,
+                    ]);
+                }
+                continue;
+            }
+
             // Skip item yang tidak memiliki warehouse_id
             if (!$item->warehouse_id) {
+                $productName = $item->product->name ?? ('ID: ' . $item->product_id);
                 Log::warning('Skipping warehouse confirmation item - no warehouse_id', [
                     'sale_order_item_id' => $item->id,
-                    'product_name' => $item->product->name ?? 'Unknown'
+                    'product_name' => $productName,
                 ]);
+                $skippedProducts[] = $productName;
                 continue;
             }
 
@@ -261,16 +386,16 @@ class SaleOrderObserver
             'wc_id' => $warehouseConfirmation->id,
             'sale_order_id' => $saleOrder->id,
             'status' => $wcStatus,
-            'auto_approved' => !$hasInsufficientStock,
+            'auto_approved' => false,
         ]);
 
-        // Jika WC status adalah confirmed, buat delivery order otomatis
-        if ($wcStatus === 'confirmed') {
-            // Load relationships yang diperlukan
-            $warehouseConfirmation->load('warehouseConfirmationItems.saleOrderItem.product');
-            
-            // Panggil method untuk membuat delivery order
-            \App\Models\WarehouseConfirmation::createDeliveryOrderForConfirmedWarehouseConfirmation($warehouseConfirmation);
+        // Notify if some items were skipped because warehouse_id is missing
+        if (!empty($skippedProducts)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Perhatian: Beberapa Item Tidak Diproses')
+                ->warning()
+                ->body('Item berikut tidak memiliki gudang sehingga tidak dimasukkan ke Warehouse Confirmation: ' . implode(', ', $skippedProducts) . '. Silakan set warehouse pada item SO tersebut.')
+                ->send();
         }
     }
 
@@ -331,8 +456,8 @@ class SaleOrderObserver
             'so_number' => $saleOrder->so_number,
         ]);
 
-        // Load sale order items with product data
-        $saleOrder->loadMissing('saleOrderItem.product');
+        // Load sale order items with product data AND warehouse allocations for multi-warehouse support
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
 
         $date = $saleOrder->order_date ?? now()->toDateString();
 
@@ -348,24 +473,64 @@ class SaleOrderObserver
                 continue;
             }
 
-            // Skip if warehouse_id is null
-            if (!$item->warehouse_id) {
-                continue;
-            }
-
-            // Create sales stock movement to reduce physical inventory
             $productService = app(\App\Services\ProductService::class);
-            $productService->createStockMovement(
-                product_id: $product->id,
-                warehouse_id: $item->warehouse_id,
-                quantity: $qtySold,
-                type: 'sales',
-                date: $date,
-                notes: "Self-pickup sales for SO {$saleOrder->so_number}",
-                rak_id: $item->rak_id,
-                fromModel: null,
-                value: $product->cost_price * $qtySold
-            );
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                // Multi-warehouse mode: create stock movement per allocation
+                foreach ($allocations as $allocation) {
+                    $allocationQty = max(0, (float) $allocation->quantity);
+                    if ($allocationQty <= 0 || !$allocation->warehouse_id) {
+                        continue;
+                    }
+
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $allocation->warehouse_id,
+                        quantity: $allocationQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Self-pickup sales (multi-gudang) for SO {$saleOrder->so_number}",
+                        rak_id: null,
+                        fromModel: null,
+                        value: $product->cost_price * $allocationQty
+                    );
+                }
+            } else {
+                // Single warehouse mode
+                if (!$item->warehouse_id) {
+                    Log::warning('SaleOrderObserver: Skipping stock reduction for self-pickup — item has no warehouse_id and no allocations', [
+                        'sale_order_item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                    ]);
+                    continue;
+                }
+
+                $productService->createStockMovement(
+                    product_id: $product->id,
+                    warehouse_id: $item->warehouse_id,
+                    quantity: $qtySold,
+                    type: 'sales',
+                    date: $date,
+                    notes: "Self-pickup sales for SO {$saleOrder->so_number}",
+                    rak_id: $item->rak_id,
+                    fromModel: null,
+                    value: $product->cost_price * $qtySold
+                );
+            }
+        }
+
+        $reservationCount = StockReservation::where('sale_order_id', $saleOrder->id)->count();
+        if ($reservationCount > 0) {
+            StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+                $reservation->delete();
+            });
+
+            Log::info('SaleOrderObserver: Released self-pickup reservations after stock movement', [
+                'sale_order_id' => $saleOrder->id,
+                'so_number' => $saleOrder->so_number,
+                'reservations_released' => $reservationCount,
+            ]);
         }
     }
 }

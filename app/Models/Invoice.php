@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Scopes\CabangScope;
+use App\Services\TaxService;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,14 +35,19 @@ class Invoice extends Model
         'invoice_number',
         'from_model_type',
         'from_model_id',
+        'currency_id',
+        'exchange_rate',
         'invoice_date',
         'subtotal',
         'tax',
+        'pph22_amount',
+        'bea_masuk_amount',
         'other_fee',
         'total',
         'due_date',
         'status', // draft, sent, paid, partially_paid, overdue
         'ppn_rate',
+        'tipe_pajak',
         'dpp', //Dasar penggunaan pajak,
         'customer_name',
         'customer_phone',
@@ -64,7 +71,146 @@ class Invoice extends Model
         'delivery_orders' => 'array',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
+        'currency_id' => 'integer',
+        'exchange_rate' => 'decimal:8',
+        'pph22_amount' => 'float',
+        'bea_masuk_amount' => 'float',
     ];
+
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower(trim((string) $value))) {
+            self::STATUS_DRAFT => self::STATUS_DRAFT,
+            self::STATUS_SENT => self::STATUS_SENT,
+            self::STATUS_PAID => self::STATUS_PAID,
+            self::STATUS_PARTIALLY_PAID => self::STATUS_PARTIALLY_PAID,
+            self::STATUS_OVERDUE => self::STATUS_OVERDUE,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            self::STATUS_DRAFT,
+            self::STATUS_SENT,
+            self::STATUS_PAID,
+            self::STATUS_PARTIALLY_PAID,
+            self::STATUS_OVERDUE => $normalized,
+            default => $value,
+        };
+    }
+
+    public function getInvoiceDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string) $value) === '' || trim((string) $value) === '-') {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function setInvoiceDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['invoice_date'] = null;
+            return;
+        }
+
+        $this->attributes['invoice_date'] = $value;
+    }
+
+    public function getDueDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string) $value) === '' || trim((string) $value) === '-') {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function setDueDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['due_date'] = null;
+            return;
+        }
+
+        $this->attributes['due_date'] = $value;
+    }
+
+    protected function normalizeMoneyAttribute(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (float) MoneyHelper::safeParse($value);
+    }
+
+    public function setSubtotalAttribute(mixed $value): void
+    {
+        $this->attributes['subtotal'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setTotalAttribute(mixed $value): void
+    {
+        $this->attributes['total'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setDppAttribute(mixed $value): void
+    {
+        $this->attributes['dpp'] = $this->normalizeMoneyAttribute($value);
+    }
+
+    public function setTaxAttribute(mixed $value): void
+    {
+        $this->attributes['tax'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setPph22AmountAttribute(mixed $value): void
+    {
+        $this->attributes['pph22_amount'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setBeaMasukAmountAttribute(mixed $value): void
+    {
+        $this->attributes['bea_masuk_amount'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
+
+    public function setCurrencyIdAttribute(mixed $value): void
+    {
+        $this->attributes['currency_id'] = is_numeric($value) ? (int) $value : null;
+    }
+
+    public function setExchangeRateAttribute(mixed $value): void
+    {
+        $this->attributes['exchange_rate'] = $this->normalizeMoneyAttribute($value) ?? 1.0;
+    }
+
+    public function setPpnRateAttribute(mixed $value): void
+    {
+        $this->attributes['ppn_rate'] = $this->normalizeMoneyAttribute($value) ?? 0.0;
+    }
 
     /**
      * Ensure other_fee always returns an array even when stored as integer 0 or null in DB.
@@ -90,7 +236,19 @@ class Invoice extends Model
     {
         parent::boot();
 
-        static::observe(\App\Observers\InvoiceObserver::class);
+        // BUG FIX: InvoiceObserver is already registered via AppServiceProvider.
+        // Double-registering it here caused all observer methods (created, updated, etc.)
+        // to fire twice, resulting in duplicate AccountReceivable/AccountPayable records
+        // and doubled journal entries on every invoice event.
+        // DO NOT add static::observe(InvoiceObserver::class) here.
+
+        // Auto-populate dpp from subtotal when not explicitly provided.
+        // Prevents null dpp on programmatically created invoices (old records, seeder, API, etc.).
+        static::creating(function (Invoice $invoice): void {
+            if ($invoice->dpp === null) {
+                $invoice->dpp = $invoice->subtotal ?? 0;
+            }
+        });
     }
 
     public function getOtherFeeTotalAttribute(): int
@@ -106,6 +264,59 @@ class Invoice extends Model
             }
         }
         return $sum;
+    }
+
+    public function getTaxTypeDisplayAttribute(): string
+    {
+        return TaxService::normalizeType($this->tipe_pajak ?? null);
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
+    }
+
+    public function getDisplayCurrencyAttribute(): ?Currency
+    {
+        if ($this->currency?->exists) {
+            return $this->currency;
+        }
+
+        if ($this->fromModel && method_exists($this->fromModel, 'currency')) {
+            return $this->fromModel->currency()->first();
+        }
+
+        return $this->fromModel?->currency ?? null;
+    }
+
+    public function getDisplayCurrencyIdAttribute(): ?int
+    {
+        return is_numeric($this->currency_id ?? null)
+            ? (int) $this->currency_id
+            : (is_numeric($this->fromModel?->currency_id ?? null) ? (int) $this->fromModel->currency_id : null);
+    }
+
+    public function getEffectivePpnRateAttribute(): float
+    {
+        $ppnRate = (float) ($this->ppn_rate ?? 0);
+
+        if ($ppnRate > 0) {
+            return $ppnRate;
+        }
+
+        $legacyTaxRate = (float) ($this->tax ?? 0);
+
+        return $legacyTaxRate > 0 ? $legacyTaxRate : 0.0;
+    }
+
+    /**
+     * Computed PPN amount (nominal PPN in IDR) = DPP × ppn_rate / 100
+     */
+    public function getPpnAmountAttribute(): float
+    {
+        $dpp = (float) ($this->subtotal ?? $this->dpp ?? 0);
+        $rate = $this->effective_ppn_rate;
+        return $rate > 0 ? round($dpp * $rate / 100, 2) : 0.0;
     }
 
     public function invoiceItem()

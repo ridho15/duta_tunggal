@@ -69,12 +69,12 @@ class VoucherRequest extends Model
 
     public function approver(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'approved_by');
+        return $this->belongsTo(User::class, 'approved_by')->withDefault();
     }
 
     public function requestedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'requested_to_owner_by');
+        return $this->belongsTo(User::class, 'requested_to_owner_by')->withDefault();
     }
 
     public function cashBankTransaction(): BelongsTo

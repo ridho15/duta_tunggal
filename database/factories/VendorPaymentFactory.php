@@ -16,13 +16,18 @@ class VendorPaymentFactory extends Factory
      */
     public function definition(): array
     {
+        $totalPayment = number_format($this->faker->numberBetween(100000, 10000000), 2, '.', '');
+
         return [
             'supplier_id' => \App\Models\Supplier::factory(), // will be overridden when needed
             'selected_invoices' => [],
             'invoice_receipts' => [],
+            'currency_id' => null,
+            'exchange_rate' => 1,
             'payment_date' => now(),
             'ntpn' => $this->faker->optional()->randomNumber(9),
-            'total_payment' => number_format($this->faker->numberBetween(100000, 10000000), 2, '.', ''),
+            'total_payment' => $totalPayment,
+            'total_payment_idr' => $totalPayment,
             'coa_id' => null,
             'payment_method' => $this->faker->randomElement(['transfer', 'cash', 'check']),
             'notes' => $this->faker->optional()->sentence(),

@@ -167,7 +167,8 @@ class PurchaseTransactionSeeder extends Seeder
             ]);
         }
 
-        $this->command->info("Created purchase transaction: {$purchaseOrder->po_number} -> {$invoice->invoice_number} (Supplier: {$supplier->name})");
+        $supplierName = $supplier->perusahaan ?? '';
+        $this->command->info("Created purchase transaction: {$purchaseOrder->po_number} -> {$invoice->invoice_number} (Supplier: {$supplierName})");
     }
 
     private function updateInventoryStock($productId, $quantity, $date): void

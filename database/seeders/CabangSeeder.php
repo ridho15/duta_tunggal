@@ -15,7 +15,7 @@ class CabangSeeder extends Seeder
     {
         $this->command->info('Seeding cabang data...');
 
-        $faker = \Faker\Factory::create('id_ID');
+        $faker = fake('id_ID');
 
         // Define static cabang data for consistent seeding
         $staticCabangs = [

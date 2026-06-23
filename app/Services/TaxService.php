@@ -22,8 +22,8 @@ class TaxService
             return 'Eksklusif'; // default system mode per business logic (amount + ppn)
         }
         return match ($t) {
-            'inklusif' => 'Inklusif',
-            'eksklusif', 'eklusif' => 'Eksklusif',
+            'inklusif', 'inclusive', 'ppn included', 'ppn_included' => 'Inklusif',
+            'eksklusif', 'eklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'Eksklusif',
             'non pajak', 'non-pajak', 'nonpajak', 'none' => 'Non Pajak',
             default => ucfirst($t),
         };

@@ -2,9 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Cabang;
-use App\Models\ChartOfAccount;
 use App\Models\Product;
+use App\Models\Cabang;
 use App\Models\ProductCategory;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
@@ -41,15 +40,34 @@ class ProductFactory extends Factory
             'jumlah_kelipatan_gudang_besar' => $this->faker->numberBetween(1, 50),
             'jumlah_jual_kategori_banyak' => $this->faker->numberBetween(1, 100),
             'kode_merk' => 'MRK-' . $this->faker->unique()->numerify('###'),
-            'inventory_coa_id' => $this->resolveCoaId('1140.10'),
-            'sales_coa_id' => $this->resolveCoaId('4100.10'),
-            'sales_return_coa_id' => $this->resolveCoaId('4120.10'),
-            'sales_discount_coa_id' => $this->resolveCoaId('4110.10'),
-            'goods_delivery_coa_id' => $this->resolveCoaId('1140.20'),
-            'cogs_coa_id' => $this->resolveCoaId('5100.10'),
-            'purchase_return_coa_id' => $this->resolveCoaId('5120.10'),
-            'unbilled_purchase_coa_id' => $this->resolveCoaId('2190.10'),
+            'inventory_coa_id' => Product::resolveDefaultProductCoaId('inventory_coa_id'),
+            'sales_coa_id' => Product::resolveDefaultProductCoaId('sales_coa_id'),
+            'sales_return_coa_id' => Product::resolveDefaultProductCoaId('sales_return_coa_id'),
+            'sales_discount_coa_id' => Product::resolveDefaultProductCoaId('sales_discount_coa_id'),
+            'goods_delivery_coa_id' => Product::resolveDefaultProductCoaId('goods_delivery_coa_id'),
+            'cogs_coa_id' => Product::resolveDefaultProductCoaId('cogs_coa_id'),
+            'purchase_return_coa_id' => Product::resolveDefaultProductCoaId('purchase_return_coa_id'),
+            'unbilled_purchase_coa_id' => Product::resolveDefaultProductCoaId('unbilled_purchase_coa_id'),
+            'temporary_procurement_coa_id' => Product::resolveDefaultProductCoaId('temporary_procurement_coa_id'),
+            'manufacturing_labor_coa_id' => Product::resolveDefaultProductCoaId('manufacturing_labor_coa_id'),
+            'manufacturing_overhead_coa_id' => Product::resolveDefaultProductCoaId('manufacturing_overhead_coa_id'),
         ];
+    }
+
+    public function forCabang(Cabang|int|null $cabang = null): static
+    {
+        return $this->state(function (array $attributes) use ($cabang) {
+            $cabangId = match (true) {
+                $cabang instanceof Cabang => $cabang->id,
+                is_int($cabang) && $cabang > 0 => $cabang,
+                default => Cabang::query()->inRandomOrder()->value('id')
+                    ?? Cabang::factory()->create()->id,
+            };
+
+            return [
+                'cabang_id' => $cabangId,
+            ];
+        });
     }
 
     public function configure()
@@ -63,20 +81,4 @@ class ProductFactory extends Factory
         });
     }
 
-    private function resolveCoaId(string $code): ?int
-    {
-        static $cache = [];
-
-        if (array_key_exists($code, $cache)) {
-            if ($cache[$code] && ! ChartOfAccount::whereKey($cache[$code])->exists()) {
-                unset($cache[$code]);
-            } else {
-                return $cache[$code];
-            }
-        }
-
-        $cache[$code] = ChartOfAccount::where('code', $code)->value('id');
-
-        return $cache[$code];
-    }
 }

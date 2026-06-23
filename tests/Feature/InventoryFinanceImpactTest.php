@@ -4,17 +4,19 @@ namespace Tests\Feature;
 
 use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
+use App\Models\JournalEntry;
 use App\Models\Product;
 use App\Models\Warehouse;
 use App\Services\BalanceSheetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class InventoryFinanceImpactTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function inventory_stock_affects_balance_sheet()
     {
         // Seed master data
@@ -61,7 +63,7 @@ class InventoryFinanceImpactTest extends TestCase
             'tipe' => 'Kecil',
             'status' => true,
         ]);
-        $coa = ChartOfAccount::where('code', '1-1300')->first(); // Persediaan COA
+        $coa = ChartOfAccount::where('code', '1-1300')->firstOrFail(); // Persediaan COA
 
         $inventoryStock = InventoryStock::create([
             'product_id' => $product->id,
@@ -73,6 +75,34 @@ class InventoryFinanceImpactTest extends TestCase
 
         // Calculate expected value (qty * cost_price)
         $expectedValue = $inventoryStock->qty_available * $product->cost_price;
+
+        $equityAccount = ChartOfAccount::where('type', 'Equity')->firstOrFail();
+
+        JournalEntry::create([
+            'coa_id' => $coa->id,
+            'date' => now()->format('Y-m-d'),
+            'reference' => 'INV-OPEN-001',
+            'description' => 'Opening inventory balance',
+            'debit' => $expectedValue,
+            'credit' => 0,
+            'journal_type' => 'opening_balance',
+            'source_type' => 'manual',
+            'source_id' => 1,
+            'cabang_id' => $warehouse->cabang_id,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $equityAccount->id,
+            'date' => now()->format('Y-m-d'),
+            'reference' => 'INV-OPEN-001',
+            'description' => 'Opening inventory balance offset',
+            'debit' => 0,
+            'credit' => $expectedValue,
+            'journal_type' => 'opening_balance',
+            'source_type' => 'manual',
+            'source_id' => 1,
+            'cabang_id' => $warehouse->cabang_id,
+        ]);
 
         // Get balance sheet after creating inventory stock
         $afterBalance = app(BalanceSheetService::class)->generate();

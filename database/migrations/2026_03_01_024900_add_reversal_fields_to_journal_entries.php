@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('journal_entries') || Schema::hasColumn('journal_entries', 'is_reversal')) {
+            return;
+        }
+
         Schema::table('journal_entries', function (Blueprint $table) {
             $table->boolean('is_reversal')->default(false)->after('bank_recon_date');
             $table->string('reversal_of_transaction_id')->nullable()->after('is_reversal');
@@ -22,6 +26,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('journal_entries') || ! Schema::hasColumn('journal_entries', 'is_reversal')) {
+            return;
+        }
+
         Schema::table('journal_entries', function (Blueprint $table) {
             $table->dropColumn(['is_reversal', 'reversal_of_transaction_id']);
         });

@@ -1,21 +1,223 @@
 <?php
 
+use App\Models\Cabang;
+use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
+use App\Models\TaxSetting;
 use App\Models\SaleOrder;
+use App\Models\UnitOfMeasure;
 use App\Models\User;
+use App\Http\Controllers\HelperController;
 use App\Services\QuotationService;
+use App\Support\TaxTypeHelper;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use App\Filament\Resources\QuotationResource\Pages\EditQuotation;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->quotationService = new QuotationService();
+    // Shared Cabang and UOM used by tests that create Products.
+    // Hard-coding id=1 fails under RefreshDatabase — factories ensure the FK exists.
+    $this->cabang = Cabang::factory()->create(['kode' => 'TEST']);
+    $this->uom    = UnitOfMeasure::factory()->create();
+    $this->idr = Currency::factory()->create([
+        'name' => 'Rupiah',
+        'symbol' => 'Rp',
+        'code' => 'IDR',
+        'to_rupiah' => 1,
+    ]);
+});
+
+test('quotation resource exposes requested form layout and locked calculated fields', function () {
+    $resource = file_get_contents(base_path('app/Filament/Resources/QuotationResource.php'));
+
+    expect($resource)->toContain("Fieldset::make('Form Quotation')")
+        ->and($resource)->toContain('->columns(6)')
+        ->and($resource)->toContain("TextInput::make('quotation_number')")
+        ->and($resource)->toContain("Select::make('customer_id')")
+        ->and($resource)->toContain("Select::make('cabang_id')")
+        ->and($resource)->toContain("DatePicker::make('date')")
+        ->and($resource)->toContain("DatePicker::make('valid_until')")
+        ->and($resource)->toContain("Select::make('currency_id')")
+        ->and($resource)->toContain("->label('Mata Uang')")
+        ->and($resource)->toContain("Hidden::make('exchange_rate')")
+        ->and($resource)->toContain("TextInput::make('tempo_pembayaran')")
+        ->and($resource)->toContain("TextInput::make('total_amount')")
+        ->and($resource)->toContain("->label('Total Amount')")
+        ->and($resource)->toContain("FileUpload::make('po_file_path')")
+        ->and($resource)->toContain("->label('Note')")
+        ->and($resource)->toContain("Repeater::make('quotationItem')")
+        ->and($resource)->toContain('->collapsible()')
+        ->and($resource)->toContain('->addAction(function (ActionsAction $action)')
+        ->and($resource)->toContain("'repeater-collapse'")
+        ->and($resource)->toContain("->icon('heroicon-o-plus-circle')")
+        ->and($resource)->toContain("return sprintf('Product: %s | Qty: %s | Subtotal: %s %s'")
+        ->and($resource)->toContain("TextInput::make('total_price')")
+        ->and($resource)->toContain("->label('Total (Harga x Qty)')")
+        ->and($resource)->toContain("TextInput::make('discount_nominal')")
+        ->and($resource)->toContain("->label('Discount (Nominal)')")
+        ->and($resource)->toContain("Radio::make('tax_type')")
+        ->and($resource)->toContain('->options(static::taxTypeOptions())')
+        ->and($resource)->not->toContain("Select::make('tax_type')")
+        ->and($resource)->toContain("TextInput::make('tax_nominal')")
+        ->and($resource)->toContain('static::resolveCurrencySymbol')
+        ->and($resource)->toContain('resolveQuotationFormCurrencyId')
+        ->and($resource)->toContain('resolveQuotationItemUnitPriceIdr')
+        ->and($resource)->toContain("Hidden::make('unit_price_idr')")
+        ->and($resource)->toContain('static::readOnlyGrayInputAttributes()');
+
+    foreach ([
+        "TextInput::make('total_amount')",
+        "TextInput::make('unit')",
+        "TextInput::make('total_price')",
+        "TextInput::make('discount_nominal')",
+        "TextInput::make('tax')",
+        "TextInput::make('tax_nominal')",
+        "TextInput::make('subtotal')",
+    ] as $field) {
+        $fieldPosition = strpos($resource, $field);
+        expect($fieldPosition)->not->toBeFalse();
+
+        $fieldBlock = substr($resource, $fieldPosition, 900);
+        expect($fieldBlock)->toContain('static::readOnlyGrayInputAttributes()');
+    }
+
+    expect(strpos($resource, "TextInput::make('quotation_number')"))->toBeLessThan(strpos($resource, "Select::make('customer_id')"));
+    expect(strpos($resource, "Select::make('customer_id')"))->toBeLessThan(strpos($resource, "Select::make('cabang_id')"));
+    expect(strpos($resource, "DatePicker::make('date')"))->toBeLessThan(strpos($resource, "DatePicker::make('valid_until')"));
+    expect(strpos($resource, "DatePicker::make('valid_until')"))->toBeLessThan(strpos($resource, "Select::make('currency_id')"));
+    expect(strpos($resource, "Select::make('currency_id')"))->toBeLessThan(strpos($resource, "TextInput::make('tempo_pembayaran')"));
+    expect(strpos($resource, "TextInput::make('tempo_pembayaran')"))->toBeLessThan(strpos($resource, "TextInput::make('total_amount')"));
+    expect(strpos($resource, "TextInput::make('total_amount')"))->toBeLessThan(strpos($resource, "FileUpload::make('po_file_path')"));
+    expect(strpos($resource, "FileUpload::make('po_file_path')"))->toBeLessThan(strpos($resource, "TextArea::make('notes')"));
+
+    expect(strpos($resource, "Select::make('product_id')"))->toBeLessThan(strpos($resource, "TextInput::make('unit')"));
+    expect(strpos($resource, "TextInput::make('unit')"))->toBeLessThan(strpos($resource, "TextInput::make('quantity')"));
+    expect(strpos($resource, "TextInput::make('unit_price')"))->toBeLessThan(strpos($resource, "TextInput::make('total_price')"));
+    expect(strpos($resource, "TextInput::make('total_price')"))->toBeLessThan(strpos($resource, "TextInput::make('discount')"));
+    expect(strpos($resource, "TextInput::make('discount')"))->toBeLessThan(strpos($resource, "TextInput::make('discount_nominal')"));
+    expect(strpos($resource, "Radio::make('tax_type')"))->toBeLessThan(strpos($resource, "TextInput::make('tax')"));
+    expect(strpos($resource, "TextInput::make('tax')"))->toBeLessThan(strpos($resource, "TextInput::make('tax_nominal')"));
+    expect(strpos($resource, "TextInput::make('tax_nominal')"))->toBeLessThan(strpos($resource, "TextInput::make('subtotal')"));
+});
+
+test('quotation tax type options follow purchase request radio values', function () {
+    expect(TaxTypeHelper::options())->toBe([
+        'none' => 'Non Pajak',
+        'inklusif' => 'Inklusif',
+        'eklusif' => 'Eklusif',
+    ]);
+});
+
+test('quotation item calculated display values follow quantity price discount and tax type', function () {
+    $qty = 5;
+    $unitPrice = 100000;
+    $discount = 10;
+    $tax = 11;
+
+    $total = $qty * $unitPrice;
+    $discountNominal = $total * ($discount / 100);
+
+    expect($total)->toBe(500000)
+        ->and($discountNominal)->toBe(50000.0)
+        ->and(HelperController::hitungTaxNominal($qty, $unitPrice, $discount, 0, 'none'))->toBe(0.0)
+        ->and(HelperController::hitungSubtotal($qty, $unitPrice, $discount, 0, 'none'))->toBe(450000.0)
+        ->and(HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, 'eklusif'))->toBe(49500.0)
+        ->and(HelperController::hitungSubtotal($qty, $unitPrice, $discount, $tax, 'eklusif'))->toBe(499500.0)
+        ->and(HelperController::hitungTaxNominal($qty, $unitPrice, $discount, $tax, 'inklusif'))->toBe(49500.0)
+        ->and(HelperController::hitungSubtotal($qty, $unitPrice, $discount, $tax, 'inklusif'))->toBe(450000.0);
+});
+
+test('quotation header currency converts item prices and persists exchange rate', function () {
+    $user = User::factory()->create();
+    foreach ([
+        'view any quotation',
+        'view quotation',
+        'create quotation',
+        'update quotation',
+        'delete quotation',
+        'view any customer',
+        'view any product',
+    ] as $permission) {
+        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        $user->givePermissionTo($permission);
+    }
+
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => '$',
+        'code' => 'USD',
+        'to_rupiah' => 16000,
+    ]);
+    $customer = Customer::factory()->create();
+    $productCategory = ProductCategory::create([
+        'name' => 'Currency Quotation Category',
+        'kode' => 'CQC001',
+        'cabang_id' => $this->cabang->id,
+        'kenaikan_harga' => 0,
+    ]);
+    $product = Product::create([
+        'name' => 'Currency Quotation Product',
+        'sku' => 'CQP001',
+        'cabang_id' => $this->cabang->id,
+        'product_category_id' => $productCategory->id,
+        'sell_price' => 160000,
+        'cost_price' => 100000,
+        'kode_merk' => 'CQP',
+        'uom_id' => $this->uom->id,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
+    $create = Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.quotation_number', 'QO-CURR-0001')
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.valid_until', now()->addDays(30)->toDateString())
+        ->set('data.currency_id', $this->idr->id)
+        ->set('data.quotationItem', [[
+            'quantity' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'tax_type' => 'none',
+        ]])
+        ->set('data.quotationItem.0.product_id', $product->id)
+        ->assertSet('data.quotationItem.0.unit_price', '160.000')
+        ->set('data.currency_id', $usd->id)
+        ->assertSet('data.quotationItem.0.unit_price', '10,00')
+        ->assertSet('data.quotationItem.0.total_price', '10,00')
+        ->assertSet('data.total_amount', '10,00')
+        ->assertSet('data.quotationItem.0.unit_price_idr', '160000.00')
+        ->assertSet('data.quotationItem.0.currency_symbol', '$')
+        ->set('data.currency_id', $this->idr->id)
+        ->assertSet('data.quotationItem.0.unit_price', '160.000')
+        ->assertSet('data.quotationItem.0.total_price', '160.000')
+        ->assertSet('data.total_amount', '160.000')
+        ->set('data.currency_id', $usd->id)
+        ->assertSet('data.quotationItem.0.unit_price', '10,00');
+
+    $create->call('create')->assertHasNoFormErrors();
+
+    $quotation = Quotation::where('quotation_number', 'QO-CURR-0001')->first();
+    $item = $quotation->quotationItem()->first();
+
+    expect($quotation)->not->toBeNull()
+        ->and((int) $quotation->currency_id)->toBe($usd->id)
+        ->and((float) $quotation->exchange_rate)->toBe(16000.0)
+        ->and((float) $quotation->total_amount)->toBe(10.0)
+        ->and((float) $item->unit_price)->toBe(10.0)
+        ->and((float) $item->unit_price_idr)->toBe(160000.0);
 });
 
 test('can create quotation with customer selection and auto-number generation', function () {
@@ -77,19 +279,19 @@ test('can add product items to quotation with quantity and price', function () {
     $productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'kenaikan_harga' => 0,
     ]);
 
     $product = Product::create([
         'name' => 'Test Product',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -145,19 +347,19 @@ test('can calculate quotation totals with subtotal discount and tax', function (
     $productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'kenaikan_harga' => 0,
     ]);
 
     $product1 = Product::create([
         'name' => 'Test Product 1',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST1',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -166,12 +368,12 @@ test('can calculate quotation totals with subtotal discount and tax', function (
     $product2 = Product::create([
         'name' => 'Test Product 2',
         'sku' => 'PROD002',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 200000,
         'cost_price' => 160000,
         'kode_merk' => 'TEST2',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -271,19 +473,19 @@ test('can handle customer acceptance and convert to sales order', function () {
     $productCategory = ProductCategory::create([
         'name' => 'Test Category',
         'kode' => 'TC001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'kenaikan_harga' => 0,
     ]);
 
     $product = Product::create([
         'name' => 'Test Product',
         'sku' => 'PROD001',
-        'cabang_id' => 1,
+        'cabang_id' => $this->cabang->id,
         'product_category_id' => $productCategory->id,
         'sell_price' => 100000,
         'cost_price' => 80000,
         'kode_merk' => 'TEST',
-        'uom_id' => 1,
+        'uom_id' => $this->uom->id,
         'is_active' => true,
         'is_manufacture' => false,
         'is_raw_material' => false,
@@ -516,3 +718,399 @@ test('quotation approval workflow works correctly', function () {
         ->and($quotation2->reject_by)->toBe($user->id)
         ->and($quotation2->reject_at)->toBeInstanceOf(Carbon::class);
 });
+
+// ─── tax_type tests ──────────────────────────────────────────────────────────
+
+test('quotation item stores tax_type None by default', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0001',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 100000,
+        'discount'     => 0,
+        'tax'          => 12,
+        // tax_type omitted — DB default is 'None' (changed by migration 2026_03_12_000001)
+    ]);
+
+    $item->refresh();
+    expect($item->tax_type)->toBe('None');
+});
+
+test('quotation item stores tax_type PPN Included when explicitly set', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0002',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 2500000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'PPN Included',
+    ]);
+
+    $item->refresh();
+    expect($item->tax_type)->toBe('PPN Included');
+});
+
+test('quotation item forces tax to zero when tax type is non tax', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0001-NP',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 100000,
+        'discount'     => 0,
+        'tax'          => 0,
+        'tax_type'     => 'None',
+    ]);
+
+    $item->refresh();
+    expect($item->tax_type)->toBe('None')
+        ->and((float) $item->tax)->toBe(0.0);
+});
+
+test('QuotationService updateTotalAmount uses PPN Excluded tax_type correctly', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0003',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    // 1 qty x 2,500,000, 0% discount, 12% PPN Excluded -> total = 2,800,000
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 2500000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'PPN Excluded',
+    ]);
+
+    $this->quotationService->updateTotalAmount($quotation);
+    $quotation->refresh();
+
+    // PPN Excluded: 2,500,000 + 12% = 2,800,000
+    expect((float) $quotation->total_amount)->toBe(2800000.0);
+});
+
+test('QuotationService updateTotalAmount uses PPN Included tax_type correctly', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0004',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    // 1 qty x 2,500,000, 0% discount, 12% PPN Included -> total stays 2,500,000
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 2500000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'PPN Included',
+    ]);
+
+    $this->quotationService->updateTotalAmount($quotation);
+    $quotation->refresh();
+
+    // PPN Included: total stays at gross amount 2,500,000
+    expect((float) $quotation->total_amount)->toBe(2500000.0);
+});
+
+test('quotation item tax_type persists through update', function () {
+    $customer = Customer::factory()->create();
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-TAX-0005',
+        'customer_id'      => $customer->id,
+        'date'             => now(),
+        'status'           => 'draft',
+        'created_by'       => 1,
+    ]);
+
+    $item = QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id'   => 1,
+        'quantity'     => 1,
+        'unit_price'   => 100000,
+        'discount'     => 0,
+        'tax'          => 12,
+        'tax_type'     => 'PPN Excluded',
+    ]);
+
+    $item->update(['tax_type' => 'PPN Included']);
+    $item->refresh();
+
+    expect($item->tax_type)->toBe('PPN Included');
+});
+
+test('quotation form prefers active setting, then product tax, then zero', function () {
+    $user = User::factory()->create();
+    $permissions = [
+        'view any quotation',
+        'view quotation',
+        'create quotation',
+        'update quotation',
+        'delete quotation',
+        'view any customer',
+        'view any product',
+    ];
+
+    foreach ($permissions as $permission) {
+        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+    }
+    $user->givePermissionTo($permissions);
+
+    $customer = Customer::factory()->create();
+    $productWithTax = Product::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'uom_id' => $this->uom->id,
+        'pajak' => 7,
+    ]);
+    $productWithoutTax = Product::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'uom_id' => $this->uom->id,
+        'pajak' => null,
+    ]);
+
+    TaxSetting::factory()->ppn()->create([
+        'effective_date' => now()->subDay()->toDateString(),
+        'status' => true,
+    ]);
+
+        Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.quotationItem', [[
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+                'tax_type' => 'PPN Excluded',
+            ]])
+        ->set('data.quotationItem.0.product_id', $productWithTax->id)
+        ->assertSet('data.quotationItem.0.tax', 11)
+        ->set('data.quotationItem.0.tax', 7)
+        ->assertSet('data.quotationItem.0.tax', 7)
+        ->assertSet('data.quotationItem.0.tax', 7)
+        ->set('data.quotationItem.0.product_id', $productWithoutTax->id)
+            ->set('data.quotationItem.0.tax_type', 'PPN Excluded')
+        ->assertSet('data.quotationItem.0.tax', 11);
+
+    TaxSetting::query()->delete();
+
+    Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.quotationItem', [
+            [
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+                'tax_type' => 'PPN Excluded',
+            ],
+        ])
+        ->set('data.quotationItem.0.product_id', $productWithTax->id)
+        ->assertSet('data.quotationItem.0.tax', 7);
+
+    Livewire::actingAs($user)
+        ->test(\App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class)
+        ->set('data.customer_id', $customer->id)
+        ->set('data.date', now()->toDateString())
+        ->set('data.quotationItem', [
+            [
+                'product_id' => $productWithoutTax->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+                'tax_type' => 'None',
+            ],
+        ])
+        ->set('data.quotationItem.0.tax_type', 'PPN Excluded')
+        ->assertSet('data.quotationItem.0.tax', 0)
+        ->set('data.quotationItem.0.tax_type', 'PPN Included')
+        ->assertSet('data.quotationItem.0.tax', 0);
+    });
+
+test('view quotation renders expandable quotation item infolist', function () {
+    $user = User::factory()->create(['cabang_id' => $this->cabang->id]);
+    foreach (['view any quotation', 'view quotation'] as $permission) {
+        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+    }
+    $user->givePermissionTo(['view any quotation', 'view quotation']);
+    $this->actingAs($user);
+
+    $customer = Customer::factory()->create(['cabang_id' => $this->cabang->id]);
+    $product = Product::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'uom_id' => $this->uom->id,
+        'sku' => 'QVIEW-001',
+        'name' => 'Produk View Quotation',
+    ]);
+
+    $quotation = Quotation::create([
+        'quotation_number' => 'QO-VIEW-0001',
+        'customer_id' => $customer->id,
+        'cabang_id' => $this->cabang->id,
+        'date' => now(),
+        'valid_until' => now()->addDays(14),
+        'tempo_pembayaran' => 30,
+        'total_amount' => 999000,
+        'notes' => 'Catatan quotation view',
+        'status' => 'approve',
+        'created_by' => $user->id,
+    ]);
+
+    QuotationItem::create([
+        'quotation_id' => $quotation->id,
+        'product_id' => $product->id,
+        'quantity' => 10,
+        'unit_price' => 100000,
+        'discount' => 10,
+        'tax' => 11,
+        'tax_type' => 'PPN Excluded',
+        'notes' => 'Catatan item quotation',
+    ]);
+
+    $response = $this->get(\App\Filament\Resources\QuotationResource::getUrl('view', [
+        'record' => $quotation,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Informasi Quotation');
+    $response->assertSee('Ringkasan Quotation');
+    $response->assertSee('Detail Item Quotation');
+    $response->assertSee('Product:');
+    $response->assertSee('Qty:');
+    $response->assertSee('Subtotal:');
+    $response->assertSee('Product :', false);
+    $response->assertSee('Satuan :', false);
+    $response->assertSee('Qty :', false);
+    $response->assertSee('Unit Price :', false);
+    $response->assertSee('Discount (Nominal) :', false);
+    $response->assertSee('Nominal Pajak :', false);
+    $response->assertSee('Subtotal :', false);
+    $response->assertSee('(QVIEW-001) Produk View Quotation');
+    $response->assertSee('Catatan item quotation');
+    $response->assertSee('Rp 999.000');
+});
+
+    test('quotation total amount stays formatted as rupiah on live updates and persists numerically', function () {
+        $user = User::factory()->create();
+        $permissions = [
+            'view any quotation',
+            'view quotation',
+            'create quotation',
+            'update quotation',
+            'delete quotation',
+            'view any customer',
+            'view any product',
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        $user->givePermissionTo($permissions);
+
+        $customer = Customer::factory()->create();
+        $productCategory = ProductCategory::create([
+            'name' => 'Quotation Test Category',
+            'kode' => 'QTC001',
+            'cabang_id' => $this->cabang->id,
+            'kenaikan_harga' => 0,
+        ]);
+        $product = Product::create([
+            'name' => 'Quotation Test Product',
+            'sku' => 'QTP001',
+            'cabang_id' => $this->cabang->id,
+            'product_category_id' => $productCategory->id,
+            'sell_price' => 100000,
+            'cost_price' => 80000,
+            'kode_merk' => 'QTEST',
+            'uom_id' => $this->uom->id,
+            'is_active' => true,
+            'is_manufacture' => false,
+            'is_raw_material' => false,
+        ]);
+
+        $create = Livewire::actingAs($user)
+            ->test(
+                \App\Filament\Resources\QuotationResource\Pages\CreateQuotation::class
+            )
+            ->set('data.quotation_number', 'QO-TEST-FORM-0001')
+            ->set('data.customer_id', $customer->id)
+            ->set('data.date', now()->toDateString())
+            ->set('data.valid_until', now()->addDays(30)->toDateString())
+            ->set('data.quotationItem', [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                    'unit_price' => 100000,
+                    'discount' => 0,
+                    'tax' => 0,
+                    'tax_type' => 'None',
+                ],
+            ])
+            ->set('data.quotationItem.0.quantity', 2);
+
+        $create->assertSet('data.total_amount', '200.000');
+        $create->call('create')->assertHasNoFormErrors();
+
+        $quotation = Quotation::where('quotation_number', 'QO-TEST-FORM-0001')->first();
+
+        expect($quotation)->not->toBeNull()
+            ->and((float) $quotation->total_amount)->toBe(200000.0);
+
+        QuotationItem::query()
+            ->where('quotation_id', $quotation->id)
+            ->update(['total_price' => 200000]);
+
+        Livewire::actingAs($user)
+            ->test(EditQuotation::class, ['record' => $quotation->id])
+            ->assertFormExists()
+            ->assertFormSet([
+                'total_amount' => '200.000',
+            ]);
+    });

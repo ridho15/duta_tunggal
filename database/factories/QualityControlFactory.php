@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Cabang;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -30,6 +31,7 @@ class QualityControlFactory extends Factory
             'rak_id' => $this->faker->optional()->numberBetween(1, 10),
             'from_model_id' => 1, // will be overridden
             'from_model_type' => 'App\\Models\\PurchaseReceipt',
+            'cabang_id' => Cabang::query()->inRandomOrder()->value('id') ?? Cabang::factory()->create()->id,
             // DB column is a nullable timestamp; use null as default to avoid invalid datetime insertion
             'purchase_return_processed' => null,
         ];

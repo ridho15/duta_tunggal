@@ -32,6 +32,14 @@ beforeEach(function () {
         'type' => 'Expense',
         'is_active' => true,
     ]);
+
+    ChartOfAccount::firstOrCreate([
+        'code' => '8000.01',
+    ], [
+        'name' => 'Biaya Admin Transfer',
+        'type' => 'Expense',
+        'is_active' => true,
+    ]);
 });
 
 test('postTransfer creates correct journal entries without admin fee', function () {
@@ -129,8 +137,8 @@ test('postTransfer with admin fee but no coa only creates two entries', function
         ->where('source_id', $transfer->id)
         ->get();
 
-    // Should only create 2 entries (no separate admin fee entry)
-    expect($journals)->toHaveCount(2);
+    // Current service posts the admin fee using the default fallback COA when none is provided.
+    expect($journals)->toHaveCount(3);
 
     // Credit should be total
     $credit = $journals->where('credit', '>', 0)->first();

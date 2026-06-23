@@ -21,7 +21,6 @@ class PaymentHistoryRelationManager extends RelationManager
             ->schema([
                 Forms\Components\TextInput::make('amount')
                     ->required()
-                    ->numeric()
                     ->indonesianMoney(),
             ]);
     }

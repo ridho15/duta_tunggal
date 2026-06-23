@@ -6,6 +6,8 @@ use App\Models\Cabang;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\PermissionRegistrar;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -25,7 +27,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        if ($this->shouldSeedBaseData()) {
+        if ($this->shouldSeedBaseData() && $this->canSeedBaseData()) {
             // Create default Cabang if not exists
             if (!Cabang::exists()) {
                 Cabang::create([
@@ -35,10 +37,18 @@ abstract class TestCase extends BaseTestCase
                     'telepon' => '021-123456',
                 ]);
             }
-            
+
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
             $this->seed(PermissionSeeder::class);
             $this->seed(RoleSeeder::class);
         }
+    }
+
+    protected function canSeedBaseData(): bool
+    {
+        return Schema::hasTable('cabangs')
+            && Schema::hasTable('permissions')
+            && Schema::hasTable('roles');
     }
 
     protected function shouldSeedBaseData(): bool

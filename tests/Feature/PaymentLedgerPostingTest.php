@@ -110,6 +110,76 @@ class PaymentLedgerPostingTest extends TestCase
         $this->assertGreaterThan(0, (float)$creditBank->credit);
     }
 
+    public function test_post_vendor_payment_is_idempotent_for_same_payment()
+    {
+        $apCoa = ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);
+        $bankCoa = ChartOfAccount::create(['code' => '1112.02', 'name' => 'Bank Account 2']);
+
+        $supplier = Supplier::create([
+            'code' => 'SUP-IDEMP',
+            'name' => 'Supplier Idempotent',
+            'perusahaan' => 'PT Idempotent',
+            'address' => 'Jalan Test No.3',
+            'phone' => '08123456781',
+            'handphone' => '08123456781',
+            'email' => 'supplier.idempotent@example.test',
+            'fax' => '',
+            'npwp' => '',
+            'tempo_hutang' => 0,
+            'kontak_person' => '',
+            'keterangan' => ''
+        ]);
+
+        AccountPayable::create([
+            'invoice_id' => 9996,
+            'supplier_id' => $supplier->id,
+            'total' => 250000,
+            'remaining' => 250000,
+            'paid' => 0,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        $payment = VendorPayment::create([
+            'supplier_id' => $supplier->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 250000,
+            'coa_id' => $bankCoa->id,
+            'payment_method' => 'cash',
+            'status' => 'Draft',
+        ]);
+
+        VendorPaymentDetail::create([
+            'vendor_payment_id' => $payment->id,
+            'method' => 'cash',
+            'amount' => 250000,
+            'coa_id' => $bankCoa->id,
+            'payment_date' => now()->toDateString(),
+            'invoice_id' => 9996,
+        ]);
+
+        $service = app(LedgerPostingService::class);
+
+        $firstResult = $service->postVendorPayment($payment);
+        $this->assertSame('posted', $firstResult['status']);
+
+        $initialEntries = JournalEntry::where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->get();
+        $this->assertCount(2, $initialEntries);
+
+        $secondResult = $service->postVendorPayment($payment);
+        $this->assertSame('skipped', $secondResult['status']);
+
+        $finalEntries = JournalEntry::where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->get();
+        $this->assertCount(2, $finalEntries);
+
+        $this->assertTrue($finalEntries->contains('coa_id', $apCoa->id));
+        $this->assertTrue($finalEntries->contains('coa_id', $bankCoa->id));
+    }
+
     public function test_post_vendor_payment_using_deposit_credits_deposit_coa()
     {
         $apCoa = ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);
@@ -179,6 +249,177 @@ class PaymentLedgerPostingTest extends TestCase
         $creditDeposit = $journals->firstWhere('coa_id', $depositCoa->id);
         $this->assertNotNull($creditDeposit);
         $this->assertGreaterThan(0, (float)$creditDeposit->credit);
+    }
+
+    public function test_post_vendor_payment_with_deposit_throws_when_deposit_coa_is_missing()
+    {
+        ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);
+
+        $supplier = Supplier::create([
+            'code' => 'SUP-DEP-MISS',
+            'name' => 'Supplier Missing Deposit',
+            'perusahaan' => 'PT Missing Deposit',
+            'address' => 'Jalan Test No.4',
+            'phone' => '08123456782',
+            'handphone' => '08123456782',
+            'email' => 'supplier.dep.miss@example.test',
+            'fax' => '',
+            'npwp' => '',
+            'tempo_hutang' => 0,
+            'kontak_person' => '',
+            'keterangan' => ''
+        ]);
+
+        $ap = AccountPayable::create([
+            'invoice_id' => 9997,
+            'supplier_id' => $supplier->id,
+            'total' => 300000,
+            'remaining' => 300000,
+            'paid' => 0,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        $payment = VendorPayment::create([
+            'supplier_id' => $supplier->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 300000,
+            'payment_method' => 'deposit',
+            'status' => 'Draft'
+        ]);
+
+        VendorPaymentDetail::withoutEvents(function () use ($payment, $ap) {
+            VendorPaymentDetail::create([
+                'vendor_payment_id' => $payment->id,
+                'method' => 'deposit',
+                'amount' => 300000,
+                'payment_date' => now()->toDateString(),
+                'invoice_id' => $ap->invoice_id,
+            ]);
+        });
+
+        $service = app(LedgerPostingService::class);
+
+        try {
+            $service->postVendorPayment($payment);
+            $this->fail('Expected vendor payment posting to fail when deposit COA is missing.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString(
+                'Akun deposit / uang muka supplier tidak ditemukan',
+                $exception->getMessage()
+            );
+        } finally {
+            $entryCount = JournalEntry::where('source_type', VendorPayment::class)
+                ->where('source_id', $payment->id)
+                ->count();
+
+            $this->assertSame(0, $entryCount);
+        }
+    }
+
+    public function test_vendor_payment_detail_creation_fails_early_when_supplier_deposit_is_insufficient()
+    {
+        ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);
+        $depositCoa = ChartOfAccount::create(['code' => '1150.01', 'name' => 'Uang Muka Supplier']);
+
+        $supplier = Supplier::create([
+            'code' => 'SUP-DETAIL-DEP',
+            'name' => 'Supplier Detail Deposit',
+            'perusahaan' => 'PT Detail Deposit',
+            'address' => 'Jalan Test No.5',
+            'phone' => '08123456783',
+            'handphone' => '08123456783',
+            'email' => 'supplier.detail.dep@example.test',
+            'fax' => '',
+            'npwp' => '',
+            'tempo_hutang' => 0,
+            'kontak_person' => '',
+            'keterangan' => ''
+        ]);
+
+        $ap = AccountPayable::create([
+            'invoice_id' => 9996,
+            'supplier_id' => $supplier->id,
+            'total' => 200000,
+            'remaining' => 200000,
+            'paid' => 0,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        Deposit::create([
+            'from_model_type' => Supplier::class,
+            'from_model_id' => $supplier->id,
+            'coa_id' => $depositCoa->id,
+            'amount' => 100000,
+            'remaining_amount' => 100000,
+            'status' => 'active',
+            'created_by' => $this->user->id,
+        ]);
+
+        $payment = VendorPayment::create([
+            'supplier_id' => $supplier->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 200000,
+            'payment_method' => 'deposit',
+            'status' => 'Draft'
+        ]);
+
+        try {
+            VendorPaymentDetail::create([
+                'vendor_payment_id' => $payment->id,
+                'method' => 'deposit',
+                'amount' => 200000,
+                'payment_date' => now()->toDateString(),
+                'invoice_id' => $ap->invoice_id,
+            ]);
+
+            $this->fail('Expected vendor payment detail creation to fail when supplier deposit is insufficient.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Saldo deposit supplier', $exception->getMessage());
+        }
+
+        $this->assertSame(0, VendorPaymentDetail::where('vendor_payment_id', $payment->id)->count());
+        $this->assertSame(200000.0, (float) $ap->fresh()->remaining);
+        $this->assertSame(0.0, (float) $ap->fresh()->paid);
+    }
+
+    public function test_vendor_payment_status_update_fails_early_when_deposit_is_unavailable()
+    {
+        ChartOfAccount::create(['code' => '2110', 'name' => 'Accounts Payable']);
+
+        $supplier = Supplier::create([
+            'code' => 'SUP-STATUS-DEP',
+            'name' => 'Supplier Status Deposit',
+            'perusahaan' => 'PT Status Deposit',
+            'address' => 'Jalan Test No.6',
+            'phone' => '08123456784',
+            'handphone' => '08123456784',
+            'email' => 'supplier.status.dep@example.test',
+            'fax' => '',
+            'npwp' => '',
+            'tempo_hutang' => 0,
+            'kontak_person' => '',
+            'keterangan' => ''
+        ]);
+
+        $payment = VendorPayment::create([
+            'supplier_id' => $supplier->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 150000,
+            'payment_method' => 'deposit',
+            'status' => 'Draft'
+        ]);
+
+        try {
+            $payment->update(['status' => 'Paid']);
+            $this->fail('Expected vendor payment status update to fail when no supplier deposit is available.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('tidak memiliki deposit aktif yang tersedia', $exception->getMessage());
+        }
+
+        $this->assertSame('Draft', $payment->fresh()->status);
+        $this->assertSame(0, JournalEntry::where('source_type', VendorPayment::class)->where('source_id', $payment->id)->count());
     }
 
     public function test_post_deposit_creates_journal_entries()
@@ -252,7 +493,7 @@ class PaymentLedgerPostingTest extends TestCase
         $purchaseOrder = \App\Models\PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
             'is_import' => true,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
             'status' => 'approved',
         ]);
 
@@ -310,7 +551,7 @@ class PaymentLedgerPostingTest extends TestCase
         $purchaseOrder = \App\Models\PurchaseOrder::factory()->create([
             'supplier_id' => $supplier->id,
             'is_import' => true,
-            'ppn_option' => 'standard',
+            'ppn_option' => 'eklusif',
             'status' => 'approved',
         ]);
 
@@ -365,12 +606,6 @@ class PaymentLedgerPostingTest extends TestCase
                 'payment_date' => now(),
             ]);
         });
-
-        VendorPaymentDetail::create([
-            'vendor_payment_id' => $payment->id,
-            'account_payable_id' => $accountPayable->id,
-            'amount' => 100000,
-        ]);
 
         // Post payment to ledger
         $service = app(LedgerPostingService::class);

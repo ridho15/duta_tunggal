@@ -23,10 +23,11 @@ use Illuminate\Support\Facades\Auth;
 class BankReconciliationResource extends Resource
 {
     protected static ?string $model = BankReconciliation::class;
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
     protected static ?string $modelLabel = 'Rekonsiliasi Bank';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -51,9 +52,9 @@ class BankReconciliationResource extends Resource
                                     ->mapWithKeys(fn($coa) => [$coa->id => $coa->code . ' - ' . $coa->name]);
                             })
                             ->searchable()->required()->columnSpan(6),
+                        Forms\Components\TextInput::make('statement_ending_balance')->indonesianMoney()->label('Saldo Akhir Rekening Koran')->required()->columnSpan(4),
                         Forms\Components\DatePicker::make('period_start')->label('Periode Dari')->required()->columnSpan(3),
                         Forms\Components\DatePicker::make('period_end')->label('Sampai')->required()->columnSpan(3),
-                        Forms\Components\TextInput::make('statement_ending_balance')->numeric()->indonesianMoney()->label('Saldo Akhir Rekening Koran')->required()->columnSpan(4),
                         Forms\Components\Textarea::make('notes')->label('Catatan')->columnSpan(8),
                     ]),
                     Forms\Components\Section::make('Transaksi yang Belum Direkonsiliasi')

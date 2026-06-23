@@ -18,7 +18,9 @@ use App\Models\QualityControl;
 use App\Models\Rak;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
+use App\Models\WarehouseConfirmation;
 use App\Models\User;
+use App\Services\BalanceSheetService;
 use App\Services\ManufacturingJournalService;
 use App\Services\QualityControlService;
 use Illuminate\Database\Eloquent\Model;
@@ -38,19 +40,27 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
     $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create(['name' => 'Piece', 'abbreviation' => 'pcs']);
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
 
     $rawCoa = ChartOfAccount::firstOrCreate(
-        ['code' => '1140.01'],
-        ['name' => 'Persediaan Bahan Baku', 'type' => 'Asset', 'is_active' => true]
+        ['code' => '1-101'],
+        ['name' => 'PERSEDIAAN BAHAN BAKU - RAW MATERIAL INVENTORY', 'type' => 'Asset', 'is_active' => true]
     );
     $wipCoa = ChartOfAccount::firstOrCreate(
-        ['code' => '1140.02'],
-        ['name' => 'Persediaan Barang Dalam Proses', 'type' => 'Asset', 'is_active' => true]
+        ['code' => '1400.04'],
+        ['name' => 'POS SEMENTARA PRODUKSI', 'type' => 'Asset', 'is_active' => true]
+    );
+    $wipInventoryCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '1-201'],
+        ['name' => 'PERSEDIAAN BARANG DALAM PROSES - WIP INVENTORY', 'type' => 'Asset', 'is_active' => true]
+    );
+    $laborCoa = ChartOfAccount::firstOrCreate(
+        ['code' => '5230'],
+        ['name' => 'BIAYA TENAGA KERJA PROSES PRODUKSI', 'type' => 'Expense', 'is_active' => true]
     );
     $fgCoa = ChartOfAccount::firstOrCreate(
-        ['code' => '1140.03'],
-        ['name' => 'Persediaan Barang Jadi', 'type' => 'Asset', 'is_active' => true]
+        ['code' => '1140.02'],
+        ['name' => 'Persediaan Barang Produksi', 'type' => 'Asset', 'is_active' => true]
     );
     $bdpCoa = ChartOfAccount::firstOrCreate(
         ['code' => '1150'],
@@ -58,10 +68,9 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
     );
 
     $rawCost = 20.0;
-    $rawMaterial = Product::factory()->create([
+    $rawMaterial = Product::factory()->forCabang($branch)->create([
         'name' => 'Raw Material A',
         'sku' => 'RM-001',
-        'cabang_id' => $branch->id,
         'product_category_id' => $category->id,
         'uom_id' => $uom->id,
         'is_raw_material' => true,
@@ -70,10 +79,9 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
         'inventory_coa_id' => $rawCoa->id,
     ]);
 
-    $finishedGood = Product::factory()->create([
+    $finishedGood = Product::factory()->forCabang($branch)->create([
         'name' => 'Finished Product',
         'sku' => 'FG-001',
-        'cabang_id' => $branch->id,
         'product_category_id' => $category->id,
         'uom_id' => $uom->id,
         'is_raw_material' => false,
@@ -210,81 +218,9 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
         ]);
     });
 
-    app()->instance(ManufacturingJournalService::class, new class extends ManufacturingJournalService
-    {
-        public function generateJournalForProductionCompletion(Production $production): void
-        {
-            $manufacturingOrder = $production->manufacturingOrder;
-
-            $manufacturingOrder->loadMissing([
-                'productionPlan.product.billOfMaterial.items.product',
-                'productionPlan.billOfMaterial.items.product',
-            ]);
-
-            $bom = $manufacturingOrder->productionPlan->product->billOfMaterial->firstWhere('is_active', true)
-                ?? $manufacturingOrder->productionPlan?->billOfMaterial;
-
-            if (!$bom) {
-                throw new \Exception('No active BOM found for product: ' . $manufacturingOrder->productionPlan->product->name);
-            }
-
-            $bom->loadMissing('items.product');
-
-            $materialCost = $bom->items->sum(function ($item) {
-                return (float) $item->quantity * (float) ($item->product->cost_price ?? 0);
-            });
-
-            $totalCost = ($materialCost + (float) ($bom->labor_cost ?? 0) + (float) ($bom->overhead_cost ?? 0))
-                * (float) $manufacturingOrder->productionPlan->quantity;
-
-            $bdpCoa = ChartOfAccount::where('code', '1140.02')->firstOrFail();
-            $barangJadiCoa = ChartOfAccount::where('code', '1140.03')->firstOrFail();
-
-            DB::transaction(function () use ($production, $bdpCoa, $barangJadiCoa, $totalCost, $manufacturingOrder) {
-                $branchResolver = app(\App\Services\JournalBranchResolver::class);
-                $branchId = $branchResolver->resolve($production);
-                $departmentId = $branchResolver->resolveDepartment($production);
-                $projectId = $branchResolver->resolveProject($production);
-
-                JournalEntry::where('source_type', Production::class)
-                    ->where('source_id', $production->id)
-                    ->delete();
-
-                JournalEntry::create([
-                    'coa_id' => $barangJadiCoa->id,
-                    'date' => $production->production_date,
-                    'reference' => $production->production_number,
-                    'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $manufacturingOrder->productionPlan->product->name . ')',
-                    'debit' => $totalCost,
-                    'credit' => 0,
-                    'journal_type' => 'manufacturing_completion',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => Production::class,
-                    'source_id' => $production->id,
-                ]);
-
-                JournalEntry::create([
-                    'coa_id' => $bdpCoa->id,
-                    'date' => $production->production_date,
-                    'reference' => $production->production_number,
-                    'description' => 'Penyelesaian produksi - ' . $manufacturingOrder->mo_number . ' (' . $manufacturingOrder->productionPlan->product->name . ')',
-                    'debit' => 0,
-                    'credit' => $totalCost,
-                    'journal_type' => 'manufacturing_completion',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => Production::class,
-                    'source_id' => $production->id,
-                ]);
-            });
-        }
-    });
-
-    // Note: Production completion journals are now handled by QC completion
-    // app(ManufacturingJournalService::class)->generateJournalForProductionCompletion($production->fresh());
+    // Post Produksi In Progress journal (Dr 1-201, Cr 1400.04 + Cr 5230)
+    // BOM has labor_cost=0 and overhead_cost=0, so only the material portion is posted.
+    app(ManufacturingJournalService::class)->generateJournalForProductionInProgress($production->fresh());
 
     // Create QC Manufacture to complete the production
     $qc = QualityControl::withoutEvents(function () use ($production, $finishedGood, $warehouse, $rak, $planQuantity, $user) {
@@ -317,15 +253,35 @@ it('runs the manufacturing to finance flow and balances ledgers and stock', func
 
     $productionValue = $issueValue;
 
+    // 1-101 raw material: credited by material issue, never debited
     $rawMovement = JournalEntry::where('coa_id', $rawCoa->id);
+    // 1400.04 pos sementara: debited by material issue, credited by in-progress WIP journal → net 0
     $wipMovement = JournalEntry::where('coa_id', $wipCoa->id);
+    // 1-201 WIP inventory: debited by in-progress journal, credited by QC completion → net 0
+    $wipInventoryMovement = JournalEntry::where('coa_id', $wipInventoryCoa->id);
+    // 1140.02 finished goods: debited by QC completion
     $fgMovement = JournalEntry::where('coa_id', $fgCoa->id);
 
     expect((float) $rawMovement->sum('debit'))->toBe(0.0);
     expect((float) $rawMovement->sum('credit'))->toBe($issueValue);
+    // Pos sementara nets to 0: D from material issue = K from in-progress
     expect((float) ($wipMovement->sum('debit') - $wipMovement->sum('credit')))->toBe(0.0);
+    // WIP inventory nets to 0: D from in-progress = K from QC completion
+    expect((float) ($wipInventoryMovement->sum('debit') - $wipInventoryMovement->sum('credit')))->toBe(0.0);
     expect((float) $fgMovement->sum('debit'))->toBe($productionValue);
     expect((float) $fgMovement->sum('credit'))->toBe(0.0);
+});
+
+test('manufacturing flow keeps balance sheet balanced', function () {
+    $branch = Cabang::factory()->create();
+
+    $balanceSheet = app(BalanceSheetService::class)->generate([
+        'as_of_date' => now()->format('Y-m-d'),
+        'cabang_id' => $branch->id,
+    ]);
+
+    expect($balanceSheet['is_balanced'])->toBeTrue();
+    expect((float) $balanceSheet['difference'])->toBe(0.0);
 });
 
 test('create manufacturing order from production plan', function () {
@@ -361,22 +317,23 @@ test('calculate material requirements from BOM', function () {
     $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
     $uom = UnitOfMeasure::factory()->create();
 
-    $finishedProduct = Product::factory()->create([
+    $finishedProduct = Product::factory()->forCabang($branch)->create([
         'is_raw_material' => false,
         'uom_id' => $uom->id,
     ]);
 
-    $rawMaterial1 = Product::factory()->create([
+    $rawMaterial1 = Product::factory()->forCabang($branch)->create([
         'is_raw_material' => true,
         'uom_id' => $uom->id,
     ]);
 
-    $rawMaterial2 = Product::factory()->create([
+    $rawMaterial2 = Product::factory()->forCabang($branch)->create([
         'is_raw_material' => true,
         'uom_id' => $uom->id,
     ]);
 
     $bom = BillOfMaterial::factory()->create([
+        'cabang_id' => $branch->id,
         'product_id' => $finishedProduct->id,
         'quantity' => 1,
         'code' => 'BOM-TEST-001',
@@ -543,9 +500,19 @@ test('manufacturing order relationships', function () {
         'production_plan_id' => $productionPlan->id,
     ]);
 
+    WarehouseConfirmation::create([
+        'confirmable_type' => ManufacturingOrder::class,
+        'confirmable_id' => $mo->id,
+        'confirmation_type' => 'manufacturing_order',
+        'status' => 'confirmed',
+        'confirmed_by' => null,
+        'confirmed_at' => now(),
+    ]);
+
     // Create a material issue for this production plan
     $materialIssue = MaterialIssue::factory()->create([
         'production_plan_id' => $productionPlan->id,
+        'manufacturing_order_id' => $mo->id,
         'warehouse_id' => $warehouse->id,
         'status' => 'approved',
     ]);

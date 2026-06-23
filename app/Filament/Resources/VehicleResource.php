@@ -29,6 +29,8 @@ class VehicleResource extends Resource
 {
     protected static ?string $model = Vehicle::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
     protected static ?string $navigationGroup = 'Master Data';
@@ -37,7 +39,7 @@ class VehicleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Kendaraan';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 8;
     public static function form(Form $form): Form
     {
         return $form

@@ -10,8 +10,11 @@ use Filament\Tables\Table;
 
 class CashFlowResource extends Resource
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-up';
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
     protected static ?int $navigationSort = 10;
     protected static ?string $slug = 'reports/cash-flow';
     protected static ?string $model = CashBankTransaction::class;

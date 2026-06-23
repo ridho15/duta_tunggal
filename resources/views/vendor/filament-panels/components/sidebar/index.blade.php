@@ -118,14 +118,40 @@
 
         <ul class="fi-sidebar-nav-groups -mx-2 flex flex-col gap-y-7">
             @foreach ($navigation as $group)
-                <x-filament-panels::sidebar.group
-                    :active="$group->isActive()"
-                    :collapsible="$group->isCollapsible()"
-                    :icon="$group->getIcon()"
-                    :items="$group->getItems()"
-                    :label="$group->getLabel()"
-                    :attributes="\Filament\Support\prepare_inherited_attributes($group->getExtraSidebarAttributeBag())"
-                />
+                @if (filled($group->getLabel()) && count($group->getItems()) === 1)
+                    @php
+                        $singleItem = \Illuminate\Support\Arr::first($group->getItems());
+                        $itemIcon = $singleItem->getIcon() ?? $group->getIcon();
+                        $itemActiveIcon = $singleItem->getActiveIcon() ?? $itemIcon;
+                    @endphp
+                    <x-filament-panels::sidebar.item
+                        :active="$singleItem->isActive()"
+                        :active-child-items="$singleItem->isChildItemsActive()"
+                        :active-icon="$itemActiveIcon"
+                        :badge="$singleItem->getBadge()"
+                        :badge-color="$singleItem->getBadgeColor()"
+                        :badge-tooltip="$singleItem->getBadgeTooltip()"
+                        :child-items="$singleItem->getChildItems()"
+                        :first="true"
+                        :grouped="false"
+                        :icon="$itemIcon"
+                        :last="true"
+                        :should-open-url-in-new-tab="$singleItem->shouldOpenUrlInNewTab()"
+                        :sidebar-collapsible="filament()->isSidebarCollapsibleOnDesktop()"
+                        :url="$singleItem->getUrl()"
+                    >
+                        {{ $singleItem->getLabel() }}
+                    </x-filament-panels::sidebar.item>
+                @else
+                    <x-filament-panels::sidebar.group
+                        :active="$group->isActive()"
+                        :collapsible="$group->isCollapsible()"
+                        :icon="$group->getIcon()"
+                        :items="$group->getItems()"
+                        :label="$group->getLabel()"
+                        :attributes="\Filament\Support\prepare_inherited_attributes($group->getExtraSidebarAttributeBag())"
+                    />
+                @endif
             @endforeach
         </ul>
 

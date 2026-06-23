@@ -51,7 +51,7 @@ class ViewVendorPayment extends ViewRecord
                     ->schema([
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('supplier.name')
+                                Infolists\Components\TextEntry::make('supplier.perusahaan')
                                     ->label('Supplier'),
                                 Infolists\Components\TextEntry::make('payment_date')
                                     ->label('Tanggal Pembayaran')
@@ -71,6 +71,21 @@ class ViewVendorPayment extends ViewRecord
                         Infolists\Components\TextEntry::make('notes')
                             ->label('Catatan')
                             ->columnSpanFull(),
+                    ]),
+                Infolists\Components\Section::make('Detail Pelunasan')
+                    ->schema([
+                        RepeatableEntry::make('vendorPaymentDetail')
+                            ->label('')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('invoice.invoice_number')->label('Invoice'),
+                                Infolists\Components\TextEntry::make('invoice.invoice_date')->label('Tanggal Invoice')->date(),
+                                Infolists\Components\TextEntry::make('invoice.due_date')->label('Due Date')->date(),
+                                Infolists\Components\TextEntry::make('invoice.total')->label('Total Invoice')->rupiah(),
+                                Infolists\Components\TextEntry::make('amount')->label('Jumlah Bayar')->rupiah(),
+                                Infolists\Components\TextEntry::make('method')->label('Metode'),
+                                Infolists\Components\TextEntry::make('coa.name')->label('COA'),
+                                Infolists\Components\TextEntry::make('notes')->label('Catatan'),
+                            ])->columns(4),
                     ]),
 
                 Infolists\Components\Section::make('Journal Entries')

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockOpnameResource\RelationManagers;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Product;
 use App\Models\Rak;
 use Filament\Forms;
@@ -33,7 +34,7 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Set $set) {
                         if ($state) {
-                            $product = Product::find($state);
+                            $product = Product::withoutGlobalScope('product_cabang')->find($state);
                             // Get current stock from inventory_stocks
                             $warehouseId = $this->getOwnerRecord()->warehouse_id;
                             $inventoryStock = \App\Models\InventoryStock::where('product_id', $state)
@@ -56,7 +57,17 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 Select::make('rak_id')
                     ->label('Rak')
-                    ->options(Rak::pluck('name', 'id'))
+                    ->options(function () {
+                        $warehouseId = $this->getOwnerRecord()->warehouse_id ?? null;
+
+                        if (!$warehouseId) {
+                            return [];
+                        }
+
+                        return Rak::where('warehouse_id', $warehouseId)
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
                     ->searchable()
                     ->preload(),
 
@@ -82,18 +93,17 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextInput::make('difference_qty')
                     ->label('Selisih Qty')
-                    ->numeric()
                     ->disabled()
                     ->dehydrated(),
 
                 TextInput::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->default(0)
-                    ->live()
+                    ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = $state ?? 0;
+                        $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
                         $differenceValue = $differenceQty * $unitCost;
                         $set('difference_value', $differenceValue);
 
@@ -105,23 +115,26 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextInput::make('average_cost')
                     ->label('Average Cost')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->default(0)
                     ->disabled()
                     ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : '')
                     ->helperText('Harga rata-rata berdasarkan riwayat pembelian'),
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->disabled()
-                    ->dehydrated(),
+                    ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : ''),
 
                 TextInput::make('total_value')
                     ->label('Total Nilai')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->disabled()
                     ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : '')
                     ->helperText('Total nilai berdasarkan qty fisik × harga satuan'),
 
                 Textarea::make('notes')
@@ -192,15 +205,19 @@ class StockOpnameItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
                 ]),
             ]);
     }

@@ -4,16 +4,14 @@ namespace App\Observers;
 
 use App\Models\InventoryStock;
 use App\Models\StockReservation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StockReservationObserver
 {
-    /**
-     * Handle the StockReservation "created" event.
-     */
     public function created(StockReservation $stockReservation): void
     {
-        Log::info('StockReservationObserver: created event triggered', [
+        Log::info('StockReservationObserver: created', [
             'reservation_id' => $stockReservation->id,
             'material_issue_id' => $stockReservation->material_issue_id,
             'quantity' => $stockReservation->quantity,
@@ -21,12 +19,8 @@ class StockReservationObserver
         $this->updateReservedStock($stockReservation, 'increment');
     }
 
-    /**
-     * Handle the StockReservation "updated" event.
-     */
     public function updated(StockReservation $stockReservation): void
     {
-        // Only handle quantity increases, not decreases (decreases are handled manually in partial releases)
         $originalQuantity = $stockReservation->getOriginal('quantity');
         $newQuantity = $stockReservation->quantity;
 
@@ -36,12 +30,9 @@ class StockReservationObserver
         }
     }
 
-    /**
-     * Handle the StockReservation "deleted" event.
-     */
     public function deleted(StockReservation $stockReservation): void
     {
-        Log::info('StockReservationObserver: deleted event triggered', [
+        Log::info('StockReservationObserver: deleted', [
             'reservation_id' => $stockReservation->id,
             'product_id' => $stockReservation->product_id,
             'quantity' => $stockReservation->quantity,
@@ -49,51 +40,63 @@ class StockReservationObserver
         $this->updateReservedStock($stockReservation, 'decrement');
     }
 
-    /**
-     * Handle the StockReservation "restored" event.
-     */
     public function restored(StockReservation $stockReservation): void
     {
         $this->updateReservedStock($stockReservation, 'increment');
     }
 
-    /**
-     * Handle the StockReservation "force deleted" event.
-     */
     public function forceDeleted(StockReservation $stockReservation): void
     {
         $this->updateReservedStock($stockReservation, 'decrement');
     }
 
-    /**
-     * Update the reserved stock quantity in inventory.
-     */
     private function updateReservedStock(StockReservation $stockReservation, string $operation, ?float $quantity = null): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockReservation->product_id)
-            ->where('warehouse_id', $stockReservation->warehouse_id)
-            ->first();
+        Log::info('StockReservationObserver: updateReservedStock', [
+            'operation' => $operation,
+            'reservation_id' => $stockReservation->id,
+            'product_id' => $stockReservation->product_id,
+            'warehouse_id' => $stockReservation->warehouse_id,
+            'quantity' => $quantity ?? $stockReservation->quantity,
+        ]);
 
-        if (!$inventoryStock) {
-            // Create inventory stock if it doesn't exist
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockReservation->product_id,
-                'warehouse_id' => $stockReservation->warehouse_id,
-                'rak_id' => $stockReservation->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-                'qty_min' => 0,
-            ]);
-        }
+        DB::transaction(function () use ($stockReservation, $operation, $quantity) {
+            $inventoryStock = InventoryStock::where('product_id', $stockReservation->product_id)
+                ->where('warehouse_id', $stockReservation->warehouse_id)
+                ->lockForUpdate()
+                ->first();
 
-        $qtyToUpdate = $quantity ?? $stockReservation->quantity;
+            if (!$inventoryStock) {
+                $inventoryStock = InventoryStock::create([
+                    'product_id' => $stockReservation->product_id,
+                    'warehouse_id' => $stockReservation->warehouse_id,
+                    'rak_id' => $stockReservation->rak_id,
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                    'qty_min' => 0,
+                ]);
+            }
 
-        if ($operation === 'increment') {
-            $inventoryStock->increment('qty_reserved', $qtyToUpdate);
-            $inventoryStock->decrement('qty_available', $qtyToUpdate); // Kurangi qty_available saat reservation dibuat
-        } elseif ($operation === 'decrement') {
-            $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
-            $inventoryStock->increment('qty_available', $qtyToUpdate); // Tambah kembali qty_available saat reservation dihapus
-        }
+            $qtyToUpdate = (float) ($quantity ?? $stockReservation->quantity);
+            $isMaterialIssueReservation = $stockReservation->material_issue_id !== null;
+
+            if ($isMaterialIssueReservation) {
+                if ($operation === 'increment') {
+                    $inventoryStock->increment('qty_reserved', $qtyToUpdate);
+                } elseif ($operation === 'decrement') {
+                    $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
+                }
+                return;
+            }
+
+            // NON-MATERIAL ISSUE (Delivery Order)
+            if ($operation === 'increment') {
+                $inventoryStock->increment('qty_reserved', $qtyToUpdate);
+                // qty_available TIDAK dikurangi di sini
+                // qty_available berkurang SAAT delivery selesai (handleCompletedStatus)
+            } elseif ($operation === 'decrement') {
+                $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
+            }
+        });
     }
 }

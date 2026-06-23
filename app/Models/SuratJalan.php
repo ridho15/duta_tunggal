@@ -17,12 +17,56 @@ class SuratJalan extends Model
         'signed_by',
         'status',
         'created_by',
-        'document_path'
+        'document_path',
+        'cabang_id',
     ];
 
     public function deliveryOrder()
     {
         return $this->belongsToMany(DeliveryOrder::class, 'surat_jalan_delivery_orders', 'surat_jalan_id', 'delivery_order_id');
+    }
+
+    public function deliverySchedules()
+    {
+        return $this->belongsToMany(
+            DeliverySchedule::class,
+            'delivery_schedule_surat_jalans',
+            'surat_jalan_id',
+            'delivery_schedule_id'
+        )->withTimestamps();
+    }
+
+    public function primaryDeliverySchedule(): ?DeliverySchedule
+    {
+        return $this->deliverySchedules()
+            ->with('driver')
+            ->orderByDesc('scheduled_date')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    public function getSenderDisplayNameAttribute(): string
+    {
+        $deliverySchedule = $this->primaryDeliverySchedule();
+
+        if (! $deliverySchedule) {
+            return '-';
+        }
+
+        return $deliverySchedule->delivery_method === 'ekspedisi'
+            ? ($deliverySchedule->driver_name ?: $deliverySchedule->vehicle_info ?: '-')
+            : ($deliverySchedule->driver?->name ?: $deliverySchedule->driver_name ?: '-');
+    }
+
+    public function getShippingMethodLabelAttribute(): string
+    {
+        $deliverySchedule = $this->primaryDeliverySchedule();
+
+        if (! $deliverySchedule) {
+            return '-';
+        }
+
+        return $deliverySchedule->delivery_method_label;
     }
 
     public function signedBy()
@@ -33,6 +77,11 @@ class SuratJalan extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     // Helper method to get customers through delivery orders and sales orders

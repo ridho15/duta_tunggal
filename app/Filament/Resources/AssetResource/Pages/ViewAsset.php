@@ -6,6 +6,7 @@ use App\Filament\Resources\AssetResource;
 use App\Http\Controllers\HelperController;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Helper\Helper;
 
 class ViewAsset extends ViewRecord
@@ -21,13 +22,29 @@ class ViewAsset extends ViewRecord
                 ->label('Hitung Penyusutan')
                 ->icon('heroicon-o-calculator')
                 ->action(function () {
-                    $this->record->calculateDepreciation();
-                    \Filament\Notifications\Notification::make()
-                        ->title('Penyusutan berhasil dihitung')
-                        ->success()
-                        ->persistent()
-                        ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
-                        ->send();
+                    try {
+                        $this->record->calculateDepreciation();
+                        \Filament\Notifications\Notification::make()
+                            ->title('Penyusutan berhasil dihitung')
+                            ->success()
+                            ->persistent()
+                            ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
+                            ->send();
+                    } catch (\Throwable $e) {
+                        Log::error('ViewAsset calculate_depreciation failed', [
+                            'asset_id' => $this->record->id,
+                            'asset_name' => $this->record->name,
+                            'user_id' => optional(\Filament\Facades\Filament::auth()->user())->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Gagal Menghitung Penyusutan')
+                            ->body('Terjadi kesalahan saat menghitung penyusutan aset. Silakan coba lagi atau hubungi tim IT.')
+                            ->danger()
+                            ->persistent()
+                            ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
+                            ->send();
+                    }
                 }),
             Actions\Action::make('post_asset_journal')
                 ->color('info')
@@ -35,14 +52,30 @@ class ViewAsset extends ViewRecord
                 ->icon('heroicon-o-document-plus')
                 ->visible(fn() => !$this->record->hasPostedJournals())
                 ->action(function () {
-                    $assetService = new \App\Services\AssetService();
-                    $assetService->postAssetAcquisitionJournal($this->record);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Jurnal akuisisi aset berhasil dipost')
-                        ->success()
-                        ->persistent()
-                        ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
-                        ->send();
+                    try {
+                        $assetService = new \App\Services\AssetService();
+                        $assetService->postAssetAcquisitionJournal($this->record);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Jurnal akuisisi aset berhasil dipost')
+                            ->success()
+                            ->persistent()
+                            ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
+                            ->send();
+                    } catch (\Throwable $e) {
+                        Log::error('ViewAsset post_asset_journal failed', [
+                            'asset_id' => $this->record->id,
+                            'asset_name' => $this->record->name,
+                            'user_id' => optional(\Filament\Facades\Filament::auth()->user())->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Gagal Post Jurnal Akuisisi')
+                            ->body('Jurnal akuisisi aset belum berhasil dipost. Silakan periksa konfigurasi COA atau hubungi tim keuangan.')
+                            ->danger()
+                            ->persistent()
+                            ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
+                            ->send();
+                    }
                 }),
             Actions\Action::make('post_depreciation_journal')
                 ->color('primary')
@@ -82,15 +115,33 @@ class ViewAsset extends ViewRecord
                         return;
                     }
 
-                    $assetService = new \App\Services\AssetService();
-                    $assetService->postAssetDepreciationJournal($this->record, $depreciationAmount, $currentMonth);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Jurnal penyusutan berhasil dipost')
-                        ->body('Jurnal penyusutan untuk bulan ' . now()->format('F Y') . ' telah berhasil dibuat.')
-                        ->success()
-                        ->persistent()
-                        ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
-                        ->send();
+                    try {
+                        $assetService = new \App\Services\AssetService();
+                        $assetService->postAssetDepreciationJournal($this->record, $depreciationAmount, $currentMonth);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Jurnal penyusutan berhasil dipost')
+                            ->body('Jurnal penyusutan untuk bulan ' . now()->format('F Y') . ' telah berhasil dibuat.')
+                            ->success()
+                            ->persistent()
+                            ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
+                            ->send();
+                    } catch (\Throwable $e) {
+                        Log::error('ViewAsset post_depreciation_journal failed', [
+                            'asset_id' => $this->record->id,
+                            'asset_name' => $this->record->name,
+                            'month' => $currentMonth,
+                            'depreciation_amount' => $depreciationAmount,
+                            'user_id' => optional(\Filament\Facades\Filament::auth()->user())->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Gagal Post Jurnal Penyusutan')
+                            ->body('Terjadi kesalahan saat membuat jurnal penyusutan. Silakan coba lagi atau hubungi tim keuangan.')
+                            ->danger()
+                            ->persistent()
+                            ->sendToDatabase(\Filament\Facades\Filament::auth()->user())
+                            ->send();
+                    }
                 }),
             Actions\Action::make('view_asset_journals')
                 ->color('gray')

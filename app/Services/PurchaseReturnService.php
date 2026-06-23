@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\JournalEntry;
@@ -11,6 +12,7 @@ use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
 use App\Models\QualityControl;
 use App\Models\PurchaseOrderItem;
+use App\Support\JournalCurrencyAmountResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -161,22 +163,30 @@ class PurchaseReturnService
     {
         $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
 
-        // Clamp so qty doesn't go negative
-        $newQty = max(0, $poItem->quantity - $totalRejected);
-        $poItem->update(['quantity' => $newQty]);
+        // Lock the PO item row to prevent concurrent returns from reading stale qty.
+        DB::transaction(function () use ($purchaseReturn, $poItem, $totalRejected) {
+            $lockedPoItem = PurchaseOrderItem::where('id', $poItem->id)
+                ->lockForUpdate()
+                ->first();
 
-        $purchaseReturn->update([
-            'tracking_notes' => ($purchaseReturn->tracking_notes ?? '')
-                . "\n[Approved] PO item qty reduced from {$poItem->quantity} to {$newQty}.",
-        ]);
+            // Clamp so qty doesn't go negative
+            $oldQty = $lockedPoItem->quantity;
+            $newQty = max(0, $oldQty - $totalRejected);
+            $lockedPoItem->update(['quantity' => $newQty]);
 
-        Log::info('QC return resolved: reduce_stock', [
-            'return_id'   => $purchaseReturn->id,
-            'po_item_id'  => $poItem->id,
-            'old_qty'     => $poItem->quantity,
-            'new_qty'     => $newQty,
-            'rejected_qty'=> $totalRejected,
-        ]);
+            $purchaseReturn->update([
+                'tracking_notes' => ($purchaseReturn->tracking_notes ?? '')
+                    . "\n[Approved] PO item qty reduced from {$oldQty} to {$newQty}.",
+            ]);
+
+            Log::info('QC return resolved: reduce_stock', [
+                'return_id'    => $purchaseReturn->id,
+                'po_item_id'   => $lockedPoItem->id,
+                'old_qty'      => $oldQty,
+                'new_qty'      => $newQty,
+                'rejected_qty' => $totalRejected,
+            ]);
+        });
     }
 
     /**
@@ -244,6 +254,13 @@ class PurchaseReturnService
     {
         try {
             DB::transaction(function () use ($purchaseReturn) {
+                $purchaseReturn->load([
+                    'purchaseReturnItem.product.inventoryCoa',
+                    'purchaseReturnItem.product.purchaseReturnCoa',
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
+                ]);
+
                 // Prevent duplicate posting
                 if (JournalEntry::where('source_type', PurchaseReturn::class)
                     ->where('source_id', $purchaseReturn->id)
@@ -251,9 +268,12 @@ class PurchaseReturnService
                     return;
                 }
 
-                $totalReturnAmount = $purchaseReturn->purchaseReturnItem->sum(function ($item) {
-                    return $item->qty_returned * $item->unit_price;
-                });
+                $resolvedLines = $purchaseReturn->purchaseReturnItem
+                    ->map(fn ($item) => $this->resolveReturnItemJournalAmount($item))
+                    ->filter(fn (array $line) => $line['amount_idr'] > 0)
+                    ->values();
+
+                $totalReturnAmount = round((float) $resolvedLines->sum('amount_idr'), 2);
 
                 if ($totalReturnAmount <= 0) {
                     return;
@@ -263,18 +283,64 @@ class PurchaseReturnService
                 $description = 'Purchase Return: ' . $purchaseReturn->nota_retur;
                 $date = $purchaseReturn->return_date ?? now();
 
-                // Get COA accounts
-                $inventoryCoa = ChartOfAccount::where('code', '1101.01')->first(); // Inventory account
-                $purchaseReturnCoa = ChartOfAccount::where('code', '5120.10')->first(); // Purchase Return account
-                $accountsPayableCoa = ChartOfAccount::where('code', '2101.01')->first(); // Accounts Payable
+                $defaultInventoryCoa = $this->findFirstExistingCoa([
+                    config('coa.inventory'),
+                    '1140.01',
+                    '1101.01',
+                    '1140.10',
+                ]);
 
-                if (!$inventoryCoa || !$purchaseReturnCoa || !$accountsPayableCoa) {
+                $purchaseReturnCoa = $this->findFirstExistingCoa([
+                    '5120.10',
+                    '5120',
+                ]);
+
+                $accountsPayableCoa = $this->findFirstExistingCoa([
+                    config('coa.accounts_payable'),
+                    '2110',
+                    '2101.01',
+                ]);
+
+                $inventoryCredits = [];
+
+                foreach ($resolvedLines as $line) {
+                    $item = $line['item'];
+                    $lineAmount = $line['amount_idr'];
+
+                    if ($lineAmount <= 0) {
+                        continue;
+                    }
+
+                    $inventoryCoa = $item->product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+
+                    if (!$inventoryCoa || !$inventoryCoa->id) {
+                        Log::error('Missing inventory COA for purchase return journal line', [
+                            'purchase_return_id' => $purchaseReturn->id,
+                            'product_id' => $item->product_id,
+                            'fallback_inventory_code' => config('coa.inventory'),
+                        ]);
+
+                        throw new \Exception('Akun COA persediaan tidak ditemukan untuk jurnal retur pembelian. Periksa konfigurasi inventory COA produk atau default inventory COA.');
+                    }
+
+                    if (!isset($inventoryCredits[$inventoryCoa->id])) {
+                        $inventoryCredits[$inventoryCoa->id] = [
+                            'coa' => $inventoryCoa,
+                            'amount' => 0,
+                        ];
+                    }
+
+                    $inventoryCredits[$inventoryCoa->id]['amount'] += $lineAmount;
+                }
+
+                if (empty($inventoryCredits) || !$accountsPayableCoa) {
                     Log::error('Missing COA accounts for purchase return journal', [
-                        'inventory' => $inventoryCoa?->id,
+                        'inventory' => $defaultInventoryCoa?->id,
                         'purchase_return' => $purchaseReturnCoa?->id,
-                        'accounts_payable' => $accountsPayableCoa?->id
+                        'accounts_payable' => $accountsPayableCoa?->id,
+                        'purchase_return_id' => $purchaseReturn->id,
                     ]);
-                    return;
+                    throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur pembelian. Periksa akun persediaan dan hutang dagang yang aktif. Legacy mapping yang masih didukung: 1101.01, 5120.10, 2101.01.');
                 }
 
                 $entries = [];
@@ -285,31 +351,37 @@ class PurchaseReturnService
                     'date' => $date,
                     'reference' => $reference,
                     'description' => $description . ' - Reduce accounts payable',
-                    'debit' => $totalReturnAmount,
+                    'debit' => round($totalReturnAmount, 2),
                     'credit' => 0,
                     'journal_type' => 'purchase_return',
                     'source_type' => PurchaseReturn::class,
                     'source_id' => $purchaseReturn->id,
+                    'cabang_id' => $purchaseReturn->cabang_id,
                 ]);
 
-                // Credit Inventory (reduce inventory value)
-                $entries[] = JournalEntry::create([
-                    'coa_id' => $inventoryCoa->id,
-                    'date' => $date,
-                    'reference' => $reference,
-                    'description' => $description . ' - Reduce inventory value',
-                    'debit' => 0,
-                    'credit' => $totalReturnAmount,
-                    'journal_type' => 'purchase_return',
-                    'source_type' => PurchaseReturn::class,
-                    'source_id' => $purchaseReturn->id,
-                ]);
+                foreach ($inventoryCredits as $inventoryCredit) {
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $inventoryCredit['coa']->id,
+                        'date' => $date,
+                        'reference' => $reference,
+                        'description' => $description . ' - Reduce inventory value',
+                        'debit' => 0,
+                        'credit' => round($inventoryCredit['amount'], 2),
+                        'journal_type' => 'purchase_return',
+                        'source_type' => PurchaseReturn::class,
+                        'source_id' => $purchaseReturn->id,
+                        'cabang_id' => $purchaseReturn->cabang_id,
+                    ]);
+                }
 
                 Log::info('Purchase return journal entries created', [
                     'purchase_return_id' => $purchaseReturn->id,
                     'nota_retur' => $purchaseReturn->nota_retur,
                     'total_amount' => $totalReturnAmount,
-                    'entries_count' => count($entries)
+                    'entries_count' => count($entries),
+                    'purchase_return_coa' => $purchaseReturnCoa?->code,
+                    'accounts_payable_coa' => $accountsPayableCoa?->code,
+                    'inventory_coa_ids' => array_keys($inventoryCredits),
                 ]);
             });
 
@@ -323,6 +395,72 @@ class PurchaseReturnService
         }
     }
 
+    private function findFirstExistingCoa(array $codes): ?ChartOfAccount
+    {
+        foreach (array_filter(array_unique($codes)) as $code) {
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa) {
+                return $coa;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve purchase return line amount to IDR. Legacy lines without receipt/PO
+     * currency context are treated as already IDR.
+     *
+     * @return array{item: PurchaseReturnItem, amount_idr: float, raw_unit_price: float, unit_price_idr: float, currency_id: ?int, currency_code: ?string, exchange_rate: float, amount_original_currency: float}
+     */
+    private function resolveReturnItemJournalAmount(PurchaseReturnItem $item): array
+    {
+        $qty = max(0, (float) ($item->qty_returned ?? 0));
+        $fallbackRawUnitPrice = (float) ($item->unit_price ?? 0);
+
+        if ($item->purchaseReceiptItem?->exists) {
+            $unitCost = JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item->purchaseReceiptItem);
+            $amountIdr = round($qty * $unitCost['unit_price_idr'], 2);
+
+            return [
+                'item' => $item,
+                'amount_idr' => $amountIdr,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitCost['unit_price_idr'],
+                'currency_id' => $unitCost['currency_id'],
+                'currency_code' => $unitCost['currency_code'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+                'amount_original_currency' => $unitCost['exchange_rate'] > 0
+                    ? round($amountIdr / $unitCost['exchange_rate'], 4)
+                    : round($qty * $unitCost['raw_unit_price'], 4),
+            ];
+        }
+
+        $resolved = JournalCurrencyAmountResolver::resolve(round($qty * $fallbackRawUnitPrice, 4), null, 1);
+
+        return [
+            'item' => $item,
+            'amount_idr' => $resolved['amount_idr'],
+            'raw_unit_price' => $fallbackRawUnitPrice,
+            'unit_price_idr' => $fallbackRawUnitPrice,
+            'currency_id' => $resolved['currency_id'],
+            'currency_code' => $resolved['currency_code'],
+            'exchange_rate' => $resolved['exchange_rate'],
+            'amount_original_currency' => $resolved['amount_original_currency'],
+        ];
+    }
+
+    private function calculateReturnTotalIdr(PurchaseReturn $purchaseReturn): float
+    {
+        $purchaseReturn->loadMissing([
+            'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+            'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
+        ]);
+
+        return round((float) $purchaseReturn->purchaseReturnItem
+            ->sum(fn (PurchaseReturnItem $item) => $this->resolveReturnItemJournalAmount($item)['amount_idr']), 2);
+    }
+
     /**
      * Adjust stock for purchase return
      */
@@ -330,10 +468,19 @@ class PurchaseReturnService
     {
         try {
             DB::transaction(function () use ($purchaseReturn) {
+                $purchaseReturn->loadMissing([
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+                    'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
+                ]);
+
                 foreach ($purchaseReturn->purchaseReturnItem as $item) {
-                    // Update inventory stock
+                    $resolvedLine = $this->resolveReturnItemJournalAmount($item);
+
+                    // Lock the inventory stock row to prevent concurrent returns
+                    // from both reading the same qty and each decrementing incorrectly.
                     $inventoryStock = InventoryStock::where('product_id', $item->product_id)
                         ->where('warehouse_id', $purchaseReturn->purchaseReceipt->warehouse_id ?? 1)
+                        ->lockForUpdate()
                         ->first();
 
                     if ($inventoryStock) {
@@ -347,7 +494,7 @@ class PurchaseReturnService
                         'warehouse_id' => $purchaseReturn->purchaseReceipt->warehouse_id ?? 1,
                         'rak_id' => $item->rak_id,
                         'quantity' => $item->qty_returned,
-                        'value' => $item->qty_returned * $item->unit_price,
+                        'value' => $resolvedLine['amount_idr'],
                         'type' => 'purchase_return',
                         'date' => $purchaseReturn->return_date ?? now(),
                         'notes' => 'Stock outbound from purchase return: ' . $purchaseReturn->nota_retur,
@@ -356,6 +503,12 @@ class PurchaseReturnService
                             'purchase_return_id' => $purchaseReturn->id,
                             'nota_retur' => $purchaseReturn->nota_retur,
                             'unit_price' => $item->unit_price,
+                            'raw_unit_price' => $resolvedLine['raw_unit_price'],
+                            'unit_price_idr' => $resolvedLine['unit_price_idr'],
+                            'currency_id' => $resolvedLine['currency_id'],
+                            'currency_code' => $resolvedLine['currency_code'],
+                            'exchange_rate' => $resolvedLine['exchange_rate'],
+                            'amount_original_currency' => $resolvedLine['amount_original_currency'],
                             'reason' => $item->reason,
                         ],
                         'from_model_type' => PurchaseReturn::class,
@@ -384,7 +537,7 @@ class PurchaseReturnService
             $purchaseReturn->update([
                 'credit_note_number' => $data['credit_note_number'] ?? null,
                 'credit_note_date' => $data['credit_note_date'] ?? now(),
-                'credit_note_amount' => $data['credit_note_amount'] ?? $purchaseReturn->purchaseReturnItem->sum(fn($item) => $item->qty_returned * $item->unit_price),
+                'credit_note_amount' => $data['credit_note_amount'] ?? $this->calculateReturnTotalIdr($purchaseReturn),
             ]);
 
             // Update account payable
@@ -394,7 +547,7 @@ class PurchaseReturnService
                 $accountPayable->increment('paid', $purchaseReturn->credit_note_amount);
 
                 if ($accountPayable->remaining <= 0) {
-                    $accountPayable->update(['status' => 'Lunas']);
+                    $accountPayable->update(['status' => PaymentStatus::PAID->value]);
                 }
             }
 
@@ -428,7 +581,7 @@ class PurchaseReturnService
                 $accountPayable->increment('paid', $purchaseReturn->refund_amount);
 
                 if ($accountPayable->remaining <= 0) {
-                    $accountPayable->update(['status' => 'Lunas']);
+                    $accountPayable->update(['status' => PaymentStatus::PAID->value]);
                 }
             }
 
@@ -448,7 +601,7 @@ class PurchaseReturnService
     public function submitForApproval(PurchaseReturn $purchaseReturn): bool
     {
         if ($purchaseReturn->status !== 'draft') {
-            throw new \Exception('Only draft purchase returns can be submitted for approval');
+            throw new \Exception('Retur pembelian hanya bisa diajukan saat masih berstatus draft.');
         }
 
         $purchaseReturn->update(['status' => 'pending_approval']);
@@ -461,7 +614,7 @@ class PurchaseReturnService
     public function approve(PurchaseReturn $purchaseReturn, array $data = []): bool
     {
         if ($purchaseReturn->status !== 'pending_approval') {
-            throw new \Exception('Only pending purchase returns can be approved');
+            throw new \Exception('Retur pembelian hanya bisa disetujui saat statusnya masih menunggu persetujuan.');
         }
 
         DB::transaction(function () use ($purchaseReturn, $data) {
@@ -479,8 +632,12 @@ class PurchaseReturnService
                 $this->executeQcResolution($purchaseReturn);
             } else {
                 // Standard receipt-based return: reverse inventory and create journal entries.
-                $this->createJournalEntry($purchaseReturn);
-                $this->adjustStock($purchaseReturn);
+                if (!$this->createJournalEntry($purchaseReturn)) {
+                    throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA inventory dan hutang dagang aktif. Legacy mapping yang masih didukung: 1101.01, 5120.10, 2101.01.');
+                }
+                if (!$this->adjustStock($purchaseReturn)) {
+                    throw new \Exception('Gagal menyesuaikan stok untuk retur pembelian. Silakan coba lagi atau hubungi administrator.');
+                }
             }
         });
 
@@ -493,7 +650,7 @@ class PurchaseReturnService
     public function reject(PurchaseReturn $purchaseReturn, array $data = []): bool
     {
         if ($purchaseReturn->status !== 'pending_approval') {
-            throw new \Exception('Only pending purchase returns can be rejected');
+            throw new \Exception('Retur pembelian hanya bisa ditolak saat statusnya masih menunggu persetujuan.');
         }
 
         $purchaseReturn->update([

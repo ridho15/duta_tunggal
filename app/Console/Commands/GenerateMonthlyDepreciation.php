@@ -13,7 +13,7 @@ class GenerateMonthlyDepreciation extends Command
      *
      * @var string
      */
-    protected $signature = 'asset:depreciate {--date= : Tanggal penyusutan (format: YYYY-MM-DD)}';
+    protected $signature = 'asset:depreciate {--date= : Tanggal penyusutan (format: YYYY-MM-DD)} {--force : Jalankan tanpa konfirmasi}';
 
     /**
      * The console command description.
@@ -36,7 +36,7 @@ class GenerateMonthlyDepreciation extends Command
         $this->info('Tanggal penyusutan: ' . $date->format('d F Y'));
         
         // Confirm before proceeding
-        if (!$this->confirm('Apakah Anda yakin ingin melanjutkan?')) {
+        if (!$this->option('force') && !$this->confirm('Apakah Anda yakin ingin melanjutkan?')) {
             $this->info('Proses dibatalkan.');
             return Command::SUCCESS;
         }

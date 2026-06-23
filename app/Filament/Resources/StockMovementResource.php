@@ -32,11 +32,13 @@ class StockMovementResource extends Resource
 {
     protected static ?string $model = StockMovement::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
@@ -76,7 +78,7 @@ class StockMovementResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', 1)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                                                                $q->where('name', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 
@@ -186,7 +188,7 @@ class StockMovementResource extends Resource
                             ->hidden(),
                         TextInput::make('from_model_id')
                             ->hidden(),
-                        DatePicker::make('date')
+                        DateTimePicker::make('date')
                             ->required(),
                         Textarea::make('notes')
                             ->nullable(),
@@ -266,33 +268,7 @@ class StockMovementResource extends Resource
                 TextColumn::make('fromModel')
                     ->label('Source')
                     ->formatStateUsing(function ($record) {
-                        if ($record->fromModel) {
-                            $modelType = $record->from_model_type;
-                            $modelName = match ($modelType) {
-                                'App\Models\SaleOrder' => 'Sales Order',
-                                'App\Models\PurchaseOrder' => 'Purchase Order',
-                                'App\Models\DeliveryOrder' => 'Delivery Order',
-                                'App\Models\PurchaseReceipt' => 'Purchase Receipt',
-                                'App\Models\StockTransfer' => 'Stock Transfer',
-                                'App\Models\ManufacturingOrder' => 'Manufacturing Order',
-                                'App\Models\StockAdjustment' => 'Stock Adjustment',
-                                default => 'Unknown'
-                            };
-
-                            $sourceNumber = match ($modelType) {
-                                'App\Models\SaleOrder' => $record->fromModel->so_number ?? 'N/A',
-                                'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
-                                'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
-                                'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
-                                'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
-                                'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
-                                'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
-                                default => 'N/A'
-                            };
-
-                            return $modelName . ' - ' . $sourceNumber;
-                        }
-                        return '-';
+                        return $record->source_display;
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         // This is complex to search, so we'll skip for now

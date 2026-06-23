@@ -2,14 +2,18 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountPayableResource\Pages;
+use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use App\Models\Invoice;
 use App\Models\Supplier;
+use App\Support\AccountPayableQuery;
+use App\Support\OverdueStatusPresenter;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -24,7 +28,6 @@ use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Filament\Resources\AccountPayableResource\RelationManagers;
 
@@ -34,9 +37,17 @@ class AccountPayableResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Pembelian';
+    protected static ?string $navigationGroup = 'Keuangan Pembelian';
+
+    protected static ?string $navigationLabel = 'Utang Usaha';
+
+    protected static ?string $modelLabel = 'Utang Usaha';
+
+    protected static ?string $pluralModelLabel = 'Utang Usaha';
 
     protected static ?int $navigationSort = 4;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -54,8 +65,15 @@ class AccountPayableResource extends Resource
                                 $invoice = Invoice::find($state);
                                 if ($invoice) {
                                     $set('supplier_id', $invoice->fromModel->supplier_id);
-                                    $set('total', (float) $invoice->total);
-                                    $set('remaining', (float) $invoice->total);
+                                    $rate = (float) ($invoice->exchange_rate ?? 1);
+                                    $rate = $rate > 0 ? $rate : 1.0;
+                                    $set('currency_id', $invoice->currency_id);
+                                    $set('exchange_rate', $rate);
+                                    $set('total_original', (float) $invoice->total);
+                                    $set('paid_original', 0);
+                                    $set('remaining_original', (float) $invoice->total);
+                                    $set('total', round((float) $invoice->total * $rate, 2));
+                                    $set('remaining', round((float) $invoice->total * $rate, 2));
                                 }
                             })
                             ->validationMessages([
@@ -78,9 +96,9 @@ class AccountPayableResource extends Resource
                             })
                             ->relationship('supplier', 'perusahaan'),
                         TextInput::make('total')
+                            ->label('Total Source')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Total tidak boleh kosong',
                                 'numeric' => 'Total harus berupa angka'
@@ -88,66 +106,68 @@ class AccountPayableResource extends Resource
                             ->readonly()
                             ->reactive()
                             ->dehydrateStateUsing(function ($state) {
-                                // Ensure total is properly processed for readonly field
-                                if (is_string($state)) {
-                                    // Remove formatting and convert to float
-                                    $cleaned = preg_replace('/[^\d.,]/', '', $state);
-                                    // Handle Indonesian format (dots as thousand separators, comma as decimal)
-                                    $parts = explode(',', $cleaned);
-                                    if (count($parts) > 1) {
-                                        $integer = str_replace('.', '', $parts[0]);
-                                        $decimal = $parts[1];
-                                        return (float)($integer . '.' . $decimal);
-                                    } else {
-                                        $integer = str_replace('.', '', $parts[0]);
-                                        return (float)$integer;
-                                    }
-                                }
-                                return (float)$state;
+                                return (float) \App\Helpers\MoneyHelper::safeParse($state);
                             })
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $total = is_numeric($state) ? (float) $state : 0;
-                                $paid = is_numeric($get('paid')) ? (float) $get('paid') : 0;
+                                $total = (float) \App\Helpers\MoneyHelper::safeParse($state);
+                                $paid = (float) \App\Helpers\MoneyHelper::safeParse($get('paid'));
                                 $set('remaining', $total - $paid);
                             })
-                            ->helperText('Total akan terisi otomatis berdasarkan invoice yang dipilih'),
+                            ->helperText(function ($get) {
+                                $invoice = Invoice::find($get('invoice_id'));
+
+                                return $invoice
+                                    ? 'Total invoice: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('total'))
+                                    : 'Total akan terisi otomatis berdasarkan invoice yang dipilih';
+                            }),
                         TextInput::make('paid')
+                            ->label('Paid Source')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Jumlah pembayaran tidak boleh kosong',
                                 'numeric' => 'Jumlah pembayaran harus berupa angka'
                             ])
                             ->default(0.00)
-                            ->reactive()
+                            ->live(debounce: 500)
+                            ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                $total = is_numeric($get('total')) ? (float) $get('total') : 0;
-                                $paid = is_numeric($state) ? (float) $state : 0;
+                                $total = (float) \App\Helpers\MoneyHelper::safeParse($get('total'));
+                                $paid = (float) \App\Helpers\MoneyHelper::safeParse($state);
                                 $set('remaining', $total - $paid);
+                            })
+                            ->helperText(function ($get) {
+                                $invoice = Invoice::find($get('invoice_id'));
+
+                                return $invoice
+                                    ? 'Dibayar: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('paid'))
+                                    : null;
                             }),
                         TextInput::make('remaining')
+                            ->label('Remaining Source')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->validationMessages([
                                 'required' => 'Sisa pembayaran tidak boleh kosong',
                                 'numeric' => 'Sisa pembayaran harus berupa angka'
                             ])
                             ->reactive()
-                            ->helperText('Sisa pembayaran akan terisi otomatis berdasarkan total invoice'),
-                        Radio::make('status')
-                            ->label('Status Pembayaran')
-                            ->options([
-                                'Belum Lunas' => 'Belum Lunas',
-                                'Lunas' => 'Lunas',
-                            ])
-                            ->default('Belum Lunas')
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Status pembayaran harus dipilih'
-                            ])
-                            ->inline()
+                            ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
+                            ->helperText(function ($get) {
+                                $invoice = Invoice::find($get('invoice_id'));
+
+                                return $invoice
+                                    ? 'Sisa hutang: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('remaining'))
+                                    : 'Sisa pembayaran akan terisi otomatis berdasarkan total invoice';
+                            }),
+                        Hidden::make('status')
+                            ->default(PaymentStatus::UNPAID->value)
+                            ->dehydrated(fn (string $context): bool => $context === 'create'),
+                        Hidden::make('currency_id'),
+                        Hidden::make('exchange_rate')->default(1),
+                        Hidden::make('total_original'),
+                        Hidden::make('paid_original')->default(0),
+                        Hidden::make('remaining_original'),
                     ])
             ]);
     }
@@ -156,24 +176,9 @@ class AccountPayableResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                // Join invoices to allow computed grouping & sorting by overdue status (including soft deleted)
-                $query->leftJoin('invoices', function ($join) {
-                    $join->on('account_payables.invoice_id', '=', 'invoices.id');
-                })
-                    ->where('account_payables.status', '!=', 'Lunas') // Exclude PAID records from ageing schedule
-                    ->whereNull('account_payables.deleted_at') // Exclude soft deleted AP records from ageing schedule
-                    ->select('account_payables.*')
-                    ->addSelect(
-                        DB::raw("CASE 
-                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL AND DATEDIFF(CURDATE(), invoices.due_date) > 60 THEN 'OVERDUE 60+ Days'
-                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL AND DATEDIFF(CURDATE(), invoices.due_date) > 30 THEN 'OVERDUE 30+ Days'
-                            WHEN invoices.due_date < CURDATE() AND invoices.deleted_at IS NULL THEN 'OVERDUE'
-                            WHEN invoices.deleted_at IS NOT NULL THEN 'DELETED INVOICE'
-                            ELSE 'CURRENT'
-                        END AS overdue_group")
-                    );
-                // Eager load required relations
-                return $query->with(['invoice', 'invoice.fromModel']);
+                return AccountPayableQuery::withOverdueGrouping(
+                    AccountPayableQuery::base()->with(['invoice', 'invoice.fromModel'])
+                );
             })
             ->columns([
                 TextColumn::make('invoice.invoice_number')
@@ -194,13 +199,13 @@ class AccountPayableResource extends Resource
                     
                 TextColumn::make('supplier')
                     ->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
+                        return "({$state->code}) {$state->perusahaan}";
                     })
                     ->label('Supplier')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('supplier', function (Builder $query) use ($search) {
                             $query->where('code', 'like', "%{$search}%")
-                                  ->orWhere('name', 'like', "%{$search}%");
+                                  ->orWhere('perusahaan', 'like', "%{$search}%");
                         });
                     })
                     ->sortable(),
@@ -220,15 +225,7 @@ class AccountPayableResource extends Resource
                     ->label('Due Date')
                     ->date('M j, Y')
                     ->sortable()
-                    ->color(function ($record) {
-                        if ($record->overdue_group === 'DELETED INVOICE') {
-                            return 'danger';
-                        }
-                        if ($record->invoice && $record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
-                            return 'danger';
-                        }
-                        return 'gray';
-                    })
+                    ->color(fn ($record) => self::overdueStatusPresenter()->dueDateColor($record))
                     ->formatStateUsing(function ($state, $record) {
                         if ($record->overdue_group === 'DELETED INVOICE') {
                             return $state . ' 🗑️ (DELETED)';
@@ -237,56 +234,28 @@ class AccountPayableResource extends Resource
                     }),
                     
                 TextColumn::make('total')
-                    ->label('Total Amount')
+                    ->label('Total Amount (Rp / Source)')
                     ->sortable()
                     ->searchable()
-                    ->rupiah()
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->rupiah()
-                            ->label('Total Outstanding')
-                    ]),
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->total_original ?? $record->invoice?->total ?? $state)),
                     
                 TextColumn::make('paid')
-                    ->label('Paid Amount')
+                    ->label('Paid Amount (Rp / Source)')
                     ->sortable()
-                    ->rupiah()
-                    ->color('success')
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->rupiah()
-                            ->label('Total Paid')
-                    ]),
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->paid_original ?? 0))
+                    ->color('success'),
                     
                 TextColumn::make('remaining')
-                    ->label('Outstanding')
+                    ->label('Outstanding (Rp / Source)')
                     ->sortable()
-                    ->rupiah()
+                    ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->remaining_original ?? $record->invoice?->total ?? $state))
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
-                    ->weight('bold')
-                    ->summarize([
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->rupiah()
-                            ->label('Total Outstanding')
-                    ]),
+                    ->weight('bold'),
                     
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
-                    ->getStateUsing(function ($record) {
-                        if ($record->overdue_group === 'DELETED INVOICE') {
-                            return 'DELETED';
-                        }
-                        if ($record->status === 'Belum Lunas' && $record->invoice && $record->invoice->due_date < now()) {
-                            return now()->diffInDays($record->invoice->due_date);
-                        }
-                        return 0;
-                    })
-                    ->color(function ($state, $record) {
-                        if ($state === 'DELETED') return 'danger';
-                        if ($state > 30) return 'danger';
-                        if ($state > 0) return 'warning';
-                        return 'success';
-                    })
+                    ->getStateUsing(fn ($record) => self::overdueStatusPresenter()->daysOverdue($record))
+                    ->color(fn ($state) => self::overdueStatusPresenter()->daysOverdueColor($state))
                     ->badge()
                     ->sortable(),
                     
@@ -294,8 +263,8 @@ class AccountPayableResource extends Resource
                     ->label('Status')
                     ->color(function ($state) {
                         return match ($state) {
-                            'Belum Lunas' => 'warning',
-                            'Lunas' => 'success',
+                            PaymentStatus::UNPAID->value => 'warning',
+                            PaymentStatus::PAID->value => 'success',
                             default => 'gray'
                         };
                     })
@@ -310,6 +279,14 @@ class AccountPayableResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->default('System'),
+                    
+                TextColumn::make('invoice.fromModel.po_number')
+                    ->label('PO Number')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->default('-')
+                    ->toggleable(),
                     
                 TextColumn::make('invoice.fromModel.createdBy.name')
                     ->label('PO Created By')
@@ -341,7 +318,7 @@ class AccountPayableResource extends Resource
             ])
             ->defaultSort('invoice.due_date', 'desc')
             ->groups([
-                Tables\Grouping\Group::make('supplier.name')
+                Tables\Grouping\Group::make('supplier.perusahaan')
                     ->label('Supplier')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
@@ -353,27 +330,14 @@ class AccountPayableResource extends Resource
                     ->label('Payment Status')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        return $record->status === 'Lunas' ? '✅ PAID' : '⏳ OUTSTANDING';
+                        return $record->status === PaymentStatus::PAID->value ? '✅ PAID' : '⏳ OUTSTANDING';
                     })
                     ->collapsible(),
                     
                 Tables\Grouping\Group::make('overdue_group')
                     ->label('Overdue Status')
                     ->titlePrefixedWithLabel(false)
-                    ->getTitleFromRecordUsing(function ($record) {
-                        if ($record->overdue_group === 'DELETED INVOICE') {
-                            return '🗑️ DELETED INVOICE';
-                        }
-                        
-                        // Since we exclude 'Lunas' records, overdue_group will never be 'PAID'
-                        if ($record->invoice && $record->invoice->due_date < now()) {
-                            $daysOverdue = now()->diffInDays($record->invoice->due_date);
-                            if ($daysOverdue > 60) return '🚨 OVERDUE 60+ Days';
-                            if ($daysOverdue > 30) return '⚠️ OVERDUE 30+ Days';
-                            if ($daysOverdue > 0) return '⏰ OVERDUE';
-                        }
-                        return '💚 CURRENT';
-                    })
+                    ->getTitleFromRecordUsing(fn ($record) => self::overdueStatusPresenter()->overdueGroupLabel($record))
                     ->collapsible(),
             ])
             ->filters([
@@ -390,8 +354,8 @@ class AccountPayableResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Payment Status')
                     ->options([
-                        'Belum Lunas' => 'Outstanding',
-                        'Lunas' => 'Paid',
+                        PaymentStatus::UNPAID->value => 'Outstanding',
+                        PaymentStatus::PAID->value => 'Paid',
                     ])
                     ->multiple(),
                     
@@ -401,12 +365,12 @@ class AccountPayableResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->numeric()
-                                    ->indonesianMoney(),
+                                    ->indonesianMoney()
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state)),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->numeric()
-                                    ->indonesianMoney(),
+                                    ->indonesianMoney()
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state)),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -419,10 +383,10 @@ class AccountPayableResource extends Resource
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
                         if ($data['amount_from'] ?? null) {
-                            $indicators['amount_from'] = 'Amount from: Rp ' . number_format($data['amount_from']);
+                            $indicators['amount_from'] = 'Amount from: ' . MoneyHelper::rupiah($data['amount_from']);
                         }
                         if ($data['amount_to'] ?? null) {
-                            $indicators['amount_to'] = 'Amount to: Rp ' . number_format($data['amount_to']);
+                            $indicators['amount_to'] = 'Amount to: ' . MoneyHelper::rupiah($data['amount_to']);
                         }
                         return $indicators;
                     }),
@@ -434,11 +398,7 @@ class AccountPayableResource extends Resource
                     
                 Tables\Filters\Filter::make('overdue')
                     ->label('Overdue Invoices')
-                    ->query(function (Builder $query): Builder {
-                        return $query->whereHas('invoice', function (Builder $query) {
-                            $query->where('due_date', '<', now());
-                        })->where('status', 'Belum Lunas');
-                    })
+                    ->query(fn (Builder $query): Builder => AccountPayableQuery::applyOverdueFilter($query))
                     ->toggle(),
                     
                 Tables\Filters\Filter::make('date_range')
@@ -506,24 +466,13 @@ class AccountPayableResource extends Resource
                         '60+' => '60+ Days',
                     ])
                     ->query(function (Builder $query, $data) {
-                        if (!$data['value']) return $query;
-                        
-                        return $query->whereHas('invoice', function (Builder $query) use ($data) {
-                            $now = now();
-                            switch ($data['value']) {
-                                case '1-30':
-                                    $query->whereBetween('due_date', [$now->copy()->subDays(30), $now->copy()->subDay()]);
-                                    break;
-                                case '31-60':
-                                    $query->whereBetween('due_date', [$now->copy()->subDays(60), $now->copy()->subDays(31)]);
-                                    break;
-                                case '60+':
-                                    $query->where('due_date', '<', $now->copy()->subDays(60));
-                                    break;
-                            }
-                        })->where('status', 'Belum Lunas');
+                        if (!$data['value']) {
+                            return $query;
+                        }
+
+                        return AccountPayableQuery::applyOverdueDaysFilter($query, $data['value']);
                     }),
-                    
+                
                 Tables\Filters\Filter::make('invoice_date_range')
                     ->form([
                         Forms\Components\Grid::make(2)
@@ -590,7 +539,7 @@ class AccountPayableResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', 'Lunas');
+        $query = parent::getEloquentQuery()->where('account_payables.status', '!=', PaymentStatus::PAID->value);
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {
@@ -610,5 +559,10 @@ class AccountPayableResource extends Resource
             'view' => Pages\ViewAccountPayable::route('/{record}'),
             'edit' => Pages\EditAccountPayable::route('/{record}/edit'),
         ];
+    }
+
+    public static function overdueStatusPresenter(): OverdueStatusPresenter
+    {
+        return app(OverdueStatusPresenter::class);
     }
 }

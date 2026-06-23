@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Helpers\MoneyHelper;
 
 class PaymentRequest extends Model
 {
@@ -31,15 +32,134 @@ class PaymentRequest extends Model
 
     protected $casts = [
         'selected_invoices' => 'array',
-        'request_date' => 'date',
-        'payment_date' => 'date',
-        'approved_at' => 'datetime',
+        // request_date, payment_date, and approved_at handled via accessors to guard against invalid DB values like '-'
     ];
+
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower(trim((string) $value))) {
+            self::STATUS_DRAFT => self::STATUS_DRAFT,
+            self::STATUS_PENDING => self::STATUS_PENDING,
+            self::STATUS_APPROVED => self::STATUS_APPROVED,
+            self::STATUS_PARTIAL => self::STATUS_PARTIAL,
+            self::STATUS_REJECTED => self::STATUS_REJECTED,
+            self::STATUS_PAID => self::STATUS_PAID,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            self::STATUS_DRAFT,
+            self::STATUS_PENDING,
+            self::STATUS_APPROVED,
+            self::STATUS_PARTIAL,
+            self::STATUS_REJECTED,
+            self::STATUS_PAID => $normalized,
+            default => $value,
+        };
+    }
+
+    /**
+     * Accessor for approved_at — guards against invalid DB values like '-'.
+     */
+    public function getApprovedAtAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string)$value) === '' || trim((string)$value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for approved_at — converts invalid values to null before saving.
+     */
+    public function setApprovedAtAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['approved_at'] = null;
+        } else {
+            $this->attributes['approved_at'] = $value;
+        }
+    }
+
+    /**
+     * Accessor for request_date — guards against invalid DB values like '-'.
+     */
+    public function getRequestDateAttribute($value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim((string)$value) === '' || trim((string)$value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for request_date — converts invalid values to null before saving.
+     */
+    public function setRequestDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['request_date'] = null;
+        } else {
+            $this->attributes['request_date'] = $value;
+        }
+    }
+
+    /**
+     * Accessor for payment_date — guards against invalid DB values like '-'.
+     * Returns a Carbon instance or null. Bypasses the Eloquent date cast
+     * to prevent DateMalformedStringException on legacy records.
+     */
+    public function getPaymentDateAttribute(?string $value): ?\Illuminate\Support\Carbon
+    {
+        if (!$value || trim($value) === '' || trim($value) === '-') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Mutator for payment_date — converts invalid values to null before saving.
+     */
+    public function setPaymentDateAttribute(mixed $value): void
+    {
+        if (!$value || (is_string($value) && (trim($value) === '' || trim($value) === '-'))) {
+            $this->attributes['payment_date'] = null;
+        } else {
+            $this->attributes['payment_date'] = $value;
+        }
+    }
 
     // Status constants
     const STATUS_DRAFT = 'draft';
     const STATUS_PENDING = 'pending_approval';
     const STATUS_APPROVED = 'approved';
+    const STATUS_PARTIAL = 'partial';
     const STATUS_REJECTED = 'rejected';
     const STATUS_PAID = 'paid';
 
@@ -47,6 +167,7 @@ class PaymentRequest extends Model
         self::STATUS_DRAFT => 'Draft',
         self::STATUS_PENDING => 'Menunggu Persetujuan',
         self::STATUS_APPROVED => 'Disetujui',
+        self::STATUS_PARTIAL => 'Dibayar Sebagian',
         self::STATUS_REJECTED => 'Ditolak',
         self::STATUS_PAID => 'Dibayar',
     ];
@@ -55,6 +176,7 @@ class PaymentRequest extends Model
         self::STATUS_DRAFT => 'gray',
         self::STATUS_PENDING => 'warning',
         self::STATUS_APPROVED => 'success',
+        self::STATUS_PARTIAL => 'info',
         self::STATUS_REJECTED => 'danger',
         self::STATUS_PAID => 'primary',
     ];
@@ -111,5 +233,16 @@ class PaymentRequest extends Model
         }
 
         return $prefix . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function getPaidAmountAttribute(): float
+    {
+        return (float) VendorPayment::where('payment_request_id', $this->id)->sum('total_payment');
+    }
+
+    public function getRemainingAmountAttribute(): float
+    {
+        $total = MoneyHelper::safeParse($this->total_amount ?? 0);
+        return max(0, $total - $this->paid_amount);
     }
 }

@@ -10,12 +10,14 @@ use App\Models\InventoryStock;
 use Illuminate\Support\Facades\Gate;
 use App\Models\ManufacturingOrder;
 use App\Models\Product;
+use App\Models\ProductionPlan;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
 use App\Services\ManufacturingService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -34,6 +36,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ManufacturingOrderResource extends Resource
@@ -42,7 +45,15 @@ class ManufacturingOrderResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
+
+    protected static ?string $navigationLabel = 'Perintah Produksi';
+
+    protected static ?string $modelLabel = 'Perintah Produksi';
+
+    protected static ?string $pluralModelLabel = 'Perintah Produksi';
+
+    protected static bool $shouldRegisterNavigation = false;
 
     // Position Manufacturing Order as the 4th group
     protected static ?int $navigationSort = 4;
@@ -83,7 +94,20 @@ class ManufacturingOrderResource extends Resource
                         Select::make('production_plan_id')
                             ->label('Rencana Produksi')
                             ->relationship('productionPlan', 'plan_number', function (Builder $query) {
-                                $query->where('status', 'in_progress');
+                                $query->whereIn('status', ['scheduled', 'in_progress']);
+
+                                $user = Auth::user();
+                                if ($user && !in_array('all', $user->manage_type ?? [])) {
+                                    $query->where(function (Builder $branchQuery) use ($user) {
+                                        $branchQuery->where('cabang_id', $user->cabang_id)
+                                            ->orWhereHas('billOfMaterial', function (Builder $relatedQuery) use ($user) {
+                                                $relatedQuery->where('cabang_id', $user->cabang_id);
+                                            })
+                                            ->orWhereHas('saleOrder', function (Builder $relatedQuery) use ($user) {
+                                                $relatedQuery->where('cabang_id', $user->cabang_id);
+                                            });
+                                    });
+                                }
                             })
                             ->searchable()
                             ->preload()
@@ -94,8 +118,13 @@ class ManufacturingOrderResource extends Resource
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 if ($state) {
-                                    $productionPlan = \App\Models\ProductionPlan::with('product', 'billOfMaterial.items.product')->find($state);
+                                    $productionPlan = \App\Models\ProductionPlan::with('product', 'billOfMaterial.items.product', 'billOfMaterial.cabang', 'saleOrder', 'warehouse')->find($state);
                                     if ($productionPlan) {
+                                        $set('cabang_id', $productionPlan->cabang_id
+                                            ?? $productionPlan->saleOrder?->cabang_id
+                                            ?? $productionPlan->billOfMaterial?->cabang_id
+                                            ?? $productionPlan->warehouse?->cabang_id);
+
                                         // Auto-fill start_date and end_date from Production Plan
                                         if ($productionPlan->start_date) {
                                             $set('start_date', \Carbon\Carbon::parse($productionPlan->start_date)->format('Y-m-d H:i:s'));
@@ -145,6 +174,123 @@ class ManufacturingOrderResource extends Resource
                             ->label('Tanggal Mulai'),
                         DateTimePicker::make('end_date')
                             ->label('Tanggal Selesai'),
+                        Fieldset::make('Informasi Produksi')
+                            ->schema([
+                                Placeholder::make('production_plan_summary')
+                                    ->label('Rencana Produksi')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+
+                                        if (! $productionPlan) {
+                                            return '-';
+                                        }
+
+                                        return sprintf('%s - %s', $productionPlan->plan_number, $productionPlan->name);
+                                    }),
+                                Placeholder::make('product_summary')
+                                    ->label('Product')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+                                        $product = $productionPlan?->product;
+
+                                        if (! $product) {
+                                            return '-';
+                                        }
+
+                                        return sprintf('(%s) %s', $product->sku, $product->name);
+                                    }),
+                                Placeholder::make('product_spec_summary')
+                                    ->label('Spesifikasi Product')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+                                        $product = $productionPlan?->product;
+
+                                        if (! $product) {
+                                            return '-';
+                                        }
+
+                                        $uomName = $product->uom?->name ?? '-';
+                                        $uomAbbreviation = $product->uom?->abbreviation;
+
+                                        return sprintf(
+                                            'Satuan %s%s | Cost Price %s',
+                                            $uomName,
+                                            $uomAbbreviation ? " ({$uomAbbreviation})" : '',
+                                            \App\Helpers\MoneyHelper::rupiah($product->cost_price)
+                                        );
+                                    }),
+                                Placeholder::make('bom_summary')
+                                    ->label('Bill of Material')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+                                        $bom = $productionPlan?->billOfMaterial;
+
+                                        if (! $bom) {
+                                            return '-';
+                                        }
+
+                                        return sprintf('(%s) %s', $bom->code, $bom->nama_bom);
+                                    }),
+                                Placeholder::make('source_summary')
+                                    ->label('Sumber Rencana')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+
+                                        if (! $productionPlan) {
+                                            return '-';
+                                        }
+
+                                        if ($productionPlan->saleOrder?->so_number) {
+                                            return sprintf('Sales Order %s', $productionPlan->saleOrder->so_number);
+                                        }
+
+                                        return $productionPlan->source_type ? Str::headline($productionPlan->source_type) : '-';
+                                    }),
+                                Placeholder::make('material_fulfillment_summary')
+                                    ->label('Ringkasan Material')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+
+                                        if (! $productionPlan || ! $productionPlan->billOfMaterial) {
+                                            return '-';
+                                        }
+
+                                        $summary = $productionPlan->getFulfillmentSummary();
+
+                                        return sprintf(
+                                            'Item %d | Available %d | Partial %d | Unavailable %d | Issued %d | Ready %s',
+                                            $summary['total_materials'] ?? 0,
+                                            $summary['fully_available'] ?? 0,
+                                            $summary['partially_available'] ?? 0,
+                                            $summary['not_available'] ?? 0,
+                                            $summary['fully_issued'] ?? 0,
+                                            ($summary['can_start_production'] ?? false) ? 'Yes' : 'No'
+                                        );
+                                    }),
+                                Placeholder::make('material_details_summary')
+                                    ->label('Detail Bahan')
+                                    ->content(function ($get) {
+                                        $productionPlan = self::resolveProductionPlan($get('production_plan_id'));
+
+                                        if (! $productionPlan) {
+                                            return '-';
+                                        }
+
+                                        $details = self::resolveMaterialItemDetailsByProductionPlan($productionPlan);
+
+                                        if (empty($details)) {
+                                            return '-';
+                                        }
+
+                                        return collect($details)
+                                            ->map(function (array $item) {
+                                                return sprintf('%s | Qty %s', $item['label'], rtrim(rtrim((string) $item['quantity'], '0'), '.'));
+                                            })
+                                            ->implode(' ; ');
+                                    })
+                                    ->visible(fn (string $operation) => $operation === 'view'),
+                            ])
+                            ->columns(2),
                         Repeater::make('items')
                             ->label('Detail Bahan')
                             ->schema([
@@ -156,7 +302,7 @@ class ManufacturingOrderResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Material harus dipilih'
                                     ])
-                                    ->options(Product::where('is_raw_material', true)->pluck('name', 'id'))
+                                    ->options(Product::where('is_raw_material', true)->orderBy('name')->limit(50)->pluck('name', 'id'))
                                     ->getOptionLabelFromRecordUsing(function ($value) {
                                         $product = Product::find($value);
                                         return $product ? "({$product->sku}) {$product->name}" : '';
@@ -170,7 +316,8 @@ class ManufacturingOrderResource extends Resource
                                         }
                                         return "Stock Material : 0";
                                     })
-                                    ->disabled(), // Disabled since loaded from BOM
+                                    ->disabled() // Disabled since loaded from BOM
+                                    ->dehydrated(true),
                                 Select::make('uom_id')
                                     ->label('Satuan')
                                     ->options(UnitOfMeasure::all()->mapWithKeys(fn($uom) => [$uom->id => "({$uom->abbreviation}) {$uom->name}"])->toArray())
@@ -180,7 +327,8 @@ class ManufacturingOrderResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Satuan harus dipilih'
                                     ])
-                                    ->disabled(), // Disabled since loaded from Material Issue
+                                    ->disabled() // Disabled since loaded from Material Issue
+                                    ->dehydrated(true),
                                 TextInput::make('quantity')
                                     ->label('Quantity Required (Dibutuhkan)')
                                     ->numeric()
@@ -189,7 +337,8 @@ class ManufacturingOrderResource extends Resource
                                         'required' => 'Quantity wajib diisi',
                                         'numeric' => 'Quantity harus berupa angka'
                                     ])
-                                    ->disabled(), // Disabled since loaded from BOM
+                                    ->disabled() // Disabled since loaded from BOM
+                                    ->dehydrated(true),
                                 TextInput::make('notes')
                                     ->label('Notes')
                                     ->maxLength(255),
@@ -197,8 +346,42 @@ class ManufacturingOrderResource extends Resource
                             ->columns(2)
                             ->columnSpanFull()
                             ->disabled() // Entire repeater disabled, for view only
+                            ->dehydrated(true)
                     ])
             ]);
+    }
+
+    public static function resolveMaterialItems(ManufacturingOrder $record): array
+    {
+        return $record->resolveMaterialItemsFallback();
+    }
+
+    public static function resolveMaterialItemDetailsByProductionPlan(?ProductionPlan $productionPlan): array
+    {
+        if (! $productionPlan || ! $productionPlan->exists || ! $productionPlan->billOfMaterial->exists) {
+            return [];
+        }
+
+        $materialIssue = \App\Models\MaterialIssue::where('production_plan_id', $productionPlan->id)
+            ->where('status', 'completed')
+            ->with('items.product')
+            ->first();
+
+        if ($materialIssue) {
+            return $materialIssue->items->map(function ($issueItem) {
+                return [
+                    'label' => sprintf('(%s) %s', $issueItem->product->sku ?? '-', $issueItem->product->name ?? '-'),
+                    'quantity' => $issueItem->quantity,
+                ];
+            })->values()->all();
+        }
+
+        return $productionPlan->billOfMaterial->items->map(function ($bomItem) use ($productionPlan) {
+            return [
+                'label' => sprintf('(%s) %s', $bomItem->product->sku ?? '-', $bomItem->product->name ?? '-'),
+                'quantity' => $bomItem->quantity * $productionPlan->quantity,
+            ];
+        })->values()->all();
     }
 
     /**
@@ -227,8 +410,9 @@ class ManufacturingOrderResource extends Resource
 
             // Get current stock from inventory
             $currentStock = \App\Models\InventoryStock::where('product_id', $item->product_id)
-                ->where('qty_available', '>', 0)
-                ->sum('qty_available');
+                ->whereRaw('(qty_available - qty_reserved) > 0')
+                ->get()
+                ->sum(fn ($stock) => (float) $stock->qty_available - (float) $stock->qty_reserved);
 
             $availabilityPercentage = $currentStock >= $requiredQuantity ? 100 : ($currentStock > 0 ? ($currentStock / $requiredQuantity) * 100 : 0);
 
@@ -265,6 +449,21 @@ class ManufacturingOrderResource extends Resource
             ],
             'details' => $materialDetails
         ];
+    }
+
+    protected static function resolveProductionPlan(?int $productionPlanId): ?ProductionPlan
+    {
+        if (! $productionPlanId) {
+            return null;
+        }
+
+        return ProductionPlan::query()
+            ->with([
+                'product.uom',
+                'saleOrder',
+                'billOfMaterial.items.product',
+            ])
+            ->find($productionPlanId);
     }
 
     public static function table(Table $table): Table
@@ -358,27 +557,44 @@ class ManufacturingOrderResource extends Resource
                             return Auth::user()->hasPermissionTo('request manufacturing order') && $record->status == 'draft';
                         })
                         ->action(function ($record) {
-                            // Policy guard: transition draft -> in_progress
-                            abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
-                            $manufacturingService = app(ManufacturingService::class);
-                            $status = $manufacturingService->checkStockMaterial($record);
-                            if ($status) {
-                                $record->update([
-                                    'status' => 'in_progress'
-                                ]);
+                            try {
+                                // Policy guard: transition draft -> in_progress
+                                abort_unless(Gate::forUser(Auth::user())->allows('updateStatus', [$record, 'in_progress']), 403);
+                                $manufacturingService = app(ManufacturingService::class);
+                                $status = $manufacturingService->checkStockMaterial($record);
+                                if ($status) {
+                                    $record->update([
+                                        'status' => 'in_progress'
+                                    ]);
 
-                                // Create Production record automatically
-                                $productionService = app(\App\Services\ProductionService::class);
-                                \App\Models\Production::create([
-                                    'production_number' => $productionService->generateProductionNumber(),
+                                    // Create Production record automatically
+                                    $productionService = app(\App\Services\ProductionService::class);
+                                    \App\Models\Production::create([
+                                        'production_number' => $productionService->generateProductionNumber(),
+                                        'manufacturing_order_id' => $record->id,
+                                        'production_date' => now()->toDateString(),
+                                        'status' => 'draft',
+                                    ]);
+
+                                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created. Proses selanjutnya: Supervisor Produksi perlu memantau jalannya produksi dan memastikan bahan baku tersedia sesuai kebutuhan.");
+                                } else {
+                                    Log::warning('ManufacturingOrder start blocked: insufficient material stock', [
+                                        'manufacturing_order_id' => $record->id,
+                                        'mo_number' => $record->mo_number,
+                                        'status' => $record->status,
+                                        'user_id' => Auth::id(),
+                                    ]);
+                                    HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
+                                }
+                            } catch (\Throwable $e) {
+                                Log::error('ManufacturingOrder start production failed', [
                                     'manufacturing_order_id' => $record->id,
-                                    'production_date' => now()->toDateString(),
-                                    'status' => 'draft',
+                                    'mo_number' => $record->mo_number,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
                                 ]);
-
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Manufacturing In Progress - Production record created");
-                            } else {
-                                HelperController::sendNotification(isSuccess: false, title: "Information", message: "Stock material tidak mencukupi");
+                                HelperController::sendNotification(isSuccess: false, title: "Gagal Memulai Produksi", message: "Terjadi kesalahan saat memulai produksi: " . $e->getMessage());
                             }
                         })
                 ])

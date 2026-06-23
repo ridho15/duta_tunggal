@@ -89,6 +89,10 @@ class ManufacturingOrderPolicy
             'cancelled' => [],
         ];
 
+        if ($to === 'in_progress' && $mo->productionStartBlockingMessage() !== null) {
+            return false;
+        }
+
         return in_array($to, $allowed[$from] ?? [], true);
     }
 }

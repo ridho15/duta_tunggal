@@ -3,19 +3,21 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class QualityControl extends Model
 {
-    use SoftDeletes, LogsGlobalActivity, HasFactory;
+    use SoftDeletes, LogsGlobalActivity, HasFactory, CascadesJournalEntries;
     protected $table = 'quality_controls';
     protected $fillable = [
         'qc_number',
         'inspected_by',
         'passed_quantity',
         'rejected_quantity',
+        'quantity_received',
         'notes',
         'status',  // send to stock / send return product
         'warehouse_id',
@@ -26,6 +28,7 @@ class QualityControl extends Model
         'from_model_id',
         'from_model_type',
         'purchase_return_processed',
+        'cabang_id',
     ];
 
     protected $appends = [
@@ -84,6 +87,11 @@ class QualityControl extends Model
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function purchaseReceipt()

@@ -42,6 +42,15 @@ class HelperController extends Controller
         return $colors;
     }
 
+    /**
+     * Returns a mapping between resource names and the set of actions
+     * that can be performed on them.  This is used by the permission
+     * seeder, the audit tests and various authorization helpers.
+     *
+     * The format must stay backwards compatible (resource => [action1,
+     * action2, …]) because the test-suite and seeder iterate over the
+     * values directly.  Do not change it to include descriptions here.
+     */
     public static function listPermission()
     {
         $listPermissions = [
@@ -405,6 +414,17 @@ class HelperController extends Controller
                 'request',
                 'response'
             ],
+            'delivery schedule' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'update status',
+                'rekap',
+            ],
             'return product' => [
                 'view any',
                 'view',
@@ -432,7 +452,9 @@ class HelperController extends Controller
                 'delete',
                 'restore',
                 'force-delete',
-                'approve'
+                'approve',
+                'reject',
+                'submit',
             ],
             'order request item' => [
                 'view any',
@@ -480,6 +502,15 @@ class HelperController extends Controller
                 'force-delete',
             ],
             'production' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'production plan' => [
                 'view any',
                 'view',
                 'create',
@@ -596,6 +627,15 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            'material issue' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
             'account receivable' => [
                 'view any',
                 'view',
@@ -633,6 +673,26 @@ class HelperController extends Controller
                 'force-delete',
             ],
             'purchase return item' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+            ],
+            'customer return' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'restore',
+                'force-delete',
+                'qc',
+                'approve',
+            ],
+            'customer return item' => [
                 'view any',
                 'view',
                 'create',
@@ -686,6 +746,97 @@ class HelperController extends Controller
         return $listPermissions;
     }
 
+    /**
+     * Generate a map of full permission names ("action resource") to an
+     * Indonesian description explaining its purpose.  The descriptions are
+     * generated programmatically for common CRUD/workflow actions, and the
+     * method falls back to a generic template if a specific phrase is not
+     * defined.  Seeders and UI components can call this helper to retrieve
+     * human‑readable text.
+     *
+     * @return array<string,string>
+     */
+    public static function permissionDescriptions()
+    {
+        $descs = [];
+        $templates = [
+            'view any'    => 'Melihat daftar semua %s',
+            'view'        => 'Melihat detail %s',
+            'create'      => 'Membuat %s baru',
+            'update'      => 'Memperbarui %s',
+            'delete'      => 'Menghapus %s',
+            'restore'     => 'Mengembalikan %s yang dihapus',
+            'force-delete'=> 'Menghapus permanen %s',
+            'update status' => 'Memperbarui status %s',
+            'rekap'          => 'Membuat rekap %s',
+            'request'     => 'Mengajukan permintaan untuk %s',
+            'response'    => 'Menanggapi permintaan %s',
+            'submit'      => 'Mengajukan %s',
+            'approve'     => 'Menyetujui %s',
+            'reject'      => 'Menolak %s',
+            'cancel'      => 'Membatalkan %s',
+            'request-approve' => 'Meminta persetujuan %s',
+            'request'     => 'Meminta %s',
+            'reject'      => 'Menolak %s',
+            'approve'     => 'Menyetujui %s',
+            'request-approve' => 'Meminta persetujuan %s',
+            'submit'      => 'Mengirimkan %s',
+            'approve'     => 'Menyetujui %s',
+            'reject'      => 'Menolak %s',
+        ];
+
+        foreach (self::listPermission() as $resource => $actions) {
+            foreach ($actions as $action) {
+                $name = $action . ' ' . $resource;
+                $tpl  = $templates[$action] ?? 'Izin untuk ' . $action . ' ' . $resource;
+                $descs[$name] = sprintf($tpl, $resource);
+            }
+        }
+        // manual refinements if needed (special cases)
+        $descs['request sales order'] = 'Meminta persetujuan atau tindakan lebih lanjut pada sales order';
+        $descs['response sales order'] = 'Memberi jawaban (terima/tolak) atas permintaan sales order';
+        $descs['request-approve quotation'] = 'Meminta persetujuan pada quotation';
+        $descs['approve quotation'] = 'Menyetujui quotation';
+        $descs['reject quotation'] = 'Menolak quotation';
+        $descs['submit voucher request'] = 'Mengirimkan permintaan voucher';
+        $descs['approve voucher request'] = 'Menyetujui permintaan voucher';
+        $descs['reject voucher request'] = 'Menolak permintaan voucher';
+        $descs['cancel voucher request'] = 'Membatalkan permintaan voucher';
+        // ...any other hand-curated descriptions here
+
+        return $descs;
+    }
+
+    /**
+     * Return Indonesian descriptions for each role defined in the system.
+     *
+     * @return array<string,string>
+     */
+    public static function roleDescriptions()
+    {
+        return [
+            'Owner'            => 'Pengguna dengan hak penuh; biasanya pemilik perusahaan atau administrator tingkat tertinggi.',
+            'Super Admin'      => 'Administrator sistem dengan hampir semua izin, kecuali beberapa operasi ekstrim.',
+            'Admin'            => 'Administrator umum yang mengelola pengguna, peran, dan beberapa konfigurasi dasar.',
+            'Sales Manager'    => 'Mengawasi tim penjualan dan memiliki akses ke data sales order, quotation, dan invoice.',
+            'Sales'            => 'Staf penjualan yang membuat dan melihat sales order serta quotation pelanggan.',
+            'Kasir'            => 'Bertanggung jawab mencatat penerimaan pembayaran pelanggan dan membuat invoice.',
+            'Inventory Manager'=> 'Mengelola persediaan, gudang, transfer stok, dan konfigurasi produk.',
+            'Admin Inventory'  => 'Role pendukung di departemen inventaris dengan akses terbatas tetapi luas ke modul gudang.',
+            'Checker'          => 'Memeriksa konfirmasi gudang, kontrol kualitas, dan stok.',
+            'Finance Manager'  => 'Mengelola keuangan, akun payables/receivables, dan laporan keuangan.',
+            'Admin Keuangan'   => 'Pendukung manajer keuangan dengan hak akses ke sebagian besar modul keuangan.',
+            'Accounting'       => 'Bertanggung jawab atas buku besar, jurnal, dan catatan akuntansi lainnya.',
+            'Purchasing'       => 'Staf pembelian yang membuat dan memantau purchase order dan penerimaan.',
+            'Purchasing Manager'=> 'Mengawasi kegiatan pembelian dan dapat memproses pembayaran vendor.',
+            'Warehouse Staff'  => 'Staf gudang yang mengelola pengiriman, transfer, dan stok fisik.',
+            'Delivery Driver'  => 'Pengemudi yang melihat dan memperbarui informasi delivery order serta surat jalan.',
+            'Customer Service' => 'Layanan pelanggan yang menangani customer, quotation, dan sales order.',
+            'Auditor'          => 'Mempunyai hak baca (view any) di seluruh modul untuk keperluan audit.',
+            'IT Support'       => 'Tim teknis yang mengelola akun, izin, dan konfigurasi sistem.',
+        ];
+    }
+
     public static function getPermissionOwner()
     {
         return [
@@ -713,111 +864,37 @@ class HelperController extends Controller
 
     public static function parseIndonesianMoney($formattedValue)
     {
+        // Use centralized MoneyHelper parsing to ensure consistent behavior across the app.
+        // This avoids duplicated, error-prone parsing logic and keeps tests stable.
         if (!$formattedValue) {
-            return 0;
+            return 0.0;
         }
 
-        // Convert to string to ensure we're working with formatted input
-        $formattedValue = (string)$formattedValue;
-
-        // Check if it contains formatting characters (dots or commas)
-        if (!preg_match('/[.,]/', $formattedValue)) {
-            // No formatting characters, treat as regular number
-            return (float)$formattedValue;
+        // If it's already numeric, return as float
+        if (is_int($formattedValue) || is_float($formattedValue) || (is_string($formattedValue) && is_numeric($formattedValue))) {
+            return (float) $formattedValue;
         }
 
-        // Remove any non-numeric characters except dots and commas
-        $cleaned = preg_replace('/[^\d.,]/', '', $formattedValue);
-
-        // Determine the format by analyzing the separators
-        $hasComma = strpos($cleaned, ',') !== false;
-        $hasDot = strpos($cleaned, '.') !== false;
-
-        $integer = '';
-        $decimal = '0';
-
-        if ($hasComma && $hasDot) {
-            // Both separators present - need to determine which is decimal separator
-            $lastCommaPos = strrpos($cleaned, ',');
-            $lastDotPos = strrpos($cleaned, '.');
-
-            if ($lastDotPos > $lastCommaPos) {
-                // Dot comes after comma - likely Western format (commas as thousand sep, dot as decimal)
-                // Example: 125,000,000.50
-                $parts = explode('.', $cleaned);
-                if (count($parts) === 2) {
-                    $integer = str_replace(',', '', $parts[0]);
-                    $decimal = $parts[1];
-                } else {
-                    // Multiple dots - take last part as decimal
-                    $decimal = array_pop($parts);
-                    $integer = implode('', $parts);
-                    $integer = str_replace(',', '', $integer);
-                }
-            } else {
-                // Comma comes after dot - likely Indonesian format (dots as thousand sep, comma as decimal)
-                // Example: 125.000.000,50
-                $parts = explode(',', $cleaned);
-                if (count($parts) === 2) {
-                    $integer = str_replace('.', '', $parts[0]);
-                    $decimal = $parts[1];
-                } else {
-                    // Multiple commas - take last part as decimal
-                    $decimal = array_pop($parts);
-                    $integer = implode('', $parts);
-                    $integer = str_replace('.', '', $integer);
-                }
-            }
-        } elseif ($hasComma) {
-            // Only commas - could be Western thousand separators or Indonesian decimal
-            $parts = explode(',', $cleaned);
-            if (count($parts) === 2 && strlen($parts[1]) <= 2) {
-                // Likely Western format: 125,000,000 (no decimal) or 125,000,000.50 (handled above)
-                $integer = str_replace(',', '', $parts[0]);
-                $decimal = $parts[1];
-            } else {
-                // Multiple commas - treat as thousand separators
-                $integer = str_replace(',', '', $cleaned);
-                $decimal = '0';
-            }
-        } elseif ($hasDot) {
-            // Only dots - could be Indonesian thousand separators or decimal
-            if (preg_match('/\.(\d{1,2})$/', $cleaned, $matches)) {
-                // Ends with .digits (1-3 digits) - likely decimal part
-                $decimal = $matches[1];
-                $integer = preg_replace('/\.\d{1,3}$/', '', $cleaned);
-                $integer = str_replace('.', '', $integer);
-            } else {
-                // All dots are thousand separators
-                $integer = str_replace('.', '', $cleaned);
-                $decimal = '0';
-            }
-        }
-
-        // Ensure decimal part is not empty
-        if (empty($decimal)) {
-            $decimal = '0';
-        }
-
-        // Combine back and return as float
-        $numeric = (float)($integer . '.' . $decimal);
-        return $numeric;
+        return \App\Helpers\MoneyHelper::safeParse($formattedValue);
+    
     }
 
     public static function hitungSubtotal($quantity, $unit_price, $discount, $tax, $taxType = null)
     {
-        // Normalize unit price if passed as formatted string (contains dot thousand separators)
+        // Normalize only human-formatted money strings. Raw DB decimals like
+        // "10000.0000000000" must stay numeric after high-precision migrations.
         if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
-            $parsed = self::parseIndonesianMoney($unit_price);
-            $unit_price = $parsed;
+            $parsed = \App\Helpers\MoneyHelper::parseHighPrecision($unit_price);
+            $unit_price = (float) $parsed;
         }
-
         // --- INPUT GUARDS ---
         $quantity  = max(0.0, (float) $quantity);
         $unit_price = max(0.0, (float) $unit_price);
         $discount  = max(0.0, min(100.0, (float) $discount));  // clamp 0-100%
         $tax       = max(0.0, min(100.0, (float) $tax));        // clamp 0-100%
-        // Use 'Inklusif' as explicit default — never pass null to TaxService silently
+        // Default to 'Inklusif' when taxType is null/empty — maintained for backward compatibility.
+        // NOTE: TaxService::normalizeType(null) defaults to 'Eksklusif'. If you call TaxService
+        // directly (not through this helper), ensure you pass an explicit type to avoid discrepancies.
         $taxType   = (is_string($taxType) && trim($taxType) !== '') ? $taxType : 'Inklusif';
 
         // Calculate base after discount
@@ -825,32 +902,40 @@ class HelperController extends Controller
         $discountAmount = $subtotal * ($discount / 100);
         $afterDiscount = $subtotal - $discountAmount;
 
-        // Use centralized tax service
-        $rate = $tax; // expecting percent, e.g., 12 for 12%
-        try {
-            // Lazy import to avoid circular deps in some contexts
-            $service = \App\Services\TaxService::class;
-            $result = $service::compute($afterDiscount, $rate, $taxType);
-            $final = round($result['total'], 2);
-            return $final;
-        } catch (\Throwable $e) {
-            // Log the error so it is not silently swallowed (guarded for unit-test contexts without app bootstrap)
-            if (function_exists('app') && app()->bound('log')) {
-                \Illuminate\Support\Facades\Log::error('hitungSubtotal: TaxService exception, falling back to exclusive', [
-                    'quantity'   => $quantity,
-                    'unit_price' => $unit_price,
-                    'discount'   => $discount,
-                    'tax'        => $tax,
-                    'taxType'    => $taxType,
-                    'error'      => $e->getMessage(),
-                ]);
-            }
-            // Fallback: previous behavior (exclusive)
-            $tax_amount = $afterDiscount * $rate / 100.0;
-            $total = $afterDiscount + $tax_amount;
-            $final = round($total, 2);
-            return $final;
+        $normalizedTaxType = strtolower(trim((string) $taxType));
+        $normalizedTaxType = match ($normalizedTaxType) {
+            'inklusif', 'inclusive', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
+            default => 'eksklusif',
+        };
+
+        $taxAmount = round($afterDiscount * ($tax / 100.0), 2);
+
+        return in_array($normalizedTaxType, ['inklusif', 'none'], true)
+            ? round($afterDiscount, 2)
+            : round($afterDiscount + $taxAmount, 2);
+    }
+
+    public static function hitungTaxNominal($quantity, $unit_price, $discount, $tax, $taxType = null)
+    {
+        if (is_string($unit_price) && preg_match('/[.,]/', $unit_price)) {
+            $unit_price = (float) \App\Helpers\MoneyHelper::parseHighPrecision($unit_price);
         }
+
+        $quantity  = max(0.0, (float) $quantity);
+        $unit_price = max(0.0, (float) $unit_price);
+        $discount  = max(0.0, min(100.0, (float) $discount));
+        $tax       = max(0.0, min(100.0, (float) $tax));
+        $taxType   = (is_string($taxType) && trim($taxType) !== '') ? $taxType : 'Inklusif';
+
+        $baseAmount = $quantity * $unit_price * (1 - ($discount / 100));
+
+        $normalizedTaxType = strtolower(trim((string) $taxType));
+        if (in_array($normalizedTaxType, ['none', 'non pajak', 'non-pajak', 'nonpajak'], true)) {
+            return 0.0;
+        }
+
+        return round($baseAmount * ($tax / 100.0), 2);
     }
 
     public static function sendNotification($isSuccess = false, $title = "", $message = "")
@@ -874,7 +959,7 @@ class HelperController extends Controller
 
     public static function terbilang($number)
     {
-        $number = abs($number);
+        $number = abs((int) round($number)); // Ensure integer to fix deprecated warnings
         $words = [
             "",
             "satu",
@@ -896,21 +981,21 @@ class HelperController extends Controller
         } else if ($number < 20) {
             $temp = static::terbilang($number - 10) . " belas ";
         } else if ($number < 100) {
-            $temp = static::terbilang($number / 10) . " puluh " . static::terbilang($number % 10);
+            $temp = static::terbilang((int) ($number / 10)) . " puluh " . static::terbilang($number % 10);
         } else if ($number < 200) {
             $temp = " seratus " . static::terbilang($number - 100);
         } else if ($number < 1000) {
-            $temp = static::terbilang($number / 100) . " ratus " . static::terbilang($number % 100);
+            $temp = static::terbilang((int) ($number / 100)) . " ratus " . static::terbilang($number % 100);
         } else if ($number < 2000) {
             $temp = " seribu" . static::terbilang($number - 1000);
         } else if ($number < 1000000) {
-            $temp = static::terbilang($number / 1000) . " ribu " . static::terbilang($number % 1000);
+            $temp = static::terbilang((int) ($number / 1000)) . " ribu " . static::terbilang($number % 1000);
         } else if ($number < 1000000000) {
-            $temp = static::terbilang($number / 1000000) . " juta " . static::terbilang($number % 1000000);
+            $temp = static::terbilang((int) ($number / 1000000)) . " juta " . static::terbilang($number % 1000000);
         } else if ($number < 1000000000000) {
-            $temp = static::terbilang($number / 1000000000) . " milyar " . static::terbilang(fmod($number, 1000000000));
+            $temp = static::terbilang((int) ($number / 1000000000)) . " milyar " . static::terbilang((int) fmod($number, 1000000000));
         } else if ($number < 1000000000000000) {
-            $temp = static::terbilang($number / 1000000000000) . " triliun " . static::terbilang(fmod($number, 1000000000000));
+            $temp = static::terbilang((int) ($number / 1000000000000)) . " triliun " . static::terbilang((int) fmod($number, 1000000000000));
         }
 
         return trim($temp);

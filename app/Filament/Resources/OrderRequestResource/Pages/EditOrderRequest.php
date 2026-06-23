@@ -20,11 +20,29 @@ class EditOrderRequest extends EditRecord
         ];
     }
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        if (! empty($data['orderRequestItem']) && is_array($data['orderRequestItem'])) {
+            foreach ($data['orderRequestItem'] as &$item) {
+                $item['tipe_pajak'] = OrderRequestResource::normalizeItemTaxType($item['tipe_pajak'] ?? null);
+            }
+            unset($item);
+        }
+
+        return $data;
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if ($this->getRecord()->created_by == null) {
             $data['created_by'] = Auth::user()->id;
         }
-        return $data;
+
+        return OrderRequestResource::mutateFormDataBeforeSave($data);
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 }

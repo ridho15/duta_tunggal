@@ -2,10 +2,14 @@
 
 namespace App\Observers;
 
+use App\Models\OrderRequestItem;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Services\PurchaseReturnService;
+use App\Support\OrderRequestQuantityLock;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +26,8 @@ class PurchaseReceiptItemObserver
     {
         Log::info("PurchaseReceiptItemObserver: created() called for item ID {$receiptItem->id}, qty_rejected: {$receiptItem->qty_rejected}");
 
+        $this->syncReferencedOrderRequestFulfillment($receiptItem);
+
         // Debug: Check qty_rejected type and value
         Log::info("PurchaseReceiptItemObserver: qty_rejected type: " . gettype($receiptItem->qty_rejected) . ", value: '{$receiptItem->qty_rejected}'");
 
@@ -33,6 +39,11 @@ class PurchaseReceiptItemObserver
         } else {
             Log::info("PurchaseReceiptItemObserver: qty_rejected <= 0 condition NOT met, skipping PurchaseReturn creation");
         }
+    }
+
+    public function saving(PurchaseReceiptItem $receiptItem): void
+    {
+        OrderRequestQuantityLock::validatePurchaseReceiptItem($receiptItem);
     }
 
     protected function createPurchaseReturnForRejectedItem(PurchaseReceiptItem $receiptItem)
@@ -93,15 +104,29 @@ class PurchaseReceiptItemObserver
             Log::error("PurchaseReceiptItemObserver: Database error for PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
             Log::error("PurchaseReceiptItemObserver: SQL: " . $e->getSql());
             Log::error("PurchaseReceiptItemObserver: Bindings: " . json_encode($e->getBindings()));
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Otomatis Belum Selesai',
+                $e,
+                'Penerimaan barang tersimpan, tetapi retur otomatis untuk item yang ditolak belum berhasil disinkronkan. Silakan periksa data retur pembelian.'
+            );
         } catch (\Exception $e) {
             Log::error("PurchaseReceiptItemObserver: Failed to auto-create PurchaseReturn for PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
             Log::error("PurchaseReceiptItemObserver: Stack trace: " . $e->getTraceAsString());
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Otomatis Belum Selesai',
+                $e,
+                'Penerimaan barang tersimpan, tetapi retur otomatis untuk item yang ditolak belum berhasil disinkronkan. Silakan periksa data retur pembelian.'
+            );
         }
     }
 
     public function updated(PurchaseReceiptItem $receiptItem)
     {
         Log::info("PurchaseReceiptItemObserver: updated() called for item ID {$receiptItem->id}");
+
+        $this->syncReferencedOrderRequestFulfillment($receiptItem);
 
         // Check if qty_rejected was changed
         if ($receiptItem->wasChanged('qty_rejected')) {
@@ -117,6 +142,8 @@ class PurchaseReceiptItemObserver
     public function deleted(PurchaseReceiptItem $receiptItem)
     {
         Log::info("PurchaseReceiptItemObserver: deleted() called for item ID {$receiptItem->id}");
+
+        $this->syncReferencedOrderRequestFulfillment($receiptItem);
 
         try {
             // Find and delete related PurchaseReturnItems
@@ -141,6 +168,12 @@ class PurchaseReceiptItemObserver
 
         } catch (\Exception $e) {
             Log::error("PurchaseReceiptItemObserver: Failed to delete related PurchaseReturn for deleted PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Pembelian Belum Selesai',
+                $e,
+                'Perubahan item penerimaan tersimpan, tetapi pembaruan retur pembelian terkait belum berhasil disinkronkan.'
+            );
         }
     }
 
@@ -221,6 +254,50 @@ class PurchaseReceiptItemObserver
         } catch (\Exception $e) {
             Log::error("PurchaseReceiptItemObserver: Failed to sync PurchaseReturn for updated PurchaseReceiptItem {$receiptItem->id}: " . $e->getMessage());
             Log::error("PurchaseReceiptItemObserver: Stack trace: " . $e->getTraceAsString());
+
+            ProcurementFailureNotifier::warning(
+                'Sinkronisasi Retur Pembelian Belum Selesai',
+                $e,
+                'Perubahan item penerimaan tersimpan, tetapi pembaruan retur pembelian terkait belum berhasil disinkronkan.'
+            );
+        }
+    }
+
+    protected function syncReferencedOrderRequestFulfillment(PurchaseReceiptItem $receiptItem): void
+    {
+        if (! $receiptItem->purchase_order_item_id) {
+            return;
+        }
+
+        $purchaseOrderItem = PurchaseOrderItem::withoutGlobalScopes()
+            ->with('referItemModel.orderRequest')
+            ->find($receiptItem->purchase_order_item_id);
+
+        if (! $purchaseOrderItem || $purchaseOrderItem->refer_item_model_type !== OrderRequestItem::class) {
+            return;
+        }
+
+        $orderRequestItem = $purchaseOrderItem->referItemModel;
+        if (! $orderRequestItem || ! $orderRequestItem->exists) {
+            return;
+        }
+
+        $poItemIds = PurchaseOrderItem::withoutGlobalScopes()
+            ->where('refer_item_model_type', OrderRequestItem::class)
+            ->where('refer_item_model_id', $orderRequestItem->id)
+            ->pluck('id');
+
+        $totalAccepted = (float) PurchaseReceiptItem::withoutGlobalScopes()
+            ->whereIn('purchase_order_item_id', $poItemIds)
+            ->sum('qty_accepted');
+
+        $orderRequestItem->update([
+            'fulfilled_quantity' => $totalAccepted,
+        ]);
+
+        $orderRequest = $orderRequestItem->orderRequest;
+        if ($orderRequest) {
+            $orderRequest->syncFulfillmentStatus();
         }
     }
 }

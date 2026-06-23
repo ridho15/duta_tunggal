@@ -2,15 +2,18 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\JournalEntry;
 use App\Models\ChartOfAccount;
+use App\Models\InventoryStock;
 use App\Models\StockMovement;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Models\Currency;
+use App\Support\JournalCurrencyAmountResolver;
+use App\Helpers\MoneyHelper;
 
 class PurchaseReceiptService
 {
@@ -20,6 +23,28 @@ class PurchaseReceiptService
      * @var array<string, ?ChartOfAccount>
      */
     protected static array $coaCache = [];
+
+    protected function skipWithWarning(string $message, array $context = []): array
+    {
+        Log::warning('PurchaseReceiptService skipped flow', array_merge([
+            'message' => $message,
+        ], $context));
+
+        return [
+            'status' => 'skipped',
+            'message' => $message,
+        ];
+    }
+
+    /**
+     * Resolve the receipt item's unit cost in IDR for ledger and stock valuation.
+     *
+     * @return array{raw_unit_price: float, currency_id: ?int, currency_code: ?string, exchange_rate: float, unit_price_idr: float}
+     */
+    protected function resolveReceiptItemUnitCostInIdr(PurchaseReceiptItem $item): array
+    {
+        return JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item);
+    }
 
     public function generateReceiptNumber()
     {
@@ -44,7 +69,7 @@ class PurchaseReceiptService
         // For now, this method just validates the receipt structure
         // Individual item posting happens when items are sent to QC
 
-        $receipt->loadMissing([
+        $receipt->load([
             'purchaseReceiptItem.purchaseOrderItem',
             'purchaseReceiptItem.product',
             'purchaseReceiptBiaya.coa',
@@ -54,23 +79,27 @@ class PurchaseReceiptService
         $debugItems = [];
         foreach ($receipt->purchaseReceiptItem as $item) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
-            $poItem = $item->purchaseOrderItem;
-            $unitPrice = $poItem?->unit_price ?? 0;
+            $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
             $debugItems[] = [
                 'item_id' => $item->id,
                 'qtyAccepted' => $qtyAccepted,
-                'po_item_id' => $poItem?->id ?? null,
-                'unitPrice' => $unitPrice,
+                'po_item_id' => $item->purchaseOrderItem?->id ?? null,
+                'unitPrice' => $unitCost['unit_price_idr'],
+                'rawUnitPrice' => $unitCost['raw_unit_price'],
+                'currencyId' => $unitCost['currency_id'],
+                'exchangeRate' => $unitCost['exchange_rate'],
             ];
 
-            if ($qtyAccepted > 0 && $unitPrice > 0) {
+            if ($qtyAccepted > 0 && $unitCost['unit_price_idr'] > 0) {
                 $validItems++;
             }
         }
 
         if ($validItems === 0) {
-            Log::info('postPurchaseReceipt: no valid items', ['receipt_id' => $receipt->id, 'items' => $debugItems]);
-            return ['status' => 'skipped', 'message' => 'No valid items to process'];
+            return $this->skipWithWarning('No valid items to process', [
+                'receipt_id' => $receipt->id,
+                'items' => $debugItems,
+            ]);
         }
 
 
@@ -152,6 +181,16 @@ class PurchaseReceiptService
         return self::$coaCache[$code];
     }
 
+    protected function getUnbilledPurchaseFallbackCodes(): array
+    {
+        return [
+            config('coa.unbilled_purchase', '2100.10'),
+            '2100.10',
+            '2190.10',
+            '1180.01',
+        ];
+    }
+
 
     /**
      * Post inventory for purchase receipt item after quality control approval.
@@ -159,53 +198,73 @@ class PurchaseReceiptService
      */
     public function postItemInventoryAfterQC(PurchaseReceiptItem $item): array
     {
-        // prevent duplicate posting
-        if (JournalEntry::where('source_type', PurchaseReceiptItem::class)
-            ->where('source_id', $item->id)
-            ->where('description', 'like', '%Inventory Stock%')
-            ->exists()
-        ) {
-            Log::info('postItemInventoryAfterQC: skipped - duplicate journal exists', ['item_id' => $item->id]);
-            return ['status' => 'skipped', 'message' => 'Item inventory already posted'];
-        }
-
         $item->loadMissing([
             'purchaseOrderItem',
             'product.inventoryCoa',
-            'product.temporaryProcurementCoa',
             'product.unbilledPurchaseCoa',
-            'purchaseReceipt.currency'
+            'purchaseReceipt.currency',
         ]);
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
-        if ($qtyAccepted <= 0) {
-            Log::info('postItemInventoryAfterQC: skipped - no accepted quantity', ['item_id' => $item->id, 'qtyAccepted' => $qtyAccepted]);
-            return ['status' => 'skipped', 'message' => 'No accepted quantity to post inventory'];
-        }
-
         $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
-        if ($unitPrice <= 0) {
-            Log::info('postItemInventoryAfterQC: skipped - invalid unit price', ['item_id' => $item->id, 'unitPrice' => $unitPrice]);
-            return ['status' => 'skipped', 'message' => 'Invalid unit price'];
+        $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
+        $unitPrice = $unitCost['unit_price_idr'];
+        $amount = round($qtyAccepted * $unitPrice, 2);
+
+        $qc = $this->resolveCompletedQcForReceiptItem($item);
+        [$movementFromType, $movementFromId] = $this->resolveReceiptItemStockSource($item, $qc);
+
+        $journalAlreadyPosted = JournalEntry::where('source_type', PurchaseReceiptItem::class)
+            ->where('source_id', $item->id)
+            ->where('journal_type', 'inventory')
+            ->exists()
+        ;
+
+        $existingMovement = $this->findReceiptItemStockMovement($item, $qc);
+
+        if ($journalAlreadyPosted && $existingMovement) {
+            $this->syncInventoryStockFromMovements($item);
+
+            return $this->skipWithWarning('Item inventory already posted', [
+                'item_id' => $item->id,
+            ]);
         }
 
-        $amount = round($qtyAccepted * $unitPrice, 2);
+        if ($qtyAccepted <= 0) {
+            return $this->skipWithWarning('No accepted quantity to post inventory', [
+                'item_id' => $item->id,
+                'qty_accepted' => $qtyAccepted,
+            ]);
+        }
+        if ($unitPrice <= 0) {
+            return $this->skipWithWarning('Invalid unit price', [
+                'item_id' => $item->id,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitPrice,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+            ]);
+        }
+
         if ($amount <= 0) {
-            Log::info('postItemInventoryAfterQC: skipped - invalid amount', ['item_id' => $item->id, 'amount' => $amount]);
-            return ['status' => 'skipped', 'message' => 'Invalid amount'];
+            return $this->skipWithWarning('Invalid amount', [
+                'item_id' => $item->id,
+                'amount' => $amount,
+            ]);
         }
 
         $product = $item->product;
-        $inventoryCoa = $product->inventoryCoa ?? $this->resolveCoaByCodes(['1140.10', '1140.01']);
-        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
-        $unbilledPurchaseCoa = $product->unbilledPurchaseCoa ?? $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        $inventoryCoa = $product->resolveInventoryCoaOrDefault();
+        $unbilledPurchaseCoa = $product->resolveUnbilledPurchaseCoaOrDefault();
 
-        if (! $inventoryCoa || ! $temporaryProcurementCoa || ! $unbilledPurchaseCoa) {
-            Log::info('postItemInventoryAfterQC: skipped - missing COA', ['item_id' => $item->id]);
-            return ['status' => 'skipped', 'message' => 'Missing required COA configuration'];
+        if (! $inventoryCoa || ! $unbilledPurchaseCoa) {
+            return $this->skipWithWarning('Missing required COA configuration', [
+                'item_id' => $item->id,
+                'inventory_coa_id' => $inventoryCoa?->id,
+                'unbilled_purchase_coa_id' => $unbilledPurchaseCoa?->id,
+            ]);
         }
-        $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
+        $date = $item->purchaseReceipt->receipt_date ?? Carbon::now();
 
         // Resolve branch from source
         $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
@@ -214,86 +273,69 @@ class PurchaseReceiptService
 
         $receiptRef = $item->purchaseReceipt?->receipt_number ?? ('PRI-' . $item->id);
         $entries = [];
+        $amountOriginalCurrency = $unitCost['exchange_rate'] > 0
+            ? round($amount / $unitCost['exchange_rate'], 4)
+            : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
-        // Debit inventory account
-        $entries[] = JournalEntry::create([
-            'coa_id' => $inventoryCoa->id,
-            'date' => $date,
-            'reference' => $receiptRef,
-            'description' => 'Debit inventory for receipt item ' . $item->id,
-            'debit' => round($amount, 2),
-            'credit' => 0,
-            'journal_type' => 'inventory',
-            'cabang_id' => $branchId,
-            'department_id' => $departmentId,
-            'project_id' => $projectId,
-            'source_type' => PurchaseReceiptItem::class,
-            'source_id' => $item->id,
-        ]);
+        if (! $journalAlreadyPosted) {
+            // Debit inventory account
+            $entries[] = JournalEntry::create([
+                'coa_id' => $inventoryCoa->id,
+                'date' => $date,
+                'reference' => $receiptRef,
+                'description' => 'Debit inventory for receipt item ' . $item->id,
+                'debit' => round($amount, 2),
+                'credit' => 0,
+                'journal_type' => 'inventory',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
+                'source_type' => PurchaseReceiptItem::class,
+                'source_id' => $item->id,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+                'amount_original_currency' => $amountOriginalCurrency,
+            ]);
 
-        // Credit temporary procurement position (close temporary procurement)
-        // Use the temporary procurement COA to close the position created when item was sent to QC
-        $entries[] = JournalEntry::create([
-            'coa_id' => $temporaryProcurementCoa->id,
-            'date' => $date,
-            'reference' => $receiptRef,
-            'description' => 'Inventory Posting - Credit temporary procurement for receipt item ' . $item->id,
-            'debit' => 0,
-            'credit' => round($amount, 2),
-            'journal_type' => 'inventory',
-            'cabang_id' => $branchId,
-            'department_id' => $departmentId,
-            'project_id' => $projectId,
-            'source_type' => PurchaseReceiptItem::class,
-            'source_id' => $item->id,
-        ]);
+            // Credit unbilled purchase position (goods receipt / GRNI)
+            $entries[] = JournalEntry::create([
+                'coa_id' => $unbilledPurchaseCoa->id,
+                'date' => $date,
+                'reference' => $receiptRef,
+                'description' => 'Inventory Posting - Credit unbilled purchase for receipt item ' . $item->id,
+                'debit' => 0,
+                'credit' => round($amount, 2),
+                'journal_type' => 'inventory',
+                'cabang_id' => $branchId,
+                'department_id' => $departmentId,
+                'project_id' => $projectId,
+                'source_type' => PurchaseReceiptItem::class,
+                'source_id' => $item->id,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+                'amount_original_currency' => $amountOriginalCurrency,
+            ]);
 
-        Log::info('postItemInventoryAfterQC: created journal entries', ['item_id' => $item->id, 'entries_count' => count($entries)]);
+            Log::info('postItemInventoryAfterQC: created journal entries', ['item_id' => $item->id, 'entries_count' => count($entries)]);
 
-        if (! $this->validateJournalBalance($entries)) {
-            Log::info('postItemInventoryAfterQC: journal entries not balanced', ['item_id' => $item->id]);
-            return ['status' => 'error', 'message' => 'Journal entries are not balanced'];
+            if (! $this->validateJournalBalance($entries)) {
+                Log::info('postItemInventoryAfterQC: journal entries not balanced', ['item_id' => $item->id]);
+                return ['status' => 'error', 'message' => 'Journal entries are not balanced'];
+            }
+
+            Log::info('postItemInventoryAfterQC: journal entries validated balanced', ['item_id' => $item->id]);
         }
-
-        Log::info('postItemInventoryAfterQC: journal entries validated balanced', ['item_id' => $item->id]);
-
-        // Create stock movement so the StockMovementObserver will update inventory quantities.
-        // Determine if this posting was triggered by a QC that originated from a PurchaseOrderItem.
-        $qc = \App\Models\QualityControl::where('from_model_type', \App\Models\PurchaseOrderItem::class)
-            ->where('from_model_id', $item->purchase_order_item_id)
-            ->where('status', 1)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        // Debug logging to assist test failures
-        Log::info('postItemInventoryAfterQC: checking for QC', [
-            'purchase_receipt_item_id' => $item->id,
-            'purchase_order_item_id' => $item->purchase_order_item_id,
-            'qc_found' => $qc?->id ?? null,
-        ]);
-
-        // Default to linking the movement to the receipt item
-        $movementFromType = PurchaseReceiptItem::class;
-        $movementFromId = $item->id;
-
-        if ($qc) {
-            // If QC exists (completed), link the stock movement to the QC instead
-            $movementFromType = \App\Models\QualityControl::class;
-            $movementFromId = $qc->id;
-        }
-
-        // Avoid duplicate stock movements for the same source (either receipt item or QC)
-        $existingMovement = StockMovement::where('from_model_type', $movementFromType)
-            ->where('from_model_id', $movementFromId)
-            ->first();
-
         if (! $existingMovement) {
             $meta = [
                 'source' => $qc ? 'quality_control' : 'purchase_receipt',
                 'purchase_receipt_id' => $item->purchase_receipt_id,
                 'purchase_receipt_item_id' => $item->id,
                 'unit_cost' => $unitPrice,
-                'currency' => optional($item->purchaseReceipt->currency)->code,
+                'unit_cost_idr' => $unitPrice,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'currency_id' => $unitCost['currency_id'],
+                'currency' => $unitCost['currency_code'],
+                'exchange_rate' => $unitCost['exchange_rate'],
                 'purchase_order_item_id' => $poItem?->id,
                 'receipt_number' => $item->purchaseReceipt->receipt_number,
             ];
@@ -318,7 +360,152 @@ class PurchaseReceiptService
             ]);
         }
 
-        return ['status' => 'posted', 'entries' => $entries];
+        $inventoryStock = $this->syncInventoryStockFromMovements($item);
+
+        return [
+            'status' => $journalAlreadyPosted ? 'reconciled' : 'posted',
+            'entries' => $entries,
+            'inventory_stock_id' => $inventoryStock?->id,
+        ];
+    }
+
+    public function reconcileReceiptItemStock(PurchaseReceiptItem $item): array
+    {
+        $item->loadMissing([
+            'purchaseOrderItem',
+            'product.inventoryCoa',
+            'product.unbilledPurchaseCoa',
+            'purchaseReceipt.currency',
+        ]);
+
+        $qc = $this->resolveCompletedQcForReceiptItem($item);
+        [$movementFromType, $movementFromId] = $this->resolveReceiptItemStockSource($item, $qc);
+        $existingMovement = $this->findReceiptItemStockMovement($item, $qc);
+
+        if (! $existingMovement) {
+            $qtyAccepted = max(0, $item->qty_accepted ?? 0);
+            $unitPrice = (float) ($item->purchaseOrderItem?->unit_price ?? 0);
+            $amount = round($qtyAccepted * $unitPrice, 2);
+
+            if ($qtyAccepted <= 0 || $unitPrice <= 0 || $amount <= 0) {
+                return $this->skipWithWarning('Unable to reconcile stock for receipt item', [
+                    'item_id' => $item->id,
+                    'qty_accepted' => $qtyAccepted,
+                    'unit_price' => $unitPrice,
+                    'amount' => $amount,
+                ]);
+            }
+
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+
+            $meta = [
+                'source' => $qc ? 'quality_control' : 'purchase_receipt',
+                'purchase_receipt_id' => $item->purchase_receipt_id,
+                'purchase_receipt_item_id' => $item->id,
+                'unit_cost' => $unitPrice,
+                'currency' => optional($item->purchaseReceipt->currency)->code,
+                'purchase_order_item_id' => $item->purchase_order_item_id,
+                'receipt_number' => $item->purchaseReceipt->receipt_number,
+            ];
+
+            if ($qc) {
+                $meta['qc_id'] = $qc->id;
+                $meta['qc_number'] = $qc->qc_number;
+            }
+
+            StockMovement::create([
+                'product_id' => $item->product_id,
+                'warehouse_id' => $item->warehouse_id,
+                'quantity' => $qtyAccepted,
+                'value' => $amount,
+                'type' => 'purchase_in',
+                'date' => $item->purchaseReceipt->receipt_date ?? now(),
+                'notes' => $qc ? 'Stock inbound from QC completion: ' . $qc->qc_number : 'Stock inbound from QC-approved receipt: ' . $item->purchaseReceipt->receipt_number,
+                'meta' => $meta,
+                'rak_id' => $item->rak_id ?? null,
+                'from_model_type' => $movementFromType,
+                'from_model_id' => $movementFromId,
+            ]);
+        }
+
+        $inventoryStock = $this->syncInventoryStockFromMovements($item);
+
+        return [
+            'status' => 'reconciled',
+            'inventory_stock_id' => $inventoryStock?->id,
+        ];
+    }
+
+    protected function resolveCompletedQcForReceiptItem(PurchaseReceiptItem $item): ?\App\Models\QualityControl
+    {
+        return \App\Models\QualityControl::where('from_model_type', \App\Models\PurchaseOrderItem::class)
+            ->where('from_model_id', $item->purchase_order_item_id)
+            ->where('status', 1)
+            ->orderBy('id', 'desc')
+            ->first();
+    }
+
+    protected function resolveReceiptItemStockSource(PurchaseReceiptItem $item, ?\App\Models\QualityControl $qc = null): array
+    {
+        return $qc
+            ? [\App\Models\QualityControl::class, $qc->id]
+            : [PurchaseReceiptItem::class, $item->id];
+    }
+
+    protected function findReceiptItemStockMovement(PurchaseReceiptItem $item, ?\App\Models\QualityControl $qc = null): ?StockMovement
+    {
+        $candidateSources = [];
+
+        if ($qc) {
+            $candidateSources[] = [\App\Models\QualityControl::class, $qc->id];
+        }
+
+        $candidateSources[] = [PurchaseReceiptItem::class, $item->id];
+
+        foreach ($candidateSources as [$sourceType, $sourceId]) {
+            $movement = StockMovement::where('from_model_type', $sourceType)
+                ->where('from_model_id', $sourceId)
+                ->first();
+
+            if ($movement) {
+                return $movement;
+            }
+        }
+
+        return null;
+    }
+
+    protected function syncInventoryStockFromMovements(PurchaseReceiptItem $item): ?InventoryStock
+    {
+        $rakId = $item->rak_id ?? null;
+        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
+        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+
+        $movementQuery = StockMovement::query()
+            ->where('product_id', $item->product_id)
+            ->where('warehouse_id', $item->warehouse_id)
+            ->when($rakId !== null, fn ($query) => $query->where('rak_id', $rakId), fn ($query) => $query->whereNull('rak_id'));
+
+        $qtyIn = (float) (clone $movementQuery)->whereIn('type', $inTypes)->sum('quantity');
+        $qtyOut = (float) (clone $movementQuery)->whereIn('type', $outTypes)->sum('quantity');
+        $computedQty = $qtyIn - $qtyOut;
+
+        $inventoryStock = InventoryStock::firstOrNew([
+            'product_id' => $item->product_id,
+            'warehouse_id' => $item->warehouse_id,
+            'rak_id' => $rakId,
+        ]);
+
+        $inventoryStock->qty_available = $computedQty;
+        if (! $inventoryStock->exists) {
+            $inventoryStock->qty_reserved = 0;
+            $inventoryStock->qty_min = $inventoryStock->qty_min ?? 0;
+        }
+        $inventoryStock->save();
+
+        return $inventoryStock;
     }
 
     /**
@@ -333,7 +520,9 @@ class PurchaseReceiptService
             ->where('description', 'like', '%Return Product%')
             ->exists()
         ) {
-            return ['status' => 'skipped', 'message' => 'Return already posted'];
+            return $this->skipWithWarning('Return already posted', [
+                'item_id' => $item->id,
+            ]);
         }
 
         $item->loadMissing([
@@ -345,26 +534,43 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
-            return ['status' => 'skipped', 'message' => 'No accepted quantity to return'];
+            return $this->skipWithWarning('No accepted quantity to return', [
+                'item_id' => $item->id,
+                'qty_accepted' => $qtyAccepted,
+            ]);
         }
 
         $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
+        $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
+        $unitPrice = $unitCost['unit_price_idr'];
         if ($unitPrice <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid unit price'];
+            return $this->skipWithWarning('Invalid unit price', [
+                'item_id' => $item->id,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitPrice,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+            ]);
         }
 
         $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid amount'];
+            return $this->skipWithWarning('Invalid amount', [
+                'item_id' => $item->id,
+                'amount' => $amount,
+            ]);
         }
 
         $product = $item->product;
-        $returnCoa = $product->purchaseReturnCoa ?? $this->resolveCoaByCodes(['6100.02', '5100.10']); // Return/Expense COA
-        $temporaryProcurementCoa = $product->temporaryProcurementCoa ?? $this->resolveCoaByCodes(['1180.01', '1400.01']);
+        $returnCoa = $product->resolvePurchaseReturnCoaOrDefault();
+        $temporaryProcurementCoa = $product->resolveTemporaryProcurementCoaOrDefault();
 
         if (! $returnCoa || ! $temporaryProcurementCoa) {
-            return ['status' => 'skipped', 'message' => 'Missing required COA configuration'];
+            return $this->skipWithWarning('Missing required COA configuration', [
+                'item_id' => $item->id,
+                'return_coa_id' => $returnCoa?->id,
+                'temporary_procurement_coa_id' => $temporaryProcurementCoa?->id,
+            ]);
         }
 
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
@@ -375,6 +581,9 @@ class PurchaseReceiptService
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
 
         $entries = [];
+        $amountOriginalCurrency = $unitCost['exchange_rate'] > 0
+            ? round($amount / $unitCost['exchange_rate'], 4)
+            : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
         // Debit return/expense account
         $entries[] = JournalEntry::create([
@@ -390,6 +599,9 @@ class PurchaseReceiptService
             'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         // Credit temporary procurement position (close temporary procurement)
@@ -406,6 +618,9 @@ class PurchaseReceiptService
             'project_id' => $projectId,
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         if (! $this->validateJournalBalance($entries)) {
@@ -474,12 +689,12 @@ class PurchaseReceiptService
 
         // 2. Debit the unbilled purchase account (reverse the original credit)
         // Prefer liability COA for unbilled purchases when zeroing out
-        $unbilledCoaForZero = $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        $unbilledCoaForZero = $this->resolveCoaByCodes($this->getUnbilledPurchaseFallbackCodes());
         $coaIdForZero = $unbilledCoaForZero?->id ?? $this->getCoaByCode('1180.01')->id;
 
         $entries[] = [
             'date' => now(),
-            'coa_id' => $coaIdForZero, // Unbilled Purchase COA (prefer 2100.10)
+            'coa_id' => $coaIdForZero,
             'debit' => round($totalDebit, 2),
             'credit' => 0,
             'description' => 'Zero out temporary procurement positions - ' . $receipt->receipt_number,
@@ -523,7 +738,9 @@ class PurchaseReceiptService
             ->where('description', 'like', '%Temporary Procurement%')
             ->exists()
         ) {
-            return ['status' => 'skipped', 'message' => 'Temporary procurement entries already exist'];
+            return $this->skipWithWarning('Temporary procurement entries already exist', [
+                'item_id' => $item->id,
+            ]);
         }
 
         $item->loadMissing([
@@ -535,32 +752,50 @@ class PurchaseReceiptService
 
         $qtyAccepted = max(0, $item->qty_accepted ?? 0);
         if ($qtyAccepted <= 0) {
-            return ['status' => 'skipped', 'message' => 'No accepted quantity'];
+            return $this->skipWithWarning('No accepted quantity', [
+                'item_id' => $item->id,
+                'qty_accepted' => $qtyAccepted,
+            ]);
         }
 
-        $poItem = $item->purchaseOrderItem;
-        $unitPrice = $poItem?->unit_price ?? 0;
+        $unitCost = $this->resolveReceiptItemUnitCostInIdr($item);
+        $unitPrice = $unitCost['unit_price_idr'];
         if ($unitPrice <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid unit price'];
+            return $this->skipWithWarning('Invalid unit price', [
+                'item_id' => $item->id,
+                'raw_unit_price' => $unitCost['raw_unit_price'],
+                'unit_price_idr' => $unitPrice,
+                'currency_id' => $unitCost['currency_id'],
+                'exchange_rate' => $unitCost['exchange_rate'],
+            ]);
         }
 
         $amount = round($qtyAccepted * $unitPrice, 2);
         if ($amount <= 0) {
-            return ['status' => 'skipped', 'message' => 'Invalid amount'];
+            return $this->skipWithWarning('Invalid amount', [
+                'item_id' => $item->id,
+                'amount' => $amount,
+            ]);
         }
 
         $product = $item->product;
-        $temporaryProcurementCoa = $product?->temporaryProcurementCoa?->exists ? $product->temporaryProcurementCoa : null;
+        $temporaryProcurementCoa = $product?->resolveTemporaryProcurementCoaOrDefault();
 
         if (! $temporaryProcurementCoa) {
-            return ['status' => 'skipped', 'message' => 'No temporary procurement COA configured for product'];
+            return $this->skipWithWarning('No temporary procurement COA configured for product', [
+                'item_id' => $item->id,
+                'product_id' => $item->product_id,
+            ]);
         }
 
         // Find unbilled purchase COA from product configuration. If not set on product,
         // prefer liability COA for unbilled purchases created at receipt time
-        $unbilledPurchaseCoa = $product?->unbilledPurchaseCoa?->exists ? $product->unbilledPurchaseCoa : $this->resolveCoaByCodes(['2100.10', '2190.10', '1180.01']);
+        $unbilledPurchaseCoa = $product?->resolveUnbilledPurchaseCoaOrDefault();
         if (! $unbilledPurchaseCoa) {
-            return ['status' => 'skipped', 'message' => 'No unbilled purchase COA configured for product and no default liability COA found'];
+            return $this->skipWithWarning('No unbilled purchase COA configured for product and no default liability COA found', [
+                'item_id' => $item->id,
+                'product_id' => $item->product_id,
+            ]);
         }
 
         $date = $item->purchaseReceipt->receipt_date ?? Carbon::now()->toDateString();
@@ -572,6 +807,9 @@ class PurchaseReceiptService
         $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($item);
         $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($item);
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($item);
+        $amountOriginalCurrency = $unitCost['exchange_rate'] > 0
+            ? round($amount / $unitCost['exchange_rate'], 4)
+            : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
         // Debit temporary procurement position
         $debitEntry = JournalEntry::create([
@@ -588,6 +826,9 @@ class PurchaseReceiptService
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
             'transaction_id' => $transactionId,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         // Credit unbilled purchase liability
@@ -605,6 +846,9 @@ class PurchaseReceiptService
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $item->id,
             'transaction_id' => $transactionId,
+            'currency_id' => $unitCost['currency_id'],
+            'exchange_rate' => $unitCost['exchange_rate'],
+            'amount_original_currency' => $amountOriginalCurrency,
         ]);
 
         return ['status' => 'posted', 'entries' => [$debitEntry, $creditEntry]];
@@ -707,20 +951,37 @@ class PurchaseReceiptService
         $invoiceService = app(\App\Services\InvoiceService::class);
         $subtotal = 0;
         $invoiceItems = [];
+        
+        Log::info('createAutomaticInvoiceFromReceipt: starting', [
+            'receipt_id' => $receipt->id,
+            'item_count' => $receipt->purchaseReceiptItem->count(),
+            'items' => $receipt->purchaseReceiptItem->map(fn($i) => [
+                'id' => $i->id,
+                'qty_accepted' => (float) $i->qty_accepted,
+                'po_item_id' => $i->purchaseOrderItem?->id,
+            ])->toArray(),
+        ]);
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
-            if ($receiptItem->qty_accepted > 0) {
+            if ((float) $receiptItem->qty_accepted > 0) {
                 $poItem = $receiptItem->purchaseOrderItem;
-                $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+                
+                    // Normalize unit price to IDR using currency conversion (high-precision)
+                    $rawUnitPrice = MoneyHelper::parseHighPrecision($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+                    $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+                    $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null, false);
+                
                 $total = round($unitPrice * $receiptItem->qty_accepted, 2);
 
                 // Debug per-item calculation
                 Log::info('createAutomaticInvoiceFromReceipt: item calc', [
                     'receipt_item_id' => $receiptItem->id,
                     'po_item_id' => $poItem?->id,
+                    'raw_unit_price' => $rawUnitPrice,
+                    'unit_currency_id' => $unitCurrencyId,
+                    'converted_unit_price' => $unitPrice,
                     'tipe_pajak' => $poItem?->tipe_pajak,
                     'tax_rate' => $poItem?->tax,
-                    'unit_price' => $unitPrice,
                     'qty' => $receiptItem->qty_accepted,
                     'line_gross' => $total,
                 ]);
@@ -771,31 +1032,42 @@ class PurchaseReceiptService
         $dppTotal = 0.0;
         $taxTotal = 0.0;
         $taxRates = [];
+        $acceptedLineCount = 0;
+        $taxableLineCount = 0;
 
         foreach ($receipt->purchaseReceiptItem as $receiptItem) {
-            if ($receiptItem->qty_accepted <= 0) {
+            if ((float) $receiptItem->qty_accepted <= 0) {
                 continue;
             }
 
+            $acceptedLineCount++;
+
             $poItem = $receiptItem->purchaseOrderItem;
-            $unitPrice = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+            
+            // Normalize unit price to IDR using currency conversion (high-precision)
+            $rawUnitPrice = MoneyHelper::parseHighPrecision($poItem->unit_price ?? $receiptItem->product->cost_price ?? 0);
+            $unitCurrencyId = (int) ($poItem->currency_id ?? $receipt->purchaseOrder?->purchaseOrderCurrency()->first()?->currency_id ?? 0);
+            $unitPrice = \App\Support\CurrencyConversionResolver::convertToIdr($rawUnitPrice, $unitCurrencyId ?: null, false);
+            
             $qty = $receiptItem->qty_accepted;
             $lineGross = round($unitPrice * $qty, 2);
             $rate = (float)($poItem->tax ?? 0);
-            $tipe = $poItem->tipe_pajak ?? ($receiptItem->product->tipe_pajak ?? 'Non Pajak');
+            $tipe = Str::lower(trim((string) ($poItem->tipe_pajak ?? ($receiptItem->product->tipe_pajak ?? 'Non Pajak'))));
 
-            if ($tipe === 'Non Pajak') {
+            if (in_array($tipe, ['non pajak', 'non-pajak', 'none', 'non'], true)) {
                 $dppLine = $lineGross;
                 $taxLine = 0.0;
-            } elseif (in_array($tipe, ['Eksklusif', 'Eklusif'], true)) {
+            } elseif (in_array($tipe, ['eksklusif', 'eklusif', 'exclusive'], true)) {
                 // unitPrice is net, tax computed on top
                 $dppLine = $lineGross;
                 $taxLine = round($dppLine * ($rate / 100), 2);
+                $taxableLineCount++;
                 $taxRates[] = $rate;
             } else { // Inklusif
                 // unitPrice includes tax
                 $dppLine = round($lineGross / (1 + ($rate / 100)), 2);
                 $taxLine = round($lineGross - $dppLine, 2);
+                $taxableLineCount++;
                 $taxRates[] = $rate;
             }
 
@@ -814,7 +1086,7 @@ class PurchaseReceiptService
 
         // Determine invoice-wide ppn_rate only when all taxable items share the same rate
         $ppnRate = 0;
-        if (!empty($taxRates)) {
+        if (!empty($taxRates) && $taxableLineCount === $acceptedLineCount) {
             $uniqueRates = array_values(array_unique($taxRates));
             if (count($uniqueRates) === 1) {
                 $ppnRate = $uniqueRates[0];
@@ -822,23 +1094,27 @@ class PurchaseReceiptService
         }
 
         $supplier = $receipt->purchaseOrder->supplier ?? null;
+        $idrCurrencyId = \App\Support\CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
 
         $invoice = \App\Models\Invoice::create([
             'invoice_number' => $invoiceService->generateInvoiceNumber(),
             'from_model_type' => \App\Models\PurchaseReceipt::class,
             'from_model_id' => $receipt->id,
+            'currency_id' => $idrCurrencyId,
+            'exchange_rate' => 1,
             'invoice_date' => now()->toDateString(),
             'subtotal' => $subtotal,
             'tax' => $tax,
             'other_fee' => $otherFees, // Add biaya as other_fee
             'total' => $total,
             'due_date' => now()->addDays(30)->toDateString(),
-            'status' => 'paid', // Create as paid directly
+            'status' => \App\Models\Invoice::STATUS_PAID, // Create as paid directly
             'ppn_rate' => $ppnRate,
             'dpp' => $subtotal,
             'supplier_name' => $supplier ? $supplier->perusahaan : null,
             'supplier_phone' => $supplier ? $supplier->phone : null,
             'purchase_receipts' => [$receipt->id],
+            'cabang_id' => $receipt->cabang_id,
         ]);
 
         // Create invoice items
@@ -855,11 +1131,16 @@ class PurchaseReceiptService
         // Create account payable
         \App\Models\AccountPayable::create([
             'invoice_id' => $invoice->id,
+            'currency_id' => $idrCurrencyId,
+            'exchange_rate' => 1,
+            'total_original' => $total,
+            'paid_original' => $total,
+            'remaining_original' => 0,
             'total' => $total,
             'paid' => $total, // Mark as fully paid since invoice is paid
             'remaining' => 0,
             'due_date' => $invoice->due_date,
-            'status' => 'Lunas',
+            'status' => PaymentStatus::PAID->value,
             'supplier_id' => $supplier ? $supplier->id : null,
         ]);
 
@@ -879,7 +1160,7 @@ class PurchaseReceiptService
     /**
      * Copy biaya tambahan from Purchase Order to Purchase Receipt
      */
-    protected function copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $receipt)
+    public function copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $receipt)
     {
         // Load biaya relationship if not already loaded
         if (!$purchaseOrder->relationLoaded('purchaseOrderBiaya')) {

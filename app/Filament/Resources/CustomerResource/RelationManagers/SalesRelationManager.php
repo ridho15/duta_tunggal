@@ -102,7 +102,6 @@ class SalesRelationManager extends RelationManager
                             ->disabled()
                             ->reactive()
                             ->default(0)
-                            ->numeric(),
                     ])
             ]);
     }

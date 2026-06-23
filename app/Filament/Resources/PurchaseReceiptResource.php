@@ -12,6 +12,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Services\PurchaseReceiptService;
+use App\Support\OrderRequestQuantityLock;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
@@ -27,10 +28,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\Alignment;
 use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -47,18 +44,36 @@ class PurchaseReceiptResource extends Resource
 {
     protected static ?string $model = PurchaseReceipt::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
 
     // Group label updated to indicate Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?string $navigationLabel = 'Penerimaan Pembelian';
+
+    protected static ?string $modelLabel = 'Penerimaan Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Penerimaan Pembelian';
+
+    protected static ?int $navigationSort = 4;
 
     /**
      * Purchase Receipt hanya dibuat otomatis dari hasil Quality Control.
      * Pembuatan manual di-nonaktifkan untuk menegakkan flow: PO → QC → Receipt.
      */
     public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
     {
         return false;
     }
@@ -92,14 +107,14 @@ class PurchaseReceiptResource extends Resource
                             ->required(),
                         Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
-                            ->visible(fn () => in_array('all', Auth::user()?->manage_type ?? []))
-                            ->default(fn () => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->disabled()
+                            ->dehydrated()
                             ->required()
                             ->searchable()
-                            ->helperText('Pilih cabang untuk purchase receipt ini'),
+                            ->helperText('Cabang terisi otomatis sesuai dengan Quality Control, PO, dan Order Request terkait.'),
                         DateTimePicker::make('receipt_date')
                             ->validationMessages([
                                 'required' => 'Tanggal penerimaan belum dipilih',
@@ -185,8 +200,7 @@ class PurchaseReceiptResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->numeric()
-                                    ->reactive()
+                                    ->live(onBlur: true)
                                     ->indonesianMoney()
                                     ->prefix(function ($get) {
                                         $currency = Currency::find($get('currency_id'));
@@ -259,11 +273,11 @@ class PurchaseReceiptResource extends Resource
                                         $user = Auth::user();
                                         $manageType = $user?->manage_type ?? [];
                                         $query = Warehouse::where('status', 1);
-                                        
+
                                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                             $query->where('cabang_id', $user?->cabang_id);
                                         }
-                                        
+
                                         return $query->get()->mapWithKeys(function ($warehouse) {
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
@@ -277,14 +291,14 @@ class PurchaseReceiptResource extends Resource
                                         $manageType = $user?->manage_type ?? [];
                                         $query = Warehouse::where('status', 1)
                                             ->where(function ($q) use ($search) {
-                                                $q->where('perusahaan', 'like', "%{$search}%")
-                                                  ->orWhere('kode', 'like', "%{$search}%");
+                                                $q->where('name', 'like', "%{$search}%")
+                                                    ->orWhere('kode', 'like', "%{$search}%");
                                             });
-                                        
+
                                         if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
                                             $query->where('cabang_id', $user?->cabang_id);
                                         }
-                                        
+
                                         return $query->limit(50)->get()->mapWithKeys(function ($warehouse) {
                                             return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
                                         });
@@ -315,7 +329,9 @@ class PurchaseReceiptResource extends Resource
                                             if ($poItem) {
                                                 $total = $poItem->quantity;
                                                 $received = $poItem->total_received;
-                                                return "Quantity yang datang dari supplier (Total PO: {$total}, Sudah diterima sebelumnya: {$received})";
+                                                $receiptItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItemId, $receiptItemId);
+                                                return "Quantity yang datang dari supplier (Total PO: {$total}, Sudah diterima sebelumnya: {$received}, Maks: {$limit['remaining_received']})";
                                             }
                                         }
                                         return "Quantity yang datang dari supplier";
@@ -326,7 +342,23 @@ class PurchaseReceiptResource extends Resource
                                         'numeric' => 'Quantity diterima tidak valid !',
                                         'min' => 'Quantity diterima minimal 0'
                                     ])
-                                    ->rules(['min:0'])
+                                    ->rules([
+                                        'min:0',
+                                        function ($get) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                $poItemId = $get('purchase_order_item_id');
+                                                if (! $poItemId) {
+                                                    return;
+                                                }
+
+                                                $receiptItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItemId, $receiptItemId);
+                                                if ((float) $value > $limit['remaining_received']) {
+                                                    $fail("Quantity Received tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                                                }
+                                            };
+                                        },
+                                    ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($state, $set, $get) {
                                         // Untuk partial receipt, jangan otomatis hitung qty_rejected
@@ -350,11 +382,26 @@ class PurchaseReceiptResource extends Resource
                                         $poItemId = $get('purchase_order_item_id');
                                         if ($poItemId) {
                                             $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
-                                            if ($poItem && $qtyAccepted > $poItem->quantity) {
-                                                $set('qty_accepted', $poItem->quantity);
+                                            $receiptItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                            $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItemId, $receiptItemId);
+                                            if ($qtyReceived > $limit['remaining_received']) {
+                                                $set('qty_received', $limit['remaining_received']);
+                                                $qtyReceived = $limit['remaining_received'];
                                                 \Filament\Notifications\Notification::make()
                                                     ->title('Peringatan')
-                                                    ->body("Quantity Accepted tidak boleh melebihi Quantity PO ({$poItem->quantity})")
+                                                    ->body("Quantity Received tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']})")
+                                                    ->warning()
+                                                    ->send();
+                                            }
+                                            if ($qtyAccepted > $qtyReceived) {
+                                                $set('qty_accepted', $qtyReceived);
+                                                $qtyAccepted = $qtyReceived;
+                                            }
+                                            if ($poItem && $qtyAccepted > $limit['remaining_accepted']) {
+                                                $set('qty_accepted', $limit['remaining_accepted']);
+                                                \Filament\Notifications\Notification::make()
+                                                    ->title('Peringatan')
+                                                    ->body("Quantity Accepted tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']})")
                                                     ->warning()
                                                     ->send();
                                             }
@@ -371,7 +418,9 @@ class PurchaseReceiptResource extends Resource
                                             if ($poItem) {
                                                 $remaining = $poItem->remaining_quantity;
                                                 $total = $poItem->quantity;
-                                                return "Quantity yang diterima/disetujui (Maksimal: {$total}, Sisa PO: {$remaining})";
+                                                $receiptItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItemId, $receiptItemId);
+                                                return "Quantity yang diterima/disetujui (Maksimal: {$total}, Sisa PO: {$remaining}, Maks: {$limit['remaining_accepted']})";
                                             }
                                         }
                                         return "Quantity yang diterima/disetujui";
@@ -387,7 +436,16 @@ class PurchaseReceiptResource extends Resource
                                         if ($poItemId) {
                                             $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
                                             if ($poItem) {
-                                                return ['max:' . $poItem->quantity, 'min:0'];
+                                                return [
+                                                    'min:0',
+                                                    function ($attribute, $value, $fail) use ($get, $poItemId) {
+                                                        $receiptItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                                        $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItemId, $receiptItemId);
+                                                        if ((float) $value > $limit['remaining_accepted']) {
+                                                            $fail("Quantity Accepted tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                                                        }
+                                                    },
+                                                ];
                                             }
                                         }
                                         return ['min:0'];
@@ -413,11 +471,13 @@ class PurchaseReceiptResource extends Resource
                                         $poItemId = $get('purchase_order_item_id');
                                         if ($poItemId) {
                                             $poItem = \App\Models\PurchaseOrderItem::find($poItemId);
-                                            if ($poItem && $qtyAccepted > $poItem->quantity) {
-                                                $component->state($poItem->quantity);
+                                            $receiptItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                            $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $poItemId, $receiptItemId);
+                                            if ($poItem && $qtyAccepted > $limit['remaining_accepted']) {
+                                                $component->state($limit['remaining_accepted']);
                                                 \Filament\Notifications\Notification::make()
                                                     ->title('Peringatan')
-                                                    ->body("Quantity Accepted tidak boleh melebihi Quantity PO ({$poItem->quantity})")
+                                                    ->body("Quantity Accepted tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']})")
                                                     ->warning()
                                                     ->send();
                                             }
@@ -489,6 +549,21 @@ class PurchaseReceiptResource extends Resource
                 TextColumn::make('receipt_number')
                     ->label('Receipt Number')
                     ->searchable(),
+                TextColumn::make('supplier_name')
+                    ->label('Supplier')
+                    ->getStateUsing(function ($record) {
+                        $supplier = $record->purchaseOrder?->supplier;
+
+                        return $supplier?->id
+                            ? "({$supplier->code}) " . ($supplier->perusahaan ?? 'N/A')
+                            : 'N/A';
+                    })
+                    ->searchable(query: function (Builder $query, $search) {
+                        return $query->whereHas('purchaseOrder.supplier', function (Builder $query) use ($search) {
+                            return $query->where('code', 'LIKE', '%' . $search . '%')
+                                ->orWhere('perusahaan', 'LIKE', '%' . $search . '%');
+                        });
+                    }),
                 TextColumn::make('cabang')
                     ->label('Cabang')
                     ->formatStateUsing(function ($state) {
@@ -611,15 +686,15 @@ class PurchaseReceiptResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Purchase Receipt</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Alur Baru (QC First)</strong>: Purchase Receipt dibuat <strong>otomatis</strong> oleh sistem setelah Quality Control Purchase disetujui (status Passed). Jangan buat receipt manual.</li>' .
-                            '<li><strong>Alur</strong>: Purchase Order → Quality Control Purchase → Purchase Receipt (otomatis).</li>' .
-                            '<li><strong>QC Status</strong>: Menampilkan status Quality Control terkait receipt ini.</li>' .
-                            '<li><strong>Stok</strong>: Stok ditambahkan ke inventory otomatis saat QC disetujui dan receipt dibuat.</li>' .
-                            '<li><strong>🔄 Sinkronisasi Retur:</strong> Jika qty_rejected diubah atau dihapus, Purchase Return akan otomatis terupdate atau terhapus untuk menjaga konsistensi data.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Alur Baru (QC First)</strong>: Purchase Receipt dibuat <strong>otomatis</strong> oleh sistem setelah Quality Control Purchase disetujui (status Passed). Jangan buat receipt manual.</li>' .
+                    '<li><strong>Alur</strong>: Purchase Order → Quality Control Purchase → Purchase Receipt (otomatis).</li>' .
+                    '<li><strong>QC Status</strong>: Menampilkan status Quality Control terkait receipt ini.</li>' .
+                    '<li><strong>Stok</strong>: Stok ditambahkan ke inventory otomatis saat QC disetujui dan receipt dibuat.</li>' .
+                    '<li><strong>🔄 Sinkronisasi Retur:</strong> Jika qty_rejected diubah atau dihapus, Purchase Return akan otomatis terupdate atau terhapus untuk menjaga konsistensi data.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ))
             ->filters([
                 SelectFilter::make('status')
@@ -659,16 +734,9 @@ class PurchaseReceiptResource extends Resource
                 ActionGroup::make([
                     ViewAction::make()
                         ->color('primary'),
-                    EditAction::make()
-                        ->color('success'),
-                    DeleteAction::make()
                 ])
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array
@@ -678,12 +746,20 @@ class PurchaseReceiptResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'purchaseOrder.supplier',
+                'purchaseReceiptItem.product',
+            ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListPurchaseReceipts::route('/'),
             'view' => ViewPurchaseReceipt::route('/{record}'),
-            'edit' => Pages\EditPurchaseReceipt::route('/{record}/edit'),
         ];
     }
 }

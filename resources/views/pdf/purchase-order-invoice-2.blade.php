@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 20mm;
+            @bottom-right {
+                content: "Hal. " counter(page) " dari " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -124,13 +134,47 @@
 </head>
 
 <body>
+    @php
+        $supplier = $invoice->supplier ?? $invoice->fromModel->supplier;
+        $effectivePpnRate = (float) ($invoice->effective_ppn_rate ?? $invoice->ppn_rate ?? 0);
+        $ppnAmount = (float) ($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $effectivePpnRate / 100));
+        $isImport = (bool) ($invoice->fromModel->is_import ?? false);
+
+        $importFeeTotals = [
+            'pph' => (float) ($invoice->pph22_amount ?? 0),
+            'bea_masuk' => (float) ($invoice->bea_masuk_amount ?? 0),
+            'other' => 0.0,
+        ];
+
+        foreach ((array) ($invoice->other_fee ?? []) as $fee) {
+            $name = strtolower(trim((string) ($fee['name'] ?? '')));
+            $amount = (float) ($fee['amount'] ?? 0);
+
+            if ($amount <= 0) {
+                continue;
+            }
+
+            if (preg_match('/\bpph\b|pph\s*22/', $name) || preg_match('/bea masuk|customs|bm|import duty|cukai/', $name)) {
+                continue;
+            }
+
+            $importFeeTotals['other'] += $amount;
+        }
+
+        $importTotal = (float) ($invoice->dpp ?? $invoice->subtotal ?? 0)
+            + $ppnAmount
+            + $importFeeTotals['pph']
+            + $importFeeTotals['bea_masuk']
+            + $importFeeTotals['other'];
+    @endphp
+
     <div class="header clearfix">
         <div class="company-info">
-            <h2>PT.DUTA TUNGGAL</h2>
-            <p>Jl. Raya Bogor KM 36, Cibinong, Bogor<br>
-                Cibinong, Jawa Barat 16911<br>
-                Telp: (021) 875-1234<br>
-                Email: info@dutatunggal.com</p>
+            <h2>PT DUTA TUNGGAL</h2>
+            <p>Jl. Contoh No. 123<br>
+                Jakarta, Indonesia<br>
+                Telp: (021) 12345678<br>
+                Email: admin@dutatunggal.co.id</p>
             @if($invoice->cabang)
             <p style="margin-top: 10px; font-size: 11px; color: #666;">
                 <strong>Cabang: {{ $invoice->cabang->nama }}</strong><br>
@@ -148,16 +192,16 @@
     <div class="invoice-details clearfix">
         <div class="customer-info">
             <h3>Supplier:</h3>
-            <p><strong>{{ $invoice->supplier_name ?? $invoice->fromModel->supplier->perusahaan }}</strong><br>
-                @if($invoice->fromModel->supplier->perusahaan)
-                {{ $invoice->fromModel->supplier->perusahaan }}<br>
+            <p><strong>{{ $invoice->supplier_name ?? $supplier->perusahaan ?? 'N/A' }}</strong><br>
+                @if($supplier->perusahaan)
+                {{ $supplier->perusahaan }}<br>
                 @endif
-                {{ $invoice->fromModel->supplier->address }}<br>
-                @if($invoice->fromModel->supplier->phone)
-                Telp: {{ $invoice->fromModel->supplier->phone }}<br>
+                {{ $supplier->address ?? '' }}<br>
+                @if($supplier->phone)
+                Telp: {{ $supplier->phone }}<br>
                 @endif
-                @if($invoice->fromModel->supplier->email)
-                Email: {{ $invoice->fromModel->supplier->email }}
+                @if($supplier->email)
+                Email: {{ $supplier->email }}
                 @endif
             </p>
         </div>
@@ -223,6 +267,40 @@
     </div>
     @endif
 
+    @if($isImport)
+    <div style="margin: 20px 0; clear: both;">
+        <h4 style="margin-bottom: 10px; color: #333;">Breakdown Impor</h4>
+        <table class="totals-table">
+            <tr>
+                <td>DPP:</td>
+                <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>PPN {{ number_format($effectivePpnRate, 2, ',', '.') }}%:</td>
+                <td class="text-right rupiah">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>PPh 22:</td>
+                <td class="text-right rupiah">Rp {{ number_format($importFeeTotals['pph'], 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>BEA MASUK:</td>
+                <td class="text-right rupiah">Rp {{ number_format($importFeeTotals['bea_masuk'], 0, ',', '.') }}</td>
+            </tr>
+            @if($importFeeTotals['other'] > 0)
+            <tr>
+                <td>Biaya Impor Lainnya:</td>
+                <td class="text-right rupiah">Rp {{ number_format($importFeeTotals['other'], 0, ',', '.') }}</td>
+            </tr>
+            @endif
+            <tr class="total-row">
+                <td><strong>TOTAL IMPOR:</strong></td>
+                <td class="text-right rupiah"><strong>Rp {{ number_format($importTotal, 0, ',', '.') }}</strong></td>
+            </tr>
+        </table>
+    </div>
+    @endif
+
     <div class="totals-section">
         <table class="totals-table">
             <tr>
@@ -231,8 +309,14 @@
             </tr>
             
             {{-- Biaya lain dari invoice --}}
-            @if($invoice->other_fee && is_array($invoice->other_fee))
+            @if(!$isImport && $invoice->other_fee && is_array($invoice->other_fee))
                 @foreach($invoice->other_fee as $fee)
+                @php
+                    $feeName = strtolower(trim((string) ($fee['name'] ?? '')));
+                    if (preg_match('/\bpph\b|pph\s*22/', $feeName) || preg_match('/bea masuk|customs|bm|import duty|cukai/', $feeName)) {
+                        continue;
+                    }
+                @endphp
                 <tr>
                     <td>{{ $fee['name'] ?? 'Biaya Lain' }}:</td>
                     <td class="text-right rupiah">Rp {{ number_format($fee['amount'] ?? 0, 0, ',', '.') }}</td>
@@ -240,44 +324,21 @@
                 @endforeach
             @endif
             
-            {{-- Biaya dari Purchase Receipts --}}
-            @if($invoice->purchase_receipts && is_array($invoice->purchase_receipts))
-                @php
-                    $receiptBiayas = \App\Models\PurchaseReceiptBiaya::whereHas('purchaseReceipt', function($query) use ($invoice) {
-                        $query->whereIn('id', $invoice->purchase_receipts);
-                    })->get();
-                @endphp
-                @foreach($receiptBiayas as $biaya)
-                <tr>
-                    <td>{{ $biaya->nama_biaya }}:</td>
-                    <td class="text-right rupiah">Rp {{ number_format($biaya->total, 0, ',', '.') }}</td>
-                </tr>
-                @endforeach
-            @endif
-            
             {{-- PPN --}}
-            @if($invoice->ppn_rate > 0)
+            @if(!$isImport && $invoice->ppn_rate > 0)
             <tr>
                 <td>DPP:</td>
                 <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
             </tr>
             <tr>
-                <td>PPN {{ $invoice->ppn_rate }}%:</td>
-                <td class="text-right rupiah">Rp {{ number_format($invoice->ppn_amount ?? (($invoice->dpp ?? $invoice->subtotal) * $invoice->ppn_rate / 100), 0, ',', '.') }}</td>
-            </tr>
-            @endif
-            
-            {{-- Tax tambahan jika ada --}}
-            @if($invoice->tax > 0)
-            <tr>
-                <td>Tax ({{ $invoice->tax }}%):</td>
-                <td class="text-right rupiah">Rp {{ number_format($invoice->tax_amount ?? ($invoice->subtotal * $invoice->tax / 100), 0, ',', '.') }}</td>
+                <td>PPN {{ number_format($effectivePpnRate, 2, ',', '.') }}%:</td>
+                <td class="text-right rupiah">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</td>
             </tr>
             @endif
             
             <tr class="total-row">
                 <td><strong>TOTAL:</strong></td>
-                <td class="text-right rupiah"><strong>Rp {{ number_format($invoice->total, 0, ',', '.') }}</strong></td>
+                <td class="text-right rupiah"><strong>Rp {{ number_format($isImport ? $importTotal : $invoice->total, 0, ',', '.') }}</strong></td>
             </tr>
         </table>
     </div>
@@ -288,17 +349,17 @@
             <p style="font-size: 11px; line-height: 1.5;">
                 • Invoice ini dibuat berdasarkan Purchase Order No: {{ $invoice->fromModel->po_number ?? 'N/A' }}<br>
                 • Pembayaran mohon ditransfer ke rekening:<br>
-                  &nbsp;&nbsp;&nbsp;BCA: 123-456-7890 a/n PT. DUTA TUNGGAL<br>
-                  &nbsp;&nbsp;&nbsp;BRI: 098-765-4321 a/n PT. DUTA TUNGGAL<br>
+                  &nbsp;&nbsp;&nbsp;BCA: 123-456-7890 a/n PT DUTA TUNGGAL<br>
+                  &nbsp;&nbsp;&nbsp;BRI: 098-765-4321 a/n PT DUTA TUNGGAL<br>
                 • Pembayaran dianggap sah setelah diterima konfirmasi dari pihak kami
             </p>
         </div>
-        
+
         <div style="text-align: center; margin-top: 30px;">
             <p><strong>Terima kasih atas kepercayaan Anda berbisnis dengan kami!</strong></p>
             <p style="margin-top: 20px;">
                 Hormat kami,<br>
-                <strong>PT. DUTA TUNGGAL</strong>
+                <strong>PT DUTA TUNGGAL</strong>
             </p>
         </div>
         

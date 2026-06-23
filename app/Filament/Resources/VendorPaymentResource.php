@@ -3,11 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\VendorPaymentResource\Pages;
+use App\Helpers\MoneyHelper;
+use App\Support\ProcurementFailureNotifier;
 use App\Models\ChartOfAccount;
 use App\Models\Invoice;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\VendorPayment;
+use App\Models\VendorPaymentDetail;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -21,6 +24,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -28,6 +32,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 use Filament\Tables\Actions\ActionGroup;
 
 class VendorPaymentResource extends Resource
@@ -36,11 +41,17 @@ class VendorPaymentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
 
-    protected static ?string $navigationLabel = 'Payment Vendor';
+    protected static ?string $navigationLabel = 'Pembayaran Vendor';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?string $modelLabel = 'Pembayaran Vendor';
+
+    protected static ?string $pluralModelLabel = 'Pembayaran Vendor';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -55,24 +66,46 @@ class VendorPaymentResource extends Resource
                                 Select::make('payment_request_id')
                                     ->label('Payment Request (PR)')
                                     ->options(function () {
-                                        return PaymentRequest::where('status', 'approved')
-                                            ->whereNull('vendor_payment_id')
+                                        // Show approved and partially-paid PRs (exclude fully paid).
+                                        return PaymentRequest::whereIn('status', [PaymentRequest::STATUS_APPROVED, PaymentRequest::STATUS_PARTIAL])
                                             ->with('supplier')
                                             ->get()
                                             ->mapWithKeys(function ($pr) {
-                                                return [$pr->id => "{$pr->request_number} - {$pr->supplier->perusahaan} (Rp " . number_format($pr->total_amount, 0, ',', '.') . ")"];
+                                                return [$pr->id => "{$pr->request_number} - {$pr->supplier->perusahaan} (" . MoneyHelper::rupiah($pr->total_amount) . ")"];
                                             });
                                     })
                                     ->searchable()
                                     ->required()
                                     ->reactive()
-                                    ->helperText('Pilih Payment Request yang sudah disetujui. Vendor Payment wajib mengacu pada Payment Request yang telah diapprove.')
+                                    ->helperText('Pilih Payment Request yang sudah disetujui. Invoice yang ditampilkan hanya berasal dari Payment Request yang dipilih.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        if (!$state) return;
+                                        if (!$state) {
+                                            $set('supplier_id', null);
+                                            $set('selected_invoices', []);
+                                            $set('total_payment', self::formatMoneyState(0));
+                                            $set('payment_details', []);
+                                            return;
+                                        }
                                         $pr = PaymentRequest::with('supplier')->find($state);
                                         if ($pr) {
                                             $set('supplier_id', $pr->supplier_id);
-                                            $set('selected_invoices', $pr->selected_invoices ?? []);
+                                            // Pre-select only invoices that still have remaining payable
+                                            $prInvoiceIds = $pr->selected_invoices ?? [];
+                                            $eligibleInvoices = empty($prInvoiceIds)
+                                                ? collect()
+                                                : Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get()
+                                                    ->filter(fn ($invoice) => ((float)($invoice->accountPayable->remaining ?? $invoice->total)) > 0);
+
+                                            $set('selected_invoices', $eligibleInvoices->pluck('id')->values()->toArray());
+                                            // Calculate total from PR invoices
+                                            if (!empty($prInvoiceIds)) {
+                                                $invoices = $eligibleInvoices;
+                                                $total = self::calculateSelectedInvoiceTotal($invoices);
+                                                $set('total_payment', self::formatMoneyState($total));
+                                                $set('payment_details', self::buildPaymentDetails($invoices));
+                                            } else {
+                                                $set('payment_details', []);
+                                            }
                                         }
                                     }),
                             ])
@@ -85,20 +118,26 @@ class VendorPaymentResource extends Resource
                                 Select::make('supplier_id')
                                     ->label('Vendor')
                                     ->options(function () {
-                                        return Supplier::all()->mapWithKeys(function ($supplier) {
+                                        return Supplier::orderBy('perusahaan')->limit(50)->get()->mapWithKeys(function ($supplier) {
                                             return [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"];
                                         })->toArray();
                                     })
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
+                                    ->disabled(fn($get) => !empty($get('payment_request_id')))
+                                    ->dehydrated(true)
+                                    ->helperText(fn($get) => !empty($get('payment_request_id')) ? 'Vendor otomatis terisi dari Payment Request.' : null)
                                     ->validationMessages([
                                         'required' => 'Supplier belum dipilih'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $set('selected_invoices', []);
-                                        $set('total_payment', 0);
-                                        $set('payment_details', []);
+                                        // Only reset if no payment_request_id is selected
+                                        if (empty($get('payment_request_id'))) {
+                                            $set('selected_invoices', []);
+                                            $set('total_payment', self::formatMoneyState(0));
+                                            $set('payment_details', []);
+                                        }
                                     })
                                     ->required(),
 
@@ -123,83 +162,95 @@ class VendorPaymentResource extends Resource
                                 CheckboxList::make('selected_invoices')
                                     ->label('Pilih Invoice')
                                     ->options(function ($get, $set) {
-                                        $supplierId = $get('supplier_id');
-                                        if (!$supplierId) {
+                                        $paymentRequestId = $get('payment_request_id');
+
+                                        if (!$paymentRequestId) {
                                             $set('has_invoices', false);
                                             return [];
                                         }
 
                                         try {
-                                            // Check if we're in edit mode by checking if selected_invoices already has values
-                                            $currentSelectedInvoices = $get('selected_invoices') ?? [];
-                                            $isEditMode = !empty($currentSelectedInvoices) && is_array($currentSelectedInvoices);
+                                            $pr = PaymentRequest::find($paymentRequestId);
+                                            $prInvoiceIds = $pr ? ($pr->selected_invoices ?? []) : [];
 
-                                            // Get unpaid/partial invoices for selected supplier
-                                            $query = Invoice::join('purchase_orders', function($join) use ($supplierId) {
-                                                    $join->on('invoices.from_model_id', '=', 'purchase_orders.id')
-                                                         ->where('invoices.from_model_type', '=', 'App\Models\PurchaseOrder')
-                                                         ->where('purchase_orders.supplier_id', '=', $supplierId);
-                                                })
-                                                ->with(['accountPayable'])
-                                                ->select('invoices.*');
-
-                                            // In edit mode, include previously selected invoices even if paid
-                                            if ($isEditMode) {
-                                                $query->where(function ($q) use ($currentSelectedInvoices) {
-                                                    $q->whereHas('accountPayable', function ($query) {
-                                                        $query->where('remaining', '>', 0);
-                                                    })->orWhereIn('invoices.id', $currentSelectedInvoices);
-                                                });
-                                            } else {
-                                                $query->whereHas('accountPayable', function ($query) {
-                                                    $query->where('remaining', '>', 0);
-                                                });
+                                            if (empty($prInvoiceIds)) {
+                                                $set('has_invoices', false);
+                                                return [];
                                             }
 
-                                            $invoices = $query->get();
+                                            $invoices = Invoice::whereIn('id', $prInvoiceIds)
+                                                ->with(['accountPayable'])
+                                                ->get();
 
                                             $options = [];
                                             foreach ($invoices as $invoice) {
-                                                $remaining = $invoice->accountPayable->remaining ?? $invoice->total;
+                                                $remaining = self::resolveInvoiceRemainingAmount($invoice);
                                                 $statusText = $remaining <= 0 ? ' (SUDAH LUNAS)' : '';
-                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} - Total: Rp " . number_format($invoice->total, 0, ',', '.') . " - Sisa: Rp " . number_format($remaining, 0, ',', '.') . $statusText;
+
+                                                $invDate = $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : '-';
+                                                $dueDate = $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '-';
+                                                $options[$invoice->id] = "Invoice {$invoice->invoice_number} ({$invDate}) - Total: "
+                                                    . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $invoice->total)
+                                                    . " - Sisa: " . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $remaining)
+                                                    . " - Due: {$dueDate}" . $statusText;
                                             }
 
                                             $set('has_invoices', !empty($options));
                                             return $options;
-                                        } catch (\Exception $e) {
+                                        } catch (\Throwable $exception) {
                                             $set('has_invoices', false);
+                                            Log::warning('VendorPaymentResource: gagal memuat daftar invoice', [
+                                                'payment_request_id' => $paymentRequestId,
+                                                'error' => $exception->getMessage(),
+                                            ]);
+                                            ProcurementFailureNotifier::warning(
+                                                'Gagal Memuat Daftar Invoice',
+                                                $exception,
+                                                'Daftar invoice supplier belum berhasil dimuat. Coba pilih ulang payment request atau refresh halaman.'
+                                            );
                                             return [];
                                         }
                                     })
-                                    ->visible(fn ($get) => !empty($get('supplier_id')))
+                                    ->disableOptionWhen(function ($value, $get) {
+                                        $paymentRequestId = $get('payment_request_id');
+                                        if (!$paymentRequestId) {
+                                            return false;
+                                        }
+
+                                        $pr = PaymentRequest::find($paymentRequestId);
+                                        $prInvoiceIds = $pr ? ($pr->selected_invoices ?? []) : [];
+                                        if (empty($prInvoiceIds)) {
+                                            return false;
+                                        }
+
+                                        $invoice = Invoice::whereIn('id', $prInvoiceIds)
+                                            ->with('accountPayable')
+                                            ->find((int)$value);
+
+                                        if (!$invoice) {
+                                            return false;
+                                        }
+
+                                        $remaining = self::resolveInvoiceRemainingAmount($invoice);
+                                        return $remaining <= 0;
+                                    })
+                                    ->visible(fn($get) => !empty($get('supplier_id')))
                                     ->helperText(function ($get) {
-                                        $supplierId = $get('supplier_id');
-                                        if (!$supplierId) {
-                                            return 'Pilih supplier terlebih dahulu untuk melihat invoice yang tersedia.';
+                                        $paymentRequestId = $get('payment_request_id');
+                                        if (!$paymentRequestId) {
+                                            return 'Pilih Payment Request terlebih dahulu untuk melihat invoice yang tersedia.';
                                         }
 
                                         $hasInvoices = $get('has_invoices');
                                         if ($hasInvoices === false) {
-                                            return 'Tidak ada invoice yang tersedia untuk vendor ini. Pastikan vendor memiliki invoice dengan sisa pembayaran.';
+                                            return 'Tidak ada invoice yang tersedia pada Payment Request ini.';
                                         }
 
-                                        $selectedInvoices = $get('selected_invoices') ?? [];
-                                        $isEditMode = !empty($selectedInvoices) && is_array($selectedInvoices);
-
-                                        if ($isEditMode) {
-                                            return 'Menampilkan invoice yang sudah dipilih sebelumnya dan invoice dengan sisa pembayaran. Invoice yang sudah lunas ditandai dengan "(SUDAH LUNAS)".';
-                                        }
-
-                                        if (empty($selectedInvoices)) {
-                                            return 'Pilih invoice yang akan dibayar. Hanya menampilkan invoice dengan sisa pembayaran.';
-                                        }
-
-                                        return 'Pilih invoice yang akan dibayar. Hanya menampilkan invoice dengan sisa pembayaran.';
+                                        return 'Pilih invoice dari Payment Request ini untuk diproses pembayarannya.';
                                     })
                                     ->reactive()
                                     ->live()
-                                    ->disabled(fn ($get) => $get('is_processing_invoices'))
+                                    ->disabled(fn($get) => $get('is_processing_invoices'))
                                     ->afterStateUpdated(function ($state, $set, $get) {
                                         // Set loading state to show processing indicator
                                         $set('is_processing_invoices', true);
@@ -214,7 +265,7 @@ class VendorPaymentResource extends Resource
 
                                         // Calculate total payment based on selected invoices
                                         if (empty($invoiceIds)) {
-                                            $set('total_payment', 0);
+                                            $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
                                             $set('force_section_update', false); // Reset force update
                                             \Illuminate\Support\Facades\Log::info('No invoices selected, resetting totals');
@@ -234,48 +285,43 @@ class VendorPaymentResource extends Resource
                                                         'id' => $invoice->id,
                                                         'number' => $invoice->invoice_number,
                                                         'total' => $invoice->total,
-                                                        'remaining' => $invoice->accountPayable->remaining ?? $invoice->total,
+                                                        'remaining' => self::resolveInvoiceRemainingAmount($invoice),
                                                     ];
                                                 })->toArray(),
                                             ]);
 
-                                            $total = $invoices->sum(function ($invoice) {
-                                                return $invoice->accountPayable->remaining ?? $invoice->total;
-                                            });
+                                            $total = self::calculateSelectedInvoiceTotal($invoices);
 
-                                            $set('total_payment', $total);
+                                            $set('total_payment', self::formatMoneyState($total));
 
                                             // Set payment details for each selected invoice
-                                            $paymentDetails = $invoices->map(function ($invoice) {
-                                                return [
-                                                    'invoice_id' => $invoice->id,
-                                                    'invoice_number' => $invoice->invoice_number,
-                                                    'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                    'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                ];
-                                            })->toArray();
+                                            $paymentDetails = self::buildPaymentDetails($invoices);
 
                                             $set('payment_details', $paymentDetails);
                                             \Illuminate\Support\Facades\Log::info('Payment details set successfully', [
                                                 'total_payment' => $total,
                                                 'payment_details_count' => count($paymentDetails),
                                             ]);
-
-                                        } catch (\Exception $e) {
-                                            \Illuminate\Support\Facades\Log::error('Error in invoice selection processing', [
-                                                'error' => $e->getMessage(),
-                                                'trace' => $e->getTraceAsString(),
+                                        } catch (\Throwable $exception) {
+                                            Log::error('VendorPaymentResource invoice selection processing failed', [
+                                                'error' => $exception->getMessage(),
+                                                'trace' => $exception->getTraceAsString(),
                                                 'invoice_ids' => $invoiceIds,
                                             ]);
-                                            $set('total_payment', 0);
+                                            $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
+                                            ProcurementFailureNotifier::warning(
+                                                'Gagal Memuat Detail Invoice',
+                                                $exception,
+                                                'Detail invoice yang dipilih belum berhasil diproses. Periksa invoice yang dipilih lalu coba lagi.'
+                                            );
                                         }
 
                                         // End loading state and force section re-render
                                         $set('is_processing_invoices', false);
                                         $set('force_section_update', !$get('force_section_update'));
                                     })
-                                    ->columns(2)
+                                        ->columns(1)
                                     ->searchable(),
                             ]),
 
@@ -326,31 +372,59 @@ class VendorPaymentResource extends Resource
                                             </div>
                                         </div>
                                     '))
-                                    ->visible(fn ($get) => $get('is_processing_invoices')),
+                                    ->visible(fn($get) => $get('is_processing_invoices')),
                                 Placeholder::make('loading_payment_details')
                                     ->label('')
                                     ->content('Memproses detail pembayaran...')
-                                    ->visible(fn ($get) => !empty($get('selected_invoices')) && empty($get('payment_details')) && !$get('is_processing_invoices')),
+                                    ->visible(fn($get) => !empty($get('selected_invoices')) && empty($get('payment_details')) && !$get('is_processing_invoices')),
                                 Repeater::make('payment_details')
                                     ->label('')
                                     ->reactive()
-                                    ->visible(fn ($get) => !empty($get('payment_details')) && !$get('is_processing_invoices'))
-                                    ->disabled(fn ($get) => $get('is_processing_invoices'))
+                                    ->visible(fn($get) => !empty($get('payment_details')) && !$get('is_processing_invoices'))
+                                    ->disabled(fn($get) => $get('is_processing_invoices'))
                                     ->schema([
                                         TextInput::make('invoice_number')
                                             ->label('No. Invoice')
                                             ->readonly()
                                             ->columnSpan(1),
-                                        TextInput::make('remaining_amount')
-                                            ->label('Sisa Hutang')
+                                        TextInput::make('invoice_date')
+                                            ->label('Tgl Invoice')
+                                            ->readonly()
+                                            ->columnSpan(1),
+                                        TextInput::make('due_date')
+                                            ->label('Due Date')
+                                            ->readonly()
+                                            ->columnSpan(1),
+                                        TextInput::make('total_invoice')
+                                            ->label('Total Invoice Source')
                                             ->readonly()
                                             ->indonesianMoney()
+                                            ->helperText(fn ($get) => $get('total_invoice_display') ?: null)
+                                            ->columnSpan(1),
+                                        TextInput::make('remaining_amount')
+                                            ->label('Sisa Hutang Source')
+                                            ->readonly()
+                                            ->indonesianMoney()
+                                            ->helperText(fn ($get) => $get('remaining_amount_display') ?: null)
                                             ->columnSpan(1),
                                         TextInput::make('payment_amount')
-                                            ->label('Jumlah Pembayaran')
+                                            ->label('Jumlah Pembayaran Source')
                                             ->indonesianMoney()
-                                            ->reactive()
+                                            ->live(debounce: 500)
                                             ->required()
+                                            ->helperText(fn ($get) => $get('remaining_amount')
+                                                ? 'Maks: ' . ($get('remaining_amount_display') ?: MoneyHelper::rupiah($get('remaining_amount') ?? 0))
+                                                : null
+                                            )
+                                            ->rules([function (Get $get) {
+                                                return function ($attribute, $value, $fail) use ($get) {
+                                                    $remaining = \App\Helpers\MoneyHelper::safeParse($get('remaining_amount') ?? 0);
+                                                    $paid = \App\Helpers\MoneyHelper::safeParse($value ?? 0);
+                                                    if ($paid > $remaining + 0.01) { // 0.01 tolerance for float rounding
+                                                        $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (' . ($get('remaining_amount_display') ?: MoneyHelper::rupiah($remaining)) . ').');
+                                                    }
+                                                };
+                                            }])
                                             ->placeholder(function ($get) {
                                                 $selectedInvoices = $get('../../selected_invoices');
                                                 if (!empty($selectedInvoices)) {
@@ -372,15 +446,15 @@ class VendorPaymentResource extends Resource
                                                     foreach ($paymentDetails as $detail) {
                                                         $amount = 0;
                                                         if (is_array($detail) && isset($detail['payment_amount'])) {
-                                                            $amount = \App\Http\Controllers\HelperController::parseIndonesianMoney($detail['payment_amount'] ?? 0);
+                                                            $amount = \App\Helpers\MoneyHelper::safeParse($detail['payment_amount'] ?? 0);
                                                         } elseif (is_object($detail) && isset($detail->payment_amount)) {
-                                                            $amount = \App\Http\Controllers\HelperController::parseIndonesianMoney($detail->payment_amount ?? 0);
+                                                            $amount = \App\Helpers\MoneyHelper::safeParse($detail->payment_amount ?? 0);
                                                         }
                                                         $totalPayment += $amount;
                                                     }
                                                 }
 
-                                                $set('../../total_payment', $totalPayment);
+                                                $set('../../total_payment', self::formatMoneyState($totalPayment));
 
                                                 \Illuminate\Support\Facades\Log::info('Payment amount updated, recalculating total', [
                                                     'new_payment_amount' => $state,
@@ -390,163 +464,19 @@ class VendorPaymentResource extends Resource
                                             })
                                             ->columnSpan(1),
                                         Hidden::make('invoice_id'),
+                                        Hidden::make('total_invoice_display')->dehydrated(false),
+                                        Hidden::make('remaining_amount_display')->dehydrated(false),
                                     ])
-                                    ->columns(3)
+                                    ->columns(1)
                                     ->columnSpanFull()
                                     ->addable(false)
                                     ->deletable(false)
                                     ->reorderable(false)
                                     ->default([])
-                                    ->key(fn ($get) => md5(json_encode($get('payment_details') ?? []))),
+                                    ->key(fn($get) => md5(json_encode($get('payment_details') ?? []))),
                             ]),
 
-                        // Payment Details Section
-                        Section::make()
-                            ->columns(3)
-                            ->schema([
-                                TextInput::make('ntpn')
-                                    ->label('NTPN')
-                                    ->placeholder('Masukkan NTPN atau klik ikon untuk generate')
-                                    ->suffixAction(
-                                        Action::make('generateNTPN')
-                                            ->icon('heroicon-m-arrow-path')
-                                            ->tooltip('Generate NTPN')
-                                            ->action(function ($set, $get) {
-                                                // Generate NTPN format: NTPN + YYYYMMDD + random 6 digits
-                                                $date = now()->format('Ymd');
-                                                $random = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
-                                                $ntpn = 'NTPN' . $date . $random;
-                                                $set('ntpn', $ntpn);
-                                            })
-                                    )
-                                    ->maxLength(255)
-                                    ->required(),
-
-                                Placeholder::make('calculating_total')
-                                    ->label('Total Pembayaran')
-                                    ->content('Menghitung total pembayaran...')
-                                    ->visible(fn ($get) => !empty($get('selected_invoices')) && $get('total_payment') == 0)
-                                    ->columnSpan(1),
-
-                                TextInput::make('total_payment')
-                                    ->label('Total Pembayaran')
-                                    ->required()
-                                    ->indonesianMoney()
-                                    ->reactive()
-                                    ->readOnly() // Make it read-only since it's calculated automatically
-                                    ->default(0)
-                                    ->visible(fn ($get) => $get('total_payment') > 0)
-                                    ->afterStateUpdated(function ($set, $get) {
-                                        $selectedInvoices = $get('selected_invoices') ?? [];
-
-                                        // Handle mixed data structure: objects from payment_details + strings
-                                        $invoiceIds = [];
-                                        if (is_array($selectedInvoices)) {
-                                            foreach ($selectedInvoices as $item) {
-                                                if (is_numeric($item)) {
-                                                    $invoiceIds[] = (int) $item;
-                                                } elseif (is_string($item)) {
-                                                    $invoiceIds[] = (int) $item;
-                                                } elseif (is_array($item) && isset($item['invoice_id'])) {
-                                                    $invoiceIds[] = (int) $item['invoice_id'];
-                                                } elseif (is_object($item) && isset($item->invoice_id)) {
-                                                    $invoiceIds[] = (int) $item->invoice_id;
-                                                }
-                                            }
-                                            $invoiceIds = array_unique($invoiceIds);
-                                        }
-
-                                        if (empty($invoiceIds)) {
-                                            $set('total_payment', 0);
-                                            $set('payment_details', []);
-                                            return;
-                                        }
-
-                                        try {
-                                            $invoices = Invoice::whereIn('id', $invoiceIds)
-                                                ->with('accountPayable')
-                                                ->get();
-
-                                            $total = $invoices->sum(function ($invoice) {
-                                                return $invoice->accountPayable->remaining ?? $invoice->total;
-                                            });
-
-                                            $set('total_payment', $total);
-
-                                            // Set payment details for each selected invoice
-                                            $paymentDetails = $invoices->map(function ($invoice) {
-                                                return [
-                                                    'invoice_id' => $invoice->id,
-                                                    'invoice_number' => $invoice->invoice_number,
-                                                    'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                    'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                                                ];
-                                            })->toArray();
-
-                                            $set('payment_details', $paymentDetails);
-                                        } catch (\Exception $e) {
-                                            $set('total_payment', 0);
-                                            $set('payment_details', []);
-                                        }
-                                    })
-                                    ->extraAttributes([
-                                        'class' => 'auto-calculated-field',
-                                        'data-field' => 'total_payment'
-                                    ])
-                                    ->helperText('Total ini dihitung otomatis berdasarkan invoice yang dipilih'),
-
-                                Select::make('coa_id')
-                                    ->label('COA')
-                                    ->options(function ($get) {
-                                        $paymentMethod = $get('payment_method');
-
-                                        try {
-                                            $coas = match($paymentMethod) {
-                                                'Cash' => ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%kas%')
-                                                          ->orWhere('name', 'LIKE', '%tunai%');
-                                                    })
-                                                    ->get(),
-                                                'Bank Transfer' => ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%bank%')
-                                                          ->orWhere('name', 'LIKE', '%rekening%');
-                                                    })
-                                                    ->get(),
-                                                'Credit' => ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where('name', 'LIKE', '%piutang%')
-                                                    ->get(),
-                                                'Deposit' => ChartOfAccount::where('type', 'asset')
-                                                    ->where('name', 'LIKE', '%deposit%')
-                                                    ->get(),
-                                                default => ChartOfAccount::all()
-                                            };
-
-                                            $options = [];
-                                            foreach ($coas as $coa) {
-                                                $options[$coa->id] = "({$coa->code}) {$coa->name}";
-                                            }
-
-                                            return $options;
-                                        } catch (\Exception $e) {
-                                            return [];
-                                        }
-                                    })
-                                    ->preload()
-                                    ->searchable()
-                                    ->reactive()
-                                    ->extraAttributes([
-                                        'id' => 'main-coa-field'
-                                    ])
-                                    ->helperText('COA akan otomatis ter-select berdasarkan metode pembayaran, namun masih bisa diubah secara manual')
-                                    ->validationMessages([
-                                        'required' => 'COA belum dipilih'
-                                    ])
-                                    ->required(),
-                            ]),
-
-                        // Notes and Payment Method Section
+                            // Notes and Payment Method Section
                         Section::make()
                             ->columns(2)
                             ->schema([
@@ -569,7 +499,7 @@ class VendorPaymentResource extends Resource
                                                 $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
                                                     ->where(function ($q) {
                                                         $q->where('name', 'LIKE', '%kas%')
-                                                          ->orWhere('name', 'LIKE', '%tunai%');
+                                                            ->orWhere('name', 'LIKE', '%tunai%');
                                                     })
                                                     ->first();
                                                 break;
@@ -577,7 +507,7 @@ class VendorPaymentResource extends Resource
                                                 $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
                                                     ->where(function ($q) {
                                                         $q->where('name', 'LIKE', '%bank%')
-                                                          ->orWhere('name', 'LIKE', '%rekening%');
+                                                            ->orWhere('name', 'LIKE', '%rekening%');
                                                     })
                                                     ->first();
                                                 break;
@@ -608,6 +538,98 @@ class VendorPaymentResource extends Resource
                                     ->columnSpan(1),
                             ]),
 
+                        // Payment Details Section
+                        Section::make()
+                            ->columns(3)
+                            ->schema([
+                                TextInput::make('ntpn')
+                                    ->label('NTPN')
+                                    ->placeholder('Masukkan NTPN (opsional, untuk pembayaran impor)')
+                                    ->nullable()
+                                    ->maxLength(255)
+                                    ->helperText('NTPN hanya diisi untuk pembayaran impor. Input manual, tidak dapat digenerate.'),
+                                Placeholder::make('calculating_total')
+                                    ->label('Total Pembayaran')
+                                    ->content('Menghitung total pembayaran...')
+                                    ->visible(fn($get) => !empty($get('selected_invoices')) && MoneyHelper::safeParse($get('total_payment') ?? 0) === 0.0)
+                                    ->columnSpan(1),
+
+                                TextInput::make('total_payment')
+                                    ->label('Total Pembayaran Source')
+                                    ->required()
+                                    ->indonesianMoney()
+                                    ->reactive()
+                                    ->readOnly() // Make it read-only since it's calculated automatically
+                                    ->default(0)
+                                    ->visible(fn($get) => MoneyHelper::safeParse($get('total_payment') ?? 0) > 0)
+                                    ->extraAttributes([
+                                        'class' => 'auto-calculated-field',
+                                        'data-field' => 'total_payment'
+                                    ])
+                                    ->helperText(function ($get) {
+                                        $invoiceIds = $get('selected_invoices');
+                                        $invoice = is_array($invoiceIds) && !empty($invoiceIds)
+                                            ? Invoice::find((int) reset($invoiceIds))
+                                            : null;
+
+                                        return $invoice
+                                            ? 'Total ini dihitung otomatis: ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $get('total_payment'))
+                                            : 'Total ini dihitung otomatis berdasarkan invoice yang dipilih';
+                                    }),
+
+                                Select::make('coa_id')
+                                    ->label('COA')
+                                    ->options(function ($get) {
+                                        $paymentMethod = $get('payment_method');
+
+                                        try {
+                                            $coas = match ($paymentMethod) {
+                                                'Cash' => ChartOfAccount::where('code', 'LIKE', '11%')
+                                                    ->where(function ($q) {
+                                                        $q->where('name', 'LIKE', '%kas%')
+                                                            ->orWhere('name', 'LIKE', '%tunai%');
+                                                    })
+                                                    ->get(),
+                                                'Bank Transfer' => ChartOfAccount::where('code', 'LIKE', '11%')
+                                                    ->where(function ($q) {
+                                                        $q->where('name', 'LIKE', '%bank%')
+                                                            ->orWhere('name', 'LIKE', '%rekening%');
+                                                    })
+                                                    ->get(),
+                                                'Credit' => ChartOfAccount::where('code', 'LIKE', '11%')
+                                                    ->where('name', 'LIKE', '%piutang%')
+                                                    ->get(),
+                                                'Deposit' => ChartOfAccount::where('type', 'asset')
+                                                    ->where('name', 'LIKE', '%deposit%')
+                                                    ->get(),
+                                                default => ChartOfAccount::all()
+                                            };
+
+                                            $options = [];
+                                            foreach ($coas as $coa) {
+                                                $options[$coa->id] = "({$coa->code}) {$coa->name}";
+                                            }
+
+                                            return $options;
+                                        } catch (\Throwable $exception) {
+                                            return [];
+                                        }
+                                    })
+                                    ->preload()
+                                    ->searchable()
+                                    ->reactive()
+                                    ->extraAttributes([
+                                        'id' => 'main-coa-field'
+                                    ])
+                                    ->helperText('COA akan otomatis ter-select berdasarkan metode pembayaran, namun masih bisa diubah secara manual')
+                                    ->validationMessages([
+                                        'required' => 'COA belum dipilih'
+                                    ])
+                                    ->required(),
+                            ]),
+
+                        
+
                         Section::make('Pajak Impor (Opsional)')
                             ->description('Isi nilai pajak impor ketika pembayaran ini mencakup PPN Impor, PPh 22, atau Bea Masuk. Nilai akan dijurnal saat pembayaran Kas/Bank.')
                             ->columns(2)
@@ -620,25 +642,22 @@ class VendorPaymentResource extends Resource
                                 TextInput::make('ppn_import_amount')
                                     ->label('PPN Impor')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0)
-                                    ->disabled(fn ($get) => !$get('is_import_payment'))
+                                    ->disabled(fn($get) => !$get('is_import_payment'))
                                     ->dehydrated()
                                     ->helperText('Masukkan nilai PPN Masukan impor yang akan diakui saat pembayaran'),
                                 TextInput::make('pph22_amount')
                                     ->label('PPh 22 Impor')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0)
-                                    ->disabled(fn ($get) => !$get('is_import_payment'))
+                                    ->disabled(fn($get) => !$get('is_import_payment'))
                                     ->dehydrated()
                                     ->helperText('Opsional: Pajak PPh 22 yang dibayarkan saat impor'),
                                 TextInput::make('bea_masuk_amount')
                                     ->label('Bea Masuk')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0)
-                                    ->disabled(fn ($get) => !$get('is_import_payment'))
+                                    ->disabled(fn($get) => !$get('is_import_payment'))
                                     ->dehydrated()
                                     ->helperText('Opsional: biaya Bea Masuk yang dibayarkan di bea cukai'),
                             ]),
@@ -661,8 +680,116 @@ class VendorPaymentResource extends Resource
             ]);
     }
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['supplier', 'vendorPaymentDetail.invoice']);
+    }
+
+    private static function formatMoneyState($value): string
+    {
+        return number_format((float) MoneyHelper::safeParse($value ?? 0), 2, ',', '.');
+    }
+
+    protected static function formatVendorPaymentTotal(?VendorPayment $payment, mixed $amount): string
+    {
+        $invoice = null;
+        $selectedInvoices = $payment?->selected_invoices;
+        $invoiceIds = is_string($selectedInvoices) ? json_decode($selectedInvoices, true) : $selectedInvoices;
+
+        if (is_array($invoiceIds) && !empty($invoiceIds)) {
+            $invoice = Invoice::find((int) reset($invoiceIds));
+        }
+
+        if (! $invoice && $payment?->relationLoaded('vendorPaymentDetail')) {
+            $invoice = $payment->vendorPaymentDetail->first()?->invoice;
+        }
+
+        $sourceAmount = $payment?->total_payment ?? $amount;
+
+        return $invoice
+            ? PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $sourceAmount)
+            : MoneyHelper::rupiah($amount);
+    }
+
+    public static function calculateSelectedInvoiceTotal($invoices): float
+    {
+        return self::buildInvoicePaymentSnapshot($invoices)->sum('remaining_amount');
+    }
+
+    public static function resolveInvoiceRemainingAmount(Invoice $invoice): float
+    {
+        $accountPayable = $invoice->accountPayable;
+
+        if ($invoice->relationLoaded('accountPayable') && $accountPayable?->getKey()) {
+            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining_original ?? $accountPayable->remaining ?? 0));
+        }
+
+        if ($accountPayable?->getKey()) {
+            return max(0, (float) MoneyHelper::safeParse($accountPayable->remaining_original ?? $accountPayable->remaining ?? 0));
+        }
+
+        $paidTotal = (float) VendorPaymentDetail::query()
+            ->where('invoice_id', $invoice->id)
+            ->selectRaw('COALESCE(SUM(amount + COALESCE(adjustment_amount, 0)), 0) as paid_total')
+            ->value('paid_total');
+
+        return max(0, (float) MoneyHelper::safeParse($invoice->total ?? 0) - $paidTotal);
+    }
+
+    private static function buildInvoicePaymentSnapshot($invoices)
+    {
+        $invoiceCollection = collect($invoices)->values();
+
+        if ($invoiceCollection->isEmpty()) {
+            return collect();
+        }
+
+        $invoiceIds = $invoiceCollection->pluck('id')->filter()->values();
+        $fallbackPaidTotals = VendorPaymentDetail::query()
+            ->whereIn('invoice_id', $invoiceIds)
+            ->selectRaw('invoice_id, COALESCE(SUM(amount + COALESCE(adjustment_amount, 0)), 0) as paid_total')
+            ->groupBy('invoice_id')
+            ->pluck('paid_total', 'invoice_id');
+
+        return $invoiceCollection->map(function ($invoice) use ($fallbackPaidTotals) {
+            $totalAmount = (float) MoneyHelper::safeParse($invoice->total ?? 0);
+            $accountPayable = $invoice->accountPayable;
+            $remainingAmount = $accountPayable?->getKey()
+                ? max(0, (float) MoneyHelper::safeParse($accountPayable->remaining_original ?? $accountPayable->remaining ?? 0))
+                : max(0, $totalAmount - (float) ($fallbackPaidTotals[$invoice->id] ?? 0));
+
+            return [
+                'invoice' => $invoice,
+                'total_amount' => $totalAmount,
+                'remaining_amount' => $remainingAmount,
+            ];
+        });
+    }
+
+    private static function buildPaymentDetails($invoices): array
+    {
+        return self::buildInvoicePaymentSnapshot($invoices)->map(function ($snapshot) {
+            /** @var Invoice $invoice */
+            $invoice = $snapshot['invoice'];
+            $remainingAmount = $snapshot['remaining_amount'];
+
+            return [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                'total_invoice' => self::formatMoneyState($snapshot['total_amount']),
+                'remaining_amount' => self::formatMoneyState($remainingAmount),
+                'payment_amount' => self::formatMoneyState($remainingAmount),
+                'total_invoice_display' => PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $snapshot['total_amount']),
+                'remaining_amount_display' => PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $remainingAmount),
+            ];
+        })->toArray();
+    }
+
     public static function mutateFormDataBeforeFill(array $data): array
     {
+
         // For edit mode, set payment_details based on selected_invoices
         if (!empty($data['selected_invoices'])) {
             try {
@@ -684,21 +811,20 @@ class VendorPaymentResource extends Resource
                         ->with('accountPayable')
                         ->get();
 
-                    $paymentDetails = $invoices->map(function ($invoice) {
-                        return [
-                            'invoice_id' => $invoice->id,
-                            'invoice_number' => $invoice->invoice_number,
-                            'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                            'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
-                        ];
-                    })->toArray();
-
-                    $data['payment_details'] = $paymentDetails;
+                    $data['payment_details'] = self::buildPaymentDetails($invoices);
                 } else {
                     $data['payment_details'] = [];
                 }
-            } catch (\Exception $e) {
-                // If there's an error, just continue without payment_details
+            } catch (\Throwable $exception) {
+                Log::warning('VendorPaymentResource: gagal mengisi detail pembayaran', [
+                    'vendor_payment_id' => $data['id'] ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+                ProcurementFailureNotifier::warning(
+                    'Detail Pembayaran Belum Lengkap',
+                    $exception,
+                    'Detail pembayaran vendor belum berhasil dimuat sepenuhnya. Silakan refresh halaman atau periksa invoice yang terkait.'
+                );
                 $data['payment_details'] = [];
                 $data['selected_invoices'] = [];
             }
@@ -716,24 +842,29 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('supplier')
                     ->label('Supplier')
                     ->formatStateUsing(function ($state) {
-                        return "({$state->code}) {$state->name}";
+                        return "({$state->code}) {$state->perusahaan}";
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         $query->whereHas('supplier', function ($query) use ($search) {
                             $query->where('code', 'LIKE', '%' . $search . '%')
-                                ->orWhere('name', 'LIKE', '%' . $search . '%');
+                                ->orWhere('perusahaan', 'LIKE', '%' . $search . '%');
                         });
                     }),
 
-                TextColumn::make('selected_invoices')
+                TextColumn::make('invoice_summary')
                     ->label('Invoices')
                     ->getStateUsing(function ($record) {
                         // Ensure we get the casted array value
                         $selectedInvoices = $record->selected_invoices;
 
                         if (!$selectedInvoices || empty($selectedInvoices)) {
-                            // Fallback to single invoice for backward compatibility
-                            return $record->invoice ? $record->invoice->invoice_number : '-';
+                            $invoiceNumbers = $record->vendorPaymentDetail
+                                ->map(fn ($detail) => $detail->invoice?->invoice_number)
+                                ->filter()
+                                ->values()
+                                ->all();
+
+                            return !empty($invoiceNumbers) ? implode(', ', $invoiceNumbers) : '-';
                         }
 
                         // Handle both JSON string and array formats
@@ -743,10 +874,23 @@ class VendorPaymentResource extends Resource
                         }
 
                         try {
-                            $invoices = Invoice::whereIn('id', $invoiceIds)->pluck('invoice_number')->toArray();
-                            return $invoices ? implode(', ', $invoices) : '-';
-                        } catch (\Exception $e) {
-                            return 'ERROR: ' . $e->getMessage();
+                            // Static cache to avoid N+1 when rendering multiple rows
+                            static $invoiceNumberCache = [];
+                            $missingIds = array_values(array_diff($invoiceIds, array_keys($invoiceNumberCache)));
+                            if (!empty($missingIds)) {
+                                $invoiceNumberCache += Invoice::whereIn('id', $missingIds)
+                                    ->pluck('invoice_number', 'id')
+                                    ->toArray();
+                            }
+                            $numbers = array_filter(array_map(fn ($id) => $invoiceNumberCache[$id] ?? null, $invoiceIds));
+                            return $numbers ? implode(', ', $numbers) : '-';
+                        } catch (\Throwable $exception) {
+                            Log::warning('VendorPaymentResource invoice summary rendering failed', [
+                                'vendor_payment_id' => $record->id,
+                                'error' => $exception->getMessage(),
+                            ]);
+
+                            return 'Data invoice tidak tersedia';
                         }
                     }),
 
@@ -761,14 +905,14 @@ class VendorPaymentResource extends Resource
                     ->placeholder('-'),
 
                 TextColumn::make('total_payment')
-                    ->label('Total Pembayaran')
-                    ->rupiah()
+                    ->label('Total Pembayaran (Rp / Source)')
+                    ->formatStateUsing(fn ($state, VendorPayment $record) => self::formatVendorPaymentTotal($record, $state))
                     ->sortable(),
 
                 TextColumn::make('payment_method')
                     ->label('Metode Pembayaran')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'Cash' => 'success',
                         'Bank Transfer' => 'info',
                         'bank_transfer' => 'info',
@@ -780,8 +924,11 @@ class VendorPaymentResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn ($state) => VendorPayment::STATUS_LABELS[$state] ?? $state)
+                    ->color(fn(string $state): string => match ($state) {
                         'Draft' => 'gray',
+                        'Partial' => 'warning',
+                        'Paid' => 'success',
                         'Approved' => 'success',
                         'Rejected' => 'danger',
                         default => 'gray',
@@ -809,11 +956,7 @@ class VendorPaymentResource extends Resource
                     ]),
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'Draft' => 'Draft',
-                        'Partial' => 'Partial',
-                        'Paid' => 'Paid',
-                    ]),
+                    ->options(VendorPayment::STATUS_LABELS),
             ])
             ->actions([
                 ActionGroup::make([
@@ -823,7 +966,7 @@ class VendorPaymentResource extends Resource
                         ->label('Journal Entries')
                         ->icon('heroicon-o-document-text')
                         ->color('info')
-                        ->url(fn ($record) => route('filament.admin.resources.journal-entries.index', [
+                        ->url(fn($record) => route('filament.admin.resources.journal-entries.index', [
                             'tableFilters[source_type][value]' => 'App\Models\VendorPayment',
                             'tableFilters[source_id][value]' => $record->id
                         ]))
@@ -841,21 +984,21 @@ class VendorPaymentResource extends Resource
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Vendor Payment (Pembayaran Vendor/Supplier)</summary>' .
                     '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Vendor Payment adalah record pembayaran kepada vendor/supplier untuk melunasi invoice pembelian yang telah diterima.</li>' .
-                            '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Supplier</em> (vendor penerima pembayaran), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
-                            '<li><strong>Multiple Invoices:</strong> Satu vendor payment dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
-                            '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
-                            '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Supplier Match</em> - invoice harus milik supplier yang sama.</li>' .
-                            '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Invoice</em> (pelunasan), <em>Account Payable</em> (pengurangan hutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (pengurangan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail payment), <em>Edit</em> (ubah payment), <em>Delete</em> (hapus payment), <em>Print Payment</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
-                            '<li><strong>Permissions:</strong> <em>view any vendor payment</em>, <em>create vendor payment</em>, <em>update vendor payment</em>, <em>delete vendor payment</em>, <em>restore vendor payment</em>, <em>force-delete vendor payment</em>.</li>' .
-                            '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Account Payable dan credit Cash/Bank Account. Overpayment akan dicatat sebagai vendor deposit.</li>' .
-                            '<li><strong>Reporting:</strong> Menyediakan data untuk accounts payable aging, cash disbursement journal, dan vendor payment history tracking.</li>' .
-                        '</ul>' .
+                    '<ul class="list-disc pl-5">' .
+                    '<li><strong>Apa ini:</strong> Vendor Payment adalah record pembayaran kepada vendor/supplier untuk melunasi invoice pembelian yang telah diterima.</li>' .
+                    '<li><strong>Metode Pembayaran:</strong> <em>Cash</em> (tunai), <em>Bank Transfer</em> (transfer bank), <em>Check</em> (cek), <em>Giro</em> (bilyet giro), atau <em>Other</em> (metode lainnya).</li>' .
+                    '<li><strong>Komponen Utama:</strong> <em>Supplier</em> (vendor penerima pembayaran), <em>Invoice(s)</em> (invoice yang dibayar - bisa multiple), <em>Payment Date</em> (tanggal pembayaran), <em>Total Payment</em> (total nominal), <em>Payment Method</em> (metode pembayaran).</li>' .
+                    '<li><strong>Multiple Invoices:</strong> Satu vendor payment dapat digunakan untuk membayar beberapa invoice sekaligus. Sistem akan otomatis mengalokasikan pembayaran ke masing-masing invoice.</li>' .
+                    '<li><strong>Payment Allocation:</strong> Pembayaran dialokasikan ke invoice berdasarkan urutan tanggal invoice (FIFO - First In First Out) atau dapat diatur manual per item invoice.</li>' .
+                    '<li><strong>Validasi:</strong> <em>Invoice Validation</em> - memastikan invoice masih outstanding. <em>Amount Check</em> - total payment tidak melebihi total outstanding invoice. <em>Supplier Match</em> - invoice harus milik supplier yang sama.</li>' .
+                    '<li><strong>Integration:</strong> Terintegrasi dengan <em>Purchase Invoice</em> (pelunasan), <em>Account Payable</em> (pengurangan hutang), <em>Journal Entry</em> (otomatis buat jurnal), <em>Cash/Bank Account</em> (pengurangan saldo), dan <em>Deposit</em> (untuk overpayment).</li>' .
+                    '<li><strong>Actions:</strong> <em>View</em> (lihat detail payment), <em>Edit</em> (ubah payment), <em>Delete</em> (hapus payment), <em>Print Payment</em> (cetak bukti pembayaran), <em>Generate Journal</em> (buat jurnal entry).</li>' .
+                    '<li><strong>Permissions:</strong> <em>view any vendor payment</em>, <em>create vendor payment</em>, <em>update vendor payment</em>, <em>delete vendor payment</em>, <em>restore vendor payment</em>, <em>force-delete vendor payment</em>.</li>' .
+                    '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Account Payable dan credit Cash/Bank Account. Overpayment akan dicatat sebagai vendor deposit.</li>' .
+                    '<li><strong>Reporting:</strong> Menyediakan data untuk accounts payable aging, cash disbursement journal, dan vendor payment history tracking.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                    '</details>'
             ));
     }
 

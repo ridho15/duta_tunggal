@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\Customer;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CreditValidationService
 {
@@ -39,6 +41,10 @@ class CreditValidationService
         return $result;
     }
 
+    /**
+     * Check credit limit atomically using a row-level lock to prevent race conditions
+     * where two concurrent SO submissions both pass the credit limit check.
+     */
     public function checkCreditLimit(Customer $customer, float $orderAmount): array
     {
         if ($customer->kredit_limit <= 0) {
@@ -48,26 +54,36 @@ class CreditValidationService
             ];
         }
 
-        $currentCreditUsage = $this->getCurrentCreditUsage($customer);
-        $totalAfterOrder = $currentCreditUsage + $orderAmount;
+        // Lock the customer row for the duration of this check so that concurrent
+        // requests cannot both read the same outstanding balance before either commits.
+        return DB::transaction(function () use ($customer, $orderAmount) {
+            // Re-fetch inside the transaction with a write lock.
+            $lockedCustomer = Customer::withoutGlobalScopes()
+                ->where('id', $customer->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($totalAfterOrder > $customer->kredit_limit) {
+            $currentCreditUsage = $this->getCurrentCreditUsage($lockedCustomer);
+            $totalAfterOrder = $currentCreditUsage + $orderAmount;
+
+            if ($totalAfterOrder > $lockedCustomer->kredit_limit) {
+                return [
+                    'is_valid' => false,
+                    'message' => sprintf(
+                        'Kredit limit tidak mencukupi. Limit: Rp %s, Terpakai: Rp %s, Order: Rp %s, Total akan menjadi: Rp %s',
+                        number_format($lockedCustomer->kredit_limit, 0, ',', '.'),
+                        number_format($currentCreditUsage, 0, ',', '.'),
+                        number_format($orderAmount, 0, ',', '.'),
+                        number_format($totalAfterOrder, 0, ',', '.')
+                    )
+                ];
+            }
+
             return [
-                'is_valid' => false,
-                'message' => sprintf(
-                    'Kredit limit tidak mencukupi. Limit: Rp %s, Terpakai: Rp %s, Order: Rp %s, Total akan menjadi: Rp %s',
-                    number_format($customer->kredit_limit, 0, ',', '.'),
-                    number_format($currentCreditUsage, 0, ',', '.'),
-                    number_format($orderAmount, 0, ',', '.'),
-                    number_format($totalAfterOrder, 0, ',', '.')
-                )
+                'is_valid' => true,
+                'message' => 'Kredit limit mencukupi'
             ];
-        }
-
-        return [
-            'is_valid' => true,
-            'message' => 'Kredit limit mencukupi'
-        ];
+        });
     }
 
     public function checkOverdueCredits(Customer $customer): array
@@ -100,7 +116,7 @@ class CreditValidationService
     public function getCurrentCreditUsage(Customer $customer): float
     {
         return AccountReceivable::where('customer_id', $customer->id)
-            ->where('status', 'Belum Lunas')
+            ->where('status', PaymentStatus::UNPAID->value)
             ->sum('remaining') ?? 0;
     }
 

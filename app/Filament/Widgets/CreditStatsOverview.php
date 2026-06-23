@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\PaymentStatus;
 use App\Helpers\MoneyHelper;
 use App\Models\Customer;
 use App\Models\AccountReceivable;
@@ -46,7 +47,7 @@ class CreditStatsOverview extends BaseWidget
             ->count();
             
         // Total outstanding receivables
-        $totalOutstanding = AccountReceivable::where('status', 'Belum Lunas')
+        $totalOutstanding = AccountReceivable::where('status', PaymentStatus::UNPAID->value)
             ->sum('remaining');
 
         return [

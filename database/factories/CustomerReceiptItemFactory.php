@@ -14,11 +14,14 @@ class CustomerReceiptItemFactory extends Factory
 
     public function definition(): array
     {
+        $amount = $this->faker->randomFloat(2, 10000, 1000000);
+
         return [
             'customer_receipt_id' => CustomerReceipt::factory(),
             'invoice_id' => Invoice::factory(),
+            'exchange_rate' => 1,
             'method' => $this->faker->randomElement(['cash', 'bank_transfer', 'cheque', 'deposit', 'credit_card']),
-            'amount' => number_format($this->faker->randomFloat(2, 10000, 1000000), 2, '.', ''),
+            'amount' => number_format($amount, 2, '.', ''),
             'coa_id' => ChartOfAccount::factory(),
             'payment_date' => $this->faker->date(),
             'selected_invoices' => null,

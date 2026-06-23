@@ -43,12 +43,14 @@ class SalesReportPageTest extends TestCase
 
         SaleOrder::factory()->create([
             'customer_id' => $customer1->id,
+            'so_number' => 'SO-FILTER-A',
             'total_amount' => 1000000,
-            'created_at' => now()->subDays(10),
+            'created_at' => now()->subDay(),
         ]);
 
         SaleOrder::factory()->create([
             'customer_id' => $customer2->id,
+            'so_number' => 'SO-FILTER-B',
             'total_amount' => 2000000,
             'created_at' => now(),
         ]);
@@ -58,14 +60,16 @@ class SalesReportPageTest extends TestCase
         // Test filter by customer
         Livewire::test(SalesReportPage::class)
             ->set('customer_id', $customer1->id)
-            ->assertSee('Customer A')
-            ->assertDontSee('Customer B');
+            ->assertSee('SO-FILTER-A')
+            ->assertDontSee('SO-FILTER-B');
     }
 
     private function createUserWithRole($role)
     {
         $user = \App\Models\User::factory()->create();
         $user->assignRole($role);
+        $user->manage_type = ['all'];
+        $user->save();
         return $user;
     }
 }

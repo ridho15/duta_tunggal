@@ -3,12 +3,17 @@
 namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 
 use App\Filament\Resources\WarehouseConfirmationResource;
+use App\Models\DeliveryOrder;
+use App\Models\MaterialIssue;
+use App\Models\ManufacturingOrder;
+use App\Models\SaleOrder;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
+use Filament\Forms\Components\Textarea;
 use Illuminate\Support\Facades\Auth;
 
 class ViewWarehouseConfirmation extends ViewRecord
@@ -19,33 +24,46 @@ class ViewWarehouseConfirmation extends ViewRecord
     {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->label('Edit Confirmation'),
-            Actions\Action::make('confirm')
-                ->label('Konfirmasi Gudang')
-                ->icon('heroicon-o-check-badge')
+            Actions\Action::make('approve_wc')
+                ->label('Approve')
+                ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->requiresConfirmation()
-                ->modalHeading('Konfirmasi Gudang')
-                ->modalDescription('This will confirm the warehouse confirmation and update the sales order status.')
+                ->modalHeading('Approve Konfirmasi Gudang')
+                ->modalDescription('Approve konfirmasi ini dan update status Delivery Order.')
                 ->action(function () {
-                    $record = $this->record;
-                    // Update warehouse confirmation status
-                    $record->update([
-                        'status' => 'confirmed',
+                    $this->record->update([
+                        'status'       => 'confirmed',
+                        'rejection_reason' => null,
                         'confirmed_by' => Auth::id(),
                         'confirmed_at' => now(),
                     ]);
-
-                    // Update sales order status if needed
-                    if ($record->saleOrder) {
-                        $record->saleOrder->update([
-                            'status' => 'confirmed',
-                            'warehouse_confirmed_at' => now(),
-                        ]);
-                    }
-
-                    $this->redirect($this->getResource()::getUrl('view', ['record' => $record]));
+                    $this->record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
+                    $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
                 })
-                ->visible(fn() => strtolower($this->record->status) === 'request'),
+                ->visible(fn () => strtolower($this->record->status) === 'request'),
+
+            Actions\Action::make('reject_wc')
+                ->label('Tolak')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->form([
+                    Textarea::make('rejection_reason')
+                        ->label('Alasan Penolakan')
+                        ->required()
+                        ->rows(3),
+                ])
+                ->action(function (array $data) {
+                    $this->record->update([
+                        'status'           => 'rejected',
+                        'rejection_reason' => $data['rejection_reason'],
+                        'confirmed_by'     => Auth::id(),
+                        'confirmed_at'     => now(),
+                    ]);
+                    $this->record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
+                    $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+                })
+                ->visible(fn () => strtolower($this->record->status) === 'request'),
         ];
     }
 
@@ -55,12 +73,33 @@ class ViewWarehouseConfirmation extends ViewRecord
             ->schema([
                 Section::make('Warehouse Confirmation Details')
                     ->schema([
+                        TextEntry::make('source_label')
+                            ->label('Dokumen Sumber')
+                            ->getStateUsing(fn ($record) => $record->source_label),
+
+                        TextEntry::make('primary_item_source_label')
+                            ->label('Source Item')
+                            ->getStateUsing(fn ($record) => $record->primary_item_source_label),
+
+                        TextEntry::make('primary_item_product_label')
+                            ->label('Produk Request')
+                            ->getStateUsing(fn ($record) => $record->primary_item_product_label),
+
+                        TextEntry::make('primary_item_warehouse_label')
+                            ->label('Gudang Request')
+                            ->getStateUsing(fn ($record) => $record->primary_item_warehouse_label),
+
+                        TextEntry::make('request_qty_summary')
+                            ->label('Qty Request')
+                            ->getStateUsing(fn ($record) => $record->request_qty_summary),
+
                         TextEntry::make('confirmation_type')
                             ->label('Confirmation Type')
                             ->formatStateUsing(function ($state) {
                                 return match ($state) {
                                     'sales_order' => 'Sales Order Confirmation',
                                     'manufacturing_order' => 'Manufacturing Order Confirmation',
+                                    'material_issue' => 'Material Issue Confirmation',
                                     default => ucfirst($state),
                                 };
                             })
@@ -68,6 +107,7 @@ class ViewWarehouseConfirmation extends ViewRecord
                             ->color(fn(string $state): string => match ($state) {
                                 'sales_order' => 'success',
                                 'manufacturing_order' => 'info',
+                                'material_issue' => 'danger',
                                 default => 'gray',
                             }),
 
@@ -100,113 +140,124 @@ class ViewWarehouseConfirmation extends ViewRecord
                     ])
                     ->columns(2),
 
-                Infolists\Components\Section::make('Sales Order Information')
+                // I2: DO information section (visible when WC is linked to a DO)
+                Infolists\Components\Section::make('Informasi Delivery Order')
                     ->schema([
-                        Infolists\Components\TextEntry::make('saleOrder.so_number')
-                            ->label('SO Number'),
-
-                        Infolists\Components\TextEntry::make('saleOrder.customer.name')
-                            ->label('Customer'),
-
-                        Infolists\Components\TextEntry::make('saleOrder.order_date')
-                            ->label('Order Date')
-                            ->date(),
-
-                        Infolists\Components\TextEntry::make('saleOrder.delivery_date')
-                            ->label('Delivery Date')
-                            ->date()
-                            ->placeholder('Not set')
-                            ->visible(fn($record) => $record->sale_order_id !== null),
-
-                        Infolists\Components\TextEntry::make('saleOrder.total_amount')
-                            ->label('Total Amount')
-                            ->rupiah(),
-
-                        Infolists\Components\TextEntry::make('saleOrder.status')
-                            ->label('SO Status')
-                            ->badge()
-                            ->color(fn(string $state): string => match (strtolower($state)) {
-                                'confirmed' => 'success',
-                                'partial_confirmed' => 'warning',
-                                'rejected' => 'danger',
-                                'request' => 'info',
-                                'approved' => 'success',
-                                'draft' => 'gray',
-                                'cancelled' => 'danger',
-                                default => 'gray',
+                        Infolists\Components\TextEntry::make('do_number_display')
+                            ->label('Nomor DO')
+                            ->getStateUsing(fn ($record) => $record->getLinkedDeliveryOrder()?->do_number ?? '-'),
+                        Infolists\Components\TextEntry::make('do_delivery_date_display')
+                            ->label('Tanggal Pengiriman')
+                            ->getStateUsing(fn ($record) => $record->getLinkedDeliveryOrder()?->delivery_date
+                                ? \Carbon\Carbon::parse($record->getLinkedDeliveryOrder()->delivery_date)->format('d/m/Y')
+                                : '-'),
+                        Infolists\Components\TextEntry::make('delivery_order_customer')
+                            ->label('Customer')
+                            ->getStateUsing(function ($record) {
+                                $do = $record->getLinkedDeliveryOrder();
+                                return $do?->salesOrders?->first()?->customer?->name
+                                    ?? $record->getLinkedSaleOrder()?->customer?->name
+                                    ?? '-';
                             }),
+                        Infolists\Components\TextEntry::make('delivery_order_total_items')
+                            ->label('Ringkasan WC Ini')
+                            ->getStateUsing(function ($record) {
+                                $count = $record->warehouseConfirmationItems->count();
+                                $qty = (float) $record->warehouseConfirmationItems->sum('requested_qty');
+                                return "{$count} baris / qty " . (string) $qty;
+                            }),
+                        Infolists\Components\TextEntry::make('do_status_display')
+                            ->label('Status DO')
+                            ->getStateUsing(fn ($record) => $record->getLinkedDeliveryOrder()?->status ?? '-')
+                            ->badge()
+                            ->color(fn ($state) => match (strtolower((string) $state)) {
+                                'approved'      => 'success',
+                                'rejected', 'reject' => 'danger',
+                                'request_stock' => 'warning',
+                                'draft'         => 'gray',
+                                default         => 'info',
+                            }),
+                        Infolists\Components\TextEntry::make('rejection_reason')
+                            ->label('Alasan Penolakan')
+                            ->placeholder('-')
+                            ->visible(fn ($record) => strtolower($record->status) === 'rejected'),
                     ])
-                    ->columns(3)
-                    ->visible(fn($record) => $record->sale_order_id !== null),
+                    ->columns(2)
+                    ->visible(fn ($record) => $record->confirmable_type === DeliveryOrder::class),
 
                 Infolists\Components\Section::make('Manufacturing Order Information')
                     ->schema([
-                        Infolists\Components\TextEntry::make('manufacturingOrder.mo_number')
-                            ->label('MO Number'),
+                        Infolists\Components\TextEntry::make('mo_number_display')
+                            ->label('MO Number')
+                            ->getStateUsing(fn ($record) => $record->confirmable?->mo_number ?? '-'),
 
-                        Infolists\Components\TextEntry::make('manufacturingOrder.status')
+                        Infolists\Components\TextEntry::make('mo_status_display')
                             ->label('MO Status')
+                            ->getStateUsing(fn ($record) => $record->confirmable?->status ?? '-')
                             ->badge(),
 
-                        Infolists\Components\TextEntry::make('manufacturingOrder.created_at')
+                        Infolists\Components\TextEntry::make('mo_created_at_display')
                             ->label('Created Date')
-                            ->date(),
+                            ->getStateUsing(fn ($record) => $record->confirmable?->created_at
+                                ? \Carbon\Carbon::parse($record->confirmable->created_at)->format('d/m/Y')
+                                : '-'),
                     ])
                     ->columns(3)
-                    ->visible(fn($record) => $record->manufacturing_order_id !== null),
+                    ->visible(fn ($record) => $record->confirmable_type === ManufacturingOrder::class),
 
-                Infolists\Components\Section::make('Sales Order Items')
+                Infolists\Components\Section::make('Informasi Material Issue')
                     ->schema([
-                        Infolists\Components\RepeatableEntry::make('saleOrder.saleOrderItem')
-                            ->label('')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('product')
-                                    ->label('Product')
-                                    ->formatStateUsing(function ($state) {
-                                        return "(" . $state['sku'] . ") " . $state['name'];
-                                    })
-                                    ->columnSpan(2),
+                        Infolists\Components\TextEntry::make('mi_number_display')
+                            ->label('Nomor Material Issue')
+                            ->getStateUsing(fn ($record) => $record->confirmable?->issue_number ?? '-'),
+                        Infolists\Components\TextEntry::make('mi_status_display')
+                            ->label('Status Material Issue')
+                            ->getStateUsing(fn ($record) => $record->confirmable?->status ?? '-')
+                            ->badge(),
+                        Infolists\Components\TextEntry::make('mi_total_items_display')
+                            ->label('Ringkasan WC Ini')
+                            ->getStateUsing(function ($record) {
+                                $count = $record->warehouseConfirmationItems->count();
+                                $qty = (float) $record->warehouseConfirmationItems->sum('requested_qty');
+                                return "{$count} baris / qty " . (string) $qty;
+                            }),
+                        Infolists\Components\TextEntry::make('mi_material_items_display')
+                            ->label('Rincian Bahan')
+                            ->getStateUsing(function ($record) {
+                                if ($record->warehouseConfirmationItems->isEmpty()) {
+                                    return '-';
+                                }
 
-                                Infolists\Components\TextEntry::make('quantity')
-                                    ->label('Quantity')
-                                    ->numeric(),
+                                return $record->warehouseConfirmationItems
+                                    ->map(fn ($item, $index) => sprintf(
+                                        '%d. %s | Request %s | Confirm %s | Status %s',
+                                        $index + 1,
+                                        $item->product_display,
+                                        (string) $item->requested_qty,
+                                        (string) $item->confirmed_qty,
+                                        ucfirst((string) $item->status)
+                                    ))
+                                    ->implode("\n");
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(3)
+                    ->visible(fn ($record) => $record->confirmable_type === MaterialIssue::class),
 
-                                Infolists\Components\TextEntry::make('unit_price')
-                                    ->label('Price')
-                                    ->rupiah(),
-
-                                Infolists\Components\TextEntry::make('total_amount')
-                                    ->label('Total')
-                                    ->rupiah()
-                                    ->state(function ($record) {
-                                        return $record->unit_price * $record->quantity;
-                                    }),
-
-                                Infolists\Components\TextEntry::make('warehouse')
-                                    ->label('Gudang')
-                                    ->formatStateUsing(function ($state) {
-                                        return "(" . $state['kode'] . ") " . $state['name'];
-                                    })
-                                    ->columnSpan(2),
-
-                                Infolists\Components\TextEntry::make('rak.name')
-                                    ->label('Rak'),
-                            ])
-                            ->columns(8),
-                    ]),
-
-                Infolists\Components\Section::make('Warehouse Confirmations')
+                Infolists\Components\Section::make('Rincian Item Konfirmasi')
                     ->schema([
                         // Show warehouse confirmation items
                         Infolists\Components\RepeatableEntry::make('warehouseConfirmationItems')
-                            ->label('Item Konfirmasi Gudang')
+                            ->label('Item Konfirmasi')
                             ->schema([
-                                Infolists\Components\TextEntry::make('saleOrderItem.product')
+                                Infolists\Components\TextEntry::make('product_display')
                                     ->label('Product')
-                                    ->formatStateUsing(function ($state) {
-                                        return "(" . $state['sku'] . ") " . $state['name'];
-                                    })
+                                    ->getStateUsing(fn ($record) => $record->product_display)
                                     ->columnSpan(2),
+
+                                Infolists\Components\TextEntry::make('source_item_display')
+                                    ->label('Source Item')
+                                    ->getStateUsing(fn ($record) => $record->source_item_display),
 
                                 Infolists\Components\TextEntry::make('requested_qty')
                                     ->label('Requested Qty')
@@ -235,45 +286,9 @@ class ViewWarehouseConfirmation extends ViewRecord
                                         'request' => 'info',
                                         default => 'gray',
                                     }),
-
-                                Infolists\Components\Actions::make([
-                                    Infolists\Components\Actions\Action::make('confirm_item')
-                                        ->label('Confirm')
-                                        ->icon('heroicon-o-check-badge')
-                                        ->color('success')
-                                        ->requiresConfirmation()
-                                        ->modalHeading('Confirm Item')
-                                        ->modalDescription('Are you sure you want to confirm this warehouse confirmation item?')
-                                        ->action(function ($record) {
-                                            $record->update([
-                                                'status' => 'confirmed',
-                                                'confirmed_qty' => $record->requested_qty,
-                                                'confirmed_by' => Auth::id(),
-                                                'confirmed_at' => now(),
-                                            ]);
-
-                                            $warehouseConfirmation = $record->warehouseConfirmation;
-
-                                            // Check if all items are confirmed to update main status
-                                            $allConfirmed = $warehouseConfirmation->warehouseConfirmationItems()
-                                                ->where('status', '!=', 'confirmed')
-                                                ->count() === 0;
-
-                                            if ($allConfirmed) {
-                                                $warehouseConfirmation->update([
-                                                    'status' => 'confirmed',
-                                                    'confirmed_by' => Auth::id(),
-                                                    'confirmed_at' => now(),
-                                                ]);
-                                            }
-
-                                            $this->redirect($this->getResource()::getUrl('view', ['record' => $warehouseConfirmation]));
-                                        })
-                                        ->visible(fn($record) => strtolower($record->status) === 'request'),
-                                ]),
                             ])
-                            ->columns(9)
-                            ->visible(fn($record) => $record->warehouseConfirmationItems->count() > 0),
+                                    ->columns(7)
+                                    ->visible(fn($record) => $record->warehouseConfirmationItems->count() > 0),
                     ])
                     ->columns(1),
             ]);
@@ -283,12 +298,9 @@ class ViewWarehouseConfirmation extends ViewRecord
     {
         return parent::getEloquentQuery()
             ->with([
-                'saleOrder.customer',
-                'saleOrder.saleOrderItem.product',
-                'saleOrder.saleOrderItem.warehouse',
-                'saleOrder.saleOrderItem.rak',
-                'manufacturingOrder',
+                'confirmable',
                 'warehouseConfirmationItems.saleOrderItem.product',
+                'warehouseConfirmationItems.materialIssueItem.product',
                 'warehouseConfirmationItems.warehouse',
                 'warehouseConfirmationItems.rak',
                 'user'

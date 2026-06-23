@@ -9,6 +9,9 @@ use App\Services\CreditValidationService;
 use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Quotation;
+use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
@@ -21,7 +24,7 @@ class CreateSaleOrder extends CreateRecord
 
     // protected static string $view = 'filament.components.sale-order.form';
 
-    protected static ?string $title = 'Buat Penjualan';
+    protected static ?string $title = 'Buat Sales Order';
 
     public function mount(int $record = null): void
     {
@@ -39,8 +42,18 @@ class CreateSaleOrder extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data = SaleOrderResource::normalizeFormDataForPersist($data);
+
         // Set created_by to current user
         $data['created_by'] = Auth::id();
+
+        // Enforce branch inheritance from quotation when SO is created from quotation
+        if (!empty($data['quotation_id'])) {
+            $quotation = Quotation::find($data['quotation_id']);
+            if ($quotation && !empty($quotation->cabang_id)) {
+                $data['cabang_id'] = $quotation->cabang_id;
+            }
+        }
         
         // Validate credit limit and overdue credits before creating sale order
         if (isset($data['customer_id']) && isset($data['total_amount'])) {
@@ -48,7 +61,12 @@ class CreateSaleOrder extends CreateRecord
             
             if ($customer) {
                 $creditService = app(CreditValidationService::class);
-                $validation = $creditService->canCustomerMakePurchase($customer, (float)$data['total_amount']);
+                $totalForCredit = CurrencyConversionResolver::convertToIdr(
+                    MoneyHelper::parseHighPrecision(SaleOrderResource::parseCurrencyState($data['total_amount'] ?? 0)),
+                    is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null,
+                    false
+                );
+                $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
                 
                 if (!$validation['can_purchase']) {
                     Notification::make()

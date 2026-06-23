@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\BillOfMaterial;
-use App\Models\Cabang;
 use App\Models\Product;
 use App\Models\UnitOfMeasure;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -14,11 +13,11 @@ class BillOfMaterialFactory extends Factory
 
     public function definition(): array
     {
+        $product = Product::factory()->create();
+
         return [
-            'cabang_id' => function () {
-                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
-            },
-            'product_id' => Product::factory(),
+            'cabang_id' => $product->cabang_id,
+            'product_id' => $product->id,
             'quantity' => $this->faker->randomFloat(2, 1, 100),
             'code' => 'BOM-' . $this->faker->unique()->numberBetween(1000, 9999),
             'nama_bom' => $this->faker->words(3, true),
@@ -28,6 +27,8 @@ class BillOfMaterialFactory extends Factory
             'labor_cost' => $this->faker->randomFloat(2, 1000, 50000),
             'overhead_cost' => $this->faker->randomFloat(2, 500, 10000),
             'total_cost' => 0, // Will be calculated
+            'labor_coa_id' => null,
+            'overhead_coa_id' => null,
         ];
     }
 

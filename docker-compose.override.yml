@@ -1,0 +1,13 @@
+services:
+  app:
+    volumes:
+      - ./:/var/www/html
+      - duta_tunggal_storage:/var/www/html/storage
+      - duta_tunggal_bootstrap_cache:/var/www/html/bootstrap/cache
+      - ./docker/dev/php.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      LOG_LEVEL: debug
+      APP_URL: https://dutatunggal.playgo.id
+      TRUSTED_PROXIES: "*"

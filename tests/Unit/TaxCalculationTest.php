@@ -1,9 +1,11 @@
 <?php
 
 namespace Tests\Unit;
+use PHPUnit\Framework\Attributes\Test;
 
 use App\Http\Controllers\HelperController;
 use App\Services\TaxService;
+use App\Support\TaxTypeHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,7 +20,7 @@ class TaxCalculationTest extends TestCase
 {
     // ─── TaxService::normalizeType ───────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function it_normalizes_eklusif_to_eksklusif(): void
     {
         $this->assertSame('Eksklusif', TaxService::normalizeType('Eklusif'));
@@ -27,14 +29,14 @@ class TaxCalculationTest extends TestCase
         $this->assertSame('Eksklusif', TaxService::normalizeType('eksklusif'));
     }
 
-    /** @test */
+    #[Test]
     public function it_normalizes_inklusif(): void
     {
         $this->assertSame('Inklusif', TaxService::normalizeType('Inklusif'));
         $this->assertSame('Inklusif', TaxService::normalizeType('inklusif'));
     }
 
-    /** @test */
+    #[Test]
     public function it_normalizes_non_pajak(): void
     {
         $this->assertSame('Non Pajak', TaxService::normalizeType('Non Pajak'));
@@ -42,7 +44,7 @@ class TaxCalculationTest extends TestCase
         $this->assertSame('Non Pajak', TaxService::normalizeType('non-pajak'));
     }
 
-    /** @test */
+    #[Test]
     public function null_defaults_to_eksklusif(): void
     {
         // When tipe_pajak is null, TaxService defaults to Eksklusif
@@ -50,9 +52,20 @@ class TaxCalculationTest extends TestCase
         $this->assertSame('Eksklusif', TaxService::normalizeType(''));
     }
 
+    #[Test]
+    public function tax_type_helper_normalizes_inclusive_aliases_without_falling_back_to_eklusif(): void
+    {
+        foreach (['Inklusif', 'inklUsif', 'Inclusive', 'included', 'PPN Included', 'ppn-included'] as $value) {
+            $this->assertSame(TaxTypeHelper::INKLUSIF, TaxTypeHelper::normalize($value));
+        }
+
+        $this->assertSame(TaxTypeHelper::EKLUSIF, TaxTypeHelper::normalize(null));
+        $this->assertSame(TaxTypeHelper::EKLUSIF, TaxTypeHelper::normalize('tax-type-tidak-valid'));
+    }
+
     // ─── TaxService::compute ─────────────────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function non_pajak_returns_same_amount(): void
     {
         $result = TaxService::compute(10000, 12, 'Non Pajak');
@@ -61,7 +74,7 @@ class TaxCalculationTest extends TestCase
         $this->assertSame(10000.0, $result['total']);
     }
 
-    /** @test */
+    #[Test]
     public function eksklusif_adds_tax_on_top(): void
     {
         // unit price 10,000 + 12% PPN = 11,200
@@ -71,14 +84,14 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(11200.0, $result['total'], 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function eklusif_old_spelling_adds_tax_on_top(): void
     {
         $result = TaxService::compute(10000, 12, 'Eklusif');
         $this->assertEqualsWithDelta(11200.0, $result['total'], 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function inklusif_tax_is_extracted_from_price(): void
     {
         // price 11,200 already includes 12% PPN
@@ -90,7 +103,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(11200.0, $result['total'], 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function inklusif_total_does_not_increase(): void
     {
         // For Inklusif, the total should equal the input amount (no extra charge)
@@ -99,7 +112,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta($amount, $result['total'], 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function zero_rate_always_returns_no_tax(): void
     {
         foreach (['Non Pajak', 'Inklusif', 'Eksklusif'] as $type) {
@@ -110,7 +123,7 @@ class TaxCalculationTest extends TestCase
 
     // ─── HelperController::hitungSubtotal ────────────────────────────────────
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_non_pajak(): void
     {
         // qty=10, price=1000, discount=0, tax=0, Non Pajak → 10000
@@ -118,7 +131,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(10000.0, $result, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_eksklusif_adds_tax(): void
     {
         // qty=10, price=1000, discount=0, tax=12%, Eksklusif → 10000 + 1200 = 11200
@@ -126,7 +139,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(11200.0, $result, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_inklusif_no_extra_charge(): void
     {
         // qty=10, price=1000, discount=0, tax=12%, Inklusif → total stays 10000 (tax inside)
@@ -134,7 +147,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(10000.0, $result, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_with_discount_eksklusif(): void
     {
         // qty=10, price=1000, discount=10%, tax=12%, Eksklusif
@@ -143,7 +156,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(10080.0, $result, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_with_discount_inklusif(): void
     {
         // qty=10, price=1000, discount=10%, tax=12%, Inklusif
@@ -152,7 +165,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta(9000.0, $result, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function hitung_subtotal_eklusif_old_spelling(): void
     {
         // Old 'Eklusif' spelling should behave same as 'Eksklusif'
@@ -161,7 +174,7 @@ class TaxCalculationTest extends TestCase
         $this->assertEqualsWithDelta($eksklusif, $eklusif, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function inklusif_ppn_is_less_than_eksklusif_ppn(): void
     {
         // For the same price, Inklusif PPN is smaller than Eksklusif PPN
@@ -171,7 +184,7 @@ class TaxCalculationTest extends TestCase
         $this->assertLessThan($eksklusif['ppn'], $inklusif['ppn']);
     }
 
-    /** @test */
+    #[Test]
     public function non_pajak_item_tax_rate_ignored(): void
     {
         // Even if tax rate is 12, Non Pajak means no PPN

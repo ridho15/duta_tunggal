@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\StockAdjustmentResource\RelationManagers;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Product;
 use App\Models\Rak;
+use App\Filament\Resources\StockAdjustmentResource;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -25,27 +27,48 @@ class StockAdjustmentItemsRelationManager extends RelationManager
         return $form
             ->schema([
                 Select::make('product_id')
-                    ->label('Product')
-                    ->options(Product::pluck('name', 'id'))
+                    ->label('Produk')
+                    ->options(fn () => StockAdjustmentResource::resolveProductOptions())
                     ->required()
                     ->searchable()
                     ->preload()
+                    ->getSearchResultsUsing(fn (string $search) => StockAdjustmentResource::resolveProductOptions($search))
+                    ->getOptionLabelUsing(fn ($value): ?string => StockAdjustmentResource::resolveProductLabel(is_numeric($value) ? (int) $value : null))
                     ->live()
                     ->afterStateUpdated(function ($state, Forms\Set $set) {
                         if ($state) {
                             $product = Product::find($state);
-                            // You can add logic to get current stock here
+                            if ($product) {
+                                $set('unit_cost', $product->cost_price ?? 0);
+                            }
                         }
                     }),
 
                 Select::make('rak_id')
                     ->label('Rak')
-                    ->options(Rak::pluck('name', 'id'))
+                    ->options(function () {
+                        $warehouseId = $this->getOwnerRecord()->warehouse_id ?? null;
+
+                        if (!$warehouseId) {
+                            return [];
+                        }
+
+                        return StockAdjustmentResource::resolveRakOptions($warehouseId);
+                    })
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->getSearchResultsUsing(function (string $search) {
+                        $warehouseId = $this->getOwnerRecord()->warehouse_id ?? null;
+
+                        if (!$warehouseId) {
+                            return [];
+                        }
+
+                        return StockAdjustmentResource::resolveRakOptions($warehouseId, $search);
+                    })
+                    ->getOptionLabelUsing(fn ($value): ?string => StockAdjustmentResource::resolveRakLabel(is_numeric($value) ? (int) $value : null)),
 
                 TextInput::make('current_qty')
-                    ->label('Qty Saat Ini')
                     ->numeric()
                     ->default(0)
                     ->required(),
@@ -65,27 +88,27 @@ class StockAdjustmentItemsRelationManager extends RelationManager
 
                 TextInput::make('difference_qty')
                     ->label('Selisih Qty')
-                    ->numeric()
                     ->disabled()
                     ->dehydrated(),
 
                 TextInput::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->default(0)
-                    ->live()
+                    ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = $state ?? 0;
+                        $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
                         $differenceValue = $differenceQty * $unitCost;
                         $set('difference_value', $differenceValue);
                     }),
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->numeric()
+                    ->prefix('Rp')
                     ->disabled()
-                    ->dehydrated(),
+                    ->dehydrated()
+                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : ''),
 
                 Textarea::make('notes')
                     ->label('Catatan')
@@ -144,15 +167,19 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status === 'draft'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status === 'draft'),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status === 'draft'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => $this->getOwnerRecord()->status === 'draft'),
                 ]),
             ]);
     }

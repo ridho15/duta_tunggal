@@ -16,7 +16,7 @@ class BalanceSheetPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Neraca (Balance Sheet) - Legacy';
 
@@ -73,16 +73,17 @@ class BalanceSheetPage extends Page
         // Default to end of current month
         $this->as_of_date = request()->query('as_of', now()->endOfMonth()->format('Y-m-d'));
         $this->cabang_id = request()->query('cabang_id');
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
         
         // Default comparison to end of previous month
-        $this->comparison_date = now()->subMonth()->endOfMonth()->format('Y-m-d');
+        $this->comparison_date = request()->query('comparison_date', now()->subMonth()->endOfMonth()->format('Y-m-d'));
         
         // Initialize multi-period with current date
-        $this->selected_periods = [$this->as_of_date];
+        $this->selected_periods = (array) request()->query('selected_periods', [$this->as_of_date]);
         
         // Default display options
-        $this->display_level = 'all';
-        $this->show_zero_balance = false;
+        $this->display_level = request()->query('display_level', 'all');
+        $this->show_zero_balance = filter_var(request('show_zero_balance', false), FILTER_VALIDATE_BOOL);
     }
 
     public function generateReport(): void
@@ -97,13 +98,25 @@ class BalanceSheetPage extends Page
             return;
         }
 
-        $this->showPreview = true;
-        $this->dispatch('report-updated');
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getUrl());
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getUrl() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'as_of' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+            'comparison_date' => $this->comparison_date,
+            'display_level' => $this->display_level,
+            'show_zero_balance' => $this->show_zero_balance ? 1 : 0,
+            'selected_periods' => array_filter($this->selected_periods),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getBalanceSheetData(): array
@@ -112,6 +125,24 @@ class BalanceSheetPage extends Page
             'as_of_date' => $this->as_of_date,
             'cabang_id' => $this->cabang_id,
         ]);
+    }
+
+    public function getBalanceAlertData(): ?array
+    {
+        if (!$this->showPreview) {
+            return null;
+        }
+
+        $data = $this->getBalanceSheetData();
+        if ($data['is_balanced']) {
+            return null;
+        }
+
+        return [
+            'title' => 'Neraca Tidak Seimbang',
+            'difference' => (float) $data['difference'],
+            'message' => 'Total aset tidak sama dengan total kewajiban dan ekuitas. Laporan sekarang menampilkan selisih ledger aktual tanpa penyesuaian otomatis laba ditahan.',
+        ];
     }
 
     public function getMultiPeriodData(): array
@@ -301,5 +332,19 @@ class BalanceSheetPage extends Page
     public function getHeading(): string
     {
         return 'Neraca';
+    }
+
+    protected function notifyIfBalanceSheetHasIssues(array $data): void
+    {
+        if ($data['is_balanced']) {
+            return;
+        }
+
+        Notification::make()
+            ->title('Neraca Tidak Seimbang')
+            ->warning()
+            ->persistent()
+            ->body('Selisih neraca saat ini ' . \App\Helpers\MoneyHelper::rupiah(abs((float) $data['difference'])) . '. Periksa jurnal sumber karena laporan tidak lagi memaksa balance lewat laba ditahan.')
+            ->send();
     }
 }

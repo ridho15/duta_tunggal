@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\DeliveryOrder;
 use App\Models\InventoryStock;
@@ -13,8 +14,10 @@ use App\Models\StockReservation;
 use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use App\Services\SalesOrderService;
+use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class StockReservationFlowTest extends TestCase
@@ -27,21 +30,38 @@ class StockReservationFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(ChartOfAccountSeeder::class);
+
         $this->salesOrderService = new SalesOrderService();
         $this->deliveryOrderService = new DeliveryOrderService();
     }
 
-    /** @test */
+    protected function createDeliverableProduct(array $attributes = []): Product
+    {
+        $inventoryCoa = ChartOfAccount::where('code', '1140.01')->first();
+        $goodsDeliveryCoa = ChartOfAccount::where('code', '1140.20')->first()
+            ?? ChartOfAccount::where('code', '1180.10')->first();
+
+        return Product::factory()->create(array_merge([
+            'inventory_coa_id' => $inventoryCoa?->id,
+            'goods_delivery_coa_id' => $goodsDeliveryCoa?->id,
+            'cost_price' => 10000,
+        ], $attributes));
+    }
+
+    #[Test]
     public function it_creates_stock_reservations_when_sale_order_is_confirmed()
     {
         // Create test data
         $customer = Customer::factory()->create();
         $warehouse = Warehouse::factory()->create();
         $category = ProductCategory::factory()->create(['kode' => 'TEST-CAT']);
-        $product = Product::factory()->create(['product_category_id' => $category->id]);
+        $product = $this->createDeliverableProduct(['product_category_id' => $category->id]);
         $inventoryStock = InventoryStock::factory()->create([
             'product_id' => $product->id,
             'warehouse_id' => $warehouse->id,
+            'rak_id' => null,
             'qty_available' => 100,
             'qty_reserved' => 0,
         ]);
@@ -77,21 +97,21 @@ class StockReservationFlowTest extends TestCase
         // Assert inventory qty_reserved is updated
         $inventoryStock->refresh();
         $this->assertEquals(10, $inventoryStock->qty_reserved);
-        $this->assertEquals(100, $inventoryStock->qty_available); // qty_available stays the same
-        $this->assertEquals(90, $inventoryStock->qty_on_hand); // available - reserved
+        $this->assertEquals(90, $inventoryStock->qty_available); // qty_available berkurang saat stok direservasi
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_stock_availability_before_creating_delivery_order()
     {
         // Create test data
         $customer = Customer::factory()->create();
         $warehouse = Warehouse::factory()->create();
         $category = ProductCategory::factory()->create(['kode' => 'TEST-CAT']);
-        $product = Product::factory()->create(['product_category_id' => $category->id]);
+        $product = $this->createDeliverableProduct(['product_category_id' => $category->id]);
         $inventoryStock = InventoryStock::factory()->create([
             'product_id' => $product->id,
             'warehouse_id' => $warehouse->id,
+            'rak_id' => null,
             'qty_available' => 5, // Only 5 available
             'qty_reserved' => 0,
         ]);
@@ -128,17 +148,18 @@ class StockReservationFlowTest extends TestCase
         $this->assertStringContainsString('Insufficient stock', $validation['errors'][0] ?? '');
     }
 
-    /** @test */
+    #[Test]
     public function it_releases_stock_reservations_when_delivery_order_is_completed()
     {
         // Create test data
         $customer = Customer::factory()->create();
         $warehouse = Warehouse::factory()->create();
         $category = ProductCategory::factory()->create(['kode' => 'TEST-CAT']);
-        $product = Product::factory()->create(['product_category_id' => $category->id]);
+        $product = $this->createDeliverableProduct(['product_category_id' => $category->id]);
         $inventoryStock = InventoryStock::factory()->create([
             'product_id' => $product->id,
             'warehouse_id' => $warehouse->id,
+            'rak_id' => null,
             'qty_available' => 100,
             'qty_reserved' => 0, // Start with no reservations
         ]);
@@ -229,17 +250,18 @@ class StockReservationFlowTest extends TestCase
         $this->assertEquals(90, $inventoryStock->qty_available); // 100 - 10 delivered
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_partial_delivery_correctly()
     {
         // Create test data
         $customer = Customer::factory()->create();
         $warehouse = Warehouse::factory()->create();
         $category = ProductCategory::factory()->create(['kode' => 'TEST-CAT']);
-        $product = Product::factory()->create(['product_category_id' => $category->id]);
+        $product = $this->createDeliverableProduct(['product_category_id' => $category->id]);
         $inventoryStock = InventoryStock::factory()->create([
             'product_id' => $product->id,
             'warehouse_id' => $warehouse->id,
+            'rak_id' => null,
             'qty_available' => 100,
             'qty_reserved' => 0, // Start with no reservations
         ]);
@@ -299,10 +321,10 @@ class StockReservationFlowTest extends TestCase
         // Assert inventory qty_reserved is updated
         $inventoryStock->refresh();
         $this->assertEquals(5, $inventoryStock->qty_reserved);
-        $this->assertEquals(95, $inventoryStock->qty_available);
+        $this->assertEquals(85, $inventoryStock->qty_available);
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_double_reservation_of_same_stock()
     {
         // Create test data
@@ -310,10 +332,11 @@ class StockReservationFlowTest extends TestCase
         $customer2 = Customer::factory()->create();
         $warehouse = Warehouse::factory()->create();
         $category = ProductCategory::factory()->create(['kode' => 'TEST-CAT']);
-        $product = Product::factory()->create(['product_category_id' => $category->id]);
+        $product = $this->createDeliverableProduct(['product_category_id' => $category->id]);
         $inventoryStock = InventoryStock::factory()->create([
             'product_id' => $product->id,
             'warehouse_id' => $warehouse->id,
+            'rak_id' => null,
             'qty_available' => 10,
             'qty_reserved' => 0,
         ]);
@@ -351,8 +374,7 @@ class StockReservationFlowTest extends TestCase
 
         $inventoryStock->refresh();
         $this->assertEquals(8, $inventoryStock->qty_reserved);
-        $this->assertEquals(10, $inventoryStock->qty_available); // qty_available stays the same
-        $this->assertEquals(2, $inventoryStock->qty_on_hand); // available - reserved
+        $this->assertEquals(2, $inventoryStock->qty_available); // qty_available berkurang sesuai qty reservasi
 
         // Try to confirm second sale order (should fail)
         $this->expectException(\Exception::class);

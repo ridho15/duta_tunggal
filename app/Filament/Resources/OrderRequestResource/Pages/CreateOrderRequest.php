@@ -15,14 +15,9 @@ class CreateOrderRequest extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Set cabang_id if not provided
-        if (empty($data['cabang_id'])) {
-            $user = Auth::user();
-            $data['cabang_id'] = $user?->cabang_id;
-        }
-
         $data['created_by'] = Auth::user()->id;
-        return $data;
+
+        return OrderRequestResource::mutateFormDataBeforeCreate($data);
     }
 
     protected function afterCreate(): void
@@ -30,7 +25,7 @@ class CreateOrderRequest extends CreateRecord
         HelperController::sendNotification(
             isSuccess: true,
             title: 'Order Request Created',
-            message: 'Order Request berhasil dibuat dengan nomor: ' . $this->record->request_number
+            message: 'Order Request berhasil dibuat dengan nomor: ' . $this->record->request_number . '. Proses selanjutnya: Menunggu persetujuan dari Supervisor/Manager Purchasing.'
         );
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\OtherSaleResource\Pages;
 use App\Filament\Resources\OtherSaleResource\RelationManagers;
 use App\Models\OtherSale;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -15,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class OtherSaleResource extends Resource
 {
@@ -28,9 +30,11 @@ class OtherSaleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Penjualan Lainnya';
 
-    protected static ?string $navigationGroup = 'Finance - Penjualan';
+    protected static ?string $navigationGroup = 'Keuangan Penjualan';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -89,15 +93,13 @@ class OtherSaleResource extends Resource
 
                         Forms\Components\TextInput::make('amount')
                             ->label('Jumlah')
-                            ->numeric()
                             ->required()
-                            ->prefix('Rp')
                             ->minValue(0)
                             ->indonesianMoney(),
 
                         Forms\Components\Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(\App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(\App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
                             ->searchable()
@@ -276,7 +278,7 @@ class OtherSaleResource extends Resource
                                 });
                         }
 
-                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                        return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
                     })
@@ -290,13 +292,21 @@ class OtherSaleResource extends Resource
                         ->color('success')
                         ->visible(fn(OtherSale $record): bool => $record->status === 'draft')
                         ->action(function (OtherSale $record) {
-                            $service = new \App\Services\OtherSaleService();
-                            $service->postJournalEntries($record);
+                            try {
+                                $service = new \App\Services\OtherSaleService();
+                                $service->postJournalEntries($record);
 
-                            \Filament\Notifications\Notification::make()
-                                ->title('Journal entries posted successfully')
-                                ->success()
-                                ->send();
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Journal entries posted successfully')
+                                    ->success()
+                                    ->send();
+                            } catch (Throwable $exception) {
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Posting Jurnal',
+                                    $exception,
+                                    'Jurnal other sale belum dapat diposting. Silakan coba lagi.'
+                                );
+                            }
                         }),
 
                     Tables\Actions\Action::make('reverse_journal')
@@ -305,13 +315,21 @@ class OtherSaleResource extends Resource
                         ->color('warning')
                         ->visible(fn(OtherSale $record): bool => $record->status === 'posted')
                         ->action(function (OtherSale $record) {
-                            $service = new \App\Services\OtherSaleService();
-                            $service->reverseJournalEntries($record);
+                            try {
+                                $service = new \App\Services\OtherSaleService();
+                                $service->reverseJournalEntries($record);
 
-                            \Filament\Notifications\Notification::make()
-                                ->title('Journal entries reversed successfully')
-                                ->warning()
-                                ->send();
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Journal entries reversed successfully')
+                                    ->warning()
+                                    ->send();
+                            } catch (Throwable $exception) {
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Membalik Jurnal',
+                                    $exception,
+                                    'Pembalikan jurnal other sale belum dapat diproses. Silakan coba lagi.'
+                                );
+                            }
                         }),
 
                     Tables\Actions\EditAction::make(),

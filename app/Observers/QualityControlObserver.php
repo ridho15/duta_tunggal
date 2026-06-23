@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\QualityControl;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseOrderItem;
+use App\Support\OrderRequestQuantityLock;
 
 class QualityControlObserver
 {
@@ -25,12 +26,6 @@ class QualityControlObserver
      */
     public function saving(QualityControl $qualityControl): void
     {
-        // Skip validation if this is a completion operation (status change to completed)
-        // The completion validation is handled in QualityControlService::completeQualityControl
-        if ($qualityControl->status == 1) {
-            return;
-        }
-
         // Validate based on the source model type
         if ($qualityControl->from_model_type === PurchaseReceiptItem::class && $qualityControl->from_model_id) {
             $item = PurchaseReceiptItem::find($qualityControl->from_model_id);
@@ -52,15 +47,47 @@ class QualityControlObserver
         } elseif ($qualityControl->from_model_type === PurchaseOrderItem::class && $qualityControl->from_model_id) {
             $item = PurchaseOrderItem::find($qualityControl->from_model_id);
             if ($item) {
+                $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $item->id);
+                $maxInspectable = (float) $limit['remaining_received'];
+                $maxAccepted = min($maxInspectable, (float) $limit['remaining_accepted']);
+
+                if ($qualityControl->exists) {
+                    $originalPassed = max(0, (float) ($qualityControl->getOriginal('passed_quantity') ?? 0));
+                    $originalRejected = max(0, (float) ($qualityControl->getOriginal('rejected_quantity') ?? 0));
+
+                    $maxInspectable = min(
+                        (float) ($item->quantity ?? 0),
+                        $maxInspectable + $originalPassed + $originalRejected
+                    );
+                    $maxAccepted = min(
+                        (float) ($item->quantity ?? 0),
+                        $maxAccepted + $originalPassed
+                    );
+                }
+
+                $quantityReceived = $qualityControl->quantity_received;
+                if ($quantityReceived !== null) {
+                    $quantityReceived = (float) $quantityReceived;
+
+                    if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+                        throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed Qty Received ({$quantityReceived}).");
+                    }
+
+                    $totalAgainstReceived = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+                    if ($totalAgainstReceived > $quantityReceived) {
+                        throw new \Exception("QC total inspected quantity ({$totalAgainstReceived}) cannot exceed Qty Received ({$quantityReceived}).");
+                    }
+                }
+
                 // Validate passed_quantity individually
-                if ($qualityControl->passed_quantity > $item->quantity) {
-                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed ordered quantity ({$item->quantity}) in purchase order.");
+                if ($qualityControl->passed_quantity > $maxAccepted) {
+                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed available quantity ({$maxAccepted}) in purchase order/order request.");
                 }
 
                 // Validate total inspected (passed + rejected)
                 $totalInspected = $qualityControl->passed_quantity + $qualityControl->rejected_quantity;
-                if ($totalInspected > $item->quantity) {
-                    throw new \Exception("QC total inspected quantity ({$totalInspected}) cannot exceed ordered quantity ({$item->quantity}) in purchase order.");
+                if ($totalInspected > $maxInspectable) {
+                    throw new \Exception("QC total inspected quantity ({$totalInspected}) cannot exceed available quantity ({$maxInspectable}) in purchase order/order request.");
                 }
             }
         }

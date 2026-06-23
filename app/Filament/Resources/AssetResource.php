@@ -18,6 +18,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section as InfolistSection;
@@ -29,6 +30,8 @@ use Filament\Tables\Enums\ActionsPosition;
 class AssetResource extends Resource
 {
     protected static ?string $model = Asset::class;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
@@ -53,14 +56,12 @@ class AssetResource extends Resource
                             ->maxLength(50)
                             ->default(fn() => \App\Models\Asset::generateAssetCode())
                             ->validationMessages([
-                                'required' => 'Kode asset wajib diisi',
                                 'unique' => 'Kode asset sudah digunakan',
                                 'max' => 'Kode asset maksimal 50 karakter'
                             ]),
 
                         Forms\Components\TextInput::make('name')
                             ->label('Nama Barang')
-                            ->required()
                             ->maxLength(255)
                             ->columnSpanFull()
                             ->validationMessages([
@@ -78,7 +79,7 @@ class AssetResource extends Resource
                                     return \App\Models\Cabang::where('id', $user?->cabang_id)
                                         ->get()
                                         ->mapWithKeys(function ($cabang) {
-                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
+                                            return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"]; 
                                         });
                                 }
 
@@ -99,7 +100,6 @@ class AssetResource extends Resource
                         Forms\Components\DatePicker::make('purchase_date')
                             ->label('Tanggal Beli')
                             ->required()
-                            ->default(now())
                             ->native(false)
                             ->validationMessages([
                                 'required' => 'Tanggal beli wajib diisi'
@@ -120,11 +120,14 @@ class AssetResource extends Resource
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->sku . ' - ' . $record->name)
                             ->getSearchResultsUsing(function (string $search, Get $get) {
                                 $cabangId = $get('cabang_id');
-                                $query = \App\Models\Product::where('perusahaan', 'like', "%{$search}%")
-                                    ->orWhere('sku', 'like', "%{$search}%");
+                                $query = \App\Models\Product::query()
+                                    ->where(function ($productQuery) use ($search) {
+                                        $productQuery->where('name', 'like', "%{$search}%")
+                                            ->orWhere('sku', 'like', "%{$search}%");
+                                    });
 
                                 if ($cabangId) {
-                                    $query->where('cabang_id', $cabangId);
+                                    $query->forCabang($cabangId);
                                 }
 
                                 return $query->get()
@@ -134,7 +137,8 @@ class AssetResource extends Resource
                             ->options(function (Get $get) {
                                 $cabangId = $get('cabang_id');
                                 if ($cabangId) {
-                                    return \App\Models\Product::where('cabang_id', $cabangId)
+                                    return \App\Models\Product::query()
+                                        ->forCabang($cabangId)
                                         ->get()
                                         ->mapWithKeys(fn($product) => [$product->id => $product->sku . ' - ' . $product->name]);
                                 }
@@ -151,7 +155,7 @@ class AssetResource extends Resource
                             ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                 if ($state) {
                                     // Auto-fill purchase_order_id and purchase_order_item_id based on selected product
-                                    $product = \App\Models\Product::find($state);
+                                    $product = \App\Models\Product::withoutGlobalScope('product_cabang')->find($state);
                                     if ($product) {
                                         // Find the latest purchase order item for this product
                                         $latestPOItem = \App\Models\PurchaseOrderItem::where('product_id', $state)
@@ -199,7 +203,7 @@ class AssetResource extends Resource
                             ->indonesianMoney()
                             ->stripCharacters(',')
                             ->helperText('Biaya perolehan aset = harga pembelian + biaya pengiriman + biaya instalasi + biaya lainnya. Akan diisi otomatis dari Purchase Order jika tersedia.')
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->validationMessages([
                                 'required' => 'Biaya aset wajib diisi',
                                 'numeric' => 'Biaya aset harus berupa angka'
@@ -373,8 +377,8 @@ class AssetResource extends Resource
                         Forms\Components\Placeholder::make('depreciable_amount')
                             ->label('Nilai yang Dapat Disusutkan')
                             ->content(function (Get $get) {
-                                $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
-                                $salvageValue = (float) str_replace(',', '', $get('salvage_value') ?? 0);
+                                $purchaseCost = (float) MoneyHelper::safeParse($get('purchase_cost') ?? 0);
+                                $salvageValue = (float) MoneyHelper::safeParse($get('salvage_value') ?? 0);
                                 $depreciable = $purchaseCost - $salvageValue;
                                 return MoneyHelper::rupiah($depreciable);
                             }),
@@ -397,14 +401,14 @@ class AssetResource extends Resource
                         Forms\Components\Placeholder::make('annual_depreciation_display')
                             ->label('Penyusutan Per Tahun')
                             ->content(function (Get $get) {
-                                $annual = (float) str_replace(',', '', $get('annual_depreciation') ?? 0);
+                                $annual = (float) MoneyHelper::safeParse($get('annual_depreciation') ?? 0);
                                 return MoneyHelper::rupiah($annual);
                             }),
 
                         Forms\Components\Placeholder::make('monthly_depreciation_display')
                             ->label('Penyusutan Per Bulan')
                             ->content(function (Get $get) {
-                                $monthly = (float) str_replace(',', '', $get('monthly_depreciation') ?? 0);
+                                $monthly = (float) MoneyHelper::safeParse($get('monthly_depreciation') ?? 0);
                                 return MoneyHelper::rupiah($monthly);
                             }),
 
@@ -439,8 +443,8 @@ class AssetResource extends Resource
 
     protected static function calculateDepreciation(Get $get, Set $set): void
     {
-        $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
-        $salvageValue = (float) str_replace(',', '', $get('salvage_value') ?? 0);
+        $purchaseCost = (float) MoneyHelper::safeParse($get('purchase_cost') ?? 0);
+        $salvageValue = (float) MoneyHelper::safeParse($get('salvage_value') ?? 0);
         $usefulLife = (float) $get('useful_life_years') ?? 1;
         $depreciationMethod = $get('depreciation_method') ?? 'straight_line';
 
@@ -498,7 +502,7 @@ class AssetResource extends Resource
             isset($data['product_id']) && isset($data['depreciation_method']) &&
             isset($data['purchase_cost']) && isset($data['useful_life_years'])
         ) {
-            $purchaseCost = (float) str_replace(',', '', $data['purchase_cost'] ?? 0);
+            $purchaseCost = (float) MoneyHelper::safeParse($data['purchase_cost'] ?? 0);
             if ($purchaseCost > 0) {
                 $data['salvage_value'] = number_format($purchaseCost * 0.05, 2, '.', '');
             }
@@ -541,7 +545,7 @@ class AssetResource extends Resource
     {
         $productId = $get('product_id');
         $depreciationMethod = $get('depreciation_method');
-        $purchaseCost = (float) str_replace(',', '', $get('purchase_cost') ?? 0);
+        $purchaseCost = (float) MoneyHelper::safeParse($get('purchase_cost') ?? 0);
         $usefulLifeYears = (float) $get('useful_life_years') ?? 0;
 
         // Only calculate salvage value if all required fields are filled
@@ -735,12 +739,27 @@ class AssetResource extends Resource
                         ->label('Hitung Penyusutan')
                         ->icon('heroicon-o-calculator')
                         ->action(function (Asset $record) {
-                            $record->calculateDepreciation();
-                            \Filament\Notifications\Notification::make()
-                                ->title('Penyusutan berhasil dihitung')
-                                ->success()
-                                ->persistent()
-                                ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            try {
+                                $record->calculateDepreciation();
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Penyusutan berhasil dihitung')
+                                    ->success()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            } catch (\Throwable $e) {
+                                Log::error('AssetResource calculate_depreciation failed', [
+                                    'asset_id' => $record->id,
+                                    'asset_name' => $record->name,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Menghitung Penyusutan')
+                                    ->body('Terjadi kesalahan saat menghitung penyusutan aset.')
+                                    ->danger()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            }
                         }),
                     Tables\Actions\Action::make('post_asset_journal')
                         ->color('info')
@@ -748,13 +767,28 @@ class AssetResource extends Resource
                         ->icon('heroicon-o-document-plus')
                         ->visible(fn(Asset $record) => !$record->hasPostedJournals())
                         ->action(function (Asset $record) {
-                            $assetService = new \App\Services\AssetService();
-                            $assetService->postAssetAcquisitionJournal($record);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Jurnal akuisisi aset berhasil dipost')
-                                ->success()
-                                ->persistent()
-                                ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            try {
+                                $assetService = new \App\Services\AssetService();
+                                $assetService->postAssetAcquisitionJournal($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Jurnal akuisisi aset berhasil dipost')
+                                    ->success()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            } catch (\Throwable $e) {
+                                Log::error('AssetResource post_asset_journal failed', [
+                                    'asset_id' => $record->id,
+                                    'asset_name' => $record->name,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Post Jurnal Akuisisi')
+                                    ->body('Jurnal akuisisi belum berhasil dipost. Silakan periksa data akun dan coba lagi.')
+                                    ->danger()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            }
                         }),
                     Tables\Actions\Action::make('post_depreciation_journal')
                         ->color('purple')
@@ -793,14 +827,31 @@ class AssetResource extends Resource
                                 return;
                             }
 
-                            $assetService = new \App\Services\AssetService();
-                            $assetService->postAssetDepreciationJournal($record, $depreciationAmount, $currentMonth);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Jurnal penyusutan berhasil dipost')
-                                ->body('Jurnal penyusutan untuk bulan ' . now()->format('F Y') . ' telah berhasil dibuat.')
-                                ->success()
-                                ->persistent()
-                                ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            try {
+                                $assetService = new \App\Services\AssetService();
+                                $assetService->postAssetDepreciationJournal($record, $depreciationAmount, $currentMonth);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Jurnal penyusutan berhasil dipost')
+                                    ->body('Jurnal penyusutan untuk bulan ' . now()->format('F Y') . ' telah berhasil dibuat.')
+                                    ->success()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            } catch (\Throwable $e) {
+                                Log::error('AssetResource post_depreciation_journal failed', [
+                                    'asset_id' => $record->id,
+                                    'asset_name' => $record->name,
+                                    'month' => $currentMonth,
+                                    'depreciation_amount' => $depreciationAmount,
+                                    'user_id' => Auth::id(),
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Post Jurnal Penyusutan')
+                                    ->body('Jurnal penyusutan belum berhasil dibuat. Silakan periksa konfigurasi akun penyusutan.')
+                                    ->danger()
+                                    ->persistent()
+                                    ->sendToDatabase(\Filament\Facades\Filament::auth()->user());
+                            }
                         }),
                     Tables\Actions\Action::make('view_asset_journals')
                         ->color('gray')

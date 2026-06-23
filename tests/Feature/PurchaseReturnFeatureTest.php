@@ -1,28 +1,135 @@
 <?php
 
 use App\Models\User;
+use App\Models\Currency;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderCurrency;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptItem;
+use App\Models\PurchaseReturnItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\JournalEntry;
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
+use App\Models\Supplier;
+use App\Models\Warehouse;
+use App\Filament\Resources\PurchaseReturnResource\Pages\ViewPurchaseReturn;
+use App\Http\Controllers\HelperController;
 use App\Services\PurchaseReturnService;
+use App\Services\BalanceSheetService;
 use App\Services\StockService;
 use App\Services\AccountingService;
+use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 uses()->group('purchase-return');
 uses(RefreshDatabase::class);
 
+if (! function_exists('registerPurchaseReturnPermissions')) {
+    function registerPurchaseReturnPermissions(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        foreach (HelperController::listPermission() as $resource => $actions) {
+            foreach ($actions as $action) {
+                Permission::firstOrCreate([
+                    'name' => sprintf('%s %s', $action, $resource),
+                    'guard_name' => 'web',
+                ]);
+            }
+        }
+    }
+}
+
+if (! function_exists('grantPurchaseReturnFilamentPermissions')) {
+    function grantPurchaseReturnFilamentPermissions(User $user): void
+    {
+        registerPurchaseReturnPermissions();
+
+        $user->givePermissionTo([
+            'view any purchase return',
+            'view purchase return',
+            'create purchase return',
+            'update purchase return',
+            'view any purchase receipt',
+            'view purchase receipt',
+            'view any purchase order',
+            'view purchase order',
+        ]);
+    }
+}
+
+if (! function_exists('createPurchaseReturnRecordForNotificationTest')) {
+    function createPurchaseReturnRecordForNotificationTest(User $user, string $status = 'draft'): PurchaseReturn
+    {
+        $purchaseOrder = PurchaseOrder::create([
+            'supplier_id' => 1,
+            'po_number' => 'PO-' . strtoupper(Str::random(6)),
+            'order_date' => now()->subDays(rand(1, 30)),
+            'status' => 'completed',
+            'received_by' => $user->id,
+            'expected_date' => now()->addDays(rand(3, 14)),
+            'total_amount' => rand(50000, 2000000),
+            'currency_id' => 1,
+            'created_by' => $user->id,
+            'is_asset' => rand(0, 1),
+            'close_reason' => null,
+            'date_approved' => now(),
+            'approved_by' => $user->id,
+            'tempo_hutang' => rand(0, 60),
+            'note' => null,
+            'close_requested_by' => $user->id,
+            'close_requested_at' => now(),
+            'closed_by' => $user->id,
+            'closed_at' => now(),
+            'completed_by' => $user->id,
+            'completed_at' => now(),
+            'refer_model_type' => null,
+            'refer_model_id' => null,
+            'is_import' => false,
+        ]);
+
+        $purchaseReceipt = PurchaseReceipt::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'receipt_number' => 'RC-' . strtoupper(Str::random(6)),
+            'receipt_date' => now()->subDays(rand(1, 7)),
+            'status' => 'completed',
+            'received_by' => $user->id,
+            'total_received' => $purchaseOrder->total_amount,
+            'cabang_id' => Cabang::first()->id,
+            'currency_id' => 1,
+            'created_by' => $user->id,
+        ]);
+
+        return PurchaseReturn::create([
+            'purchase_receipt_id' => $purchaseReceipt->id,
+            'return_date' => now(),
+            'nota_retur' => 'NR-' . now()->format('Ymd') . '-' . str_pad((string) rand(1, 9999), 4, '0', STR_PAD_LEFT),
+            'created_by' => $user->id,
+            'status' => $status,
+            'cabang_id' => Cabang::first()->id,
+        ]);
+    }
+}
+
 beforeEach(function () {
     // Seed other required data (but not suppliers yet, as they need cabang)
+    test()->seed(\Database\Seeders\ChartOfAccountSeeder::class);
     test()->seed(\Database\Seeders\CurrencySeeder::class);
     test()->seed(\Database\Seeders\UnitOfMeasureSeeder::class);
     test()->seed(\Database\Seeders\ProductSeeder::class);
     test()->seed(\Database\Seeders\WarehouseSeeder::class);
+});
+
+afterEach(function () {
+    Mockery::close();
 });
 
 test('can create purchase return with auto generated number', function () {
@@ -32,7 +139,7 @@ test('can create purchase return with auto generated number', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
     test()->actingAs($user);
     $service = app(PurchaseReturnService::class);
 
@@ -67,7 +174,7 @@ test('can create purchase return with auto generated number', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -92,7 +199,119 @@ test('can create purchase return with auto generated number', function () {
 
     expect($purchaseReturn->nota_retur)->toMatch('/^NR-\d{8}-\d{4}$/')
         ->and($purchaseReturn->purchase_receipt_id)->toBe($purchaseReceipt->id)
-        ->and($purchaseReturn->cabang_id)->toBe($user->cabang_id);
+        ->and($purchaseReturn->status)->toBe('draft');
+});
+
+test('purchase return journal converts usd receipt item amount to idr and keeps balance sheet balanced', function () {
+    test()->seed(\Database\Seeders\CabangSeeder::class);
+    test()->seed(\Database\Seeders\SupplierSeeder::class);
+
+    $user = User::factory()->create(['cabang_id' => Cabang::first()->id, 'manage_type' => 'all']);
+    test()->actingAs($user);
+
+    $usd = Currency::updateOrCreate(
+        ['code' => 'USD'],
+        ['name' => 'US Dollar', 'symbol' => '$', 'to_rupiah' => 15000]
+    );
+
+    $inventoryCoa = ChartOfAccount::where('code', '1140.01')->first();
+    $product = Product::factory()->create([
+        'inventory_coa_id' => $inventoryCoa?->id,
+        'purchase_return_coa_id' => ChartOfAccount::where('code', '5120.10')->first()?->id,
+    ]);
+
+    $warehouse = Warehouse::first() ?? Warehouse::factory()->create();
+    $supplier = Supplier::first();
+    $cabang = Cabang::first();
+
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $supplier->id,
+        'po_number' => 'PO-USD-RET',
+        'order_date' => now()->toDateString(),
+        'status' => 'completed',
+        'received_by' => $user->id,
+        'expected_date' => now()->addDay()->toDateString(),
+        'total_amount' => 80000,
+        'cabang_id' => $cabang->id,
+        'currency_id' => $usd->id,
+        'created_by' => $user->id,
+        'warehouse_id' => $warehouse->id,
+        'tempo_hutang' => 30,
+        'ppn_option' => 'non_pajak',
+    ]);
+
+    PurchaseOrderCurrency::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'currency_id' => $usd->id,
+        'nominal' => 16000,
+    ]);
+
+    $poItem = PurchaseOrderItem::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'unit_price' => 5,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Non Pajak',
+        'currency_id' => $usd->id,
+    ]);
+
+    $purchaseReceipt = PurchaseReceipt::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'receipt_number' => 'RC-USD-RET',
+        'receipt_date' => now()->toDateString(),
+        'status' => 'completed',
+        'received_by' => $user->id,
+        'total_received' => 80000,
+        'cabang_id' => $cabang->id,
+        'currency_id' => $usd->id,
+        'created_by' => $user->id,
+        'warehouse_id' => $warehouse->id,
+    ]);
+
+    $receiptItem = PurchaseReceiptItem::create([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+        'purchase_order_item_id' => $poItem->id,
+        'product_id' => $product->id,
+        'qty_received' => 1,
+        'qty_accepted' => 1,
+        'qty_rejected' => 0,
+        'warehouse_id' => $warehouse->id,
+        'status' => 'completed',
+    ]);
+
+    $purchaseReturn = PurchaseReturn::create([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+        'return_date' => now()->toDateString(),
+        'nota_retur' => 'NR-USD-RET',
+        'created_by' => $user->id,
+        'status' => 'approved',
+        'cabang_id' => $cabang->id,
+    ]);
+
+    PurchaseReturnItem::create([
+        'purchase_return_id' => $purchaseReturn->id,
+        'purchase_receipt_item_id' => $receiptItem->id,
+        'product_id' => $product->id,
+        'qty_returned' => 1,
+        'unit_price' => 5,
+        'reason' => 'Rejected by supplier',
+    ]);
+
+    expect(app(PurchaseReturnService::class)->createJournalEntry($purchaseReturn))->toBeTrue();
+
+    $entries = JournalEntry::where('source_type', PurchaseReturn::class)
+        ->where('source_id', $purchaseReturn->id)
+        ->where('journal_type', 'purchase_return')
+        ->get();
+
+    expect((float) $entries->sum('debit'))->toBe(80000.0)
+        ->and((float) $entries->sum('credit'))->toBe(80000.0);
+
+    $balanceSheet = app(BalanceSheetService::class)->generate();
+    expect($balanceSheet['is_balanced'])->toBeTrue()
+        ->and(abs((float) $balanceSheet['difference']))->toBeLessThan(0.01);
 });
 
 test('can submit purchase return for approval', function () {
@@ -102,7 +321,7 @@ test('can submit purchase return for approval', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
     test()->actingAs($user);
     $service = app(PurchaseReturnService::class);
 
@@ -134,7 +353,7 @@ test('can submit purchase return for approval', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -187,7 +406,7 @@ test('cannot submit non-draft purchase return', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
     test()->actingAs($user);
     $service = app(PurchaseReturnService::class);
 
@@ -219,7 +438,7 @@ test('cannot submit non-draft purchase return', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -284,7 +503,7 @@ test('can approve pending purchase return', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -353,7 +572,7 @@ test('can reject pending purchase return', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -421,7 +640,7 @@ test('stock adjustment on approval', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -488,7 +707,7 @@ test('journal entry creation on approval', function () {
         'refer_model_type' => null,
         'refer_model_id' => null,
         'is_import' => false,
-        'ppn_option' => 'standard',
+        'ppn_option' => 'eklusif',
     ]);
 
     // Create purchase receipt
@@ -511,9 +730,34 @@ test('journal entry creation on approval', function () {
         'status' => 'approved',
     ]);
 
+    $product = Product::factory()->create([
+        'cabang_id' => Cabang::query()->value('id'),
+        'supplier_id' => Supplier::query()->value('id'),
+        'inventory_coa_id' => ChartOfAccount::where('code', '1140.01')->value('id'),
+        'purchase_return_coa_id' => ChartOfAccount::where('code', '5120.10')->value('id'),
+    ]);
+
+    \App\Models\PurchaseReturnItem::create([
+        'purchase_return_id' => $purchaseReturn->id,
+        'product_id' => $product->id,
+        'qty_returned' => 2,
+        'unit_price' => 50000,
+        'reason' => 'Barang rusak',
+    ]);
+
     $result = $service->createJournalEntry($purchaseReturn);
 
-    expect($result)->toBeTrue();
+    $entries = JournalEntry::withoutGlobalScopes()->with('coa')->where('source_type', PurchaseReturn::class)
+        ->where('source_id', $purchaseReturn->id)
+        ->orderBy('id')
+        ->get();
+
+    expect($result)->toBeTrue()
+        ->and($entries)->toHaveCount(2)
+        ->and((float) $entries->sum('debit'))->toBe(100000.0)
+        ->and((float) $entries->sum('credit'))->toBe(100000.0)
+        ->and($entries->firstWhere('debit', '>', 0)?->coa?->code)->toBe('2110')
+        ->and($entries->firstWhere('credit', '>', 0)?->coa?->code)->toBe($product->inventoryCoa?->code ?? '1140.01');
 });
 
 test('purchase return auto created for rejected items in receipt', function () {
@@ -523,7 +767,8 @@ test('purchase return auto created for rejected items in receipt', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $cabang = Cabang::first();
+    $user = User::factory()->create(['cabang_id' => $cabang->id]);
     test()->actingAs($user);
 
     // Create purchase order
@@ -535,7 +780,7 @@ test('purchase return auto created for rejected items in receipt', function () {
         'received_by' => $user->id,
         'expected_date' => now()->addDays(rand(3, 14)),
         'total_amount' => 1000000,
-        'cabang_id' => Cabang::first()->id,
+        'cabang_id' => $cabang->id,
         'warehouse_id' => 1,
         'tempo_hutang' => 30,
         'created_by' => $user->id,
@@ -558,7 +803,7 @@ test('purchase return auto created for rejected items in receipt', function () {
         'purchase_order_id' => $purchaseOrder->id,
         'receipt_number' => 'RN-' . now()->format('Ymd') . '-001',
         'receipt_date' => now(),
-        'cabang_id' => Cabang::first()->id,
+        'cabang_id' => $cabang->id,
         'received_by' => $user->id,
         'total_received' => 1000000,
         'currency_id' => 1,
@@ -606,7 +851,8 @@ test('purchase return not created when no rejected items', function () {
     // Now seed suppliers after cabang exists
     test()->seed(\Database\Seeders\SupplierSeeder::class);
 
-    $user = User::factory()->create(['cabang_id' => 1]);
+    $cabang = Cabang::first();
+    $user = User::factory()->create(['cabang_id' => $cabang->id]);
     test()->actingAs($user);
 
     // Create purchase order
@@ -618,7 +864,9 @@ test('purchase return not created when no rejected items', function () {
         'received_by' => $user->id,
         'expected_date' => now()->addDays(rand(3, 14)),
         'total_amount' => 1000000,
-        'cabang_id' => Cabang::first()->id,
+        'cabang_id' => $cabang->id,
+        'warehouse_id' => 1,
+        'tempo_hutang' => 30,
         'created_by' => $user->id,
         'approved_by' => $user->id,
         'date_approved' => now(),
@@ -631,6 +879,7 @@ test('purchase return not created when no rejected items', function () {
         'quantity' => 10,
         'unit_price' => 100000,
         'subtotal' => 1000000,
+        'currency_id' => 1,
     ]);
 
     // Create purchase receipt with NO rejected items
@@ -638,8 +887,8 @@ test('purchase return not created when no rejected items', function () {
         'purchase_order_id' => $purchaseOrder->id,
         'receipt_number' => 'RN-' . now()->format('Ymd') . '-002',
         'receipt_date' => now(),
-        'cabang_id' => Cabang::first()->id,
-        'created_by' => $user->id,
+        'cabang_id' => $cabang->id,
+        'received_by' => $user->id,
         'total_received' => 1000000,
         'currency_id' => 1,
     ]);
@@ -656,5 +905,143 @@ test('purchase return not created when no rejected items', function () {
     ]);
 
     // Assert: PurchaseReturn should NOT be created
+    expect(PurchaseReturn::where('purchase_receipt_id', $purchaseReceipt->id)->exists())->toBeFalse();
+});
+
+test('submit action shows friendly notification when purchase return submission fails', function () {
+    test()->seed(\Database\Seeders\CabangSeeder::class);
+    test()->seed(\Database\Seeders\SupplierSeeder::class);
+
+    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
+    grantPurchaseReturnFilamentPermissions($user);
+    test()->actingAs($user);
+
+    $purchaseReturn = createPurchaseReturnRecordForNotificationTest($user, 'draft');
+
+    $service = Mockery::mock(PurchaseReturnService::class);
+    $service->shouldReceive('submitForApproval')
+        ->once()
+        ->withArgs(fn (PurchaseReturn $record) => $record->is($purchaseReturn))
+        ->andThrow(new \RuntimeException('simulated submit failure'));
+    app()->instance(PurchaseReturnService::class, $service);
+
+    Livewire::test(ViewPurchaseReturn::class, ['record' => $purchaseReturn->getKey()])
+        ->callAction('submit_for_approval')
+        ->assertNotified('Gagal Mengajukan Retur Pembelian');
+
+    expect($purchaseReturn->fresh()->status)->toBe('draft');
+});
+
+test('approve action shows friendly notification when purchase return approval fails', function () {
+    test()->seed(\Database\Seeders\CabangSeeder::class);
+    test()->seed(\Database\Seeders\SupplierSeeder::class);
+
+    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
+    grantPurchaseReturnFilamentPermissions($user);
+    test()->actingAs($user);
+
+    $purchaseReturn = createPurchaseReturnRecordForNotificationTest($user, 'pending_approval');
+
+    $service = Mockery::mock(PurchaseReturnService::class);
+    $service->shouldReceive('approve')
+        ->once()
+        ->withArgs(fn (PurchaseReturn $record, array $data) => $record->is($purchaseReturn) && ($data['approval_notes'] ?? null) === 'Perlu verifikasi')
+        ->andThrow(new \RuntimeException('simulated approve failure'));
+    app()->instance(PurchaseReturnService::class, $service);
+
+    Livewire::test(ViewPurchaseReturn::class, ['record' => $purchaseReturn->getKey()])
+        ->callAction('approve', data: ['approval_notes' => 'Perlu verifikasi'])
+        ->assertNotified('Gagal Menyetujui Retur Pembelian');
+
+    expect($purchaseReturn->fresh()->status)->toBe('pending_approval');
+});
+
+test('reject action shows friendly notification when purchase return rejection fails', function () {
+    test()->seed(\Database\Seeders\CabangSeeder::class);
+    test()->seed(\Database\Seeders\SupplierSeeder::class);
+
+    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
+    grantPurchaseReturnFilamentPermissions($user);
+    test()->actingAs($user);
+
+    $purchaseReturn = createPurchaseReturnRecordForNotificationTest($user, 'pending_approval');
+
+    $service = Mockery::mock(PurchaseReturnService::class);
+    $service->shouldReceive('reject')
+        ->once()
+        ->withArgs(fn (PurchaseReturn $record, array $data) => $record->is($purchaseReturn) && ($data['rejection_notes'] ?? null) === 'Dokumen belum lengkap')
+        ->andThrow(new \RuntimeException('simulated reject failure'));
+    app()->instance(PurchaseReturnService::class, $service);
+
+    Livewire::test(ViewPurchaseReturn::class, ['record' => $purchaseReturn->getKey()])
+        ->callAction('reject', data: ['rejection_notes' => 'Dokumen belum lengkap'])
+        ->assertNotified('Gagal Menolak Retur Pembelian');
+
+    expect($purchaseReturn->fresh()->status)->toBe('pending_approval');
+});
+
+test('purchase receipt rejected item sync failure sends friendly warning notification', function () {
+    test()->seed(\Database\Seeders\CabangSeeder::class);
+    test()->seed(\Database\Seeders\SupplierSeeder::class);
+
+    $cabang = Cabang::first();
+    $user = User::factory()->create(['cabang_id' => $cabang->id]);
+    test()->actingAs($user);
+
+    $service = Mockery::mock(PurchaseReturnService::class);
+    $service->shouldReceive('generateNotaRetur')
+        ->once()
+        ->andThrow(new \RuntimeException('simulated auto return sync failure'));
+    app()->instance(PurchaseReturnService::class, $service);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => 1,
+        'po_number' => 'PO-' . strtoupper(Str::random(6)),
+        'order_date' => now()->subDays(3),
+        'status' => 'approved',
+        'received_by' => $user->id,
+        'expected_date' => now()->addDays(7),
+        'total_amount' => 1000000,
+        'cabang_id' => $cabang->id,
+        'warehouse_id' => 1,
+        'tempo_hutang' => 30,
+        'created_by' => $user->id,
+        'approved_by' => $user->id,
+        'date_approved' => now(),
+        'currency_id' => 1,
+    ]);
+
+    $poItem = \App\Models\PurchaseOrderItem::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => 1,
+        'quantity' => 10,
+        'unit_price' => 100000,
+        'subtotal' => 1000000,
+        'currency_id' => 1,
+    ]);
+
+    $purchaseReceipt = PurchaseReceipt::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'receipt_number' => 'RN-' . now()->format('Ymd') . '-ERR',
+        'receipt_date' => now(),
+        'cabang_id' => $cabang->id,
+        'received_by' => $user->id,
+        'total_received' => 1000000,
+        'currency_id' => 1,
+        'created_by' => $user->id,
+    ]);
+
+    \App\Models\PurchaseReceiptItem::create([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+        'purchase_order_item_id' => $poItem->id,
+        'product_id' => 1,
+        'qty_received' => 10,
+        'qty_accepted' => 7,
+        'qty_rejected' => 3,
+        'warehouse_id' => 1,
+        'reason_rejected' => 'Kemasan rusak',
+    ]);
+
+    Notification::assertNotified('Sinkronisasi Retur Otomatis Belum Selesai');
     expect(PurchaseReturn::where('purchase_receipt_id', $purchaseReceipt->id)->exists())->toBeFalse();
 });

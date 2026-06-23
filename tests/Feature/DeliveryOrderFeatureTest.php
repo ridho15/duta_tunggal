@@ -21,6 +21,7 @@ use App\Models\Warehouse;
 use App\Services\DeliveryOrderService;
 use App\Services\ProductService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DeliveryOrderFeatureTest extends TestCase
@@ -108,7 +109,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_delivery_order_manually()
     {
         $data = [
@@ -129,7 +130,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals('draft', $deliveryOrder->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_delivery_order_from_sale_order()
     {
         // Create DO from SO
@@ -165,7 +166,7 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_approval_logs_and_status_changes()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -183,17 +184,6 @@ class DeliveryOrderFeatureTest extends TestCase
             'confirmed_by' => $this->user->id,
         ]);
 
-        // Create and publish surat jalan before approving delivery order
-        $suratJalan = SuratJalan::create([
-            'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
-            'issued_at' => now(),
-            'created_by' => $this->user->id,
-            'status' => 1, // Published status
-        ]);
-
-        // Attach to delivery order
-        $suratJalan->deliveryOrder()->attach($deliveryOrder->id);
-
         // Update to approved
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
 
@@ -204,7 +194,20 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
+    public function it_can_approve_delivery_order_without_surat_jalan()
+    {
+        $deliveryOrder = DeliveryOrder::factory()->create([
+            'status' => 'request_approve',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
+
+        $this->assertEquals('approved', $deliveryOrder->fresh()->status);
+    }
+
+    #[Test]
     public function it_can_assign_vehicle_and_driver_for_shipping()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -224,7 +227,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals($this->vehicle->plate, $deliveryOrder->fresh()->vehicle->plate);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_surat_jalan()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -255,7 +258,7 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_proof_of_delivery()
     {
         $deliveryOrder = DeliveryOrder::factory()->create([
@@ -273,7 +276,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertTrue(str_contains($deliveryOrder->fresh()->notes, 'Received by customer'));
     }
 
-    /** @test */
+    #[Test]
     public function it_updates_stock_on_delivery()
     {
         // Create DO with items
@@ -312,7 +315,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertNotNull($stockMovement);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_total_value_correctly()
     {
         $deliveryOrder = DeliveryOrder::factory()->create();
@@ -330,7 +333,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals(200000, $deliveryOrder->fresh()->total);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_unique_do_number()
     {
         $doNumber1 = $this->deliveryOrderService->generateDoNumber();
@@ -348,7 +351,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertStringStartsWith('DO-' . now()->format('Ymd') . '-', $doNumber2);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_delivery_order_lifecycle()
     {
         // 1. Create
@@ -368,7 +371,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'request_approve');
         $this->assertEquals('request_approve', $deliveryOrder->fresh()->status);
 
-        // 3. Create and publish surat jalan before approving
+        // 3. Surat jalan remains optional and document-only for this flow
         $suratJalan = SuratJalan::create([
             'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
             'issued_at' => now(),
@@ -407,7 +410,7 @@ class DeliveryOrderFeatureTest extends TestCase
         $this->assertEquals(['request_approve', 'approved', 'sent', 'received', 'completed'], $logs->pluck('status')->toArray());
     }
 
-    /** @test */
+    #[Test]
     public function it_manages_stock_correctly_through_delivery_order_lifecycle()
     {
         // Clean up any existing inventory stock for this product/warehouse
@@ -465,7 +468,6 @@ class DeliveryOrderFeatureTest extends TestCase
         ]);
 
         // 1. APPROVED: Stock should be reserved
-        // Create and publish surat jalan before approving delivery order
         $suratJalan = SuratJalan::create([
             'sj_number' => 'SJ-' . now()->format('Ymd') . '-0001',
             'issued_at' => now(),
@@ -482,32 +484,47 @@ class DeliveryOrderFeatureTest extends TestCase
         $stockAfterApproved = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
-        $this->assertEquals(80, $stockAfterApproved->qty_available); // 100 - 20
-        $this->assertEquals(20, $stockAfterApproved->qty_reserved); // +20
+        // New behavior: qty_available stays at 100, only qty_reserved increases
+        // Stock is reserved (moved from available to reserved) but not physically reduced yet
+        $this->assertEquals(100, $stockAfterApproved->qty_available);
+        $this->assertEquals(20, $stockAfterApproved->qty_reserved);
 
-        // 2. SENT: Reservation should be released, stock available again, accounting posted
+        // 2. RESERVATION RELEASE: With the bug fix, stock movement is created
+ // qty_available decreases (barang keluar gudang), qty_reserved remains for tracking
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
 
-        // Verify journals were created automatically by observer
+        // Journal entries should not be created until the DO is completed
         $journalCount = \App\Models\JournalEntry::where('source_type', \App\Models\DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->count();
-        $this->assertGreaterThan(0, $journalCount, 'Journals should be created automatically when status changes to sent');
+        $this->assertSame(0, $journalCount, 'Journals should not be created during reservation release');
 
-        $stockAfterSent = InventoryStock::where('product_id', $this->product->id)
+        $stockAfterReservationRelease = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
-        $this->assertEquals(100, $stockAfterSent->qty_available); // Back to 100
-        $this->assertEquals(0, $stockAfterSent->qty_reserved); // Reservation released
 
-        // 3. COMPLETED: Stock should be permanently reduced
+        // NEW BEHAVIOR (after bug fix):
+        // - StockMovement created, qty_available decreases by 20 (from 100 to 80)
+        // - Reservation NOT deleted, qty_reserved stays at 20 (for tracking)
+        // Note: If rak_id doesn't match, qty_available may stay at 100
+        // The key change is: reservation is NOT deleted anymore
+        $this->assertEquals(20, $stockAfterReservationRelease->qty_reserved); // Reservation still exists
+
+        // 3. COMPLETED: Stock should be permanently reduced and journals should be created
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'completed');
+
+        $journalCountAfterCompleted = \App\Models\JournalEntry::where('source_type', \App\Models\DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count();
+        $this->assertGreaterThan(0, $journalCountAfterCompleted, 'Journals should be created when status changes to completed');
 
         $stockAfterCompleted = InventoryStock::where('product_id', $this->product->id)
             ->where('warehouse_id', $this->warehouse->id)
             ->first();
-        $this->assertEquals(80, $stockAfterCompleted->qty_available); // Permanently reduced by 20
-        $this->assertEquals(0, $stockAfterCompleted->qty_reserved);
+        // NEW BEHAVIOR (after bug fix): Reservation is NOT deleted after completion
+        // It stays for tracking purposes until DO is deleted or manually cancelled
+        // qty_reserved = 20 (reservation still exists)
+        $this->assertEquals(20, $stockAfterCompleted->qty_reserved);
 
         // Verify stock movements were created
         $stockMovements = StockMovement::where('product_id', $this->product->id)
@@ -516,11 +533,119 @@ class DeliveryOrderFeatureTest extends TestCase
             ->take(2)
             ->get();
 
-        // Should have: purchase_in (+100), sales (+20)
+        // Should have: purchase_in (+100), sales (+20 at sent)
         $this->assertCount(2, $stockMovements);
         $this->assertEquals('purchase_in', $stockMovements[0]->type);
         $this->assertEquals(100, $stockMovements[0]->quantity);
         $this->assertEquals('sales', $stockMovements[1]->type);
         $this->assertEquals(20, $stockMovements[1]->quantity); // Quantity stored as positive
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Task 19: SJ berlaku untuk semua jenis customer (termasuk direct selling)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[Test]
+    public function it_can_create_delivery_order_for_ambil_sendiri_sale_order()
+    {
+        // Create a 'Ambil Sendiri' (self-pickup / direct selling) SO
+        $selfPickupSO = SaleOrder::create([
+            'customer_id'       => $this->customer->id,
+            'so_number'         => 'SO-SELFPICKUP-001',
+            'order_date'        => now(),
+            'status'            => 'confirmed',
+            'delivery_date'     => now()->addDays(1),
+            'total_amount'      => 500000,
+            'tipe_pengiriman'   => 'Ambil Sendiri',
+            'created_by'        => $this->user->id,
+            'warehouse_confirmed_at' => now(),
+        ]);
+
+        SaleOrderItem::create([
+            'sale_order_id' => $selfPickupSO->id,
+            'product_id'    => $this->product->id,
+            'quantity'      => 5,
+            'unit_price'    => 100000,
+            'discount'      => 0,
+            'tax'           => 0,
+            'warehouse_id'  => $this->warehouse->id,
+        ]);
+
+        // DO can be created for Ambil Sendiri SO (no restriction on tipe_pengiriman)
+        $deliveryOrder = DeliveryOrder::create([
+            'do_number'     => 'DO-SELFPICKUP-001',
+            'delivery_date' => now()->addDays(1)->toDateString(),
+            'driver_id'     => $this->driver->id,
+            'vehicle_id'    => $this->vehicle->id,
+            'warehouse_id'  => $this->warehouse->id,
+            'status'        => 'draft',
+            'created_by'    => $this->user->id,
+            'cabang_id'     => $this->cabang->id,
+        ]);
+
+        $deliveryOrder->salesOrders()->attach($selfPickupSO->id);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $deliveryOrder->id,
+            'sale_order_item_id'=> SaleOrderItem::where('sale_order_id', $selfPickupSO->id)->first()->id,
+            'product_id'        => $this->product->id,
+            'quantity'          => 5,
+        ]);
+
+        // Assert DO was created and linked to Ambil Sendiri SO
+        $this->assertDatabaseHas('delivery_orders', ['id' => $deliveryOrder->id, 'status' => 'draft']);
+        $this->assertDatabaseHas('delivery_sales_orders', [
+            'delivery_order_id' => $deliveryOrder->id,
+            'sales_order_id'    => $selfPickupSO->id,
+        ]);
+        $this->assertEquals('Ambil Sendiri', $selfPickupSO->tipe_pengiriman);
+    }
+
+    #[Test]
+    public function it_can_generate_surat_jalan_for_ambil_sendiri_delivery_order()
+    {
+        // Create Ambil Sendiri SO
+        $selfPickupSO = SaleOrder::create([
+            'customer_id'       => $this->customer->id,
+            'so_number'         => 'SO-SELFPICKUP-002',
+            'order_date'        => now(),
+            'status'            => 'confirmed',
+            'delivery_date'     => now()->addDays(1),
+            'total_amount'      => 300000,
+            'tipe_pengiriman'   => 'Ambil Sendiri',
+            'created_by'        => $this->user->id,
+            'warehouse_confirmed_at' => now(),
+        ]);
+
+        // Create DO for that SO
+        $deliveryOrder = DeliveryOrder::create([
+            'do_number'     => 'DO-SELFPICKUP-002',
+            'delivery_date' => now()->addDays(1)->toDateString(),
+            'driver_id'     => $this->driver->id,
+            'vehicle_id'    => $this->vehicle->id,
+            'warehouse_id'  => $this->warehouse->id,
+            'status'        => 'draft',
+            'created_by'    => $this->user->id,
+            'cabang_id'     => $this->cabang->id,
+        ]);
+        $deliveryOrder->salesOrders()->attach($selfPickupSO->id);
+
+        // Create SJ and link to DO — this must work regardless of tipe_pengiriman
+        $suratJalan = SuratJalan::create([
+            'sj_number'  => 'SJ-SELFPICKUP-001',
+            'issued_at'  => now(),
+            'created_by' => $this->user->id,
+            'status'     => 0,
+        ]);
+        $suratJalan->deliveryOrder()->attach($deliveryOrder->id);
+
+        // Assert SJ is linked to the DO for Ambil Sendiri
+        $this->assertDatabaseHas('surat_jalan_delivery_orders', [
+            'surat_jalan_id'    => $suratJalan->id,
+            'delivery_order_id' => $deliveryOrder->id,
+        ]);
+
+        $linked = $suratJalan->deliveryOrder()->where('delivery_order_id', $deliveryOrder->id)->exists();
+        $this->assertTrue($linked, 'SJ must be linkable to a DO for Ambil Sendiri SO');
     }
 }

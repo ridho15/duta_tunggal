@@ -14,7 +14,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ApprovalLogsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'approvalLogs';
+    // Use the existing delivery order logs table for approval history
+    protected static string $relationship = 'log';
     
     protected static ?string $title = 'Approval History';
 
@@ -29,17 +30,17 @@ class ApprovalLogsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('action')
             ->columns([
-                TextColumn::make('user.name')
+                TextColumn::make('confirmedBy.name')
                     ->label('User')
                     ->sortable(),
-                
-                BadgeColumn::make('action')
+
+                BadgeColumn::make('status')
                     ->label('Action')
                     ->colors([
-                        'warning' => 'pending',
+                        'warning' => 'request_stock',
+                        'primary' => 'request_approve',
                         'success' => 'approved',
-                        'danger' => 'rejected',
-                        'secondary' => 'cancelled',
+                        'danger' => 'reject',
                     ])
                     ->sortable(),
                 
@@ -54,7 +55,7 @@ class ApprovalLogsRelationManager extends RelationManager
                         return $state;
                     }),
                 
-                TextColumn::make('approved_at')
+                TextColumn::make('created_at')
                     ->label('Date & Time')
                     ->dateTime()
                     ->sortable(),

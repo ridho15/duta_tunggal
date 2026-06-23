@@ -11,9 +11,9 @@ use Filament\Tables\Actions\Action;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Exports\PurchaseReportExport;
+use App\Services\Reports\PurchaseReportService;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +32,11 @@ class PurchaseReportPage extends Page implements HasTable
 
     protected static ?int $navigationSort = 2;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public ?string $start_date = null;
     public ?string $end_date = null;
     public ?int $supplier_id = null;
@@ -40,15 +45,19 @@ class PurchaseReportPage extends Page implements HasTable
 
     public function mount(): void
     {
-        $this->form->fill([
-            'start_date' => now()->startOfMonth()->format('Y-m-d'),
-            'end_date' => now()->format('Y-m-d'),
-            'supplier_id' => null,
-            'status' => null,
-            'sort_by_total' => null,
-        ]);
+        $this->start_date = now()->startOfMonth()->format('Y-m-d');
+        $this->end_date = now()->format('Y-m-d');
+        $this->supplier_id = null;
+        $this->status = null;
+        $this->sort_by_total = null;
 
-        $this->updateFilters();
+        $this->form->fill([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'supplier_id' => $this->supplier_id,
+            'status' => $this->status,
+            'sort_by_total' => $this->sort_by_total,
+        ]);
     }
 
     public function table(Table $table): Table
@@ -84,7 +93,6 @@ class PurchaseReportPage extends Page implements HasTable
                     ->label('Export Excel')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $this->updateFilters();
                         $query = $this->getFilteredQuery();
                         return Excel::download(new PurchaseReportExport($query), 'purchase_report.xlsx');
                     }),
@@ -92,11 +100,11 @@ class PurchaseReportPage extends Page implements HasTable
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
                     ->action(function () {
-                        $this->updateFilters();
-                        $query = $this->getFilteredQuery();
+                        $payload = $this->purchaseReportService()->pdfPayload($this->reportFilters(), Auth::user());
 
                         $pdf = Pdf::loadView('reports.purchase_report', [
-                            'data' => $query->get(),
+                            'rows' => $payload['rows'],
+                            'summary' => $payload['summary'],
                             'start_date' => $this->start_date,
                             'end_date' => $this->end_date,
                         ]);
@@ -144,7 +152,7 @@ class PurchaseReportPage extends Page implements HasTable
                     ->searchable()
                     ->getSearchResultsUsing(function (string $search): array {
                         return Supplier::where('code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%")
+                            ->orWhere('perusahaan', 'like', "%{$search}%")
                             ->limit(50)
                             ->get()
                             ->mapWithKeys(function ($supplier) {
@@ -175,8 +183,8 @@ class PurchaseReportPage extends Page implements HasTable
                 Select::make('sort_by_total')
                     ->label('Urutkan Total')
                     ->options([
-                        'asc' => 'Tertinggi ke Terendah',
-                        'desc' => 'Terendah ke Tertinggi',
+                        'asc' => 'Terendah ke Tertinggi',
+                        'desc' => 'Tertinggi ke Terendah',
                     ])
                     ->placeholder('Tidak diurutkan')
                     ->live()
@@ -215,39 +223,27 @@ class PurchaseReportPage extends Page implements HasTable
 
     public function updateFilters(): void
     {
-        $formData = $this->form->getState();
-        $this->start_date = $formData['start_date'] ?? null;
-        $this->end_date = $formData['end_date'] ?? null;
-        $this->supplier_id = $formData['supplier_id'] ?? null;
-        $this->status = $formData['status'] ?? null;
-        $this->sort_by_total = $formData['sort_by_total'] ?? null;
-
-        // Reset table pagination when filters change
         $this->resetTable();
     }
 
     private function getFilteredQuery()
     {
-        $query = PurchaseOrder::query()
-            ->when($this->start_date, fn($q) => $q->whereDate('order_date', '>=', $this->start_date))
-            ->when($this->end_date, fn($q) => $q->whereDate('order_date', '<=', $this->end_date))
-            ->when($this->supplier_id, fn($q) => $q->where('supplier_id', $this->supplier_id))
-            ->when($this->status, fn($q) => $q->where('status', $this->status))
-            ->with(['supplier', 'purchaseOrderItem.product']);
+        return $this->purchaseReportService()->query($this->reportFilters(), Auth::user());
+    }
 
-        // Apply branch scoping
-        $user = Auth::user();
-        if ($user && !in_array('all', $user->manage_type ?? [])) {
-            $query->where('cabang_id', $user->cabang_id);
-        }
+    private function reportFilters(): array
+    {
+        return [
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'supplier_id' => $this->supplier_id,
+            'status' => $this->status,
+            'sort_by_total' => $this->sort_by_total,
+        ];
+    }
 
-        // Apply sorting
-        if ($this->sort_by_total === 'asc') {
-            $query->orderBy('total_amount', 'asc');
-        } elseif ($this->sort_by_total === 'desc') {
-            $query->orderBy('total_amount', 'desc');
-        }
-
-        return $query;
+    private function purchaseReportService(): PurchaseReportService
+    {
+        return app(PurchaseReportService::class);
     }
 }

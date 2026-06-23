@@ -6,6 +6,7 @@ use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Quotation extends Model
 {
@@ -17,6 +18,7 @@ class Quotation extends Model
         'request_approve_at' => 'datetime',
         'reject_at' => 'datetime',
         'approve_at' => 'datetime',
+        'exchange_rate' => 'decimal:8',
     ];
 
     protected $fillable = [
@@ -24,6 +26,9 @@ class Quotation extends Model
         'customer_id',
         'date',
         'valid_until',
+        'currency_id',
+        'exchange_rate',
+        'tempo_pembayaran',
         'total_amount',
         'status_payment',
         'po_file_path',
@@ -35,12 +40,18 @@ class Quotation extends Model
         'reject_by',
         'reject_at',
         'approve_by',
-        'approve_at'
+        'approve_at',
+        'cabang_id',
     ];
 
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function quotationItem()
@@ -68,8 +79,20 @@ class Quotation extends Model
         return $this->belongsTo(User::class, 'approve_by')->withDefault();
     }
 
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
     protected static function booted()
     {
+        // Auto-assign cabang_id when creating so new quotations are branch-scoped
+        static::creating(function ($model) {
+            if (empty($model->cabang_id)) {
+                $model->cabang_id = Auth::user()?->cabang_id;
+            }
+        });
+
         static::deleting(function ($quotation) {
             if ($quotation->isForceDeleting()) {
                 $quotation->quotationItem()->forceDelete();

@@ -37,14 +37,13 @@ class Supplier extends Model
         static::creating(function ($model) {
             if (empty($model->cabang_id)) {
                 $model->cabang_id = Auth::user()?->cabang_id
-                    ?? \App\Models\Cabang::first()?->id
-                    ?? \App\Models\Cabang::create([
-                        'kode' => 'CBG-' . uniqid(),
-                        'nama' => 'Cabang Default',
-                        'alamat' => 'Auto-created',
-                        'telepon' => '0000000000',
-                        'status' => true,
-                    ])->id;
+                    ?? \App\Models\Cabang::first()?->id;
+
+                if (empty($model->cabang_id)) {
+                    \Illuminate\Support\Facades\Log::warning('Supplier created without cabang_id and no branch exists in DB', [
+                        'supplier_data' => $model->only(['code', 'perusahaan']),
+                    ]);
+                }
             }
         });
     }

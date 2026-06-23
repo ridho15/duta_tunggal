@@ -31,12 +31,14 @@ class ChartOfAccountResource extends Resource
 {
     protected static ?string $model = ChartOfAccount::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
 
     protected static ?string $navigationGroup = 'Master Data';
 
     // Position Finance group as the 6th group
-    protected static ?int $navigationSort = 11;
+    protected static ?int $navigationSort = 12;
 
     public static function form(Form $form): Form
     {
@@ -103,7 +105,6 @@ class ChartOfAccountResource extends Resource
                     ->label('Description'),
                 TextInput::make('opening_balance')
                     ->label('Saldo Awal')
-                    ->numeric()
                     ->default(0)
                     ->indonesianMoney()
                     ->validationMessages([
@@ -113,7 +114,6 @@ class ChartOfAccountResource extends Resource
                     ->maxLength(255),
                 TextInput::make('debit')
                     ->label('Debit')
-                    ->numeric()
                     ->default(0)
                     ->indonesianMoney()
                     ->validationMessages([

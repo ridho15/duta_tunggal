@@ -40,11 +40,12 @@ class ViewStockMutationReport extends Page implements HasTable
 
     public function mount(): void
     {
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
         $this->form->fill([
-            'startDate' => request('start', now()->startOfMonth()->format('Y-m-d')),
-            'endDate' => request('end', now()->endOfMonth()->format('Y-m-d')),
-            'productIds' => [],
-            'warehouseIds' => [],
+            'startDate' => request('startDate', now()->startOfMonth()->format('Y-m-d')),
+            'endDate' => request('endDate', now()->endOfMonth()->format('Y-m-d')),
+            'productIds' => (array) request('productIds', []),
+            'warehouseIds' => (array) request('warehouseIds', []),
         ]);
 
         $this->updateFilters();
@@ -71,12 +72,23 @@ class ViewStockMutationReport extends Page implements HasTable
     public function generateReport(): void
     {
         $this->updateFilters();
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getResource()::getUrl('index') . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'productIds' => array_filter($this->productIds),
+            'warehouseIds' => array_filter($this->warehouseIds),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function table(Table $table): Table
@@ -199,7 +211,7 @@ class ViewStockMutationReport extends Page implements HasTable
 
                 Select::make('productIds')
                     ->label('Produk')
-                    ->options(fn () => Product::query()->orderBy('name')->get()->mapWithKeys(fn ($product) => [
+                    ->options(fn () => Product::query()->orderBy('name')->limit(50)->get()->mapWithKeys(fn ($product) => [
                         $product->id => "{$product->name} ({$product->sku})"
                     ]))
                     ->multiple()

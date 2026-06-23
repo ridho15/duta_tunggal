@@ -2,7 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Cabang;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -20,16 +21,20 @@ class PurchaseReceiptFactory extends Factory
     {
         return [
             'receipt_number' => 'RN-' . strtoupper(Str::random(6)),
-            'purchase_order_id' => 1, // will be overridden
+            'purchase_order_id' => PurchaseOrder::factory()->state(function () {
+                $supplier = Supplier::factory()->create();
+
+                return [
+                    'supplier_id' => $supplier->id,
+                ];
+            }),
             'receipt_date' => now(),
             'received_by' => 1,
             'notes' => $this->faker->optional()->sentence(),
             'currency_id' => 1,
             'other_cost' => $this->faker->numberBetween(0, 10000),
             'status' => 'completed',
-            'cabang_id' => function () {
-                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
-            },
+            'cabang_id' => null,
         ];
     }
 }

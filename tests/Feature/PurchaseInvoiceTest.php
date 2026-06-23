@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AccountPayable;
 use App\Models\AgeingSchedule;
+use App\Models\ChartOfAccount;
 use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -32,6 +33,46 @@ class PurchaseInvoiceTest extends TestCase
         \App\Models\UnitOfMeasure::factory()->create();
         Currency::factory()->create();
         Supplier::factory()->create();
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.accounts_payable'),
+        ], [
+            'name' => 'Hutang Dagang',
+            'type' => 'Liability',
+            'is_active' => true,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.unbilled_purchase'),
+        ], [
+            'name' => 'Pembelian Belum Tertagih',
+            'type' => 'Liability',
+            'is_active' => true,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.inventory'),
+        ], [
+            'name' => 'Persediaan Barang',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.ppn_masukan'),
+        ], [
+            'name' => 'PPN Masukan',
+            'type' => 'Asset',
+            'is_active' => true,
+        ]);
+
+        ChartOfAccount::firstOrCreate([
+            'code' => config('coa.general_expense'),
+        ], [
+            'name' => 'Beban Umum',
+            'type' => 'Expense',
+            'is_active' => true,
+        ]);
     }
 
     public function test_purchase_invoice_creation_with_proper_relationships()
@@ -171,6 +212,70 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertNotNull($accountPayable);
         $this->assertEquals($supplier->id, $accountPayable->supplier_id);
         $this->assertNotNull($accountPayable->ageingSchedule);
+    }
+
+    public function test_purchase_invoice_creation_posts_balanced_automatic_journal_entries()
+    {
+        $supplier = Supplier::factory()->create();
+
+        $this->actingAs($user = User::factory()->create());
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $supplier->id,
+            'status' => 'completed',
+        ]);
+
+        PurchaseReceipt::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'status' => 'completed',
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'invoice_number' => 'PINV-20251101-0100',
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $purchaseOrder->id,
+            'invoice_date' => now(),
+            'due_date' => now()->addDays(30),
+            'subtotal' => 100000,
+            'tax' => 11,
+            'ppn_rate' => 11,
+            'total' => 111000,
+            'status' => 'draft',
+        ]);
+
+        $entries = JournalEntry::where('source_type', Invoice::class)
+            ->where('source_id', $invoice->id)
+            ->get();
+
+        $this->assertCount(3, $entries);
+
+        $debitTotal = (float) $entries->sum('debit');
+        $creditTotal = (float) $entries->sum('credit');
+        $this->assertSame($debitTotal, $creditTotal);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => Invoice::class,
+            'source_id' => $invoice->id,
+            'coa_id' => ChartOfAccount::where('code', config('coa.unbilled_purchase'))->value('id'),
+            'debit' => 100000,
+            'credit' => 0,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => Invoice::class,
+            'source_id' => $invoice->id,
+            'coa_id' => ChartOfAccount::where('code', config('coa.ppn_masukan'))->value('id'),
+            'debit' => 11000,
+            'credit' => 0,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => Invoice::class,
+            'source_id' => $invoice->id,
+            'coa_id' => ChartOfAccount::where('code', config('coa.accounts_payable'))->value('id'),
+            'debit' => 0,
+            'credit' => 111000,
+        ]);
     }
 
     public function test_three_way_matching_validation()
@@ -335,24 +440,23 @@ class PurchaseInvoiceTest extends TestCase
             'from_model_id' => $purchaseOrder->id,
             'subtotal' => 100000,
             'tax' => 11000, // 11% of subtotal
-            'other_fee' => 5000,
+            'other_fee' => [5000],
             'ppn_rate' => 11,
             'dpp' => 100000,
             'total' => 116000, // 100000 + 11000 + 5000
             'status' => 'draft'
         ]);
 
-        $this->assertDatabaseHas('invoices', [
-            'id' => $invoice->id,
-            'subtotal' => 100000,
-            'tax' => 11000,
-            'other_fee' => 5000,
-            'ppn_rate' => 11,
-            'dpp' => 100000,
-            'total' => 116000
-        ]);
+        $invoice = $invoice->fresh();
 
-        // Test accessor for other_fee_total
+        $this->assertEquals('100000.00', $invoice->subtotal);
+        $this->assertEquals(11000, $invoice->tax);
+        $this->assertEquals([5000], $invoice->other_fee);
+        $this->assertEquals('11.00', $invoice->ppn_rate);
+        $this->assertEquals('100000.00', $invoice->dpp);
+        $this->assertEquals('116000.00', $invoice->total);
+
+        // Test accessor for other_fee_total (should sum the array)
         $this->assertEquals(5000, $invoice->other_fee_total);
     }
 

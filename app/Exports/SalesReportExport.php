@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\SaleOrder;
+use App\Services\Reports\SalesReportService;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -23,150 +23,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
 
     public function collection()
     {
-        $data = collect();
-
-        $orders = $this->query->with(['customer', 'saleOrderItem.product'])->get();
-
-        $totalOrders = $orders->count();
-        $totalAmount = $orders->sum('total_amount');
-        $completedOrders = $orders->where('status', 'completed')->count();
-        $cancelledOrders = $orders->where('status', 'cancelled')->count();
-        $draftOrders = $orders->where('status', 'draft')->count();
-        $processingOrders = $orders->where('status', 'processing')->count();
-        $confirmedOrders = $orders->where('status', 'confirmed')->count();
-
-        // Calculate additional statistics
-        $totalQuantity = $orders->sum(function ($order) {
-            return $order->saleOrderItem->sum('quantity');
-        });
-        $averageAmount = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
-        $uniqueProducts = $orders->flatMap(function ($order) {
-            return $order->saleOrderItem->pluck('product_id');
-        })->unique()->count();
-
-        foreach ($orders as $order) {
-            // Header row for each order
-            $data->push([
-                'No. SO' => $order->so_number,
-                'Tanggal' => $order->created_at->format('d/m/Y'),
-                'Kode Customer' => $order->customer->code ?? '-',
-                'Nama Customer' => $order->customer->name ?? '-',
-                'Alamat Customer' => $order->customer->address ?? '-',
-                'No. Telp' => $order->customer->phone ?? '-',
-                'Email' => $order->customer->email ?? '-',
-                'Produk' => '',
-                'Qty' => '',
-                'Harga Satuan' => '',
-                'Subtotal' => '',
-                'Total SO' => 'Rp ' . number_format($order->total_amount ?? 0, 0, ',', '.'),
-                'Status' => $order->status,
-            ]);
-
-            // Item rows
-            foreach ($order->saleOrderItem as $item) {
-                if (($item->unit_price ?? 0) > 0 && ($item->quantity ?? 0) > 0) {
-                    $data->push([
-                        'No. SO' => '',
-                        'Tanggal' => '',
-                        'Kode Customer' => '',
-                        'Nama Customer' => '',
-                        'Alamat Customer' => '',
-                        'No. Telp' => '',
-                        'Email' => '',
-                        'Produk' => $item->product->name ?? '-',
-                        'Qty' => $item->quantity ?? 0,
-                        'Harga Satuan' => 'Rp ' . number_format($item->unit_price ?? 0, 0, ',', '.'),
-                        'Subtotal' => 'Rp ' . number_format(($item->quantity ?? 0) * ($item->unit_price ?? 0), 0, ',', '.'),
-                        'Total SO' => '',
-                        'Status' => '',
-                    ]);
-                }
-            }
-
-            // Empty row for separation
-            $data->push([
-                'No. SO' => '',
-                'Tanggal' => '',
-                'Kode Customer' => '',
-                'Nama Customer' => '',
-                'Alamat Customer' => '',
-                'No. Telp' => '',
-                'Email' => '',
-                'Produk' => '',
-                'Qty' => '',
-                'Harga Satuan' => '',
-                'Subtotal' => '',
-                'Total SO' => '',
-                'Status' => '',
-            ]);
-        }
-
-        // Summary row
-        $data->push([
-            'No. SO' => 'SUMMARY',
-            'Tanggal' => '',
-            'Kode Customer' => '',
-            'Nama Customer' => '',
-            'Alamat Customer' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => '',
-            'Qty' => '',
-            'Harga Satuan' => '',
-            'Subtotal' => '',
-            'Total SO' => 'Total: Rp ' . number_format($totalAmount, 0, ',', '.'),
-            'Status' => '',
-        ]);
-
-        $data->push([
-            'No. SO' => '',
-            'Tanggal' => '',
-            'Kode Customer' => '',
-            'Nama Customer' => '',
-            'Alamat Customer' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => 'Total Orders: ' . $totalOrders,
-            'Qty' => 'Completed: ' . $completedOrders,
-            'Harga Satuan' => 'Cancelled: ' . $cancelledOrders,
-            'Subtotal' => '',
-            'Total SO' => '',
-            'Status' => '',
-        ]);
-
-        $data->push([
-            'No. SO' => '',
-            'Tanggal' => '',
-            'Kode Customer' => '',
-            'Nama Customer' => '',
-            'Alamat Customer' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => 'Draft: ' . $draftOrders,
-            'Qty' => 'Processing: ' . $processingOrders,
-            'Harga Satuan' => 'Confirmed: ' . $confirmedOrders,
-            'Subtotal' => '',
-            'Total SO' => '',
-            'Status' => '',
-        ]);
-
-        $data->push([
-            'No. SO' => '',
-            'Tanggal' => '',
-            'Kode Customer' => '',
-            'Nama Customer' => '',
-            'Alamat Customer' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => 'Total Qty: ' . $totalQuantity,
-            'Qty' => 'Avg Transaction: Rp ' . number_format($averageAmount, 0, ',', '.'),
-            'Harga Satuan' => 'Unique Products: ' . $uniqueProducts,
-            'Subtotal' => '',
-            'Total SO' => '',
-            'Status' => '',
-        ]);
-
-        return $data;
+        return app(SalesReportService::class)->exportCollectionFromQuery($this->query);
     }
 
     public function headings(): array
@@ -182,6 +39,12 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'Produk',
             'Qty',
             'Harga Satuan',
+            'Discount (%)',
+            'Tax Rate (%)',
+            'Tipe Pajak',
+            'DPP',
+            'PPN Amount',
+            'Item Subtotal',
             'Subtotal',
             'Total SO',
             'Status'
@@ -191,7 +54,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
     public function styles(Worksheet $sheet)
     {
         // Style for headings
-        $sheet->getStyle('A1:M1')->applyFromArray([
+        $sheet->getStyle('A1:S1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'size' => 12,
@@ -219,7 +82,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             $soValue = $sheet->getCell('A' . $row)->getValue();
             if ($soValue === 'SUMMARY') {
                 // Style for summary header
-                $sheet->getStyle('A' . $row . ':M' . $row)->applyFromArray([
+                $sheet->getStyle('A' . $row . ':S' . $row)->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'size' => 14,
@@ -244,7 +107,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
                 for ($i = 1; $i <= 3; $i++) {
                     $nextRow = $row + $i;
                     if ($nextRow <= $highestRow) {
-                        $sheet->getStyle('A' . $nextRow . ':M' . $nextRow)->applyFromArray([
+                        $sheet->getStyle('A' . $nextRow . ':S' . $nextRow)->applyFromArray([
                             'font' => [
                                 'bold' => true,
                                 'size' => 12,
@@ -265,7 +128,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
                 }
                 break; // Assuming summary is at the end
             } elseif (!empty($soValue)) {
-                $sheet->getStyle('A' . $row . ':M' . $row)->applyFromArray([
+                $sheet->getStyle('A' . $row . ':S' . $row)->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'color' => ['rgb' => '000000'],
@@ -315,9 +178,15 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
             'H' => 30, // Produk
             'I' => 8,  // Qty
             'J' => 15, // Harga Satuan
-            'K' => 15, // Subtotal
-            'L' => 15, // Total SO
-            'M' => 12, // Status
+            'K' => 15, // Discount
+            'L' => 12, // Tax Rate
+            'M' => 15, // Tipe Pajak
+            'N' => 15, // DPP
+            'O' => 15, // PPN Amount
+            'P' => 15, // Item Subtotal
+            'Q' => 15, // Subtotal
+            'R' => 15, // Total SO
+            'S' => 12, // Status
         ];
     }
 }

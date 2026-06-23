@@ -3,135 +3,317 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>KUITANSI SALE ORDER</title>
+    <title>SALES ORDER</title>
+    @php
+        $formatMoney = function (float $amount) {
+            return 'Rp ' . number_format($amount, 0, ',', '.');
+        };
+    @endphp
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            color: #000;
+        @page {
+            size: A4 landscape;
+            margin: 15mm 20mm;
+            @bottom-right {
+                content: "Hal. " counter(page) " dari " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
         }
 
-        .header {
-            text-align: center;
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 11px;
+            color: #333;
+            line-height: 1.4;
+        }
+
+        .header-table {
+            width: 100%;
+            border: none;
+            margin-bottom: 5px;
+        }
+
+        .header-table td {
+            border: none;
+            padding: 0;
+            vertical-align: top;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #222;
+        }
+
+        .company-info {
+            font-size: 11px;
+            color: #555;
         }
 
         .logo {
-            height: 60px;
+            height: 50px;
+            object-fit: contain;
+        }
+
+        .title-container {
+            text-align: center;
+            margin: 15px 0;
         }
 
         .title {
             font-size: 18px;
             font-weight: bold;
-            text-decoration: underline;
-            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: inline-block;
+            border-bottom: 2px solid #222;
+            padding-bottom: 3px;
         }
 
-        table {
+        .info-table {
+            width: 100%;
+            border: none;
+            margin-bottom: 15px;
+        }
+
+        .info-table td {
+            border: none;
+            padding: 4px 8px;
+            vertical-align: top;
+        }
+
+        .info-table td.label {
+            font-weight: bold;
+            width: 130px;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-bottom: 20px;
         }
 
-        th,
-        td {
-            border: 1px solid #333;
-            padding: 5px;
+        .items-table th,
+        .items-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
             text-align: left;
+            vertical-align: middle;
         }
 
-        .total {
+        .items-table th {
+            background-color: #f4f6f8;
             font-weight: bold;
+            color: #444;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .sign {
+        .right {
+            text-align: right !important;
+        }
+
+        .center {
+            text-align: center !important;
+        }
+
+        .summary-row td {
+            border-top: none;
+            border-bottom: none;
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+
+        .summary-row.total td {
+            border-top: 1px solid #222;
+            border-bottom: 2px solid #222;
+            background-color: #f4f6f8;
+            font-size: 12px;
+            font-weight: bold;
+            color: #111;
+        }
+
+        .signature-section {
+            margin-top: 40px;
+            width: 100%;
+        }
+
+        .signature-table {
+            width: 100%;
+            border: none;
+        }
+
+        .signature-table td {
+            border: none;
             text-align: center;
-            margin-top: 50px;
+            width: 50%;
+            vertical-align: bottom;
+            padding: 0;
+        }
+
+        .signature-box {
+            display: inline-block;
+            width: 250px;
+        }
+
+        .signature-name {
+            font-weight: bold;
+            border-top: 1px solid #888;
+            padding-top: 5px;
+            width: 80%;
+            margin: 0 auto;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="header">
-        <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
-        <h2>PT.DUTA TUNGGAL</h2>
-        <p>Alamat Perusahaan</p>
-        <div class="title">KUITANSI</div>
-    </div>
-
-    <table style="border: none;">
+    <table class="header-table">
         <tr>
-            <td style="border: none;">No. Kuitansi</td>
-            <td style="border: none;">: {{ $saleOrder->so_number }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Tanggal</td>
-            <td style="border: none;">: {{ Carbon\Carbon::parse($saleOrder->order_date)->locale('id')->format('D, d M
-                Y') }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Customer</td>
-            <td style="border: none;">: {{ $saleOrder->customer->name }}</td>
+            <td style="width: 70%;">
+                <div class="company-name">PT DUTA TUNGGAL</div>
+                <div class="company-info">
+                    Jl. Contoh No. 123<br>
+                    Jakarta, Indonesia<br>
+                    Telp: (021) 12345678<br>
+                    Email: admin@dutatunggal.co.id
+                </div>
+            </td>
+            <td class="right">
+                <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
+            </td>
         </tr>
     </table>
 
-    <br>
+    <div class="title-container">
+        <div class="title">SALES ORDER</div>
+    </div>
 
-    <h4>Detail Sale Order:</h4>
-    <table>
+    <table class="info-table">
+        <tr>
+            <td class="label">No. SO</td>
+            <td>: <strong>{{ $saleOrder->so_number }}</strong></td>
+            <td class="label">Tanggal SO</td>
+            <td>: {{ \Carbon\Carbon::parse($saleOrder->order_date)->locale('id')->format('d M Y') }}</td>
+        </tr>
+        <tr>
+            <td class="label">Customer</td>
+            <td>: <strong>{{ $saleOrder->customer->name ?? '-' }}</strong></td>
+            <td class="label">Cabang</td>
+            <td>: {{ $saleOrder->cabang->nama ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label">TOP</td>
+            <td>: {{ ($saleOrder->customer->tempo_kredit ?? 30) . ' hari' }}</td>
+            <td class="label">Delivery</td>
+            <td>: {{ \Carbon\Carbon::parse($saleOrder->delivery_date)->locale('id')->format('d M Y') }}</td>
+        </tr>
+    </table>
+
+    <table class="items-table">
         <thead>
             <tr>
-                <th>No</th>
-                <th>Nama Item</th>
-                <th>Qty</th>
-                <th>Harga Satuan</th>
-                <th>Discount</th>
-                <th>Tax</th>
-                <th>Subtotal</th>
+                <th class="center" style="width: 4%;">No</th>
+                <th>Nama Barang</th>
+                <th class="center" style="width: 7%;">Satuan</th>
+                <th class="center" style="width: 6%;">Qty</th>
+                <th class="right" style="width: 11%;">Harga Satuan</th>
+                <th class="right" style="width: 7%;">Disc (%)</th>
+                <th class="center" style="width: 9%;">Tipe Pajak</th>
+                <th class="right" style="width: 7%;">Tax (%)</th>
+                <th class="right" style="width: 10%;">DPP</th>
+                <th class="right" style="width: 8%;">PPN</th>
+                <th class="right" style="width: 12%;">Subtotal</th>
             </tr>
         </thead>
         <tbody>
-            @php $total = 0; @endphp
-            @foreach ($saleOrder->saleOrderItem as $index => $item)
             @php
-            $subtotal = $item->quantity * $item->unit_price - $item->discount + $item->tax;
-            $total += $subtotal;
+                $total = 0;
+                $totalDpp = 0;
+                $totalPpn = 0;
             @endphp
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
-                <td>{{ $item->quantity }}</td>
-                <td>Rp {{ number_format($item->unit_price, 0, ',', '.') }}</td>
-                <td>Rp {{ number_format($item->discount, 0, ',', '.') }}</td>
-                <td>Rp {{ number_format($item->tax, 0, ',', '.') }}</td>
-                <td>Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
-            </tr>
+            @foreach ($saleOrder->saleOrderItem as $index => $item)
+                @php
+                    // compute using TaxService for accuracy (handles inclusive/exclusive)
+                    $lineBase = $item->quantity * $item->unit_price;
+                    $discountAmount = $lineBase * ($item->discount / 100);
+                    $afterDiscount = $lineBase - $discountAmount;
+                    $taxType = \App\Services\TaxService::normalizeType($item->tipe_pajak ?? 'PPN Excluded');
+                    $taxResult = \App\Services\TaxService::compute($afterDiscount, (float)$item->tax, $taxType);
+                    $itemDpp = $taxResult['dpp'];
+                    $taxAmount = $taxResult['ppn'];
+                    $subtotal = $taxResult['total'];
+
+                    $total += $subtotal;
+                    $totalDpp += $itemDpp;
+                    $totalPpn += $taxAmount;
+                @endphp
+                <tr>
+                    <td class="center">{{ $index + 1 }}</td>
+                    <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
+                    <td class="center">{{ $item->product->uom->name ?? '-' }}</td>
+                    <td class="center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
+                    <td class="right">{{ $formatMoney($item->unit_price) }}</td>
+                    <td class="right">{{ number_format($item->discount, 2, ',', '.') }}%</td>
+                    <td class="center">{{ $taxType }}</td>
+                    <td class="right">{{ number_format($item->tax, 2, ',', '.') }}%</td>
+                    <td class="right">{{ $formatMoney($itemDpp) }}</td>
+                    <td class="right">{{ $formatMoney($taxAmount) }}</td>
+                    <td class="right">{{ $formatMoney($subtotal) }}</td>
+                </tr>
             @endforeach
-            <tr>
-                <td colspan="6" class="total">Total</td>
-                <td class="total">Rp {{ number_format($total, 0, ',', '.') }}</td>
+
+            {{-- Summary Rows --}}
+            <tr class="summary-row">
+                <td colspan="10" class="right"><strong>DPP (Dasar Pengenaan Pajak)</strong></td>
+                <td class="right"><strong>{{ $formatMoney($totalDpp) }}</strong></td>
+            </tr>
+            <tr class="summary-row">
+                <td colspan="10" class="right"><strong>PPN (Pajak Pertambahan Nilai)</strong></td>
+                <td class="right"><strong>{{ $formatMoney($totalPpn) }}</strong></td>
+            </tr>
+            <tr class="summary-row total">
+                <td colspan="10" class="right">GRAND TOTAL</td>
+                <td class="right">{{ $formatMoney($total) }}</td>
             </tr>
         </tbody>
     </table>
 
-    <br>
-    <strong>Terbilang:</strong> <em>{{ App\Http\Controllers\HelperController::terbilang($saleOrder->total_amount)
-        }}</em>
+    <div style="margin-top: 15px; font-size: 11px;">
+        <strong>Terbilang:</strong> <em>{{ \App\Http\Controllers\HelperController::terbilang($saleOrder->total_amount) }} Rupiah</em>
+    </div>
 
-    <table style="border: none; margin-top: 50px;">
-        <tr>
-            <td style="border: none;" width="60%"></td>
-            <td style="border: none;" class="sign">
-                Jakarta, {{ Carbon\Carbon::parse($saleOrder->approve_at)->locale('id')->format('D, d M Y') }}
-                <br>
-                Hormat kami,
-                <img src="{{ public_path('storage' . $saleOrder->approveBy->signature) }}" alt=""
-                    style="height: 75px; width: auto">
-                <strong>PT.DUTA TUNGGAL</strong><br>
-                (____________________)
-            </td>
-        </tr>
-    </table>
+    <div class="signature-section">
+        <table class="signature-table">
+            <tr>
+                <td>
+                    <div class="signature-box">
+                        <p style="margin-bottom: 10px;">
+                            Jakarta, {{ \Carbon\Carbon::parse($saleOrder->approve_at ?? now())->locale('id')->format('d M Y') }}<br>
+                            Hormat kami,
+                        </p>
+                        <div style="height: 70px; margin: 10px 0;"></div>
+                        <div class="signature-name">
+                            {{ $saleOrder->approveBy->name ?? 'PT DUTA TUNGGAL' }}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="signature-box">
+                        <p style="margin-bottom: 10px;">Disetujui Oleh,</p>
+                        <div style="height: 70px; margin: 10px 0;"></div>
+                        <div class="signature-name">
+                            {{ $saleOrder->customer->name ?? 'Customer' }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
 
 </body>
 

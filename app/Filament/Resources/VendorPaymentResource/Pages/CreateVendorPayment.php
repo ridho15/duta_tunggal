@@ -3,12 +3,20 @@
 namespace App\Filament\Resources\VendorPaymentResource\Pages;
 
 use App\Filament\Resources\VendorPaymentResource;
+use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use App\Models\Invoice;
 use App\Models\Deposit;
 use App\Models\PaymentRequest;
+use App\Models\VendorPayment;
+use App\Helpers\MoneyHelper;
 use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class CreateVendorPayment extends CreateRecord
 {
@@ -42,13 +50,13 @@ class CreateVendorPayment extends CreateRecord
             }
 
             // Calculate total payment amount
-            $totalPaymentAmount = $data['total_payment'] ?? 0;
+            $totalPaymentAmount = MoneyHelper::safeParse($data['total_payment'] ?? 0);
 
             $totalAvailableDeposit = $availableDeposits->sum('remaining_amount');
             if ($totalAvailableDeposit < $totalPaymentAmount) {
                 Notification::make()
                     ->title('Saldo Deposit Tidak Mencukupi')
-                    ->body("Saldo deposit supplier tidak mencukupi. Saldo tersedia: Rp " . number_format($totalAvailableDeposit, 0, ',', '.') . ", dibutuhkan: Rp " . number_format($totalPaymentAmount, 0, ',', '.'))
+                    ->body("Saldo deposit supplier tidak mencukupi. Saldo tersedia: " . \App\Helpers\MoneyHelper::rupiah($totalAvailableDeposit) . ", dibutuhkan: " . \App\Helpers\MoneyHelper::rupiah($totalPaymentAmount))
                     ->danger()
                     ->persistent()
                     ->send();
@@ -62,7 +70,9 @@ class CreateVendorPayment extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Determine payment status based on total payment vs total invoice amounts
-        $totalPayment = $data['total_payment'] ?? 0;
+        $totalPayment = MoneyHelper::safeParse($data['total_payment'] ?? 0);
+        $data['total_payment'] = $totalPayment;
+        $exchangeRate = 1.0;
 
         if ($totalPayment > 0) {
             // If we have selected_invoices, calculate based on remaining amounts
@@ -72,12 +82,27 @@ class CreateVendorPayment extends CreateRecord
                     : json_decode($data['selected_invoices'], true);
 
                 if (is_array($selectedInvoices)) {
-                    $totalInvoiceAmount = Invoice::whereIn('id', $selectedInvoices)
+                    $invoices = Invoice::whereIn('id', $selectedInvoices)
                         ->with('accountPayable')
-                        ->get()
-                        ->sum(function ($invoice) {
-                            return $invoice->accountPayable->remaining ?? $invoice->total;
-                        });
+                        ->get();
+                    $currencyKeys = $invoices
+                        ->map(fn (Invoice $invoice) => ($invoice->currency_id ?? 'null') . ':' . number_format((float) ($invoice->exchange_rate ?? 1), 8, '.', ''))
+                        ->unique();
+
+                    if ($currencyKeys->count() > 1) {
+                        throw ValidationException::withMessages([
+                            'selected_invoices' => 'Pembayaran vendor hanya boleh mencakup invoice dengan satu mata uang dan satu rate.',
+                        ]);
+                    }
+
+                    $firstInvoice = $invoices->first();
+                    if ($firstInvoice) {
+                        $data['currency_id'] = is_numeric($firstInvoice->currency_id ?? null) ? (int) $firstInvoice->currency_id : null;
+                        $exchangeRate = (float) ($firstInvoice->exchange_rate ?? 1);
+                        $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+                        $data['exchange_rate'] = $exchangeRate;
+                    }
+                    $totalInvoiceAmount = VendorPaymentResource::calculateSelectedInvoiceTotal($invoices);
 
                     // Debug logging
                     \Illuminate\Support\Facades\Log::info('VendorPayment Status Determination (Page Level)', [
@@ -105,18 +130,89 @@ class CreateVendorPayment extends CreateRecord
             $data['status'] = 'Draft';
         }
 
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? $exchangeRate);
+        $data['total_payment_idr'] = round($totalPayment * (float) ($data['exchange_rate'] ?: 1), 2);
+
         return $data;
     }
 
     protected function afterCreate(): void
     {
-        // Update linked PaymentRequest: set status to 'paid' and link vendor_payment_id
-        $paymentRequestId = $this->record->payment_request_id;
-        if ($paymentRequestId) {
-            PaymentRequest::where('id', $paymentRequestId)->update([
-                'status' => PaymentRequest::STATUS_PAID,
+        try {
+            $paymentRequestId = $this->record->payment_request_id;
+            if (!$paymentRequestId) {
+                return;
+            }
+
+            $pr = PaymentRequest::find($paymentRequestId);
+            if (!$pr) {
+                return;
+            }
+
+            $paidSoFar = VendorPayment::where('payment_request_id', $paymentRequestId)
+                ->get()
+                ->sum(function (VendorPayment $payment) {
+                    $selectedInvoices = is_string($payment->selected_invoices)
+                        ? json_decode($payment->selected_invoices, true)
+                        : $payment->selected_invoices;
+
+                    $invoice = is_array($selectedInvoices) && !empty($selectedInvoices)
+                        ? Invoice::find((int) reset($selectedInvoices))
+                        : null;
+
+                    return $invoice
+                        ? PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $payment->total_payment)
+                        : MoneyHelper::safeParse($payment->total_payment ?? 0);
+                });
+            $requestTotal = MoneyHelper::safeParse($pr->total_amount ?? 0);
+
+            if ($paidSoFar >= ($requestTotal - 0.01)) {
+                $newStatus = PaymentRequest::STATUS_PAID;
+            } elseif ($paidSoFar > 0) {
+                $newStatus = PaymentRequest::STATUS_PARTIAL;
+            } else {
+                $newStatus = PaymentRequest::STATUS_APPROVED;
+            }
+
+            $pr->update([
+                'status' => $newStatus,
                 'vendor_payment_id' => $this->record->id,
             ]);
+        } catch (Throwable $exception) {
+            Log::error('CreateVendorPayment afterCreate failed', [
+                'vendor_payment_id' => $this->record?->id,
+                'payment_request_id' => $this->record?->payment_request_id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::warning(
+                'Pembayaran Vendor Tersimpan Dengan Catatan',
+                $exception,
+                'Pembayaran vendor berhasil disimpan, tetapi sinkronisasi payment request belum berhasil diperbarui. Silakan periksa status payment request terkait.'
+            );
+        }
+    }
+
+    protected function handleRecordCreation(array $data): Model
+    {
+        try {
+            return parent::handleRecordCreation($data);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('CreateVendorPayment handleRecordCreation failed', [
+                'supplier_id' => $data['supplier_id'] ?? null,
+                'payment_request_id' => $data['payment_request_id'] ?? null,
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::danger(
+                'Gagal Membuat Pembayaran Vendor',
+                $exception,
+                'Pembayaran vendor belum berhasil dibuat. Periksa kembali invoice, nominal pembayaran, dan akun yang dipilih lalu coba lagi.'
+            );
+
+            throw $exception;
         }
     }
 }

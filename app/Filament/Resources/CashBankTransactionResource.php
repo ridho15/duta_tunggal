@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CashBankTransactionResource\Pages;
+use App\Helpers\MoneyHelper;
 use App\Models\CashBankTransaction;
 use App\Models\ChartOfAccount;
 use App\Models\VoucherRequest;
@@ -42,9 +43,11 @@ class CashBankTransactionResource extends Resource
 {
     protected static ?string $model = CashBankTransaction::class;
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
     protected static ?string $modelLabel = 'Transaksi Kas & Bank';
     protected static ?int $navigationSort = 6;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -95,7 +98,6 @@ class CashBankTransactionResource extends Resource
                             ]),
                         TextInput::make('amount')
                             ->label('Jumlah Total')
-                            ->numeric()
                             ->minValue(0.01)
                             ->required()
                             ->indonesianMoney()
@@ -141,7 +143,7 @@ class CashBankTransactionResource extends Resource
                                 $voucherService = app(VoucherRequestService::class);
                                 return $voucherService->getAvailableVouchers()->mapWithKeys(function ($voucher) {
                                     $remaining = $voucher->getRemainingAmount();
-                                    return [$voucher->id => $voucher->voucher_number . ' - ' . $voucher->related_party . ' (' . formatCurrency($remaining) . ' tersisa)'];
+                                    return [$voucher->id => $voucher->voucher_number . ' - ' . $voucher->related_party . ' (' . \App\Helpers\MoneyHelper::rupiah($remaining) . ' tersisa)'];
                                 });
                             })
                             ->searchable()
@@ -190,11 +192,12 @@ class CashBankTransactionResource extends Resource
                             ]),
                         TextInput::make('voucher_amount_used')
                             ->label('Jumlah Voucher yang Digunakan')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->minValue(0.01)
                             ->visible(fn(callable $get) => $get('voucher_request_id') || $get('voucher_number'))
                             ->columnSpan(6)
                             ->default(fn(callable $get) => $get('amount'))
+                            ->dehydrateStateUsing(fn ($state) => \App\Helpers\MoneyHelper::safeParse($state))
                             ->rules([
                                 function (callable $get) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -264,7 +267,6 @@ class CashBankTransactionResource extends Resource
                                 ]),
                             TextInput::make('amount')
                                 ->label('Jumlah')
-                                ->numeric()
                                 ->minValue(-999999999)
                                 ->maxValue(999999999)
                                 ->required()
@@ -301,14 +303,14 @@ class CashBankTransactionResource extends Resource
                         ->collapsible()
                         ->itemLabel(fn(array $state): ?string => $state['description'] ?? ChartOfAccount::find($state['chart_of_account_id'] ?? null)?->name ?? 'Rincian Baru')
                         ->afterStateUpdated(function ($state, callable $set) {
-                            $total = collect($state ?? [])->sum('amount');
+                            $total = (float) collect($state ?? [])->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['amount'] ?? 0));
                             if ($total > 0) {
                                 $set('../../amount', abs($total)); // Use absolute value for main amount
                             }
                         })
                         ->rules([
                             fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
-                                $total = collect($value ?? [])->sum('amount');
+                                $total = (float) collect($value ?? [])->sum(fn ($row) => (float) \App\Helpers\MoneyHelper::safeParse($row['amount'] ?? 0));
                                 if ($total == 0) {
                                     $fail('Total rincian tidak boleh 0');
                                 }
@@ -497,7 +499,7 @@ class CashBankTransactionResource extends Resource
                                 $totalDebit = $entries->sum('debit');
                                 $totalCredit = $entries->sum('credit');
                                 $count = $entries->count();
-                                return "Total Entries: {$count} | Total Debit: Rp " . number_format($totalDebit, 0, ',', '.') . " | Total Credit: Rp " . number_format($totalCredit, 0, ',', '.');
+                                return "Total Entries: {$count} | Total Debit: " . MoneyHelper::rupiah($totalDebit) . " | Total Credit: " . MoneyHelper::rupiah($totalCredit);
                             })
                             ->columnSpanFull(),
                         RepeatableEntry::make('journalEntries')

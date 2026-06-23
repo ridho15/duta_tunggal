@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Support\OrderRequestQuantityLock;
+use App\Support\TaxTypeHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -29,6 +31,63 @@ class PurchaseOrderItem extends Model
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id')->withDefault();
     }
 
+    protected static function booted()
+    {
+        static::saving(function (PurchaseOrderItem $purchaseOrderItem) {
+            if (
+                $purchaseOrderItem->refer_item_model_type === OrderRequestItem::class
+                && ! empty($purchaseOrderItem->refer_item_model_id)
+            ) {
+                $orderRequestItem = OrderRequestItem::withoutGlobalScopes()
+                    ->find($purchaseOrderItem->refer_item_model_id);
+
+                if ($orderRequestItem) {
+                    $purchaseOrderItem->tipe_pajak = TaxTypeHelper::normalize($orderRequestItem->tipe_pajak);
+
+                    return;
+                }
+            }
+
+            $purchaseOrderItem->tipe_pajak = TaxTypeHelper::normalize($purchaseOrderItem->tipe_pajak ?? null);
+        });
+
+        static::creating(function (PurchaseOrderItem $purchaseOrderItem) {
+            if (! empty($purchaseOrderItem->refer_item_model_type) && ! empty($purchaseOrderItem->refer_item_model_id)) {
+                return;
+            }
+
+            $purchaseOrder = PurchaseOrder::withoutGlobalScopes()->find($purchaseOrderItem->purchase_order_id);
+            if (! $purchaseOrder || $purchaseOrder->refer_model_type !== OrderRequest::class || ! $purchaseOrder->refer_model_id) {
+                return;
+            }
+
+            $orderRequest = OrderRequest::withoutGlobalScopes()->find($purchaseOrder->refer_model_id);
+            if (! $orderRequest || ! $orderRequest->exists) {
+                return;
+            }
+
+            $matchedItem = $orderRequest->orderRequestItem()
+                ->where('product_id', $purchaseOrderItem->product_id)
+                ->when($purchaseOrder->supplier_id, function ($query) use ($purchaseOrder) {
+                    $query->where(function ($supplierQuery) use ($purchaseOrder) {
+                        $supplierQuery->where('supplier_id', $purchaseOrder->supplier_id)
+                            ->orWhereNull('supplier_id');
+                    });
+                })
+                ->orderBy('id')
+                ->get()
+                ->first(fn (OrderRequestItem $item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0);
+
+            if (! $matchedItem) {
+                return;
+            }
+
+            $purchaseOrderItem->refer_item_model_type = OrderRequestItem::class;
+            $purchaseOrderItem->refer_item_model_id = $matchedItem->id;
+            $purchaseOrderItem->tipe_pajak = TaxTypeHelper::normalize($matchedItem->tipe_pajak);
+        });
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
@@ -47,6 +106,11 @@ class PurchaseOrderItem extends Model
     public function qualityControl()
     {
         return $this->morphOne(QualityControl::class, 'from_model');
+    }
+
+    public function qualityControls()
+    {
+        return $this->morphMany(QualityControl::class, 'from_model');
     }
 
     public function currency()

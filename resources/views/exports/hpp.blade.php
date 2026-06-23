@@ -153,6 +153,27 @@
             color: #6b7280;
         }
 
+        .data-quality-warning {
+            margin: 0 15px 15px;
+            padding: 12px 14px;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            background: #fffbeb;
+            color: #92400e;
+            font-size: 12px;
+        }
+
+        .data-quality-warning h2 {
+            margin: 0 0 6px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .data-quality-warning ul {
+            margin: 6px 0 0;
+            padding-left: 18px;
+        }
+
         .footer p {
             margin: 0;
         }
@@ -195,6 +216,18 @@
                 </div>
             </div>
         </div>
+
+        @if(!empty($report['data_quality']['warnings'] ?? []))
+        <div class="data-quality-warning">
+            <h2>Peringatan kualitas data HPP</h2>
+            <div>Laporan ini memakai fallback untuk sebagian nilai. Periksa sumber data berikut:</div>
+            <ul>
+                @foreach($report['data_quality']['warnings'] as $warning)
+                    <li>{{ is_array($warning) ? ($warning['message'] ?? json_encode($warning)) : $warning }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
 
         <!-- Content -->
         <div class="content-section">

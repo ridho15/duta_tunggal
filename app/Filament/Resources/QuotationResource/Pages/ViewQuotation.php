@@ -6,7 +6,7 @@ use App\Filament\Resources\QuotationResource;
 use App\Http\Controllers\HelperController;
 use App\Models\Rak;
 use App\Models\SaleOrder;
-use App\Models\Warehouse;
+use App\Support\WarehouseStockOptions;
 use App\Services\QuotationService;
 use App\Services\SalesOrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -31,6 +31,11 @@ use Illuminate\Support\Facades\Log;
 class ViewQuotation extends ViewRecord
 {
     protected static string $resource = QuotationResource::class;
+    
+    public function getTitle(): string
+    {
+        return 'View Quotation - ' . QuotationResource::quotationStatusLabel($this->record?->status);
+    }
 
     protected function getActions(): array
     {
@@ -63,7 +68,7 @@ class ViewQuotation extends ViewRecord
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
                         $quotationService->requestApprove($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Mengajukan Approve Berhasil");
+                        HelperController::sendNotification(isSuccess: true, title: "Information", message: "Pengajuan persetujuan Quotation berhasil. Proses selanjutnya: Manajer Sales perlu mereview dan memberikan persetujuan atas Quotation ini.");
                     }),
                 Action::make('approve')
                     ->label('Approve')
@@ -76,7 +81,7 @@ class ViewQuotation extends ViewRecord
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
                         $quotationService->approve($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Berhasil melakukan approve quotation");
+                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Quotation berhasil disetujui. Proses selanjutnya: Tim Sales perlu membuat Sale Order berdasarkan Quotation yang telah disetujui ini.");
                     }),
                 Action::make('reject')
                     ->label('Reject')
@@ -89,7 +94,7 @@ class ViewQuotation extends ViewRecord
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
                         $quotationService->reject($record);
-                        HelperController::sendNotification(isSuccess: true, title: "Danger", message: "Quotation di reject");
+                        HelperController::sendNotification(isSuccess: true, title: "Danger", message: "Quotation ditolak. Proses selanjutnya: Tim Sales perlu merevisi penawaran sesuai catatan penolakan dan mengajukan kembali untuk persetujuan.");
                     }),
                 Action::make('sync_total_amount')
                     ->icon('heroicon-o-arrow-path-rounded-square')
@@ -101,18 +106,11 @@ class ViewQuotation extends ViewRecord
                         HelperController::sendNotification(isSuccess: true, title: "Information", message: "Total berhasil di update");
                     }),
                 Action::make('pdf_quotation')
-                    ->label('Download PDF')
-                    ->icon('heroicon-o-document')
-                    ->color('danger')
-                    ->action(function ($record) {
-                        $pdf = Pdf::loadView('pdf.quotation', [
-                            'quotation' => $record
-                        ])->setPaper('A4', 'portrait');
-
-                        return response()->streamDownload(function () use ($pdf) {
-                            echo $pdf->stream();
-                        }, 'Quotation_' . $record->quotation_number . '.pdf');
-                    }),
+                    ->label('Preview / Download PDF')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('info')
+                    ->url(fn ($record) => route('pdf-stream', ['type' => 'quotation', 'id' => $record->id]))
+                    ->openUrlInNewTab(),
                 Action::make('create_sale_order')
                     ->label('Buat Sales Order')
                     ->icon('heroicon-o-plus')
@@ -146,7 +144,7 @@ class ViewQuotation extends ViewRecord
                                     ->content(fn($record) => $record->customer->name ?? '-'),
                                 Placeholder::make('total_amount')
                                     ->label('Total Amount')
-                                    ->content(fn($record) => 'Rp ' . number_format($record->total_amount, 0, ',', '.')),
+                                    ->content(fn($record) => \App\Helpers\MoneyHelper::rupiah($record->total_amount)),
                                 Placeholder::make('item_count')
                                     ->label('Jumlah Item')
                                     ->content(fn($record) => $record->quotationItem->count() . ' item(s)'),
@@ -200,6 +198,7 @@ class ViewQuotation extends ViewRecord
                                     ->label('Item Sales Order')
                                     ->schema([
                                         Hidden::make('product_id'),
+                                        Hidden::make('tax_type')->default('None'),
                                         Placeholder::make('product_info')
                                             ->label('Produk')
                                             ->content(function ($get, $record) {
@@ -222,21 +221,24 @@ class ViewQuotation extends ViewRecord
                                                 'required' => 'Quantity wajib diisi',
                                                 'numeric' => 'Quantity harus berupa angka'
                                             ])
-                                            ->reactive()
+                                            ->live(onBlur: true)
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $state ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $get('tax') ?? 0;
-                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                $taxType = $get('tax_type') ?? 'None';
+                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                 $set('subtotal', $subtotal);
+                                                $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                             }),
                                         TextInput::make('unit_price')
                                             ->label('Unit Price')
-                                            ->numeric()
                                             ->default(function ($get, $record) {
                                                 $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                return $quotationItem ? $quotationItem->unit_price : 0;
+                                                return $quotationItem
+                                                    ? number_format((float) $quotationItem->unit_price, 2, ',', '.')
+                                                    : 0;
                                             })
                                             ->required()
                                             ->indonesianMoney()
@@ -244,31 +246,33 @@ class ViewQuotation extends ViewRecord
                                                 'required' => 'Unit Price wajib diisi',
                                                 'numeric' => 'Unit Price harus berupa angka'
                                             ])
-                                            ->reactive()
+                                            ->live(debounce: 500)
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($state ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $get('tax') ?? 0;
-                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                $taxType = $get('tax_type') ?? 'None';
+                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                 $set('subtotal', $subtotal);
+                                                $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                             }),
                                         Select::make('warehouse_id')
                                             ->label('Gudang')
                                             ->searchable()
                                             ->preload()
-                                            ->options(function () {
-                                                return Warehouse::where('status', 1)->pluck('name', 'id')->map(function ($name, $id) {
-                                                    $warehouse = Warehouse::find($id);
-                                                    return "({$warehouse->kode}) {$name}";
-                                                });
+                                            ->options(function ($get) {
+                                                return WarehouseStockOptions::forProduct(
+                                                    $get('product_id'),
+                                                    $get('warehouse_id'),
+                                                );
                                             })
-                                            ->required()
+                                            ->helperText('Hanya menampilkan gudang yang memiliki stok tersedia untuk produk ini.')
                                             ->validationMessages([
                                                 'required' => 'Gudang wajib dipilih'
                                             ])
-                                            ->default(function () {
-                                                return Warehouse::where('status', 1)->first()?->id;
+                                            ->default(function ($get) {
+                                                return array_key_first(WarehouseStockOptions::forProduct($get('product_id')));
                                             })
                                             ->reactive()
                                             ->afterStateUpdated(function ($set) {
@@ -276,7 +280,7 @@ class ViewQuotation extends ViewRecord
                                             }),
                                         Select::make('rak_id')
                                             ->label('Rak')
-                                            ->searchable(['code', 'perusahaan'])
+                                            ->searchable(['code', 'name'])
                                             ->preload()
                                             ->options(function ($get) {
                                                 $warehouseId = $get('warehouse_id');
@@ -301,11 +305,13 @@ class ViewQuotation extends ViewRecord
                                             ->reactive()
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $discount = $state ?? 0;
                                                 $tax = $get('tax') ?? 0;
-                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                $taxType = $get('tax_type') ?? 'None';
+                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                 $set('subtotal', $subtotal);
+                                                $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                             }),
                                         TextInput::make('tax')
                                             ->label('Tax (%)')
@@ -319,15 +325,21 @@ class ViewQuotation extends ViewRecord
                                             ->reactive()
                                             ->afterStateUpdated(function ($state, $set, $get) {
                                                 $quantity = $get('quantity') ?? 0;
-                                                $unitPrice = HelperController::parseIndonesianMoney($get('unit_price') ?? 0);
+                                                $unitPrice = \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $discount = $get('discount') ?? 0;
                                                 $tax = $state ?? 0;
-                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax);
+                                                $taxType = $get('tax_type') ?? 'None';
+                                                $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
                                                 $set('subtotal', $subtotal);
+                                                $set('tax_nominal', HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType));
                                             }),
+                                        TextInput::make('tax_nominal')
+                                            ->label('Tax Amount')
+                                            ->indonesianMoney()
+                                            ->readOnly()
+                                            ->default(0),
                                         TextInput::make('subtotal')
                                             ->label('Subtotal')
-                                            ->numeric()
                                             ->indonesianMoney()
                                             ->readOnly()
                                             ->default(0),
@@ -347,12 +359,26 @@ class ViewQuotation extends ViewRecord
                                                 $items[] = [
                                                     'product_id' => $quotationItem->product_id,
                                                     'quantity' => $quotationItem->quantity,
-                                                    'unit_price' => $quotationItem->unit_price,
+                                                    'unit_price' => number_format((float) $quotationItem->unit_price, 2, ',', '.'),
                                                     'discount' => $quotationItem->discount,
                                                     'tax' => $quotationItem->tax,
+                                                    'tax_type' => $quotationItem->tax_type ?? 'None',
                                                     'warehouse_id' => null,
                                                     'rak_id' => null,
-                                                    'subtotal' => $quotationItem->quantity * ($quotationItem->unit_price + $quotationItem->tax - $quotationItem->discount)
+                                                    'tax_nominal' => HelperController::hitungTaxNominal(
+                                                        $quotationItem->quantity,
+                                                        (float) $quotationItem->unit_price,
+                                                        $quotationItem->discount,
+                                                        $quotationItem->tax,
+                                                        $quotationItem->tax_type ?? 'None'
+                                                    ),
+                                                    'subtotal' => HelperController::hitungSubtotal(
+                                                        $quotationItem->quantity,
+                                                        (float) $quotationItem->unit_price,
+                                                        $quotationItem->discount,
+                                                        $quotationItem->tax,
+                                                        $quotationItem->tax_type ?? 'None'
+                                                    )
                                                 ];
                                             }
                                             return $items;
@@ -374,6 +400,7 @@ class ViewQuotation extends ViewRecord
                         $saleOrder = SaleOrder::create([
                             'customer_id' => $record->customer_id,
                             'quotation_id' => $record->id,
+                            'cabang_id' => $record->cabang_id, // Warisi cabang dari quotation
                             'so_number' => $data['so_number'],
                             'order_date' => $data['order_date'],
                             'delivery_date' => $data['delivery_date'],
@@ -391,9 +418,10 @@ class ViewQuotation extends ViewRecord
                                 $saleOrder->saleOrderItem()->create([
                                     'product_id' => $item['product_id'],
                                     'quantity' => $item['quantity'],
-                                    'unit_price' => HelperController::parseIndonesianMoney($item['unit_price']),
+                                    'unit_price' => \App\Helpers\MoneyHelper::safeParse($item['unit_price']),
                                     'discount' => $item['discount'] ?? 0,
                                     'tax' => $item['tax'] ?? 0,
+                                    'tipe_pajak' => $item['tax_type'] ?? 'None',
                                     'warehouse_id' => $item['warehouse_id'],
                                     'rak_id' => $item['rak_id'] ?? null,
                                 ]);
@@ -407,6 +435,7 @@ class ViewQuotation extends ViewRecord
                                     'unit_price' => $quotationItem->unit_price,
                                     'discount' => $quotationItem->discount,
                                     'tax' => $quotationItem->tax,
+                                    'tipe_pajak' => $quotationItem->tax_type ?? 'None',
                                     'warehouse_id' => 1, // Default warehouse
                                     'rak_id' => null,
                                 ]);
@@ -416,7 +445,7 @@ class ViewQuotation extends ViewRecord
                         // Update total amount
                         $salesOrderService->updateTotalAmount($saleOrder);
 
-                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat");
+                        HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation. Proses selanjutnya: Manajer Sales perlu menyetujui Sales Order ini sebelum diproses lebih lanjut.");
 
                         // Redirect to edit page
                         return redirect()->route('filament.admin.resources.sale-orders.edit', $saleOrder);
@@ -428,5 +457,10 @@ class ViewQuotation extends ViewRecord
                     ->slideOver()
             ])->button()
         ];
+    }
+
+    public function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
+    {
+        return QuotationResource::infolist($infolist);
     }
 }

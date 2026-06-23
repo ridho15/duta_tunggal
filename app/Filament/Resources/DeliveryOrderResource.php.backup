@@ -531,7 +531,7 @@ class DeliveryOrderResource extends Resource
                                 return "Surat Jalan: {$suratJalan->sj_number}\nStatus: Terbit";
                             }
                         }
-                        return 'Delivery Order belum memiliki Surat Jalan yang terbit. Surat Jalan yang terbit diperlukan sebelum approval.';
+                        return 'Delivery Order belum memiliki Surat Jalan. Surat Jalan hanya dipakai sebagai dokumen pendukung DO dan bukan syarat approval.';
                     }),
                 TextColumn::make('salesOrders.so_number')
                     ->label('Sales Orders')

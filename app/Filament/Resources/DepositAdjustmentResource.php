@@ -84,14 +84,14 @@ class DepositAdjustmentResource extends Resource
                                     ->searchable()
                                     ->options(function ($get) {
                                         if ($get('from_model_type') == 'App\Models\Supplier') {
-                                            return Supplier::get()->pluck('name', 'id');
+                                            return Supplier::get()->pluck('perusahaan', 'id');
                                         } elseif ($get('from_model_type') == 'App\Models\Customer') {
                                             return Customer::get()->pluck('name', 'id');
                                         }
                                         return [];
                                     })
                                     ->getOptionLabelFromRecordUsing(function ($record) {
-                                        return "({$record->code}) {$record->name}";
+                                        return "({$record->code}) " . ($record->perusahaan ?? $record->name ?? '');
                                     })
                                     ->reactive(),
                             ]),
@@ -102,26 +102,23 @@ class DepositAdjustmentResource extends Resource
                                     ->label('Deposit Amount')
                                     ->indonesianMoney()
                                     ->required()
-                                    ->numeric()
                                     ->default(0),
                                     
                                 TextInput::make('used_amount')
                                     ->label('Used Amount')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0),
                                     
                                 TextInput::make('remaining_amount')
                                     ->label('Remaining Amount')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->default(0),
                             ]),
                             
                         Select::make('coa_id')
                             ->label('Chart Of Account')
                             ->required()
-                            ->searchable(['code', 'perusahaan'])
+                            ->searchable(['code', 'name'])
                             ->relationship('coa', 'code')
                             ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                                 return "({$chartOfAccount->code}) {$chartOfAccount->name}";
@@ -205,7 +202,6 @@ class DepositAdjustmentResource extends Resource
                                     TextInput::make('adjustment_amount')
                                         ->label('Adjustment Amount')
                                         ->indonesianMoney()
-                                        ->numeric()
                                         ->required()
                                         ->helperText('Positive to add, negative to subtract'),
                                         

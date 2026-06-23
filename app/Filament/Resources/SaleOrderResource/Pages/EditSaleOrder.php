@@ -6,6 +6,8 @@ use App\Filament\Resources\SaleOrderResource;
 use App\Services\SalesOrderService;
 use App\Services\CreditValidationService;
 use App\Models\Customer;
+use App\Support\CurrencyConversionResolver;
+use App\Helpers\MoneyHelper;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -18,13 +20,13 @@ class EditSaleOrder extends EditRecord
 
     // protected static string $view = 'filament.components.sale-order.form';
 
-    protected static ?string $title = 'Ubah Penjualan';
+    protected static ?string $title = 'Ubah Sales Order';
 
     protected function getHeaderActions(): array
     {
         return [
             Action::make('view_sale_order')
-                ->label('Lihat Penjualan')
+                ->label('Lihat Sales Order')
                 ->icon('heroicon-o-eye')
                 ->color('primary')
                 ->url(fn () => route('filament.admin.resources.sale-orders.view', $this->getRecord())),
@@ -35,13 +37,20 @@ class EditSaleOrder extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data = SaleOrderResource::normalizeFormDataForPersist($data);
+
         // Validate credit limit and overdue credits before saving sale order
         if (isset($data['customer_id']) && isset($data['total_amount'])) {
             $customer = Customer::find($data['customer_id']);
 
             if ($customer) {
                 $creditService = app(CreditValidationService::class);
-                $validation = $creditService->canCustomerMakePurchase($customer, (float)$data['total_amount']);
+                $totalForCredit = CurrencyConversionResolver::convertToIdr(
+                    MoneyHelper::parseHighPrecision(SaleOrderResource::parseCurrencyState($data['total_amount'] ?? 0)),
+                    is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null,
+                    false
+                );
+                $validation = $creditService->canCustomerMakePurchase($customer, (float) $totalForCredit);
 
                 if (!$validation['can_purchase']) {
                     Notification::make()

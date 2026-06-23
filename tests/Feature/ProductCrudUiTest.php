@@ -22,6 +22,11 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->seed(ChartOfAccountSeeder::class);
 
+    ChartOfAccount::firstOrCreate(
+        ['code' => '2100.10'],
+        ['name' => 'Pembelian Belum Tertagih', 'type' => 'Liability', 'is_active' => true]
+    );
+
     $this->user = User::factory()->create();
     $this->cabang = Cabang::factory()->create();
     $this->supplier = Supplier::factory()->create();
@@ -62,14 +67,14 @@ beforeEach(function () {
 function productDefaultAccounts(): array
 {
     return [
-        'inventory_coa_id' => ChartOfAccount::where('code', '1140.10')->value('id'),
+        'inventory_coa_id' => ChartOfAccount::where('code', '1140.01')->value('id'),
         'sales_coa_id' => ChartOfAccount::where('code', '4100.10')->value('id'),
         'sales_return_coa_id' => ChartOfAccount::where('code', '4120.10')->value('id'),
         'sales_discount_coa_id' => ChartOfAccount::where('code', '4110.10')->value('id'),
         'goods_delivery_coa_id' => ChartOfAccount::where('code', '1140.20')->value('id'),
         'cogs_coa_id' => ChartOfAccount::where('code', '5100.10')->value('id'),
         'purchase_return_coa_id' => ChartOfAccount::where('code', '5120.10')->value('id'),
-        'unbilled_purchase_coa_id' => ChartOfAccount::where('code', '2190.10')->value('id'),
+        'unbilled_purchase_coa_id' => ChartOfAccount::where('code', '2100.10')->value('id'),
         'temporary_procurement_coa_id' => ChartOfAccount::where('code', '1400.01')->value('id'),
     ];
 }

@@ -18,9 +18,9 @@ class QuotationItemFactory extends Factory
      */
     public function definition(): array
     {
-        $quotation = Quotation::inRandomOrder()->first()->id;
-        $product = Product::inRandomOrder()->first();
-        $unit_price = $product->sell_price;
+        $quotation = Quotation::inRandomOrder()->first()?->id ?? Quotation::factory()->create()->id;
+        $product = Product::inRandomOrder()->first() ?? Product::factory()->create();
+        $unit_price = $product->sell_price ?? 10000;
         $discount = random_int(0, 20);
         $quantity = random_int(1, 20);
         $tax = random_int(0, 20);

@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             
             // Master Data
-            // CurrencySeeder::class, // REMOVED: Handled by FinanceSeeder
+            CurrencySeeder::class,
             UnitOfMeasureSeeder::class,
             CabangSeeder::class, // ✅ TAMBAHKAN: Data cabang untuk multi-cabang
             ChartOfAccountSeeder::class, // ✅ TAMBAHKAN: COA lengkap
@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
             DriverSeeder::class,
             VehicleSeeder::class,
             ProductSeeder::class,
+            ProductSupplierSeeder::class,
             BillOfMaterialSeeder::class,
             
             // Manufacturing Process
@@ -67,6 +68,7 @@ class DatabaseSeeder extends Seeder
             CompleteSalesFlowSeeder::class, // ✅ TAMBAHKAN: Complete sales flow with approved quotation, SO, and DO
             
             // Operations
+            DeliveryScheduleSeeder::class, // ✅ TAMBAHKAN: Delivery schedules
             DeliveryOrderSeeder::class,
             SuratJalanSeeder::class,
             ReturnProductSeeder::class, // ✅ TAMBAHKAN: Product returns
@@ -74,9 +76,9 @@ class DatabaseSeeder extends Seeder
             StockMovementSeeder::class, // ✅ TAMBAHKAN: Stock movements
             
             // Finance
+            FinanceSeeder::class,
             CashBankDemoSeeder::class,
             BankReconciliationDemoSeeder::class,
-            FinanceSeeder::class,
             OtherSaleSeeder::class, // ✅ TAMBAHKAN: Other sales (building rental, etc.)
         ]);
     }

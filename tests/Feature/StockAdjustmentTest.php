@@ -2,17 +2,21 @@
 
 use App\Models\Product;
 use App\Models\Rak;
+use App\Models\InventoryStock;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Filament\Resources\StockAdjustmentResource;
+use App\Services\StockAdjustmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    // No special setup needed for these model tests
+    $this->service = app(StockAdjustmentService::class);
 });
 
 test('can create stock adjustment with increase type', function () {
@@ -118,18 +122,27 @@ test('stock adjustment item belongs to adjustment', function () {
 });
 
 test('can approve stock adjustment', function () {
-    $adjustment = StockAdjustment::factory()->draft()->create();
+    $adjustment = StockAdjustment::factory()->draft()->increase()->create();
     $approver = User::factory()->create();
+    $product = Product::factory()->create();
+    $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
 
-    $adjustment->update([
-        'status' => 'approved',
-        'approved_by' => $approver->id,
-        'approved_at' => now(),
+    StockAdjustmentItem::create([
+        'stock_adjustment_id' => $adjustment->id,
+        'product_id' => $product->id,
+        'rak_id' => $rak->id,
+        'current_qty' => 10,
+        'adjusted_qty' => 15,
+        'difference_qty' => 5,
+        'unit_cost' => 1000,
+        'difference_value' => 5000,
     ]);
 
-    expect($adjustment->status)->toBe('approved')
-        ->and($adjustment->approved_by)->toBe($approver->id)
-        ->and($adjustment->approved_at)->not->toBeNull();
+    $approvedAdjustment = $this->service->approveStockAdjustment($adjustment, $approver->id);
+
+    expect($approvedAdjustment->status)->toBe('approved')
+        ->and($approvedAdjustment->approved_by)->toBe($approver->id)
+        ->and($approvedAdjustment->approved_at)->not->toBeNull();
 });
 
 test('can reject stock adjustment', function () {
@@ -148,24 +161,89 @@ test('can reject stock adjustment', function () {
 });
 
 test('stock adjustment generates stock movements when approved', function () {
-    $adjustment = StockAdjustment::factory()->increase()->create();
-    $item = StockAdjustmentItem::factory()->create([
+    $adjustment = StockAdjustment::factory()->draft()->increase()->create();
+    $product = Product::factory()->create();
+    $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
+
+    InventoryStock::factory()->create([
+        'product_id' => $product->id,
+        'warehouse_id' => $adjustment->warehouse_id,
+        'rak_id' => $rak->id,
+        'qty_available' => 50,
+        'qty_reserved' => 0,
+    ]);
+
+    StockAdjustmentItem::create([
         'stock_adjustment_id' => $adjustment->id,
+        'product_id' => $product->id,
+        'rak_id' => $rak->id,
         'current_qty' => 50.00,
         'adjusted_qty' => 75.00,
         'difference_qty' => 25.00,
+        'unit_cost' => 15000,
+        'difference_value' => 375000,
     ]);
 
-    // Approve the adjustment
-    $adjustment->update(['status' => 'approved']);
+    expect((float) InventoryStock::where('product_id', $product->id)
+        ->where('warehouse_id', $adjustment->warehouse_id)
+        ->where('rak_id', $rak->id)
+        ->first()->qty_available)->toBe(50.0);
 
-    // Check if stock movement was created (may not be implemented yet)
+    $this->service->approveStockAdjustment($adjustment, User::factory()->create()->id);
+
     $stockMovement = StockMovement::where('from_model_type', StockAdjustment::class)
         ->where('from_model_id', $adjustment->id)
         ->first();
 
-    // This test passes whether stock movement is created or not
-    expect($stockMovement instanceof StockMovement || $stockMovement === null)->toBeTrue();
+    expect($stockMovement)->not->toBeNull()
+        ->and($stockMovement->type)->toBe('adjustment_in')
+        ->and((float) $stockMovement->quantity)->toBe(25.0);
+
+    expect((float) InventoryStock::where('product_id', $product->id)
+        ->where('warehouse_id', $adjustment->warehouse_id)
+        ->where('rak_id', $rak->id)
+        ->first()->qty_available)->toBe(75.0);
+});
+
+test('stock adjustment decrease approval is blocked when stock is insufficient', function () {
+    $adjustment = StockAdjustment::factory()->draft()->decrease()->create();
+    $product = Product::factory()->create();
+    $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
+
+    InventoryStock::factory()->create([
+        'product_id' => $product->id,
+        'warehouse_id' => $adjustment->warehouse_id,
+        'rak_id' => $rak->id,
+        'qty_available' => 4,
+        'qty_reserved' => 0,
+    ]);
+
+    StockAdjustmentItem::create([
+        'stock_adjustment_id' => $adjustment->id,
+        'product_id' => $product->id,
+        'rak_id' => $rak->id,
+        'current_qty' => 4,
+        'adjusted_qty' => 0,
+        'difference_qty' => -6,
+        'unit_cost' => 1000,
+        'difference_value' => -6000,
+    ]);
+
+    expect(fn () => $this->service->approveStockAdjustment($adjustment, User::factory()->create()->id))
+        ->toThrow(ValidationException::class, 'Stok tidak cukup');
+
+    expect(StockMovement::where('from_model_type', StockAdjustment::class)
+        ->where('from_model_id', $adjustment->id)
+        ->count())->toBe(0);
+
+    expect($adjustment->fresh()->status)->toBe('draft');
+});
+
+test('stock adjustment approval requires at least one item', function () {
+    $adjustment = StockAdjustment::factory()->draft()->increase()->create();
+
+    expect(fn () => $this->service->approveStockAdjustment($adjustment, User::factory()->create()->id))
+        ->toThrow(ValidationException::class, 'Tambahkan minimal satu item');
 });
 
 test('stock adjustment soft deletes', function () {
@@ -228,4 +306,57 @@ test('adjustment belongs to approver', function () {
     ]);
 
     expect($adjustment->approver->id)->toBe($user->id);
+});
+
+test('stock adjustment resource formats product and rack labels with sku and code', function () {
+    $warehouse = Warehouse::factory()->create();
+    $product = Product::factory()->create([
+        'sku' => 'SKU-SA-001',
+        'name' => 'Stock Adjustment Product',
+    ]);
+    $rak = Rak::factory()->create([
+        'warehouse_id' => $warehouse->id,
+        'code' => 'RAK-SA-001',
+        'name' => 'Rak Stock Adjustment',
+    ]);
+
+    InventoryStock::create([
+        'product_id' => $product->id,
+        'warehouse_id' => $warehouse->id,
+        'rak_id' => $rak->id,
+        'qty_available' => 9,
+        'qty_reserved' => 4,
+        'qty_min' => 0,
+    ]);
+
+    expect(StockAdjustmentResource::resolveProductOptions())
+        ->toHaveKey($product->id)
+        ->and(StockAdjustmentResource::resolveProductOptions()[$product->id])
+        ->toBe('(SKU-SA-001) Stock Adjustment Product')
+        ->and(StockAdjustmentResource::resolveProductLabel($product->id))
+        ->toBe('(SKU-SA-001) Stock Adjustment Product')
+        ->and(StockAdjustmentResource::resolveRakOptions($warehouse->id))
+        ->toHaveKey($rak->id)
+        ->and(StockAdjustmentResource::resolveRakOptions($warehouse->id)[$rak->id])
+        ->toBe('(RAK-SA-001) Rak Stock Adjustment')
+        ->and(StockAdjustmentResource::resolveRakLabel($rak->id))
+        ->toBe('(RAK-SA-001) Rak Stock Adjustment')
+        ->and(StockAdjustmentResource::resolveAdjustmentCurrentQty($product->id, $warehouse->id, $rak->id))
+        ->toBe(5.0);
+});
+
+test('stock adjustment rak selection stays within the adjustment warehouse', function () {
+    $adjustment = StockAdjustment::factory()->create();
+    $otherWarehouse = Warehouse::factory()->create();
+
+    $rakInAdjustmentWarehouse = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
+    $rakInOtherWarehouse = Rak::factory()->create(['warehouse_id' => $otherWarehouse->id]);
+
+    $eligibleRakIds = Rak::where('warehouse_id', $adjustment->warehouse_id)
+        ->pluck('id')
+        ->all();
+
+    expect($eligibleRakIds)
+        ->toContain($rakInAdjustmentWarehouse->id)
+        ->not->toContain($rakInOtherWarehouse->id);
 });

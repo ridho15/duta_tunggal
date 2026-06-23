@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\Cabang;
+use App\Helpers\MoneyHelper;
 use Filament\Forms;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -31,11 +32,13 @@ class PaymentRequestResource extends Resource
     protected static ?string $model = PaymentRequest::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationLabel = 'Payment Request';
-    protected static ?string $modelLabel = 'Payment Request';
-    protected static ?string $pluralModelLabel = 'Payment Requests';
-    protected static ?string $navigationGroup = 'Finance - Pembayaran';
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Permintaan Pembayaran';
+    protected static ?string $modelLabel = 'Permintaan Pembayaran';
+    protected static ?string $pluralModelLabel = 'Permintaan Pembayaran';
+    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
+    protected static ?int $navigationSort = 1;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -49,13 +52,20 @@ class PaymentRequestResource extends Resource
                                 TextInput::make('request_number')
                                     ->label('Nomor PR')
                                     ->default(fn () => PaymentRequest::generateNumber())
-                                    ->disabled()
                                     ->dehydrated(true)
-                                    ->required(),
+                                    ->required()
+                                    ->suffixAction(
+                                        Forms\Components\Actions\Action::make('generate')
+                                            ->icon('heroicon-m-arrow-path')
+                                            ->tooltip('Generate Nomor PR')
+                                            ->action(function ($set) {
+                                                $set('request_number', PaymentRequest::generateNumber());
+                                            })
+                                    ),
 
                                 Select::make('supplier_id')
                                     ->label('Vendor / Supplier')
-                                    ->options(fn () => Supplier::all()->mapWithKeys(fn ($s) => [
+                                    ->options(fn () => Supplier::orderBy('perusahaan')->limit(50)->get()->mapWithKeys(fn ($s) => [
                                         $s->id => "({$s->code}) {$s->perusahaan}"
                                     ]))
                                     ->searchable()
@@ -75,7 +85,7 @@ class PaymentRequestResource extends Resource
 
                                 Select::make('cabang_id')
                                     ->label('Cabang')
-                                    ->options(fn () => Cabang::all()->mapWithKeys(fn ($c) => [
+                                    ->options(fn () => Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(fn ($c) => [
                                         $c->id => "({$c->kode}) {$c->nama}"
                                     ]))
                                     ->searchable()
@@ -85,10 +95,10 @@ class PaymentRequestResource extends Resource
 
                                 TextInput::make('total_amount')
                                     ->label('Total Pembayaran (Rp)')
-                                    ->numeric()
                                     ->disabled()
                                     ->dehydrated(true)
-                                    ->prefix('Rp'),
+                                    ->dehydrateStateUsing(fn ($state) => MoneyHelper::safeParse($state))
+                                    ->indonesianMoney(),
                             ]),
 
                         Section::make('Pilih Invoice yang akan Dibayar')
@@ -99,28 +109,45 @@ class PaymentRequestResource extends Resource
                                         $supplierId = $get('supplier_id');
                                         if (!$supplierId) return [];
 
-                                        return Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
-                                            ->whereHas('fromModel.supplier', fn ($q) => $q->where('id', $supplierId))
-                                            ->whereIn('status', ['unpaid', 'draft', 'sent', 'overdue', 'partially_paid'])
-                                            ->get()
+                                        // restrict to invoices issued from purchase orders belonging to the selected supplier
+                                            $poIds = \App\Models\PurchaseOrder::where('supplier_id', $supplierId)->pluck('id');
+
+                                            return Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
+                                                ->whereIn('from_model_id', $poIds)
+                                                ->whereIn('status', ['unpaid', 'draft', 'sent', 'overdue', 'partially_paid'])
+                                                ->get()
                                             ->mapWithKeys(function ($invoice) {
-                                                $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
-                                                $total = number_format($invoice->total, 0, ',', '.');
-                                                $isOverdue = $invoice->due_date && Carbon::parse($invoice->due_date)->isPast();
-                                                $label = "{$invoice->invoice_number} - Rp {$total} (Due: {$dueDate})";
+                                                try {
+                                                    $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
+                                                    $isOverdue = $invoice->due_date && Carbon::parse($invoice->due_date)->isPast();
+                                                } catch (\Throwable $e) {
+                                                    $dueDate = '-';
+                                                    $isOverdue = false;
+                                                }
+                                                $total = PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $invoice->total);
+                                                $label = "{$invoice->invoice_number} - {$total} (Due: {$dueDate})";
                                                 if ($isOverdue) $label .= ' ⚠ TERLAMBAT';
                                                 return [$invoice->id => $label];
                                             });
                                     })
                                     ->columns(1)
                                     ->reactive()
-                                    ->afterStateUpdated(function ($set, $state) {
+                                    ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
+                                            $set('cabang_id', Auth::user()?->cabang_id);
                                             $set('total_amount', 0);
                                             return;
                                         }
-                                        $total = Invoice::whereIn('id', $state)->sum('total');
-                                        $set('total_amount', $total);
+
+                                        $invoice = Invoice::whereIn('id', $state)->orderBy('id')->first();
+                                        if ($invoice && $invoice->cabang_id) {
+                                            $set('cabang_id', $invoice->cabang_id);
+                                        }
+
+                                        $total = Invoice::whereIn('id', $state)
+                                            ->get()
+                                            ->sum(fn (Invoice $invoice) => PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $invoice->total));
+                                        $set('total_amount', number_format((float) $total, 0, ',', '.'));
                                     }),
                             ]),
 

@@ -158,7 +158,8 @@ test('sales order self pickup approved does not create stock reservation', funct
     $salesOrderService->approve($saleOrder);
 
     $saleOrder->refresh();
-    expect($saleOrder->status)->toBe('approved');
+    // With sufficient stock, WC is auto-confirmed → SO status promoted to 'confirmed'
+    expect($saleOrder->status)->toBe('confirmed');
 
     // Check that no stock reservation is created for self pickup
     $stockReservations = StockReservation::where('sale_order_id', $saleOrder->id)->get();

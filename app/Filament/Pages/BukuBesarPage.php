@@ -14,9 +14,11 @@ class BukuBesarPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Buku Besar (General Ledger)';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 1;
 
@@ -48,12 +50,12 @@ class BukuBesarPage extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getUrl());
     }
 
     public function mount(Request $request): void
@@ -61,6 +63,7 @@ class BukuBesarPage extends Page
         // default dates to current month
         $this->start_date = $request->query('start', now()->startOfMonth()->format('Y-m-d'));
         $this->end_date = $request->query('end', now()->endOfMonth()->format('Y-m-d'));
+        $this->showPreview = filter_var($request->query('preview', false), FILTER_VALIDATE_BOOL);
 
         // optional preselected coa
         $coaId = $request->query('coa_id');
@@ -68,6 +71,17 @@ class BukuBesarPage extends Page
             $this->coa_ids = [$coaId];
             $this->view_mode = 'by_coa';
         }
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return static::getUrl() . '?' . http_build_query(array_filter([
+            'preview' => 1,
+            'start' => $this->start_date,
+            'end' => $this->end_date,
+            'coa_id' => !empty($this->coa_ids) ? $this->coa_ids[0] : null,
+            'view_mode' => $this->view_mode,
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getCoaOptionsProperty(): array
@@ -91,7 +105,7 @@ class BukuBesarPage extends Page
 
     /**
      * Livewire hook when coa_ids is updated from the frontend.
-     * We log it to help debugging whether Livewire receives the change.
+        $this->redirect(static::getUrl());
      */
     public function updatedCoaIds($value): void
     {
@@ -100,7 +114,7 @@ class BukuBesarPage extends Page
     }
 
     /**
-     * Method to be called from Alpine when COA selection changes.
+        return static::getUrl() . '?' . http_build_query(array_filter([
      * This sets the view mode and updates the selected COAs.
      */
     public function selectCoas($coaIds): void
@@ -166,6 +180,6 @@ class BukuBesarPage extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 }

@@ -25,13 +25,15 @@ class UnitOfMeasureResource extends Resource
 {
     protected static ?string $model = UnitOfMeasure::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-square-2-stack';
 
     protected static ?string $navigationGroup = 'Master Data';
 
     protected static ?string $modelLabel = 'Satuan';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {

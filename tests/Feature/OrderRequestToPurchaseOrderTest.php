@@ -22,12 +22,16 @@ use App\Models\Currency;
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
+use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Services\OrderRequestService;
+use App\Services\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
@@ -58,9 +62,6 @@ beforeEach(function () {
     $this->productB = Product::factory()->create(['cost_price' => 20000, 'sell_price' => 30000]);
 
     $this->orderRequest = OrderRequest::factory()->create([
-        'warehouse_id' => $this->warehouse->id,
-        'cabang_id'    => $this->cabang->id,
-        'supplier_id'  => $this->supplier->id,
         'created_by'   => $this->user->id,
         'status'       => 'draft',
         'request_date' => Carbon::today()->toDateString(),
@@ -119,6 +120,144 @@ test('approve without selected_items creates PO with all order request items', f
     expect((float) $poItemB->unit_price)->toBe(20000.0);
 });
 
+test('OR item tax types are preserved when building and approving a purchase order', function () {
+    $this->itemA->update([
+        'tipe_pajak' => 'Inclusive',
+        'tax' => 11,
+    ]);
+    $this->itemB->update([
+        'tipe_pajak' => 'Eklusif',
+        'tax' => 11,
+    ]);
+    $this->orderRequest->load('orderRequestItem.product.uom');
+
+    $formItems = PurchaseOrderResource::buildOrderRequestItems(
+        $this->orderRequest,
+        $this->supplier->id,
+        null,
+        $this->currency->id,
+    );
+
+    expect(collect($formItems)->firstWhere('product_id', $this->productA->id)['tipe_pajak'])->toBe('inklusif')
+        ->and(collect($formItems)->firstWhere('product_id', $this->productB->id)['tipe_pajak'])->toBe('eklusif');
+
+    $result = $this->service->approve($this->orderRequest->fresh(), [
+        'create_purchase_order' => true,
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-TAX-INHERIT-001',
+        'order_date' => Carbon::today()->toDateString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'quantity' => 4,
+                'unit_price' => 10000,
+                'include' => true,
+            ],
+            [
+                'item_id' => $this->itemB->id,
+                'quantity' => 5,
+                'unit_price' => 20000,
+                'include' => true,
+            ],
+        ],
+    ]);
+
+    $purchaseOrder = $result->fresh('purchaseOrder.purchaseOrderItem')->purchaseOrder;
+
+    expect($purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productA->id)->tipe_pajak)->toBe('inklusif')
+        ->and($purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productB->id)->tipe_pajak)->toBe('eklusif')
+        ->and((float) $purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productA->id)->quantity)->toBe(4.0);
+});
+
+test('purchase order item inherits tax type from referenced order request item even when payload is missing or wrong', function () {
+    $this->itemA->update([
+        'tipe_pajak' => 'inklusif',
+        'tax' => 11,
+    ]);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-TAX-BACKEND-GUARD-001',
+        'order_date' => Carbon::today()->toDateString(),
+        'status' => 'draft',
+        'total_amount' => 0,
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'created_by' => $this->user->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+    ]);
+
+    $missingPayloadItem = PurchaseOrderItem::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 1,
+        'unit_price' => 10000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => null,
+        'currency_id' => $this->currency->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $this->itemA->id,
+    ]);
+
+    expect($missingPayloadItem->fresh()->tipe_pajak)->toBe('inklusif');
+
+    $missingPayloadItem->update(['tipe_pajak' => 'eklusif']);
+
+    expect($missingPayloadItem->fresh()->tipe_pajak)->toBe('inklusif');
+});
+
+test('mixed order request tax types are preserved when creating a purchase order', function () {
+    $thirdProduct = Product::factory()->create(['cost_price' => 30000, 'sell_price' => 45000]);
+    $thirdItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $this->orderRequest->id,
+        'product_id' => $thirdProduct->id,
+        'supplier_id' => $this->supplier->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 30000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Non Pajak',
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $this->itemA->update(['tipe_pajak' => 'Inklusif', 'tax' => 11]);
+    $this->itemB->update(['tipe_pajak' => 'Eklusif', 'tax' => 11]);
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), [
+        'supplier_id' => $this->supplier->id,
+        'po_number' => 'PO-TAX-MIXED-001',
+        'order_date' => Carbon::today()->toDateString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'quantity' => 2,
+                'unit_price' => 10000,
+                'include' => true,
+            ],
+            [
+                'item_id' => $this->itemB->id,
+                'quantity' => 2,
+                'unit_price' => 20000,
+                'include' => true,
+            ],
+            [
+                'item_id' => $thirdItem->id,
+                'quantity' => 2,
+                'unit_price' => 30000,
+                'include' => true,
+            ],
+        ],
+    ]);
+
+    $items = $po->fresh('purchaseOrderItem')->purchaseOrderItem->keyBy('product_id');
+
+    expect($items[$this->productA->id]->tipe_pajak)->toBe('inklusif')
+        ->and($items[$this->productB->id]->tipe_pajak)->toBe('eklusif')
+        ->and($items[$thirdProduct->id]->tipe_pajak)->toBe('none');
+});
+
 // ─────────────────────────────────────────────
 // SCENARIO 2 — Approve with partial item selection (only itemA)
 // ─────────────────────────────────────────────
@@ -161,7 +300,7 @@ test('approve with selected_items creates PO with only included items', function
 // ─────────────────────────────────────────────
 // SCENARIO 3 — Approve with quantity override in selected_items
 // ─────────────────────────────────────────────
-test('approve with selected_items respects user-edited quantity', function () {
+test('approve with selected_items keeps fulfilled quantity at zero until receipt acceptance', function () {
     $payload = [
         'create_purchase_order' => true,
         'supplier_id'           => $this->supplier->id,
@@ -192,7 +331,107 @@ test('approve with selected_items respects user-edited quantity', function () {
 
     expect((float) $poItemA->quantity)->toBe(4.0);
 
-    // fulfilled_quantity on OR item should reflect the 4 units fulfilled
+    // PO approval no longer counts as fulfillment; receipt acceptance is the source of truth.
+    $this->itemA->refresh();
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(0.0);
+});
+
+test('purchase receipt acceptance updates fulfilled quantity on the linked order request item', function () {
+    $payload = [
+        'create_purchase_order' => true,
+        'supplier_id'           => $this->supplier->id,
+        'po_number'             => 'PO-TEST-003-RCPT',
+        'order_date'            => Carbon::today()->toDateString(),
+        'selected_items'        => [
+            [
+                'item_id'      => $this->itemA->id,
+                'product_name' => 'Product A',
+                'quantity'     => 4,
+                'unit_price'   => 10000,
+                'include'      => true,
+            ],
+        ],
+    ];
+
+    $result = $this->service->approve($this->orderRequest, $payload);
+    $po = $result->fresh()->purchaseOrder;
+    $poItemA = $po->purchaseOrderItem->firstWhere('product_id', $this->productA->id);
+
+    $this->itemA->refresh();
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(0.0);
+
+    $receipt = PurchaseReceipt::factory()->create([
+        'purchase_order_id' => $po->id,
+        'receipt_date' => now(),
+        'received_by' => $this->user->id,
+        'currency_id' => $this->currency->id,
+        'status' => 'completed',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    PurchaseReceiptItem::factory()->create([
+        'purchase_receipt_id' => $receipt->id,
+        'purchase_order_item_id' => $poItemA->id,
+        'product_id' => $this->productA->id,
+        'warehouse_id' => $this->warehouse->id,
+        'qty_received' => 4,
+        'qty_accepted' => 4,
+        'qty_rejected' => 0,
+        'status' => 'completed',
+    ]);
+
+    $this->itemA->refresh();
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(4.0);
+});
+
+test('order request fulfillment reconciliation command repairs stale fulfilled quantities from receipts', function () {
+    $payload = [
+        'create_purchase_order' => true,
+        'supplier_id'           => $this->supplier->id,
+        'po_number'             => 'PO-TEST-RECON-001',
+        'order_date'            => Carbon::today()->toDateString(),
+        'selected_items'        => [
+            [
+                'item_id'      => $this->itemA->id,
+                'product_name' => 'Product A',
+                'quantity'     => 4,
+                'unit_price'   => 10000,
+                'include'      => true,
+            ],
+        ],
+    ];
+
+    $result = $this->service->approve($this->orderRequest, $payload);
+    $po = $result->fresh()->purchaseOrder;
+    $poItemA = $po->purchaseOrderItem->firstWhere('product_id', $this->productA->id);
+
+    $receipt = PurchaseReceipt::factory()->create([
+        'purchase_order_id' => $po->id,
+        'receipt_date' => now(),
+        'received_by' => $this->user->id,
+        'currency_id' => $this->currency->id,
+        'status' => 'completed',
+        'cabang_id' => $this->cabang->id,
+    ]);
+
+    PurchaseReceiptItem::factory()->create([
+        'purchase_receipt_id' => $receipt->id,
+        'purchase_order_item_id' => $poItemA->id,
+        'product_id' => $this->productA->id,
+        'warehouse_id' => $this->warehouse->id,
+        'qty_received' => 4,
+        'qty_accepted' => 4,
+        'qty_rejected' => 0,
+        'status' => 'completed',
+    ]);
+
+    $this->itemA->update(['fulfilled_quantity' => 10]);
+
+    $this->artisan('order-request:reconcile-fulfillment', [
+        '--item-id' => $this->itemA->id,
+        '--yes' => true,
+    ])->assertExitCode(0);
+
     $this->itemA->refresh();
     expect((float) $this->itemA->fulfilled_quantity)->toBe(4.0);
 });
@@ -307,6 +546,43 @@ test('createPurchaseOrder with selected_items includes only checked items', func
 });
 
 // ─────────────────────────────────────────────
+// SCENARIO 7B — manual PO item creation still backfills traceability
+// ─────────────────────────────────────────────
+test('manually created PO items linked to an OrderRequest backfill refer_item_model without fulfillment', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $this->orderRequest->id,
+        'po_number' => 'PO-TEST-MANUAL-001',
+        'order_date' => Carbon::today()->toDateString(),
+        'status' => 'draft',
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'created_by' => $this->user->id,
+    ]);
+
+    $poItem = PurchaseOrderItem::create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->productA->id,
+        'quantity' => 10,
+        'unit_price' => 10000,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'Non Pajak',
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $poItem->refresh();
+    $this->itemA->refresh();
+
+    expect($poItem->refer_item_model_type)->toBe(OrderRequestItem::class)
+        ->and($poItem->refer_item_model_id)->toBe($this->itemA->id)
+        ->and((float) $this->itemA->fulfilled_quantity)->toBe(0.0)
+        ->and((float) $this->itemA->remaining_quantity)->toBe(10.0);
+});
+
+// ─────────────────────────────────────────────
 // SCENARIO 8 — refer_item_model traceability preserved
 // ─────────────────────────────────────────────
 test('PO items have correct refer_item_model traceability after approve', function () {
@@ -334,7 +610,7 @@ test('PO items have correct refer_item_model traceability after approve', functi
 // ─────────────────────────────────────────────
 // SCENARIO 9 — fulfilled_quantity updated correctly on approve
 // ─────────────────────────────────────────────
-test('fulfilled_quantity on OrderRequestItems is updated after approve', function () {
+test('fulfilled_quantity on OrderRequestItems remains zero after approve without receipt acceptance', function () {
     $payload = [
         'create_purchase_order' => true,
         'supplier_id'           => $this->supplier->id,
@@ -347,8 +623,52 @@ test('fulfilled_quantity on OrderRequestItems is updated after approve', functio
     $this->itemA->refresh();
     $this->itemB->refresh();
 
-    expect((float) $this->itemA->fulfilled_quantity)->toBe(10.0);
-    expect((float) $this->itemB->fulfilled_quantity)->toBe(5.0);
+    expect((float) $this->itemA->fulfilled_quantity)->toBe(0.0);
+    expect((float) $this->itemB->fulfilled_quantity)->toBe(0.0);
+});
+
+test('approving an existing PO does not double count fulfilled quantities', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+
+    $payload = [
+        'supplier_id'    => $this->supplier->id,
+        'po_number'      => 'PO-TEST-009B',
+        'order_date'     => Carbon::today()->toDateString(),
+        'selected_items' => [
+            [
+                'item_id'      => $this->itemA->id,
+                'product_name' => 'Product A',
+                'quantity'     => 10,
+                'unit_price'   => 10000,
+                'include'      => true,
+            ],
+            [
+                'item_id'      => $this->itemB->id,
+                'product_name' => 'Product B',
+                'quantity'     => 5,
+                'unit_price'   => 20000,
+                'include'      => true,
+            ],
+        ],
+    ];
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(), $payload);
+
+    $this->itemA->refresh();
+    $this->itemB->refresh();
+
+    $fulfilledA = (float) $this->itemA->fulfilled_quantity;
+    $fulfilledB = (float) $this->itemB->fulfilled_quantity;
+
+    app(PurchaseOrderService::class)->approvePo($po, $this->user->id);
+
+    $this->itemA->refresh();
+    $this->itemB->refresh();
+
+    expect((float) $this->itemA->fulfilled_quantity)->toBe($fulfilledA);
+    expect((float) $this->itemB->fulfilled_quantity)->toBe($fulfilledB);
+    expect((float) $this->itemA->remaining_quantity)->toBe((float) max(0, $this->itemA->quantity - $fulfilledA));
+    expect((float) $this->itemB->remaining_quantity)->toBe((float) max(0, $this->itemB->quantity - $fulfilledB));
 });
 
 // ─────────────────────────────────────────────

@@ -11,7 +11,9 @@ use App\Models\Deposit;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\User;
+use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CustomerReceiptJournalTest extends TestCase
@@ -45,28 +47,36 @@ class CustomerReceiptJournalTest extends TestCase
         $this->actingAs($this->user);
 
         // Create COAs
-        $this->cashCoa = ChartOfAccount::factory()->create([
+        $this->cashCoa = ChartOfAccount::firstOrCreate([
             'code' => '1111.01',
+        ], [
             'name' => 'Kas Kecil',
             'type' => 'asset',
+            'is_active' => true,
         ]);
 
-        $this->bankCoa = ChartOfAccount::factory()->create([
+        $this->bankCoa = ChartOfAccount::firstOrCreate([
             'code' => '1112.01',
+        ], [
             'name' => 'Bank BCA',
             'type' => 'asset',
+            'is_active' => true,
         ]);
 
-        $this->accountsReceivableCoa = ChartOfAccount::factory()->create([
+        $this->accountsReceivableCoa = ChartOfAccount::firstOrCreate([
             'code' => '1120',
+        ], [
             'name' => 'Piutang Usaha',
             'type' => 'asset',
+            'is_active' => true,
         ]);
 
-        $this->depositCoa = ChartOfAccount::factory()->create([
+        $this->depositCoa = ChartOfAccount::firstOrCreate([
             'code' => '1150.01',
+        ], [
             'name' => 'Hutang Titipan Konsumen',
             'type' => 'liability',
+            'is_active' => true,
         ]);
 
         // Debug: check COA ids
@@ -83,7 +93,7 @@ class CustomerReceiptJournalTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_cash_bank_customer_receipt()
     {
         // Create invoice
@@ -155,7 +165,64 @@ class CustomerReceiptJournalTest extends TestCase
         expect($arEntry->description)->toContain('Customer receipt for receipt id');
     }
 
-    /** @test */
+    #[Test]
+    public function it_only_creates_two_total_journal_entries_for_a_single_cash_receipt(): void
+    {
+        $invoice = Invoice::factory()->create([
+            'customer_name' => $this->customer->name,
+            'total' => 1382000.00,
+            'status' => 'unpaid',
+        ]);
+
+        AccountReceivable::factory()->create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $this->customer->id,
+            'total' => 1382000.00,
+            'paid' => 0,
+            'remaining' => 1382000.00,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        $receipt = CustomerReceipt::factory()->create([
+            'customer_id' => $this->customer->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 1382000.00,
+            'payment_method' => 'cash',
+            'coa_id' => $this->cashCoa->id,
+            'status' => 'paid',
+        ]);
+
+        CustomerReceiptItem::factory()->create([
+            'customer_receipt_id' => $receipt->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'cash',
+            'amount' => 1382000.00,
+            'coa_id' => $this->cashCoa->id,
+        ]);
+
+        $receipt->update(['status' => 'paid']);
+
+        $receiptEntries = JournalEntry::where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
+            ->get();
+
+        $itemEntries = JournalEntry::where('source_type', CustomerReceiptItem::class)
+            ->where('source_id', $receipt->customerReceiptItem->first()->id)
+            ->get();
+
+        expect($receiptEntries)->toHaveCount(2);
+        expect($itemEntries)->toHaveCount(0);
+        expect(JournalEntry::where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
+            ->orWhere(function ($query) use ($receipt) {
+                $query->where('source_type', CustomerReceiptItem::class)
+                    ->whereIn('source_id', $receipt->customerReceiptItem->pluck('id'));
+            })
+            ->count())->toBe(2);
+    }
+
+    #[Test]
     public function it_creates_correct_journal_entries_for_bank_customer_receipt()
     {
         // Create invoice
@@ -227,7 +294,7 @@ class CustomerReceiptJournalTest extends TestCase
         expect($arEntry->description)->toContain('Customer receipt for receipt id');
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_deposit_customer_receipt()
     {
         // Create deposit for customer
@@ -306,7 +373,7 @@ class CustomerReceiptJournalTest extends TestCase
         expect($arEntry->description)->toContain('Customer receipt for receipt id');
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_correct_journal_entries_for_mixed_payment_methods()
     {
         // Create deposit for customer
@@ -408,5 +475,58 @@ class CustomerReceiptJournalTest extends TestCase
         expect($cashEntry->debit)->toBe('691000.00');
         expect($cashEntry->credit)->toBe('0.00');
         expect($cashEntry->description)->toContain('Bank/Cash for receipt id');
+    }
+
+    #[Test]
+    public function it_throws_when_deposit_receipt_has_no_deposit_coa_and_rolls_back_entries()
+    {
+        $this->depositCoa->delete();
+
+        $invoice = Invoice::factory()->create([
+            'customer_name' => $this->customer->name,
+            'total' => 500000.00,
+            'status' => 'unpaid',
+        ]);
+
+        AccountReceivable::factory()->create([
+            'invoice_id' => $invoice->id,
+            'customer_id' => $this->customer->id,
+            'total' => 500000.00,
+            'paid' => 0,
+            'remaining' => 500000.00,
+            'status' => 'Belum Lunas',
+            'created_by' => $this->user->id,
+        ]);
+
+        $receipt = CustomerReceipt::factory()->create([
+            'customer_id' => $this->customer->id,
+            'payment_date' => now()->toDateString(),
+            'total_payment' => 500000.00,
+            'payment_method' => 'deposit',
+            'status' => 'draft',
+        ]);
+
+        CustomerReceiptItem::factory()->create([
+            'customer_receipt_id' => $receipt->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'deposit',
+            'amount' => 500000.00,
+            'coa_id' => null,
+        ]);
+
+        $service = app(LedgerPostingService::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Akun deposit / uang muka pelanggan tidak ditemukan');
+
+        try {
+            $service->postCustomerReceipt($receipt);
+        } finally {
+            $entryCount = JournalEntry::where('source_type', CustomerReceipt::class)
+                ->where('source_id', $receipt->id)
+                ->count();
+
+            $this->assertSame(0, $entryCount);
+        }
     }
 }

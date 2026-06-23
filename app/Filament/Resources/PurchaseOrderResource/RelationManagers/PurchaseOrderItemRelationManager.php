@@ -2,9 +2,13 @@
 
 namespace App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 
+use App\Filament\Resources\QualityControlPurchaseResource;
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\Currency;
 use App\Models\Product;
+use App\Support\OrderRequestQuantityLock;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -38,6 +42,10 @@ class PurchaseOrderItemRelationManager extends RelationManager
             ->schema([
                 Fieldset::make('Form Purchasee Order Item')
                     ->schema([
+                        Hidden::make('refer_item_model_type')
+                            ->dehydrated(true),
+                        Hidden::make('refer_item_model_id')
+                            ->dehydrated(true),
                         Select::make('product_id')
                             ->label('Product')
                             ->searchable()
@@ -48,7 +56,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->relationship('product', 'name')
                             ->reactive()
                             ->afterStateUpdated(function (Set $set, Get $get, $state, $livewire) {
-                                $product = Product::find($state);
+                                $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                 // Use supplier price from product_supplier pivot; fallback to cost_price
                                 $unitPrice = (float) ($product->cost_price ?? 0);
                                 $supplierId = $livewire->ownerRecord->supplier_id ?? null;
@@ -60,12 +68,37 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 }
                                 $set('unit_price', $unitPrice);
 
+                                $po = $livewire->ownerRecord;
+                                $referItem = null;
+                                if ($po?->refer_model_type === 'App\\Models\\OrderRequest' && $po?->refer_model_id) {
+                                    $referItem = PurchaseOrderResource::resolveOrderRequestItemReference(
+                                        (int) $po->refer_model_id,
+                                        (int) $state,
+                                        $supplierId ? (int) $supplierId : null
+                                    );
+                                }
+
+                                $set('refer_item_model_type', $referItem ? \App\Models\OrderRequestItem::class : null);
+                                $set('refer_item_model_id', $referItem?->id);
+
+                                $tipePajak = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
+                                $taxType = match ($tipePajak) {
+                                    'none' => 'None',
+                                    'inklusif' => 'PPN Included',
+                                    default => 'PPN Excluded',
+                                };
+                                $resolvedTax = \App\Support\TaxDefaultResolver::resolveForProductId(
+                                    $state ? (int) $state : null,
+                                    $taxType
+                                );
+                                $set('tax', $resolvedTax);
+
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
                                     'unit_price' => $get('unit_price'),
-                                    'tax' => $get('tax'),
+                                    'tax' => $resolvedTax,
                                     'discount' => $get('discount'),
-                                    'tipe_pajak' => $get('tipe_pajak') ?? null,
+                                    'tipe_pajak' => $tipePajak,
                                 ]);
                                 $set('subtotal', $subtotal);
                             })
@@ -86,6 +119,32 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->label('Quantity')
                             ->default(0)
                             ->reactive()
+                            ->helperText(function (Get $get) {
+                                $orItemId = $get('refer_item_model_id');
+                                if (! $orItemId) {
+                                    return null;
+                                }
+
+                                $max = OrderRequestQuantityLock::orderRequestItemLimit((int) $orItemId)['remaining_for_po'];
+                                return "Maks: {$max} (sisa OR)";
+                            })
+                            ->rules([function (Get $get, $record) {
+                                return function ($attribute, $value, $fail) use ($get, $record) {
+                                    $orItemId = $get('refer_item_model_id');
+                                    if (! $orItemId) {
+                                        return;
+                                    }
+
+                                    $max = OrderRequestQuantityLock::orderRequestItemLimit(
+                                        (int) $orItemId,
+                                        $record?->id ? (int) $record->id : null
+                                    )['remaining_for_po'];
+
+                                    if ((float) $value > $max) {
+                                        $fail("Qty tidak boleh melebihi sisa Order Request ({$max}).");
+                                    }
+                                };
+                            }])
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -99,7 +158,22 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->numeric(),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->reactive()
+                            ->live(debounce: 500)
+                            ->mask(\Filament\Support\RawJs::make(<<<'JS'
+            $money($input, ',', '.', 2)
+        JS))
+                            ->formatStateUsing(function ($state) {
+                                if ($state === null || $state === '') {
+                                    return '';
+                                }
+                                return number_format(\App\Helpers\MoneyHelper::safeParse($state), 2, ',', '.');
+                            })
+                            ->dehydrateStateUsing(function ($state) {
+                                if ($state === null || $state === '') {
+                                    return null;
+                                }
+                                return \App\Helpers\MoneyHelper::safeParse($state);
+                            })
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -108,12 +182,10 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     'discount' => $get('discount')
                                 ]);
                                 $set('subtotal', $subtotal);
-                            })
-                            ->indonesianMoney()
-                            ->default(0),
+                            }),
                         TextInput::make('discount')
                             ->label('Discount')
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -128,6 +200,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                         TextInput::make('tax')
                             ->label('Tax')
                             ->reactive()
+                            ->disabled()
+                            ->dehydrated(true)
                             ->afterStateUpdated(function (Set $set, Get $get) {
                                 $subtotal = static::getSubtotal([
                                     'quantity' => $get('quantity'),
@@ -138,7 +212,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                 $set('subtotal', $subtotal);
                             })
                             ->indonesianMoney()
-                            ->default(0),
+                            ->default(fn () => \App\Support\TaxDefaultResolver::resolveFallbackRate()),
                         TextInput::make('subtotal')
                             ->label('Sub Total')
                             ->reactive()
@@ -146,15 +220,37 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->default(0)
                             ->readOnly(),
                         Radio::make('tipe_pajak')
-                            ->label('Tipe Pajak')
+                            ->label('Tipe Pajak per Item')
                             ->inline()
                             ->required()
                             ->options([
-                                'Non Pajak' => 'Non Pajak',
-                                'Inklusif' => 'Inklusif',
-                                'Eklusif' => 'Eklusif'
+                                'none' => 'Non Pajak',
+                                'inklusif' => 'Inklusif',
+                                'eklusif' => 'Eklusif'
                             ])
-                            ->default('Inklusif')
+                            ->default('inklusif')
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                $normalizedState = \App\Filament\Resources\PurchaseOrderResource::normalizeTaxTypeValue($state);
+                                $taxType = match ($normalizedState) {
+                                    'none' => 'None',
+                                    'inklusif' => 'PPN Included',
+                                    default => 'PPN Excluded',
+                                };
+                                $resolvedTax = \App\Support\TaxDefaultResolver::resolveForProductId(
+                                    $get('product_id') ? (int) $get('product_id') : null,
+                                    $taxType
+                                );
+                                $set('tax', $resolvedTax);
+
+                                $subtotal = static::getSubtotal([
+                                    'quantity' => $get('quantity'),
+                                    'unit_price' => $get('unit_price'),
+                                    'tax' => $resolvedTax,
+                                    'discount' => $get('discount'),
+                                    'tipe_pajak' => $normalizedState,
+                                ]);
+                                $set('subtotal', $subtotal);
+                            })
                     ])
             ]);
     }
@@ -188,7 +284,9 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->sortable(),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                    ->rupiah()
+                        ->formatStateUsing(function ($state, $record) {
+                        return \App\Filament\Resources\PurchaseOrderResource::formatCurrencyPreviewState($state, $record->currency_id ?? null);
+                    })
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
@@ -213,29 +311,150 @@ class PurchaseOrderItemRelationManager extends RelationManager
                 ActionGroup::make([
                     // Send PO item to Quality Control (QC-before-receipt flow)
                     \Filament\Tables\Actions\Action::make('kirim_qc')
-                        ->label('Kirim QC')
+                        ->label('Kirim ke QC')
                         ->color('success')
                         ->icon('heroicon-o-paper-airplane')
-                        ->requiresConfirmation()
                         ->modalHeading('Kirim ke Quality Control')
-                        ->modalDescription('Apakah Anda yakin ingin mengirim item ini ke Quality Control? QC akan dibuat dengan quantity 0 dan dapat diedit setelahnya.')
-                        ->modalSubmitActionLabel('Ya, Kirim QC')
+                        ->modalSubmitActionLabel('Buat QC')
                         ->visible(fn ($record) => $record->purchaseOrder->status === 'approved' && !$record->qualityControl)
-                        ->action(function ($record) {
+                        ->form(function ($record) {
+                            $po = $record->purchaseOrder;
+                            $alreadyInspected = $record->qualityControls->sum(
+                                fn ($qc) => $qc->passed_quantity + $qc->rejected_quantity
+                            );
+                            $limit = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $record->id);
+                            $remaining = min(max(0, ($record->quantity ?? 0) - $alreadyInspected), $limit['remaining_received']);
+
+                            // Resolve default warehouse (Order Request > PO)
+                            $defaultWarehouseId = $po->warehouse_id;
+                            if ($po->refer_model_type === 'App\Models\OrderRequest' && $po->refer_model_id) {
+                                $or = \App\Models\OrderRequest::find($po->refer_model_id);
+                                if ($or && $or->warehouse_id) {
+                                    $defaultWarehouseId = $or->warehouse_id;
+                                }
+                            }
+
+                            return [
+                                \Filament\Forms\Components\Fieldset::make('Informasi Produk')
+                                    ->columns(3)
+                                    ->schema([
+                                        \Filament\Forms\Components\TextInput::make('_product_name')
+                                            ->label('Produk')
+                                            ->default($record->product->name ?? '-')
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                        \Filament\Forms\Components\TextInput::make('_quantity_ordered')
+                                            ->label('Qty Dipesan')
+                                            ->default($record->quantity ?? 0)
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                        \Filament\Forms\Components\TextInput::make('_warehouse_po')
+                                            ->label('Gudang PO')
+                                            ->default(optional($po->warehouse)->name ?? '-')
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                    ]),
+                                \Filament\Forms\Components\Fieldset::make('Data QC')
+                                    ->columns(2)
+                                    ->schema([
+                                        \Filament\Forms\Components\Select::make('warehouse_id')
+                                            ->label('Gudang Tujuan')
+                                            ->options(function ($record) {
+                                                 $po = $record->purchaseOrder;
+                                                 $query = \App\Models\Warehouse::where('status', 1);
+                                                 if ($po) {
+                                                     $cabangId = $po->cabang_id ?? $po->supplier->cabang_id ?? null;
+                                                     if ($cabangId) {
+                                                         $query->where('cabang_id', $cabangId);
+                                                     }
+                                                 }
+                                                return $query->orderBy('name')
+                                                    ->get()
+                                                    ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"]);
+                                            })
+                                            ->default($defaultWarehouseId)
+                                            ->searchable()
+                                            ->required()
+                                            ->validationMessages(['required' => 'Gudang wajib dipilih']),
+                                        \Filament\Forms\Components\Select::make('inspected_by')
+                                            ->label('Diperiksa Oleh')
+                                            ->options(\App\Models\User::pluck('name', 'id'))
+                                            ->default(Auth::id())
+                                            ->disabled(fn () => Auth::user()?->hasRole(['Super Admin', 'Owner']) !== true)
+                                            ->dehydrated(true)
+                                            ->required()
+                                            ->validationMessages(['required' => 'Pemeriksa wajib dipilih']),
+                                        \Filament\Forms\Components\TextInput::make('quantity_received')
+                                            ->label('Qty Diterima')
+                                            ->numeric()
+                                            ->default($remaining)
+                                            ->required()
+                                            ->minValue(1)
+                                            ->reactive()
+                                            ->afterStateUpdated(function ($set, $get, $state) {
+                                                $received = (float) $state;
+                                                $set('passed_quantity', min((float) ($get('passed_quantity') ?? $received), $received));
+                                                QualityControlPurchaseResource::syncQcQuantityAgainstReceived($set, $get, 'quantity_received');
+                                            })
+                                            ->validationMessages([
+                                                'required' => 'Qty diterima wajib diisi',
+                                                'min' => 'Qty diterima minimal 1',
+                                            ]),
+                                        \Filament\Forms\Components\TextInput::make('passed_quantity')
+                                            ->label('Qty Lulus QC')
+                                            ->numeric()
+                                            ->default($remaining)
+                                            ->required()
+                                            ->minValue(0)
+                                            ->reactive()
+                                            ->rules([
+                                                fn ($get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                    QualityControlPurchaseResource::validateQcQuantityAgainstReceived($get, $fail, $value);
+                                                },
+                                            ])
+                                            ->afterStateUpdated(function ($set, $get) {
+                                                QualityControlPurchaseResource::syncQcQuantityAgainstReceived($set, $get, 'passed_quantity');
+                                            })
+                                            ->validationMessages(['required' => 'Qty lulus wajib diisi']),
+                                        \Filament\Forms\Components\TextInput::make('rejected_quantity')
+                                            ->label('Qty Ditolak')
+                                            ->numeric()
+                                            ->default(0)
+                                            ->disabled()
+                                            ->dehydrated(true),
+                                        \Filament\Forms\Components\Select::make('condition')
+                                            ->label('Kondisi')
+                                            ->options([
+                                                'good'    => 'Baik',
+                                                'damaged' => 'Rusak Sebagian',
+                                                'reject'  => 'Ditolak',
+                                            ])
+                                            ->default('good')
+                                            ->required(),
+                                        \Filament\Forms\Components\Textarea::make('notes')
+                                            ->label('Catatan QC')
+                                            ->rows(2)
+                                            ->columnSpanFull(),
+                                    ]),
+                            ];
+                        })
+                        ->action(function ($record, array $data) {
                             $qualityControlService = app(QualityControlService::class);
+                            $canChooseInspector = Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
 
                             $qc = $qualityControlService->createQCFromPurchaseOrderItem($record, [
-                                'inspected_by' => Auth::id(),
-                                'passed_quantity' => 0,
-                                'rejected_quantity' => 0,
-                                'warehouse_id' => $record->purchaseOrder->warehouse_id,
+                                'inspected_by'     => $canChooseInspector ? ($data['inspected_by'] ?? Auth::id()) : Auth::id(),
+                                'passed_quantity'  => (float) ($data['passed_quantity'] ?? 0),
+                                'rejected_quantity' => (float) ($data['rejected_quantity'] ?? 0),
+                                'quantity_received' => (float) ($data['quantity_received'] ?? 0),
+                                'warehouse_id'     => $data['warehouse_id'],
+                                'notes'            => $data['notes'] ?? null,
                             ]);
 
                             if ($qc) {
-                                // Notify current user
                                 \Filament\Notifications\Notification::make()
-                                    ->title('QC Created')
-                                    ->body('Quality Control created for PO Item: ' . optional($record->product)->name)
+                                    ->title('QC Berhasil Dibuat')
+                                    ->body('Quality Control untuk ' . optional($record->product)->name . ' telah dibuat.')
                                     ->icon('heroicon-o-check-badge')
                                     ->color('success')
                                     ->send();

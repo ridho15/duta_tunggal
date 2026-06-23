@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Models\CustomerReceipt;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\CustomerReceiptItem;
+use App\Models\DeliverySchedule;
 use App\Models\Deposit;
 use App\Models\DepositLog;
 use App\Models\Invoice;
@@ -35,8 +37,10 @@ use App\Models\JournalEntry;
 use App\Models\CashBankTransfer;
 use App\Observers\DeliveryOrderObserver;
 use App\Observers\DeliveryOrderItemObserver;
+use App\Observers\DeliveryScheduleObserver;
 use App\Observers\CustomerReceiptObserver;
 use App\Observers\DepositLogObserser;
+use App\Observers\CustomerReceiptItemObserver;
 use App\Observers\DepositObserver;
 use App\Observers\GlobalActivityObserver;
 use App\Observers\InvoiceObserver;
@@ -63,7 +67,10 @@ use App\Observers\CashBankTransferObserver;
 use App\Observers\OtherSaleObserver;
 use App\Helpers\MoneyHelper;
 use Barryvdh\Debugbar\Facades\Debugbar;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\AliasLoader;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
@@ -81,7 +88,13 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $loader = AliasLoader::getInstance();
-        $loader->alias('Debugbar', Debugbar::class);
+        if (class_exists(Debugbar::class)) {
+            $loader->alias('Debugbar', Debugbar::class);
+        }
+
+        if ($this->app->environment(['local', 'testing']) && class_exists(\Laravel\Dusk\DuskServiceProvider::class)) {
+            $this->app->register(\Laravel\Dusk\DuskServiceProvider::class);
+        }
 
         // Ensure Filament classes are loaded before registering macros
         class_exists(\Filament\Forms\Components\TextInput::class);
@@ -103,7 +116,7 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         TextColumn::macro('rupiah', function (): TextColumn {
             /** @var TextColumn $this */
-            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
         });
 
         // ---------------------------------------------------------------
@@ -112,7 +125,7 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         TextEntry::macro('rupiah', function (): TextEntry {
             /** @var TextEntry $this */
-            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
         });
 
         // ---------------------------------------------------------------
@@ -121,7 +134,7 @@ class AppServiceProvider extends ServiceProvider
         // ---------------------------------------------------------------
         \Filament\Tables\Columns\Summarizers\Sum::macro('rupiah', function () {
             /** @var \Filament\Tables\Columns\Summarizers\Sum $this */
-            return $this->formatStateUsing(fn ($state) => MoneyHelper::rupiah($state));
+            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
         });
 
         // ---------------------------------------------------------------
@@ -129,73 +142,61 @@ class AppServiceProvider extends ServiceProvider
         // Usage: TextInput::make('amount')->indonesianMoney()
         //
         // Behaviour:
-        //  - JS mask: real-time thousand-dot formatting while user types
+        //  - JS mask: real-time Indonesian money formatting while user types
         //  - formatStateUsing: loads DB numeric value as formatted string
         //  - dehydrateStateUsing: parses user input back to float for DB storage
         // ---------------------------------------------------------------
         TextInput::macro('indonesianMoney', function (): TextInput {
             /** @var TextInput $this */
+
             return $this
                 ->prefix('Rp')
-                ->placeholder('500.000')
+                ->placeholder('500.000,00')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-                    $input.map(function(value) {
-                        // Strip all non-digit characters
-                        value = value.replace(/[^\d]/g, '');
-                        if (!value) return '';
-                        // Format with dot as thousands separator (id-ID locale)
-                        return new Intl.NumberFormat('id-ID').format(parseInt(value, 10));
-                    })
-                JS))
-                ->formatStateUsing(function ($state): string {
-                    // Format DB numeric value for display in the input field
+            $money($input, ',', '.', 2)
+        JS))
+                ->extraInputAttributes([
+                    'x-on:blur' => <<<'JS'
+                        let value = ($event.target.value || '').trim()
+
+                        if (value !== '') {
+                            if (value.includes(',')) {
+                                let parts = value.split(',')
+                                let integer = parts.shift()
+                                let decimal = (parts.join('') || '').replace(/\D/g, '').slice(0, 2).padEnd(2, '0')
+                                $event.target.value = `${integer},${decimal}`
+                            } else {
+                                $event.target.value = `${value},00`
+                            }
+
+                            $dispatch('input', $event.target.value)
+                        }
+                    JS,
+                ])
+                ->formatStateUsing(function ($state) {
                     if ($state === null || $state === '') {
-                        return '0';
+                        return '';
                     }
-                    $numeric = (float) $state;
-                    return number_format($numeric, 0, ',', '.');
+
+                    return number_format(\App\Helpers\MoneyHelper::safeParse($state), 2, ',', '.');
                 })
+                ->rules([function () {
+                    return function ($attribute, $value, $fail) {
+                        if ($value === null || $value === '') {
+                            return;
+                        }
+                        $parsed = \App\Helpers\MoneyHelper::safeParse($value);
+                        if (! is_numeric($parsed)) {
+                            $fail('Nilai nominal tidak valid. Contoh format: 1.000.000,00');
+                        }
+                    };
+                }])
                 ->dehydrateStateUsing(function ($state) {
-                    // Parse the user's (possibly formatted) input back to a numeric value
                     if ($state === null || $state === '') {
-                        return 0;
+                        return null;
                     }
 
-                    $str = (string) $state;
-                    // Strip non-numeric characters except dots and commas
-                    $clean = preg_replace('/[^\d\.,]/', '', $str);
-                    if ($clean === '') {
-                        return 0;
-                    }
-
-                    $hasComma = strpos($clean, ',') !== false;
-                    $hasDot   = strpos($clean, '.') !== false;
-
-                    if ($hasComma && $hasDot) {
-                        $dotPos   = strrpos($clean, '.');
-                        $afterDot = strlen($clean) - $dotPos - 1;
-                        if ($afterDot >= 1 && $afterDot <= 2) {
-                            // Western format: dot = decimal, comma = thousands
-                            $clean = str_replace(',', '', $clean);
-                        } else {
-                            // Indonesian format: dot = thousands, comma = decimal
-                            $clean = str_replace('.', '', $clean);
-                            $clean = str_replace(',', '.', $clean);
-                        }
-                    } elseif ($hasDot) {
-                        // Only dots — treat as Indonesian thousands separators (e.g. 1.000.000)
-                        $clean = str_replace('.', '', $clean);
-                    } elseif ($hasComma) {
-                        if (preg_match('/,\d{1,2}$/', $clean)) {
-                            // Comma is decimal separator
-                            $clean = str_replace(',', '.', $clean);
-                        } else {
-                            // Comma is thousands separator
-                            $clean = str_replace(',', '', $clean);
-                        }
-                    }
-
-                    return (float) $clean;
+                    return \App\Helpers\MoneyHelper::safeParse($state);
                 });
         });
     }
@@ -205,6 +206,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('login', function (Request $request) {
+            $email = (string) $request->input('email', 'guest');
+            return Limit::perMinute(5)->by(strtolower($email) . '|' . $request->ip());
+        });
+
         StockMovement::observe(StockMovementObserver::class);
         StockReservation::observe(StockReservationObserver::class);
         ManufacturingOrder::observe(ObserversManufacturingOrder::class);
@@ -215,9 +221,10 @@ class AppServiceProvider extends ServiceProvider
         VendorPayment::observe(VendorPaymentObserver::class);
         VendorPaymentDetail::observe(VendorPaymentDetailObserver::class);
         CustomerReceipt::observe(CustomerReceiptObserver::class);
-        // CustomerReceiptItem::observe(CustomerReceiptItemObserver::class);
+        CustomerReceiptItem::observe(CustomerReceiptItemObserver::class);
         DeliveryOrder::observe(DeliveryOrderObserver::class);
         DeliveryOrderItem::observe(DeliveryOrderItemObserver::class);
+        DeliverySchedule::observe(DeliveryScheduleObserver::class);
         Deposit::observe(DepositObserver::class);
         DepositLog::observe(DepositLogObserser::class);
         VoucherRequest::observe(VoucherRequestObserver::class);

@@ -3,8 +3,16 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Services\PurchaseInvoiceAccountingService;
+use App\Support\CurrencyConversionResolver;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class EditPurchaseInvoice extends EditRecord
 {
@@ -68,6 +76,20 @@ class EditPurchaseInvoice extends EditRecord
                 }
             }
             $data['receiptBiayaItems'] = $receiptBiayaItems;
+
+            $isImport = (bool) ($this->record->fromModel?->is_import ?? false);
+            if (! $isImport) {
+                $data['pph22_amount'] = 0;
+                $data['bea_masuk_amount'] = 0;
+                $data['receiptBiayaItems'] = array_values(array_filter($data['receiptBiayaItems'], function ($item) {
+                    $name = strtolower(trim((string) ($item['nama_biaya'] ?? '')));
+                    return ! preg_match('/\bpph\b|pph\s*22|bea masuk|customs|bm|import duty|cukai/', $name);
+                }));
+                $data['other_fees'] = array_values(array_filter($data['other_fees'], function ($fee) {
+                    $name = strtolower(trim((string) ($fee['name'] ?? '')));
+                    return ! preg_match('/\bpph\b|pph\s*22|bea masuk|customs|bm|import duty|cukai/', $name);
+                }));
+            }
         }
 
         // Load COA data from database
@@ -75,6 +97,9 @@ class EditPurchaseInvoice extends EditRecord
         $data['ppn_masukan_coa_id'] = $this->record->ppn_masukan_coa_id;
         $data['inventory_coa_id'] = $this->record->inventory_coa_id;
         $data['expense_coa_id'] = $this->record->expense_coa_id;
+
+        $data['currency_id'] = $this->record->currency_id ?? $this->record->fromModel?->currency_id;
+        $data['exchange_rate'] = (float) ($this->record->exchange_rate ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null));
 
         return $data;
     }
@@ -85,21 +110,66 @@ class EditPurchaseInvoice extends EditRecord
         unset($data['selected_supplier']);
         unset($data['selected_purchase_order']);
         unset($data['selected_purchase_receipts']);
+
+        $data = app(PurchaseInvoiceAccountingService::class)->normalizeFormData($data);
+        unset($data['other_fees'], $data['receiptBiayaItems']);
+
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? 1.0);
         
         return $data;
     }
 
     protected function afterSave(): void
     {
-        // Sync invoice items
-        if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            // Delete existing items
-            $this->record->invoiceItem()->delete();
-            
-            // Create new items
-            foreach ($this->data['invoiceItem'] as $item) {
-                $this->record->invoiceItem()->create($item);
+        try {
+            if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
+                $this->record->invoiceItem()->delete();
+
+                $items = app(PurchaseInvoiceAccountingService::class)->normalizeInvoiceItems($this->data['invoiceItem']);
+                foreach ($items as $item) {
+                    $this->record->invoiceItem()->create($item);
+                }
             }
+
+            app(PurchaseInvoiceAccountingService::class)->finaliseInvoice($this->record);
+        } catch (Throwable $exception) {
+            Log::error('EditPurchaseInvoice afterSave failed', [
+                'invoice_id' => $this->record?->id,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::warning(
+                'Invoice Pembelian Tersimpan Dengan Catatan',
+                $exception,
+                'Perubahan invoice pembelian berhasil disimpan, tetapi sinkronisasi detail item belum selesai. Periksa kembali invoice ini sebelum dilanjutkan.'
+            );
+        }
+    }
+
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        try {
+            return PurchaseInvoiceAccountingService::withoutObserverPosting(
+                fn () => parent::handleRecordUpdate($record, $data)
+            );
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            Log::error('EditPurchaseInvoice handleRecordUpdate failed', [
+                'invoice_id' => $record->id,
+                'user_id' => Auth::id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            ProcurementFailureNotifier::danger(
+                'Gagal Memperbarui Invoice Pembelian',
+                $exception,
+                'Perubahan invoice pembelian belum berhasil disimpan. Periksa kembali data invoice lalu coba lagi.'
+            );
+
+            throw $exception;
         }
     }
 }

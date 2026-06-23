@@ -71,10 +71,20 @@ class BalanceSheetService
         // Detailed liabilities breakdown logging will be performed after current/long-term classification is computed.
 
         $currentLiabilities = $allLiabilities->filter(function ($liability) {
-            return ($liability->is_current === true) || $this->inferCurrentClassification($liability, 'Liability') === true;
+            $isCurrent = $liability->is_current;
+            if ($isCurrent === null) {
+                $isCurrent = $this->inferCurrentClassification($liability, 'Liability');
+            }
+
+            return (bool) $isCurrent;
         });
         $longTermLiabilities = $allLiabilities->filter(function ($liability) {
-            return ($liability->is_current === false) || $this->inferCurrentClassification($liability, 'Liability') === false;
+            $isCurrent = $liability->is_current;
+            if ($isCurrent === null) {
+                $isCurrent = $this->inferCurrentClassification($liability, 'Liability');
+            }
+
+            return ! (bool) $isCurrent;
         });
         
         $totalCurrentLiabilities = (float) $currentLiabilities->sum('balance');
@@ -109,16 +119,8 @@ class BalanceSheetService
         $totalLiabilitiesAndEquity = $totalLiabilities + $totalEquityWithRetained;
 
         // Check if balanced
-        $isBalanced = abs($totalAssets - $totalLiabilitiesAndEquity) < 0.01; // Allow small rounding diff
-
-        // If not balanced, adjust retained earnings to force balance
-        if (!$isBalanced) {
-            $difference = $totalAssets - $totalLiabilitiesAndEquity;
-            $retainedEarnings += $difference;
-            $totalEquityWithRetained += $difference;
-            $totalLiabilitiesAndEquity += $difference;
-            $isBalanced = true;
-        }
+        $difference = $totalAssets - $totalLiabilitiesAndEquity;
+        $isBalanced = abs($difference) < 0.01; // Allow small rounding diff
 
         // Now apply display level filtering for the accounts shown in UI
         $displayCurrentAssets = $this->filterAccountsByDisplayLevel($currentAssets, $displayLevel, $showZeroBalance);
@@ -127,16 +129,6 @@ class BalanceSheetService
         $displayCurrentLiabilities = $this->filterAccountsByDisplayLevel($currentLiabilities, $displayLevel, $showZeroBalance);
         $displayLongTermLiabilities = $this->filterAccountsByDisplayLevel($longTermLiabilities, $displayLevel, $showZeroBalance);
         $displayEquity = $this->filterAccountsByDisplayLevel($equity, $displayLevel, $showZeroBalance);
-        $isBalanced = abs($totalAssets - $totalLiabilitiesAndEquity) < 0.01; // Allow small rounding diff
-
-        // If not balanced, adjust retained earnings to force balance
-        if (!$isBalanced) {
-            $difference = $totalAssets - $totalLiabilitiesAndEquity;
-            $retainedEarnings += $difference;
-            $totalEquityWithRetained += $difference;
-            $totalLiabilitiesAndEquity += $difference;
-            $isBalanced = true;
-        }
 
         return [
             'as_of_date' => $asOfDate,
@@ -182,7 +174,7 @@ class BalanceSheetService
             // TOTALS
             'total_liabilities_and_equity' => $totalLiabilitiesAndEquity,
             'is_balanced' => $isBalanced,
-            'difference' => $totalAssets - $totalLiabilitiesAndEquity,
+            'difference' => $difference,
         ];
     }
 
@@ -232,43 +224,90 @@ class BalanceSheetService
             });
         }
 
-        return $accounts->map(function ($account) use ($asOfDate, $cabangId, $type) {
-            // Get all journal entries for this account up to the date
-            $query = JournalEntry::where('coa_id', $account->id)
-                ->whereDate('date', '<=', $asOfDate);
+        // Pre-load all balances in a single bulk aggregate query to avoid N+1
+        // (previously one query per account — 500 accounts = 500+ queries, ~30-60s load time).
+        $accountIds = $accounts->pluck('id');
 
-            if ($cabangId) {
-                $query->where('cabang_id', $cabangId);
-            }
+        $balanceMap = $accountIds->isEmpty()
+            ? collect()
+            : JournalEntry::whereIn('coa_id', $accountIds)
+                ->whereDate('date', '<=', $asOfDate)
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->groupBy('coa_id')
+                ->selectRaw('coa_id, SUM(debit) as total_debit, SUM(credit) as total_credit, COUNT(*) as entries_count')
+                ->get()
+                ->keyBy('coa_id');
 
-            $entries = $query->get();
-
-            $totalDebit = $entries->sum('debit');
-            $totalCredit = $entries->sum('credit');
+        return $this->orderAccountsHierarchically($accounts->map(function ($account) use ($balanceMap, $type) {
+            $row = $balanceMap->get($account->id);
+            $totalDebit  = (float) ($row->total_debit  ?? 0);
+            $totalCredit = (float) ($row->total_credit ?? 0);
 
             // Calculate balance based on account type (normal balance)
             // Include opening balance in the calculation
             $openingBalance = (float) ($account->opening_balance ?? 0);
             $balance = match ($type) {
-                'Asset' => $openingBalance + $totalDebit - $totalCredit,
-                'Contra Asset' => $openingBalance - $totalDebit + $totalCredit, // Contra assets have credit normal balance
+                'Asset'            => $openingBalance + $totalDebit - $totalCredit,
+                'Contra Asset'     => $openingBalance - $totalDebit + $totalCredit,
                 'Liability', 'Equity' => $openingBalance - $totalDebit + $totalCredit,
-                default => $openingBalance + $totalDebit - $totalCredit,
+                default            => $openingBalance + $totalDebit - $totalCredit,
             };
 
             // Create object with balance property
             $accountWithBalance = clone $account;
-            $accountWithBalance->balance = $balance;
-            $accountWithBalance->total_debit = $totalDebit;
-            $accountWithBalance->total_credit = $totalCredit;
-            $accountWithBalance->entries_count = $entries->count();
-            
+            $accountWithBalance->balance       = $balance;
+            $accountWithBalance->total_debit   = $totalDebit;
+            $accountWithBalance->total_credit  = $totalCredit;
+            $accountWithBalance->entries_count = (int) ($row->entries_count ?? 0);
+
             // Add kode and nama aliases for blade compatibility
             $accountWithBalance->kode = $account->code;
             $accountWithBalance->nama = $account->name;
 
             return $accountWithBalance;
-        });
+        }));
+    }
+
+    protected function orderAccountsHierarchically(Collection $accounts): Collection
+    {
+        $groupedByParent = $accounts->groupBy(fn ($account) => $account->parent_id ?? 0);
+        $ordered = collect();
+        $visited = [];
+
+        $appendChildren = function ($parentId) use (&$appendChildren, $groupedByParent, &$ordered, &$visited) {
+            $children = ($groupedByParent->get($parentId) ?? collect())
+                ->sortBy('code')
+                ->values();
+
+            foreach ($children as $account) {
+                if (isset($visited[$account->id])) {
+                    continue;
+                }
+
+                $visited[$account->id] = true;
+                $ordered->push($account);
+                $appendChildren($account->id);
+            }
+        };
+
+        $appendChildren(0);
+
+        $orphans = $accounts
+            ->filter(fn ($account) => !isset($visited[$account->id]))
+            ->sortBy('code')
+            ->values();
+
+        foreach ($orphans as $account) {
+            if (isset($visited[$account->id])) {
+                continue;
+            }
+
+            $visited[$account->id] = true;
+            $ordered->push($account);
+            $appendChildren($account->id);
+        }
+
+        return $ordered;
     }
 
     /**
@@ -356,23 +395,21 @@ class BalanceSheetService
             ->whereNull('deleted_at')
             ->pluck('id');
 
-        // Calculate total revenue up to date
-        $revenueQuery = JournalEntry::whereIn('coa_id', $revenueAccounts)
-            ->whereDate('date', '<=', $asOfDate);
-        if ($cabangId) $revenueQuery->where('cabang_id', $cabangId);
-        
-        $totalRevenueDebit = $revenueQuery->sum('debit');
-        $totalRevenueCredit = $revenueQuery->sum('credit');
-        $totalRevenue = $totalRevenueCredit - $totalRevenueDebit; // Revenue normal balance is credit
+        // Calculate total revenue up to date — single query instead of two separate sum() calls.
+        $revenueResult = JournalEntry::whereIn('coa_id', $revenueAccounts)
+            ->whereDate('date', '<=', $asOfDate)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->selectRaw('SUM(credit) as total_credit, SUM(debit) as total_debit')
+            ->first();
+        $totalRevenue = (float) ($revenueResult->total_credit ?? 0) - (float) ($revenueResult->total_debit ?? 0);
 
-        // Calculate total expense up to date
-        $expenseQuery = JournalEntry::whereIn('coa_id', $expenseAccounts)
-            ->whereDate('date', '<=', $asOfDate);
-        if ($cabangId) $expenseQuery->where('cabang_id', $cabangId);
-        
-        $totalExpenseDebit = $expenseQuery->sum('debit');
-        $totalExpenseCredit = $expenseQuery->sum('credit');
-        $totalExpense = $totalExpenseDebit - $totalExpenseCredit; // Expense normal balance is debit
+        // Calculate total expense up to date — single query instead of two separate sum() calls.
+        $expenseResult = JournalEntry::whereIn('coa_id', $expenseAccounts)
+            ->whereDate('date', '<=', $asOfDate)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+            ->first();
+        $totalExpense = (float) ($expenseResult->total_debit ?? 0) - (float) ($expenseResult->total_credit ?? 0);
 
         // Retained Earnings = Total Revenue - Total Expense
         return $totalRevenue - $totalExpense;

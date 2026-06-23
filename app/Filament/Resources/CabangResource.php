@@ -6,6 +6,7 @@ use App\Filament\Resources\CabangResource\Pages;
 use App\Filament\Resources\CabangResource\Pages\ViewCabang;
 use App\Models\Cabang;
 use App\Models\Warehouse;
+use App\Rules\InternationalPhoneNumber;
 use App\Services\CabangService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
@@ -36,6 +37,8 @@ class CabangResource extends Resource
 {
     protected static ?string $model = Cabang::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
     protected static ?string $navigationLabel = 'Cabang';
@@ -46,7 +49,7 @@ class CabangResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {
@@ -86,15 +89,17 @@ class CabangResource extends Resource
                             ->required(),
                         TextInput::make('telepon')
                             ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
                             ->label('Telepon')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
                                 'required' => 'Nomor Telepon tidak boleh kosong',
-                                'regex' => 'Nomor Telepon tidak valid !'
+                                'max' => 'Nomor telepon terlalu panjang'
                             ])
-                            ->helperText('Contoh : 07512345678')
-                            ->rules(['regex:/^0[2-9][0-9]{7,10}$/'])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 07512345678')
+                            ->rules([new InternationalPhoneNumber()])
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(50),
                         TextInput::make('kenaikan_harga')
                             ->label('Kenaikan Harga (%)')
                             ->numeric()

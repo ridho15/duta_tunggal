@@ -50,8 +50,8 @@
 
     <div class="header">
         <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
-        <h2>PT.DUTA TUNGGAL</h2>
-        <p>Alamat Perusahaan</p>
+        <h2>PT DUTA TUNGGAL</h2>
+        <p>Jl. Contoh No. 123, Jakarta, Indonesia<br>Telp: (021) 12345678 | Email: admin@dutatunggal.co.id</p>
         <div class="title">SURAT JALAN</div>
     </div>
 
@@ -82,6 +82,12 @@
                 @endforeach
                 @endforeach</td>
         </tr>
+        <tr>
+            <td style="border: none;">Cabang</td>
+            <td style="border: none;">: @foreach ($suratJalan->deliveryOrder as $deliveryOrder)
+                {{ $deliveryOrder->cabang->name ?? 'N/A' }},
+                @endforeach</td>
+        </tr>
     </table>
 
     <br>
@@ -93,25 +99,62 @@
                 <th>No</th>
                 <th>Nama Barang</th>
                 <th>Qty</th>
+                <th>Harga Satuan</th>
+                <th>Discount (%)</th>
+                <th>Tax (%)</th>
+                <th>Tax Amount</th>
+                <th>Subtotal</th>
                 <th>Keterangan</th>
             </tr>
         </thead>
         <tbody>
             @php
+            // J3: Collect all items across all DOs and group by product_id to avoid duplicate rows
+            $allItems = collect();
+            foreach ($suratJalan->deliveryOrder as $deliveryOrder) {
+                foreach ($deliveryOrder->deliveryOrderItem as $item) {
+                    $allItems->push($item);
+                }
+            }
+            // Group by product_id, merge quantities; use first item's saleOrderItem for pricing
+            $groupedItems = $allItems->groupBy('product_id');
             $number = 1;
             @endphp
-            @foreach ($suratJalan->deliveryOrder as $index => $deliveryOrder)
-            @foreach ($deliveryOrder->deliveryOrderItem as $index2 => $deliveryOrderItem)
+            @foreach ($groupedItems as $productId => $itemGroup)
+            @php
+                $firstItem = $itemGroup->first();
+                $totalQty = $itemGroup->sum('quantity');
+                $price = 0;
+                $discountPct = 0;
+                $taxRate = 0;
+                $taxAmount = 0;
+                $lineSubtotal = 0;
+                if ($firstItem->saleOrderItem) {
+                    $price = $firstItem->saleOrderItem->unit_price;
+                    $discountPct = $firstItem->saleOrderItem->discount;
+                    $taxRate = $firstItem->saleOrderItem->tax;
+                    $base = $totalQty * $price * (1 - $discountPct/100);
+                    $tr = \App\Services\TaxService::normalizeType($firstItem->saleOrderItem->tipe_pajak ?? 'PPN Excluded');
+                    $taxResult = \App\Services\TaxService::compute($base, $taxRate, $tr);
+                    $taxAmount = $taxResult['ppn'];
+                    $lineSubtotal = $taxResult['total'];
+                }
+                $reasons = $itemGroup->pluck('reason')->filter()->unique()->implode(', ');
+            @endphp
             <tr>
                 <td>{{ $number }}</td>
-                <td>({{ $deliveryOrderItem->product->sku }}) {{ $deliveryOrderItem->product->name }}</td>
-                <td>{{ $deliveryOrderItem->quantity }}</td>
-                <td>{{ $deliveryOrderItem->reason }}</td>
+                <td>({{ $firstItem->product->sku }}) {{ $firstItem->product->name }}</td>
+                <td>{{ $totalQty }}</td>
+                <td>Rp {{ number_format($price,0,',','.') }}</td>
+                <td>{{ number_format($discountPct,2) }}%</td>
+                <td>{{ number_format($taxRate,2) }}%</td>
+                <td>Rp {{ number_format($taxAmount,0,',','.') }}</td>
+                <td>Rp {{ number_format($lineSubtotal,0,',','.') }}</td>
+                <td>{{ $reasons }}</td>
             </tr>
             @php
             $number++;
             @endphp
-            @endforeach
             @endforeach
         </tbody>
     </table>
@@ -124,7 +167,7 @@
             </td>
             <td style="border: none; text-align: center;">
                 Hormat kami, <br><br><br><br>
-                <strong>PT.DUTA TUNGGAL</strong><br>
+                <strong>PT DUTA TUNGGAL</strong><br>
                 (____________________)
             </td>
         </tr>

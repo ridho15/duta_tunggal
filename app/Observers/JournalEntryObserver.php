@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Enums\PaymentStatus;
+use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\User;
 use App\Notifications\JournalEntryCreated;
@@ -210,7 +212,7 @@ class JournalEntryObserver
                     // Reset account payable to original state
                     $accountPayable->paid = 0;
                     $accountPayable->remaining = $accountPayable->total;
-                    $accountPayable->status = 'Belum Lunas';
+                    $accountPayable->status = PaymentStatus::UNPAID->value;
                     $accountPayable->save();
                 }
             }
@@ -315,12 +317,14 @@ class JournalEntryObserver
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
+                $accountPayable->invoice->status = $newRemaining <= 0.01
+                    ? Invoice::STATUS_PAID
+                    : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
             }
         }
@@ -347,7 +351,7 @@ class JournalEntryObserver
 
             $accountReceivable->paid = $newPaid;
             $accountReceivable->remaining = $newRemaining;
-            $accountReceivable->status = $newRemaining <= 0.01 ? 'Lunas' : 'Belum Lunas';
+            $accountReceivable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountReceivable->save();
 
             // Sync invoice status with AR

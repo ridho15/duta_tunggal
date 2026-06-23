@@ -14,10 +14,23 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
+use App\Support\CurrencyConversionResolver;
 
 class ViewSalesInvoice extends ViewRecord
 {
     protected static string $resource = SalesInvoiceResource::class;
+
+    public function mount($record): void
+    {
+        parent::mount($record);
+        // debug log invoice whenever the page is instantiated
+        \Illuminate\Support\Facades\Log::debug('Viewing invoice for debug', [
+            'id' => $this->record->id,
+            'tax_rate' => $this->record->tax,
+            'ppn_amount' => $this->record->ppn_amount,
+            'account_payable' => optional($this->record->accountPayable)->toArray(),
+        ]);
+    }
 
     public function infolist(Infolist $infolist): Infolist
     {
@@ -29,6 +42,9 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('invoice_number')
                                     ->label('Invoice Number'),
+                                TextEntry::make('currency_display')
+                                    ->label('Mata Uang')
+                                    ->state(fn ($record) => $record->displayCurrency?->code ? ($record->displayCurrency?->symbol . ' ' . $record->displayCurrency?->code) : '-'),
                                 TextEntry::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->date(),
@@ -67,25 +83,36 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('dpp')
                                     ->label('DPP')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
-                                    ->rupiah(),
-                                TextEntry::make('tax')
-                                    ->label('PPN Amount')
-                                    ->rupiah(),
-                                TextEntry::make('ppn_rate')
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
+                                TextEntry::make('tax_type_display')
+                                    ->label('Tipe Pajak')
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'Non Pajak' => 'gray',
+                                        'Inklusif' => 'info',
+                                        'Eksklusif' => 'warning',
+                                        default => 'gray',
+                                    }),
+                                TextEntry::make('effective_ppn_rate')
                                     ->label('PPN Rate (%)')
-                                    ->suffix('%'),
+                                    ->suffix('%')
+                                    ->visible(fn ($record) => (float) ($record->effective_ppn_rate ?? 0) > 0),
                             ]),
-                        Grid::make(2)
+                        Grid::make(4)
                             ->schema([
+                                TextEntry::make('ppn_amount')
+                                    ->label('Nominal PPN (Rp)')
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state))
+                                    ->visible(fn ($record) => (float) ($record->ppn_amount ?? 0) > 0),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                 TextEntry::make('total')
                                     ->label('Grand Total')
-                                    ->rupiah()
+                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state))
                                     ->weight('bold')
                                     ->size('lg'),
                             ]),
@@ -123,10 +150,10 @@ class ViewSalesInvoice extends ViewRecord
                                             ->label('Quantity'),
                                         TextEntry::make('price')
                                             ->label('Price')
-                                            ->rupiah(),
+                                            ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                         TextEntry::make('total')
                                             ->label('Total')
-                                            ->rupiah(),
+                                            ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
                                     ]),
                             ])
                             ->columnSpanFull(),
@@ -170,18 +197,11 @@ class ViewSalesInvoice extends ViewRecord
                     }
                 }),
             Actions\Action::make('print_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    $pdf = Pdf::loadView('pdf.sale-order-invoice', [
-                        'invoice' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Invoice_SO_' . $record->invoice_number . '.pdf');
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 }

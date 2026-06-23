@@ -25,6 +25,7 @@ class SaleOrder extends Model
         'completed_at' => 'datetime',
         'reject_at' => 'datetime',
         'warehouse_confirmed_at' => 'datetime',
+        'exchange_rate' => 'decimal:8',
     ];
     protected $fillable = [
         'customer_id',
@@ -48,6 +49,9 @@ class SaleOrder extends Model
         'reject_at',
         'reason_close',
         'tipe_pengiriman', // Ambil Sendiri, Kirim Langsung
+        'tempo_pembayaran',
+        'currency_id',
+        'exchange_rate',
         'created_by',
         'warehouse_confirmed_at',
         'cabang_id'
@@ -64,9 +68,22 @@ class SaleOrder extends Model
         return $this->belongsTo(Quotation::class, 'quotation_id')->withDefault();
     }
 
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
+    }
+
     public function saleOrderItem()
     {
         return $this->hasMany(SaleOrderItem::class, 'sale_order_id');
+    }
+
+    /**
+     * Alias for saleOrderItem() to support legacy/consumers expecting ->items
+     */
+    public function items()
+    {
+        return $this->saleOrderItem();
     }
 
     public function requestApproveBy()
@@ -109,9 +126,19 @@ class SaleOrder extends Model
         return $this->hasMany(DeliverySalesOrder::class, 'sales_order_id');
     }
 
+    /**
+     * Warehouse confirmations linked to this SO via polymorphic relationship.
+     * Previously hasOne('sale_order_id') — now morphMany so multiple WCs per SO are supported.
+     */
+    public function warehouseConfirmations()
+    {
+        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
+    }
+
+    /** Alias for backward-compatible single-record access. */
     public function warehouseConfirmation()
     {
-        return $this->hasOne(WarehouseConfirmation::class, 'sale_order_id');
+        return $this->morphOne(WarehouseConfirmation::class, 'confirmable')->latestOfMany();
     }
 
     public function purchaseOrder()
@@ -125,18 +152,44 @@ class SaleOrder extends Model
     }
 
     /**
+     * Inverse relation to invoices created from this Sale Order.
+     * Filament resources expect a `salesInvoices` relation for eager-loading.
+     */
+    public function salesInvoices()
+    {
+        // Use the same polymorphic column names as Invoice::fromModel()
+        // Invoice::fromModel() uses ('from_model_type', 'from_model_id') explicitly,
+        // so provide those here to avoid Laravel looking for `fromModel_id`.
+        return $this->morphMany(\App\Models\Invoice::class, 'fromModel', 'from_model_type', 'from_model_id');
+    }
+
+    /**
      * Check if any items in this sale order have insufficient stock
      */
     public function hasInsufficientStock()
     {
         foreach ($this->saleOrderItem as $item) {
-            $availableStock = InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->where('rak_id', $item->rak_id)
-                ->sum('qty_available');
-            
-            if ($availableStock < $item->quantity) {
-                return true;
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                $allocatedTotal = (float) $allocations->sum('quantity');
+                if (abs($allocatedTotal - (float) $item->quantity) > 0.0001) {
+                    return true;
+                }
+
+                foreach ($allocations as $allocation) {
+                    $availableStock = InventoryStock::freeQtyFor($item->product_id, $allocation->warehouse_id);
+
+                    if ((float) $availableStock < (float) $allocation->quantity) {
+                        return true;
+                    }
+                }
+            } else {
+                $availableStock = InventoryStock::freeQtyFor($item->product_id, $item->warehouse_id, $item->rak_id);
+
+                if ($availableStock < $item->quantity) {
+                    return true;
+                }
             }
         }
         return false;
@@ -149,17 +202,42 @@ class SaleOrder extends Model
     {
         $insufficientItems = [];
         foreach ($this->saleOrderItem as $item) {
-            $availableStock = InventoryStock::where('product_id', $item->product_id)
-                ->where('warehouse_id', $item->warehouse_id)
-                ->where('rak_id', $item->rak_id)
-                ->sum('qty_available');
-            if ($availableStock < $item->quantity) {
-                $insufficientItems[] = [
-                    'item' => $item,
-                    'available' => $availableStock,
-                    'needed' => $item->quantity,
-                    'shortage' => $item->quantity - $availableStock
-                ];
+            $allocations = $item->warehouseAllocations;
+
+            if ($allocations->isNotEmpty()) {
+                $allocatedTotal = (float) $allocations->sum('quantity');
+                if (abs($allocatedTotal - (float) $item->quantity) > 0.0001) {
+                    $insufficientItems[] = [
+                        'item' => $item,
+                        'available' => $allocatedTotal,
+                        'needed' => $item->quantity,
+                        'shortage' => $item->quantity - $allocatedTotal
+                    ];
+                    continue;
+                }
+
+                foreach ($allocations as $allocation) {
+                    $availableStock = InventoryStock::freeQtyFor($item->product_id, $allocation->warehouse_id);
+
+                    if ((float) $availableStock < (float) $allocation->quantity) {
+                        $insufficientItems[] = [
+                            'item' => $item,
+                            'available' => $availableStock,
+                            'needed' => $allocation->quantity,
+                            'shortage' => (float) $allocation->quantity - (float) $availableStock
+                        ];
+                    }
+                }
+            } else {
+                $availableStock = InventoryStock::freeQtyFor($item->product_id, $item->warehouse_id, $item->rak_id);
+                if ($availableStock < $item->quantity) {
+                    $insufficientItems[] = [
+                        'item' => $item,
+                        'available' => $availableStock,
+                        'needed' => $item->quantity,
+                        'shortage' => $item->quantity - $availableStock
+                    ];
+                }
             }
         }
         return $insufficientItems;
@@ -173,13 +251,14 @@ class SaleOrder extends Model
             if ($saleOrder->isForceDeleting()) {
                 $saleOrder->saleOrderItem()->forceDelete();
                 $saleOrder->deliverySalesOrder()->forceDelete();
-                $saleOrder->warehouseConfirmation()->forceDelete();
+                // Use query builder (with parens) — safe even when no record exists
+                $saleOrder->warehouseConfirmations()->forceDelete();
                 $saleOrder->purchaseOrder()->forceDelete();
                 $saleOrder->depositLog()->forceDelete();
             } else {
                 $saleOrder->saleOrderItem()->delete();
                 $saleOrder->deliverySalesOrder()->delete();
-                $saleOrder->warehouseConfirmation()->delete();
+                $saleOrder->warehouseConfirmations()->delete();
                 $saleOrder->purchaseOrder()->delete();
                 $saleOrder->depositLog()->delete();
             }
@@ -188,7 +267,7 @@ class SaleOrder extends Model
         static::restoring(function ($saleOrder) {
             $saleOrder->saleOrderItem()->withTrashed()->restore();
             $saleOrder->deliverySalesOrder()->withTrashed()->restore();
-            $saleOrder->warehouseConfirmation()->withTrashed()->restore();
+            $saleOrder->warehouseConfirmations()->withTrashed()->restore();
             $saleOrder->purchaseOrder()->withTrashed()->restore();
             $saleOrder->depositLog()->withTrashed()->restore();
         });

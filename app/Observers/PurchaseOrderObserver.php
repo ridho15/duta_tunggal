@@ -6,6 +6,7 @@ use App\Models\PurchaseOrder;
 use App\Models\JournalEntry;
 use App\Models\ChartOfAccount;
 use App\Services\PurchaseOrderService;
+use App\Support\OrderRequestQuantityLock;
 
 class PurchaseOrderObserver
 {
@@ -42,6 +43,13 @@ class PurchaseOrderObserver
         $this->purchaseOrderService->updateTotalAmount($purchaseOrder);
     }
 
+    public function updating(PurchaseOrder $purchaseOrder): void
+    {
+        if ($purchaseOrder->isDirty('status') && $purchaseOrder->status === 'approved') {
+            OrderRequestQuantityLock::validatePurchaseOrderApproval($purchaseOrder);
+        }
+    }
+
     /**
      * Handle the PurchaseOrder "updated" event.
      */
@@ -55,9 +63,69 @@ class PurchaseOrderObserver
             $this->handleAssetPurchaseApproval($purchaseOrder);
         }
 
+        // When PO is approved, update the related OrderRequest status
+        if ($purchaseOrder->wasChanged('status') && $purchaseOrder->status === 'approved') {
+            $this->updateOrderRequestStatus($purchaseOrder);
+        }
+
         // Sync related journal entries if total amount changed
         if ($purchaseOrder->wasChanged('total_amount')) {
             $this->syncJournalEntries($purchaseOrder);
+        }
+    }
+
+    /**
+     * Update OrderRequest status based on fulfilled quantities when PO is approved.
+     */
+    protected function updateOrderRequestStatus(PurchaseOrder $purchaseOrder): void
+    {
+        // Get the referenced OrderRequest (via morphTo refer_model)
+        $orderRequest = null;
+        if (
+            $purchaseOrder->refer_model_type === 'App\\Models\\OrderRequest' &&
+            $purchaseOrder->refer_model_id
+        ) {
+            $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);
+        }
+
+        if (!$orderRequest) {
+            return;
+        }
+
+        // Reload items with fresh fulfilled_quantity values
+        $items = $orderRequest->orderRequestItem()->get();
+
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $allFulfilled = true;
+        $anyFulfilled = false;
+
+        foreach ($items as $item) {
+            $fulfilled = (float) ($item->fulfilled_quantity ?? 0);
+            $total     = (float) ($item->quantity ?? 0);
+
+            if ($fulfilled >= $total && $total > 0) {
+                $anyFulfilled = true;
+            } elseif ($fulfilled > 0) {
+                $anyFulfilled = true;
+                $allFulfilled = false;
+            } else {
+                $allFulfilled = false;
+            }
+        }
+
+        // Only update status if currently approved or partial (don't overwrite closed/rejected)
+        $currentStatus = $orderRequest->status;
+        if (!in_array($currentStatus, ['approved', 'partial', 'complete'])) {
+            return;
+        }
+
+        if ($allFulfilled) {
+            $orderRequest->update(['status' => 'complete']);
+        } elseif ($anyFulfilled) {
+            $orderRequest->update(['status' => 'partial']);
         }
     }
 
@@ -68,6 +136,14 @@ class PurchaseOrderObserver
     {
         // Load relations to ensure they are available
         $purchaseOrder->load('purchaseOrderItem.product');
+
+        if ($purchaseOrder->purchaseOrderItem->isEmpty()) {
+            \Illuminate\Support\Facades\Log::warning('Asset PO approved without items, skipping auto-complete', [
+                'purchase_order_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+            ]);
+            return;
+        }
 
         // Prevent duplicate asset creation: if assets already exist for this PO, skip
         if (\App\Models\Asset::where('purchase_order_id', $purchaseOrder->id)->exists()) {
@@ -96,10 +172,23 @@ class PurchaseOrderObserver
                 $item->tipe_pajak
             );
 
-            // Get default COA for assets - adjust codes per your chart of accounts
-            $assetCoa = \App\Models\ChartOfAccount::where('code', '1210.01')->first(); // PERALATAN KANTOR
-            $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('code', '1220.01')->first(); // AKUMULASI PENYUSUTAN
-            $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('code', '6311')->first(); // BEBAN PENYUSUTAN
+            // Get default COA for assets from config
+            $assetCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first();
+            $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.accumulated_depreciation', '1220.01'))->first();
+            $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.depreciation_expense', '6311'))->first();
+
+            if (! $accumulatedDepreciationCoa) {
+                $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('type', 'Contra Asset')->first();
+            }
+
+            if (! $depreciationExpenseCoa) {
+                $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('type', 'Expense')
+                    ->where('name', 'like', '%penyusutan%')
+                    ->first()
+                    ?? \App\Models\ChartOfAccount::where('type', 'Expense')->first();
+            }
+
+            $resolvedCabangId = $this->resolveCabangId($purchaseOrder, $item);
 
             // Create one asset record per unit purchased
             $units = max(1, (int)$item->quantity);
@@ -116,11 +205,11 @@ class PurchaseOrderObserver
                     'useful_life_years' => 5,
                     'depreciation_method' => 'straight_line',
                     'asset_coa_id' => $assetCoa?->id,
-                    'accumulated_depreciation_coa_id' => $accumulatedDepreciationCoa?->id,
-                    'depreciation_expense_coa_id' => $depreciationExpenseCoa?->id,
+                    'accumulated_depreciation_coa_id' => $accumulatedDepreciationCoa?->id ?? $assetCoa?->id,
+                    'depreciation_expense_coa_id' => $depreciationExpenseCoa?->id ?? $assetCoa?->id,
                     'status' => 'active',
                     'notes' => 'Generated from PO ' . $purchaseOrder->po_number,
-                    'cabang_id' => $purchaseOrder->cabang_id,
+                    'cabang_id' => $resolvedCabangId,
                 ]);
 
                 // Calculate depreciation for the created unit
@@ -148,20 +237,27 @@ class PurchaseOrderObserver
             $totalAssetCost = $purchaseOrder->total_amount;
 
             // Get branch and department info
-            $branchId = $purchaseOrder->cabang_id;
+            $branchId = $this->resolveCabangId($purchaseOrder);
             $departmentId = null; // Could be added later if needed
             $projectId = null; // Could be added later if needed
 
             // Get asset COA (debit side)
-            $assetCoa = ChartOfAccount::where('code', '1500')->first(); // HARGA PEROLEHAN ASET TETAP
+            $assetCoa = ChartOfAccount::where('code', '1500')->first();
             if (!$assetCoa) {
-                $assetCoa = ChartOfAccount::where('perusahaan', 'like', '%aset%')->first();
+                $assetCoa = ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first();
+            }
+            if (!$assetCoa) {
+                $assetCoa = ChartOfAccount::where('type', 'Asset')
+                    ->where('name', 'like', '%aset%')
+                    ->first();
             }
 
             // Get accounts payable COA (credit side) - assuming not paid yet
-            $payableCoa = ChartOfAccount::where('code', '2110')->first(); // HUTANG USAHA
+            $payableCoa = ChartOfAccount::where('code', config('asset.coa.accounts_payable', '2110'))->first();
             if (!$payableCoa) {
-                $payableCoa = ChartOfAccount::where('perusahaan', 'like', '%hutang%')->first();
+                $payableCoa = ChartOfAccount::where('type', 'Liability')
+                    ->where('name', 'like', '%hutang%')
+                    ->first();
             }
 
             if (!$assetCoa || !$payableCoa) {
@@ -299,5 +395,40 @@ class PurchaseOrderObserver
     public function syncJournalEntriesPublic(PurchaseOrder $purchaseOrder): void
     {
         $this->syncJournalEntries($purchaseOrder);
+    }
+
+    /**
+     * Resolve the best available cabang_id for asset and journal creation.
+     *
+     * Purchase orders may no longer persist cabang_id in the database, so we
+     * fall back to the item/product branch context when needed.
+     */
+    protected function resolveCabangId(PurchaseOrder $purchaseOrder, $purchaseOrderItem = null): ?int
+    {
+        if (! empty($purchaseOrder->cabang_id)) {
+            return (int) $purchaseOrder->cabang_id;
+        }
+
+        if ($purchaseOrderItem) {
+            if (! empty($purchaseOrderItem->cabang_id)) {
+                return (int) $purchaseOrderItem->cabang_id;
+            }
+
+            if (! empty($purchaseOrderItem->product?->cabang_id)) {
+                return (int) $purchaseOrderItem->product->cabang_id;
+            }
+        }
+
+        foreach ($purchaseOrder->purchaseOrderItem as $item) {
+            if (! empty($item->cabang_id)) {
+                return (int) $item->cabang_id;
+            }
+
+            if (! empty($item->product?->cabang_id)) {
+                return (int) $item->product->cabang_id;
+            }
+        }
+
+        return null;
     }
 }

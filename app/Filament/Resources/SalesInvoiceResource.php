@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SalesInvoiceResource\Pages;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\Invoice;
 use App\Models\SaleOrder;
@@ -25,6 +26,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Support\Carbon;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\ViewAction;
@@ -44,8 +46,50 @@ class SalesInvoiceResource extends Resource
     protected static ?string $navigationLabel = 'Invoice Penjualan';
     protected static ?string $modelLabel = 'Invoice Penjualan';
     protected static ?string $pluralModelLabel = 'Invoice Penjualan';
-    protected static ?string $navigationGroup = 'Finance - Penjualan';
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationGroup = 'Keuangan Penjualan';
+    protected static ?int $navigationSort = 1;
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    protected static function readonlyInputAttributes(): array
+    {
+        return [
+            'class' => 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed text-gray-500 dark:text-gray-400',
+            'style' => 'background-color: #f3f4f6; cursor: not-allowed; color: #6b7280;',
+        ];
+    }
+
+    protected static function resolveCoaIdByCodes(array $codes): ?int
+    {
+        $codes = array_values(array_unique(array_filter($codes)));
+
+        if (empty($codes)) {
+            return null;
+        }
+
+        $accounts = \App\Models\ChartOfAccount::query()
+            ->whereIn('code', $codes)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('code');
+
+        foreach ($codes as $code) {
+            if ($accounts->has($code)) {
+                return $accounts->get($code)?->id;
+            }
+        }
+
+        return null;
+    }
+
+    public static function normalizeInvoiceTaxTypeValue(?string $taxType): string
+    {
+        return match (\App\Services\TaxService::normalizeType($taxType)) {
+            'Inklusif' => 'Inklusif',
+            'Eksklusif' => 'Eksklusif',
+            default => 'None',
+        };
+    }
 
     public static function form(Form $form): Form
     {
@@ -126,9 +170,11 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('invoice_number')
                                     ->label('Invoice Number')
                                     ->required()
+                                    ->unique(table: 'invoices', column: 'invoice_number', ignoreRecord: true)
                                     ->validationMessages([
                                         'required' => 'Nomor invoice tidak boleh kosong',
-                                        'max' => 'Nomor invoice terlalu panjang'
+                                        'max' => 'Nomor invoice terlalu panjang',
+                                        'unique' => 'Nomor invoice sudah digunakan'
                                     ])
                                     ->suffixAction(
                                         Action::make('generate')
@@ -144,15 +190,36 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('due_date_display')
                                     ->label('Due Date')
                                     ->disabled()
-                                    ->placeholder('Auto calculated'),
+                                    ->placeholder('Auto calculated')
+                                    ->dehydrated(false)
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
+                                    ->afterStateHydrated(function ($component, $state, $get) {
+                                        $due = $get('due_date');
+                                        $invoice = $get('invoice_date') ?? now();
+                                        if ($due) {
+                                            $days = \Illuminate\Support\Carbon::parse($invoice)
+                                                ->diffInDays(\Illuminate\Support\Carbon::parse($due));
+                                            $component->state("{$due} ({$days} hari)");
+                                        }
+                                    }),
 
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->required()
+                                    ->reactive()
                                     ->validationMessages([
                                         'required' => 'Tanggal invoice harus diisi'
                                     ])
-                                    ->default(now()),
+                                    ->default(now())
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        // recalc due_date_display when invoice date changes
+                                        $due = $get('due_date');
+                                        if ($due) {
+                                            $days = \Illuminate\Support\Carbon::parse($state)
+                                                ->diffInDays(\Illuminate\Support\Carbon::parse($due));
+                                            $set('due_date_display', "{$due} ({$days} hari)");
+                                        }
+                                    }),
 
                                 DatePicker::make('due_date')
                                     ->label('Due Date')
@@ -163,7 +230,10 @@ class SalesInvoiceResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if ($state) {
-                                            $set('due_date_display', $state);
+                                            $invoice = $get('invoice_date') ?? now();
+                                            $days = \Illuminate\Support\Carbon::parse($invoice)
+                                                ->diffInDays(\Illuminate\Support\Carbon::parse($state));
+                                            $set('due_date_display', "{$state} ({$days} hari)");
                                         }
                                     }),
                             ]),
@@ -214,7 +284,7 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             $isInvoiced = in_array($do->id, $invoicedDOIds);
                                             $total = $do->total ?? 0;
-                                            $label = "{$do->do_number} - Rp. " . number_format($total, 0, ',', '.');
+                                            $label = "{$do->do_number} - " . MoneyHelper::rupiah($total);
 
                                             if ($isInvoiced) {
                                                 $label .= " (Sudah di-invoice)";
@@ -270,7 +340,10 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->saleOrderItem) {
-                                                    $price = (float) $item->saleOrderItem->unit_price - (float) $item->saleOrderItem->discount + (float) $item->saleOrderItem->tax;
+                                                    // FIX #3: discount and tax are percentages (0-100), not IDR amounts.
+                                                    // Correct net-DPP price = unit_price * (1 - discount/100)
+                                                    $discountPct = max(0.0, min(100.0, (float) $item->saleOrderItem->discount));
+                                                    $price = (float) $item->saleOrderItem->unit_price * (1 - $discountPct / 100);
                                                     $total = (float) $price * (float) $item->quantity;
 
                                                     $items[] = [
@@ -298,7 +371,9 @@ class SalesInvoiceResource extends Resource
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
                                                 if ($item->product && $item->saleOrderItem) {
-                                                    $originalPrice = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
+                                                    // FIX #3: discount is a percentage, not an IDR amount
+                                                    $discountPct = max(0.0, min(100.0, (float) $item->saleOrderItem->discount));
+                                                    $originalPrice = (float) $item->saleOrderItem->unit_price * (1 - $discountPct / 100);
 
                                                     // For edit, try to find existing invoice item data
                                                     $invoiceQuantity = $item->quantity;
@@ -335,11 +410,21 @@ class SalesInvoiceResource extends Resource
                                         }
                                         $set('delivery_order_items', $deliveryOrderItems);
 
+                                        // L1: Auto-fill tipe_pajak from SO items
+                                        $soForTax = SaleOrder::with('saleOrderItem')->find($saleOrderId);
+                                        if ($soForTax && $soForTax->saleOrderItem->isNotEmpty()) {
+                                            $tipePajak = static::normalizeInvoiceTaxTypeValue($soForTax->saleOrderItem->first()->tipe_pajak ?? 'None');
+                                            $set('tipe_pajak', $tipePajak);
+                                            if ($tipePajak === 'None') {
+                                                $set('ppn_rate', 0);
+                                            }
+                                        }
+
                                         // Calculate tax and total
-                                        $tax = $get('tax') ?? 0;
+                                        $tax = 0;
                                         $otherFee = 0; // Initialize as 0
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
 
@@ -383,7 +468,9 @@ class SalesInvoiceResource extends Resource
                                         $subtotal = 0;
 
                                         foreach ($saleOrder->saleOrderItem as $item) {
-                                            $price = (float) $item->unit_price - (float) $item->discount + (float) $item->tax;
+                                            // FIX #3: discount is a percentage, not an IDR amount
+                                            $discountPct = max(0.0, min(100.0, (float) $item->discount));
+                                            $price = (float) $item->unit_price * (1 - $discountPct / 100);
                                             $total = (float) $price * (float) $item->quantity;
 
                                             $items[] = [
@@ -407,7 +494,9 @@ class SalesInvoiceResource extends Resource
                                             $deliveryOrderItems = [];
                                             foreach ($saleOrder->saleOrderItem as $item) {
                                                 if ($item->product) {
-                                                    $originalPrice = $item->unit_price - $item->discount + $item->tax;
+                                                    // FIX #3: discount is a percentage, not an IDR amount
+                                                    $discountPct = max(0.0, min(100.0, (float) $item->discount));
+                                                    $originalPrice = (float) $item->unit_price * (1 - $discountPct / 100);
 
                                                     $deliveryOrderItems[] = [
                                                         'do_number' => 'SO-' . $saleOrder->so_number, // Use SO number as reference
@@ -425,11 +514,20 @@ class SalesInvoiceResource extends Resource
                                             $set('delivery_order_items', $deliveryOrderItems);
                                         }
 
+                                        // L1: Auto-fill tipe_pajak from SO items
+                                        if ($saleOrder && $saleOrder->saleOrderItem->isNotEmpty()) {
+                                            $tipePajak = static::normalizeInvoiceTaxTypeValue($saleOrder->saleOrderItem->first()->tipe_pajak ?? 'None');
+                                            $set('tipe_pajak', $tipePajak);
+                                            if ($tipePajak === 'None') {
+                                                $set('ppn_rate', 0);
+                                            }
+                                        }
+
                                         // Calculate tax and total
-                                        $tax = $get('tax') ?? 0;
+                                        $tax = 0;
                                         $otherFee = 0;
                                         $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $finalTotal = $subtotal + $otherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     }),
                             ]),
@@ -444,15 +542,18 @@ class SalesInvoiceResource extends Resource
                                         TextInput::make('do_number')
                                             ->label('No. DO')
                                             ->disabled()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(1),
                                         TextInput::make('product_name')
                                             ->label('Product')
                                             ->disabled()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(2),
                                         TextInput::make('original_quantity')
                                             ->label('Qty DO Asli')
                                             ->disabled()
                                             ->numeric()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(1),
                                         TextInput::make('invoice_quantity')
                                             ->label('Qty untuk Invoice')
@@ -474,7 +575,7 @@ class SalesInvoiceResource extends Resource
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get) {
                                                 $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) str_replace(['.', ','], ['', '.'], $get('unit_price') ?? '0');
+                                                $price = (float) \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
@@ -482,6 +583,8 @@ class SalesInvoiceResource extends Resource
                                             ->label('Harga Satuan')
                                             ->indonesianMoney()
                                             ->required()
+                                            ->readOnly()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->default(function ($get) {
                                                 return $get('original_price') ?? 0;
                                             })
@@ -494,7 +597,7 @@ class SalesInvoiceResource extends Resource
                                             ->reactive()
                                             ->afterStateUpdated(function ($set, $get) {
                                                 $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) str_replace(['.', ','], ['', '.'], $get('unit_price') ?? '0');
+                                                $price = (float) \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
                                                 $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
@@ -502,14 +605,9 @@ class SalesInvoiceResource extends Resource
                                             ->label('Total')
                                             ->indonesianMoney()
                                             ->disabled()
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->columnSpan(1),
-                                        Select::make('coa_id')
-                                            ->label('COA Revenue')
-                                            ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                                return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                            }))
-                                            ->searchable()
-                                            ->preload()
+                                        Hidden::make('coa_id')
                                             ->default(function ($get) {
                                                 $productId = $get('product_id');
                                                 if ($productId) {
@@ -517,12 +615,7 @@ class SalesInvoiceResource extends Resource
                                                     return $product?->sales_coa_id;
                                                 }
                                                 return null;
-                                            })
-                                            ->required()
-                                            ->validationMessages([
-                                                'required' => 'COA revenue harus dipilih'
-                                            ])
-                                            ->columnSpan(1),
+                                            }),
                                     ])
                                     ->columns(4)
                                     ->columnSpanFull()
@@ -539,7 +632,7 @@ class SalesInvoiceResource extends Resource
 
                                         foreach ($deliveryOrderItems as $item) {
                                             $quantity = (float) ($item['invoice_quantity'] ?? 0);
-                                            $price = (float) ($item['unit_price'] ?? 0);
+                                            $price = (float) \App\Helpers\MoneyHelper::safeParse($item['unit_price'] ?? 0);
                                             $total = $quantity * $price;
 
                                             $invoiceItems[] = [
@@ -558,11 +651,11 @@ class SalesInvoiceResource extends Resource
                                         $set('dpp', $subtotal);
 
                                         // Recalculate total
-                                        $tax = $get('tax') ?? 0;
+                                        $tax = 0;
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = collect($otherFees)->sum('amount');
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                         $set('other_fee', $otherFeeTotal);
                                     }),
@@ -584,25 +677,24 @@ class SalesInvoiceResource extends Resource
                                         TextInput::make('amount')
                                             ->label('Jumlah')
                                             ->indonesianMoney()
-                                            ->numeric()
                                             ->required()
                                             ->validationMessages([
                                                 'required' => 'Jumlah tidak boleh kosong',
                                                 'numeric' => 'Jumlah harus berupa angka'
                                             ])
                                             ->default(0)
-                                            ->reactive(),
+                                            ->live(debounce: 500),
                                     ])
                                     ->columns(2)
                                     ->defaultItems(0)
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $totalOtherFee = collect($state ?? [])->sum('amount');
+                                        $totalOtherFee = (float) collect($state ?? [])->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
                                         $set('other_fee', $totalOtherFee);
 
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $tax = $get('tax') ?? 0;
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $tax / 100) + ($subtotal * $ppnRate / 100);
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
+                                        $tax = 0;
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
+                                        $finalTotal = $subtotal + $totalOtherFee + ($subtotal * $ppnRate / 100);
                                         $set('total', $finalTotal);
                                     })
                                     ->collapsible(),
@@ -615,31 +707,43 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('dpp')
                                     ->label('DPP (Dasar Pengenaan Pajak)')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->validationMessages([
                                         'numeric' => 'DPP harus berupa angka'
                                     ])
                                     ->default(0)
-                                    ->readonly(),
+                                    ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes()),
 
-                                TextInput::make('tax')
-                                    ->label('Tax (%)')
-                                    ->numeric()
-                                    ->validationMessages([
-                                        'numeric' => 'Tax harus berupa angka'
+                                \Filament\Forms\Components\Hidden::make('tax')
+                                    ->default(0),
+
+                                Select::make('tipe_pajak')
+                                    ->label('Tipe Pajak')
+                                    ->options([
+                                        'None'     => 'Tidak Kena Pajak (None)',
+                                        'Inklusif' => 'PPN Inklusif (sudah termasuk harga)',
+                                        'Eksklusif'  => 'PPN Eksklusif (ditambah ke harga)',
                                     ])
-                                    ->suffix('%')
-                                    ->default(0)
+                                    ->default('None')
                                     ->reactive()
+                                    ->afterStateHydrated(function ($component, $state) {
+                                        $component->state(static::normalizeInvoiceTaxTypeValue($state));
+                                    })
+                                    ->helperText('Diisi otomatis dari Sales Order. Dapat diubah bila perlu.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $state = $state ?? 0; // Ensure it's not null
-                                        $subtotal = $get('subtotal') ?? 0;
-                                        $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = collect($otherFees)->sum('amount');
-                                        $ppnRate = $get('ppn_rate') ?? 0;
-                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $state / 100) + ($subtotal * $ppnRate / 100);
-                                        $set('total', $finalTotal);
-                                        $set('other_fee', $otherFeeTotal);
+                                        $activePpnRate = \App\Models\TaxSetting::activeRate('PPN');
+
+                                        // If None, set ppn_rate to 0
+                                        if ($state === 'None') {
+                                            $set('ppn_rate', 0);
+                                            $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
+                                            $otherFees = $get('other_fees') ?? [];
+                                            $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
+                                            $set('total', $subtotal + $otherFeeTotal);
+                                        } else {
+                                            // Reapply active rate when PPN is enabled, but keep the field editable
+                                            $set('ppn_rate', $activePpnRate);
+                                        }
                                     }),
 
                                 TextInput::make('ppn_rate')
@@ -649,22 +753,16 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'PPN rate harus berupa angka'
                                     ])
                                     ->suffix('%')
-                                    ->default(function () {
-                                        $taxSetting = \App\Models\TaxSetting::where('status', true)
-                                            ->where('effective_date', '<=', now())
-                                            ->where('type', 'PPN')
-                                            ->orderByDesc('effective_date')
-                                            ->first();
-                                        return $taxSetting?->rate ?? 11;
-                                    })
+                                    ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                                     ->reactive()
+                                    ->visible(fn ($get) => $get('tipe_pajak') !== 'None')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $state = $state ?? 11; // Ensure it's not null, default to 11
-                                        $subtotal = $get('subtotal') ?? 0;
+                                        $subtotal = (float) \App\Helpers\MoneyHelper::safeParse($get('subtotal') ?? 0);
                                         $otherFees = $get('other_fees') ?? [];
-                                        $otherFeeTotal = collect($otherFees)->sum('amount');
-                                        $tax = $get('tax') ?? 0;
-                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $tax / 100) + ($subtotal * $state / 100);
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
+                                        $tax = 0;
+                                        $finalTotal = $subtotal + $otherFeeTotal + ($subtotal * $state / 100);
                                         $set('total', $finalTotal);
                                         $set('other_fee', $otherFeeTotal);
                                     }),
@@ -676,60 +774,31 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('total')
                                     ->label('')
                                     ->indonesianMoney()
-                                    ->numeric()
                                     ->validationMessages([
                                         'numeric' => 'Total harus berupa angka'
                                     ])
                                     ->readonly()
+                                    ->extraInputAttributes(static::readonlyInputAttributes())
                                     ->extraAttributes(['class' => 'text-lg font-bold']),
                             ]),
 
-                        // COA Selection
-                        Section::make('Pilih COA untuk Journal Entries')
-                            ->description('Pilih COA yang akan digunakan untuk journal entries invoice penjualan')
-                            ->columns(2)
-                            ->schema([
-                                Select::make('ar_coa_id')
-                                    ->label('COA Piutang Usaha (AR)')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '1120')->first()?->id;
-                                    })
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'COA piutang usaha harus dipilih'
-                                    ]),
-
-                                Select::make('revenue_coa_id')
-                                    ->label('COA Penjualan (Revenue)')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '4000')->first()?->id;
-                                    })
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'COA penjualan harus dipilih'
-                                    ]),
-
-                                Select::make('ppn_keluaran_coa_id')
-                                    ->label('COA PPn Keluaran')
-                                    ->options(\App\Models\ChartOfAccount::all()->mapWithKeys(function ($coa) {
-                                        return [$coa->id => "({$coa->code}) {$coa->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
-                                    ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '2120.06')->first()?->id;
-                                    }),
-                            ]),
+                        // COA fields — hidden from UI, auto-populated from defaults
+                        Hidden::make('ar_coa_id')
+                            ->default(fn () => static::resolveCoaIdByCodes([
+                                config('coa.accounts_receivable'),
+                                '1120',
+                            ])),
+                        Hidden::make('revenue_coa_id')
+                            ->default(fn () => static::resolveCoaIdByCodes([
+                                config('coa.sales_revenue'),
+                                '4000',
+                                '4111',
+                            ])),
+                        Hidden::make('ppn_keluaran_coa_id')
+                            ->default(fn () => static::resolveCoaIdByCodes([
+                                config('coa.sales_output_vat'),
+                                '2120.06',
+                            ])),
 
                         // Hidden fields
                         Hidden::make('id'),
@@ -741,15 +810,6 @@ class SalesInvoiceResource extends Resource
                         Hidden::make('status')->default('draft'),
                         Hidden::make('delivery_orders'),
                         Hidden::make('dpp')->default(0),
-                        Hidden::make('tax')->default(0),
-                        Hidden::make('ppn_rate')->default(function () {
-                            $taxSetting = \App\Models\TaxSetting::where('status', true)
-                                ->where('effective_date', '<=', now())
-                                ->where('type', 'PPN')
-                                ->orderByDesc('effective_date')
-                                ->first();
-                            return $taxSetting?->rate ?? 11;
-                        }),
                         Hidden::make('total')->default(0),
 
                         Repeater::make('invoiceItem')
@@ -758,7 +818,7 @@ class SalesInvoiceResource extends Resource
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->options(function () {
-                                        return \App\Models\Product::all()->pluck('name', 'id');
+                                        return \App\Models\Product::query()->orderBy('name')->limit(50)->pluck('name', 'id');
                                     })
                                     ->searchable()
                                     ->required()
@@ -775,8 +835,8 @@ class SalesInvoiceResource extends Resource
                                     ]),
                                 TextInput::make('price')
                                     ->label('Price')
-                                    ->numeric()
                                     ->indonesianMoney()
+                                    ->readOnly()
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Harga tidak boleh kosong',
@@ -784,7 +844,6 @@ class SalesInvoiceResource extends Resource
                                     ]),
                                 TextInput::make('total')
                                     ->label('Total')
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->required()
                                     ->validationMessages([
@@ -908,6 +967,12 @@ class SalesInvoiceResource extends Resource
                 ActionGroup::make([
                     ViewAction::make(),
                     EditAction::make(),
+                    Tables\Actions\Action::make('print_invoice')
+                        ->label('Preview Invoice')
+                        ->icon('heroicon-o-document-text')
+                        ->color('primary')
+                        ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                     Tables\Actions\Action::make('view_journal_entries')
                         ->label('Lihat Journal Entries')
                         ->icon('heroicon-o-book-open')
@@ -936,7 +1001,7 @@ class SalesInvoiceResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('invoice_date', 'desc')
+            ->defaultSort('created_at', 'desc')
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
                     '<summary class="cursor-pointer font-semibold">Panduan Sales Invoice</summary>' .
@@ -959,6 +1024,7 @@ class SalesInvoiceResource extends Resource
     {
         return parent::getEloquentQuery()
             ->where('from_model_type', 'App\Models\SaleOrder')
+            ->orderByDesc('created_at')
             ->with([
                 'invoiceItem.product',
                 'fromModel',

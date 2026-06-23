@@ -9,6 +9,12 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Schedule::command('asset:depreciate --force')
+    ->monthlyOn((int) config('asset.depreciation.monthly_day', 1), '01:00')
+    ->name('asset-monthly-depreciation')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Purchase return automation removed - now handled manually or through UI triggers
 // Schedule::command('purchase:automate-return')
 //     ->dailyAt('08:00')

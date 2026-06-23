@@ -25,11 +25,13 @@ class RakResource extends Resource
 {
     protected static ?string $model = Rak::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-square-2-stack';
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 9;
     public static function form(Form $form): Form
     {
         return $form
@@ -55,17 +57,23 @@ class RakResource extends Resource
                     ->options(function () {
                         $user = Auth::user();
                         $manageType = $user?->manage_type ?? [];
+                            $query = Warehouse::where('status', 1);
+
                         if ($user && is_array($manageType) && in_array('all', $manageType)) {
-                            // User dengan akses semua bisa lihat semua warehouse
-                            return Warehouse::all()->mapWithKeys(function ($warehouse) {
-                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                            });
-                        } else {
-                            // User biasa hanya lihat warehouse di cabang mereka
-                            return Warehouse::where('cabang_id', $user?->cabang_id)->get()->mapWithKeys(function ($warehouse) {
-                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
-                            });
-                        }
+                                return $query->orderBy('name')
+                                    ->get()
+                                    ->mapWithKeys(function ($warehouse) {
+                                        return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                    });
+                            }
+
+                            // User biasa hanya lihat warehouse aktif di cabang mereka
+                            return $query->where('cabang_id', $user?->cabang_id)
+                                ->orderBy('name')
+                                ->get()
+                                ->mapWithKeys(function ($warehouse) {
+                                    return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                });
                     })
                     ->searchable()
                     ->preload()

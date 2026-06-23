@@ -3,13 +3,21 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ViewPurchaseInvoice extends ViewRecord
 {
     protected static string $resource = PurchaseInvoiceResource::class;
+
+    protected function canManageStatus(): bool
+    {
+        return PurchaseInvoiceResource::canManuallySetStatus();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -40,39 +48,38 @@ class ViewPurchaseInvoice extends ViewRecord
                 ->label('Mark as Sent')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('warning')
-                ->visible(fn ($record) => $record->status === 'draft')
+                ->visible(fn ($record) => $record->status === 'draft' && $this->canManageStatus())
                 ->requiresConfirmation()
                 ->modalHeading('Mark Invoice as Sent')
                 ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
                 ->modalSubmitActionLabel('Yes, Mark as Sent')
                 ->action(function ($record) {
-                    $record->update(['status' => 'sent']);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Invoice marked as sent')
-                        ->success()
-                        ->send();
+                    try {
+                        $record->update(['status' => 'sent']);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Invoice berhasil ditandai sebagai terkirim')
+                            ->success()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Log::error('ViewPurchaseInvoice mark_as_sent failed', [
+                            'invoice_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Mengubah Status Invoice',
+                            $exception,
+                            'Status invoice pembelian belum berhasil diperbarui. Silakan coba lagi.'
+                        );
+                    }
                 }),
             Actions\Action::make('print_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    // Load necessary relationships for PDF
-                    $record->load([
-                        'fromModel.supplier',
-                        'fromModel.purchaseOrderBiaya',
-                        'invoiceItem.product',
-                        'cabang'
-                    ]);
-                    
-                    $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
-                        'invoice' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'purchase-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 

@@ -24,9 +24,9 @@ class DeliveryOrderApprovalLogResource extends Resource
     protected static ?string $navigationLabel = 'Approval Logs';
     protected static ?string $modelLabel = 'Approval Log';
     protected static ?string $pluralModelLabel = 'Approval Logs';
-    protected static ?string $navigationGroup = 'Delivery Order';
+    protected static ?string $navigationGroup = 'Pengiriman';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     public static function shouldRegisterNavigation(): bool
     {

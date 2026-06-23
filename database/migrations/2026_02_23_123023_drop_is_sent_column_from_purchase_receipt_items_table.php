@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('purchase_receipt_items') || ! Schema::hasColumn('purchase_receipt_items', 'is_sent')) {
+            return;
+        }
+
         Schema::table('purchase_receipt_items', function (Blueprint $table) {
             $table->dropColumn('is_sent');
         });
@@ -21,8 +25,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('purchase_receipt_items')) {
+            return;
+        }
+
         Schema::table('purchase_receipt_items', function (Blueprint $table) {
-            $table->boolean('is_sent')->default(false)->after('warehouse_id');
+            if (! Schema::hasColumn('purchase_receipt_items', 'is_sent')) {
+                $table->boolean('is_sent')->default(false)->after('warehouse_id');
+            }
         });
     }
 };

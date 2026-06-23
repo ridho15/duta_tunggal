@@ -34,8 +34,7 @@ use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
 use App\Models\Customer;
-use App\Models\Driver;
-use App\Models\Vehicle;
+use App\Models\Cabang;
 
 class SuratJalanResource extends Resource
 {
@@ -43,13 +42,13 @@ class SuratJalanResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Delivery Order';
+    protected static ?string $navigationGroup = 'Pengiriman';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 
     public static function form(Form $form): Form
@@ -87,13 +86,40 @@ class SuratJalanResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->relationship('deliveryOrder', 'do_number', function (Builder $query) {
-                                $query->whereDoesntHave('suratJalan')
-                                      ->whereIn('status', ['draft', 'request_approve', 'sent', 'received']);
+                            ->reactive()
+                            ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get) {
+                                // J1: create => only approved DOs, edit => allow linked sent/received for compatibility.
+                                $isCreatePage = str_ends_with((string) request()->path(), 'surat-jalans/create');
+                                if ($isCreatePage) {
+                                    $query->where('status', 'approved');
+                                } else {
+                                    $query->whereIn('status', ['approved', 'sent', 'received']);
+                                }
                             })
                             ->multiple()
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $ids = is_array($state) ? $state : (empty($state) ? [] : [$state]);
+                                $deliveryOrders = DeliveryOrder::whereIn('id', $ids)->get();
+                                if ($deliveryOrders->isNotEmpty()) {
+                                    $set('cabang_id', $deliveryOrders->first()->cabang_id);
+                                }
+                            })
                             ->validationMessages([
                                 'required' => 'Delivery Order harus dipilih'
+                            ]),
+                        Select::make('cabang_id')
+                            ->label('Cabang')
+                            ->searchable()
+                            ->preload()
+                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
+                            }))
+                            ->visible(fn() => in_array('all', Auth::user()?->manage_type ?? []))
+                            ->default(fn() => in_array('all', Auth::user()?->manage_type ?? []) ? null : Auth::user()?->cabang_id)
+                            ->required()
+                            ->helperText('Diisi otomatis dari Delivery Order. Dapat diubah bila perlu.')
+                            ->validationMessages([
+                                'required' => 'Cabang wajib dipilih'
                             ]),
                         FileUpload::make('document_path')
                             ->label('Upload Document')
@@ -106,7 +132,7 @@ class SuratJalanResource extends Resource
                                 'maxSize' => 'Ukuran file maksimal 5MB'
                             ]),
                         Hidden::make('status')
-                            ->default(0), // 0 = Draft, 1 = Terbit
+                            ->default(1), // J2: auto-terbit, tidak perlu approval
                         Hidden::make('created_by')
                             ->default(fn () => Auth::id())
                     ])
@@ -158,10 +184,22 @@ class SuratJalanResource extends Resource
                         });
                     })
                     ->wrap(),
+                TextColumn::make('cabang.nama')
+                    ->label('Cabang')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('driver_info')
                     ->label('Driver')
                     ->getStateUsing(function (SuratJalan $record): string {
-                        $drivers = $record->deliveryOrder->pluck('driver.name')->filter()->unique();
+                        $drivers = $record->deliveryOrder->map(function ($deliveryOrder) {
+                            $driver = $deliveryOrder->driver;
+                            if ($driver) {
+                                $code = $driver->license ? "({$driver->license}) " : '';
+                                return $code . $driver->name;
+                            }
+                            return null;
+                        })->filter()->unique();
+
                         return $drivers->implode(', ') ?: '-';
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -170,7 +208,12 @@ class SuratJalanResource extends Resource
                     ->getStateUsing(function (SuratJalan $record): string {
                         $vehicles = $record->deliveryOrder->map(function ($deliveryOrder) {
                             if ($deliveryOrder->vehicle) {
-                                return "{$deliveryOrder->vehicle->license_plate} ({$deliveryOrder->vehicle->vehicle_type})";
+                                $plate = $deliveryOrder->vehicle->plate ?? $deliveryOrder->vehicle->license_plate ?? null;
+                                $type = $deliveryOrder->vehicle->type ?? $deliveryOrder->vehicle->vehicle_type ?? null;
+                                if ($plate && $type) {
+                                    return "{$plate} ({$type})";
+                                }
+                                return $plate ?? $type;
                             }
                             return null;
                         })->filter()->unique();
@@ -234,7 +277,6 @@ class SuratJalanResource extends Resource
                 SelectFilter::make('status')
                     ->label('Filter Status')
                     ->options([
-                        '0' => 'Draft',
                         '1' => 'Terbit'
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -265,34 +307,8 @@ class SuratJalanResource extends Resource
                             );
                     }),
                     
-                SelectFilter::make('driver')
-                    ->label('Filter Driver')
-                    ->options(Driver::all()->pluck('name', 'id'))
-                    ->query(function (Builder $query, array $data): Builder {
-                        if (empty($data['value'])) {
-                            return $query;
-                        }
-                        
-                        return $query->whereHas('deliveryOrder', function (Builder $query) use ($data) {
-                            $query->where('driver_id', $data['value']);
-                        });
-                    }),
-                    
-                SelectFilter::make('vehicle')
-                    ->label('Filter Kendaraan')
-                    ->options(Vehicle::all()->mapWithKeys(function ($vehicle) {
-                        return [$vehicle->id => "{$vehicle->license_plate} - {$vehicle->vehicle_type}"];
-                    }))
-                    ->query(function (Builder $query, array $data): Builder {
-                        if (empty($data['value'])) {
-                            return $query;
-                        }
-                        
-                        return $query->whereHas('deliveryOrder', function (Builder $query) use ($data) {
-                            $query->where('vehicle_id', $data['value']);
-                        });
-                    }),
             ])
+            ->headerActions([])
             ->actions([
                 ActionGroup::make([
                     EditAction::make()
@@ -310,35 +326,12 @@ class SuratJalanResource extends Resource
                             return response()->download(storage_path('app/public/' . $record->document_path));
                         }),
                     Action::make('download_surat_jalan')
-                        ->label('Download Surat')
+                        ->label('Preview / Download PDF')
                         ->icon('heroicon-o-clipboard-document-check')
-                        ->color('danger')
-                        ->visible(function ($record) {
-                            return $record->status == 1;
-                        })
-                        ->action(function ($record) {
-                            $pdf = Pdf::loadView('pdf.surat-jalan', [
-                                'suratJalan' => $record
-                            ])->setPaper('A4', 'potrait');
-
-                            return response()->streamDownload(function () use ($pdf) {
-                                echo $pdf->stream();
-                            }, 'Surat_Jalan_' . $record->sj_number . '.pdf');
-                        }),
-                    Action::make('terbit')
-                        ->label('Terbitkan')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-clipboard-document-list')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response surat jalan') && $record->status == 0;
-                        })->action(function ($record) {
-                            $record->update([
-                                'signed_by' => Auth::user()->id,
-                                'status' => 1
-                            ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Surat Jalan Terbit');
-                        })
+                        ->color('info')
+                        ->visible(fn ($record) => $record->status == 1)
+                        ->url(fn ($record) => route('pdf-stream', ['type' => 'surat-jalan', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                 ])
             ], position: ActionsPosition::BeforeCells)
             ->bulkActions([
@@ -346,20 +339,61 @@ class SuratJalanResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
+            ->recordClasses(fn($record) => $record->terbit ? 'bg-blue-100' : 'bg-gray-100')
             ->description(new \Illuminate\Support\HtmlString(
-                '<details class="mb-4">' .
-                    '<summary class="cursor-pointer font-semibold">Panduan Surat Jalan</summary>' .
-                    '<div class="mt-2 text-sm">' .
-                        '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order dalam satu perjalanan.</li>' .
-                            '<li><strong>Status:</strong> <em>Draft</em> (belum terbit) dan <em>Terbit</em> (sudah resmi). Hanya Surat Jalan terbit yang dapat digunakan untuk pengiriman.</li>' .
-                            '<li><strong>Actions:</strong> <em>Edit</em> (draft only), <em>Delete</em> (draft only), <em>Download Document</em> (jika ada file), <em>Download Surat</em> (PDF terbit), <em>Terbitkan</em> (ubah ke status terbit).</li>' .
-                            '<li><strong>Grouping:</strong> Satu Surat Jalan dapat mencakup multiple Delivery Order untuk efisiensi pengiriman ke customer yang sama.</li>' .
-                            '<li><strong>Persyaratan Terbit:</strong> Surat Jalan hanya dapat diterbitkan oleh user dengan permission <em>response surat jalan</em>.</li>' .
-                            '<li><strong>PDF:</strong> Download PDF Surat Jalan tersedia setelah status terbit untuk keperluan pengiriman.</li>' .
-                        '</ul>' .
+                '<style>
+                    .fi-ta-header:has(.sj-legend){display:block!important;width:100%}
+                    .fi-ta-description:has(.sj-legend){display:block!important;width:100%;margin-bottom:16px}
+                    .sj-legend{width:100%;min-width:100%;max-width:none;box-sizing:border-box;display:block}
+                    .sj-legend+.fi-ta-header,.fi-ta-description+.fi-ta-header{margin-top:16px!important}
+                    .fi-ta-description .sj-legend{margin-bottom:0}
+                </style>' .
+                '<div class="sj-legend space-y-4 mb-4" style="width:100%;min-width:100%;max-width:none;box-sizing:border-box;margin-bottom:16px;">' .
+                '<details class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm transition-all duration-200 w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<summary class="flex justify-between items-center cursor-pointer font-semibold text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:600;color:#374151;">' .
+                        '<span class="flex items-center gap-2" style="display:flex;align-items:center;gap:8px;">' .
+                        '<svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:#3b82f6;">' .
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />' .
+                        '</svg>' .
+                        'Panduan Surat Jalan' .
+                        '</span>' .
+                        '<span class="transition group-open:rotate-180">' .
+                        '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>' .
+                        '</span>' .
+                    '</summary>' .
+                    '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);">' .
+                    '<ul class="list-disc pl-0" style="list-style:none;padding-left:0;">' .
+                    '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order.</li>' .
+                    '<li><strong>Status:</strong> <em>Terbit</em> (otomatis saat dibuat).</li>' .
+                    '<li><strong>PDF:</strong> Download PDF tersedia untuk keperluan pengiriman.</li>' .
+                    '</ul>' .
                     '</div>' .
-                '</details>'
+                '</details>' .
+                '<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm w-full" style="width:100%;box-sizing:border-box;border:1px solid #edf2f7;border-radius:12px;padding:16px;background-color:#ffffff;">' .
+                    '<h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-2" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:12px;display:flex;align-items:center;gap:8px;">' .
+                    '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;">' .
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />' .
+                    '</svg>' .
+                    'Legenda Warna Status Baris Data' .
+                    '</h4>' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #f9fafb; border: 1px solid #e5e7eb;">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; box-shadow: 0 1px 3px rgba(156, 163, 175, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #4b5563;">Abu (Draft)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Belum terbit</span>' .
+                    '</div>' .
+                    '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Terbit)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SJ sudah terbit</span>' .
+                    '</div>' .
+                    '</div>' .
+                    '</div>' .
+                '</div>' .
+                '</div>'
             ));
     }
 
@@ -388,6 +422,9 @@ class SuratJalanResource extends Resource
     {
         return [
             'index' => Pages\ListSuratJalans::route('/'),
+            'create' => Pages\CreateSuratJalan::route('/create'),
+            'edit' => Pages\EditSuratJalan::route('/{record}/edit'),
+            'view' => Pages\ViewSuratJalan::route('/{record}'),
         ];
     }
 }

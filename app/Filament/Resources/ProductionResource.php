@@ -9,6 +9,7 @@ use App\Services\ProductionService;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -19,9 +20,11 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Filament\Tables\Filters\SelectFilter;
@@ -32,11 +35,19 @@ class ProductionResource extends Resource
 {
     protected static ?string $model = Production::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Produksi';
+
+    protected static ?string $modelLabel = 'Produksi';
+
+    protected static ?string $pluralModelLabel = 'Produksi';
+
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
@@ -77,6 +88,57 @@ class ProductionResource extends Resource
                             ->validationMessages([
                                 'required' => 'Tanggal produksi tidak boleh kosong'
                             ]),
+                    ]),
+
+                Fieldset::make('Informasi BOM dan Kebutuhan Bahan Produksi')
+                    ->schema([
+                        Placeholder::make('production_plan_info')
+                            ->label('Rencana Produksi')
+                            ->content(function ($record) {
+                                return $record?->resolveProductionPlanLabel() ?? '-';
+                            })
+                            ->visible(fn ($record) => (bool) $record),
+                        Placeholder::make('bom_info')
+                            ->label('BOM')
+                            ->content(function ($record) {
+                                return $record?->resolveBillOfMaterialLabel() ?? '-';
+                            })
+                            ->visible(fn ($record) => (bool) $record),
+                        Placeholder::make('material_requirement_summary')
+                            ->label('Ringkasan Kebutuhan')
+                            ->content(function ($record) {
+                                if (! $record) {
+                                    return '-';
+                                }
+
+                                $summary = $record->getFulfillmentSummary();
+
+                                return sprintf(
+                                    'Total bahan %d | Stok bebas cukup %d | Stok bebas sebagian %d | Stok bebas tidak cukup %d | Sudah di-issue %d | Siap %s',
+                                    $summary['total_materials'] ?? 0,
+                                    $summary['fully_available'] ?? 0,
+                                    $summary['partially_available'] ?? 0,
+                                    $summary['not_available'] ?? 0,
+                                    $summary['fully_issued'] ?? 0,
+                                    ($summary['can_start_production'] ?? false) ? 'Ya' : 'Tidak'
+                                );
+                            })
+                            ->visible(fn ($record) => (bool) $record),
+                        Placeholder::make('material_requirement_table')
+                            ->label('Daftar Kebutuhan Bahan')
+                            ->content(function ($record) {
+                                if (! $record) {
+                                    return '-';
+                                }
+
+                                return new HtmlString(
+                                    view('filament.infolists.production-plan-material-requirements-table', [
+                                        'getRecord' => fn () => $record,
+                                    ])->render()
+                                );
+                            })
+                            ->columnSpanFull()
+                            ->visible(fn ($record) => (bool) $record),
                     ])
             ]);
     }
@@ -102,6 +164,20 @@ class ProductionResource extends Resource
                                 ->orWhere('name', 'LIKE', '%' . $search . '%');
                         });
                     }),
+                TextColumn::make('manufacturingOrder.productionPlan.quantity')
+                    ->label('Qty Plan')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('quantity_produced')
+                    ->label('Qty Produced')
+                    ->formatStateUsing(function ($state, $record) {
+                        return $state ?? $record->manufacturingOrder?->productionPlan?->quantity ?? '-';
+                    })
+                    ->sortable(),
+                TextColumn::make('manufacturingOrder.cabang.nama')
+                    ->label('Cabang')
+                    ->placeholder('-')
+                    ->toggleable(),
                 TextColumn::make('production_date')
                     ->date()
                     ->sortable(),
@@ -164,6 +240,7 @@ class ProductionResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
+                    ViewAction::make(),
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make(),
@@ -176,16 +253,14 @@ class ProductionResource extends Resource
                         })
                         ->requiresConfirmation()
                         ->action(function ($record) {
-                            $manufacturingOrder = $record->manufacturingOrder;
-                            if ($manufacturingOrder) {
-                                $manufacturingOrder->update([
-                                    'status' => 'completed'
-                                ]);
-                            }
+                            $plannedQuantity = $record->manufacturingOrder?->productionPlan?->quantity;
+
                             $record->update([
-                                'status' => 'finished'
+                                'status' => 'finished',
+                                'quantity_produced' => $record->quantity_produced ?? $plannedQuantity,
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished");
+
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Production Finished. Quality Control manufacture dibuat otomatis dan Manufacturing Order akan diselesaikan setelah QC diproses.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -241,8 +316,8 @@ class ProductionResource extends Resource
     {
         return [
             'index' => Pages\ListProductions::route('/'),
-            // 'create' => Pages\CreateProduction::route('/create'),
-            // 'edit' => Pages\EditProduction::route('/{record}/edit'),
+            'view' => Pages\ViewProduction::route('/{record}'),
+            'edit' => Pages\EditProduction::route('/{record}/edit'),
         ];
     }
 }

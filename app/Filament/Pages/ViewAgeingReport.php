@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\PaymentStatus;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
@@ -17,8 +18,8 @@ use App\Models\AccountPayable;
 use App\Models\Cabang;
 use App\Exports\AgeingReportExport;
 use App\Exports\AgeingReportPdfExport;
+use App\Services\Reports\AgeingReportService;
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -44,6 +45,11 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
     public function mount(): void
     {
         $this->as_of_date = now()->format('Y-m-d');
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
     }
 
     public function form(Form $form): Form
@@ -148,7 +154,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                 TextColumn::make('days_outstanding')
                     ->label('Days Outstanding')
                     ->getStateUsing(function ($record) {
-                        return $this->calculateDaysOutstanding($record);
+                        return $this->ageingReportService()->resolveDaysOutstanding($record, $this->as_of_date);
                     }),
 
                 TextColumn::make('remaining')
@@ -159,7 +165,7 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                 BadgeColumn::make('aging_bucket')
                     ->label('Aging Bucket')
                     ->getStateUsing(function ($record) {
-                        return $this->calculateBucket($record);
+                        return $this->ageingReportService()->resolveBucketLabel($record, $this->as_of_date);
                     })
                     ->colors([
                         'success' => 'Current',
@@ -170,8 +176,8 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
                 BadgeColumn::make('status')
                     ->colors([
-                        'success' => 'Lunas',
-                        'warning' => fn ($state) => !in_array($state, ['Lunas']),
+                        'success' => PaymentStatus::PAID->value,
+                        'warning' => fn ($state) => !in_array($state, [PaymentStatus::PAID->value]),
                     ]),
             ])
             ->defaultSort('invoice.due_date', 'asc')
@@ -186,104 +192,22 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
     public function getAgingSummary($type, $bucket): string
     {
-        $query = null;
+        $records = $type === 'receivables'
+            ? $this->ageingReportService()->getReceivableRecords($this->ageingFilters())
+            : $this->ageingReportService()->getPayableRecords($this->ageingFilters());
 
-        if ($type === 'receivables') {
-            $query = AccountReceivable::where('remaining', '>', 0);
-            if ($this->cabang_id) {
-                $query->where('cabang_id', $this->cabang_id);
-            }
-        } elseif ($type === 'payables') {
-            $query = AccountPayable::where('remaining', '>', 0);
-            if ($this->cabang_id) {
-                $query->whereHas('invoice', function($q) {
-                    $q->where('cabang_id', $this->cabang_id);
-                });
-            }
-        }
+        $total = $records->where('aging_bucket_computed', $bucket)->sum('remaining');
 
-        if (!$query) return 'Rp 0';
-
-        $total = 0;
-        $records = $query->with(['ageingSchedule', 'invoice'])->get();
-
-        foreach ($records as $record) {
-            $recordBucket = $this->calculateBucket($record);
-            if ($recordBucket === $bucket) {
-                $total += $record->remaining;
-            }
-        }
-
-        return 'Rp ' . number_format($total, 0, ',', '.');
+        return \App\Helpers\MoneyHelper::rupiah($total);
     }
 
     public function calculateExpectedCashFlow($type, $days): float
     {
-        $query = null;
-        $total = 0;
+        $projection = $this->ageingReportService()->projectCashFlow($this->ageingFilters(), $days);
 
-        if ($type === 'receivables') {
-            $query = AccountReceivable::where('remaining', '>', 0);
-            if ($this->cabang_id) {
-                $query->where('cabang_id', $this->cabang_id);
-            }
-        } elseif ($type === 'payables') {
-            $query = AccountPayable::where('remaining', '>', 0);
-            if ($this->cabang_id) {
-                $query->whereHas('invoice', function($q) {
-                    $q->where('cabang_id', $this->cabang_id);
-                });
-            }
-        }
-
-        if (!$query) return 0;
-
-        $records = $query->with(['ageingSchedule', 'invoice'])->get();
-        $futureDate = Carbon::parse($this->as_of_date)->addDays($days);
-
-        foreach ($records as $record) {
-            if ($record->invoice && $record->invoice->due_date) {
-                $dueDate = Carbon::parse($record->invoice->due_date);
-                if ($dueDate->lte($futureDate)) {
-                    $total += $record->remaining;
-                }
-            }
-        }
-
-        return $total;
-    }
-
-    private function calculateBucket($record): string
-    {
-        $ageingSchedule = $record->ageingSchedule;
-        $daysOutstanding = 0;
-
-        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
-            $daysOutstanding = $ageingSchedule->days_outstanding;
-        } elseif ($record->invoice && $record->invoice->invoice_date) {
-            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-            $daysOutstanding = $invoiceDate->diffInDays(Carbon::parse($this->as_of_date), false);
-        }
-
-        if ($daysOutstanding <= 30) return 'Current';
-        if ($daysOutstanding <= 60) return '31–60';
-        if ($daysOutstanding <= 90) return '61–90';
-        return '>90';
-    }
-
-    private function calculateDaysOutstanding($record): int
-    {
-        $ageingSchedule = $record->ageingSchedule;
-        $daysOutstanding = 0;
-
-        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
-            $daysOutstanding = $ageingSchedule->days_outstanding;
-        } elseif ($record->invoice && $record->invoice->invoice_date) {
-            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-            $daysOutstanding = $invoiceDate->diffInDays(Carbon::parse($this->as_of_date), false);
-        }
-
-        return $daysOutstanding;
+        return $type === 'receivables'
+            ? $projection['receivables']
+            : $projection['payables'];
     }
 
     protected function getActions(): array
@@ -321,5 +245,18 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
                     }, 'ageing-report-' . now()->format('Y-m-d') . '.pdf');
                 }),
         ];
+    }
+
+    private function ageingFilters(): array
+    {
+        return [
+            'as_of_date' => $this->as_of_date,
+            'cabang_id' => $this->cabang_id,
+        ];
+    }
+
+    private function ageingReportService(): AgeingReportService
+    {
+        return app(AgeingReportService::class);
     }
 }

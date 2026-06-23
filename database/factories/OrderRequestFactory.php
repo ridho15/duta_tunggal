@@ -2,10 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Cabang;
-use App\Models\Supplier;
+use App\Http\Controllers\HelperController;
+use App\Models\Currency;
 use App\Models\User;
-use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,16 +19,14 @@ class OrderRequestFactory extends Factory
      */
     public function definition(): array
     {
+        $currencyId = Currency::where('code', 'IDR')->value('id') ?? Currency::query()->inRandomOrder()->value('id');
+
         return [
-            'request_number' => $this->faker->unique()->word(),
-            'warehouse_id' => Warehouse::inRandomOrder()->first()->id,
-            'supplier_id' => Supplier::inRandomOrder()->first()->id,
-            'cabang_id' => function () {
-                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
-            },
-            'request_date' => $this->faker->date(),
+            'request_number' => HelperController::generateRequestNumber(),
+            'request_date' => $this->faker->dateTimeBetween('-90 days', 'now')->format('Y-m-d'),
             'note' => $this->faker->sentence(),
-            'created_by' => User::inRandomOrder()->first()->id,
+            'created_by' => User::query()->inRandomOrder()->value('id') ?? User::factory()->create()->id,
+            'currency_id' => $currencyId,
         ];
     }
 }

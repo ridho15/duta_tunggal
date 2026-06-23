@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Helpers\MoneyHelper;
 use App\Models\User;
 use App\Models\Cabang;
 use App\Models\Product;
 use App\Models\Supplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MultiSupplierTest extends TestCase
@@ -41,20 +43,19 @@ class MultiSupplierTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function product_can_have_multiple_suppliers()
     {
-        $product = Product::factory()->create([
-            'cabang_id' => $this->cabang->id,
+        $product = Product::factory()->forCabang($this->cabang)->create([
             'supplier_id' => $this->supplier1->id,
         ]);
 
         // Attach additional suppliers
         $product->suppliers()->attach($this->supplier2->id, [
             'supplier_price' => 15000,
-            'supplier_sku' => 'SUP2-SKU-001',
-            'is_primary' => false,
         ]);
+
+        $product->load('suppliers');
 
         $this->assertCount(1, $product->suppliers);
         $this->assertEquals($this->supplier2->id, $product->suppliers->first()->id);
@@ -63,46 +64,55 @@ class MultiSupplierTest extends TestCase
         echo "✓ Test passed: Product can have multiple suppliers\n";
     }
 
-    /** @test */
+    #[Test]
     public function supplier_can_have_multiple_products()
     {
-        $product1 = Product::factory()->create(['cabang_id' => $this->cabang->id]);
-        $product2 = Product::factory()->create(['cabang_id' => $this->cabang->id]);
+        $product1 = Product::factory()->forCabang($this->cabang)->create();
+        $product2 = Product::factory()->forCabang($this->cabang)->create();
 
         $this->supplier1->productSuppliers()->attach($product1->id, [
             'supplier_price' => 10000,
-            'is_primary' => true,
         ]);
 
         $this->supplier1->productSuppliers()->attach($product2->id, [
             'supplier_price' => 20000,
-            'is_primary' => false,
         ]);
+
+        $this->supplier1->load('productSuppliers');
 
         $this->assertCount(2, $this->supplier1->productSuppliers);
 
         echo "✓ Test passed: Supplier can have multiple products\n";
     }
 
-    /** @test */
+    #[Test]
     public function product_supplier_pivot_stores_additional_data()
     {
-        $product = Product::factory()->create([
-            'cabang_id' => $this->cabang->id,
-        ]);
+        $product = Product::factory()->forCabang($this->cabang)->create();
 
         $product->suppliers()->attach($this->supplier1->id, [
             'supplier_price' => 12500,
-            'supplier_sku' => 'CUSTOM-SKU-123',
-            'is_primary' => true,
         ]);
 
         $pivot = $product->suppliers()->first()->pivot;
 
         $this->assertEquals(12500, $pivot->supplier_price);
-        $this->assertEquals('CUSTOM-SKU-123', $pivot->supplier_sku);
-        $this->assertEquals(1, $pivot->is_primary); // Database stores as 1/0
 
-        echo "✓ Test passed: Product-Supplier pivot stores price, SKU, and primary flag\n";
+        echo "✓ Test passed: Product-Supplier pivot stores supplier price\n";
+    }
+
+    #[Test]
+    public function product_supplier_price_keeps_two_decimal_money_format()
+    {
+        $product = Product::factory()->forCabang($this->cabang)->create();
+
+        $product->suppliers()->attach($this->supplier1->id, [
+            'supplier_price' => MoneyHelper::safeParse('92.550,52'),
+        ]);
+
+        $pivot = $product->suppliers()->first()->pivot;
+
+        $this->assertSame(92550.52, (float) $pivot->supplier_price);
+        $this->assertSame('Rp 92.550,52', MoneyHelper::rupiah($pivot->supplier_price));
     }
 }

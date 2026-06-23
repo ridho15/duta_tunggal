@@ -27,11 +27,16 @@ class VendorPaymentDetailFactory extends Factory
      */
     public function definition(): array
     {
+        $amount = number_format($this->faker->numberBetween(10000, 1000000), 2, '.', '');
+
         return [
             'vendor_payment_id' => VendorPayment::factory(),
             'invoice_id' => Invoice::factory(),
+            'currency_id' => null,
+            'exchange_rate' => 1,
             'method' => $this->faker->randomElement(['Cash', 'Bank Transfer', 'Cheque', 'Credit', 'Deposit']),
-            'amount' => number_format($this->faker->numberBetween(10000, 1000000), 2, '.', ''),
+            'amount' => $amount,
+            'amount_idr' => $amount,
             'coa_id' => ChartOfAccount::factory(),
             'payment_date' => now(),
             'notes' => $this->faker->optional()->sentence(),
