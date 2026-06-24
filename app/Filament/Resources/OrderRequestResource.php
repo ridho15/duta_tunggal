@@ -199,7 +199,39 @@ class OrderRequestResource extends Resource
 
     public static function formatMoneyInputState(mixed $amount): string
     {
-        return number_format(self::parseCurrencyState($amount ?? 0), 2, ',', '.');
+        return number_format(self::parseMoneyForFormatting($amount ?? 0), 2, ',', '.');
+    }
+
+    public static function formatMoneyInputStateForCurrency(mixed $amount, ?int $currencyId): string
+    {
+        if (self::isIdrCurrency($currencyId)) {
+            return self::formatMoneyInputState($amount);
+        }
+
+        $formatted = number_format(self::parseMoneyForFormatting($amount ?? 0), 4, ',', '.');
+
+        if (! str_contains($formatted, ',')) {
+            return $formatted . ',00';
+        }
+
+        [$whole, $decimal] = explode(',', $formatted, 2);
+        $decimal = rtrim($decimal, '0');
+        $decimal = str_pad($decimal, 2, '0');
+
+        return $whole . ',' . $decimal;
+    }
+
+    protected static function parseMoneyForFormatting(mixed $amount): float
+    {
+        if (is_int($amount) || is_float($amount)) {
+            return (float) $amount;
+        }
+
+        if (is_string($amount) && is_numeric(trim($amount))) {
+            return (float) trim($amount);
+        }
+
+        return self::parseCurrencyState($amount ?? 0);
     }
 
     public static function formatMoneyPreviewState(mixed $amount): string
@@ -239,10 +271,40 @@ class OrderRequestResource extends Resource
         $cabangs = \App\Models\Cabang::whereIn('id', $cabangIds)
             ->get(['id', 'kode', 'nama'])
             ->keyBy('id');
+        $currencies = Currency::orderBy('name')
+            ->get(['id', 'name', 'code', 'symbol', 'to_rupiah'])
+            ->keyBy('id');
 
         $totalItems = count($items);
         $totalQty = collect($items)->sum(fn ($item) => (float) ($item['quantity'] ?? 0));
         $totalSubtotal = collect($items)->sum(fn ($item) => MoneyHelper::safeParse($item['subtotal'] ?? 0));
+        $totalSubtotalIdr = collect($items)->sum(function ($item): float {
+            $currencyId = isset($item['currency_id']) && is_numeric($item['currency_id']) ? (int) $item['currency_id'] : null;
+
+            return CurrencyConversionResolver::convertToIdr(
+                MoneyHelper::safeParse($item['subtotal'] ?? 0),
+                $currencyId,
+                false
+            );
+        });
+        $itemCurrencyIds = collect($items)
+            ->pluck('currency_id')
+            ->filter(fn ($value) => filled($value) && is_numeric($value))
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->values();
+        $footerCurrencyId = $itemCurrencyIds->count() === 1 ? $itemCurrencyIds->first() : null;
+        $footerCurrency = $footerCurrencyId ? $currencies->get($footerCurrencyId) : null;
+        $footerIsForeignCurrency = $footerCurrency && strtoupper((string) $footerCurrency->code) !== 'IDR';
+        $footerTotalLabel = $footerCurrencyId && $itemCurrencyIds->count() === 1
+            ? 'Total Subtotal (' . ($footerCurrency?->code ?: CurrencyConversionResolver::resolveSymbol($footerCurrencyId)) . ')'
+            : 'Total Subtotal ekuivalen IDR';
+        $footerTotalValue = $footerCurrencyId && $itemCurrencyIds->count() === 1
+            ? trim(CurrencyConversionResolver::resolveSymbol($footerCurrencyId) . ' ' . self::formatMoneyPreviewState($totalSubtotal))
+            : 'Rp ' . self::formatMoneyPreviewState($totalSubtotalIdr);
+        $footerTotalHelper = $footerIsForeignCurrency
+            ? '≈ Rp ' . self::formatMoneyPreviewState($totalSubtotalIdr)
+            : null;
         $hasFilters = $search !== '' || $supplierFilter || $cabangFilter || $taxFilter;
 
         $matchedItems = collect($items)->map(function ($item, $key) {
@@ -304,13 +366,12 @@ class OrderRequestResource extends Resource
         }
         $activeFilterCount = count($chips);
 
+        $currencyOptions = $currencies
+            ->map(fn (Currency $currency) => trim("{$currency->name} ({$currency->code} / {$currency->symbol})"))
+            ->all();
         $supplierOptions = $suppliers
             ->sortBy('perusahaan')
             ->map(fn (Supplier $supplier) => "({$supplier->code}) {$supplier->perusahaan}")
-            ->all();
-        $productOptions = $products
-            ->sortBy('sku')
-            ->map(fn (Product $product) => trim(($product->sku ? "({$product->sku}) " : '') . ($product->name ?? '-')))
             ->all();
         $cabangOptions = $cabangs
             ->sortBy('kode')
@@ -326,7 +387,7 @@ class OrderRequestResource extends Resource
         $tableRows = $matchedItems
             ->slice($offset, $pageSize)
             ->values()
-            ->map(function ($item, $index) use ($products, $suppliers, $cabangs, $offset) {
+            ->map(function ($item, $index) use ($products, $suppliers, $cabangs, $currencies, $offset) {
                 $rowNumber = $offset + $index + 1;
                 $product = $products->get($item['product_id'] ?? null);
                 $supplier = $suppliers->get($item['supplier_id'] ?? null);
@@ -346,7 +407,32 @@ class OrderRequestResource extends Resource
                 $remainingQty = max(0, (float) ($item['quantity'] ?? 0) - $fulfilledQty);
                 $currencyId = isset($item['currency_id']) && is_numeric($item['currency_id']) ? (int) $item['currency_id'] : null;
                 $currencySymbol = CurrencyConversionResolver::resolveSymbol($currencyId);
-                $subtotal = trim($currencySymbol . ' ' . self::formatMoneyPreviewState(MoneyHelper::safeParse($item['subtotal'] ?? 0)));
+                $currency = $currencies->get($currencyId);
+                $currencyCode = strtoupper((string) ($currency?->code ?? 'IDR'));
+                $currencyRate = CurrencyConversionResolver::resolveRate($currencyId);
+                $isForeignCurrency = $currency && $currencyCode !== 'IDR';
+                $unitPriceAmount = MoneyHelper::safeParse($item['unit_price'] ?? $item['original_price'] ?? 0);
+                $originalPriceAmount = MoneyHelper::safeParse($item['original_price'] ?? $item['unit_price'] ?? 0);
+                $discountNominalAmount = MoneyHelper::safeParse($item['discount_nominal'] ?? 0);
+                $taxNominalAmount = MoneyHelper::safeParse($item['tax_nominal'] ?? 0);
+                $subtotalAmount = MoneyHelper::safeParse($item['subtotal'] ?? 0);
+                $totalAmount = MoneyHelper::safeParse($item['total'] ?? $item['total_cost'] ?? 0);
+                $subtotal = trim($currencySymbol . ' ' . self::formatMoneyPreviewState($subtotalAmount));
+                $price = trim($currencySymbol . ' ' . self::formatMoneyInputStateForCurrency($unitPriceAmount, $currencyId));
+                $unitPriceIdr = (float) ($item['unit_price_idr'] ?? 0);
+                $originalPriceIdr = (float) ($item['original_price_idr'] ?? 0);
+                if ($unitPriceIdr <= 0) {
+                    $unitPriceIdr = CurrencyConversionResolver::convertToIdr($unitPriceAmount, $currencyId, false);
+                }
+                if ($originalPriceIdr <= 0) {
+                    $originalPriceIdr = CurrencyConversionResolver::convertToIdr($originalPriceAmount, $currencyId, false);
+                }
+                $currencyRateLabel = $isForeignCurrency
+                    ? sprintf('1 %s = Rp %s', $currencyCode, self::formatMoneyPreviewState($currencyRate))
+                    : null;
+                $recommendedSupplierId = self::resolveProductSupplierId(
+                    is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null
+                );
 
                 return [
                     'number' => $rowNumber,
@@ -354,29 +440,63 @@ class OrderRequestResource extends Resource
                     'product_id' => $item['product_id'] ?? null,
                     'supplier_id' => $item['supplier_id'] ?? null,
                     'cabang_id' => $item['cabang_id'] ?? null,
+                    'currency_id' => $currencyId,
+                    'currency_symbol' => $currencySymbol,
+                    'currency_code' => $currencyCode,
+                    'is_foreign_currency' => $isForeignCurrency,
+                    'currency_rate_label' => $currencyRateLabel,
+                    'currency_label' => $currency
+                        ? trim("{$currency->name} ({$currency->code} / {$currency->symbol})")
+                        : '-',
                     'product' => $productLabel,
                     'supplier' => $supplierLabel,
                     'cabang' => $cabangLabel,
+                    'product_options' => ($item['product_id'] ?? null) && $product
+                        ? [(int) $item['product_id'] => $productLabel]
+                        : [],
+                    'supplier_options' => ($item['supplier_id'] ?? null) && $supplier
+                        ? [
+                            (int) $item['supplier_id'] => self::resolveSupplierLabel(
+                                (int) $item['supplier_id'],
+                                is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
+                                $currencyId
+                            ) ?? $supplierLabel,
+                        ]
+                        : [],
+                    'cabang_options' => ($item['cabang_id'] ?? null) && $cabang
+                        ? [(int) $item['cabang_id'] => $cabangLabel]
+                        : [],
+                    'recommended_supplier' => $recommendedSupplierId
+                        ? self::resolveSupplierLabel(
+                            $recommendedSupplierId,
+                            is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
+                            $currencyId
+                        )
+                        : null,
                     'qty' => $qty,
                     'quantity_value' => $item['quantity'] ?? 0,
                     'unit_value' => $item['unit'] ?? $uom,
-                    'unit_price_value' => self::formatMoneyInputState(MoneyHelper::safeParse($item['unit_price'] ?? $item['original_price'] ?? 0)),
-                    'original_price_value' => self::formatMoneyInputState(MoneyHelper::safeParse($item['original_price'] ?? $item['unit_price'] ?? 0)),
+                    'unit_price_value' => self::formatMoneyInputStateForCurrency($unitPriceAmount, $currencyId),
+                    'original_price_value' => self::formatMoneyInputStateForCurrency($originalPriceAmount, $currencyId),
                     'discount_value' => $item['discount'] ?? 0,
-                    'discount_nominal_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['discount_nominal'] ?? 0)),
+                    'discount_nominal_value' => self::formatMoneyPreviewState($discountNominalAmount),
                     'tax_value' => $item['tax'] ?? 0,
-                    'tax_nominal_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['tax_nominal'] ?? 0)),
-                    'subtotal_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['subtotal'] ?? 0)),
-                    'total_value' => self::formatMoneyPreviewState(MoneyHelper::safeParse($item['total'] ?? $item['total_cost'] ?? 0)),
+                    'tax_nominal_value' => self::formatMoneyPreviewState($taxNominalAmount),
+                    'subtotal_value' => self::formatMoneyPreviewState($subtotalAmount),
+                    'total_value' => self::formatMoneyPreviewState($totalAmount),
+                    'unit_price_idr_equivalent' => '≈ Rp ' . self::formatMoneyPreviewState($unitPriceIdr),
+                    'original_price_idr_equivalent' => '≈ Rp ' . self::formatMoneyPreviewState($originalPriceIdr),
+                    'discount_nominal_idr_equivalent' => '≈ Rp ' . self::formatMoneyPreviewState(CurrencyConversionResolver::convertToIdr($discountNominalAmount, $currencyId, false)),
+                    'tax_nominal_idr_equivalent' => '≈ Rp ' . self::formatMoneyPreviewState(CurrencyConversionResolver::convertToIdr($taxNominalAmount, $currencyId, false)),
+                    'subtotal_idr_equivalent' => '≈ Rp ' . self::formatMoneyPreviewState(CurrencyConversionResolver::convertToIdr($subtotalAmount, $currencyId, false)),
+                    'total_idr_equivalent' => '≈ Rp ' . self::formatMoneyPreviewState(CurrencyConversionResolver::convertToIdr($totalAmount, $currencyId, false)),
                     'tipe_pajak_value' => self::normalizeItemTaxType($item['tipe_pajak'] ?? null),
                     'uom' => $uom,
-                    'price' => trim($currencySymbol . ' ' . self::formatMoneyPreviewState(MoneyHelper::safeParse($item['unit_price'] ?? $item['original_price'] ?? 0))),
+                    'price' => $price,
                     'subtotal' => $subtotal,
                     'tax_type' => Str::upper((string) ($item['tipe_pajak'] ?? '-')),
                     'note' => filled($item['note'] ?? null) ? (string) $item['note'] : '-',
-                    'required_date' => '-',
                     'note_value' => (string) ($item['note'] ?? ''),
-                    'required_date_value' => (string) ($item['required_date'] ?? ''),
                     'available_stock' => number_format((float) ($product?->available_stock ?? 0), 2, ',', '.'),
                     'fulfilled_qty' => number_format($fulfilledQty, 2, ',', '.'),
                     'remaining_qty' => number_format($remainingQty, 2, ',', '.'),
@@ -402,6 +522,10 @@ class OrderRequestResource extends Resource
             'supplierCount' => $supplierIds->count(),
             'cabangCount' => $cabangIds->count(),
             'totalSubtotal' => $totalSubtotal,
+            'totalSubtotalIdr' => $totalSubtotalIdr,
+            'footerTotalLabel' => $footerTotalLabel,
+            'footerTotalValue' => $footerTotalValue,
+            'footerTotalHelper' => $footerTotalHelper,
             'matchedCount' => $matchedCount,
             'showingFrom' => $showingFrom,
             'showingTo' => $showingTo,
@@ -414,16 +538,16 @@ class OrderRequestResource extends Resource
             'supplierFilter' => $supplierFilter,
             'cabangFilter' => $cabangFilter,
             'taxFilter' => $taxFilter,
-            'productOptions' => $productOptions,
             'supplierOptions' => $supplierOptions,
             'cabangOptions' => $cabangOptions,
+            'currencyOptions' => $currencyOptions,
             'taxOptions' => $taxOptions,
         ]);
     }
 
     public static function usesLargeOrderRequestItemEditor(array $items, ?string $operation): bool
     {
-        return $operation === 'edit' && count($items) >= 25;
+        return in_array($operation, ['create', 'edit'], true) && count($items) >= 1;
     }
 
     public static function renderIndexSupplierSummary(OrderRequest $record, int $limit = 2): \Illuminate\Support\HtmlString
@@ -513,6 +637,10 @@ class OrderRequestResource extends Resource
 
     public static function isIdrCurrency(?int $currencyId): bool
     {
+        if (! $currencyId) {
+            return true;
+        }
+
         $currencyCode = Currency::find($currencyId)?->code;
 
         return strtoupper((string) $currencyCode) === 'IDR';
@@ -841,11 +969,26 @@ class OrderRequestResource extends Resource
             return null;
         }
 
+        $recommended = $product->suppliers
+            ->filter(fn (Supplier $supplier) => $supplier->pivot?->supplier_price !== null)
+            ->sortBy(fn (Supplier $supplier) => sprintf(
+                '%020.6f|%s',
+                (float) $supplier->pivot->supplier_price,
+                Str::lower((string) $supplier->perusahaan)
+            ))
+            ->first();
+
+        if ($recommended?->id) {
+            return (int) $recommended->id;
+        }
+
         if ($product->supplier_id) {
             return (int) $product->supplier_id;
         }
 
-        return $product->suppliers->first()?->id ? (int) $product->suppliers->first()->id : null;
+        return $product->suppliers
+            ->sortBy(fn (Supplier $supplier) => Str::lower((string) $supplier->perusahaan))
+            ->first()?->id;
     }
 
     public static function resolveSupplierOptions(?int $productId = null, ?string $search = null, int $limit = 50, ?int $currencyId = null): array
@@ -885,15 +1028,35 @@ class OrderRequestResource extends Resource
             });
         }
 
-        if (! empty($linkedSupplierIds)) {
-            $placeholders = implode(',', array_fill(0, count($linkedSupplierIds), '?'));
-            $query->orderByRaw("CASE WHEN id IN ({$placeholders}) THEN 0 ELSE 1 END", $linkedSupplierIds);
-        }
+        $linkedSuppliers = empty($linkedSupplierIds)
+            ? collect()
+            : (clone $query)
+                ->whereIn('id', $linkedSupplierIds)
+                ->get()
+                ->sortBy(function (Supplier $supplier) use ($linkedPriceMap) {
+                $supplierId = (int) $supplier->id;
+                $price = $linkedPriceMap[$supplierId] ?? null;
 
-        $query->orderBy('perusahaan');
+                return sprintf(
+                    '%d|%020.6f|%s',
+                    $price !== null ? 0 : 1,
+                    $price ?? PHP_FLOAT_MAX,
+                    Str::lower((string) $supplier->perusahaan)
+                );
+            });
+        $remainingLimit = max(0, $limit - $linkedSuppliers->count());
+        $remainingSuppliers = $remainingLimit === 0
+            ? collect()
+            : (clone $query)
+                ->when(! empty($linkedSupplierIds), fn (Builder $supplierQuery) => $supplierQuery->whereNotIn('id', $linkedSupplierIds))
+                ->orderBy('perusahaan')
+                ->limit($remainingLimit)
+                ->get();
+        $suppliers = $linkedSuppliers
+            ->concat($remainingSuppliers)
+            ->take($limit);
 
-        return $query->limit($limit)
-            ->get()
+        return $suppliers
             ->mapWithKeys(function ($supplier) use ($productId, $linkedPriceMap, $currencyId) {
                 $priceLabel = '';
                 if ($productId) {
@@ -1019,6 +1182,7 @@ class OrderRequestResource extends Resource
                             ] : [])
                             ->hint('Tambahkan item produk yang ingin dipesan')
                             ->minItems(1)
+                            ->defaultItems(1)
                             ->required()
                             ->collapsed(function (?string $operation, ?\Filament\Forms\ComponentContainer $item, \Filament\Forms\Components\Repeater $component): bool {
                                 if (! $item) {

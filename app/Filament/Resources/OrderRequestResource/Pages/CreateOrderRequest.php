@@ -3,14 +3,15 @@
 namespace App\Filament\Resources\OrderRequestResource\Pages;
 
 use App\Filament\Resources\OrderRequestResource;
+use App\Filament\Resources\OrderRequestResource\Pages\Concerns\InteractsWithInlineOrderRequestItems;
 use App\Http\Controllers\HelperController;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
 class CreateOrderRequest extends CreateRecord
 {
+    use InteractsWithInlineOrderRequestItems;
+
     protected static string $resource = OrderRequestResource::class;
 
     protected function mutateFormDataBeforeCreate(array $data): array

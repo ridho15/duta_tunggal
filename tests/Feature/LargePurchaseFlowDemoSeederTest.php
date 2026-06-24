@@ -80,7 +80,7 @@ test('large purchase item UX keeps repeaters safe and relation manager review pa
     expect($orderRequestNavigator)->not->toContain('returnEditorToDock');
     expect($orderRequestNavigator)->not->toContain('bridgeMountedEditorEvents');
     expect($orderRequestNavigator)->not->toContain('data-dt-or-editor-mount');
-    expect($orderRequestNavigator)->not->toContain('appendChild');
+    expect($orderRequestNavigator)->not->toContain('appendChild(item)');
     expect($orderRequestNavigator)->toContain('dt-item-detail-row');
     expect($orderRequestNavigator)->toContain('Editor item #');
     expect($orderRequestNavigator)->toContain('data-dt-inline-editor');
@@ -93,7 +93,12 @@ test('large purchase item UX keeps repeaters safe and relation manager review pa
     expect($orderRequestNavigator)->toContain('data-dt-delete-item');
     expect($orderRequestNavigator)->toContain('removeInlineItem(@js($row');
     expect($orderRequestNavigator)->toContain('updateInlineItem(@js($row');
-    expect($orderRequestNavigator)->toContain('Total Subtotal (IDR)');
+    expect($orderRequestNavigator)->toContain('$footerTotalLabel');
+    expect($orderRequestNavigator)->toContain('$footerTotalValue');
+    expect($orderRequestNavigator)->toContain('data-dt-inline-currency-rate');
+    expect($orderRequestNavigator)->toContain('data-dt-inline-subtotal-idr');
+    expect($orderRequestNavigator)->not->toContain('Required date');
+    expect($orderRequestNavigator)->not->toContain('required_date');
     expect($orderRequestNavigator)->toContain('.dt-or-large-repeater .fi-fo-repeater-item{display:none!important}');
     expect($orderRequestNavigator)->toContain('.dt-or-large-repeater{height:0!important');
     expect($orderRequestNavigator)->toContain('this.$wire.addInlineOrderRequestItem()');
@@ -121,10 +126,14 @@ test('large purchase item UX keeps repeaters safe and relation manager review pa
     expect($relationManager)->toContain("SelectFilter::make('receipt_qc_status')");
 });
 
-test('large OR editor activates only for edit operations with at least 25 items', function () {
-    expect(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 24, []), 'edit'))->toBeFalse()
+test('order request navigator activates for create and edit operations with at least one item', function () {
+    expect(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 1, []), 'edit'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 10, []), 'edit'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 24, []), 'edit'))->toBeTrue()
         ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 25, []), 'edit'))->toBeTrue()
-        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 120, []), 'create'))->toBeFalse();
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 1, []), 'create'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 120, []), 'create'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 1, []), 'view'))->toBeFalse();
 });
 
 test('large OR navigator renders only the selected page without discarding source items', function () {

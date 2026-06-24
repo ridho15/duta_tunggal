@@ -79,6 +79,19 @@
     .dt-item-inline-select::-ms-expand{display:none}
     .dt-item-inline-select:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
     .dt-item-inline-select:disabled{cursor:not-allowed;opacity:.65;background-color:#f8fafc}
+    .dt-item-inline-editor .select2-container{width:100%!important;min-width:0}
+    .dt-item-inline-editor .select2-container .select2-selection--single{height:38px;border:1px solid #d1d5db;border-radius:10px;background:#fff}
+    .dt-item-inline-editor .select2-container .select2-selection--single .select2-selection__rendered{line-height:36px;padding-left:11px;padding-right:34px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .dt-item-inline-editor .select2-container .select2-selection--single .select2-selection__arrow{height:36px;right:8px}
+    .dt-item-inline-editor .select2-container--focus .select2-selection--single{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}
+    .dt-item-inline-editor .select2-dropdown{border-color:#d1d5db;border-radius:10px;overflow:hidden;font-size:13px}
+    .dt-item-money-wrap{display:flex;align-items:stretch;min-width:0}
+    .dt-item-money-prefix{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:0 10px;border:1px solid #d1d5db;border-right:0;border-radius:10px 0 0 10px;background:#f8fafc;color:#475569;font-size:12px;font-weight:800}
+    .dt-item-money-wrap .dt-item-inline-input{border-radius:0 10px 10px 0;min-width:0}
+    .dt-item-currency-helper,.dt-item-money-helper{margin-top:3px;color:#64748b;font-size:11px;font-weight:700}
+    .dt-item-currency-helper strong,.dt-item-money-helper strong{color:#334155}
+    .dt-item-number small{display:block;margin-top:3px;color:#64748b;font-size:11px;font-weight:700;white-space:nowrap}
+    .dt-item-recommendation{margin-top:2px;color:#1d4ed8;font-size:11px;font-weight:700}
     .dt-item-detail-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .dt-item-delete-text{display:inline-flex;align-items:center;gap:7px;border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer}
     .dt-item-delete-text:hover:not(:disabled){background:#fef2f2}
@@ -141,6 +154,8 @@
         recentlyAddedKey: window.__dtOrRecentlyAddedKey || null,
         recentlyAddedMessage: window.__dtOrRecentlyAddedMessage || '',
         recentlyAddedTimer: null,
+        select2AssetsPromise: null,
+        inlineSelectChangeHandler: null,
 
         init() {
             this.searchValue = this.$root.dataset.currentSearch || '';
@@ -156,6 +171,9 @@
 
             this.$nextTick(() => {
                 this.reconcile();
+                if (this.expandedKey) {
+                    this.initInlineSelects(this.expandedKey);
+                }
 
                 const target = this.repeater() || this.$root.closest('form');
                 if (! target) return;
@@ -166,10 +184,32 @@
                 });
                 this.observer.observe(target, { childList: true, subtree: true });
             });
+
+            this.inlineSelectChangeHandler = (event) => {
+                const select = event.target?.closest?.('select[data-dt-inline-select]');
+                if (! select || ! this.$root.contains(select)) return;
+
+                const editor = select.closest('[data-dt-inline-editor]');
+                const key = editor?.dataset?.dtInlineEditor;
+                const field = select.dataset.field;
+
+                if (! key || ! field) return;
+
+                const label = field
+                    .replace('_id', '')
+                    .replace('currency', 'mata uang');
+
+                this.updateInlineItem(key, field, select.value, 'Memperbarui ' + label + '…');
+            };
+
+            this.$root.addEventListener('change', this.inlineSelectChangeHandler);
         },
 
         destroy() {
             this.observer?.disconnect();
+            if (this.inlineSelectChangeHandler) {
+                this.$root.removeEventListener('change', this.inlineSelectChangeHandler);
+            }
             window.clearTimeout(this.reconcileTimer);
             window.clearTimeout(this.loadingFallbackTimer);
             window.clearTimeout(this.recentlyAddedTimer);
@@ -273,6 +313,118 @@
             if (shouldScroll) {
                 window.setTimeout(() => row?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 30);
             }
+
+            this.$nextTick(() => this.initInlineSelects(key));
+        },
+
+        ensureSelect2Assets() {
+            if (window.jQuery?.fn?.select2) {
+                return Promise.resolve(window.jQuery);
+            }
+
+            if (window.__dtOrSelect2AssetsPromise) {
+                return window.__dtOrSelect2AssetsPromise;
+            }
+
+            const loadStyle = () => {
+                if (document.querySelector('link[data-dt-or-select2]')) return;
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css';
+                link.dataset.dtOrSelect2 = 'true';
+                document.head.appendChild(link);
+            };
+            const loadScript = (src, marker) => new Promise((resolve, reject) => {
+                const existing = document.querySelector('script[' + marker + ']');
+                if (existing) {
+                    if (existing.dataset.loaded === 'true') return resolve();
+                    existing.addEventListener('load', resolve, { once: true });
+                    existing.addEventListener('error', reject, { once: true });
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = src;
+                script.setAttribute(marker, 'true');
+                script.addEventListener('load', () => {
+                    script.dataset.loaded = 'true';
+                    resolve();
+                }, { once: true });
+                script.addEventListener('error', reject, { once: true });
+                document.head.appendChild(script);
+            });
+
+            window.__dtOrSelect2AssetsPromise = (async () => {
+                loadStyle();
+                if (! window.jQuery) {
+                    await loadScript('https://code.jquery.com/jquery-3.7.1.min.js', 'data-dt-or-jquery');
+                }
+                if (! window.jQuery?.fn?.select2) {
+                    await loadScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', 'data-dt-or-select2-script');
+                }
+                return window.jQuery;
+            })();
+
+            return window.__dtOrSelect2AssetsPromise;
+        },
+
+        async initInlineSelects(key) {
+            const editor = this.$root.querySelector('[data-dt-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (! editor) return;
+
+            let jq;
+            try {
+                jq = await this.ensureSelect2Assets();
+            } catch (error) {
+                console.warn('Select2 inline OR tidak dapat dimuat; memakai native select.', error);
+                return;
+            }
+
+            editor.querySelectorAll('select[data-dt-inline-select]').forEach((element) => {
+                const $select = jq(element);
+                const field = element.dataset.field;
+                const searchMethod = element.dataset.searchMethod;
+                const productId = element.dataset.productId ? Number(element.dataset.productId) : null;
+                const currencyId = element.dataset.currencyId ? Number(element.dataset.currencyId) : null;
+
+                if ($select.data('select2')) {
+                    $select.off('.dtOrInline');
+                    $select.select2('destroy');
+                }
+
+                $select.select2({
+                    width: '100%',
+                    allowClear: true,
+                    placeholder: element.dataset.placeholder || 'Pilih data',
+                    dropdownParent: jq(editor),
+                    ajax: {
+                        delay: 250,
+                        transport: (params, success, failure) => {
+                            const search = params.data?.term || '';
+                            let request;
+
+                            if (searchMethod === 'products') {
+                                request = this.$wire.searchInlineOrderRequestProducts(search);
+                            } else if (searchMethod === 'suppliers') {
+                                request = this.$wire.searchInlineOrderRequestSuppliers(productId, currencyId, search);
+                            } else if (searchMethod === 'cabangs') {
+                                request = this.$wire.searchInlineOrderRequestCabangs(search);
+                            } else {
+                                request = this.$wire.searchInlineOrderRequestCurrencies(search);
+                            }
+
+                            Promise.resolve(request)
+                                .then((results) => success({ results: results || [] }))
+                                .catch(failure);
+
+                            return { abort() {} };
+                        },
+                        processResults: (data) => data,
+                    },
+                });
+
+                $select.off('.dtOrInline');
+            });
         },
 
         async updateInlineItem(key, field, value, message = 'Menghitung item…') {
@@ -340,6 +492,7 @@
 
             this.expandedKey = String(key);
             window.__dtOrExpandedItemKey = this.expandedKey;
+            this.$nextTick(() => this.initInlineSelects(key));
         },
 
         openItem(key, shouldScroll = true) {
@@ -677,8 +830,18 @@
                         <td>{{ $row['supplier'] }}</td>
                         <td class="dt-item-number">{{ $row['qty'] }}</td>
                         <td>{{ $row['uom'] }}</td>
-                        <td class="dt-item-number">{{ $row['price'] }}</td>
-                        <td class="dt-item-number">{{ $row['subtotal'] }}</td>
+                        <td class="dt-item-number">
+                            {{ $row['price'] }}
+                            @if ($row['is_foreign_currency'])
+                                <small>{{ $row['unit_price_idr_equivalent'] }}</small>
+                            @endif
+                        </td>
+                        <td class="dt-item-number">
+                            {{ $row['subtotal'] }}
+                            @if ($row['is_foreign_currency'])
+                                <small>{{ $row['subtotal_idr_equivalent'] }}</small>
+                            @endif
+                        </td>
                         <td><span class="dt-item-tax">{{ $row['tax_type'] }}</span></td>
                         <td class="dt-item-action-col">
                             <div class="dt-item-row-actions">
@@ -732,12 +895,15 @@
                                             <select
                                                 class="dt-item-inline-select"
                                                 data-dt-inline-product
+                                                data-dt-inline-select
+                                                data-field="product_id"
+                                                data-search-method="products"
+                                                data-placeholder="Cari SKU atau nama product"
                                                 title="{{ $row['product'] }}"
                                                 x-bind:disabled="isLoading || isAddingItem"
-                                                x-on:change="updateInlineItem(@js($row['key']), 'product_id', $event.target.value, 'Memperbarui produk…')"
                                             >
                                                 <option value="">Pilih product</option>
-                                                @foreach ($productOptions as $value => $label)
+                                                @foreach ($row['product_options'] as $value => $label)
                                                     <option value="{{ $value }}" title="{{ $label }}" @selected((string) $row['product_id'] === (string) $value)>{{ $label }}</option>
                                                 @endforeach
                                             </select>
@@ -747,27 +913,38 @@
                                             <select
                                                 class="dt-item-inline-select"
                                                 data-dt-inline-supplier
+                                                data-dt-inline-select
+                                                data-field="supplier_id"
+                                                data-search-method="suppliers"
+                                                data-product-id="{{ $row['product_id'] }}"
+                                                data-currency-id="{{ $row['currency_id'] }}"
+                                                data-placeholder="Cari kode atau perusahaan supplier"
                                                 title="{{ $row['supplier'] }}"
                                                 x-bind:disabled="isLoading || isAddingItem"
-                                                x-on:change="updateInlineItem(@js($row['key']), 'supplier_id', $event.target.value, 'Memperbarui supplier…')"
                                             >
                                                 <option value="">Pilih supplier</option>
-                                                @foreach ($supplierOptions as $value => $label)
+                                                @foreach ($row['supplier_options'] as $value => $label)
                                                     <option value="{{ $value }}" title="{{ $label }}" @selected((string) $row['supplier_id'] === (string) $value)>{{ $label }}</option>
                                                 @endforeach
                                             </select>
+                                            @if ($row['recommended_supplier'])
+                                                <div class="dt-item-recommendation">Rekomendasi: {{ $row['recommended_supplier'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Cabang</label>
                                             <select
                                                 class="dt-item-inline-select"
                                                 data-dt-inline-cabang
+                                                data-dt-inline-select
+                                                data-field="cabang_id"
+                                                data-search-method="cabangs"
+                                                data-placeholder="Cari kode atau nama cabang"
                                                 title="{{ $row['cabang'] }}"
                                                 x-bind:disabled="isLoading || isAddingItem"
-                                                x-on:change="updateInlineItem(@js($row['key']), 'cabang_id', $event.target.value, 'Memperbarui cabang…')"
                                             >
                                                 <option value="">Pilih cabang</option>
-                                                @foreach ($cabangOptions as $value => $label)
+                                                @foreach ($row['cabang_options'] as $value => $label)
                                                     <option value="{{ $value }}" title="{{ $label }}" @selected((string) $row['cabang_id'] === (string) $value)>{{ $label }}</option>
                                                 @endforeach
                                             </select>
@@ -792,41 +969,64 @@
                                                 class="dt-item-inline-input"
                                                 value="{{ $row['unit_value'] }}"
                                                 data-dt-inline-unit
-                                                x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'unit', $event.target.value)"
-                                                x-on:keydown.enter.prevent.stop="void 0"
+                                                readonly
                                             >
                                         </div>
                                         <div class="dt-item-inline-field">
-                                            <label>Required date</label>
-                                            <input
-                                                type="date"
-                                                class="dt-item-inline-input"
-                                                value="{{ $row['required_date_value'] }}"
-                                                data-dt-inline-required-date
-                                                x-on:change="updateInlineItem(@js($row['key']), 'required_date', $event.target.value, 'Memperbarui tanggal…')"
+                                            <label>Mata Uang Item</label>
+                                            <select
+                                                class="dt-item-inline-select"
+                                                data-dt-inline-currency
+                                                data-dt-inline-select
+                                                data-field="currency_id"
+                                                data-search-method="currencies"
+                                                data-placeholder="Cari mata uang"
+                                                title="{{ $row['currency_label'] }}"
+                                                x-bind:disabled="isLoading || isAddingItem"
                                             >
+                                                <option value="">Pilih mata uang</option>
+                                                @foreach ($currencyOptions as $value => $label)
+                                                    <option value="{{ $value }}" title="{{ $label }}" @selected((string) $row['currency_id'] === (string) $value)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                            @if ($row['is_foreign_currency'] && $row['currency_rate_label'])
+                                                <div class="dt-item-currency-helper" data-dt-inline-currency-rate>
+                                                    Kurs: <strong>{{ $row['currency_rate_label'] }}</strong>
+                                                </div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Original price</label>
-                                            <input
-                                                type="text"
-                                                class="dt-item-inline-input"
-                                                value="{{ $row['original_price_value'] }}"
-                                                data-dt-inline-original-price
-                                                x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'original_price', $event.target.value)"
-                                                x-on:keydown.enter.prevent.stop="void 0"
-                                            >
+                                            <div class="dt-item-money-wrap">
+                                                <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
+                                                <input
+                                                    type="text"
+                                                    class="dt-item-inline-input"
+                                                    value="{{ $row['original_price_value'] }}"
+                                                    data-dt-inline-original-price
+                                                    readonly
+                                                >
+                                            </div>
+                                            @if ($row['is_foreign_currency'])
+                                                <div class="dt-item-money-helper" data-dt-inline-original-price-idr>{{ $row['original_price_idr_equivalent'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Harga Override</label>
-                                            <input
-                                                type="text"
-                                                class="dt-item-inline-input"
-                                                value="{{ $row['unit_price_value'] }}"
-                                                data-dt-inline-unit-price
-                                                x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'unit_price', $event.target.value)"
-                                                x-on:keydown.enter.prevent.stop="void 0"
-                                            >
+                                            <div class="dt-item-money-wrap">
+                                                <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
+                                                <input
+                                                    type="text"
+                                                    class="dt-item-inline-input"
+                                                    value="{{ $row['unit_price_value'] }}"
+                                                    data-dt-inline-unit-price
+                                                    x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'unit_price', $event.target.value)"
+                                                    x-on:keydown.enter.prevent.stop="void 0"
+                                                >
+                                            </div>
+                                            @if ($row['is_foreign_currency'])
+                                                <div class="dt-item-money-helper" data-dt-inline-unit-price-idr>{{ $row['unit_price_idr_equivalent'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Discount (%)</label>
@@ -843,11 +1043,23 @@
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Discount nominal</label>
-                                            <input type="text" class="dt-item-inline-input" value="{{ $row['discount_nominal_value'] }}" readonly data-dt-inline-discount-nominal>
+                                            <div class="dt-item-money-wrap">
+                                                <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['discount_nominal_value'] }}" readonly data-dt-inline-discount-nominal>
+                                            </div>
+                                            @if ($row['is_foreign_currency'])
+                                                <div class="dt-item-money-helper" data-dt-inline-discount-nominal-idr>{{ $row['discount_nominal_idr_equivalent'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Total</label>
-                                            <input type="text" class="dt-item-inline-input" value="{{ $row['total_value'] }}" readonly data-dt-inline-total>
+                                            <div class="dt-item-money-wrap">
+                                                <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['total_value'] }}" readonly data-dt-inline-total>
+                                            </div>
+                                            @if ($row['is_foreign_currency'])
+                                                <div class="dt-item-money-helper" data-dt-inline-total-idr>{{ $row['total_idr_equivalent'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Tipe Pajak</label>
@@ -870,22 +1082,31 @@
                                             <label>Tax (%)</label>
                                             <input
                                                 type="number"
-                                                step="0.01"
-                                                min="0"
                                                 class="dt-item-inline-input"
                                                 value="{{ $row['tax_value'] }}"
                                                 data-dt-inline-tax
-                                                x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'tax', $event.target.value)"
-                                                x-on:keydown.enter.prevent.stop="void 0"
+                                                readonly
                                             >
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Tax nominal</label>
-                                            <input type="text" class="dt-item-inline-input" value="{{ $row['tax_nominal_value'] }}" readonly data-dt-inline-tax-nominal>
+                                            <div class="dt-item-money-wrap">
+                                                <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['tax_nominal_value'] }}" readonly data-dt-inline-tax-nominal>
+                                            </div>
+                                            @if ($row['is_foreign_currency'])
+                                                <div class="dt-item-money-helper" data-dt-inline-tax-nominal-idr>{{ $row['tax_nominal_idr_equivalent'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field">
                                             <label>Subtotal</label>
-                                            <input type="text" class="dt-item-inline-input" value="{{ $row['subtotal_value'] }}" readonly data-dt-inline-subtotal>
+                                            <div class="dt-item-money-wrap">
+                                                <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['subtotal_value'] }}" readonly data-dt-inline-subtotal>
+                                            </div>
+                                            @if ($row['is_foreign_currency'])
+                                                <div class="dt-item-money-helper" data-dt-inline-subtotal-idr>{{ $row['subtotal_idr_equivalent'] }}</div>
+                                            @endif
                                         </div>
                                         <div class="dt-item-inline-field full">
                                             <label>Note</label>
@@ -966,8 +1187,13 @@
     <div class="dt-item-footer">
         <div>Total Items: {{ number_format($totalItems, 0, ',', '.') }}</div>
         <div class="dt-item-footer-total">
-            <span>Total Subtotal (IDR)</span>
-            <span>Rp {{ number_format($totalSubtotal, 2, ',', '.') }}</span>
+            <span>{{ $footerTotalLabel }}</span>
+            <span>
+                {{ $footerTotalValue }}
+                @if ($footerTotalHelper)
+                    <small style="display:block;color:#64748b;font-size:11px;font-weight:700;">{{ $footerTotalHelper }}</small>
+                @endif
+            </span>
         </div>
     </div>
 </div>
