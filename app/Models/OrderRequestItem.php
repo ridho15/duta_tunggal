@@ -6,6 +6,7 @@ use App\Helpers\MoneyHelper;
 use App\Support\CurrencyConversionResolver;
 use App\Support\TaxDefaultResolver;
 use App\Support\TaxTypeHelper;
+use App\Models\User;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class OrderRequestItem extends Model
 {
     use SoftDeletes, HasFactory,LogsGlobalActivity;
+
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_REJECTED = 'rejected';
     protected $table = 'order_request_items';
     protected $fillable = [
         'order_request_id',
@@ -22,6 +27,12 @@ class OrderRequestItem extends Model
         'product_id',
         'quantity',
         'fulfilled_quantity',
+        'status',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'rejection_note',
         'unit_price',
         'unit_price_idr',       // IDR anchor — always stored in IDR for lossless re-conversion
         'original_price',
@@ -32,6 +43,11 @@ class OrderRequestItem extends Model
         'subtotal',
         'note',
         'currency_id',
+    ];
+
+    protected $casts = [
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function orderRequest()
@@ -64,10 +80,21 @@ class OrderRequestItem extends Model
         return $this->morphOne(PurchaseOrderItem::class, 'refer_item_model')->withDefault();
     }
 
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by')->withDefault();
+    }
+
+    public function rejectedBy()
+    {
+        return $this->belongsTo(User::class, 'rejected_by')->withDefault();
+    }
+
     protected static function booted()
     {
         static::saving(function (OrderRequestItem $item) {
             $item->loadMissing('orderRequest');
+            $item->status = static::normalizeApprovalStatus($item->status ?? null);
 
             $quantity    = (float) ($item->quantity ?? 0);
             $unitPrice   = MoneyHelper::safeParse($item->unit_price ?? 0);
@@ -115,6 +142,42 @@ class OrderRequestItem extends Model
         // Pivot synchronization is intentionally handled during OR approval / PO creation flow.
     }
 
+    public static function approvalStatuses(): array
+    {
+        return [
+            self::STATUS_DRAFT,
+            self::STATUS_APPROVED,
+            self::STATUS_REJECTED,
+        ];
+    }
+
+    public static function normalizeApprovalStatus(?string $status): string
+    {
+        $status = strtolower(trim((string) $status));
+
+        return in_array($status, self::approvalStatuses(), true)
+            ? $status
+            : self::STATUS_DRAFT;
+    }
+
+    public static function approvalStatusLabel(?string $status): string
+    {
+        return match (self::normalizeApprovalStatus($status)) {
+            self::STATUS_APPROVED => 'Approved',
+            self::STATUS_REJECTED => 'Rejected',
+            default => 'Draft',
+        };
+    }
+
+    public static function approvalStatusColor(?string $status): string
+    {
+        return match (self::normalizeApprovalStatus($status)) {
+            self::STATUS_APPROVED => 'success',
+            self::STATUS_REJECTED => 'danger',
+            default => 'gray',
+        };
+    }
+
     public static function normalizeItemTaxType(?string $value): string
     {
         return TaxTypeHelper::normalize($value);
@@ -151,3 +214,5 @@ class OrderRequestItem extends Model
         return max(0, $this->quantity - ($this->fulfilled_quantity ?? 0));
     }
 }
+
+

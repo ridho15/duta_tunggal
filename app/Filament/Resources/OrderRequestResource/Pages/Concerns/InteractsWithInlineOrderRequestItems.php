@@ -41,6 +41,16 @@ trait InteractsWithInlineOrderRequestItems
         }
 
         $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+
+        if (OrderRequestItem::normalizeApprovalStatus($item['status'] ?? null) !== OrderRequestItem::STATUS_DRAFT) {
+            Notification::make()
+                ->warning()
+                ->title('Item tidak dapat diedit')
+                ->body('Item yang sudah approved atau rejected harus dikembalikan ke Draft sebelum diedit.')
+                ->send();
+
+            return;
+        }
         $normalizedValue = is_string($value) ? trim($value) : $value;
 
         if (in_array($field, ['product_id', 'supplier_id', 'cabang_id', 'currency_id'], true)) {
@@ -239,6 +249,12 @@ trait InteractsWithInlineOrderRequestItems
             'cabang_id' => null,
             'quantity' => 1,
             'fulfilled_quantity' => 0,
+            'status' => OrderRequestItem::STATUS_DRAFT,
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+            'rejection_note' => null,
             'unit' => '-',
             'original_price' => '0,00',
             'unit_price' => '0,00',
@@ -266,6 +282,76 @@ trait InteractsWithInlineOrderRequestItems
         return $itemKey;
     }
 
+    public function bulkUpdateInlineOrderRequestItemStatus(array $itemKeys, string $status, ?string $rejectionNote = null): void
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+
+        if (! is_array($items)) {
+            return;
+        }
+
+        $status = OrderRequestItem::normalizeApprovalStatus($status);
+        $itemKeys = collect($itemKeys)
+            ->map(fn ($key) => (string) $key)
+            ->filter(fn (string $key) => array_key_exists($key, $items))
+            ->unique()
+            ->values();
+
+        if ($itemKeys->isEmpty()) {
+            return;
+        }
+
+        $note = trim((string) $rejectionNote);
+        if ($status === OrderRequestItem::STATUS_REJECTED && $note === '') {
+            Notification::make()
+                ->danger()
+                ->title('Alasan reject wajib diisi')
+                ->body('Isi alasan reject sebelum menolak item yang dipilih.')
+                ->send();
+
+            return;
+        }
+
+        $now = now()->toDateTimeString();
+        $userId = Auth::id();
+
+        foreach ($itemKeys as $itemKey) {
+            $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+
+            if ($status === OrderRequestItem::STATUS_APPROVED) {
+                $item['status'] = OrderRequestItem::STATUS_APPROVED;
+                $item['approved_by'] = $userId;
+                $item['approved_at'] = $now;
+                $item['rejected_by'] = null;
+                $item['rejected_at'] = null;
+                $item['rejection_note'] = null;
+            } elseif ($status === OrderRequestItem::STATUS_REJECTED) {
+                $item['status'] = OrderRequestItem::STATUS_REJECTED;
+                $item['approved_by'] = null;
+                $item['approved_at'] = null;
+                $item['rejected_by'] = $userId;
+                $item['rejected_at'] = $now;
+                $item['rejection_note'] = $note;
+            } else {
+                $item['status'] = OrderRequestItem::STATUS_DRAFT;
+                $item['approved_by'] = null;
+                $item['approved_at'] = null;
+                $item['rejected_by'] = null;
+                $item['rejected_at'] = null;
+                $item['rejection_note'] = null;
+            }
+
+            $items[$itemKey] = $item;
+        }
+
+        $this->data['orderRequestItem'] = $items;
+
+        Notification::make()
+            ->success()
+            ->title('Status item diperbarui')
+            ->body(number_format($itemKeys->count(), 0, ',', '.') . ' item berhasil diperbarui.')
+            ->send();
+    }
     public function removeInlineOrderRequestItem(string $itemKey): bool
     {
         $items = data_get($this->data, 'orderRequestItem', []);
@@ -346,3 +432,4 @@ trait InteractsWithInlineOrderRequestItems
         return 'Klik Simpan untuk menyimpan Order Request.';
     }
 }
+

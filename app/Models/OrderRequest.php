@@ -71,6 +71,44 @@ class OrderRequest extends Model
      *  - At least one item partially fulfilled → partial
      *  - Nothing fulfilled → stays at approved
      */
+    public function syncItemApprovalStatus(): void
+    {
+        if (in_array($this->status, ['complete', 'closed'], true)) {
+            return;
+        }
+
+        $items = $this->orderRequestItem()->withoutTrashed()->get(['id', 'order_request_id', 'status']);
+
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $statuses = $items->map(fn (OrderRequestItem $item) => OrderRequestItem::normalizeApprovalStatus($item->status ?? null));
+
+        $allApproved = $statuses->every(fn (string $status) => $status === OrderRequestItem::STATUS_APPROVED);
+        $allRejected = $statuses->every(fn (string $status) => $status === OrderRequestItem::STATUS_REJECTED);
+        $allDraft = $statuses->every(fn (string $status) => $status === OrderRequestItem::STATUS_DRAFT);
+        $hasDecision = $statuses->contains(fn (string $status) => in_array($status, [OrderRequestItem::STATUS_APPROVED, OrderRequestItem::STATUS_REJECTED], true));
+
+        if ($allApproved) {
+            $this->update(['status' => 'approved']);
+            return;
+        }
+
+        if ($allRejected) {
+            $this->update(['status' => 'rejected']);
+            return;
+        }
+
+        if ($hasDecision) {
+            $this->update(['status' => 'partial']);
+            return;
+        }
+
+        if ($allDraft && $this->status !== 'request_approve') {
+            $this->update(['status' => 'draft']);
+        }
+    }
     public function syncFulfillmentStatus(): void
     {
         // Only auto-transition from approved/partial states; never touch draft/closed/rejected.
@@ -158,3 +196,4 @@ class OrderRequest extends Model
         $this->attributes['tax_type'] = $normalized;
     }
 }
+

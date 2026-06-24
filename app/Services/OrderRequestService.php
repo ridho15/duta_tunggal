@@ -42,6 +42,10 @@ class OrderRequestService
                         return null;
                     }
 
+                    if (OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_REJECTED) {
+                        return null;
+                    }
+
                     $qty = (float) ($row['quantity'] ?? $orderRequestItem->quantity);
 
                     // Validate quantity does not exceed remaining unfulfilled AND un-locked quantity.
@@ -91,6 +95,7 @@ class OrderRequestService
 
         // No selection provided — use all items with remaining quantity
         return $orderRequest->orderRequestItem
+            ->filter(fn ($orderRequestItem) => OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) !== OrderRequestItem::STATUS_REJECTED)
             ->map(function ($orderRequestItem) use ($supplier) {
             $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
             if ($remainingQty <= 0) {
@@ -134,9 +139,90 @@ class OrderRequestService
         return ! empty($orderRequest->cabang_id) ? (int) $orderRequest->cabang_id : null;
     }
 
+    private function applyItemApprovalDecisions($orderRequest, array $data): void
+    {
+        $orderRequest->loadMissing('orderRequestItem');
+        $selectedItems = collect($data['selected_items'] ?? []);
+
+        if ($selectedItems->isEmpty()) {
+            $orderRequest->orderRequestItem()->update([
+                'status' => OrderRequestItem::STATUS_APPROVED,
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'rejected_by' => null,
+                'rejected_at' => null,
+                'rejection_note' => null,
+            ]);
+            $orderRequest->syncItemApprovalStatus();
+            return;
+        }
+
+        foreach ($selectedItems as $row) {
+            $itemId = $row['item_id'] ?? null;
+            if (! $itemId) {
+                continue;
+            }
+
+            $item = $orderRequest->orderRequestItem->firstWhere('id', (int) $itemId);
+            if (! $item) {
+                continue;
+            }
+
+            $decision = OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null);
+            if (! isset($row['approval_status'])) {
+                $decision = ! empty($row['include'])
+                    ? OrderRequestItem::STATUS_APPROVED
+                    : OrderRequestItem::STATUS_DRAFT;
+            }
+
+            if ($decision === OrderRequestItem::STATUS_APPROVED) {
+                $item->update([
+                    'status' => OrderRequestItem::STATUS_APPROVED,
+                    'approved_by' => Auth::id(),
+                    'approved_at' => now(),
+                    'rejected_by' => null,
+                    'rejected_at' => null,
+                    'rejection_note' => null,
+                ]);
+                continue;
+            }
+
+            if ($decision === OrderRequestItem::STATUS_REJECTED) {
+                $note = trim((string) ($row['rejection_note'] ?? ''));
+                if ($note === '') {
+                    throw new \InvalidArgumentException('Alasan reject wajib diisi untuk item yang ditolak.');
+                }
+
+                $item->update([
+                    'status' => OrderRequestItem::STATUS_REJECTED,
+                    'approved_by' => null,
+                    'approved_at' => null,
+                    'rejected_by' => Auth::id(),
+                    'rejected_at' => now(),
+                    'rejection_note' => $note,
+                ]);
+                continue;
+            }
+
+            $item->update([
+                'status' => OrderRequestItem::STATUS_DRAFT,
+                'approved_by' => null,
+                'approved_at' => null,
+                'rejected_by' => null,
+                'rejected_at' => null,
+                'rejection_note' => null,
+            ]);
+        }
+
+        $orderRequest->syncItemApprovalStatus();
+    }
+
     public function approve($orderRequest, $data)
     {
         $createPurchaseOrder = $data['create_purchase_order'] ?? true;
+
+        $this->applyItemApprovalDecisions($orderRequest, $data);
+        $orderRequest->refresh();
 
         if ($createPurchaseOrder) {
             $supplier = Supplier::findOrFail($data['supplier_id']);
@@ -205,7 +291,7 @@ class OrderRequestService
             }
 
             // Ensure OR is approved first, then sync supplier-product pivot.
-            $orderRequest->update(['status' => 'approved']);
+            $orderRequest->syncItemApprovalStatus();
             foreach ($itemsForPivotSync as $syncRow) {
                 $this->productSupplierSyncService->syncSupplierProductPrice(
                     $syncRow['product_id'],
@@ -233,7 +319,7 @@ class OrderRequestService
                     );
                 }
             }
-            $orderRequest->update(['status' => 'approved']);
+            $orderRequest->syncItemApprovalStatus();
         }
 
         return $orderRequest->fresh(['purchaseOrder.purchaseOrderItem']);
@@ -314,11 +400,26 @@ class OrderRequestService
 
     public function reject($orderRequest)
     {
+        $orderRequest->orderRequestItem()->update([
+            'status' => OrderRequestItem::STATUS_REJECTED,
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejected_by' => Auth::id(),
+            'rejected_at' => now(),
+            'rejection_note' => 'Order Request ditolak pada level header.',
+        ]);
+
         $orderRequest->update(['status' => 'rejected']);
     }
 
     public function submitForApproval($orderRequest)
     {
-        $orderRequest->update(['status' => 'pending']);
+        $orderRequest->update(['status' => 'request_approve']);
     }
 }
+
+
+
+
+
+

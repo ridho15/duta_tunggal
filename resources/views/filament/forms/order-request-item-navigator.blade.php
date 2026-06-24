@@ -1,15 +1,18 @@
 <style>
     .dt-item-panel{padding:18px;border:1px solid #2563eb;border-radius:14px;background:#fff;color:#111827;box-shadow:0 10px 30px rgba(15,23,42,.05)}
-    .dt-item-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+    .dt-item-toolbar{display:flex;flex-direction:column;align-items:stretch;gap:12px}
     .dt-item-title{font-weight:800;color:#111827}
     .dt-item-title .required{color:#dc2626}
-    .dt-item-toolbar-left{display:flex;align-items:center;gap:12px;flex:1 1 620px;min-width:280px}
-    .dt-item-search-wrap{position:relative;flex:1;min-width:260px}
+    .dt-item-toolbar-main{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+    .dt-item-toolbar-left{display:flex;align-items:center;gap:12px;flex:1 1 520px;min-width:0;flex-wrap:wrap}
+    .dt-item-search-wrap{position:relative;flex:1 1 320px;min-width:240px}
     .dt-item-search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#9ca3af}
     .dt-item-control{width:100%;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#111827;padding:10px 12px;font-size:13px;line-height:1.4}
     .dt-item-search{padding-left:38px}
     .dt-item-control:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
-    .dt-item-nav-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .dt-item-nav-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:0 0 auto;flex-wrap:wrap}
+    .dt-item-bulk-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;padding:10px 0 0;border-top:1px solid #eef2f7}
+    .dt-item-bulk-actions .dt-item-nav-button{padding:8px 12px;font-size:12px}
     .dt-item-nav-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d1d5db;background:#fff;color:#111827;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
     .dt-item-nav-button:hover:not(:disabled){background:#f8fafc}
     .dt-item-nav-button.primary{border-color:#2563eb;background:#2563eb;color:#fff}
@@ -48,7 +51,13 @@
     .dt-item-expand-col,.dt-item-check-col{width:34px;text-align:center}
     .dt-item-expand{border:0;background:transparent;color:#475569;cursor:pointer;width:26px;height:26px;border-radius:8px;font-size:17px;line-height:1}
     .dt-item-expand:hover{background:#eef2ff;color:#1d4ed8}
-    .dt-item-checkbox{display:inline-block;width:15px;height:15px;border:1px solid #d1d5db;border-radius:4px;background:#fff}
+    .dt-item-checkbox{width:16px;height:16px;cursor:pointer;accent-color:#2563eb}
+    .dt-item-status-badge{display:inline-flex;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+    .dt-item-status-badge.draft{background:#f3f4f6;color:#4b5563}
+    .dt-item-status-badge.approved{background:#dcfce7;color:#166534}
+    .dt-item-status-badge.rejected{background:#fee2e2;color:#991b1b}
+    .dt-item-rejection-note{display:block;margin-top:4px;color:#991b1b;font-size:11px;font-weight:700;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .dt-item-lock-banner{grid-column:span 12;border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:800}
     .dt-item-product{font-weight:700;color:#111827;max-width:310px}
     .dt-item-product small{display:block;margin-top:3px;color:#6b7280;font-weight:600}
     .dt-item-number{text-align:right;white-space:nowrap}
@@ -121,8 +130,8 @@
     .dt-item-highlight-target{outline:3px solid #60a5fa!important;outline-offset:4px;border-radius:12px}
     .dt-item-new-row-highlight td{animation:dt-item-new-row-pulse 4s ease-out 1;background:#eff6ff!important}
     .dt-item-new-row-highlight + .dt-item-detail-row .dt-item-detail-card{animation:dt-item-new-editor-pulse 4s ease-out 1;border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.28)}
-    @media (max-width: 1024px){.dt-item-toolbar-left{flex-basis:100%}.dt-item-filter-drawer{grid-template-columns:1fr 1fr}.dt-item-detail-footer{grid-template-columns:1fr 1fr}.dt-item-detail-card{margin-left:14px;margin-right:14px}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 6}}
-    @media (max-width: 640px){.dt-item-panel{padding:12px}.dt-item-toolbar-left,.dt-item-nav-actions{width:100%}.dt-item-nav-button{flex:1}.dt-item-filter-drawer{grid-template-columns:1fr}.dt-item-detail-footer{grid-template-columns:1fr}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 12}}
+    @media (max-width: 1024px){.dt-item-toolbar-main{align-items:stretch}.dt-item-toolbar-left{flex-basis:100%}.dt-item-nav-actions{width:100%;justify-content:flex-start}.dt-item-filter-drawer{grid-template-columns:1fr 1fr}.dt-item-detail-footer{grid-template-columns:1fr 1fr}.dt-item-detail-card{margin-left:14px;margin-right:14px}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 6}}
+    @media (max-width: 640px){.dt-item-panel{padding:12px}.dt-item-toolbar-left,.dt-item-nav-actions,.dt-item-bulk-actions{width:100%}.dt-item-search-wrap{min-width:100%}.dt-item-nav-button{flex:1 1 auto}.dt-item-bulk-actions .dt-item-nav-button{flex:1 1 46%}.dt-item-filter-drawer{grid-template-columns:1fr}.dt-item-detail-footer{grid-template-columns:1fr}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 12}}
     @keyframes dt-item-new-row-pulse{0%,70%{background:#dbeafe}100%{background:#fff}}
     @keyframes dt-item-new-editor-pulse{0%,70%{box-shadow:0 0 0 3px rgba(37,99,235,.35)}100%{box-shadow:0 0 0 3px rgba(96,165,250,.28)}}
 </style>
@@ -138,6 +147,7 @@
     data-current-page-size="{{ e((string) $pageSize) }}"
     x-data="{
         activeKey: window.__dtOrActiveItemKey || null,
+        selectedKeys: [],
         expandedKey: window.__dtOrExpandedItemKey || null,
         filterOpen: false,
         observer: null,
@@ -226,6 +236,38 @@
             if (! this.isAddingItem) {
                 this.loadingMessage = '';
             }
+        },
+
+        selectedCount() {
+            return this.selectedKeys.length;
+        },
+
+        toggleSelected(key, checked) {
+            key = String(key);
+            if (checked && ! this.selectedKeys.includes(key)) {
+                this.selectedKeys.push(key);
+            }
+            if (! checked) {
+                this.selectedKeys = this.selectedKeys.filter((itemKey) => itemKey !== key);
+            }
+        },
+
+        clearSelection() {
+            this.selectedKeys = [];
+        },
+
+        async bulkStatus(status) {
+            if (! this.selectedCount() || this.isLoading || this.isAddingItem) return;
+
+            let note = null;
+            if (status === 'rejected') {
+                note = window.prompt('Alasan reject item yang dipilih');
+                if (! note || ! note.trim()) return;
+            }
+
+            const message = status === 'approved' ? 'Approve item terpilih...' : (status === 'rejected' ? 'Reject item terpilih...' : 'Mengubah status item...');
+            await this.runNavigatorRequest(message, () => this.$wire.bulkUpdateInlineOrderRequestItemStatus([...this.selectedKeys], status, note));
+            this.clearSelection();
         },
 
         async runNavigatorRequest(message, callback) {
@@ -598,52 +640,58 @@
     <div class="dt-item-title">Order request item<span class="required">*</span></div>
 
     <div class="dt-item-toolbar" style="margin-top:12px">
-        <div class="dt-item-toolbar-left">
-            <div class="dt-item-search-wrap">
-                <svg class="dt-item-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="M9 15.5A6.5 6.5 0 1 0 9 2.5a6.5 6.5 0 0 0 0 13ZM14 14l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                </svg>
-                <input
-                    id="dt-or-item-search"
-                    type="search"
-                    class="dt-item-control dt-item-search"
-                    placeholder="Search item / product / supplier..."
-                    x-model="searchValue"
-                    x-on:input="startLoading('Mencari item…')"
-                    x-on:input.debounce.500ms="updateSearch()"
-                    x-on:keydown.enter.prevent.stop="void 0"
-                    data-dt-or-search
-                >
+        <div class="dt-item-toolbar-main">
+            <div class="dt-item-toolbar-left">
+                <div class="dt-item-search-wrap">
+                    <svg class="dt-item-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path d="M9 15.5A6.5 6.5 0 1 0 9 2.5a6.5 6.5 0 0 0 0 13ZM14 14l3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                    <input
+                        id="dt-or-item-search"
+                        type="search"
+                        class="dt-item-control dt-item-search"
+                        placeholder="Search item / product / supplier..."
+                        x-model="searchValue"
+                        x-on:input="startLoading('Mencari item...')"
+                        x-on:input.debounce.500ms="updateSearch()"
+                        x-on:keydown.enter.prevent.stop="void 0"
+                        data-dt-or-search
+                    >
+                </div>
+
+                <button type="button" class="dt-item-nav-button" data-dt-or-filter-toggle x-on:click="filterOpen = ! filterOpen">
+                    <span aria-hidden="true">&#9776;</span>
+                    <span>Filter</span>
+                    <span class="dt-item-filter-badge">{{ number_format($activeFilterCount, 0, ',', '.') }}</span>
+                </button>
             </div>
 
-            <button type="button" class="dt-item-nav-button" data-dt-or-filter-toggle x-on:click="filterOpen = ! filterOpen">
-                <span>☰</span>
-                <span>Filter</span>
-                <span class="dt-item-filter-badge">{{ number_format($activeFilterCount, 0, ',', '.') }}</span>
-            </button>
-
-            <button type="button" class="dt-item-nav-button" disabled data-dt-or-bulk-actions>
-                <span>Bulk Actions</span>
-                <span class="dt-item-bulk-caret">⌄</span>
-            </button>
+            <div class="dt-item-nav-actions">
+                <button type="button" class="dt-item-nav-button" data-dt-or-collapse-all x-on:click="collapseAll()">Collapse All</button>
+                <button
+                    type="button"
+                    class="dt-item-nav-button primary"
+                    data-dt-or-add-navigator
+                    x-on:click="addItem()"
+                    x-bind:disabled="isAddingItem || isLoading"
+                >
+                    <span x-show="! isAddingItem && ! recentlyAddedMessage">+ Tambah Item</span>
+                    <span x-cloak x-show="! isAddingItem && recentlyAddedMessage">Item baru dibuka</span>
+                    <span x-cloak x-show="isAddingItem">Menambahkan item...</span>
+                </button>
+            </div>
         </div>
 
-        <div class="dt-item-nav-actions">
-            <button type="button" class="dt-item-nav-button" data-dt-or-collapse-all x-on:click="collapseAll()">Collapse All</button>
-            <button
-                type="button"
-                class="dt-item-nav-button primary"
-                data-dt-or-add-navigator
-                x-on:click="addItem()"
-                x-bind:disabled="isAddingItem || isLoading"
-            >
-                <span x-show="! isAddingItem && ! recentlyAddedMessage">＋ Tambah Item</span>
-                <span x-cloak x-show="! isAddingItem && recentlyAddedMessage">Item baru dibuka</span>
-                <span x-cloak x-show="isAddingItem">Menambahkan item…</span>
+        <div class="dt-item-bulk-actions" data-dt-or-bulk-row>
+            <button type="button" class="dt-item-nav-button" data-dt-or-bulk-actions x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem" x-on:click="bulkStatus('approved')">
+                <span>Approve Selected</span>
+                <span class="dt-item-filter-badge" x-text="selectedCount()">0</span>
             </button>
+            <button type="button" class="dt-item-nav-button" data-dt-or-bulk-reject x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem" x-on:click="bulkStatus('rejected')">Reject Selected</button>
+            <button type="button" class="dt-item-nav-button" data-dt-or-bulk-draft x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem" x-on:click="bulkStatus('draft')">Set Draft</button>
+            <button type="button" class="dt-item-nav-button" data-dt-or-bulk-clear x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem" x-on:click="clearSelection()">Clear Selection</button>
         </div>
     </div>
-
     <div class="dt-item-filter-drawer" x-cloak x-show="filterOpen" data-dt-or-filterbar>
         <div class="dt-item-field">
             <label for="dt-or-item-supplier">Supplier</label>
@@ -821,7 +869,16 @@
                                 x-text="expandedKey === @js($row['key']) ? '⌄' : '›'"
                             >›</button>
                         </td>
-                        <td class="dt-item-check-col"><span class="dt-item-checkbox" aria-hidden="true"></span></td>
+                        <td class="dt-item-check-col">
+                            <input
+                                type="checkbox"
+                                class="dt-item-checkbox"
+                                value="{{ $row['key'] }}"
+                                aria-label="Pilih item #{{ $row['number'] }}"
+                                x-bind:checked="selectedKeys.includes(@js($row['key']))"
+                                x-on:change="toggleSelected(@js($row['key']), $event.target.checked)"
+                            >
+                        </td>
                         <td>{{ $row['number'] }}</td>
                         <td class="dt-item-product">
                             {{ $row['product'] }}
@@ -842,7 +899,12 @@
                                 <small>{{ $row['subtotal_idr_equivalent'] }}</small>
                             @endif
                         </td>
-                        <td><span class="dt-item-tax">{{ $row['tax_type'] }}</span></td>
+                        <td>
+                            <span class="dt-item-status-badge {{ $row['status_value'] }}">{{ $row['status_label'] }}</span>
+                            @if ($row['status_value'] === 'rejected' && filled($row['rejection_note']))
+                                <span class="dt-item-rejection-note" title="{{ $row['rejection_note'] }}">{{ $row['rejection_note'] }}</span>
+                            @endif
+                        </td>
                         <td class="dt-item-action-col">
                             <div class="dt-item-row-actions">
                                 <button
@@ -873,6 +935,7 @@
                                 <div class="dt-item-detail-summary">
                                     <div>
                                         <strong>Editor item #{{ $row['number'] }}</strong>
+                                        <span class="dt-item-status-badge {{ $row['status_value'] }}" style="margin-left:8px;">{{ $row['status_label'] }}</span>
                                         <span style="color:#6b7280;">· {{ $row['product'] }}</span>
                                     </div>
                                     <div class="dt-item-detail-actions">
@@ -890,6 +953,9 @@
                                 </div>
                                 <div class="dt-item-inline-editor" data-dt-inline-editor="{{ $row['key'] }}">
                                     <div class="dt-item-inline-grid">
+                                        @if ($row['is_status_locked'])
+                                            <div class="dt-item-lock-banner">Item {{ $row['status_label'] }} tidak bisa diedit dari inline editor. Gunakan bulk action untuk mengembalikan ke Draft jika perlu revisi.</div>
+                                        @endif
                                         <div class="dt-item-inline-field wide">
                                             <label>Product</label>
                                             <select
@@ -1017,9 +1083,11 @@
                                                 <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
                                                 <input
                                                     type="text"
+                                                    inputmode="decimal"
                                                     class="dt-item-inline-input"
                                                     value="{{ $row['unit_price_value'] }}"
                                                     data-dt-inline-unit-price
+                                                    x-mask:dynamic="$money($input, ',', '.', 2)"
                                                     x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'unit_price', $event.target.value)"
                                                     x-on:keydown.enter.prevent.stop="void 0"
                                                 >
@@ -1125,6 +1193,7 @@
                                     <div>Available stock: <strong>{{ $row['available_stock'] }} {{ $row['uom'] }}</strong></div>
                                     <div>Fulfilled: <strong>{{ $row['fulfilled_qty'] }} {{ $row['uom'] }}</strong></div>
                                     <div>Remaining: <strong>{{ $row['remaining_qty'] }} {{ $row['uom'] }}</strong></div>
+                                    <div>Status Item: <strong>{{ $row['status_label'] }}</strong></div>
                                 </div>
                             </div>
                         </td>

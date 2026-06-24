@@ -482,6 +482,215 @@ class PurchaseOrderResource extends Resource
         ));
     }
 
+    public static function usesLargePurchaseOrderItemEditor(array $items, ?string $operation): bool
+    {
+        return in_array($operation, ['create', 'edit'], true);
+    }
+
+    public static function parsePurchaseOrderCurrencyState(mixed $value): float
+    {
+        return self::parseCurrencyState($value);
+    }
+
+    public static function formatPurchaseOrderCurrencyInputState(mixed $amount, ?int $currencyId): string
+    {
+        return self::formatCurrencyInputState($amount, $currencyId);
+    }
+
+    public static function recalculatePurchaseOrderItemPreviewState(array $item): array
+    {
+        $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+        $quantity = (float) ($item['quantity'] ?? 0);
+        $unitPrice = self::parseCurrencyState($item['unit_price'] ?? 0);
+        $discount = (float) ($item['discount'] ?? 0);
+        $taxType = self::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+        $tax = $taxType === 'none' ? 0.0 : (float) ($item['tax'] ?? \App\Models\TaxSetting::activeRate('PPN'));
+
+        $preview = self::calculateCurrencyPreview($quantity, $unitPrice, $discount, $tax, $taxType, $currencyId);
+
+        $item['tipe_pajak'] = $taxType;
+        $item['tax'] = $tax;
+        $item['total'] = self::formatCurrencyPreviewState($preview['total'], $currencyId);
+        $item['discount_nominal'] = self::formatCurrencyPreviewState($preview['discount_nominal'], $currencyId);
+        $item['tax_nominal'] = self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
+        $item['subtotal'] = self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
+
+        return $item;
+    }
+
+    public static function calculateInlinePurchaseOrderTotalAmount(array $items, array $currencies = []): string
+    {
+        $rates = collect($currencies)
+            ->filter(fn ($row) => is_numeric($row['currency_id'] ?? null))
+            ->mapWithKeys(fn ($row) => [(int) $row['currency_id'] => (float) ($row['nominal'] ?? 0)]);
+
+        $total = collect($items)->sum(function (array $item) use ($rates): float {
+            $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+            $subtotal = self::parseCurrencyState($item['subtotal'] ?? 0);
+            $rate = $currencyId ? (float) $rates->get($currencyId, 0) : 0.0;
+
+            if ($rate <= 0) {
+                $rate = CurrencyConversionResolver::resolveRate($currencyId);
+            }
+
+            return $subtotal * $rate;
+        });
+
+        return self::formatMoneyState($total, null);
+    }
+
+    public static function renderPurchaseOrderItemNavigator(
+        array $items,
+        ?string $search = null,
+        ?string $taxFilter = null,
+        ?string $sourceFilter = null,
+        mixed $cabangFilter = null
+    ): \Illuminate\Support\HtmlString {
+        $search = trim((string) $search);
+        $taxFilter = filled($taxFilter) ? self::normalizeTaxTypeValue($taxFilter) : null;
+        $sourceFilter = filled($sourceFilter) ? (string) $sourceFilter : null;
+        $cabangFilter = filled($cabangFilter) ? (int) $cabangFilter : null;
+        $itemCollection = collect($items)->map(function ($item, $key) {
+            $item = is_array($item) ? $item : [];
+            $item['_navigator_key'] = (string) $key;
+
+            return $item;
+        });
+
+        $productIds = $itemCollection->pluck('product_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $referItemIds = $itemCollection->pluck('refer_item_model_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $currencyIds = $itemCollection->pluck('currency_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+
+        $products = Product::withoutGlobalScope('product_cabang')
+            ->whereIn('id', $productIds)
+            ->get(['id', 'sku', 'name', 'cabang_id', 'cost_price'])
+            ->keyBy('id');
+        $referItems = OrderRequestItem::withoutGlobalScopes()
+            ->whereIn('id', $referItemIds)
+            ->get(['id', 'cabang_id'])
+            ->keyBy('id');
+        $currencies = Currency::query()
+            ->when($currencyIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $currencyIds))
+            ->orWhereIn('code', ['IDR'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'symbol'])
+            ->keyBy('id');
+
+        $matched = $itemCollection->filter(function ($item) use ($search, $taxFilter, $sourceFilter, $cabangFilter, $products, $referItems) {
+            $taxType = self::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+            $isOrderRequestBacked = ($item['refer_item_model_type'] ?? null) === OrderRequestItem::class
+                || filled($item['refer_item_model_id'] ?? null);
+            $product = $products->get($item['product_id'] ?? null);
+            $referItem = $referItems->get($item['refer_item_model_id'] ?? null);
+            $resolvedCabangId = $referItem?->cabang_id ?? $product?->cabang_id;
+
+            if ($taxFilter && $taxType !== $taxFilter) {
+                return false;
+            }
+
+            if ($sourceFilter === 'order_request' && ! $isOrderRequestBacked) {
+                return false;
+            }
+
+            if ($sourceFilter === 'manual' && $isOrderRequestBacked) {
+                return false;
+            }
+
+            if ($cabangFilter && (int) $resolvedCabangId !== $cabangFilter) {
+                return false;
+            }
+
+            if ($search === '') {
+                return true;
+            }
+
+            $haystack = Str::lower(implode(' ', array_filter([
+                $product?->sku,
+                $product?->name,
+                $item['unit'] ?? null,
+                $isOrderRequestBacked ? 'order request or' : 'manual',
+            ])));
+
+            return Str::contains($haystack, Str::lower($search));
+        });
+
+        $productOptions = Product::withoutGlobalScope('product_cabang')
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'sku', 'name'])
+            ->mapWithKeys(fn (Product $product) => [$product->id => "({$product->sku}) {$product->name}"])
+            ->all();
+        $currencyOptions = Currency::orderBy('name')
+            ->get(['id', 'name', 'code', 'symbol'])
+            ->mapWithKeys(fn (Currency $currency) => [$currency->id => trim("{$currency->name} ({$currency->code} / {$currency->symbol})")])
+            ->all();
+
+        $cabangIds = $products->pluck('cabang_id')
+            ->merge($referItems->pluck('cabang_id'))
+            ->filter()
+            ->unique()
+            ->values();
+        $cabangs = \App\Models\Cabang::whereIn('id', $cabangIds)
+            ->orderBy('kode')
+            ->get(['id', 'kode', 'nama'])
+            ->keyBy('id');
+        $cabangOptions = $cabangs
+            ->map(fn (\App\Models\Cabang $cabang) => "({$cabang->kode}) {$cabang->nama}")
+            ->all();
+
+        $rows = $matched->values()->map(function ($item, int $index) use ($products, $referItems, $currencies, $productOptions, $currencyOptions): array {
+            $key = (string) ($item['_navigator_key'] ?? $item['id'] ?? $index);
+            $product = $products->get($item['product_id'] ?? null);
+            $referItem = $referItems->get($item['refer_item_model_id'] ?? null);
+            $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+            $currencySymbol = CurrencyConversionResolver::resolveSymbol($currencyId);
+            $isOrderRequestBacked = ($item['refer_item_model_type'] ?? null) === OrderRequestItem::class
+                || filled($item['refer_item_model_id'] ?? null);
+            $taxType = self::normalizeTaxTypeValue($item['tipe_pajak'] ?? null);
+
+            return [
+                'key' => $key,
+                'number' => $index + 1,
+                'product_id' => $item['product_id'] ?? null,
+                'product' => $product ? "({$product->sku}) {$product->name}" : '-',
+                'product_options' => ($item['product_id'] ?? null) && $product
+                    ? [(int) $item['product_id'] => "({$product->sku}) {$product->name}"] + $productOptions
+                    : $productOptions,
+                'currency_id' => $currencyId,
+                'currency_options' => $currencyOptions,
+                'currency_symbol' => $currencySymbol,
+                'quantity' => $item['quantity'] ?? 0,
+                'unit' => $item['unit'] ?? ($product?->uom?->abbreviation ?? '-'),
+                'unit_price' => self::formatCurrencyInputState($item['unit_price'] ?? 0, $currencyId),
+                'total' => self::formatCurrencyPreviewState($item['total'] ?? 0, $currencyId),
+                'discount' => $item['discount'] ?? 0,
+                'discount_nominal' => self::formatCurrencyPreviewState($item['discount_nominal'] ?? 0, $currencyId),
+                'tax' => $item['tax'] ?? 0,
+                'tax_nominal' => self::formatCurrencyPreviewState($item['tax_nominal'] ?? 0, $currencyId),
+                'subtotal' => self::formatCurrencyPreviewState($item['subtotal'] ?? 0, $currencyId),
+                'tipe_pajak' => $taxType,
+                'source' => $isOrderRequestBacked ? 'Order Request' : 'Manual',
+                'is_order_request_backed' => $isOrderRequestBacked,
+                'refer_item_model_id' => $item['refer_item_model_id'] ?? null,
+                'cabang_id' => $referItem?->cabang_id ?? $product?->cabang_id,
+            ];
+        })->all();
+
+        return new \Illuminate\Support\HtmlString(view('filament.forms.purchase-order-item-navigator', [
+            'rows' => $rows,
+            'totalItems' => count($items),
+            'matchedCount' => count($rows),
+            'totalQty' => $itemCollection->sum(fn ($item) => (float) ($item['quantity'] ?? 0)),
+            'totalSubtotal' => $itemCollection->sum(fn ($item) => self::parseCurrencyState($item['subtotal'] ?? 0)),
+            'search' => $search,
+            'taxFilter' => $taxFilter,
+            'sourceFilter' => $sourceFilter,
+            'cabangFilter' => $cabangFilter,
+            'cabangOptions' => $cabangOptions,
+            'taxOptions' => TaxTypeHelper::options(),
+        ])->render());
+    }
+
     public static function calculateCurrencyPreview(float $quantity, float $unitPrice, float $discount, float $tax, ?string $taxType, ?int $currencyId): array
     {
         $normalizedTaxType = self::normalizeTaxTypeValue($taxType);
@@ -1352,6 +1561,7 @@ class PurchaseOrderResource extends Resource
                             ->label('Cari Item PO')
                             ->placeholder('Cari SKU/nama produk atau sumber item')
                             ->helperText('Untuk PO besar, gunakan pencarian ini bersama filter dan collapse/expand item. Data item tidak difilter keluar dari state.')
+                            ->hidden()
                             ->live(debounce: 500)
                             ->dehydrated(false)
                             ->columnSpanFull(),
@@ -1362,6 +1572,7 @@ class PurchaseOrderResource extends Resource
                                 'eklusif' => 'Eklusif',
                                 'none' => 'Non Pajak',
                             ])
+                            ->hidden()
                             ->native(false)
                             ->live()
                             ->dehydrated(false),
@@ -1371,6 +1582,7 @@ class PurchaseOrderResource extends Resource
                                 'order_request' => 'Dari Order Request',
                                 'manual' => 'Manual',
                             ])
+                            ->hidden()
                             ->native(false)
                             ->live()
                             ->dehydrated(false),
@@ -1393,13 +1605,14 @@ class PurchaseOrderResource extends Resource
                                     ->get(['id', 'kode', 'nama'])
                                     ->mapWithKeys(fn (\App\Models\Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"]);
                             })
+                            ->hidden()
                             ->searchable()
                             ->native(false)
                             ->live()
                             ->dehydrated(false),
                         Placeholder::make('_purchase_order_item_summary')
                             ->label('Ringkasan Item PO')
-                            ->content(fn (Get $get) => self::renderLargePurchaseOrderItemSummary(
+                            ->content(fn (Get $get) => self::renderPurchaseOrderItemNavigator(
                                 is_array($get('purchaseOrderItem')) ? $get('purchaseOrderItem') : [],
                                 $get('_purchase_order_item_search'),
                                 $get('_purchase_order_item_tax_filter'),
@@ -1409,6 +1622,10 @@ class PurchaseOrderResource extends Resource
                             ->columnSpanFull(),
                         Repeater::make('purchaseOrderItem')
                             ->relationship()
+                            ->extraAttributes(fn (?string $operation): array => self::usesLargePurchaseOrderItemEditor([], $operation) ? [
+                                'class' => 'dt-po-large-repeater',
+                                'data-dt-large-po-repeater' => 'true',
+                            ] : [])
                             ->addable(fn(Get $get) => $get('refer_model_type') !== 'App\\Models\\OrderRequest')
                             ->mutateRelationshipDataBeforeFillUsing(function (array $data): array {
                                 $currencyId = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;

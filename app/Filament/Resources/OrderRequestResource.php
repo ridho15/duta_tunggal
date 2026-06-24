@@ -6,6 +6,7 @@ use App\Filament\Resources\OrderRequestResource\Pages;
 use App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest;
 use App\Http\Controllers\HelperController;
 use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
@@ -405,6 +406,7 @@ class OrderRequestResource extends Resource
                 $qty = number_format((float) ($item['quantity'] ?? 0), 2, ',', '.');
                 $fulfilledQty = (float) ($item['fulfilled_quantity'] ?? 0);
                 $remainingQty = max(0, (float) ($item['quantity'] ?? 0) - $fulfilledQty);
+                $approvalStatus = OrderRequestItem::normalizeApprovalStatus($item['status'] ?? null);
                 $currencyId = isset($item['currency_id']) && is_numeric($item['currency_id']) ? (int) $item['currency_id'] : null;
                 $currencySymbol = CurrencyConversionResolver::resolveSymbol($currencyId);
                 $currency = $currencies->get($currencyId);
@@ -500,6 +502,11 @@ class OrderRequestResource extends Resource
                     'available_stock' => number_format((float) ($product?->available_stock ?? 0), 2, ',', '.'),
                     'fulfilled_qty' => number_format($fulfilledQty, 2, ',', '.'),
                     'remaining_qty' => number_format($remainingQty, 2, ',', '.'),
+                    'status_value' => $approvalStatus,
+                    'status_label' => OrderRequestItem::approvalStatusLabel($approvalStatus),
+                    'status_color' => $approvalStatus,
+                    'is_status_locked' => $approvalStatus !== OrderRequestItem::STATUS_DRAFT,
+                    'rejection_note' => (string) ($item['rejection_note'] ?? ''),
                     'detail_total' => $subtotal,
                 ];
             });
@@ -573,17 +580,17 @@ class OrderRequestResource extends Resource
         }
 
         $visible = $suppliers->take($limit)->map(function (Supplier $supplier) {
-            return '<span style="display:inline-flex;margin:2px 4px 2px 0;padding:3px 8px;border-radius:999px;background:#eff6ff;color:#1e40af;font-size:12px;font-weight:600;">'
+            return '<span style="display:inline-flex;align-items:center;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;padding:3px 8px;border-radius:999px;background:#eff6ff;color:#1e40af;font-size:12px;font-weight:600;">'
                 . e("({$supplier->code}) {$supplier->perusahaan}")
                 . '</span>';
         })->implode('');
 
         $remaining = max(0, $suppliers->count() - $limit);
         $more = $remaining > 0
-            ? '<span style="display:inline-flex;margin:2px 0;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:12px;font-weight:600;">+' . number_format($remaining, 0, ',', '.') . ' supplier lainnya</span>'
+            ? '<span style="display:inline-flex;align-items:center;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;padding:3px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:12px;font-weight:600;">+' . number_format($remaining, 0, ',', '.') . ' supplier lainnya</span>'
             : '';
 
-        return new \Illuminate\Support\HtmlString('<div style="max-width:320px;">' . $visible . $more . '</div>');
+        return new \Illuminate\Support\HtmlString('<div style="display:flex;flex-wrap:wrap;gap:4px;max-width:320px;overflow:hidden;">' . $visible . $more . '</div>');
     }
 
     public static function renderIndexItemSummary(OrderRequest $record, int $limit = 3): \Illuminate\Support\HtmlString
@@ -591,7 +598,7 @@ class OrderRequestResource extends Resource
         $items = $record->relationLoaded('orderRequestItem')
             ? $record->orderRequestItem
             : $record->orderRequestItem()
-                ->select(['id', 'order_request_id', 'product_id'])
+                ->select(['id', 'order_request_id', 'product_id', 'status'])
                 ->whereNotNull('product_id')
                 ->with('product:id,sku,name')
                 ->limit($limit + 1)
@@ -616,15 +623,30 @@ class OrderRequestResource extends Resource
             ? '<div style="margin-top:3px;color:#6b7280;">+' . number_format($remaining, 0, ',', '.') . ' item lainnya</div>'
             : '';
 
+        $statusCounts = $record->orderRequestItem()
+            ->selectRaw("COALESCE(status, 'draft') as status_value, COUNT(*) as aggregate")
+            ->groupBy('status_value')
+            ->pluck('aggregate', 'status_value');
+        $approvedCount = (int) ($statusCounts[OrderRequestItem::STATUS_APPROVED] ?? 0);
+        $rejectedCount = (int) ($statusCounts[OrderRequestItem::STATUS_REJECTED] ?? 0);
+        $draftCount = (int) ($statusCounts[OrderRequestItem::STATUS_DRAFT] ?? 0);
+        $statusSummary = sprintf(
+            '<div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap;font-size:11px;"><span style="color:#166534;font-weight:700;">%s approved</span><span style="color:#991b1b;font-weight:700;">%s rejected</span><span style="color:#6b7280;font-weight:700;">%s draft</span></div>',
+            number_format($approvedCount, 0, ',', '.'),
+            number_format($rejectedCount, 0, ',', '.'),
+            number_format($draftCount, 0, ',', '.')
+        );
+
         return new \Illuminate\Support\HtmlString(sprintf(
-            '<div style="min-width:260px;">
+            '<div style="width:260px;max-width:360px;overflow:hidden;">
                 <div style="font-weight:700;color:#111827;">%s items <span style="color:#6b7280;font-weight:500;">• Total Qty %s</span></div>
-                <div style="margin-top:4px;color:#374151;font-size:12px;">%s%s</div>
+                <div style="margin-top:4px;color:#374151;font-size:12px;">%s%s</div>%s
             </div>',
             number_format($itemCount, 0, ',', '.'),
             number_format($totalQty, 2, ',', '.'),
             $productPreview ?: '<span style="color:#6b7280;">Tidak ada item</span>',
-            $more
+            $more,
+            $statusSummary
         ));
     }
 
@@ -822,8 +844,9 @@ class OrderRequestResource extends Resource
                 $supplierName = $state['supplier_name'] ?? '-';
                 $subtotal = $state['subtotal'] ?? '0';
                 $includeStatus = ($state['include'] ?? true) ? 'Disertakan' : 'Tidak disertakan';
+                $approvalStatus = OrderRequestItem::approvalStatusLabel($state['approval_status'] ?? OrderRequestItem::STATUS_APPROVED);
 
-                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal} | {$includeStatus}";
+                return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal} | {$approvalStatus} | {$includeStatus}";
             })
             ->schema([
                 Hidden::make('item_id'),
@@ -831,6 +854,21 @@ class OrderRequestResource extends Resource
                 Hidden::make('item_cabang_id'),
                 Hidden::make('max_quantity'),
                 Hidden::make('currency_id'),
+                Select::make('approval_status')
+                    ->label('Keputusan Item')
+                    ->options([
+                        OrderRequestItem::STATUS_APPROVED => 'Approve',
+                        OrderRequestItem::STATUS_DRAFT => 'Tetap Draft',
+                        OrderRequestItem::STATUS_REJECTED => 'Reject',
+                    ])
+                    ->default(OrderRequestItem::STATUS_APPROVED)
+                    ->required()
+                    ->live(),
+                Textarea::make('rejection_note')
+                    ->label('Alasan Reject')
+                    ->rows(2)
+                    ->visible(fn (Get $get) => $get('approval_status') === OrderRequestItem::STATUS_REJECTED)
+                    ->required(fn (Get $get) => $get('approval_status') === OrderRequestItem::STATUS_REJECTED),
                 TextInput::make('product_name')
                     ->label('Nama Produk')
                     ->readOnly()
@@ -1289,6 +1327,12 @@ class OrderRequestResource extends Resource
                                 'min' => 'Order request harus memiliki setidaknya satu item produk.',
                             ])
                             ->schema([
+                                Hidden::make('status')->default(OrderRequestItem::STATUS_DRAFT),
+                                Hidden::make('approved_by'),
+                                Hidden::make('approved_at'),
+                                Hidden::make('rejected_by'),
+                                Hidden::make('rejected_at'),
+                                Hidden::make('rejection_note'),
                                 \Filament\Forms\Components\Grid::make(5)
                                     ->schema([
                                         Select::make('product_id')
@@ -2282,6 +2326,8 @@ class OrderRequestResource extends Resource
                                     'total_cost'       => self::formatMoneyPreviewState($base),
                                     'subtotal'         => $subtotal,
                                     'max_quantity'     => max(0, $remainingQty),
+                                    'approval_status'  => OrderRequestItem::STATUS_APPROVED,
+                                    'rejection_note'   => null,
                                     'include'          => $remainingQty > 0,
                                     'tipe_pajak'       => self::normalizeItemTaxType($item->tipe_pajak ?? null),
                                 ];
@@ -2350,7 +2396,7 @@ class OrderRequestResource extends Resource
                             try {
                                 $orderRequestService = app(OrderRequestService::class);
 
-                                $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                                $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED));
                                 $groups = $includedItems->groupBy(function ($item) {
                                     return implode('|', [
                                         (string) ($item['item_supplier_id'] ?? ''),
@@ -2360,7 +2406,7 @@ class OrderRequestResource extends Resource
 
                                 if (! empty($data['multi_supplier']) || $groups->count() > 1) {
                                     // Multi-group mode: group included items by supplier + cabang and create one PO each
-                                    $includedItems = collect($data['selected_items'])->filter(fn($i) => $i['include'] ?? false);
+                                    $includedItems = collect($data['selected_items'])->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED));
                                     if ($includedItems->isEmpty()) {
                                         HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
                                         return;
@@ -2404,7 +2450,7 @@ class OrderRequestResource extends Resource
                                     // Get supplier_id from first selected item if not provided
                                     if (empty($data['supplier_id']) && !empty($data['selected_items'])) {
                                         $firstItem = collect($data['selected_items'])
-                                            ->filter(fn($i) => $i['include'] ?? false)
+                                            ->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED))
                                             ->first();
                                         $data['supplier_id'] = $firstItem['item_supplier_id'] ?? null;
                                     }
@@ -2494,6 +2540,8 @@ class OrderRequestResource extends Resource
                                     'total_cost'       => self::formatMoneyPreviewState(max(0, $remainingQty) * $supplierPrice),
                                     'subtotal'         => $subtotal,
                                     'max_quantity'     => max(0, $remainingQty),
+                                    'approval_status'  => OrderRequestItem::STATUS_APPROVED,
+                                    'rejection_note'   => null,
                                     'include'          => $remainingQty > 0,
                                     'tipe_pajak'       => self::normalizeItemTaxType($item->tipe_pajak ?? null),
                                 ];
@@ -2578,7 +2626,14 @@ class OrderRequestResource extends Resource
                                 $orderRequestService = app(OrderRequestService::class);
 
                                 if ($data['create_purchase_order']) {
-                                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED));
+                                    if ($includedItems->isEmpty()) {
+                                        $data['create_purchase_order'] = false;
+                                        $orderRequestService->approve($record, $data);
+                                        $record->refresh();
+                                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Keputusan item Order Request berhasil disimpan tanpa membuat Purchase Order.');
+                                        return;
+                                    }
                                     $groups = $includedItems->groupBy(function ($item) {
                                         return implode('|', [
                                             (string) ($item['item_supplier_id'] ?? ''),
@@ -2635,7 +2690,7 @@ class OrderRequestResource extends Resource
                                     // Get supplier_id from first selected item if not provided
                                     if (empty($data['supplier_id']) && !empty($data['selected_items'])) {
                                         $firstItem = collect($data['selected_items'])
-                                            ->filter(fn($i) => $i['include'] ?? false)
+                                            ->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED))
                                             ->first();
                                         $data['supplier_id'] = $firstItem['item_supplier_id'] ?? null;
                                     }
@@ -2998,3 +3053,11 @@ class OrderRequestResource extends Resource
         return $data;
     }
 }
+
+
+
+
+
+
+
+

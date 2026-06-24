@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrderRequestResource\RelationManagers;
 use App\Filament\Resources\OrderRequestResource;
 use App\Filament\Resources\OrderRequestResource\Pages\EditOrderRequest;
 use App\Models\Cabang;
+use App\Models\OrderRequestItem;
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -137,6 +138,12 @@ class OrderRequestItemsRelationManager extends RelationManager
                         'none' => 'gray',
                         default => 'warning',
                     }),
+                TextColumn::make('status')
+                    ->label('Status Item')
+                    ->formatStateUsing(fn ($state) => OrderRequestItem::approvalStatusLabel($state))
+                    ->badge()
+                    ->color(fn ($state) => OrderRequestItem::approvalStatusColor($state))
+                    ->sortable(),
                 TextColumn::make('subtotal')
                     ->label('Subtotal')
                     ->formatStateUsing(fn ($state, $record) => OrderRequestResource::resolveCurrencySymbol($record->currency_id ?? $this->getOwnerRecord()?->currency_id) . ' ' . OrderRequestResource::formatMoneyPreviewState($state))
@@ -144,6 +151,11 @@ class OrderRequestItemsRelationManager extends RelationManager
                 TextColumn::make('note')
                     ->label('Catatan')
                     ->limit(35)
+                    ->tooltip(fn ($state) => $state)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('rejection_note')
+                    ->label('Alasan Reject')
+                    ->limit(45)
                     ->tooltip(fn ($state) => $state)
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -174,6 +186,13 @@ class OrderRequestItemsRelationManager extends RelationManager
                         'inklusif' => 'Inklusif',
                         'eklusif' => 'Eklusif',
                         'none' => 'Non Pajak',
+                    ]),
+                SelectFilter::make('status')
+                    ->label('Status Item')
+                    ->options([
+                        OrderRequestItem::STATUS_DRAFT => 'Draft',
+                        OrderRequestItem::STATUS_APPROVED => 'Approved',
+                        OrderRequestItem::STATUS_REJECTED => 'Rejected',
                     ]),
                 SelectFilter::make('fulfillment_status')
                     ->label('Status Qty')

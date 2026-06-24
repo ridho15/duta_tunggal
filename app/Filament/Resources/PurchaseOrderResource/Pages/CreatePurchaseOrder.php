@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
 use App\Filament\Resources\PurchaseOrderResource;
+use App\Filament\Resources\PurchaseOrderResource\Pages\Concerns\InteractsWithInlinePurchaseOrderItems;
 use App\Models\OrderRequest;
 use App\Services\PurchaseOrderService;
 use App\Support\ProcurementFailureNotifier;
@@ -16,6 +17,8 @@ use Throwable;
 
 class CreatePurchaseOrder extends CreateRecord
 {
+    use InteractsWithInlinePurchaseOrderItems;
+
     protected static string $resource = PurchaseOrderResource::class;
 
     protected static ?string $title = 'Buat Pembelian';
