@@ -138,6 +138,47 @@ trait InteractsWithInlinePurchaseOrderItems
         return true;
     }
 
+    public function searchInlinePurchaseOrderProducts(string $search = ''): array
+    {
+        $this->skipRender();
+
+        return Product::withoutGlobalScope('product_cabang')
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'sku', 'name'])
+            ->map(fn (Product $product) => [
+                'id' => (string) $product->id,
+                'text' => "({$product->sku}) {$product->name}",
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function searchInlinePurchaseOrderCurrencies(string $search = ''): array
+    {
+        $this->skipRender();
+
+        return Currency::query()
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('symbol', 'like', "%{$search}%");
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'code', 'symbol'])
+            ->map(fn (Currency $currency) => [
+                'id' => (string) $currency->id,
+                'text' => trim("{$currency->name} ({$currency->code} / {$currency->symbol})"),
+            ])
+            ->values()
+            ->all();
+    }
+
     protected function hydrateInlinePurchaseOrderProductFields(array &$item, int $productId): void
     {
         $product = Product::withoutGlobalScope('product_cabang')->with('uom', 'suppliers')->find($productId);

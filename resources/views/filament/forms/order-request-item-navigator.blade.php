@@ -70,7 +70,7 @@
     .dt-item-icon-button.danger{color:#dc2626}
     .dt-item-icon-button.danger:hover{background:#fef2f2;border-color:#fecaca}
     .dt-item-detail-row td{padding:0;border-bottom:1px solid #e5e7eb;background:#fff}
-    .dt-item-detail-card{margin:0 42px 12px 82px;border:1px solid #e5e7eb;border-radius:11px;overflow:hidden;background:#fff}
+    .dt-item-detail-card{margin:0 42px 12px 82px;border:1px solid #e5e7eb;border-radius:11px;overflow:visible;background:#fff}
     .dt-item-detail-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc;font-size:13px}
     .dt-item-detail-summary strong{font-weight:800;color:#111827}
     .dt-item-detail-footer{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;border-top:1px solid #e5e7eb;padding:13px 20px;font-size:13px}
@@ -94,6 +94,8 @@
     .dt-item-inline-editor .select2-container .select2-selection--single .select2-selection__arrow{height:36px;right:8px}
     .dt-item-inline-editor .select2-container--focus .select2-selection--single{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}
     .dt-item-inline-editor .select2-dropdown{border-color:#d1d5db;border-radius:10px;overflow:hidden;font-size:13px}
+    body > .select2-container--open{z-index:99999!important}
+    .dt-or-inline-select2-dropdown{z-index:99999!important;border-color:#d1d5db;border-radius:10px;overflow:hidden;font-size:13px}
     .dt-item-money-wrap{display:flex;align-items:stretch;min-width:0}
     .dt-item-money-prefix{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:0 10px;border:1px solid #d1d5db;border-right:0;border-radius:10px 0 0 10px;background:#f8fafc;color:#475569;font-size:12px;font-weight:800}
     .dt-item-money-wrap .dt-item-inline-input{border-radius:0 10px 10px 0;min-width:0}
@@ -152,6 +154,7 @@
         filterOpen: false,
         observer: null,
         reconcileTimer: null,
+        select2RefreshTimer: null,
         searchValue: '',
         supplierValue: '',
         cabangValue: '',
@@ -190,26 +193,22 @@
 
                 this.observer = new MutationObserver(() => {
                     window.clearTimeout(this.reconcileTimer);
-                    this.reconcileTimer = window.setTimeout(() => this.reconcile(), 40);
+                    this.reconcileTimer = window.setTimeout(() => {
+                        this.reconcile();
+                        this.refreshInlineSelects();
+                    }, 40);
                 });
                 this.observer.observe(target, { childList: true, subtree: true });
             });
 
+            this.registerInlineSelectRefreshHooks();
+
             this.inlineSelectChangeHandler = (event) => {
                 const select = event.target?.closest?.('select[data-dt-inline-select]');
                 if (! select || ! this.$root.contains(select)) return;
+                if (this.isSelect2Managed(select)) return;
 
-                const editor = select.closest('[data-dt-inline-editor]');
-                const key = editor?.dataset?.dtInlineEditor;
-                const field = select.dataset.field;
-
-                if (! key || ! field) return;
-
-                const label = field
-                    .replace('_id', '')
-                    .replace('currency', 'mata uang');
-
-                this.updateInlineItem(key, field, select.value, 'Memperbarui ' + label + '…');
+                this.handleInlineSelectChange(select);
             };
 
             this.$root.addEventListener('change', this.inlineSelectChangeHandler);
@@ -221,6 +220,7 @@
                 this.$root.removeEventListener('change', this.inlineSelectChangeHandler);
             }
             window.clearTimeout(this.reconcileTimer);
+            window.clearTimeout(this.select2RefreshTimer);
             window.clearTimeout(this.loadingFallbackTimer);
             window.clearTimeout(this.recentlyAddedTimer);
         },
@@ -359,9 +359,116 @@
             this.$nextTick(() => this.initInlineSelects(key));
         },
 
+        openItemWhenReady(key, shouldScroll = true, attempt = 0) {
+            const row = this.$root.querySelector('[data-dt-or-row=' + CSS.escape(String(key)) + ']');
+
+            if (row || attempt >= 4) {
+                this.openItem(key, shouldScroll);
+                return;
+            }
+
+            window.setTimeout(() => this.openItemWhenReady(key, shouldScroll, attempt + 1), 120);
+        },
+
+        refreshInlineSelects(delay = 80) {
+            if (! this.expandedKey) return;
+
+            window.clearTimeout(this.select2RefreshTimer);
+            this.select2RefreshTimer = window.setTimeout(() => {
+                const editor = this.$root.querySelector('[data-dt-inline-editor=' + CSS.escape(String(this.expandedKey)) + ']');
+                if (editor?.querySelector('select[data-dt-select2-open]')) return;
+
+                this.$nextTick(() => {
+                    this.initInlineSelects(this.expandedKey);
+                    this.syncInlineSelect2Values(this.expandedKey);
+                    this.syncInlineMoneyInputs(this.expandedKey);
+                });
+            }, delay);
+        },
+
+        isSelect2Managed(select) {
+            if (! select) return false;
+
+            const jq = window.jQuery || window.$;
+
+            return Boolean(
+                select.nextElementSibling?.classList?.contains('select2')
+                || (jq && jq(select).data('select2'))
+            );
+        },
+
+        syncInlineSelect2Values(key = this.expandedKey) {
+            if (! key) return;
+
+            const editor = this.$root.querySelector('[data-dt-inline-editor=' + CSS.escape(String(key)) + ']');
+            const jq = window.jQuery || window.$;
+            if (! editor || ! jq?.fn?.select2) return;
+
+            editor
+                .querySelectorAll('select[data-dt-inline-select]')
+                .forEach((select) => {
+                    if (! jq(select).data('select2')) return;
+
+                    const renderedValue = select.value || '';
+                    jq(select).val(renderedValue).trigger('change.select2');
+                });
+        },
+
+        syncInlineMoneyInputs(key = this.expandedKey) {
+            if (! key) return;
+
+            const editor = this.$root.querySelector('[data-dt-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (! editor) return;
+
+            editor
+                .querySelectorAll('input[data-dt-inline-unit-price]')
+                .forEach((input) => {
+                    const renderedValue = input.getAttribute('value');
+
+                    if (renderedValue !== null && input.value !== renderedValue) {
+                        input.value = renderedValue;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+        },
+
+        registerInlineSelectRefreshHooks() {
+            if (window.__dtOrSelect2LivewireHooksRegistered) return;
+            window.__dtOrSelect2LivewireHooksRegistered = true;
+
+            const refreshNavigators = () => {
+                document
+                    .querySelectorAll('[data-dt-or-navigator]')
+                .forEach((navigator) => {
+                    const alpine = navigator._x_dataStack?.[0];
+                    alpine?.refreshInlineSelects?.(120);
+                    alpine?.syncInlineSelect2Values?.();
+                    alpine?.syncInlineMoneyInputs?.();
+                });
+            };
+
+            const registerLivewireHook = () => {
+                if (! window.Livewire || typeof window.Livewire.hook !== 'function') return;
+
+                window.Livewire.hook('message.processed', () => refreshNavigators());
+                window.Livewire.hook('morph.updated', () => refreshNavigators());
+            };
+
+            if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                registerLivewireHook();
+            } else {
+                document.addEventListener('livewire:load', registerLivewireHook, { once: true });
+                document.addEventListener('livewire:init', registerLivewireHook, { once: true });
+            }
+
+            document.addEventListener('filament:page:loaded', refreshNavigators);
+        },
+
         ensureSelect2Assets() {
-            if (window.jQuery?.fn?.select2) {
-                return Promise.resolve(window.jQuery);
+            const existingJq = window.jQuery || window.$;
+            if (existingJq?.fn?.select2) {
+                window.jQuery = existingJq;
+                return Promise.resolve(existingJq);
             }
 
             if (window.__dtOrSelect2AssetsPromise) {
@@ -398,13 +505,23 @@
 
             window.__dtOrSelect2AssetsPromise = (async () => {
                 loadStyle();
-                if (! window.jQuery) {
-                    await loadScript('https://code.jquery.com/jquery-3.7.1.min.js', 'data-dt-or-jquery');
+                if (! (window.jQuery || window.$)) {
+                    await loadScript('https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js', 'data-dt-or-jquery');
                 }
-                if (! window.jQuery?.fn?.select2) {
+                const jq = window.jQuery || window.$;
+                if (jq && ! window.jQuery) {
+                    window.jQuery = jq;
+                }
+                if (! jq?.fn?.select2) {
                     await loadScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', 'data-dt-or-select2-script');
                 }
-                return window.jQuery;
+                const loadedJq = window.jQuery || window.$;
+                if (! loadedJq?.fn?.select2) {
+                    throw new Error('Select2 assets loaded but jQuery/select2 global is unavailable.');
+                }
+
+                window.jQuery = loadedJq;
+                return loadedJq;
             })();
 
             return window.__dtOrSelect2AssetsPromise;
@@ -426,56 +543,119 @@
                 const $select = jq(element);
                 const field = element.dataset.field;
                 const searchMethod = element.dataset.searchMethod;
-                const productId = element.dataset.productId ? Number(element.dataset.productId) : null;
-                const currencyId = element.dataset.currencyId ? Number(element.dataset.currencyId) : null;
+                const hasRenderedSelect2 = element.nextElementSibling?.classList?.contains('select2');
 
-                if ($select.data('select2')) {
-                    $select.off('.dtOrInline');
-                    $select.select2('destroy');
+                if ($select.data('select2') && ! hasRenderedSelect2) {
+                    try {
+                        $select.select2('destroy');
+                    } catch (error) {
+                        $select.removeData('select2');
+                    }
                 }
 
-                $select.select2({
-                    width: '100%',
-                    allowClear: true,
-                    placeholder: element.dataset.placeholder || 'Pilih data',
-                    dropdownParent: jq(editor),
-                    ajax: {
-                        delay: 250,
-                        transport: (params, success, failure) => {
-                            const search = params.data?.term || '';
-                            let request;
+                if (! $select.data('select2')) {
+                    $select.select2({
+                        width: '100%',
+                        allowClear: true,
+                        placeholder: element.dataset.placeholder || 'Pilih data',
+                        dropdownParent: jq(editor),
+                        dropdownCssClass: 'dt-or-inline-select2-dropdown',
+                        ajax: {
+                            delay: 250,
+                            transport: (params, success, failure) => {
+                                const search = params.data?.term || '';
+                                let request;
+                                const latestProductId = this.currentInlineSelectValue(editor, 'product_id');
+                                const latestCurrencyId = this.currentInlineSelectValue(editor, 'currency_id');
 
-                            if (searchMethod === 'products') {
-                                request = this.$wire.searchInlineOrderRequestProducts(search);
-                            } else if (searchMethod === 'suppliers') {
-                                request = this.$wire.searchInlineOrderRequestSuppliers(productId, currencyId, search);
-                            } else if (searchMethod === 'cabangs') {
-                                request = this.$wire.searchInlineOrderRequestCabangs(search);
-                            } else {
-                                request = this.$wire.searchInlineOrderRequestCurrencies(search);
-                            }
+                                if (searchMethod === 'products') {
+                                    request = this.$wire.searchInlineOrderRequestProducts(search);
+                                } else if (searchMethod === 'suppliers') {
+                                    request = this.$wire.searchInlineOrderRequestSuppliers(latestProductId, latestCurrencyId, search);
+                                } else if (searchMethod === 'cabangs') {
+                                    request = this.$wire.searchInlineOrderRequestCabangs(search);
+                                } else {
+                                    request = this.$wire.searchInlineOrderRequestCurrencies(search);
+                                }
 
-                            Promise.resolve(request)
-                                .then((results) => success({ results: results || [] }))
-                                .catch(failure);
+                                Promise.resolve(request)
+                                    .then((results) => success({ results: results || [] }))
+                                    .catch(failure);
 
-                            return { abort() {} };
+                                return { abort() {} };
+                            },
+                            processResults: (data) => data,
                         },
-                        processResults: (data) => data,
-                    },
-                });
+                    });
+                }
 
                 $select.off('.dtOrInline');
+                $select.on('select2:open.dtOrInline', () => {
+                    element.setAttribute('data-dt-select2-open', 'true');
+                });
+                $select.on('select2:close.dtOrInline', () => {
+                    element.removeAttribute('data-dt-select2-open');
+                });
+                $select.on('select2:select.dtOrInline', (event) => {
+                    this.handleInlineSelectChange(element, event.params?.data?.id ?? element.value);
+                });
+                $select.on('select2:clear.dtOrInline', () => {
+                    this.handleInlineSelectChange(element, '');
+                });
             });
+
+            this.syncInlineSelect2Values(key);
+        },
+
+        currentInlineSelectValue(editor, field) {
+            const select = editor.querySelector('select[data-field=' + CSS.escape(String(field)) + ']');
+            const value = select?.value || '';
+
+            return value !== '' && ! Number.isNaN(Number(value)) ? Number(value) : null;
+        },
+
+        async handleInlineSelectChange(select, forcedValue = null) {
+            if (! select || select.dataset.dtSelect2Updating === 'true') return;
+
+            const editor = select.closest('[data-dt-inline-editor]');
+            const key = editor?.dataset?.dtInlineEditor;
+            const field = select.dataset.field;
+
+            if (! key || ! field) return;
+
+            select.setAttribute('data-dt-select2-updating', 'true');
+
+            const label = field
+                .replace('_id', '')
+                .replace('currency', 'mata uang');
+
+            try {
+                await this.updateInlineItem(key, field, forcedValue ?? select.value, 'Memperbarui ' + label + '…');
+
+                if (field === 'product_id' || field === 'currency_id') {
+                    this.refreshInlineSelects(120);
+                }
+            } finally {
+                window.setTimeout(() => {
+                    select.removeAttribute('data-dt-select2-updating');
+                }, 0);
+            }
         },
 
         async updateInlineItem(key, field, value, message = 'Menghitung item…') {
             this.startLoading(message);
 
             try {
-                return await this.$wire.updateInlineOrderRequestItemField(String(key), String(field), value);
+                const result = await this.$wire.updateInlineOrderRequestItemField(String(key), String(field), value);
+                this.$nextTick(() => {
+                    this.syncInlineSelect2Values(String(key));
+                    this.syncInlineMoneyInputs(String(key));
+                });
+
+                return result;
             } finally {
                 this.finishLoading();
+                this.refreshInlineSelects();
             }
         },
 
@@ -529,12 +709,15 @@
             if (this.expandedKey === String(key)) {
                 this.expandedKey = null;
                 window.__dtOrExpandedItemKey = null;
+                if (this.activeKey === String(key)) {
+                    this.activeKey = null;
+                    window.__dtOrActiveItemKey = null;
+                    this.applyVisibility();
+                }
                 return;
             }
 
-            this.expandedKey = String(key);
-            window.__dtOrExpandedItemKey = this.expandedKey;
-            this.$nextTick(() => this.initInlineSelects(key));
+            this.openItem(key);
         },
 
         openItem(key, shouldScroll = true) {
@@ -575,7 +758,9 @@
                     window.__dtOrActiveItemKey = this.activeKey;
                     window.__dtOrExpandedItemKey = this.expandedKey;
                     this.showAddFeedback(newKey);
-                    this.$nextTick(() => this.scrollEditorIntoView(newKey, true));
+                    this.$nextTick(() => this.openItemWhenReady(newKey, true));
+                    window.setTimeout(() => this.openItemWhenReady(newKey, true), 120);
+                    this.refreshInlineSelects(140);
                 }
 
                 return newKey;
@@ -855,6 +1040,7 @@
                     <tr
                         class="dt-item-row"
                         data-dt-or-row="{{ $row['key'] }}"
+                        wire:key="dt-or-row-{{ $row['key'] }}"
                         x-bind:class="{
                             'is-expanded': expandedKey === @js($row['key']),
                             'dt-item-new-row-highlight': recentlyAddedKey === @js($row['key']),
@@ -929,7 +1115,7 @@
                             </div>
                         </td>
                     </tr>
-                    <tr class="dt-item-detail-row" x-cloak x-show="expandedKey === @js($row['key'])">
+                    <tr class="dt-item-detail-row" wire:key="dt-or-detail-{{ $row['key'] }}" x-cloak x-show="expandedKey === @js($row['key'])">
                         <td colspan="11">
                             <div class="dt-item-detail-card">
                                 <div class="dt-item-detail-summary">
@@ -1199,7 +1385,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="11" class="dt-item-empty">Tidak ada item yang cocok dengan pencarian/filter aktif.</td></tr>
+                    <tr wire:key="dt-or-empty-row"><td colspan="11" class="dt-item-empty">Tidak ada item yang cocok dengan pencarian/filter aktif.</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -54,7 +54,9 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi",
+            "@php artisan package:discover --ansi"
+        ],
+        "filament-upgrade": [
             "@php artisan filament:upgrade"
         ],
         "post-update-cmd": [
@@ -75,6 +77,12 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "test:safe": [
+            "@php scripts/run-tests-safe.php"
+        ],
+        "test:unit-safe": [
+            "@php scripts/run-tests-safe.php --testsuite=Unit"
         ]
     },
     "extra": {

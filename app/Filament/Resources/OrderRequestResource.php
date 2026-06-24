@@ -455,7 +455,7 @@ class OrderRequestResource extends Resource
                     'cabang' => $cabangLabel,
                     'product_options' => ($item['product_id'] ?? null) && $product
                         ? [(int) $item['product_id'] => $productLabel]
-                        : [],
+                        : self::resolveProductOptions(limit: 50),
                     'supplier_options' => ($item['supplier_id'] ?? null) && $supplier
                         ? [
                             (int) $item['supplier_id'] => self::resolveSupplierLabel(
@@ -812,7 +812,7 @@ class OrderRequestResource extends Resource
 
     public static function resolveProductOptions(?string $search = null, int $limit = 50): array
     {
-        $query = Product::query()->orderBy('name');
+        $query = Product::withoutGlobalScope('product_cabang')->orderBy('name');
 
         if ($search !== null && $search !== '') {
             $query->where(function ($productQuery) use ($search) {

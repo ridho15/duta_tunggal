@@ -30,6 +30,9 @@ it('provides purchase order inline item operations and navigator UI', function (
         ->toContain('updateInlinePurchaseOrderItemField')
         ->toContain('addInlinePurchaseOrderItem')
         ->toContain('removeInlinePurchaseOrderItem')
+        ->toContain('searchInlinePurchaseOrderProducts')
+        ->toContain('searchInlinePurchaseOrderCurrencies')
+        ->toContain('skipRender()')
         ->toContain('recalculatePurchaseOrderItemPreviewState')
         ->toContain('isOrderRequestBacked');
 
@@ -38,9 +41,27 @@ it('provides purchase order inline item operations and navigator UI', function (
         ->toContain('Purchase order item')
         ->toContain('updateInlineItem')
         ->toContain('addItem()')
+        ->toContain('data-dt-po-inline-select')
+        ->toContain('select2:select.dtPoInline')
+        ->toContain('select2:clear.dtPoInline')
+        ->toContain('select2:open.dtPoInline')
+        ->toContain('select2:close.dtPoInline')
+        ->toContain('syncInlineSelect2Values')
+        ->toContain("trigger('change.select2')")
+        ->toContain('syncInlineMoneyInputs')
+        ->toContain('dropdownParent: jq(document.body)')
+        ->toContain('window.__dtPoSelect2LivewireHooksRegistered')
+        ->toContain('wire:key="dt-po-row-{{ $row[\'key\'] }}"')
+        ->toContain('wire:key="dt-po-detail-{{ $row[\'key\'] }}"')
+        ->toContain('wire:key="dt-po-empty-row"')
+        ->toContain('openItemWhenReady')
+        ->toContain('window.setTimeout(() => this.openItemWhenReady(key), 120)')
+        ->toContain('data-dt-po-row="{{ $row[\'key\'] }}"')
         ->toContain('Source')
         ->toContain('Order Request')
         ->toContain('Manual')
         ->toContain('dt-po-table')
         ->toContain('dt-po-inline-editor');
+
+    expect($view)->not->toContain('change.dtPoInline');
 });

@@ -69,7 +69,7 @@ trait InteractsWithInlineOrderRequestItems
         $item[$field] = $normalizedValue;
 
         if ($field === 'product_id' && $normalizedValue) {
-            $product = Product::query()->with('uom')->find($normalizedValue);
+            $product = Product::withoutGlobalScope('product_cabang')->with('uom')->find($normalizedValue);
 
             if ($product) {
                 $supplierId = OrderRequestResource::resolveProductSupplierId((int) $normalizedValue);
@@ -164,6 +164,8 @@ trait InteractsWithInlineOrderRequestItems
 
     public function searchInlineOrderRequestProducts(string $search = ''): array
     {
+        $this->skipRender();
+
         return collect(OrderRequestResource::resolveProductOptions($search, 50))
             ->map(fn (string $text, int|string $id) => ['id' => (string) $id, 'text' => $text])
             ->values()
@@ -175,6 +177,8 @@ trait InteractsWithInlineOrderRequestItems
         ?int $currencyId = null,
         string $search = ''
     ): array {
+        $this->skipRender();
+
         return collect(OrderRequestResource::resolveSupplierOptions($productId, $search, 50, $currencyId))
             ->map(fn (string $text, int|string $id) => ['id' => (string) $id, 'text' => $text])
             ->values()
@@ -183,6 +187,8 @@ trait InteractsWithInlineOrderRequestItems
 
     public function searchInlineOrderRequestCabangs(string $search = ''): array
     {
+        $this->skipRender();
+
         $user = Auth::user();
         $manageType = $user?->manage_type ?? [];
         $query = Cabang::query();
@@ -211,6 +217,8 @@ trait InteractsWithInlineOrderRequestItems
 
     public function searchInlineOrderRequestCurrencies(string $search = ''): array
     {
+        $this->skipRender();
+
         return Currency::query()
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($currencyQuery) use ($search) {

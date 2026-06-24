@@ -67,6 +67,13 @@ it('uses real checkboxes and bulk status actions in the custom order request ite
         ->toContain('Set Draft')
         ->toContain('Clear Selection')
         ->toContain('dt-item-status-badge')
+        ->toContain('wire:key="dt-or-row-{{ $row[\'key\'] }}"')
+        ->toContain('wire:key="dt-or-detail-{{ $row[\'key\'] }}"')
+        ->toContain('wire:key="dt-or-empty-row"')
+        ->toContain('openItemWhenReady')
+        ->toContain('window.setTimeout(() => this.openItemWhenReady(newKey, true), 120)')
+        ->toContain('if (this.activeKey === String(key))')
+        ->toContain('this.openItem(key)')
         ->not->toContain('span class="dt-item-checkbox"')
         ->not->toContain('disabled data-dt-or-bulk-actions');
 
@@ -101,4 +108,57 @@ it('shows item approval summaries on index and relation manager', function () {
         ->toContain("SelectFilter::make('status')")
         ->toContain("OrderRequestItem::STATUS_APPROVED => 'Approved'")
         ->toContain("OrderRequestItem::STATUS_REJECTED => 'Rejected'");
+});
+it('keeps the custom order request product select stable with native fallback options', function () {
+    $resource = project_file('app/Filament/Resources/OrderRequestResource.php');
+    $trait = project_file('app/Filament/Resources/OrderRequestResource/Pages/Concerns/InteractsWithInlineOrderRequestItems.php');
+    $blade = project_file('resources/views/filament/forms/order-request-item-navigator.blade.php');
+
+    expect($resource)
+        ->toContain("\$query = Product::withoutGlobalScope('product_cabang')->orderBy('name');")
+        ->toContain(': self::resolveProductOptions(limit: 50)');
+
+    expect($trait)
+        ->toContain("Product::withoutGlobalScope('product_cabang')->with('uom')->find(\$normalizedValue)")
+        ->toContain("public function searchInlineOrderRequestProducts(string \$search = ''): array\n    {\n        \$this->skipRender();")
+        ->toContain("public function searchInlineOrderRequestSuppliers(\n        ?int \$productId = null,\n        ?int \$currencyId = null,\n        string \$search = ''\n    ): array {\n        \$this->skipRender();");
+
+    expect($blade)
+        ->toContain('dropdownParent: jq(editor)')
+        ->toContain("dropdownCssClass: 'dt-or-inline-select2-dropdown'")
+        ->toContain('.dt-item-detail-card{margin:0 42px 12px 82px;border:1px solid #e5e7eb;border-radius:11px;overflow:visible;background:#fff}');
+});
+
+it('refreshes inline select2 controls after livewire refreshes', function () {
+    $blade = project_file('resources/views/filament/forms/order-request-item-navigator.blade.php');
+
+    expect($blade)
+        ->toContain('refreshInlineSelects')
+        ->toContain('syncInlineSelect2Values')
+        ->toContain('isSelect2Managed')
+        ->toContain("trigger('change.select2')")
+        ->toContain('syncInlineMoneyInputs')
+        ->toContain("querySelectorAll('input[data-dt-inline-unit-price]')")
+        ->toContain("input.value = renderedValue")
+        ->toContain('registerInlineSelectRefreshHooks')
+        ->toContain('hasRenderedSelect2')
+        ->toContain("\$select.data('select2') && ! hasRenderedSelect2")
+        ->toContain("window.__dtOrSelect2LivewireHooksRegistered")
+        ->toContain("window.Livewire.hook('message.processed'")
+        ->toContain("window.Livewire.hook('morph.updated'")
+        ->toContain('select2:select.dtOrInline')
+        ->toContain('select2:clear.dtOrInline')
+        ->toContain('event.params?.data?.id ?? element.value')
+        ->toContain("this.handleInlineSelectChange(element, '')")
+        ->toContain('data-dt-select2-updating')
+        ->toContain('data-dt-select2-open')
+        ->toContain('select2:open.dtOrInline')
+        ->toContain('select2:close.dtOrInline')
+        ->toContain("editor?.querySelector('select[data-dt-select2-open]')")
+        ->toContain("this.currentInlineSelectValue(editor, 'product_id')")
+        ->toContain("this.currentInlineSelectValue(editor, 'currency_id')")
+        ->toContain('searchInlineOrderRequestSuppliers(latestProductId, latestCurrencyId, search)')
+        ->toContain("\$select.select2('destroy')")
+        ->not->toContain('change.dtOrInline')
+        ->not->toContain('searchInlineOrderRequestSuppliers(productId, currencyId, search)');
 });

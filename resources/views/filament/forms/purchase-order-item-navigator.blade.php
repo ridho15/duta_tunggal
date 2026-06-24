@@ -47,9 +47,16 @@
     .dt-po-icon-button.danger{color:#dc2626}
     .dt-po-icon-button.danger:hover{background:#fef2f2;border-color:#fecaca}
     .dt-po-detail-row td{padding:0;border-bottom:1px solid #e5e7eb;background:#fff}
-    .dt-po-detail-card{margin:0 42px 12px 82px;border:1px solid #e5e7eb;border-radius:11px;overflow:hidden;background:#fff}
+    .dt-po-detail-card{margin:0 42px 12px 82px;border:1px solid #e5e7eb;border-radius:11px;overflow:visible;background:#fff}
     .dt-po-detail-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc;font-size:13px}
     .dt-po-inline-editor{padding:16px;background:#fff}
+    .dt-po-inline-editor .select2-container{width:100%!important;min-width:0}
+    .dt-po-inline-editor .select2-container .select2-selection--single{height:38px;border:1px solid #d1d5db;border-radius:10px;background:#fff}
+    .dt-po-inline-editor .select2-container .select2-selection--single .select2-selection__rendered{line-height:36px;padding-left:11px;padding-right:34px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .dt-po-inline-editor .select2-container .select2-selection--single .select2-selection__arrow{height:36px;right:8px}
+    .dt-po-inline-editor .select2-container--focus .select2-selection--single{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}
+    body > .select2-container--open{z-index:99999!important}
+    .dt-po-inline-select2-dropdown{z-index:99999!important;border-color:#d1d5db;border-radius:10px;overflow:hidden;font-size:13px}
     .dt-po-inline-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}
     .dt-po-inline-field{display:flex;flex-direction:column;gap:6px;grid-column:span 3}
     .dt-po-inline-field.wide{grid-column:span 6}
@@ -87,11 +94,44 @@
         cabangValue: '',
         isLoading: false,
         loadingMessage: '',
+        observer: null,
+        select2RefreshTimer: null,
+        select2AssetsPromise: null,
+        inlineSelectChangeHandler: null,
         init() {
             this.searchValue = this.$root.dataset.currentSearch || '';
             this.taxValue = this.$root.dataset.currentTax || '';
             this.sourceValue = this.$root.dataset.currentSource || '';
             this.cabangValue = this.$root.dataset.currentCabang || '';
+
+            this.$nextTick(() => {
+                if (this.expandedKey) {
+                    this.initInlineSelects(this.expandedKey);
+                }
+
+                const target = this.$root.closest('form') || this.$root;
+                this.observer = new MutationObserver(() => this.refreshInlineSelects(100));
+                this.observer.observe(target, { childList: true, subtree: true });
+            });
+
+            this.registerInlineSelectRefreshHooks();
+
+            this.inlineSelectChangeHandler = (event) => {
+                const select = event.target?.closest?.('select[data-dt-po-inline-select]');
+                if (! select || ! this.$root.contains(select)) return;
+                if (this.isSelect2Managed(select)) return;
+
+                this.handleInlineSelectChange(select);
+            };
+
+            this.$root.addEventListener('change', this.inlineSelectChangeHandler);
+        },
+        destroy() {
+            this.observer?.disconnect();
+            if (this.inlineSelectChangeHandler) {
+                this.$root.removeEventListener('change', this.inlineSelectChangeHandler);
+            }
+            window.clearTimeout(this.select2RefreshTimer);
         },
         startLoading(message) {
             this.loadingMessage = message;
@@ -113,9 +153,16 @@
         async updateInlineItem(key, field, value, message = 'Menghitung item...') {
             this.startLoading(message);
             try {
-                return await this.$wire.updateInlinePurchaseOrderItemField(String(key), String(field), value);
+                const result = await this.$wire.updateInlinePurchaseOrderItemField(String(key), String(field), value);
+                this.$nextTick(() => {
+                    this.syncInlineSelect2Values(String(key));
+                    this.syncInlineMoneyInputs(String(key));
+                });
+
+                return result;
             } finally {
                 this.finishLoading();
+                this.refreshInlineSelects();
             }
         },
         async addItem() {
@@ -124,6 +171,9 @@
                 const key = await this.$wire.addInlinePurchaseOrderItem();
                 this.expandedKey = String(key);
                 window.__dtPoExpandedItemKey = this.expandedKey;
+                this.$nextTick(() => this.openItemWhenReady(key));
+                window.setTimeout(() => this.openItemWhenReady(key), 120);
+                this.refreshInlineSelects(120);
             } finally {
                 this.finishLoading();
             }
@@ -149,6 +199,265 @@
 
             this.expandedKey = String(key);
             window.__dtPoExpandedItemKey = this.expandedKey;
+            this.$nextTick(() => this.openItemWhenReady(this.expandedKey));
+        },
+        openItemWhenReady(key, attempt = 0) {
+            const row = this.$root.querySelector('[data-dt-po-row=' + CSS.escape(String(key)) + ']');
+
+            if (row || attempt >= 4) {
+                this.expandedKey = String(key);
+                window.__dtPoExpandedItemKey = this.expandedKey;
+                this.$nextTick(() => {
+                    this.initInlineSelects(this.expandedKey);
+                    this.syncInlineSelect2Values(this.expandedKey);
+                    this.syncInlineMoneyInputs(this.expandedKey);
+                    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+                return;
+            }
+
+            window.setTimeout(() => this.openItemWhenReady(key, attempt + 1), 120);
+        },
+        refreshInlineSelects(delay = 80) {
+            if (! this.expandedKey) return;
+
+            window.clearTimeout(this.select2RefreshTimer);
+            this.select2RefreshTimer = window.setTimeout(() => {
+                const editor = this.$root.querySelector('[data-dt-po-inline-editor=' + CSS.escape(String(this.expandedKey)) + ']');
+                if (editor?.querySelector('select[data-dt-select2-open]')) return;
+
+                this.$nextTick(() => {
+                    this.initInlineSelects(this.expandedKey);
+                    this.syncInlineSelect2Values(this.expandedKey);
+                    this.syncInlineMoneyInputs(this.expandedKey);
+                });
+            }, delay);
+        },
+        isSelect2Managed(select) {
+            if (! select) return false;
+
+            const jq = window.jQuery || window.$;
+
+            return Boolean(
+                select.nextElementSibling?.classList?.contains('select2')
+                || (jq && jq(select).data('select2'))
+            );
+        },
+        syncInlineSelect2Values(key = this.expandedKey) {
+            if (! key) return;
+
+            const editor = this.$root.querySelector('[data-dt-po-inline-editor=' + CSS.escape(String(key)) + ']');
+            const jq = window.jQuery || window.$;
+            if (! editor || ! jq?.fn?.select2) return;
+
+            editor
+                .querySelectorAll('select[data-dt-po-inline-select]')
+                .forEach((select) => {
+                    if (! jq(select).data('select2')) return;
+
+                    const renderedValue = select.value || '';
+                    jq(select).val(renderedValue).trigger('change.select2');
+                });
+        },
+        syncInlineMoneyInputs(key = this.expandedKey) {
+            if (! key) return;
+
+            const editor = this.$root.querySelector('[data-dt-po-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (! editor) return;
+
+            editor
+                .querySelectorAll('input[data-dt-po-inline-money]')
+                .forEach((input) => {
+                    const renderedValue = input.getAttribute('value');
+
+                    if (renderedValue !== null && input.value !== renderedValue) {
+                        input.value = renderedValue;
+                    }
+                });
+        },
+        registerInlineSelectRefreshHooks() {
+            if (window.__dtPoSelect2LivewireHooksRegistered) return;
+            window.__dtPoSelect2LivewireHooksRegistered = true;
+
+            const refreshNavigators = () => {
+                document
+                    .querySelectorAll('[data-dt-po-navigator]')
+                    .forEach((navigator) => {
+                        const alpine = navigator._x_dataStack?.[0];
+                        alpine?.refreshInlineSelects?.(120);
+                        alpine?.syncInlineSelect2Values?.();
+                        alpine?.syncInlineMoneyInputs?.();
+                    });
+            };
+
+            const registerLivewireHook = () => {
+                if (! window.Livewire || typeof window.Livewire.hook !== 'function') return;
+
+                window.Livewire.hook('message.processed', () => refreshNavigators());
+                window.Livewire.hook('morph.updated', () => refreshNavigators());
+            };
+
+            if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                registerLivewireHook();
+            } else {
+                document.addEventListener('livewire:load', registerLivewireHook, { once: true });
+                document.addEventListener('livewire:init', registerLivewireHook, { once: true });
+            }
+
+            document.addEventListener('filament:page:loaded', refreshNavigators);
+        },
+        ensureSelect2Assets() {
+            const existingJq = window.jQuery || window.$;
+            if (existingJq?.fn?.select2) {
+                window.jQuery = existingJq;
+                return Promise.resolve(existingJq);
+            }
+
+            if (window.__dtPoSelect2AssetsPromise) {
+                return window.__dtPoSelect2AssetsPromise;
+            }
+
+            const loadStyle = () => {
+                if (document.querySelector('link[data-dt-po-select2]')) return;
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css';
+                link.dataset.dtPoSelect2 = 'true';
+                document.head.appendChild(link);
+            };
+            const loadScript = (src, marker) => new Promise((resolve, reject) => {
+                const existing = document.querySelector('script[' + marker + ']');
+                if (existing) {
+                    if (existing.dataset.loaded === 'true') return resolve();
+                    existing.addEventListener('load', resolve, { once: true });
+                    existing.addEventListener('error', reject, { once: true });
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = src;
+                script.setAttribute(marker, 'true');
+                script.addEventListener('load', () => {
+                    script.dataset.loaded = 'true';
+                    resolve();
+                }, { once: true });
+                script.addEventListener('error', reject, { once: true });
+                document.head.appendChild(script);
+            });
+
+            window.__dtPoSelect2AssetsPromise = (async () => {
+                loadStyle();
+                if (! (window.jQuery || window.$)) {
+                    await loadScript('https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js', 'data-dt-po-jquery');
+                }
+                const jq = window.jQuery || window.$;
+                if (jq && ! window.jQuery) {
+                    window.jQuery = jq;
+                }
+                if (! jq?.fn?.select2) {
+                    await loadScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', 'data-dt-po-select2-script');
+                }
+                const loadedJq = window.jQuery || window.$;
+                if (! loadedJq?.fn?.select2) {
+                    throw new Error('Select2 assets loaded but jQuery/select2 global is unavailable.');
+                }
+
+                window.jQuery = loadedJq;
+                return loadedJq;
+            })();
+
+            return window.__dtPoSelect2AssetsPromise;
+        },
+        async initInlineSelects(key) {
+            const editor = this.$root.querySelector('[data-dt-po-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (! editor) return;
+
+            let jq;
+            try {
+                jq = await this.ensureSelect2Assets();
+            } catch (error) {
+                console.warn('Select2 inline PO tidak dapat dimuat; memakai native select.', error);
+                return;
+            }
+
+            editor.querySelectorAll('select[data-dt-po-inline-select]').forEach((element) => {
+                const $select = jq(element);
+                const searchMethod = element.dataset.searchMethod;
+                const hasRenderedSelect2 = element.nextElementSibling?.classList?.contains('select2');
+
+                if ($select.data('select2') && ! hasRenderedSelect2) {
+                    try {
+                        $select.select2('destroy');
+                    } catch (error) {
+                        $select.removeData('select2');
+                    }
+                }
+
+                if (! $select.data('select2')) {
+                    $select.select2({
+                        width: '100%',
+                        allowClear: true,
+                        placeholder: element.dataset.placeholder || 'Pilih data',
+                        dropdownParent: jq(document.body),
+                        dropdownCssClass: 'dt-po-inline-select2-dropdown',
+                        ajax: {
+                            delay: 250,
+                            transport: (params, success, failure) => {
+                                const search = params.data?.term || '';
+                                const request = searchMethod === 'products'
+                                    ? this.$wire.searchInlinePurchaseOrderProducts(search)
+                                    : this.$wire.searchInlinePurchaseOrderCurrencies(search);
+
+                                Promise.resolve(request)
+                                    .then((results) => success({ results: results || [] }))
+                                    .catch(failure);
+
+                                return { abort() {} };
+                            },
+                            processResults: (data) => data,
+                        },
+                    });
+                }
+
+                $select.off('.dtPoInline');
+                $select.on('select2:open.dtPoInline', () => {
+                    element.setAttribute('data-dt-select2-open', 'true');
+                });
+                $select.on('select2:close.dtPoInline', () => {
+                    element.removeAttribute('data-dt-select2-open');
+                });
+                $select.on('select2:select.dtPoInline', (event) => {
+                    this.handleInlineSelectChange(element, event.params?.data?.id ?? element.value);
+                });
+                $select.on('select2:clear.dtPoInline', () => {
+                    this.handleInlineSelectChange(element, '');
+                });
+            });
+
+            this.syncInlineSelect2Values(key);
+        },
+        async handleInlineSelectChange(select, forcedValue = null) {
+            if (! select || select.dataset.dtSelect2Updating === 'true') return;
+
+            const editor = select.closest('[data-dt-po-inline-editor]');
+            const key = editor?.dataset?.dtPoInlineEditor;
+            const field = select.dataset.field;
+
+            if (! key || ! field) return;
+
+            select.setAttribute('data-dt-select2-updating', 'true');
+
+            const label = field
+                .replace('_id', '')
+                .replace('currency', 'mata uang');
+
+            try {
+                await this.updateInlineItem(key, field, forcedValue ?? select.value, 'Memperbarui ' + label + '...');
+            } finally {
+                window.setTimeout(() => {
+                    select.removeAttribute('data-dt-select2-updating');
+                }, 0);
+            }
         },
     }"
     x-bind:aria-busy="isLoading.toString()"
@@ -252,7 +561,12 @@
             </thead>
             <tbody>
                 @forelse ($rows as $row)
-                    <tr class="dt-po-row" x-bind:class="{ 'is-expanded': expandedKey === @js($row['key']) }">
+                    <tr
+                        class="dt-po-row"
+                        data-dt-po-row="{{ $row['key'] }}"
+                        wire:key="dt-po-row-{{ $row['key'] }}"
+                        x-bind:class="{ 'is-expanded': expandedKey === @js($row['key']) }"
+                    >
                         <td class="dt-po-expand-col">
                             <button type="button" class="dt-po-expand" x-on:click="toggleDetail(@js($row['key']))">
                                 <span x-show="expandedKey !== @js($row['key'])">+</span>
@@ -271,18 +585,25 @@
                             <button type="button" class="dt-po-icon-button danger" x-on:click="removeItem(@js($row['key']))" @disabled($row['is_order_request_backed']) title="Hapus item">x</button>
                         </td>
                     </tr>
-                    <tr class="dt-po-detail-row" x-show="expandedKey === @js($row['key'])" x-cloak>
+                    <tr class="dt-po-detail-row" wire:key="dt-po-detail-{{ $row['key'] }}" x-show="expandedKey === @js($row['key'])" x-cloak>
                         <td colspan="10">
                             <div class="dt-po-detail-card">
                                 <div class="dt-po-detail-summary">
                                     <strong>{{ $row['product'] }}</strong>
                                     <span class="dt-po-badge {{ $row['is_order_request_backed'] ? '' : 'manual' }}">{{ $row['source'] }}</span>
                                 </div>
-                                <div class="dt-po-inline-editor">
+                                <div class="dt-po-inline-editor" data-dt-po-inline-editor="{{ $row['key'] }}">
                                     <div class="dt-po-inline-grid">
                                         <div class="dt-po-inline-field wide">
                                             <label>Product</label>
-                                            <select class="dt-po-inline-select" x-on:change="updateInlineItem(@js($row['key']), 'product_id', $event.target.value, 'Memperbarui product...')" @disabled($row['is_order_request_backed'])>
+                                            <select
+                                                class="dt-po-inline-select"
+                                                data-dt-po-inline-select
+                                                data-field="product_id"
+                                                data-search-method="products"
+                                                data-placeholder="Pilih product"
+                                                @disabled($row['is_order_request_backed'])
+                                            >
                                                 <option value="">Pilih product</option>
                                                 @foreach ($row['product_options'] as $id => $label)
                                                     <option value="{{ $id }}" @selected((string) $row['product_id'] === (string) $id)>{{ $label }}</option>
@@ -299,7 +620,14 @@
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Mata Uang</label>
-                                            <select class="dt-po-inline-select" x-on:change="updateInlineItem(@js($row['key']), 'currency_id', $event.target.value, 'Memperbarui mata uang...')" @disabled($row['is_order_request_backed'])>
+                                            <select
+                                                class="dt-po-inline-select"
+                                                data-dt-po-inline-select
+                                                data-field="currency_id"
+                                                data-search-method="currencies"
+                                                data-placeholder="Pilih mata uang"
+                                                @disabled($row['is_order_request_backed'])
+                                            >
                                                 <option value="">Pilih mata uang</option>
                                                 @foreach ($row['currency_options'] as $id => $label)
                                                     <option value="{{ $id }}" @selected((string) $row['currency_id'] === (string) $id)>{{ $label }}</option>
@@ -310,7 +638,7 @@
                                             <label>Unit Price</label>
                                             <div class="dt-po-money-wrap">
                                                 <span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span>
-                                                <input type="text" class="dt-po-inline-input" value="{{ $row['unit_price'] }}" readonly>
+                                                <input type="text" class="dt-po-inline-input" value="{{ $row['unit_price'] }}" data-dt-po-inline-money readonly>
                                             </div>
                                         </div>
                                         <div class="dt-po-inline-field">
@@ -331,19 +659,19 @@
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Discount nominal</label>
-                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['discount_nominal'] }}" readonly></div>
+                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['discount_nominal'] }}" data-dt-po-inline-money readonly></div>
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Tax nominal</label>
-                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['tax_nominal'] }}" readonly></div>
+                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['tax_nominal'] }}" data-dt-po-inline-money readonly></div>
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Total</label>
-                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['total'] }}" readonly></div>
+                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['total'] }}" data-dt-po-inline-money readonly></div>
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Subtotal</label>
-                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['subtotal'] }}" readonly></div>
+                                            <div class="dt-po-money-wrap"><span class="dt-po-money-prefix">{{ $row['currency_symbol'] }}</span><input type="text" class="dt-po-inline-input" value="{{ $row['subtotal'] }}" data-dt-po-inline-money readonly></div>
                                         </div>
                                     </div>
                                 </div>
@@ -351,7 +679,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td class="dt-po-empty" colspan="10">Belum ada item. Klik Tambah Item untuk mulai mengisi Purchase Order.</td></tr>
+                    <tr wire:key="dt-po-empty-row"><td class="dt-po-empty" colspan="10">Belum ada item. Klik Tambah Item untuk mulai mengisi Purchase Order.</td></tr>
                 @endforelse
             </tbody>
         </table>
