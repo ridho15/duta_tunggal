@@ -2,16 +2,29 @@
 
 use App\Filament\Resources\OrderRequestResource;
 
-test('large order request editor is limited to edit operations with at least 25 items', function () {
-    expect(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 24, []), 'edit'))->toBeFalse()
+test('order request navigator is used for every create and edit form with at least one item', function () {
+    expect(OrderRequestResource::usesLargeOrderRequestItemEditor([], 'edit'))->toBeFalse()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor([], 'create'))->toBeFalse()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 1, []), 'edit'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 10, []), 'edit'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 24, []), 'edit'))->toBeTrue()
         ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 25, []), 'edit'))->toBeTrue()
-        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 120, []), 'create'))->toBeFalse();
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 1, []), 'create'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 120, []), 'create'))->toBeTrue()
+        ->and(OrderRequestResource::usesLargeOrderRequestItemEditor(array_fill(0, 1, []), 'view'))->toBeFalse();
+});
+
+test('order request money formatting keeps decimal numeric values precise', function () {
+    expect(OrderRequestResource::formatMoneyInputState(0.675))->toBe('0,68')
+        ->and(OrderRequestResource::formatMoneyInputStateForCurrency(0.675, null))->toBe('0,68');
 });
 
 test('large order request navigator keeps server pagination and single editor controls', function () {
     $projectRoot = dirname(__DIR__, 2);
     $resource = file_get_contents($projectRoot . '/app/Filament/Resources/OrderRequestResource.php');
+    $createPage = file_get_contents($projectRoot . '/app/Filament/Resources/OrderRequestResource/Pages/CreateOrderRequest.php');
     $editPage = file_get_contents($projectRoot . '/app/Filament/Resources/OrderRequestResource/Pages/EditOrderRequest.php');
+    $inlineTrait = file_get_contents($projectRoot . '/app/Filament/Resources/OrderRequestResource/Pages/Concerns/InteractsWithInlineOrderRequestItems.php');
     $navigator = file_get_contents($projectRoot . '/resources/views/filament/forms/order-request-item-navigator.blade.php');
     $relationManager = file_get_contents($projectRoot . '/app/Filament/Resources/OrderRequestResource/RelationManagers/OrderRequestItemsRelationManager.php');
 
@@ -66,7 +79,7 @@ test('large order request navigator keeps server pagination and single editor co
         ->and($navigator)->not->toContain('const commit = this.$wire.set(model, value)')
         ->and($navigator)->not->toContain('data-dt-or-editor-mount')
         ->and($navigator)->not->toContain('dt-item-editor-mount')
-        ->and($navigator)->not->toContain('appendChild')
+        ->and($navigator)->not->toContain('appendChild(item)')
         ->and($navigator)->toContain('collapseAll()')
         ->and($navigator)->toContain('loadingMessage:')
         ->and($navigator)->toContain('async runNavigatorRequest(message, callback)')
@@ -90,7 +103,9 @@ test('large order request navigator keeps server pagination and single editor co
         ->and($navigator)->toContain("'Menghapus filter…'")
         ->and($navigator)->toContain("'Menghapus item…'")
         ->and($navigator)->toContain("'Menambahkan item…'")
-        ->and($editPage)->toContain('public function addInlineOrderRequestItem(): string')
+        ->and($createPage)->toContain('InteractsWithInlineOrderRequestItems')
+        ->and($editPage)->toContain('InteractsWithInlineOrderRequestItems')
+        ->and($inlineTrait)->toContain('public function addInlineOrderRequestItem(): string')
         ->and($navigator)->toContain('const newKey = await this.$wire.addInlineOrderRequestItem()')
         ->and($navigator)->toContain('this.showAddFeedback(newKey)')
         ->and($navigator)->not->toContain('addButton.click()')
@@ -116,6 +131,24 @@ test('large order request navigator keeps server pagination and single editor co
         ->and($navigator)->toContain('data-dt-inline-product')
         ->and($navigator)->toContain('data-dt-inline-supplier')
         ->and($navigator)->toContain('data-dt-inline-cabang')
+        ->and($navigator)->toContain('data-dt-inline-currency')
+        ->and($navigator)->toContain('data-dt-inline-currency-rate')
+        ->and($navigator)->toContain('data-dt-inline-original-price-idr')
+        ->and($navigator)->toContain('data-dt-inline-unit-price-idr')
+        ->and($navigator)->toContain('data-dt-inline-subtotal-idr')
+        ->and($navigator)->toContain('data-dt-inline-select')
+        ->and($navigator)->toContain('inlineSelectChangeHandler')
+        ->and($navigator)->toContain("select[data-dt-inline-select]")
+        ->and($navigator)->toContain('this.updateInlineItem(key, field, select.value')
+        ->and($navigator)->toContain('searchInlineOrderRequestProducts')
+        ->and($navigator)->toContain('searchInlineOrderRequestSuppliers')
+        ->and($navigator)->toContain('searchInlineOrderRequestCabangs')
+        ->and($navigator)->toContain('searchInlineOrderRequestCurrencies')
+        ->and($navigator)->toContain('select2({')
+        ->and($navigator)->toContain('dt-item-money-prefix')
+        ->and($navigator)->toContain('dt-item-money-helper')
+        ->and($navigator)->toContain('dt-item-currency-helper')
+        ->and($navigator)->toContain('Rekomendasi:')
         ->and($navigator)->toContain('dt-item-inline-select')
         ->and($navigator)->toContain('appearance:none')
         ->and($navigator)->toContain('background-repeat:no-repeat')
@@ -125,11 +158,20 @@ test('large order request navigator keeps server pagination and single editor co
         ->and($navigator)->toContain('data-dt-inline-discount')
         ->and($navigator)->toContain('data-dt-inline-tax-type')
         ->and($navigator)->toContain('data-dt-inline-subtotal')
+        ->and($navigator)->not->toContain("'original_price', \$event.target.value")
+        ->and($navigator)->not->toContain("'unit', \$event.target.value")
+        ->and($navigator)->not->toContain("'tax', \$event.target.value")
+        ->and($navigator)->not->toContain('required_date')
+        ->and($navigator)->not->toContain('Required date')
+        ->and($editPage)->not->toContain("'required_date'")
+        ->and($inlineTrait)->not->toContain("'required_date'")
         ->and($navigator)->toContain('updateInlineItem(@js($row')
         ->and($navigator)->toContain('Cabang:')
         ->and($navigator)->toContain('Available stock:')
         ->and($navigator)->toContain('Total Items:')
-        ->and($navigator)->toContain('Total Subtotal (IDR)')
+        ->and($navigator)->toContain('$footerTotalLabel')
+        ->and($navigator)->toContain('$footerTotalValue')
+        ->and($resource)->toContain("'footerTotalHelper' => \$footerTotalHelper")
         ->and($navigator)->toContain('$pageNumbers as $pageNumber')
         ->and($navigator)->toContain('dt-item-more')
         ->and($navigator)->not->toContain('dt-item-grid')
@@ -139,12 +181,12 @@ test('large order request navigator keeps server pagination and single editor co
         ->and($navigator)->not->toContain('data-dt-or-close-editor')
         ->and($navigator)->toContain('data-dt-or-add-navigator')
         ->and($navigator)->toContain('[aria-invalid=true]')
-        ->and($editPage)->toContain('public function removeInlineOrderRequestItem(string $itemKey): bool')
-        ->and($editPage)->toContain("count(\$items) <= 1")
-        ->and($editPage)->toContain('inlineOrderRequestItemIsLocked')
-        ->and($editPage)->toContain('Item sudah dipakai pada proses pembelian.')
-        ->and($editPage)->toContain('PurchaseOrderItem::withoutGlobalScopes()')
-        ->and($editPage)->toContain("\$this->data['orderRequestItem'] = \$items")
+        ->and($inlineTrait)->toContain('public function removeInlineOrderRequestItem(string $itemKey): bool')
+        ->and($inlineTrait)->toContain("count(\$items) <= 1")
+        ->and($inlineTrait)->toContain('inlineOrderRequestItemIsLocked')
+        ->and($inlineTrait)->toContain('Item sudah dipakai pada proses pembelian.')
+        ->and($inlineTrait)->toContain('PurchaseOrderItem::withoutGlobalScopes()')
+        ->and($inlineTrait)->toContain("\$this->data['orderRequestItem'] = \$items")
         ->and($resource)->toContain("'activeFilterCount' => \$activeFilterCount")
         ->and($resource)->toContain("'pageNumbers' => \$pageNumbers")
         ->and($resource)->toContain("'available_stock'")

@@ -355,6 +355,156 @@ it('resolves product supplier options and auto-selects supplier when product cha
         ->assertSet('data.orderRequestItem.0.supplier_id', $this->supplier->id);
 });
 
+it('orders linked product suppliers by lowest price before alphabetical fallback suppliers', function () {
+    $expensive = Supplier::factory()->create([
+        'perusahaan' => 'Beta Supplier',
+        'cabang_id' => $this->cabang->id,
+    ]);
+    $cheapest = Supplier::factory()->create([
+        'perusahaan' => 'Zeta Recommended Supplier',
+        'cabang_id' => $this->cabang->id,
+    ]);
+    $alphabeticalFallback = Supplier::factory()->create([
+        'perusahaan' => 'Alpha General Supplier',
+        'cabang_id' => $this->cabang->id,
+    ]);
+    $product = Product::factory()->forCabang($this->cabang)->create([
+        'supplier_id' => $expensive->id,
+    ]);
+
+    $product->suppliers()->syncWithoutDetaching([
+        $expensive->id => ['supplier_price' => 150000],
+        $cheapest->id => ['supplier_price' => 100000],
+    ]);
+
+    $options = OrderRequestResource::resolveSupplierOptions(
+        $product->id,
+        null,
+        50,
+        $this->defaultCurrency->id
+    );
+    $keys = array_keys($options);
+
+    expect($keys[0])->toBe($cheapest->id)
+        ->and($keys[1])->toBe($expensive->id)
+        ->and(array_search($alphabeticalFallback->id, $keys, true))->toBeGreaterThan(1)
+        ->and($options[$cheapest->id])->toContain('Rp 100.000');
+});
+
+it('keeps inline UOM and original price server controlled and recalculates currency values', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => 'USD',
+        'code' => 'USD',
+        'to_rupiah' => 16000,
+    ]);
+    $uom = UnitOfMeasure::factory()->create(['abbreviation' => 'box']);
+    $product = Product::factory()->forCabang($this->cabang)->create([
+        'supplier_id' => $this->supplier->id,
+        'uom_id' => $uom->id,
+        'cost_price' => 160000,
+        'pajak' => 11,
+    ]);
+    $product->suppliers()->syncWithoutDetaching([
+        $this->supplier->id => ['supplier_price' => 160000],
+    ]);
+    $or = OrderRequest::factory()->create([
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'currency_id' => $this->defaultCurrency->id,
+        'quantity' => 1,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'eklusif',
+        'subtotal' => 1110,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(EditOrderRequest::class, ['record' => $or->getKey()]);
+    $items = $component->get('data.orderRequestItem');
+    $key = (string) array_key_first($items);
+
+    $component
+        ->call('updateInlineOrderRequestItemField', $key, 'product_id', $product->id)
+        ->call('updateInlineOrderRequestItemField', $key, 'unit', 'hacked-uom')
+        ->call('updateInlineOrderRequestItemField', $key, 'original_price', '1,00')
+        ->call('updateInlineOrderRequestItemField', $key, 'required_date', '2026-06-24');
+
+    $item = $component->get("data.orderRequestItem.{$key}");
+
+    expect($item['unit'])->toBe('box')
+        ->and($item['original_price'])->toBe('160.000,00')
+        ->and($item['unit_price'])->toBe('160.000,00')
+        ->and(array_key_exists('required_date', $item))->toBeFalse();
+
+    $component
+        ->call('updateInlineOrderRequestItemField', $key, 'quantity', 2)
+        ->call('updateInlineOrderRequestItemField', $key, 'discount', 10)
+        ->call('updateInlineOrderRequestItemField', $key, 'currency_id', $usd->id);
+
+    $item = $component->get("data.orderRequestItem.{$key}");
+
+    expect($item['currency_id'])->toBe($usd->id)
+        ->and($item['original_price'])->toBe('10,00')
+        ->and($item['unit_price'])->toBe('10,00')
+        ->and((float) $item['original_price_idr'])->toBe(160000.0)
+        ->and((float) $item['unit_price_idr'])->toBe(160000.0)
+        ->and($item['discount_nominal'])->toBe('2,00')
+        ->and($item['tax_nominal'])->toBe('1,98')
+        ->and($item['subtotal'])->toBe('19,98');
+});
+
+it('shows foreign currency rate and IDR equivalents in inline navigator', function () {
+    $usd = Currency::factory()->create([
+        'name' => 'US Dollar',
+        'symbol' => 'USD',
+        'code' => 'USD',
+        'to_rupiah' => 16000,
+    ]);
+    $product = Product::factory()->forCabang($this->cabang)->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'cost_price' => 160000,
+    ]);
+
+    $html = OrderRequestResource::renderLargeItemSummary([
+        'demo-key' => [
+            'product_id' => $product->id,
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'currency_id' => $usd->id,
+            'quantity' => 2,
+            'unit' => 'pcs',
+            'original_price' => '10,00',
+            'unit_price' => '10,00',
+            'original_price_idr' => 160000,
+            'unit_price_idr' => 160000,
+            'discount' => 10,
+            'discount_nominal' => '2,00',
+            'tax' => 11,
+            'tax_nominal' => '1,98',
+            'tipe_pajak' => 'eklusif',
+            'total' => '20,00',
+            'subtotal' => '19,98',
+            'note' => 'Foreign currency preview',
+        ],
+    ])->render();
+
+    expect($html)->toContain('Kurs:')
+        ->and($html)->toContain('1 USD = Rp 16.000,00')
+        ->and($html)->toContain('USD 10,00')
+        ->and($html)->toContain('≈ Rp 160.000,00')
+        ->and($html)->not->toContain('Required date')
+        ->and($html)->not->toContain('required_date');
+});
+
 it('formats original and override prices after product and supplier are selected', function () {
     $secondarySupplier = Supplier::factory()->create(['cabang_id' => $this->cabang->id]);
     $product = Product::factory()->forCabang($this->cabang)->create([
@@ -1240,6 +1390,71 @@ it('adds an inline order request item through edit state and can remove it befor
     $component->call('removeInlineOrderRequestItem', (string) $newKey);
 
     expect($component->get('data.orderRequestItem'))->toHaveCount(120);
+});
+
+it('adds an inline order request item through create state and can remove it before save', function () {
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->set('data.orderRequestItem', [
+            'existing' => [
+                'product_id' => null,
+                'supplier_id' => null,
+                'cabang_id' => null,
+                'quantity' => 1,
+                'fulfilled_quantity' => 0,
+                'unit' => '-',
+                'original_price' => '0,00',
+                'unit_price' => '0,00',
+                'original_price_idr' => 0,
+                'unit_price_idr' => 0,
+                'discount' => 0,
+                'discount_nominal' => '0,00',
+                'tax' => 11,
+                'tax_nominal' => '0,00',
+                'tipe_pajak' => 'eklusif',
+                'total' => '0,00',
+                'total_cost' => '0,00',
+                'subtotal' => '0,00',
+                'note' => '',
+                'currency_id' => $this->defaultCurrency->id,
+            ],
+        ])
+        ->set('data._order_request_item_search', 'hidden filter')
+        ->set('data._order_request_item_supplier_filter', $this->supplier->id)
+        ->set('data._order_request_item_cabang_filter', $this->cabang->id)
+        ->set('data._order_request_item_tax_filter', 'inklusif');
+
+    $component->call('addInlineOrderRequestItem');
+
+    $items = $component->get('data.orderRequestItem');
+    $newKey = array_key_first($items);
+
+    expect($items)->toHaveCount(2)
+        ->and($newKey)->toStartWith('inline-')
+        ->and($items[$newKey]['quantity'])->toBe(1)
+        ->and($items[$newKey]['currency_id'])->toBe($this->defaultCurrency->id)
+        ->and($component->get('data._order_request_item_page'))->toBe(1)
+        ->and($component->get('data._order_request_item_search'))->toBeNull()
+        ->and($component->get('data._order_request_item_supplier_filter'))->toBeNull()
+        ->and($component->get('data._order_request_item_cabang_filter'))->toBeNull()
+        ->and($component->get('data._order_request_item_tax_filter'))->toBeNull();
+
+    $component
+        ->call('updateInlineOrderRequestItemField', (string) $newKey, 'product_id', $this->product->id)
+        ->call('updateInlineOrderRequestItemField', (string) $newKey, 'quantity', 2)
+        ->call('updateInlineOrderRequestItemField', (string) $newKey, 'unit_price', '100.000,00');
+
+    $updatedItems = $component->get('data.orderRequestItem');
+
+    expect($updatedItems[$newKey]['product_id'])->toBe($this->product->id)
+        ->and((float) $updatedItems[$newKey]['quantity'])->toBe(2.0)
+        ->and($updatedItems[$newKey]['total'])->toBe('200.000,00')
+        ->and($updatedItems[$newKey]['subtotal'])->not->toBe('0,00');
+
+    $component->call('removeInlineOrderRequestItem', (string) $newKey);
+
+    expect($component->get('data.orderRequestItem'))->toHaveCount(1)
+        ->and(array_key_first($component->get('data.orderRequestItem')))->toBe('existing');
 });
 
 it('does not remove an inline order request item that is already referenced by purchase order', function () {

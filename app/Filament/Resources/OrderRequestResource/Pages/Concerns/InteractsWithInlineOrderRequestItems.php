@@ -1,0 +1,348 @@
+<?php
+
+namespace App\Filament\Resources\OrderRequestResource\Pages\Concerns;
+
+use App\Filament\Resources\OrderRequestResource;
+use App\Models\Cabang;
+use App\Models\Currency;
+use App\Models\OrderRequestItem;
+use App\Models\Product;
+use App\Models\PurchaseOrderItem;
+use App\Models\Supplier;
+use App\Support\CurrencyConversionResolver;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+
+trait InteractsWithInlineOrderRequestItems
+{
+    public function updateInlineOrderRequestItemField(string $itemKey, string $field, mixed $value): void
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+
+        if (! is_array($items) || ! array_key_exists($itemKey, $items)) {
+            return;
+        }
+
+        $allowedFields = [
+            'product_id',
+            'supplier_id',
+            'cabang_id',
+            'currency_id',
+            'quantity',
+            'unit_price',
+            'discount',
+            'tipe_pajak',
+            'note',
+        ];
+
+        if (! in_array($field, $allowedFields, true)) {
+            return;
+        }
+
+        $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+        $normalizedValue = is_string($value) ? trim($value) : $value;
+
+        if (in_array($field, ['product_id', 'supplier_id', 'cabang_id', 'currency_id'], true)) {
+            $normalizedValue = filled($normalizedValue) && is_numeric($normalizedValue) ? (int) $normalizedValue : null;
+        }
+
+        if (in_array($field, ['quantity', 'discount'], true)) {
+            $normalizedValue = is_numeric($normalizedValue) ? (float) $normalizedValue : 0;
+        }
+
+        if ($field === 'tipe_pajak') {
+            $normalizedValue = OrderRequestResource::normalizeItemTaxType((string) $normalizedValue);
+        }
+
+        $oldCurrencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+        $item[$field] = $normalizedValue;
+
+        if ($field === 'product_id' && $normalizedValue) {
+            $product = Product::query()->with('uom')->find($normalizedValue);
+
+            if ($product) {
+                $supplierId = OrderRequestResource::resolveProductSupplierId((int) $normalizedValue);
+
+                $supplierProduct = $supplierId
+                    ? $product->suppliers()->where('suppliers.id', $supplierId)->first()
+                    : null;
+
+                $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product->cost_price ?? 0);
+                $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+                $displayPrice = OrderRequestResource::convertIdrToCurrency($rawIdrPrice, $currencyId, false);
+
+                $item['supplier_id'] = $supplierId;
+                $item['unit'] = $product->uom?->abbreviation ?? $product->uom?->name ?? '-';
+                $item['cabang_id'] = $product->cabang_id ?? Supplier::find($supplierId)?->cabang_id ?? Auth::user()?->cabang_id;
+                $item['original_price'] = OrderRequestResource::formatMoneyInputStateForCurrency($displayPrice, $currencyId);
+                $item['unit_price'] = OrderRequestResource::formatMoneyInputStateForCurrency($displayPrice, $currencyId);
+                $item['original_price_idr'] = number_format($rawIdrPrice, 2, '.', '');
+                $item['unit_price_idr'] = number_format($rawIdrPrice, 2, '.', '');
+                $item['tax'] = OrderRequestResource::resolveItemTaxRate(
+                    (int) $normalizedValue,
+                    $item['tipe_pajak'] ?? 'eklusif'
+                );
+            }
+        }
+
+        if ($field === 'supplier_id' && filled($normalizedValue) && filled($item['product_id'] ?? null)) {
+            $product = Product::withoutGlobalScope('product_cabang')->find($item['product_id']);
+            $supplierProduct = $product?->suppliers()->where('suppliers.id', $normalizedValue)->first();
+            $rawIdrPrice = (float) ($supplierProduct?->pivot->supplier_price ?? $product?->cost_price ?? 0);
+
+            if ($rawIdrPrice > 0) {
+                $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+                $displayPrice = OrderRequestResource::convertIdrToCurrency($rawIdrPrice, $currencyId, false);
+                $item['original_price'] = OrderRequestResource::formatMoneyInputStateForCurrency($displayPrice, $currencyId);
+                $item['unit_price'] = OrderRequestResource::formatMoneyInputStateForCurrency($displayPrice, $currencyId);
+                $item['original_price_idr'] = number_format($rawIdrPrice, 2, '.', '');
+                $item['unit_price_idr'] = number_format($rawIdrPrice, 2, '.', '');
+            }
+        }
+
+        if ($field === 'currency_id') {
+            $newCurrencyId = is_numeric($normalizedValue) ? (int) $normalizedValue : null;
+            $unitPriceIdr = (float) ($item['unit_price_idr'] ?? 0);
+            $originalPriceIdr = (float) ($item['original_price_idr'] ?? 0);
+
+            if ($unitPriceIdr <= 0) {
+                $unitPriceIdr = CurrencyConversionResolver::convertToIdr(
+                    OrderRequestResource::parseCurrencyState($item['unit_price'] ?? 0),
+                    $oldCurrencyId,
+                    false
+                );
+            }
+
+            if ($originalPriceIdr <= 0) {
+                $originalPriceIdr = CurrencyConversionResolver::convertToIdr(
+                    OrderRequestResource::parseCurrencyState($item['original_price'] ?? 0),
+                    $oldCurrencyId,
+                    false
+                );
+            }
+
+            $item['unit_price_idr'] = number_format($unitPriceIdr, 2, '.', '');
+            $item['original_price_idr'] = number_format($originalPriceIdr, 2, '.', '');
+            $item['unit_price'] = OrderRequestResource::formatMoneyInputStateForCurrency(
+                OrderRequestResource::convertIdrToCurrency($unitPriceIdr, $newCurrencyId, false),
+                $newCurrencyId
+            );
+            $item['original_price'] = OrderRequestResource::formatMoneyInputStateForCurrency(
+                OrderRequestResource::convertIdrToCurrency($originalPriceIdr, $newCurrencyId, false),
+                $newCurrencyId
+            );
+        }
+
+        if ($field === 'unit_price') {
+            $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+            $item['unit_price_idr'] = OrderRequestResource::resolveOverrideAnchorFromInput($normalizedValue, $currencyId);
+        }
+
+        if ($field === 'tipe_pajak') {
+            $item['tax'] = OrderRequestResource::resolveItemTaxRate(
+                is_numeric($item['product_id'] ?? null) ? (int) $item['product_id'] : null,
+                (string) $normalizedValue
+            );
+        }
+
+        $item = OrderRequestResource::recalculateOrderRequestItemPreviewState($item);
+
+        $items[$itemKey] = $item;
+        $this->data['orderRequestItem'] = $items;
+    }
+
+    public function searchInlineOrderRequestProducts(string $search = ''): array
+    {
+        return collect(OrderRequestResource::resolveProductOptions($search, 50))
+            ->map(fn (string $text, int|string $id) => ['id' => (string) $id, 'text' => $text])
+            ->values()
+            ->all();
+    }
+
+    public function searchInlineOrderRequestSuppliers(
+        ?int $productId = null,
+        ?int $currencyId = null,
+        string $search = ''
+    ): array {
+        return collect(OrderRequestResource::resolveSupplierOptions($productId, $search, 50, $currencyId))
+            ->map(fn (string $text, int|string $id) => ['id' => (string) $id, 'text' => $text])
+            ->values()
+            ->all();
+    }
+
+    public function searchInlineOrderRequestCabangs(string $search = ''): array
+    {
+        $user = Auth::user();
+        $manageType = $user?->manage_type ?? [];
+        $query = Cabang::query();
+
+        if (! (is_array($manageType) && in_array('all', $manageType, true))) {
+            $query->whereKey($user?->cabang_id);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($cabangQuery) use ($search) {
+                $cabangQuery->where('kode', 'like', "%{$search}%")
+                    ->orWhere('nama', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderBy('kode')
+            ->limit(50)
+            ->get(['id', 'kode', 'nama'])
+            ->map(fn (Cabang $cabang) => [
+                'id' => (string) $cabang->id,
+                'text' => "({$cabang->kode}) {$cabang->nama}",
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function searchInlineOrderRequestCurrencies(string $search = ''): array
+    {
+        return Currency::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($currencyQuery) use ($search) {
+                    $currencyQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('symbol', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'code', 'symbol'])
+            ->map(fn (Currency $currency) => [
+                'id' => (string) $currency->id,
+                'text' => trim("{$currency->name} ({$currency->code} / {$currency->symbol})"),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function addInlineOrderRequestItem(): string
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+        $items = is_array($items) ? $items : [];
+
+        do {
+            $itemKey = 'inline-' . (string) Str::uuid();
+        } while (array_key_exists($itemKey, $items));
+
+        $currencyId = is_numeric(data_get($this->data, 'currency_id'))
+            ? (int) data_get($this->data, 'currency_id')
+            : CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
+
+        $newItem = [
+            'product_id' => null,
+            'supplier_id' => null,
+            'cabang_id' => null,
+            'quantity' => 1,
+            'fulfilled_quantity' => 0,
+            'unit' => '-',
+            'original_price' => '0,00',
+            'unit_price' => '0,00',
+            'original_price_idr' => 0,
+            'unit_price_idr' => 0,
+            'discount' => 0,
+            'discount_nominal' => '0,00',
+            'tax' => 11,
+            'tax_nominal' => '0,00',
+            'tipe_pajak' => 'eklusif',
+            'total' => '0,00',
+            'total_cost' => '0,00',
+            'subtotal' => '0,00',
+            'note' => '',
+            'currency_id' => $currencyId,
+        ];
+
+        $this->data['orderRequestItem'] = [$itemKey => $newItem] + $items;
+        $this->data['_order_request_item_search'] = null;
+        $this->data['_order_request_item_supplier_filter'] = null;
+        $this->data['_order_request_item_cabang_filter'] = null;
+        $this->data['_order_request_item_tax_filter'] = null;
+        $this->data['_order_request_item_page'] = 1;
+
+        return $itemKey;
+    }
+
+    public function removeInlineOrderRequestItem(string $itemKey): bool
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+
+        if (! is_array($items) || ! array_key_exists($itemKey, $items)) {
+            return false;
+        }
+
+        if (count($items) <= 1) {
+            Notification::make()
+                ->warning()
+                ->title('Item tidak dapat dihapus')
+                ->body('Order Request harus memiliki setidaknya satu item.')
+                ->send();
+
+            return false;
+        }
+
+        $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+        $itemId = filled($item['id'] ?? null) && is_numeric($item['id']) ? (int) $item['id'] : null;
+
+        if ($itemId && $this->inlineOrderRequestItemIsLocked($itemId, $item)) {
+            Notification::make()
+                ->warning()
+                ->title('Item tidak dapat dihapus')
+                ->body('Item sudah dipakai pada proses pembelian.')
+                ->send();
+
+            return false;
+        }
+
+        unset($items[$itemKey]);
+
+        $pageSize = (int) data_get($this->data, '_order_request_item_page_size', 10);
+        $pageSize = in_array($pageSize, [10, 25, 50, 100], true) ? $pageSize : 10;
+        $lastPage = max(1, (int) ceil(count($items) / $pageSize));
+        $currentPage = max(1, (int) data_get($this->data, '_order_request_item_page', 1));
+
+        if ($currentPage > $lastPage) {
+            $this->data['_order_request_item_page'] = $lastPage;
+        }
+
+        $this->data['orderRequestItem'] = $items;
+
+        Notification::make()
+            ->success()
+            ->title('Item dihapus dari form')
+            ->body($this->inlineOrderRequestItemDeletedNotificationBody())
+            ->send();
+
+        return true;
+    }
+
+    protected function inlineOrderRequestItemIsLocked(int $itemId, array $item): bool
+    {
+        if ((float) ($item['fulfilled_quantity'] ?? 0) > 0) {
+            return true;
+        }
+
+        $orderRequestItem = OrderRequestItem::withoutGlobalScopes()->find($itemId);
+
+        if ($orderRequestItem && (float) ($orderRequestItem->fulfilled_quantity ?? 0) > 0) {
+            return true;
+        }
+
+        return PurchaseOrderItem::withoutGlobalScopes()
+            ->where('refer_item_model_type', OrderRequestItem::class)
+            ->where('refer_item_model_id', $itemId)
+            ->exists();
+    }
+
+    protected function inlineOrderRequestItemDeletedNotificationBody(): string
+    {
+        if (method_exists($this, 'getRecord') && $this->getRecord()?->exists) {
+            return 'Klik Simpan untuk menyimpan perubahan Order Request.';
+        }
+
+        return 'Klik Simpan untuk menyimpan Order Request.';
+    }
+}
