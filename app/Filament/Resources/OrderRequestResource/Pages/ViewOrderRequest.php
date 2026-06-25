@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\OrderRequestResource\Pages;
 
 use App\Filament\Resources\OrderRequestResource;
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
+use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Services\OrderRequestService;
@@ -29,6 +31,7 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Get;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class ViewOrderRequest extends ViewRecord
@@ -153,6 +156,10 @@ class ViewOrderRequest extends ViewRecord
                             'total_cost'       => OrderRequestResource::formatMoneyPreviewState($preview['total_cost']),
                             'subtotal'         => OrderRequestResource::formatMoneyPreviewState($preview['subtotal']),
                             'max_quantity'     => max(0, $remainingQty),
+                            'approval_status'  => OrderRequestResource::resolveApprovalGateStatus($item->status ?? null),
+                            'rejection_note'   => OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_REJECTED
+                                ? $item->rejection_note
+                                : null,
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null),
                         ];
@@ -219,9 +226,8 @@ class ViewOrderRequest extends ViewRecord
                         ->description('Centang item yang akan dimasukkan ke PO. Harga Override dapat diubah; Harga Asli berasal dari master produk.')
                         ->icon('heroicon-o-shopping-cart')
                         ->collapsible()
-                        ->visible(fn(Get $get) => $get('create_purchase_order'))
                         ->schema([
-                            OrderRequestResource::buildPurchaseOrderSelectedItemsRepeater(),
+                            OrderRequestResource::buildPurchaseOrderSelectedItemsRepeater(true),
                         ]),
                 ])
                 ->visible(function ($record) {
@@ -230,10 +236,15 @@ class ViewOrderRequest extends ViewRecord
                 ->action(function (array $data, $record) {
                     try {
                         $orderRequestService = app(OrderRequestService::class);
-                        if ($data['create_purchase_order']) {
-                            $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                        OrderRequestResource::validateApprovalGateItemDecisions($data);
+
+                        if (! empty($data['create_purchase_order'])) {
+                            $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED));
                             if ($includedItems->isEmpty()) {
-                                HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                $data['create_purchase_order'] = false;
+                                $orderRequestService->approve($record, $data);
+                                $record->refresh();
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: 'Keputusan item Order Request berhasil disimpan tanpa membuat Purchase Order.');
                                 return;
                             }
 
@@ -245,6 +256,8 @@ class ViewOrderRequest extends ViewRecord
                             });
 
                             if (!empty($data['multi_supplier']) || $groups->count() > 1) {
+                                $orderRequestService->applyItemApprovalDecisionsOnly($record, $data);
+                                $record->refresh();
                                 $created = 0;
                                 foreach ($groups as $groupItems) {
                                     $firstItem = $groupItems->first();
@@ -267,7 +280,7 @@ class ViewOrderRequest extends ViewRecord
                                 }
 
                                 $record->refresh();
-                                $record->update(['status' => 'approved']);
+                                $record->syncItemApprovalStatus();
                                 HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                                 return;
                             }
@@ -286,6 +299,8 @@ class ViewOrderRequest extends ViewRecord
                         $orderRequestService->approve($record, $data);
                         $record->refresh();
                         HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
+                    } catch (ValidationException $exception) {
+                        throw $exception;
                     } catch (Throwable $exception) {
                         ProcurementFailureNotifier::danger(
                             'Gagal Memproses Order Request',
@@ -303,6 +318,10 @@ class ViewOrderRequest extends ViewRecord
                 ->modalDescription('Pilih item yang akan dimasukkan ke Purchase Order baru. Harga Override dapat diubah.')
                 ->fillForm(function ($record) {
                     $items = $record->orderRequestItem->map(function ($item) use($record) {
+                        if (! PurchaseOrderResource::isOrderRequestItemEligibleForPurchaseOrder($item)) {
+                            return null;
+                        }
+
                         $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'];
                         if ($remainingQty <= 0) {
                             return null;
@@ -351,6 +370,7 @@ class ViewOrderRequest extends ViewRecord
                             'total_cost'       => OrderRequestResource::formatMoneyPreviewState($preview['total_cost']),
                             'subtotal'         => OrderRequestResource::formatMoneyPreviewState($preview['subtotal']),
                             'max_quantity'     => max(0, $remainingQty),
+                            'approval_status'  => OrderRequestItem::STATUS_APPROVED,
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => $tipePajak,
                         ];
@@ -365,8 +385,8 @@ class ViewOrderRequest extends ViewRecord
                         ->unique();
                     $isMultiSupplier = $groups->count() > 1;
 
-                    // Pre-fill supplier from the first item that has one
-                    $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+                    // Pre-fill supplier from the first eligible item that has one.
+                    $firstSupplierId = collect($items)->first(fn ($item) => filled($item['item_supplier_id'] ?? null))['item_supplier_id'] ?? null;
 
                     return [
                         'supplier_id'    => $isMultiSupplier ? null : $firstSupplierId,
@@ -408,14 +428,18 @@ class ViewOrderRequest extends ViewRecord
                     if (!Auth::user()->hasPermissionTo('approve order request') || !in_array($record->status, ['approved', 'partial'], true)) {
                         return false;
                     }
-                    // Show button as long as some items still have unfulfilled quantity
+                    // Show button only when an approved item still has quantity available for PO.
                     return $record->orderRequestItem->contains(
-                        fn($item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0
+                        fn($item) => PurchaseOrderResource::isOrderRequestItemEligibleForPurchaseOrder($item)
+                            && OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0
                     );
                 })
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
-                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                    $includedItems = collect($data['selected_items'] ?? [])->filter(
+                        fn($i) => ($i['include'] ?? false)
+                            && (($i['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED)
+                    );
                     if ($includedItems->isEmpty()) {
                         HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
                         return;

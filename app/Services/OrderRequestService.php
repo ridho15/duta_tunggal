@@ -217,6 +217,13 @@ class OrderRequestService
         $orderRequest->syncItemApprovalStatus();
     }
 
+    public function applyItemApprovalDecisionsOnly($orderRequest, array $data)
+    {
+        $this->applyItemApprovalDecisions($orderRequest, $data);
+
+        return $orderRequest->fresh(['orderRequestItem']);
+    }
+
     public function approve($orderRequest, $data)
     {
         $createPurchaseOrder = $data['create_purchase_order'] ?? true;

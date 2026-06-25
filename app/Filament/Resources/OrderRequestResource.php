@@ -378,6 +378,19 @@ class OrderRequestResource extends Resource
             ->sortBy('kode')
             ->map(fn (\App\Models\Cabang $cabang) => "({$cabang->kode}) {$cabang->nama}")
             ->all();
+        $bulkSupplierOptions = self::resolveSupplierOptions(limit: 100);
+        $bulkCabangQuery = \App\Models\Cabang::query();
+        $user = Auth::user();
+        $manageType = $user?->manage_type ?? [];
+        if (! (is_array($manageType) && in_array('all', $manageType, true))) {
+            $bulkCabangQuery->whereKey($user?->cabang_id);
+        }
+        $bulkCabangOptions = $bulkCabangQuery
+            ->orderBy('kode')
+            ->limit(100)
+            ->get(['id', 'kode', 'nama'])
+            ->mapWithKeys(fn (\App\Models\Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+            ->all();
         $taxOptions = [
             'inklusif' => 'Inklusif',
             'eklusif' => 'Eklusif',
@@ -547,6 +560,8 @@ class OrderRequestResource extends Resource
             'taxFilter' => $taxFilter,
             'supplierOptions' => $supplierOptions,
             'cabangOptions' => $cabangOptions,
+            'bulkSupplierOptions' => $bulkSupplierOptions,
+            'bulkCabangOptions' => $bulkCabangOptions,
             'currencyOptions' => $currencyOptions,
             'taxOptions' => $taxOptions,
         ]);
@@ -829,7 +844,7 @@ class OrderRequestResource extends Resource
             ->all();
     }
 
-    public static function buildPurchaseOrderSelectedItemsRepeater(): Repeater
+    public static function buildPurchaseOrderSelectedItemsRepeater(bool $approvalGate = false): Repeater
     {
         return Repeater::make('selected_items')
             ->label('')
@@ -844,7 +859,9 @@ class OrderRequestResource extends Resource
                 $supplierName = $state['supplier_name'] ?? '-';
                 $subtotal = $state['subtotal'] ?? '0';
                 $includeStatus = ($state['include'] ?? true) ? 'Disertakan' : 'Tidak disertakan';
-                $approvalStatus = OrderRequestItem::approvalStatusLabel($state['approval_status'] ?? OrderRequestItem::STATUS_APPROVED);
+                $approvalStatus = filled($state['approval_status'] ?? null)
+                    ? OrderRequestItem::approvalStatusLabel($state['approval_status'])
+                    : 'Pilih keputusan';
 
                 return "Product: {$productName} | Qty: {$qty} | Supplier: {$supplierName} | Subtotal: {$subtotal} | {$approvalStatus} | {$includeStatus}";
             })
@@ -856,19 +873,31 @@ class OrderRequestResource extends Resource
                 Hidden::make('currency_id'),
                 Select::make('approval_status')
                     ->label('Keputusan Item')
-                    ->options([
-                        OrderRequestItem::STATUS_APPROVED => 'Approve',
-                        OrderRequestItem::STATUS_DRAFT => 'Tetap Draft',
-                        OrderRequestItem::STATUS_REJECTED => 'Reject',
-                    ])
-                    ->default(OrderRequestItem::STATUS_APPROVED)
+                    ->placeholder($approvalGate ? 'Pilih keputusan' : null)
+                    ->options($approvalGate
+                        ? [
+                            OrderRequestItem::STATUS_APPROVED => 'Approve',
+                            OrderRequestItem::STATUS_REJECTED => 'Reject',
+                        ]
+                        : [
+                            OrderRequestItem::STATUS_APPROVED => 'Approve',
+                            OrderRequestItem::STATUS_DRAFT => 'Tetap Draft',
+                            OrderRequestItem::STATUS_REJECTED => 'Reject',
+                        ])
+                    ->default($approvalGate ? null : OrderRequestItem::STATUS_APPROVED)
                     ->required()
+                    ->validationMessages([
+                        'required' => 'Pilih keputusan untuk semua item sebelum menyetujui Order Request.',
+                    ])
                     ->live(),
                 Textarea::make('rejection_note')
                     ->label('Alasan Reject')
                     ->rows(2)
                     ->visible(fn (Get $get) => $get('approval_status') === OrderRequestItem::STATUS_REJECTED)
-                    ->required(fn (Get $get) => $get('approval_status') === OrderRequestItem::STATUS_REJECTED),
+                    ->required(fn (Get $get) => $get('approval_status') === OrderRequestItem::STATUS_REJECTED)
+                    ->validationMessages([
+                        'required' => 'Alasan reject wajib diisi untuk item yang ditolak.',
+                    ]),
                 TextInput::make('product_name')
                     ->label('Nama Produk')
                     ->readOnly()
@@ -993,6 +1022,52 @@ class OrderRequestResource extends Resource
                     ->live()
                     ->default(true),
             ]);
+    }
+
+    public static function resolveApprovalGateStatus(?string $status): ?string
+    {
+        $normalized = OrderRequestItem::normalizeApprovalStatus($status);
+
+        return in_array($normalized, [
+            OrderRequestItem::STATUS_APPROVED,
+            OrderRequestItem::STATUS_REJECTED,
+        ], true) ? $normalized : null;
+    }
+
+    public static function validateApprovalGateItemDecisions(array $data): void
+    {
+        $selectedItems = collect($data['selected_items'] ?? []);
+        $validDecisions = [
+            OrderRequestItem::STATUS_APPROVED,
+            OrderRequestItem::STATUS_REJECTED,
+        ];
+
+        if ($selectedItems->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_items' => 'Pilih keputusan untuk semua item sebelum menyetujui Order Request.',
+            ]);
+        }
+
+        $hasMissingDecision = $selectedItems->contains(
+            fn (array $row): bool => ! in_array($row['approval_status'] ?? null, $validDecisions, true)
+        );
+
+        if ($hasMissingDecision) {
+            throw ValidationException::withMessages([
+                'selected_items' => 'Pilih keputusan untuk semua item sebelum menyetujui Order Request.',
+            ]);
+        }
+
+        $hasRejectedWithoutNote = $selectedItems->contains(
+            fn (array $row): bool => ($row['approval_status'] ?? null) === OrderRequestItem::STATUS_REJECTED
+                && trim((string) ($row['rejection_note'] ?? '')) === ''
+        );
+
+        if ($hasRejectedWithoutNote) {
+            throw ValidationException::withMessages([
+                'selected_items' => 'Alasan reject wajib diisi untuk item yang ditolak.',
+            ]);
+        }
     }
 
     public static function resolveProductSupplierId(?int $productId): ?int
@@ -2540,8 +2615,10 @@ class OrderRequestResource extends Resource
                                     'total_cost'       => self::formatMoneyPreviewState(max(0, $remainingQty) * $supplierPrice),
                                     'subtotal'         => $subtotal,
                                     'max_quantity'     => max(0, $remainingQty),
-                                    'approval_status'  => OrderRequestItem::STATUS_APPROVED,
-                                    'rejection_note'   => null,
+                                    'approval_status'  => self::resolveApprovalGateStatus($item->status ?? null),
+                                    'rejection_note'   => OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_REJECTED
+                                        ? $item->rejection_note
+                                        : null,
                                     'include'          => $remainingQty > 0,
                                     'tipe_pajak'       => self::normalizeItemTaxType($item->tipe_pajak ?? null),
                                 ];
@@ -2611,9 +2688,8 @@ class OrderRequestResource extends Resource
                                 ->description('Centang item yang akan dimasukkan ke dalam Purchase Order. Anda dapat mengubah quantity dan harga sebelum menyetujui.')
                                 ->icon('heroicon-o-shopping-cart')
                                 ->collapsible()
-                                ->visible(fn(Get $get) => $get('create_purchase_order'))
                                 ->schema([
-                                    self::buildPurchaseOrderSelectedItemsRepeater(),
+                                    self::buildPurchaseOrderSelectedItemsRepeater(true),
                                 ]),
                         ])
                         ->visible(function ($record) {
@@ -2624,9 +2700,10 @@ class OrderRequestResource extends Resource
                         ->action(function (array $data, $record) {
                             try {
                                 $orderRequestService = app(OrderRequestService::class);
+                                self::validateApprovalGateItemDecisions($data);
 
-                                if ($data['create_purchase_order']) {
-                                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED));
+                                if (! empty($data['create_purchase_order'])) {
+                                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED));
                                     if ($includedItems->isEmpty()) {
                                         $data['create_purchase_order'] = false;
                                         $orderRequestService->approve($record, $data);
@@ -2642,11 +2719,8 @@ class OrderRequestResource extends Resource
                                     });
 
                                     if (!empty($data['multi_supplier']) || $groups->count() > 1) {
-                                        if ($includedItems->isEmpty()) {
-                                            HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
-                                            return;
-                                        }
-
+                                        $orderRequestService->applyItemApprovalDecisionsOnly($record, $data);
+                                        $record->refresh();
                                         $created = 0;
                                         foreach ($groups as $groupItems) {
                                             $firstItem = $groupItems->first();
@@ -2675,7 +2749,7 @@ class OrderRequestResource extends Resource
                                         }
 
                                         $record->refresh();
-                                        $record->update(['status' => 'approved']);
+                                        $record->syncItemApprovalStatus();
                                         HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                                         return;
                                     }
@@ -2690,7 +2764,7 @@ class OrderRequestResource extends Resource
                                     // Get supplier_id from first selected item if not provided
                                     if (empty($data['supplier_id']) && !empty($data['selected_items'])) {
                                         $firstItem = collect($data['selected_items'])
-                                            ->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? OrderRequestItem::STATUS_APPROVED) === OrderRequestItem::STATUS_APPROVED))
+                                            ->filter(fn($i) => ($i['include'] ?? false) && (($i['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED))
                                             ->first();
                                         $data['supplier_id'] = $firstItem['item_supplier_id'] ?? null;
                                     }
@@ -2704,6 +2778,8 @@ class OrderRequestResource extends Resource
                                 $orderRequestService->approve($record, $data);
                                 $record->refresh();
                                 HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
+                            } catch (ValidationException $exception) {
+                                throw $exception;
                             } catch (Throwable $exception) {
                                 ProcurementFailureNotifier::danger(
                                     'Gagal Memproses Order Request',

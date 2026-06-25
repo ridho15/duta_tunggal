@@ -37,6 +37,7 @@ it('wires item approval decisions into order request approval service', function
 
     expect($service)
         ->toContain('applyItemApprovalDecisions')
+        ->toContain('applyItemApprovalDecisionsOnly')
         ->toContain('Alasan reject wajib diisi untuk item yang ditolak.')
         ->toContain('OrderRequestItem::STATUS_APPROVED')
         ->toContain('OrderRequestItem::STATUS_REJECTED')
@@ -62,10 +63,23 @@ it('uses real checkboxes and bulk status actions in the custom order request ite
         ->toContain('type="checkbox"')
         ->toContain('selectedKeys')
         ->toContain('bulkUpdateInlineOrderRequestItemStatus')
+        ->toContain('bulkUpdateInlineOrderRequestItemSupplier')
+        ->toContain('bulkUpdateInlineOrderRequestItemCabang')
+        ->toContain('updateInlineOrderRequestItemStatus')
+        ->toContain('data-dt-or-bulk-supplier-select')
+        ->toContain('data-dt-or-bulk-cabang-select')
+        ->toContain('data-dt-or-bulk-set-supplier')
+        ->toContain('data-dt-or-bulk-set-cabang')
+        ->toContain('Set Supplier')
+        ->toContain('Set Cabang')
         ->toContain('Approve Selected')
         ->toContain('Reject Selected')
         ->toContain('Set Draft')
         ->toContain('Clear Selection')
+        ->toContain('data-dt-or-approve-item')
+        ->toContain('data-dt-or-reject-item')
+        ->toContain('data-dt-or-draft-item')
+        ->toContain('setItemStatus(@js($row[\'key\']), \'approved\')')
         ->toContain('dt-item-status-badge')
         ->toContain('wire:key="dt-or-row-{{ $row[\'key\'] }}"')
         ->toContain('wire:key="dt-or-detail-{{ $row[\'key\'] }}"')
@@ -84,6 +98,11 @@ it('uses real checkboxes and bulk status actions in the custom order request ite
 
     expect($trait)
         ->toContain('bulkUpdateInlineOrderRequestItemStatus')
+        ->toContain('public function bulkUpdateInlineOrderRequestItemSupplier')
+        ->toContain('public function bulkUpdateInlineOrderRequestItemCabang')
+        ->toContain('public function updateInlineOrderRequestItemStatus')
+        ->toContain('applyInlineOrderRequestItemFieldUpdate($item, \'supplier_id\', $supplierId)')
+        ->toContain('inlineOrderRequestCabangIsAllowed')
         ->toContain('Alasan reject wajib diisi')
         ->toContain('Item tidak dapat diedit')
         ->toContain('OrderRequestItem::STATUS_DRAFT');
@@ -109,6 +128,33 @@ it('shows item approval summaries on index and relation manager', function () {
         ->toContain("OrderRequestItem::STATUS_APPROVED => 'Approved'")
         ->toContain("OrderRequestItem::STATUS_REJECTED => 'Rejected'");
 });
+
+it('requires explicit item decisions when approving an order request', function () {
+    $resource = project_file('app/Filament/Resources/OrderRequestResource.php');
+    $viewPage = project_file('app/Filament/Resources/OrderRequestResource/Pages/ViewOrderRequest.php');
+
+    expect($resource)
+        ->toContain('buildPurchaseOrderSelectedItemsRepeater(bool $approvalGate = false)')
+        ->toContain("->placeholder(\$approvalGate ? 'Pilih keputusan' : null)")
+        ->toContain('self::resolveApprovalGateStatus($item->status ?? null)')
+        ->toContain('self::validateApprovalGateItemDecisions($data)')
+        ->toContain('$selectedItems->isEmpty()')
+        ->toContain('Pilih keputusan untuk semua item sebelum menyetujui Order Request.')
+        ->toContain('OrderRequestItem::STATUS_APPROVED => \'Approve\',')
+        ->toContain('OrderRequestItem::STATUS_REJECTED => \'Reject\',')
+        ->toContain('applyItemApprovalDecisionsOnly($record, $data)')
+        ->toContain('$record->syncItemApprovalStatus()')
+        ->not->toContain('$record->update([\'status\' => \'approved\']);');
+
+    expect($viewPage)
+        ->toContain('OrderRequestResource::resolveApprovalGateStatus($item->status ?? null)')
+        ->toContain('OrderRequestResource::buildPurchaseOrderSelectedItemsRepeater(true)')
+        ->toContain('OrderRequestResource::validateApprovalGateItemDecisions($data)')
+        ->toContain('applyItemApprovalDecisionsOnly($record, $data)')
+        ->toContain('$record->syncItemApprovalStatus()')
+        ->not->toContain('$record->update([\'status\' => \'approved\']);');
+});
+
 it('keeps the custom order request product select stable with native fallback options', function () {
     $resource = project_file('app/Filament/Resources/OrderRequestResource.php');
     $trait = project_file('app/Filament/Resources/OrderRequestResource/Pages/Concerns/InteractsWithInlineOrderRequestItems.php');
@@ -161,4 +207,25 @@ it('refreshes inline select2 controls after livewire refreshes', function () {
         ->toContain("\$select.select2('destroy')")
         ->not->toContain('change.dtOrInline')
         ->not->toContain('searchInlineOrderRequestSuppliers(productId, currencyId, search)');
+});
+
+it('only allows approved order request items to feed purchase orders', function () {
+    $purchaseOrderResource = project_file('app/Filament/Resources/PurchaseOrderResource.php');
+    $viewPage = project_file('app/Filament/Resources/OrderRequestResource/Pages/ViewOrderRequest.php');
+
+    expect($purchaseOrderResource)
+        ->toContain('public static function isOrderRequestItemEligibleForPurchaseOrder(OrderRequestItem $orderRequestItem): bool')
+        ->toContain('OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED')
+        ->toContain('if (! static::isOrderRequestItemEligibleForPurchaseOrder($orderRequestItem))')
+        ->toContain('getAvailableOrderRequestItemGroups(OrderRequest $orderRequest): array')
+        ->toContain('buildOrderRequestItems(')
+        ->toContain('getAvailableOrderRequestSupplierIds(OrderRequest $orderRequest): array');
+
+    expect($viewPage)
+        ->toContain('use App\Filament\Resources\PurchaseOrderResource;')
+        ->toContain('PurchaseOrderResource::isOrderRequestItemEligibleForPurchaseOrder($item)')
+        ->toContain("'approval_status'  => OrderRequestItem::STATUS_APPROVED")
+        ->toContain("&& ((\$i['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED)")
+        ->toContain('Show button only when an approved item still has quantity available for PO.')
+        ->not->toContain('// Show button as long as some items still have unfulfilled quantity');
 });

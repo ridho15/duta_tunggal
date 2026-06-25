@@ -12,6 +12,7 @@
     .dt-item-control:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
     .dt-item-nav-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:0 0 auto;flex-wrap:wrap}
     .dt-item-bulk-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;padding:10px 0 0;border-top:1px solid #eef2f7}
+    .dt-item-bulk-actions .dt-item-control{flex:1 1 190px;max-width:260px;padding:8px 10px;font-size:12px}
     .dt-item-bulk-actions .dt-item-nav-button{padding:8px 12px;font-size:12px}
     .dt-item-nav-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #d1d5db;background:#fff;color:#111827;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
     .dt-item-nav-button:hover:not(:disabled){background:#f8fafc}
@@ -83,7 +84,8 @@
     .dt-item-inline-field label{font-size:12px;font-weight:800;color:#475569}
     .dt-item-inline-input{width:100%;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#111827;padding:9px 11px;font-size:13px;line-height:1.4}
     .dt-item-inline-input:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
-    .dt-item-inline-input[readonly]{background:#f8fafc;color:#64748b}
+    .dt-item-inline-input[readonly],.dt-item-inline-input:disabled{background:#f8fafc;color:#64748b}
+    .dt-item-inline-input:disabled{cursor:not-allowed;opacity:.65}
     .dt-item-inline-select{width:100%;min-width:0;border:1px solid #d1d5db;border-radius:10px;background-color:#fff;color:#111827;padding:9px 38px 9px 11px;font-size:13px;line-height:1.4;appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%236b7280' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;background-size:18px 18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .dt-item-inline-select::-ms-expand{display:none}
     .dt-item-inline-select:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
@@ -93,6 +95,7 @@
     .dt-item-inline-editor .select2-container .select2-selection--single .select2-selection__rendered{line-height:36px;padding-left:11px;padding-right:34px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .dt-item-inline-editor .select2-container .select2-selection--single .select2-selection__arrow{height:36px;right:8px}
     .dt-item-inline-editor .select2-container--focus .select2-selection--single{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe}
+    .dt-item-inline-editor .select2-container--disabled .select2-selection--single{background:#f8fafc;cursor:not-allowed;opacity:.65}
     .dt-item-inline-editor .select2-dropdown{border-color:#d1d5db;border-radius:10px;overflow:hidden;font-size:13px}
     body > .select2-container--open{z-index:99999!important}
     .dt-or-inline-select2-dropdown{z-index:99999!important;border-color:#d1d5db;border-radius:10px;overflow:hidden;font-size:13px}
@@ -122,6 +125,23 @@
     .dt-item-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:14px;font-weight:800}
     .dt-item-footer-total{display:inline-flex;gap:10px;align-items:center}
     .dt-item-footer-total span:last-child{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:8px 12px}
+    body.dt-item-reject-modal-open{overflow:hidden}
+    .dt-item-reject-modal{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:rgba(15,23,42,.58);backdrop-filter:blur(2px)}
+    .dt-item-reject-modal-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 48px);display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(15,23,42,.12);border-radius:12px;background:#fff;color:#111827;box-shadow:0 24px 72px rgba(15,23,42,.28)}
+    .dt-item-reject-modal-header{padding:20px 22px 12px;border-bottom:1px solid #eef2f7}
+    .dt-item-reject-modal-title{margin:0;color:#111827;font-size:17px;font-weight:800;line-height:1.35}
+    .dt-item-reject-modal-description{margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.5}
+    .dt-item-reject-modal-body{padding:16px 22px 20px;overflow:auto}
+    .dt-item-reject-modal-field{display:flex;flex-direction:column;gap:8px}
+    .dt-item-reject-modal-label{color:#334155;font-size:13px;font-weight:800}
+    .dt-item-reject-modal-textarea{width:100%;min-height:132px;max-height:260px;resize:vertical;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#111827;padding:11px 12px;font-size:14px;line-height:1.5}
+    .dt-item-reject-modal-textarea:focus{outline:2px solid #fecaca;border-color:#dc2626}
+    .dt-item-reject-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid #eef2f7;background:#f8fafc}
+    .dt-item-reject-modal-button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#111827;padding:9px 14px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap}
+    .dt-item-reject-modal-button:hover:not(:disabled){background:#f8fafc}
+    .dt-item-reject-modal-button.danger{border-color:#dc2626;background:#dc2626;color:#fff}
+    .dt-item-reject-modal-button.danger:hover:not(:disabled){background:#b91c1c;border-color:#b91c1c}
+    .dt-item-reject-modal-button:disabled{cursor:not-allowed;opacity:.5;background:#fee2e2;color:#991b1b}
     [x-cloak]{display:none!important}
     @keyframes dt-item-spin{to{transform:rotate(360deg)}}
     .dt-or-large-repeater .fi-fo-repeater-item{display:none!important}
@@ -133,7 +153,7 @@
     .dt-item-new-row-highlight td{animation:dt-item-new-row-pulse 4s ease-out 1;background:#eff6ff!important}
     .dt-item-new-row-highlight + .dt-item-detail-row .dt-item-detail-card{animation:dt-item-new-editor-pulse 4s ease-out 1;border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.28)}
     @media (max-width: 1024px){.dt-item-toolbar-main{align-items:stretch}.dt-item-toolbar-left{flex-basis:100%}.dt-item-nav-actions{width:100%;justify-content:flex-start}.dt-item-filter-drawer{grid-template-columns:1fr 1fr}.dt-item-detail-footer{grid-template-columns:1fr 1fr}.dt-item-detail-card{margin-left:14px;margin-right:14px}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 6}}
-    @media (max-width: 640px){.dt-item-panel{padding:12px}.dt-item-toolbar-left,.dt-item-nav-actions,.dt-item-bulk-actions{width:100%}.dt-item-search-wrap{min-width:100%}.dt-item-nav-button{flex:1 1 auto}.dt-item-bulk-actions .dt-item-nav-button{flex:1 1 46%}.dt-item-filter-drawer{grid-template-columns:1fr}.dt-item-detail-footer{grid-template-columns:1fr}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 12}}
+    @media (max-width: 640px){.dt-item-panel{padding:12px}.dt-item-toolbar-left,.dt-item-nav-actions,.dt-item-bulk-actions{width:100%}.dt-item-search-wrap{min-width:100%}.dt-item-nav-button{flex:1 1 auto}.dt-item-bulk-actions .dt-item-nav-button{flex:1 1 46%}.dt-item-filter-drawer{grid-template-columns:1fr}.dt-item-detail-footer{grid-template-columns:1fr}.dt-item-inline-field,.dt-item-inline-field.wide{grid-column:span 12}.dt-item-reject-modal{align-items:flex-end;padding:12px}.dt-item-reject-modal-dialog{width:100%;max-height:calc(100vh - 24px)}.dt-item-reject-modal-footer{flex-direction:column-reverse;align-items:stretch}.dt-item-reject-modal-button{width:100%}}
     @keyframes dt-item-new-row-pulse{0%,70%{background:#dbeafe}100%{background:#fff}}
     @keyframes dt-item-new-editor-pulse{0%,70%{box-shadow:0 0 0 3px rgba(37,99,235,.35)}100%{box-shadow:0 0 0 3px rgba(96,165,250,.28)}}
 </style>
@@ -158,6 +178,8 @@
         searchValue: '',
         supplierValue: '',
         cabangValue: '',
+        bulkSupplierValue: '',
+        bulkCabangValue: '',
         taxValue: '',
         pageSizeValue: '10',
         isLoading: false,
@@ -167,6 +189,11 @@
         recentlyAddedKey: window.__dtOrRecentlyAddedKey || null,
         recentlyAddedMessage: window.__dtOrRecentlyAddedMessage || '',
         recentlyAddedTimer: null,
+        rejectModalOpen: false,
+        rejectModalTitle: '',
+        rejectModalReason: '',
+        rejectModalKeys: [],
+        rejectModalMode: 'single',
         select2AssetsPromise: null,
         inlineSelectChangeHandler: null,
 
@@ -219,6 +246,7 @@
             if (this.inlineSelectChangeHandler) {
                 this.$root.removeEventListener('change', this.inlineSelectChangeHandler);
             }
+            document.body.classList.remove('dt-item-reject-modal-open');
             window.clearTimeout(this.reconcileTimer);
             window.clearTimeout(this.select2RefreshTimer);
             window.clearTimeout(this.loadingFallbackTimer);
@@ -228,6 +256,7 @@
         startLoading(message) {
             this.loadingMessage = message;
             this.isLoading = true;
+            this.$nextTick(() => this.syncInlineEditorLockState());
         },
 
         finishLoading() {
@@ -236,6 +265,8 @@
             if (! this.isAddingItem) {
                 this.loadingMessage = '';
             }
+
+            this.$nextTick(() => this.syncInlineEditorLockState());
         },
 
         selectedCount() {
@@ -259,14 +290,81 @@
         async bulkStatus(status) {
             if (! this.selectedCount() || this.isLoading || this.isAddingItem) return;
 
-            let note = null;
             if (status === 'rejected') {
-                note = window.prompt('Alasan reject item yang dipilih');
-                if (! note || ! note.trim()) return;
+                this.openRejectModal([...this.selectedKeys], 'Reject item terpilih', 'bulk');
+                return;
             }
 
-            const message = status === 'approved' ? 'Approve item terpilih...' : (status === 'rejected' ? 'Reject item terpilih...' : 'Mengubah status item...');
-            await this.runNavigatorRequest(message, () => this.$wire.bulkUpdateInlineOrderRequestItemStatus([...this.selectedKeys], status, note));
+            const message = status === 'approved' ? 'Approve item terpilih...' : 'Mengubah status item...';
+            await this.runNavigatorRequest(message, () => this.$wire.bulkUpdateInlineOrderRequestItemStatus([...this.selectedKeys], status, null));
+            this.clearSelection();
+        },
+
+        openRejectModal(keys, title, mode = 'single') {
+            if (this.isLoading || this.isAddingItem) return;
+
+            this.rejectModalOpen = true;
+            this.rejectModalTitle = title || 'Reject item';
+            this.rejectModalReason = '';
+            this.rejectModalKeys = Array.isArray(keys) ? keys.map((key) => String(key)) : [];
+            this.rejectModalMode = mode;
+            document.body.classList.add('dt-item-reject-modal-open');
+            this.$nextTick(() => document.querySelector('[data-dt-reject-reason]')?.focus());
+        },
+
+        closeRejectModal() {
+            this.rejectModalOpen = false;
+            this.rejectModalTitle = '';
+            this.rejectModalReason = '';
+            this.rejectModalKeys = [];
+            this.rejectModalMode = 'single';
+            document.body.classList.remove('dt-item-reject-modal-open');
+        },
+
+        async submitRejectModal() {
+            if (! this.rejectModalOpen || this.isLoading || this.isAddingItem) return;
+
+            const note = (this.rejectModalReason || '').trim();
+            if (! note) return;
+
+            const keys = [...this.rejectModalKeys];
+            if (! keys.length) return;
+
+            const message = this.rejectModalMode === 'bulk' ? 'Reject item terpilih...' : 'Reject item...';
+            this.closeRejectModal();
+            await this.runNavigatorRequest(message, () => this.$wire.bulkUpdateInlineOrderRequestItemStatus(keys, 'rejected', note));
+            this.clearSelection();
+        },
+
+        async setItemStatus(key, status) {
+            if (this.isLoading || this.isAddingItem) return;
+
+            if (status === 'rejected') {
+                this.openRejectModal([key], 'Reject item', 'single');
+                return;
+            }
+
+            const message = status === 'approved' ? 'Approve item...' : 'Mengubah status item...';
+            await this.runNavigatorRequest(message, () => this.$wire.updateInlineOrderRequestItemStatus(String(key), status, null));
+        },
+
+        async bulkSetSupplier() {
+            if (! this.selectedCount() || ! this.bulkSupplierValue || this.isLoading || this.isAddingItem) return;
+
+            await this.runNavigatorRequest(
+                'Mengubah supplier item terpilih...',
+                () => this.$wire.bulkUpdateInlineOrderRequestItemSupplier([...this.selectedKeys], this.bulkSupplierValue)
+            );
+            this.clearSelection();
+        },
+
+        async bulkSetCabang() {
+            if (! this.selectedCount() || ! this.bulkCabangValue || this.isLoading || this.isAddingItem) return;
+
+            await this.runNavigatorRequest(
+                'Mengubah cabang item terpilih...',
+                () => this.$wire.bulkUpdateInlineOrderRequestItemCabang([...this.selectedKeys], this.bulkCabangValue)
+            );
             this.clearSelection();
         },
 
@@ -382,6 +480,7 @@
                     this.initInlineSelects(this.expandedKey);
                     this.syncInlineSelect2Values(this.expandedKey);
                     this.syncInlineMoneyInputs(this.expandedKey);
+                    this.syncInlineEditorLockState(this.expandedKey);
                 });
             }, delay);
         },
@@ -432,6 +531,44 @@
                 });
         },
 
+        syncInlineEditorLockState(key = this.expandedKey) {
+            if (! key) return;
+
+            const editor = this.$root.querySelector('[data-dt-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (! editor) return;
+
+            const shouldDisable = editor.dataset.statusLocked === 'true' || this.isLoading || this.isAddingItem;
+            const editableSelector = [
+                'select[data-dt-inline-product]',
+                'select[data-dt-inline-supplier]',
+                'select[data-dt-inline-cabang]',
+                'select[data-dt-inline-currency]',
+                '[data-dt-inline-quantity]',
+                '[data-dt-inline-unit-price]',
+                '[data-dt-inline-discount]',
+                '[data-dt-inline-note]',
+                '[data-dt-inline-tax-type] input[type=radio]',
+            ].join(',');
+            const jq = window.jQuery || window.$;
+
+            editor.querySelectorAll(editableSelector).forEach((element) => {
+                element.disabled = shouldDisable;
+
+                if (element.matches('select[data-dt-inline-select]')) {
+                    if (jq?.fn?.select2 && jq(element).data('select2')) {
+                        jq(element).prop('disabled', shouldDisable).trigger('change.select2');
+                    }
+
+                    const container = element.nextElementSibling?.classList?.contains('select2')
+                        ? element.nextElementSibling
+                        : null;
+                    container?.classList.toggle('select2-container--disabled', shouldDisable);
+                    const selection = container ? container.querySelector('.select2-selection') : null;
+                    selection?.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+                }
+            });
+        },
+
         registerInlineSelectRefreshHooks() {
             if (window.__dtOrSelect2LivewireHooksRegistered) return;
             window.__dtOrSelect2LivewireHooksRegistered = true;
@@ -444,6 +581,7 @@
                     alpine?.refreshInlineSelects?.(120);
                     alpine?.syncInlineSelect2Values?.();
                     alpine?.syncInlineMoneyInputs?.();
+                    alpine?.syncInlineEditorLockState?.();
                 });
             };
 
@@ -605,6 +743,7 @@
             });
 
             this.syncInlineSelect2Values(key);
+            this.syncInlineEditorLockState(key);
         },
 
         currentInlineSelectValue(editor, field) {
@@ -622,6 +761,7 @@
             const field = select.dataset.field;
 
             if (! key || ! field) return;
+            if (select.disabled || editor?.dataset?.statusLocked === 'true') return;
 
             select.setAttribute('data-dt-select2-updating', 'true');
 
@@ -643,6 +783,9 @@
         },
 
         async updateInlineItem(key, field, value, message = 'Menghitung item…') {
+            const editor = this.$root.querySelector('[data-dt-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (editor?.dataset?.statusLocked === 'true') return null;
+
             this.startLoading(message);
 
             try {
@@ -868,6 +1011,30 @@
         </div>
 
         <div class="dt-item-bulk-actions" data-dt-or-bulk-row>
+            <select
+                class="dt-item-control"
+                x-model="bulkSupplierValue"
+                x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem"
+                data-dt-or-bulk-supplier-select
+            >
+                <option value="">Pilih supplier target</option>
+                @foreach ($bulkSupplierOptions as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <button type="button" class="dt-item-nav-button" data-dt-or-bulk-set-supplier x-bind:disabled="selectedCount() === 0 || ! bulkSupplierValue || isLoading || isAddingItem" x-on:click="bulkSetSupplier()">Set Supplier</button>
+            <select
+                class="dt-item-control"
+                x-model="bulkCabangValue"
+                x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem"
+                data-dt-or-bulk-cabang-select
+            >
+                <option value="">Pilih cabang target</option>
+                @foreach ($bulkCabangOptions as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <button type="button" class="dt-item-nav-button" data-dt-or-bulk-set-cabang x-bind:disabled="selectedCount() === 0 || ! bulkCabangValue || isLoading || isAddingItem" x-on:click="bulkSetCabang()">Set Cabang</button>
             <button type="button" class="dt-item-nav-button" data-dt-or-bulk-actions x-bind:disabled="selectedCount() === 0 || isLoading || isAddingItem" x-on:click="bulkStatus('approved')">
                 <span>Approve Selected</span>
                 <span class="dt-item-filter-badge" x-text="selectedCount()">0</span>
@@ -1102,6 +1269,42 @@
                                 >
                                     ✎
                                 </button>
+                                @if ($row['status_value'] !== 'approved')
+                                    <button
+                                        type="button"
+                                        class="dt-item-icon-button"
+                                        title="Approve item"
+                                        data-dt-or-approve-item="{{ $row['key'] }}"
+                                        x-bind:disabled="isLoading || isAddingItem"
+                                        x-on:click="setItemStatus(@js($row['key']), 'approved')"
+                                    >
+                                        ✓
+                                    </button>
+                                @endif
+                                @if ($row['status_value'] !== 'rejected')
+                                    <button
+                                        type="button"
+                                        class="dt-item-icon-button danger"
+                                        title="Reject item"
+                                        data-dt-or-reject-item="{{ $row['key'] }}"
+                                        x-bind:disabled="isLoading || isAddingItem"
+                                        x-on:click="setItemStatus(@js($row['key']), 'rejected')"
+                                    >
+                                        ×
+                                    </button>
+                                @endif
+                                @if ($row['status_value'] !== 'draft')
+                                    <button
+                                        type="button"
+                                        class="dt-item-icon-button"
+                                        title="Set item ke Draft"
+                                        data-dt-or-draft-item="{{ $row['key'] }}"
+                                        x-bind:disabled="isLoading || isAddingItem"
+                                        x-on:click="setItemStatus(@js($row['key']), 'draft')"
+                                    >
+                                        D
+                                    </button>
+                                @endif
                                 <button
                                     type="button"
                                     class="dt-item-icon-button danger"
@@ -1137,7 +1340,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div class="dt-item-inline-editor" data-dt-inline-editor="{{ $row['key'] }}">
+                                <div class="dt-item-inline-editor" data-dt-inline-editor="{{ $row['key'] }}" data-status-locked="{{ $row['is_status_locked'] ? 'true' : 'false' }}">
                                     <div class="dt-item-inline-grid">
                                         @if ($row['is_status_locked'])
                                             <div class="dt-item-lock-banner">Item {{ $row['status_label'] }} tidak bisa diedit dari inline editor. Gunakan bulk action untuk mengembalikan ke Draft jika perlu revisi.</div>
@@ -1152,7 +1355,8 @@
                                                 data-search-method="products"
                                                 data-placeholder="Cari SKU atau nama product"
                                                 title="{{ $row['product'] }}"
-                                                x-bind:disabled="isLoading || isAddingItem"
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                             >
                                                 <option value="">Pilih product</option>
                                                 @foreach ($row['product_options'] as $value => $label)
@@ -1172,7 +1376,8 @@
                                                 data-currency-id="{{ $row['currency_id'] }}"
                                                 data-placeholder="Cari kode atau perusahaan supplier"
                                                 title="{{ $row['supplier'] }}"
-                                                x-bind:disabled="isLoading || isAddingItem"
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                             >
                                                 <option value="">Pilih supplier</option>
                                                 @foreach ($row['supplier_options'] as $value => $label)
@@ -1193,7 +1398,8 @@
                                                 data-search-method="cabangs"
                                                 data-placeholder="Cari kode atau nama cabang"
                                                 title="{{ $row['cabang'] }}"
-                                                x-bind:disabled="isLoading || isAddingItem"
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                             >
                                                 <option value="">Pilih cabang</option>
                                                 @foreach ($row['cabang_options'] as $value => $label)
@@ -1210,6 +1416,8 @@
                                                 class="dt-item-inline-input"
                                                 value="{{ $row['quantity_value'] }}"
                                                 data-dt-inline-quantity
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                                 x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'quantity', $event.target.value)"
                                                 x-on:keydown.enter.prevent.stop="void 0"
                                             >
@@ -1234,7 +1442,8 @@
                                                 data-search-method="currencies"
                                                 data-placeholder="Cari mata uang"
                                                 title="{{ $row['currency_label'] }}"
-                                                x-bind:disabled="isLoading || isAddingItem"
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                             >
                                                 <option value="">Pilih mata uang</option>
                                                 @foreach ($currencyOptions as $value => $label)
@@ -1273,6 +1482,8 @@
                                                     class="dt-item-inline-input"
                                                     value="{{ $row['unit_price_value'] }}"
                                                     data-dt-inline-unit-price
+                                                    @disabled($row['is_status_locked'])
+                                                    x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                                     x-mask:dynamic="$money($input, ',', '.', 2)"
                                                     x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'unit_price', $event.target.value)"
                                                     x-on:keydown.enter.prevent.stop="void 0"
@@ -1291,6 +1502,8 @@
                                                 class="dt-item-inline-input"
                                                 value="{{ $row['discount_value'] }}"
                                                 data-dt-inline-discount
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                                 x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'discount', $event.target.value)"
                                                 x-on:keydown.enter.prevent.stop="void 0"
                                             >
@@ -1325,6 +1538,8 @@
                                                             name="dt-inline-{{ $row['key'] }}-tipe-pajak"
                                                             value="{{ $value }}"
                                                             @checked($row['tipe_pajak_value'] === $value)
+                                                            @disabled($row['is_status_locked'])
+                                                            x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                                             x-on:change="updateInlineItem(@js($row['key']), 'tipe_pajak', $event.target.value)"
                                                         >
                                                         {{ $label }}
@@ -1368,6 +1583,8 @@
                                                 class="dt-item-inline-input"
                                                 rows="2"
                                                 data-dt-inline-note
+                                                @disabled($row['is_status_locked'])
+                                                x-bind:disabled="isLoading || isAddingItem || @js($row['is_status_locked'])"
                                                 x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'note', $event.target.value, 'Memperbarui note…')"
                                                 x-on:keydown.enter.stop
                                             >{{ $row['note_value'] }}</textarea>
@@ -1451,4 +1668,41 @@
             </span>
         </div>
     </div>
+
+    <template x-teleport="body">
+        <div
+            class="dt-item-reject-modal"
+            x-cloak
+            x-show="rejectModalOpen"
+            x-transition.opacity
+            x-on:keydown.escape.window="closeRejectModal()"
+            x-on:click.self="closeRejectModal()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dt-item-reject-modal-title"
+        >
+            <div class="dt-item-reject-modal-dialog">
+                <div class="dt-item-reject-modal-header">
+                    <h3 class="dt-item-reject-modal-title" id="dt-item-reject-modal-title" x-text="rejectModalTitle"></h3>
+                    <p class="dt-item-reject-modal-description">Masukkan alasan reject sebelum melanjutkan.</p>
+                </div>
+                <div class="dt-item-reject-modal-body">
+                    <label class="dt-item-reject-modal-field">
+                        <span class="dt-item-reject-modal-label">Alasan reject</span>
+                        <textarea
+                            class="dt-item-reject-modal-textarea"
+                            rows="5"
+                            x-model="rejectModalReason"
+                            placeholder="Tulis alasan reject item..."
+                            data-dt-reject-reason
+                        ></textarea>
+                    </label>
+                </div>
+                <div class="dt-item-reject-modal-footer">
+                    <button type="button" class="dt-item-reject-modal-button" x-on:click="closeRejectModal()">Batal</button>
+                    <button type="button" class="dt-item-reject-modal-button danger" x-bind:disabled="! rejectModalReason.trim()" x-on:click="submitRejectModal()">Reject</button>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>

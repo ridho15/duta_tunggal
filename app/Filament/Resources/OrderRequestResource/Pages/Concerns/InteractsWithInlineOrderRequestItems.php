@@ -40,7 +40,37 @@ trait InteractsWithInlineOrderRequestItems
             return;
         }
 
-        $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+        $item = $this->applyInlineOrderRequestItemFieldUpdate(
+            is_array($items[$itemKey]) ? $items[$itemKey] : [],
+            $field,
+            $value
+        );
+
+        if ($item === null) {
+            return;
+        }
+
+        $items[$itemKey] = $item;
+        $this->data['orderRequestItem'] = $items;
+    }
+
+    protected function applyInlineOrderRequestItemFieldUpdate(array $item, string $field, mixed $value): ?array
+    {
+        $allowedFields = [
+            'product_id',
+            'supplier_id',
+            'cabang_id',
+            'currency_id',
+            'quantity',
+            'unit_price',
+            'discount',
+            'tipe_pajak',
+            'note',
+        ];
+
+        if (! in_array($field, $allowedFields, true)) {
+            return null;
+        }
 
         if (OrderRequestItem::normalizeApprovalStatus($item['status'] ?? null) !== OrderRequestItem::STATUS_DRAFT) {
             Notification::make()
@@ -49,8 +79,9 @@ trait InteractsWithInlineOrderRequestItems
                 ->body('Item yang sudah approved atau rejected harus dikembalikan ke Draft sebelum diedit.')
                 ->send();
 
-            return;
+            return null;
         }
+
         $normalizedValue = is_string($value) ? trim($value) : $value;
 
         if (in_array($field, ['product_id', 'supplier_id', 'cabang_id', 'currency_id'], true)) {
@@ -158,8 +189,7 @@ trait InteractsWithInlineOrderRequestItems
 
         $item = OrderRequestResource::recalculateOrderRequestItemPreviewState($item);
 
-        $items[$itemKey] = $item;
-        $this->data['orderRequestItem'] = $items;
+        return $item;
     }
 
     public function searchInlineOrderRequestProducts(string $search = ''): array
@@ -360,6 +390,150 @@ trait InteractsWithInlineOrderRequestItems
             ->body(number_format($itemKeys->count(), 0, ',', '.') . ' item berhasil diperbarui.')
             ->send();
     }
+
+    public function updateInlineOrderRequestItemStatus(string $itemKey, string $status, ?string $rejectionNote = null): void
+    {
+        $this->bulkUpdateInlineOrderRequestItemStatus([$itemKey], $status, $rejectionNote);
+    }
+
+    public function bulkUpdateInlineOrderRequestItemSupplier(array $itemKeys, mixed $supplierId): void
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+
+        if (! is_array($items)) {
+            return;
+        }
+
+        $supplierId = filled($supplierId) && is_numeric($supplierId) ? (int) $supplierId : null;
+        if (! $supplierId || ! Supplier::query()->whereKey($supplierId)->exists()) {
+            Notification::make()
+                ->warning()
+                ->title('Supplier belum dipilih')
+                ->body('Pilih supplier target sebelum menjalankan bulk set supplier.')
+                ->send();
+
+            return;
+        }
+
+        $itemKeys = $this->normalizeInlineOrderRequestItemKeys($itemKeys, $items);
+        if ($itemKeys->isEmpty()) {
+            return;
+        }
+
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($itemKeys as $itemKey) {
+            $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+
+            if (
+                OrderRequestItem::normalizeApprovalStatus($item['status'] ?? null) !== OrderRequestItem::STATUS_DRAFT
+                || ! filled($item['product_id'] ?? null)
+            ) {
+                $skipped++;
+                continue;
+            }
+
+            $updatedItem = $this->applyInlineOrderRequestItemFieldUpdate($item, 'supplier_id', $supplierId);
+            if ($updatedItem === null) {
+                $skipped++;
+                continue;
+            }
+
+            $items[$itemKey] = $updatedItem;
+            $updated++;
+        }
+
+        $this->data['orderRequestItem'] = $items;
+        $this->notifyInlineBulkFieldUpdate('Supplier item diperbarui', $updated, $skipped);
+    }
+
+    public function bulkUpdateInlineOrderRequestItemCabang(array $itemKeys, mixed $cabangId): void
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+
+        if (! is_array($items)) {
+            return;
+        }
+
+        $cabangId = filled($cabangId) && is_numeric($cabangId) ? (int) $cabangId : null;
+        if (! $cabangId || ! $this->inlineOrderRequestCabangIsAllowed($cabangId)) {
+            Notification::make()
+                ->warning()
+                ->title('Cabang tidak dapat dipakai')
+                ->body('Pilih cabang target yang tersedia untuk user ini.')
+                ->send();
+
+            return;
+        }
+
+        $itemKeys = $this->normalizeInlineOrderRequestItemKeys($itemKeys, $items);
+        if ($itemKeys->isEmpty()) {
+            return;
+        }
+
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($itemKeys as $itemKey) {
+            $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+
+            if (OrderRequestItem::normalizeApprovalStatus($item['status'] ?? null) !== OrderRequestItem::STATUS_DRAFT) {
+                $skipped++;
+                continue;
+            }
+
+            $updatedItem = $this->applyInlineOrderRequestItemFieldUpdate($item, 'cabang_id', $cabangId);
+            if ($updatedItem === null) {
+                $skipped++;
+                continue;
+            }
+
+            $items[$itemKey] = $updatedItem;
+            $updated++;
+        }
+
+        $this->data['orderRequestItem'] = $items;
+        $this->notifyInlineBulkFieldUpdate('Cabang item diperbarui', $updated, $skipped);
+    }
+
+    protected function normalizeInlineOrderRequestItemKeys(array $itemKeys, array $items): \Illuminate\Support\Collection
+    {
+        return collect($itemKeys)
+            ->map(fn ($key) => (string) $key)
+            ->filter(fn (string $key) => array_key_exists($key, $items))
+            ->unique()
+            ->values();
+    }
+
+    protected function inlineOrderRequestCabangIsAllowed(int $cabangId): bool
+    {
+        $user = Auth::user();
+        $manageType = $user?->manage_type ?? [];
+        $query = Cabang::query()->whereKey($cabangId);
+
+        if (! (is_array($manageType) && in_array('all', $manageType, true))) {
+            $query->whereKey($user?->cabang_id);
+        }
+
+        return $query->exists();
+    }
+
+    protected function notifyInlineBulkFieldUpdate(string $title, int $updated, int $skipped): void
+    {
+        $body = number_format($updated, 0, ',', '.') . ' item draft berhasil diperbarui.';
+
+        if ($skipped > 0) {
+            $body .= ' ' . number_format($skipped, 0, ',', '.') . ' item dilewati karena terkunci atau belum punya product.';
+        }
+
+        Notification::make()
+            ->success()
+            ->title($title)
+            ->body($body)
+            ->send();
+    }
+
     public function removeInlineOrderRequestItem(string $itemKey): bool
     {
         $items = data_get($this->data, 'orderRequestItem', []);
