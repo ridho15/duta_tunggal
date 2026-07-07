@@ -13,6 +13,8 @@ use App\Support\CurrencyConversionResolver;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Renderless;
 
 trait InteractsWithInlineOrderRequestItems
 {
@@ -40,7 +42,14 @@ trait InteractsWithInlineOrderRequestItems
             return;
         }
 
-        $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+        $drafts = data_get($this->data, '_order_request_item_drafts', []);
+        $drafts = is_array($drafts) ? $drafts : [];
+        $dirty = data_get($this->data, '_order_request_item_dirty', []);
+        $dirty = is_array($dirty) ? $dirty : [];
+
+        $item = is_array($drafts[$itemKey] ?? null)
+            ? $drafts[$itemKey]
+            : (is_array($items[$itemKey]) ? $items[$itemKey] : []);
 
         if (OrderRequestItem::normalizeApprovalStatus($item['status'] ?? null) !== OrderRequestItem::STATUS_DRAFT) {
             Notification::make()
@@ -158,10 +167,108 @@ trait InteractsWithInlineOrderRequestItems
 
         $item = OrderRequestResource::recalculateOrderRequestItemPreviewState($item);
 
-        $items[$itemKey] = $item;
-        $this->data['orderRequestItem'] = $items;
+        $drafts[$itemKey] = $item;
+        $dirty[$itemKey] = true;
+        $this->data['_order_request_item_drafts'] = $drafts;
+        $this->data['_order_request_item_dirty'] = $dirty;
     }
 
+    public function applyInlineOrderRequestItem(string $itemKey): bool
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+        $drafts = data_get($this->data, '_order_request_item_drafts', []);
+        $dirty = data_get($this->data, '_order_request_item_dirty', []);
+
+        if (
+            ! is_array($items)
+            || ! is_array($drafts)
+            || ! array_key_exists($itemKey, $items)
+            || ! array_key_exists($itemKey, $drafts)
+        ) {
+            return false;
+        }
+
+        $items[$itemKey] = OrderRequestResource::recalculateOrderRequestItemPreviewState(
+            is_array($drafts[$itemKey]) ? $drafts[$itemKey] : []
+        );
+
+        unset($drafts[$itemKey], $dirty[$itemKey]);
+
+        $this->data['orderRequestItem'] = $items;
+        $this->data['_order_request_item_drafts'] = $drafts;
+        $this->data['_order_request_item_dirty'] = is_array($dirty) ? $dirty : [];
+
+        return true;
+    }
+
+    public function applyPendingInlineOrderRequestItemDrafts(): void
+    {
+        $items = data_get($this->data, 'orderRequestItem', []);
+        $drafts = data_get($this->data, '_order_request_item_drafts', []);
+
+        if (! is_array($items) || ! is_array($drafts) || empty($drafts)) {
+            return;
+        }
+
+        foreach ($drafts as $itemKey => $draft) {
+            if (! array_key_exists($itemKey, $items) || ! is_array($draft)) {
+                continue;
+            }
+
+            $items[$itemKey] = OrderRequestResource::recalculateOrderRequestItemPreviewState($draft);
+        }
+
+        $this->data['orderRequestItem'] = $items;
+        $this->data['_order_request_item_drafts'] = [];
+        $this->data['_order_request_item_dirty'] = [];
+    }
+
+    protected function handleInlineOrderRequestValidationError(ValidationException $exception): void
+    {
+        $errors = $exception->validator?->errors()->messages() ?? [];
+        $itemErrorKey = null;
+        $itemMessages = [];
+
+        foreach ($errors as $attribute => $messages) {
+            if (! preg_match('/(?:^|\\.)orderRequestItem\\.([^\\.]+)\\./', (string) $attribute, $matches)) {
+                continue;
+            }
+
+            $itemErrorKey = (string) $matches[1];
+            $itemMessages = array_values(array_filter((array) $messages));
+
+            break;
+        }
+
+        if ($itemErrorKey === null) {
+            $this->data['_order_request_item_validation_error_key'] = null;
+            $this->data['_order_request_item_validation_errors'] = [];
+
+            return;
+        }
+
+        $items = data_get($this->data, 'orderRequestItem', []);
+        $itemKeys = is_array($items) ? array_values(array_map('strval', array_keys($items))) : [];
+        $itemIndex = array_search($itemErrorKey, $itemKeys, true);
+
+        $pageSize = (int) (data_get($this->data, '_order_request_item_page_size', 10) ?: 10);
+        $pageSize = in_array($pageSize, [10, 25, 50, 100], true) ? $pageSize : 10;
+
+        if ($itemIndex !== false) {
+            $this->data['_order_request_item_page'] = (int) floor($itemIndex / $pageSize) + 1;
+        }
+
+        $this->data['_order_request_item_search'] = null;
+        $this->data['_order_request_item_supplier_filter'] = null;
+        $this->data['_order_request_item_cabang_filter'] = null;
+        $this->data['_order_request_item_tax_filter'] = null;
+        $this->data['_order_request_item_active_key'] = $itemErrorKey;
+        $this->data['_order_request_item_expanded_key'] = $itemErrorKey;
+        $this->data['_order_request_item_validation_error_key'] = $itemErrorKey;
+        $this->data['_order_request_item_validation_errors'] = $itemMessages;
+    }
+
+    #[Renderless]
     public function searchInlineOrderRequestProducts(string $search = ''): array
     {
         return collect(OrderRequestResource::resolveProductOptions($search, 50))
@@ -170,6 +277,7 @@ trait InteractsWithInlineOrderRequestItems
             ->all();
     }
 
+    #[Renderless]
     public function searchInlineOrderRequestSuppliers(
         ?int $productId = null,
         ?int $currencyId = null,
@@ -181,6 +289,7 @@ trait InteractsWithInlineOrderRequestItems
             ->all();
     }
 
+    #[Renderless]
     public function searchInlineOrderRequestCabangs(string $search = ''): array
     {
         $user = Auth::user();
@@ -209,6 +318,7 @@ trait InteractsWithInlineOrderRequestItems
             ->all();
     }
 
+    #[Renderless]
     public function searchInlineOrderRequestCurrencies(string $search = ''): array
     {
         return Currency::query()
@@ -273,11 +383,17 @@ trait InteractsWithInlineOrderRequestItems
         ];
 
         $this->data['orderRequestItem'] = [$itemKey => $newItem] + $items;
+        $this->data['_order_request_item_drafts'] = [];
+        $this->data['_order_request_item_dirty'] = [];
         $this->data['_order_request_item_search'] = null;
         $this->data['_order_request_item_supplier_filter'] = null;
         $this->data['_order_request_item_cabang_filter'] = null;
         $this->data['_order_request_item_tax_filter'] = null;
         $this->data['_order_request_item_page'] = 1;
+        $this->data['_order_request_item_active_key'] = $itemKey;
+        $this->data['_order_request_item_expanded_key'] = $itemKey;
+        $this->data['_order_request_item_recently_added_key'] = $itemKey;
+        $this->data['_order_request_item_recently_added_message'] = 'Item baru ditambahkan di baris paling atas';
 
         return $itemKey;
     }
@@ -384,6 +500,32 @@ trait InteractsWithInlineOrderRequestItems
         }
 
         unset($items[$itemKey]);
+        $drafts = data_get($this->data, '_order_request_item_drafts', []);
+        $dirty = data_get($this->data, '_order_request_item_dirty', []);
+
+        if (is_array($drafts)) {
+            unset($drafts[$itemKey]);
+            $this->data['_order_request_item_drafts'] = $drafts;
+        }
+
+        if (is_array($dirty)) {
+            unset($dirty[$itemKey]);
+            $this->data['_order_request_item_dirty'] = $dirty;
+        }
+
+        foreach ([
+            '_order_request_item_active_key',
+            '_order_request_item_expanded_key',
+            '_order_request_item_recently_added_key',
+        ] as $stateKey) {
+            if ((string) data_get($this->data, $stateKey) === (string) $itemKey) {
+                $this->data[$stateKey] = null;
+            }
+        }
+
+        if ((string) data_get($this->data, '_order_request_item_recently_added_key') === '') {
+            $this->data['_order_request_item_recently_added_message'] = null;
+        }
 
         $pageSize = (int) data_get($this->data, '_order_request_item_page_size', 10);
         $pageSize = in_array($pageSize, [10, 25, 50, 100], true) ? $pageSize : 10;
@@ -432,4 +574,3 @@ trait InteractsWithInlineOrderRequestItems
         return 'Klik Simpan untuk menyimpan Order Request.';
     }
 }
-

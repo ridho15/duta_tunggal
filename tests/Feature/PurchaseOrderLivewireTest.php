@@ -202,6 +202,155 @@ test('purchase order edit page pre-fills cabang from related items when raw caba
         ->assertSet('data.cabang_id', $this->cabang->id);
 });
 
+test('purchase order inline item edits stay in draft until applied', function () {
+    $purchaseOrder = PurchaseOrder::create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'po_number' => 'PO-INLINE-DRAFT-001',
+        'order_date' => Carbon::now()->toDateString(),
+        'status' => 'draft',
+        'expected_date' => Carbon::now()->addDays(3)->toDateString(),
+        'total_amount' => 25000,
+        'tempo_hutang' => $this->supplier->tempo_hutang,
+        'created_by' => $this->user->id,
+    ]);
+
+    $purchaseOrder->purchaseOrderCurrency()->create([
+        'currency_id' => $this->currency->id,
+        'nominal' => 1,
+    ]);
+
+    $purchaseOrder->purchaseOrderItem()->create([
+        'product_id' => $this->product->id,
+        'quantity' => 2,
+        'unit_price' => 12500,
+        'discount' => 0,
+        'tax' => 0,
+        'tipe_pajak' => 'none',
+        'currency_id' => $this->currency->id,
+        'subtotal' => 25000,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id]);
+
+    $items = $component->get('data.purchaseOrderItem');
+    $key = (string) array_key_first($items);
+
+    $component->call('updateInlinePurchaseOrderItemField', $key, 'quantity', 3);
+
+    expect((float) $component->get("data.purchaseOrderItem.{$key}.quantity"))->toBe(2.0)
+        ->and((float) $component->get("data._purchase_order_item_drafts.{$key}.quantity"))->toBe(3.0)
+        ->and($component->get("data._purchase_order_item_dirty.{$key}"))->toBeTrue()
+        ->and((float) \App\Helpers\MoneyHelper::safeParse($component->get('data.total_amount')))->toBe(25000.0);
+
+    $component->call('applyInlinePurchaseOrderItem', $key);
+
+    expect((float) $component->get("data.purchaseOrderItem.{$key}.quantity"))->toBe(3.0)
+        ->and($component->get("data._purchase_order_item_drafts.{$key}"))->toBeNull()
+        ->and((float) \App\Helpers\MoneyHelper::safeParse($component->get('data.total_amount')))->toBe(37500.0);
+});
+
+test('existing order request backed purchase order item can be saved again at allocated quantity', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->currency->id,
+        'status' => 'approved',
+    ]);
+
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'currency_id' => $this->currency->id,
+        'status' => 'approved',
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'total_amount' => 111000,
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->product->id,
+        'quantity' => 10,
+        'unit_price' => 10000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'eklusif',
+        'currency_id' => $this->currency->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItem->id,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id])
+        ->call('save')
+        ->assertHasNoErrors();
+});
+
+test('order request backed purchase order item over allocation shows visible validation feedback', function () {
+    $orderRequest = OrderRequest::factory()->create([
+        'currency_id' => $this->currency->id,
+    ]);
+
+    $orderRequestItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $orderRequest->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 10,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->currency->id,
+        'status' => 'approved',
+    ]);
+
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'currency_id' => $this->currency->id,
+        'status' => 'approved',
+        'refer_model_type' => OrderRequest::class,
+        'refer_model_id' => $orderRequest->id,
+        'total_amount' => 111000,
+    ]);
+
+    PurchaseOrderItem::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'product_id' => $this->product->id,
+        'quantity' => 10,
+        'unit_price' => 10000,
+        'discount' => 0,
+        'tax' => 11,
+        'tipe_pajak' => 'eklusif',
+        'currency_id' => $this->currency->id,
+        'refer_item_model_type' => OrderRequestItem::class,
+        'refer_item_model_id' => $orderRequestItem->id,
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id]);
+
+    $items = $component->get('data.purchaseOrderItem');
+    $key = (string) array_key_first($items);
+
+    $component
+        ->set("data.purchaseOrderItem.{$key}.quantity", 11)
+        ->call('save')
+        ->assertHasErrors(["data.purchaseOrderItem.{$key}.quantity"])
+        ->assertNotified('Item Purchase Order Belum Valid');
+
+    expect($component->get("data._purchase_order_item_validation_errors.{$key}.0"))
+        ->toContain('Qty tidak boleh melebihi sisa Order Request');
+});
+
 test('purchase order view uses infolist sections with purchase order details', function () {
     $purchaseOrder = PurchaseOrder::create([
         'supplier_id' => $this->supplier->id,

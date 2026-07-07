@@ -22,8 +22,10 @@ class OrderRequestService
 
     /**
      * Build the list of OrderRequestItems to convert to PO items.
-     * When $data['selected_items'] is present, use only items with include=true
-     * and respect the user-edited quantity/price. Otherwise fall back to all items.
+     * Only approved Order Request items may be converted into Purchase Order
+     * items. When $data['selected_items'] is present, use only approved items
+     * with include=true and respect the user-edited quantity/price. Otherwise
+     * fall back to all approved items with remaining quantity.
      *
      * Returns a Collection of arrays:
      *  ['order_request_item' => OrderRequestItem, 'quantity' => float, 'unit_price' => float]
@@ -42,7 +44,7 @@ class OrderRequestService
                         return null;
                     }
 
-                    if (OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_REJECTED) {
+                    if (OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) !== OrderRequestItem::STATUS_APPROVED) {
                         return null;
                     }
 
@@ -93,9 +95,9 @@ class OrderRequestService
                 ->filter();
         }
 
-        // No selection provided — use all items with remaining quantity
+        // No selection provided — use all approved items with remaining quantity.
         return $orderRequest->orderRequestItem
-            ->filter(fn ($orderRequestItem) => OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) !== OrderRequestItem::STATUS_REJECTED)
+            ->filter(fn ($orderRequestItem) => OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED)
             ->map(function ($orderRequestItem) use ($supplier) {
             $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
             if ($remainingQty <= 0) {
@@ -145,16 +147,36 @@ class OrderRequestService
         $selectedItems = collect($data['selected_items'] ?? []);
 
         if ($selectedItems->isEmpty()) {
-            $orderRequest->orderRequestItem()->update([
-                'status' => OrderRequestItem::STATUS_APPROVED,
-                'approved_by' => Auth::id(),
-                'approved_at' => now(),
-                'rejected_by' => null,
-                'rejected_at' => null,
-                'rejection_note' => null,
-            ]);
-            $orderRequest->syncItemApprovalStatus();
-            return;
+            throw new \InvalidArgumentException('Keputusan item wajib diisi sebelum Order Request dapat di-approve.');
+        }
+
+        $selectedByItemId = $selectedItems
+            ->filter(fn ($row) => ! empty($row['item_id']))
+            ->keyBy(fn ($row) => (int) $row['item_id']);
+
+        foreach ($orderRequest->orderRequestItem as $item) {
+            $row = $selectedByItemId->get((int) $item->id);
+
+            if (! $row) {
+                if (OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT) {
+                    throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
+                }
+
+                continue;
+            }
+
+            if (! array_key_exists('approval_status', $row)) {
+                throw new \InvalidArgumentException('Keputusan item wajib diisi sebelum Order Request dapat di-approve.');
+            }
+
+            $decision = OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null);
+            if ($decision === OrderRequestItem::STATUS_DRAFT) {
+                throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
+            }
+
+            if ($decision === OrderRequestItem::STATUS_REJECTED && trim((string) ($row['rejection_note'] ?? '')) === '') {
+                throw new \InvalidArgumentException('Alasan reject wajib diisi untuk item yang ditolak.');
+            }
         }
 
         foreach ($selectedItems as $row) {
@@ -169,10 +191,16 @@ class OrderRequestService
             }
 
             $decision = OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null);
-            if (! isset($row['approval_status'])) {
-                $decision = ! empty($row['include'])
-                    ? OrderRequestItem::STATUS_APPROVED
-                    : OrderRequestItem::STATUS_DRAFT;
+            if (! isset($row['approval_status']) || $decision === OrderRequestItem::STATUS_DRAFT) {
+                $item->update([
+                    'status' => OrderRequestItem::STATUS_DRAFT,
+                    'approved_by' => null,
+                    'approved_at' => null,
+                    'rejected_by' => null,
+                    'rejected_at' => null,
+                    'rejection_note' => null,
+                ]);
+                continue;
             }
 
             if ($decision === OrderRequestItem::STATUS_APPROVED) {
@@ -217,14 +245,36 @@ class OrderRequestService
         $orderRequest->syncItemApprovalStatus();
     }
 
+    private function ensureAllItemsHaveApprovalDecision($orderRequest): void
+    {
+        $orderRequest->load('orderRequestItem');
+
+        $hasDraftItem = $orderRequest->orderRequestItem
+            ->contains(fn (OrderRequestItem $item): bool => OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT);
+
+        if ($hasDraftItem) {
+            throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
+        }
+    }
+
     public function approve($orderRequest, $data)
     {
         $createPurchaseOrder = $data['create_purchase_order'] ?? true;
 
         $this->applyItemApprovalDecisions($orderRequest, $data);
         $orderRequest->refresh();
+        $this->ensureAllItemsHaveApprovalDecision($orderRequest);
 
         if ($createPurchaseOrder) {
+            $hasIncludedApprovedItem = ! empty($data['selected_items'])
+                && collect($data['selected_items'])
+                    ->filter(fn ($row) => ! empty($row['include']))
+                    ->contains(fn ($row) => OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED);
+
+            if (! $hasIncludedApprovedItem) {
+                return $orderRequest->fresh(['purchaseOrder.purchaseOrderItem']);
+            }
+
             $supplier = Supplier::findOrFail($data['supplier_id']);
 
             $defaultCurrency = Currency::query()->first();
@@ -235,6 +285,10 @@ class OrderRequestService
 
             $orderRequest->load('orderRequestItem');
             $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
+            if ($resolvedItems->isEmpty()) {
+                throw new \RuntimeException('Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.');
+            }
+
             $cabangId = $this->resolvePurchaseOrderCabangId($orderRequest, $data, $resolvedItems);
 
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
@@ -337,6 +391,10 @@ class OrderRequestService
 
         $orderRequest->load('orderRequestItem');
         $resolvedItems = $this->resolveSelectedItems($orderRequest, $data, $supplier);
+        if ($resolvedItems->isEmpty()) {
+            throw new \RuntimeException('Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.');
+        }
+
         $cabangId = $this->resolvePurchaseOrderCabangId($orderRequest, $data, $resolvedItems);
 
         $purchaseOrder = $orderRequest->purchaseOrders()->create([
@@ -417,9 +475,4 @@ class OrderRequestService
         $orderRequest->update(['status' => 'request_approve']);
     }
 }
-
-
-
-
-
 

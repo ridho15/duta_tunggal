@@ -25,6 +25,11 @@ class CreatePurchaseOrder extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $this->applyPendingInlinePurchaseOrderItemDrafts();
+        $data['purchaseOrderItem'] = $this->data['purchaseOrderItem'] ?? ($data['purchaseOrderItem'] ?? []);
+        $data['purchaseOrderCurrency'] = $this->data['purchaseOrderCurrency'] ?? ($data['purchaseOrderCurrency'] ?? []);
+        $data['total_amount'] = $this->data['total_amount'] ?? ($data['total_amount'] ?? 0);
+
         $data['created_by'] = Auth::id();
         $data['status']     = 'draft'; // PO dimulai dari draft, perlu disetujui manual
         return PurchaseOrderResource::syncPurchaseOrderCurrencyData($data);

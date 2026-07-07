@@ -7,6 +7,7 @@ use App\Filament\Resources\OrderRequestResource\Pages\Concerns\InteractsWithInli
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class EditOrderRequest extends EditRecord
 {
@@ -36,11 +37,21 @@ class EditOrderRequest extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $this->applyPendingInlineOrderRequestItemDrafts();
+        $data['orderRequestItem'] = $this->data['orderRequestItem'] ?? ($data['orderRequestItem'] ?? []);
+
         if ($this->getRecord()->created_by == null) {
             $data['created_by'] = Auth::user()->id;
         }
 
         return OrderRequestResource::mutateFormDataBeforeSave($data);
+    }
+
+    protected function onValidationError(ValidationException $exception): void
+    {
+        $this->handleInlineOrderRequestValidationError($exception);
+
+        parent::onValidationError($exception);
     }
 
     protected function getRedirectUrl(): string

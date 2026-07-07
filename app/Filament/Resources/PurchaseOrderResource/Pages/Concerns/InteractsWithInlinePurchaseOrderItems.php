@@ -10,6 +10,7 @@ use App\Support\CurrencyConversionResolver;
 use App\Support\TaxTypeHelper;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Renderless;
 
 trait InteractsWithInlinePurchaseOrderItems
 {
@@ -27,7 +28,14 @@ trait InteractsWithInlinePurchaseOrderItems
             return;
         }
 
-        $item = is_array($items[$itemKey]) ? $items[$itemKey] : [];
+        $drafts = data_get($this->data, '_purchase_order_item_drafts', []);
+        $drafts = is_array($drafts) ? $drafts : [];
+        $dirty = data_get($this->data, '_purchase_order_item_dirty', []);
+        $dirty = is_array($dirty) ? $dirty : [];
+
+        $item = is_array($drafts[$itemKey] ?? null)
+            ? $drafts[$itemKey]
+            : (is_array($items[$itemKey]) ? $items[$itemKey] : []);
         $oldCurrencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
         $isOrderRequestBacked = ($item['refer_item_model_type'] ?? null) === OrderRequestItem::class
             || filled($item['refer_item_model_id'] ?? null);
@@ -73,10 +81,106 @@ trait InteractsWithInlinePurchaseOrderItems
         }
 
         $item = PurchaseOrderResource::recalculatePurchaseOrderItemPreviewState($item);
-        $items[$itemKey] = $item;
+        $drafts[$itemKey] = $item;
+        $dirty[$itemKey] = true;
+
+        $this->data['_purchase_order_item_drafts'] = $drafts;
+        $this->data['_purchase_order_item_dirty'] = $dirty;
+    }
+
+    public function applyInlinePurchaseOrderItem(string $itemKey): bool
+    {
+        $items = data_get($this->data, 'purchaseOrderItem', []);
+        $drafts = data_get($this->data, '_purchase_order_item_drafts', []);
+        $dirty = data_get($this->data, '_purchase_order_item_dirty', []);
+
+        if (
+            ! is_array($items)
+            || ! is_array($drafts)
+            || ! array_key_exists($itemKey, $items)
+            || ! array_key_exists($itemKey, $drafts)
+        ) {
+            return false;
+        }
+
+        $items[$itemKey] = PurchaseOrderResource::recalculatePurchaseOrderItemPreviewState(
+            is_array($drafts[$itemKey]) ? $drafts[$itemKey] : []
+        );
+
+        unset($drafts[$itemKey], $dirty[$itemKey]);
 
         $this->data['purchaseOrderItem'] = $items;
+        $this->data['_purchase_order_item_drafts'] = $drafts;
+        $this->data['_purchase_order_item_dirty'] = is_array($dirty) ? $dirty : [];
         $this->syncInlinePurchaseOrderTotalsAndCurrencies();
+
+        return true;
+    }
+
+    public function applyPendingInlinePurchaseOrderItemDrafts(): void
+    {
+        $items = data_get($this->data, 'purchaseOrderItem', []);
+        $drafts = data_get($this->data, '_purchase_order_item_drafts', []);
+
+        if (! is_array($items) || ! is_array($drafts) || empty($drafts)) {
+            return;
+        }
+
+        foreach ($drafts as $itemKey => $draft) {
+            if (! array_key_exists($itemKey, $items) || ! is_array($draft)) {
+                continue;
+            }
+
+            $items[$itemKey] = PurchaseOrderResource::recalculatePurchaseOrderItemPreviewState($draft);
+        }
+
+        $this->data['purchaseOrderItem'] = $items;
+        $this->data['_purchase_order_item_drafts'] = [];
+        $this->data['_purchase_order_item_dirty'] = [];
+        $this->syncInlinePurchaseOrderTotalsAndCurrencies();
+    }
+
+    #[Renderless]
+    public function searchInlinePurchaseOrderProducts(string $search = ''): array
+    {
+        return Product::withoutGlobalScope('product_cabang')
+            ->when(trim($search) !== '', function ($query) use ($search) {
+                $query->where(function ($productQuery) use ($search) {
+                    $productQuery->where('sku', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'sku', 'name'])
+            ->map(fn (Product $product) => [
+                'id' => (string) $product->id,
+                'text' => "({$product->sku}) {$product->name}",
+            ])
+            ->values()
+            ->all();
+    }
+
+    #[Renderless]
+    public function searchInlinePurchaseOrderCurrencies(string $search = ''): array
+    {
+        return Currency::query()
+            ->when(trim($search) !== '', function ($query) use ($search) {
+                $query->where(function ($currencyQuery) use ($search) {
+                    $currencyQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('symbol', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'code', 'symbol'])
+            ->map(fn (Currency $currency) => [
+                'id' => (string) $currency->id,
+                'text' => trim("{$currency->name} ({$currency->code} / {$currency->symbol})"),
+            ])
+            ->values()
+            ->all();
     }
 
     public function addInlinePurchaseOrderItem(): string
@@ -105,6 +209,8 @@ trait InteractsWithInlinePurchaseOrderItems
         ]);
 
         $this->data['purchaseOrderItem'] = [$itemKey => $newItem] + $items;
+        $this->data['_purchase_order_item_drafts'] = [];
+        $this->data['_purchase_order_item_dirty'] = [];
         $this->data['_purchase_order_item_search'] = null;
         $this->data['_purchase_order_item_tax_filter'] = null;
         $this->data['_purchase_order_item_source_filter'] = null;
@@ -132,6 +238,19 @@ trait InteractsWithInlinePurchaseOrderItems
         }
 
         unset($items[$itemKey]);
+        $drafts = data_get($this->data, '_purchase_order_item_drafts', []);
+        $dirty = data_get($this->data, '_purchase_order_item_dirty', []);
+
+        if (is_array($drafts)) {
+            unset($drafts[$itemKey]);
+            $this->data['_purchase_order_item_drafts'] = $drafts;
+        }
+
+        if (is_array($dirty)) {
+            unset($dirty[$itemKey]);
+            $this->data['_purchase_order_item_dirty'] = $dirty;
+        }
+
         $this->data['purchaseOrderItem'] = $items;
         $this->syncInlinePurchaseOrderTotalsAndCurrencies();
 

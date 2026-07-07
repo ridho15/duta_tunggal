@@ -40,12 +40,21 @@
     .dt-po-number{text-align:right;white-space:nowrap}
     .dt-po-badge{display:inline-flex;border-radius:999px;background:#eff6ff;color:#1e40af;padding:4px 9px;font-size:11px;font-weight:800}
     .dt-po-badge.manual{background:#f3f4f6;color:#374151}
+    .dt-po-badge.dirty{background:#fef3c7;color:#92400e}
+    .dt-po-dirty-helper{display:inline-flex;color:#92400e;font-size:11px;font-weight:700}
+    .dt-po-idle-helper{display:inline-flex;color:#64748b;font-size:11px;font-weight:700}
+    .dt-po-error-alert{margin:12px 0;border:1px solid #fecaca;border-radius:10px;background:#fef2f2;color:#991b1b;padding:10px 12px;font-size:12px;font-weight:700}
+    .dt-po-error-alert ul{margin:6px 0 0 18px;padding:0}
+    .dt-po-error-badge{display:inline-flex;border-radius:999px;background:#fee2e2;color:#991b1b;padding:4px 9px;font-size:11px;font-weight:800}
     .dt-po-action-col{position:sticky;right:0;background:#fff;box-shadow:-8px 0 12px -12px rgba(15,23,42,.45);text-align:center;min-width:86px}
     .dt-po-table th.dt-po-action-col{background:#f8fafc;z-index:1}
     .dt-po-icon-button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid #e5e7eb;background:#fff;color:#1d4ed8;border-radius:9px;cursor:pointer;font-weight:900}
     .dt-po-icon-button:hover{background:#eff6ff;border-color:#93c5fd}
     .dt-po-icon-button.danger{color:#dc2626}
     .dt-po-icon-button.danger:hover{background:#fef2f2;border-color:#fecaca}
+    .dt-po-apply-button{display:inline-flex;align-items:center;gap:7px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:900;cursor:pointer}
+    .dt-po-apply-button:hover:not(:disabled){background:#dbeafe}
+    .dt-po-apply-button:disabled{cursor:not-allowed;opacity:.55}
     .dt-po-detail-row td{padding:0;border-bottom:1px solid #e5e7eb;background:#fff}
     .dt-po-detail-card{margin:0 42px 12px 82px;border:1px solid #e5e7eb;border-radius:11px;overflow:hidden;background:#fff}
     .dt-po-detail-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc;font-size:13px}
@@ -56,6 +65,20 @@
     .dt-po-inline-field label{font-size:12px;font-weight:800;color:#475569}
     .dt-po-inline-input,.dt-po-inline-select{width:100%;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#111827;padding:9px 11px;font-size:13px;line-height:1.4}
     .dt-po-inline-select{padding-right:34px}
+    .dt-po-tax-select{
+        appearance:none;
+        -webkit-appearance:none;
+        -moz-appearance:none;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+        background-repeat:no-repeat;
+        background-position:right 11px center;
+        background-size:16px 16px;
+        padding-right:40px;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+    }
+    .dt-po-tax-select:disabled{background-image:none}
     .dt-po-inline-input[readonly],.dt-po-inline-select:disabled{background:#f8fafc;color:#64748b;cursor:not-allowed}
     .dt-po-money-wrap{display:flex;align-items:stretch;min-width:0}
     .dt-po-money-prefix{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:0 10px;border:1px solid #d1d5db;border-right:0;border-radius:10px 0 0 10px;background:#f8fafc;color:#475569;font-size:12px;font-weight:800}
@@ -87,11 +110,18 @@
         cabangValue: '',
         isLoading: false,
         loadingMessage: '',
+        select2AssetsPromise: null,
         init() {
             this.searchValue = this.$root.dataset.currentSearch || '';
             this.taxValue = this.$root.dataset.currentTax || '';
             this.sourceValue = this.$root.dataset.currentSource || '';
             this.cabangValue = this.$root.dataset.currentCabang || '';
+
+            this.$nextTick(() => {
+                if (this.expandedKey) {
+                    this.initInlineSelects(this.expandedKey);
+                }
+            });
         },
         startLoading(message) {
             this.loadingMessage = message;
@@ -116,6 +146,19 @@
                 return await this.$wire.updateInlinePurchaseOrderItemField(String(key), String(field), value);
             } finally {
                 this.finishLoading();
+                this.$nextTick(() => {
+                    if (this.expandedKey) {
+                        this.initInlineSelects(this.expandedKey);
+                    }
+                });
+            }
+        },
+        async applyInlineItem(key) {
+            this.startLoading('Menyimpan perubahan item...');
+            try {
+                return await this.$wire.applyInlinePurchaseOrderItem(String(key));
+            } finally {
+                this.finishLoading();
             }
         },
         async addItem() {
@@ -124,6 +167,7 @@
                 const key = await this.$wire.addInlinePurchaseOrderItem();
                 this.expandedKey = String(key);
                 window.__dtPoExpandedItemKey = this.expandedKey;
+                this.$nextTick(() => this.initInlineSelects(this.expandedKey));
             } finally {
                 this.finishLoading();
             }
@@ -149,6 +193,119 @@
 
             this.expandedKey = String(key);
             window.__dtPoExpandedItemKey = this.expandedKey;
+            this.$nextTick(() => this.initInlineSelects(this.expandedKey));
+        },
+        ensureSelect2Assets() {
+            if (window.jQuery?.fn?.select2) {
+                return Promise.resolve(window.jQuery);
+            }
+
+            if (window.__dtPoSelect2AssetsPromise) {
+                return window.__dtPoSelect2AssetsPromise;
+            }
+
+            const loadStyle = () => {
+                if (document.querySelector('link[data-dt-po-select2]')) return;
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css';
+                link.dataset.dtPoSelect2 = 'true';
+                document.head.appendChild(link);
+            };
+            const loadScript = (src, marker) => new Promise((resolve, reject) => {
+                const existing = document.querySelector('script[' + marker + ']');
+                if (existing) {
+                    if (existing.dataset.loaded === 'true') return resolve();
+                    existing.addEventListener('load', resolve, { once: true });
+                    existing.addEventListener('error', reject, { once: true });
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = src;
+                script.setAttribute(marker, 'true');
+                script.addEventListener('load', () => {
+                    script.dataset.loaded = 'true';
+                    resolve();
+                }, { once: true });
+                script.addEventListener('error', reject, { once: true });
+                document.head.appendChild(script);
+            });
+
+            window.__dtPoSelect2AssetsPromise = (async () => {
+                loadStyle();
+                if (! window.jQuery) {
+                    await loadScript('https://code.jquery.com/jquery-3.7.1.min.js', 'data-dt-po-jquery');
+                }
+                if (! window.jQuery?.fn?.select2) {
+                    await loadScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', 'data-dt-po-select2-script');
+                }
+                return window.jQuery;
+            })();
+
+            return window.__dtPoSelect2AssetsPromise;
+        },
+        async initInlineSelects(key) {
+            const editor = this.$root.querySelector('[data-dt-po-inline-editor=' + CSS.escape(String(key)) + ']');
+            if (! editor) return;
+
+            let jq;
+            try {
+                jq = await this.ensureSelect2Assets();
+            } catch (error) {
+                console.warn('Select2 inline PO tidak dapat dimuat; memakai native select.', error);
+                return;
+            }
+
+            editor.querySelectorAll('select[data-dt-po-inline-select]').forEach((element) => {
+                const $select = jq(element);
+                const field = element.dataset.field;
+                const searchMethod = element.dataset.searchMethod;
+
+                if ($select.data('select2')) {
+                    $select.off('.dtPoInline');
+                    $select.select2('destroy');
+                }
+
+                if (element.disabled) {
+                    return;
+                }
+
+                element.dataset.dtPoSelect2Managed = 'true';
+
+                $select.select2({
+                    width: '100%',
+                    allowClear: true,
+                    placeholder: element.dataset.placeholder || 'Pilih data',
+                    dropdownParent: jq(editor),
+                    ajax: {
+                        delay: 250,
+                        transport: (params, success, failure) => {
+                            const search = params.data?.term || '';
+                            const request = searchMethod === 'products'
+                                ? this.$wire.searchInlinePurchaseOrderProducts(search)
+                                : this.$wire.searchInlinePurchaseOrderCurrencies(search);
+
+                            Promise.resolve(request)
+                                .then((results) => success({ results: results || [] }))
+                                .catch(failure);
+
+                            return { abort() {} };
+                        },
+                        processResults: (data) => data,
+                    },
+                });
+
+                $select.off('.dtPoInline').on('change.dtPoInline', () => {
+                    const currentEditor = element.closest('[data-dt-po-inline-editor]');
+                    const currentKey = currentEditor?.dataset?.dtPoInlineEditor;
+
+                    if (! currentKey || ! field) return;
+
+                    const label = field.replace('_id', '').replace('currency', 'mata uang');
+                    this.updateInlineItem(currentKey, field, element.value, 'Memperbarui ' + label + '...');
+                });
+            });
         },
     }"
     x-bind:aria-busy="isLoading.toString()"
@@ -231,6 +388,19 @@
         </template>
     </div>
 
+    @if (! empty($validationErrors))
+        <div class="dt-po-error-alert" data-dt-po-validation-summary>
+            Ada item Purchase Order yang belum valid. Buka item yang ditandai untuk melihat detail.
+            <ul>
+                @foreach ($validationErrors as $itemKey => $messages)
+                    @foreach ((array) $messages as $message)
+                        <li>Item {{ $itemKey }}: {{ $message }}</li>
+                    @endforeach
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <div class="dt-po-table-wrap" x-bind:class="{ 'is-loading': isLoading }">
         <template x-if="isLoading">
             <div class="dt-po-loading-overlay"><div class="dt-po-loading-card"><span class="dt-po-loading-spinner"></span><span x-text="loadingMessage"></span></div></div>
@@ -261,7 +431,12 @@
                         </td>
                         <td>{{ $row['number'] }}</td>
                         <td class="dt-po-product">{{ $row['product'] }}<small>{{ $row['refer_item_model_id'] ? 'OR Item #' . $row['refer_item_model_id'] : 'Manual item' }}</small></td>
-                        <td><span class="dt-po-badge {{ $row['is_order_request_backed'] ? '' : 'manual' }}">{{ $row['source'] }}</span></td>
+                        <td>
+                            <span class="dt-po-badge {{ $row['is_order_request_backed'] ? '' : 'manual' }}">{{ $row['source'] }}</span>
+                            @if (! empty($row['validation_errors']))
+                                <span class="dt-po-error-badge">Ada error</span>
+                            @endif
+                        </td>
                         <td class="dt-po-number">{{ number_format((float) $row['quantity'], 2, ',', '.') }}</td>
                         <td>{{ $row['unit'] }}</td>
                         <td class="dt-po-number">{{ $row['currency_symbol'] }} {{ $row['unit_price'] }}</td>
@@ -275,14 +450,51 @@
                         <td colspan="10">
                             <div class="dt-po-detail-card">
                                 <div class="dt-po-detail-summary">
-                                    <strong>{{ $row['product'] }}</strong>
-                                    <span class="dt-po-badge {{ $row['is_order_request_backed'] ? '' : 'manual' }}">{{ $row['source'] }}</span>
+                                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                        <strong>{{ $row['product'] }}</strong>
+                                        <span class="dt-po-badge {{ $row['is_order_request_backed'] ? '' : 'manual' }}">{{ $row['source'] }}</span>
+                                        @if ($row['is_dirty'])
+                                            <span class="dt-po-badge dirty">Belum diterapkan</span>
+                                            <span class="dt-po-dirty-helper">Klik Simpan Perubahan Item agar masuk ke total/summary.</span>
+                                        @else
+                                            <span class="dt-po-idle-helper">Tidak ada perubahan item. Ubah qty/harga/diskon/pajak jika ingin menyimpan perubahan item.</span>
+                                        @endif
+                                        @if (! empty($row['validation_errors']))
+                                            <span class="dt-po-error-badge">Item belum valid</span>
+                                        @endif
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="dt-po-apply-button"
+                                        title="{{ $row['is_dirty'] ? 'Simpan perubahan item ke total/summary.' : 'Belum ada perubahan item untuk disimpan.' }}"
+                                        x-bind:disabled="isLoading || ! @js($row['is_dirty'])"
+                                        x-on:click="applyInlineItem(@js($row['key']))"
+                                    >
+                                        Simpan Perubahan Item
+                                    </button>
                                 </div>
-                                <div class="dt-po-inline-editor">
+                                <div class="dt-po-inline-editor" data-dt-po-inline-editor="{{ $row['key'] }}">
+                                    @if (! empty($row['validation_errors']))
+                                        <div class="dt-po-error-alert">
+                                            <ul>
+                                                @foreach ($row['validation_errors'] as $message)
+                                                    <li>{{ $message }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
                                     <div class="dt-po-inline-grid">
                                         <div class="dt-po-inline-field wide">
                                             <label>Product</label>
-                                            <select class="dt-po-inline-select" x-on:change="updateInlineItem(@js($row['key']), 'product_id', $event.target.value, 'Memperbarui product...')" @disabled($row['is_order_request_backed'])>
+                                            <select
+                                                class="dt-po-inline-select"
+                                                data-dt-po-inline-select
+                                                data-field="product_id"
+                                                data-search-method="products"
+                                                data-placeholder="Cari SKU atau nama product"
+                                                x-on:change="if (! $event.target.dataset.dtPoSelect2Managed) updateInlineItem(@js($row['key']), 'product_id', $event.target.value, 'Memperbarui product...')"
+                                                @disabled($row['is_order_request_backed'])
+                                            >
                                                 <option value="">Pilih product</option>
                                                 @foreach ($row['product_options'] as $id => $label)
                                                     <option value="{{ $id }}" @selected((string) $row['product_id'] === (string) $id)>{{ $label }}</option>
@@ -299,7 +511,15 @@
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Mata Uang</label>
-                                            <select class="dt-po-inline-select" x-on:change="updateInlineItem(@js($row['key']), 'currency_id', $event.target.value, 'Memperbarui mata uang...')" @disabled($row['is_order_request_backed'])>
+                                            <select
+                                                class="dt-po-inline-select"
+                                                data-dt-po-inline-select
+                                                data-field="currency_id"
+                                                data-search-method="currencies"
+                                                data-placeholder="Cari mata uang"
+                                                x-on:change="if (! $event.target.dataset.dtPoSelect2Managed) updateInlineItem(@js($row['key']), 'currency_id', $event.target.value, 'Memperbarui mata uang...')"
+                                                @disabled($row['is_order_request_backed'])
+                                            >
                                                 <option value="">Pilih mata uang</option>
                                                 @foreach ($row['currency_options'] as $id => $label)
                                                     <option value="{{ $id }}" @selected((string) $row['currency_id'] === (string) $id)>{{ $label }}</option>
@@ -319,7 +539,7 @@
                                         </div>
                                         <div class="dt-po-inline-field">
                                             <label>Tipe Pajak</label>
-                                            <select class="dt-po-inline-select" x-on:change="updateInlineItem(@js($row['key']), 'tipe_pajak', $event.target.value)" @disabled($row['is_order_request_backed'])>
+                                            <select class="dt-po-inline-select dt-po-tax-select" x-on:change="updateInlineItem(@js($row['key']), 'tipe_pajak', $event.target.value)" @disabled($row['is_order_request_backed'])>
                                                 @foreach ($taxOptions as $value => $label)
                                                     <option value="{{ $value }}" @selected($row['tipe_pajak'] === $value)>{{ $label }}</option>
                                                 @endforeach

@@ -7,6 +7,7 @@ use App\Filament\Resources\OrderRequestResource\Pages\Concerns\InteractsWithInli
 use App\Http\Controllers\HelperController;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class CreateOrderRequest extends CreateRecord
 {
@@ -16,9 +17,19 @@ class CreateOrderRequest extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $this->applyPendingInlineOrderRequestItemDrafts();
+
+        $data['orderRequestItem'] = $this->data['orderRequestItem'] ?? ($data['orderRequestItem'] ?? []);
         $data['created_by'] = Auth::user()->id;
 
         return OrderRequestResource::mutateFormDataBeforeCreate($data);
+    }
+
+    protected function onValidationError(ValidationException $exception): void
+    {
+        $this->handleInlineOrderRequestValidationError($exception);
+
+        parent::onValidationError($exception);
     }
 
     protected function afterCreate(): void

@@ -67,6 +67,7 @@ beforeEach(function () {
         'tax'              => 5,  // percent
         'tipe_pajak'       => 'Eklusif',
         'note'             => 'Untuk batch produksi 01',
+        'status'           => OrderRequestItem::STATUS_APPROVED,
     ]);
 
     $this->itemB = OrderRequestItem::factory()->create([
@@ -78,7 +79,170 @@ beforeEach(function () {
         'tax'              => 0,
         'tipe_pajak'       => 'Non Pajak',
         'note'             => 'Safety stock',
+        'status'           => OrderRequestItem::STATUS_APPROVED,
     ]);
+});
+
+test('approval without approved item keeps header from becoming approved', function () {
+    $this->orderRequest->update(['status' => 'request_approve']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    expect(fn () => $this->service->approve($this->orderRequest->fresh(['orderRequestItem']), [
+            'create_purchase_order' => false,
+            'selected_items' => [
+                ['item_id' => $this->itemA->id, 'approval_status' => OrderRequestItem::STATUS_DRAFT, 'include' => true],
+                ['item_id' => $this->itemB->id, 'approval_status' => OrderRequestItem::STATUS_DRAFT, 'include' => true],
+            ],
+        ]))
+        ->toThrow(\InvalidArgumentException::class, 'Masih ada item berstatus Draft');
+
+    expect($this->orderRequest->fresh()->status)->toBe('request_approve');
+    expect($this->itemA->fresh()->status)->toBe(OrderRequestItem::STATUS_DRAFT);
+    expect($this->itemB->fresh()->status)->toBe(OrderRequestItem::STATUS_DRAFT);
+    expect(PurchaseOrder::count())->toBe(0);
+});
+
+test('approval without selected item decisions is rejected', function () {
+    $this->orderRequest->update(['status' => 'request_approve']);
+
+    expect(fn () => $this->service->approve($this->orderRequest->fresh(['orderRequestItem']), [
+            'create_purchase_order' => false,
+        ]))
+        ->toThrow(\InvalidArgumentException::class, 'Keputusan item wajib diisi sebelum Order Request dapat di-approve.');
+
+    expect($this->orderRequest->fresh()->status)->toBe('request_approve');
+    expect($this->itemA->fresh()->status)->toBe(OrderRequestItem::STATUS_APPROVED);
+    expect($this->itemB->fresh()->status)->toBe(OrderRequestItem::STATUS_APPROVED);
+});
+
+test('approval rejects header when all items are rejected', function () {
+    $this->orderRequest->update(['status' => 'request_approve']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    $result = $this->service->approve($this->orderRequest->fresh(['orderRequestItem']), [
+        'create_purchase_order' => false,
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'approval_status' => OrderRequestItem::STATUS_REJECTED,
+                'rejection_note' => 'Tidak dibutuhkan',
+                'include' => true,
+            ],
+            [
+                'item_id' => $this->itemB->id,
+                'approval_status' => OrderRequestItem::STATUS_REJECTED,
+                'rejection_note' => 'Tidak dibutuhkan',
+                'include' => true,
+            ],
+        ],
+    ]);
+
+    expect($result->fresh()->status)->toBe('rejected');
+    expect(PurchaseOrder::count())->toBe(0);
+});
+
+test('approval rejects partial decision while any item remains draft', function () {
+    $this->orderRequest->update(['status' => 'request_approve']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    expect(fn () => $this->service->approve($this->orderRequest->fresh(['orderRequestItem.product']), [
+            'create_purchase_order' => true,
+            'po_number' => 'PO-PARTIAL-APPROVAL-001',
+            'supplier_id' => $this->supplier->id,
+            'order_date' => Carbon::now()->toDateTimeString(),
+            'selected_items' => [
+                [
+                    'item_id' => $this->itemA->id,
+                    'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                    'quantity' => 5,
+                    'unit_price' => 15000,
+                    'include' => true,
+                ],
+                [
+                    'item_id' => $this->itemB->id,
+                    'approval_status' => OrderRequestItem::STATUS_DRAFT,
+                    'quantity' => 3,
+                    'unit_price' => 27500,
+                    'include' => true,
+                ],
+            ],
+        ]))
+        ->toThrow(\InvalidArgumentException::class, 'Masih ada item berstatus Draft');
+
+    expect($this->orderRequest->fresh()->status)->toBe('request_approve');
+    expect(PurchaseOrder::count())->toBe(0);
+});
+
+test('approval marks header partial when items are explicitly approved and rejected', function () {
+    $this->orderRequest->update(['status' => 'request_approve']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    $result = $this->service->approve($this->orderRequest->fresh(['orderRequestItem.product']), [
+        'create_purchase_order' => true,
+        'po_number' => 'PO-PARTIAL-APPROVAL-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => Carbon::now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'quantity' => 5,
+                'unit_price' => 15000,
+                'include' => true,
+            ],
+            [
+                'item_id' => $this->itemB->id,
+                'approval_status' => OrderRequestItem::STATUS_REJECTED,
+                'rejection_note' => 'Tidak dibutuhkan',
+                'quantity' => 3,
+                'unit_price' => 27500,
+                'include' => true,
+            ],
+        ],
+    ]);
+
+    $purchaseOrder = $result->fresh()->purchaseOrders()->first();
+
+    expect($result->fresh()->status)->toBe('partial');
+    expect($purchaseOrder)->not->toBeNull();
+    expect($purchaseOrder->purchaseOrderItem)->toHaveCount(1)
+        ->and($purchaseOrder->purchaseOrderItem->first()->refer_item_model_id)->toBe($this->itemA->id);
+});
+
+test('approved item with include false is approved without creating purchase order', function () {
+    $this->orderRequest->update(['status' => 'request_approve']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    $result = $this->service->approve($this->orderRequest->fresh(['orderRequestItem.product']), [
+        'create_purchase_order' => true,
+        'po_number' => 'PO-NOT-CREATED-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => Carbon::now()->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'quantity' => 5,
+                'unit_price' => 15000,
+                'include' => false,
+            ],
+            [
+                'item_id' => $this->itemB->id,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'quantity' => 3,
+                'unit_price' => 27500,
+                'include' => false,
+            ],
+        ],
+    ]);
+
+    expect($result->fresh()->status)->toBe('approved');
+    expect(PurchaseOrder::count())->toBe(0);
 });
 
 test('order request approval generates purchase order and items', function () {
@@ -91,6 +255,22 @@ test('order request approval generates purchase order and items', function () {
         'order_date' => $orderDate->toDateTimeString(),
         'note' => 'Auto generated from order request',
         'expected_date' => $expectedDate->toDateTimeString(),
+        'selected_items' => [
+            [
+                'item_id' => $this->itemA->id,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'quantity' => 5,
+                'unit_price' => (float) $this->productA->cost_price,
+                'include' => true,
+            ],
+            [
+                'item_id' => $this->itemB->id,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'quantity' => 3,
+                'unit_price' => (float) $this->productB->cost_price,
+                'include' => true,
+            ],
+        ],
     ];
 
     $orderRequest = $this->orderRequest->fresh(['orderRequestItem.product']);
@@ -253,6 +433,67 @@ test('create purchase order from order request auto approves purchase order', fu
     expect($po->status)->toBe('approved')
         ->and($po->date_approved)->not->toBeNull()
         ->and($po->approved_by)->toBe($this->user->id);
+});
+
+test('createPurchaseOrder with selected_items only converts approved order request items', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_APPROVED]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    $rejectedItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $this->orderRequest->id,
+        'product_id' => $this->productB->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 4,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 12000,
+        'original_price' => 12000,
+        'currency_id' => $this->currency->id,
+        'status' => OrderRequestItem::STATUS_REJECTED,
+    ]);
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(['orderRequestItem.product']), [
+        'po_number' => 'PO-APPROVED-ONLY-001',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => now()->toDateTimeString(),
+        'selected_items' => [
+            ['item_id' => $this->itemA->id, 'quantity' => 5, 'unit_price' => 15000, 'include' => true],
+            ['item_id' => $this->itemB->id, 'quantity' => 3, 'unit_price' => 27500, 'include' => true],
+            ['item_id' => $rejectedItem->id, 'quantity' => 4, 'unit_price' => 12000, 'include' => true],
+        ],
+    ])->fresh(['purchaseOrderItem']);
+
+    expect($po->purchaseOrderItem)->toHaveCount(1)
+        ->and($po->purchaseOrderItem->first()->refer_item_model_id)->toBe($this->itemA->id);
+});
+
+test('createPurchaseOrder without selected_items only converts approved order request items', function () {
+    $this->orderRequest->update(['status' => 'approved']);
+    $this->itemA->update(['status' => OrderRequestItem::STATUS_APPROVED]);
+    $this->itemB->update(['status' => OrderRequestItem::STATUS_DRAFT]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $this->orderRequest->id,
+        'product_id' => $this->productB->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 2,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 9000,
+        'original_price' => 9000,
+        'currency_id' => $this->currency->id,
+        'status' => OrderRequestItem::STATUS_REJECTED,
+    ]);
+
+    $po = $this->service->createPurchaseOrder($this->orderRequest->fresh(['orderRequestItem.product']), [
+        'po_number' => 'PO-APPROVED-ONLY-002',
+        'supplier_id' => $this->supplier->id,
+        'order_date' => now()->toDateTimeString(),
+    ])->fresh(['purchaseOrderItem']);
+
+    expect($po->purchaseOrderItem)->toHaveCount(1)
+        ->and($po->purchaseOrderItem->first()->refer_item_model_id)->toBe($this->itemA->id);
 });
 
 // ─── Feature 2: tax_type → tipe_pajak mapping ────────────────────────────────

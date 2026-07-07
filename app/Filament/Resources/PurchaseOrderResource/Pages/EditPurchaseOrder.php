@@ -165,6 +165,52 @@ class EditPurchaseOrder extends EditRecord
         }
     }
 
+    public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
+    {
+        try {
+            $this->data['_purchase_order_item_validation_errors'] = [];
+            parent::save($shouldRedirect, $shouldSendSavedNotification);
+        } catch (ValidationException $exception) {
+            $this->data['_purchase_order_item_validation_errors'] = $this->purchaseOrderItemValidationErrors($exception);
+
+            if (! empty($this->data['_purchase_order_item_validation_errors'])) {
+                Notification::make()
+                    ->title('Item Purchase Order Belum Valid')
+                    ->body('Ada item Purchase Order yang belum valid. Periksa item yang ditandai lalu coba simpan kembali.')
+                    ->warning()
+                    ->send();
+            }
+
+            throw $exception;
+        }
+    }
+
+    protected function purchaseOrderItemValidationErrors(ValidationException $exception): array
+    {
+        $errors = [];
+
+        foreach ($exception->errors() as $attribute => $messages) {
+            if (! str_contains((string) $attribute, 'purchaseOrderItem')) {
+                continue;
+            }
+
+            $segments = explode('.', (string) $attribute);
+            $purchaseOrderItemIndex = array_search('purchaseOrderItem', $segments, true);
+            $itemKey = $purchaseOrderItemIndex !== false ? ($segments[$purchaseOrderItemIndex + 1] ?? null) : null;
+
+            if (! $itemKey) {
+                continue;
+            }
+
+            $errors[(string) $itemKey] = array_values(array_unique(array_merge(
+                $errors[(string) $itemKey] ?? [],
+                (array) $messages
+            )));
+        }
+
+        return $errors;
+    }
+
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
         try {
@@ -257,6 +303,13 @@ class EditPurchaseOrder extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $this->applyPendingInlinePurchaseOrderItemDrafts();
+        $data['purchaseOrderItem'] = $this->data['purchaseOrderItem'] ?? ($data['purchaseOrderItem'] ?? []);
+        $data['purchaseOrderCurrency'] = $this->data['purchaseOrderCurrency'] ?? ($data['purchaseOrderCurrency'] ?? []);
+        $data['total_amount'] = PurchaseOrderResource::parsePurchaseOrderCurrencyState(
+            $this->data['total_amount'] ?? ($data['total_amount'] ?? 0)
+        );
+
         return PurchaseOrderResource::syncPurchaseOrderCurrencyData($data);
     }
 }

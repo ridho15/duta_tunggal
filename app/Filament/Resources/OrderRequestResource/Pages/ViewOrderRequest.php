@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrderRequestResource\Pages;
 use App\Filament\Resources\OrderRequestResource;
 use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
+use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Services\OrderRequestService;
@@ -153,6 +154,8 @@ class ViewOrderRequest extends ViewRecord
                             'total_cost'       => OrderRequestResource::formatMoneyPreviewState($preview['total_cost']),
                             'subtotal'         => OrderRequestResource::formatMoneyPreviewState($preview['subtotal']),
                             'max_quantity'     => max(0, $remainingQty),
+                            'approval_status'  => OrderRequestItem::normalizeApprovalStatus($item->status ?? null),
+                            'rejection_note'   => $item->rejection_note,
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null),
                         ];
@@ -203,7 +206,10 @@ class ViewOrderRequest extends ViewRecord
                                 ->label('Tanggal Pembelian')
                                 ->required()
                                 ->native(false)
-                                ->displayFormat('d M Y'),
+                                ->displayFormat('d M Y')
+                                ->validationMessages([
+                                    'required' => 'Tanggal pembelian wajib diisi.',
+                                ]),
                             DatePicker::make('expected_date')
                                 ->label('Tanggal Diharapkan')
                                 ->nullable()
@@ -215,13 +221,15 @@ class ViewOrderRequest extends ViewRecord
                                 ->rows(3)
                                 ->columnSpanFull(),
                         ]),
-                    Section::make('Pilih Item yang Akan Dibeli')
-                        ->description('Centang item yang akan dimasukkan ke PO. Harga Override dapat diubah; Harga Asli berasal dari master produk.')
+                    Section::make('Keputusan Item Order Request')
+                        ->description(fn (Get $get): string => $get('create_purchase_order')
+                            ? 'Tentukan keputusan setiap item. Checkbox Sertakan memilih item Approved yang akan dibuatkan Purchase Order otomatis.'
+                            : 'Tentukan keputusan setiap item. Purchase Order tidak akan dibuat otomatis.'
+                        )
                         ->icon('heroicon-o-shopping-cart')
                         ->collapsible()
-                        ->visible(fn(Get $get) => $get('create_purchase_order'))
                         ->schema([
-                            OrderRequestResource::buildPurchaseOrderSelectedItemsRepeater(),
+                            OrderRequestResource::buildPurchaseOrderSelectedItemsRepeater(includeDependsOnAutoPurchaseOrder: true),
                         ]),
                 ])
                 ->visible(function ($record) {
@@ -231,9 +239,16 @@ class ViewOrderRequest extends ViewRecord
                     try {
                         $orderRequestService = app(OrderRequestService::class);
                         if ($data['create_purchase_order']) {
-                            $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                            $includedItems = OrderRequestResource::selectedPurchaseOrderApprovedItems($data['selected_items'] ?? []);
                             if ($includedItems->isEmpty()) {
-                                HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                                $data['create_purchase_order'] = false;
+                                $orderRequestService->approve($record, $data);
+                                $record->refresh();
+                                $notification = OrderRequestResource::approvalOutcomeNotification($record);
+                                if (OrderRequestItem::normalizeApprovalStatus($record->status) !== OrderRequestItem::STATUS_REJECTED) {
+                                    $notification['message'] = 'Order Request disetujui, tetapi tidak ada Purchase Order dibuat karena tidak ada item Approved yang dicentang untuk dibuatkan PO otomatis.';
+                                }
+                                HelperController::sendNotification(...$notification);
                                 return;
                             }
 
@@ -245,6 +260,10 @@ class ViewOrderRequest extends ViewRecord
                             });
 
                             if (!empty($data['multi_supplier']) || $groups->count() > 1) {
+                                $approvalData = array_merge($data, ['create_purchase_order' => false]);
+                                $orderRequestService->approve($record, $approvalData);
+                                $record->refresh();
+
                                 $created = 0;
                                 foreach ($groups as $groupItems) {
                                     $firstItem = $groupItems->first();
@@ -267,7 +286,8 @@ class ViewOrderRequest extends ViewRecord
                                 }
 
                                 $record->refresh();
-                                $record->update(['status' => 'approved']);
+                                $record->syncItemApprovalStatus();
+                                $record->refresh();
                                 HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
                                 return;
                             }
@@ -351,6 +371,8 @@ class ViewOrderRequest extends ViewRecord
                             'total_cost'       => OrderRequestResource::formatMoneyPreviewState($preview['total_cost']),
                             'subtotal'         => OrderRequestResource::formatMoneyPreviewState($preview['subtotal']),
                             'max_quantity'     => max(0, $remainingQty),
+                            'approval_status'  => OrderRequestItem::normalizeApprovalStatus($item->status ?? null),
+                            'rejection_note'   => $item->rejection_note,
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => $tipePajak,
                         ];
@@ -384,7 +406,10 @@ class ViewOrderRequest extends ViewRecord
                                 ->label('Tanggal Pembelian')
                                 ->required()
                                 ->native(false)
-                                ->displayFormat('d M Y'),
+                                ->displayFormat('d M Y')
+                                ->validationMessages([
+                                    'required' => 'Tanggal pembelian wajib diisi.',
+                                ]),
                             DatePicker::make('expected_date')
                                 ->label('Tanggal Diharapkan')
                                 ->nullable()
@@ -397,7 +422,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->columnSpanFull(),
                         ]),
                     Section::make('Pilih Item yang Akan Dibeli')
-                        ->description('Centang item yang akan dimasukkan ke dalam Purchase Order ini. Anda dapat mengubah harga override per item.')
+                        ->description('Hanya item berstatus Approved dengan sisa qty yang dapat dibuatkan Purchase Order. Checkbox Sertakan hanya memilih item mana yang masuk PO.')
                         ->icon('heroicon-o-shopping-cart')
                         ->collapsible()
                         ->schema([
@@ -408,16 +433,13 @@ class ViewOrderRequest extends ViewRecord
                     if (!Auth::user()->hasPermissionTo('approve order request') || !in_array($record->status, ['approved', 'partial'], true)) {
                         return false;
                     }
-                    // Show button as long as some items still have unfulfilled quantity
-                    return $record->orderRequestItem->contains(
-                        fn($item) => OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'] > 0
-                    );
+                    return OrderRequestResource::hasApprovedItemsAvailableForPurchaseOrder($record);
                 })
                 ->action(function (array $data, $record) {
                     $orderRequestService = app(OrderRequestService::class);
-                    $includedItems = collect($data['selected_items'] ?? [])->filter(fn($i) => $i['include'] ?? false);
+                    $includedItems = OrderRequestResource::selectedPurchaseOrderApprovedItems($data['selected_items'] ?? []);
                     if ($includedItems->isEmpty()) {
-                        HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Pilih minimal satu item.');
+                        HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.');
                         return;
                     }
 

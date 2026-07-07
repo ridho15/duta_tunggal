@@ -56,8 +56,12 @@
     .dt-item-status-badge.draft{background:#f3f4f6;color:#4b5563}
     .dt-item-status-badge.approved{background:#dcfce7;color:#166534}
     .dt-item-status-badge.rejected{background:#fee2e2;color:#991b1b}
+    .dt-item-dirty-helper{display:inline-flex;color:#92400e;font-size:11px;font-weight:700}
+    .dt-item-idle-helper{display:inline-flex;color:#64748b;font-size:11px;font-weight:700}
     .dt-item-rejection-note{display:block;margin-top:4px;color:#991b1b;font-size:11px;font-weight:700;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .dt-item-lock-banner{grid-column:span 12;border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:800}
+    .dt-item-error-summary{margin:12px 16px 0;padding:11px 13px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:10px;font-size:12px;font-weight:800}
+    .dt-item-error-summary ul{margin:6px 0 0 18px;padding:0;font-weight:700}
     .dt-item-product{font-weight:700;color:#111827;max-width:310px}
     .dt-item-product small{display:block;margin-top:3px;color:#6b7280;font-weight:600}
     .dt-item-number{text-align:right;white-space:nowrap}
@@ -102,6 +106,9 @@
     .dt-item-number small{display:block;margin-top:3px;color:#64748b;font-size:11px;font-weight:700;white-space:nowrap}
     .dt-item-recommendation{margin-top:2px;color:#1d4ed8;font-size:11px;font-weight:700}
     .dt-item-detail-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .dt-item-apply-button{display:inline-flex;align-items:center;gap:7px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:900;cursor:pointer}
+    .dt-item-apply-button:hover:not(:disabled){background:#dbeafe}
+    .dt-item-apply-button:disabled{cursor:not-allowed;opacity:.55}
     .dt-item-delete-text{display:inline-flex;align-items:center;gap:7px;border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer}
     .dt-item-delete-text:hover:not(:disabled){background:#fef2f2}
     .dt-item-delete-text:disabled{cursor:not-allowed;opacity:.55}
@@ -145,10 +152,15 @@
     data-current-cabang="{{ e((string) ($cabangFilter ?? '')) }}"
     data-current-tax="{{ e((string) ($taxFilter ?? '')) }}"
     data-current-page-size="{{ e((string) $pageSize) }}"
+    data-current-active-key="{{ e((string) ($activeKey ?? '')) }}"
+    data-current-expanded-key="{{ e((string) ($expandedKey ?? '')) }}"
+    data-current-recently-added-key="{{ e((string) ($recentlyAddedKey ?? '')) }}"
+    data-current-recently-added-message="{{ e((string) ($recentlyAddedMessage ?? '')) }}"
+    data-current-validation-error-key="{{ e((string) ($validationErrorKey ?? '')) }}"
     x-data="{
-        activeKey: window.__dtOrActiveItemKey || null,
+        activeKey: null,
         selectedKeys: [],
-        expandedKey: window.__dtOrExpandedItemKey || null,
+        expandedKey: null,
         filterOpen: false,
         observer: null,
         reconcileTimer: null,
@@ -161,8 +173,8 @@
         isAddingItem: false,
         loadingMessage: '',
         loadingFallbackTimer: null,
-        recentlyAddedKey: window.__dtOrRecentlyAddedKey || null,
-        recentlyAddedMessage: window.__dtOrRecentlyAddedMessage || '',
+        recentlyAddedKey: null,
+        recentlyAddedMessage: '',
         recentlyAddedTimer: null,
         select2AssetsPromise: null,
         inlineSelectChangeHandler: null,
@@ -173,6 +185,17 @@
             this.cabangValue = this.$root.dataset.currentCabang || '';
             this.taxValue = this.$root.dataset.currentTax || '';
             this.pageSizeValue = this.$root.dataset.currentPageSize || '10';
+            this.activeKey = this.$root.dataset.currentActiveKey || window.__dtOrActiveItemKey || null;
+            this.expandedKey = this.$root.dataset.currentExpandedKey || window.__dtOrExpandedItemKey || null;
+            this.recentlyAddedKey = this.$root.dataset.currentRecentlyAddedKey || window.__dtOrRecentlyAddedKey || null;
+            this.recentlyAddedMessage = this.$root.dataset.currentRecentlyAddedMessage || window.__dtOrRecentlyAddedMessage || '';
+
+            const validationErrorKey = this.$root.dataset.currentValidationErrorKey || '';
+            if (validationErrorKey) {
+                this.activeKey = validationErrorKey;
+                this.expandedKey = validationErrorKey;
+                this.$nextTick(() => this.scrollEditorIntoView(validationErrorKey, true));
+            }
 
             if (this.recentlyAddedMessage) {
                 window.clearTimeout(this.recentlyAddedTimer);
@@ -198,6 +221,7 @@
             this.inlineSelectChangeHandler = (event) => {
                 const select = event.target?.closest?.('select[data-dt-inline-select]');
                 if (! select || ! this.$root.contains(select)) return;
+                if (select.dataset.dtSelect2Managed === 'true') return;
 
                 const editor = select.closest('[data-dt-inline-editor]');
                 const key = editor?.dataset?.dtInlineEditor;
@@ -426,13 +450,13 @@
                 const $select = jq(element);
                 const field = element.dataset.field;
                 const searchMethod = element.dataset.searchMethod;
-                const productId = element.dataset.productId ? Number(element.dataset.productId) : null;
-                const currencyId = element.dataset.currencyId ? Number(element.dataset.currencyId) : null;
 
                 if ($select.data('select2')) {
                     $select.off('.dtOrInline');
                     $select.select2('destroy');
                 }
+
+                element.dataset.dtSelect2Managed = 'true';
 
                 $select.select2({
                     width: '100%',
@@ -443,6 +467,8 @@
                         delay: 250,
                         transport: (params, success, failure) => {
                             const search = params.data?.term || '';
+                            const productId = element.dataset.productId ? Number(element.dataset.productId) : null;
+                            const currencyId = element.dataset.currencyId ? Number(element.dataset.currencyId) : null;
                             let request;
 
                             if (searchMethod === 'products') {
@@ -465,7 +491,18 @@
                     },
                 });
 
-                $select.off('.dtOrInline');
+                $select.off('.dtOrInline').on('change.dtOrInline', () => {
+                    const currentEditor = element.closest('[data-dt-inline-editor]');
+                    const currentKey = currentEditor?.dataset?.dtInlineEditor;
+
+                    if (! currentKey || ! field) return;
+
+                    const label = field
+                        .replace('_id', '')
+                        .replace('currency', 'mata uang');
+
+                    this.updateInlineItem(currentKey, field, element.value, 'Memperbarui ' + label + '…');
+                });
             });
         },
 
@@ -474,6 +511,50 @@
 
             try {
                 return await this.$wire.updateInlineOrderRequestItemField(String(key), String(field), value);
+            } finally {
+                this.finishLoading();
+                this.$nextTick(() => {
+                    const shouldForceSync = ['product_id', 'supplier_id', 'currency_id'].includes(String(field));
+
+                    this.syncInlineInputValues(String(key), shouldForceSync);
+
+                    if (this.expandedKey) {
+                        this.initInlineSelects(this.expandedKey);
+                    }
+                });
+            }
+        },
+
+        syncInlineInputValues(key, force = false) {
+            const editor = Array.from(this.$root.querySelectorAll('[data-dt-inline-editor]'))
+                .find((element) => String(element.dataset.dtInlineEditor) === String(key));
+
+            if (! editor) return;
+
+            editor.querySelectorAll('[data-dt-sync-value]').forEach((element) => {
+                if (! force && document.activeElement === element) return;
+
+                element.value = element.dataset.dtSyncValue ?? element.getAttribute('value') ?? element.value;
+            });
+
+            editor.closest('.dt-item-detail-card')
+                ?.querySelectorAll('[data-dt-sync-apply]')
+                .forEach((button) => {
+                    const isDirty = button.dataset.dtApplyDirty === 'true';
+                    button.disabled = this.isLoading || this.isAddingItem || ! isDirty;
+                    button.title = isDirty
+                        ? 'Simpan perubahan item ke total/summary.'
+                        : 'Belum ada perubahan item untuk disimpan.';
+                });
+        },
+
+        async applyInlineItem(key) {
+            if (this.isLoading || this.isAddingItem) return;
+
+            this.startLoading('Menyimpan perubahan item…');
+
+            try {
+                return await this.$wire.applyInlineOrderRequestItem(String(key));
             } finally {
                 this.finishLoading();
             }
@@ -528,11 +609,13 @@
         toggleDetail(key) {
             if (this.expandedKey === String(key)) {
                 this.expandedKey = null;
+                this.$root.dataset.currentExpandedKey = '';
                 window.__dtOrExpandedItemKey = null;
                 return;
             }
 
             this.expandedKey = String(key);
+            this.$root.dataset.currentExpandedKey = this.expandedKey;
             window.__dtOrExpandedItemKey = this.expandedKey;
             this.$nextTick(() => this.initInlineSelects(key));
         },
@@ -540,13 +623,39 @@
         openItem(key, shouldScroll = true) {
             this.activeKey = String(key);
             this.expandedKey = String(key);
+            this.$root.dataset.currentActiveKey = this.activeKey;
+            this.$root.dataset.currentExpandedKey = this.expandedKey;
             window.__dtOrActiveItemKey = this.activeKey;
             window.__dtOrExpandedItemKey = this.expandedKey;
             this.$nextTick(() => this.scrollEditorIntoView(this.activeKey, shouldScroll));
         },
 
+        openItemWhenReady(key, attempts = 30) {
+            const normalizedKey = String(key);
+            this.activeKey = normalizedKey;
+            this.expandedKey = normalizedKey;
+            this.$root.dataset.currentActiveKey = normalizedKey;
+            this.$root.dataset.currentExpandedKey = normalizedKey;
+            window.__dtOrActiveItemKey = normalizedKey;
+            window.__dtOrExpandedItemKey = normalizedKey;
+
+            this.$nextTick(() => {
+                const row = this.$root.querySelector('[data-dt-or-row=' + CSS.escape(normalizedKey) + ']');
+
+                if (row) {
+                    this.scrollEditorIntoView(normalizedKey, true);
+                    return;
+                }
+
+                if (attempts > 0) {
+                    window.setTimeout(() => this.openItemWhenReady(normalizedKey, attempts - 1), 120);
+                }
+            });
+        },
+
         closeEditor(shouldScroll = true) {
             this.activeKey = null;
+            this.$root.dataset.currentActiveKey = '';
             window.__dtOrActiveItemKey = null;
             this.applyVisibility();
             if (shouldScroll) {
@@ -554,8 +663,14 @@
             }
         },
 
+        isExpanded(key) {
+            const fallbackKey = this.$root.dataset.currentExpandedKey || window.__dtOrExpandedItemKey || '';
+            return String(this.expandedKey || fallbackKey || '') === String(key);
+        },
+
         collapseAll(shouldScroll = true) {
             this.expandedKey = null;
+            this.$root.dataset.currentExpandedKey = '';
             window.__dtOrExpandedItemKey = null;
             this.closeEditor(shouldScroll);
         },
@@ -575,7 +690,7 @@
                     window.__dtOrActiveItemKey = this.activeKey;
                     window.__dtOrExpandedItemKey = this.expandedKey;
                     this.showAddFeedback(newKey);
-                    this.$nextTick(() => this.scrollEditorIntoView(newKey, true));
+                    this.openItemWhenReady(newKey);
                 }
 
                 return newKey;
@@ -854,9 +969,10 @@
                 @forelse ($rows as $row)
                     <tr
                         class="dt-item-row"
+                        wire:key="dt-or-row-{{ $row['key'] }}"
                         data-dt-or-row="{{ $row['key'] }}"
                         x-bind:class="{
-                            'is-expanded': expandedKey === @js($row['key']),
+                            'is-expanded': isExpanded(@js($row['key'])),
                             'dt-item-new-row-highlight': recentlyAddedKey === @js($row['key']),
                         }"
                     >
@@ -866,7 +982,7 @@
                                 class="dt-item-expand"
                                 aria-label="Expand item"
                                 x-on:click="toggleDetail(@js($row['key']))"
-                                x-text="expandedKey === @js($row['key']) ? '⌄' : '›'"
+                                x-text="isExpanded(@js($row['key'])) ? '⌄' : '›'"
                             >›</button>
                         </td>
                         <td class="dt-item-check-col">
@@ -929,17 +1045,39 @@
                             </div>
                         </td>
                     </tr>
-                    <tr class="dt-item-detail-row" x-cloak x-show="expandedKey === @js($row['key'])">
+                    <tr
+                        class="dt-item-detail-row"
+                        wire:key="dt-or-detail-{{ $row['key'] }}"
+                        x-cloak
+                        x-show="isExpanded(@js($row['key']))"
+                    >
                         <td colspan="11">
                             <div class="dt-item-detail-card">
                                 <div class="dt-item-detail-summary">
                                     <div>
                                         <strong>Editor item #{{ $row['number'] }}</strong>
                                         <span class="dt-item-status-badge {{ $row['status_value'] }}" style="margin-left:8px;">{{ $row['status_label'] }}</span>
+                                        @if ($row['is_dirty'])
+                                            <span class="dt-item-status-badge draft" style="margin-left:8px;">Belum diterapkan</span>
+                                            <span class="dt-item-dirty-helper">Klik Simpan Perubahan Item agar masuk ke total/summary.</span>
+                                        @else
+                                            <span class="dt-item-idle-helper" style="margin-left:8px;">Tidak ada perubahan item. Ubah qty/harga/diskon/pajak jika ingin menyimpan perubahan item.</span>
+                                        @endif
                                         <span style="color:#6b7280;">· {{ $row['product'] }}</span>
                                     </div>
                                     <div class="dt-item-detail-actions">
                                         <div style="color:#6b7280;">Cabang: <strong>{{ $row['cabang'] }}</strong></div>
+                                        <button
+                                            type="button"
+                                            class="dt-item-apply-button"
+                                            data-dt-sync-apply
+                                            data-dt-apply-dirty="{{ $row['is_dirty'] ? 'true' : 'false' }}"
+                                            title="{{ $row['is_dirty'] ? 'Simpan perubahan item ke total/summary.' : 'Belum ada perubahan item untuk disimpan.' }}"
+                                            x-bind:disabled="isLoading || isAddingItem || ! @js($row['is_dirty'])"
+                                            x-on:click="applyInlineItem(@js($row['key']))"
+                                        >
+                                            Simpan Perubahan Item
+                                        </button>
                                         <button
                                             type="button"
                                             class="dt-item-delete-text"
@@ -951,6 +1089,16 @@
                                         </button>
                                     </div>
                                 </div>
+                                @if (! empty($row['validation_errors']))
+                                    <div class="dt-item-error-summary" data-dt-inline-validation-errors>
+                                        Validasi item perlu diperbaiki:
+                                        <ul>
+                                            @foreach ($row['validation_errors'] as $errorMessage)
+                                                <li>{{ $errorMessage }}</li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endif
                                 <div class="dt-item-inline-editor" data-dt-inline-editor="{{ $row['key'] }}">
                                     <div class="dt-item-inline-grid">
                                         @if ($row['is_status_locked'])
@@ -1069,6 +1217,7 @@
                                                     type="text"
                                                     class="dt-item-inline-input"
                                                     value="{{ $row['original_price_value'] }}"
+                                                    data-dt-sync-value="{{ $row['original_price_value'] }}"
                                                     data-dt-inline-original-price
                                                     readonly
                                                 >
@@ -1086,6 +1235,7 @@
                                                     inputmode="decimal"
                                                     class="dt-item-inline-input"
                                                     value="{{ $row['unit_price_value'] }}"
+                                                    data-dt-sync-value="{{ $row['unit_price_value'] }}"
                                                     data-dt-inline-unit-price
                                                     x-mask:dynamic="$money($input, ',', '.', 2)"
                                                     x-on:input.debounce.500ms="updateInlineItem(@js($row['key']), 'unit_price', $event.target.value)"
@@ -1113,7 +1263,7 @@
                                             <label>Discount nominal</label>
                                             <div class="dt-item-money-wrap">
                                                 <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
-                                                <input type="text" class="dt-item-inline-input" value="{{ $row['discount_nominal_value'] }}" readonly data-dt-inline-discount-nominal>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['discount_nominal_value'] }}" data-dt-sync-value="{{ $row['discount_nominal_value'] }}" readonly data-dt-inline-discount-nominal>
                                             </div>
                                             @if ($row['is_foreign_currency'])
                                                 <div class="dt-item-money-helper" data-dt-inline-discount-nominal-idr>{{ $row['discount_nominal_idr_equivalent'] }}</div>
@@ -1123,7 +1273,7 @@
                                             <label>Total</label>
                                             <div class="dt-item-money-wrap">
                                                 <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
-                                                <input type="text" class="dt-item-inline-input" value="{{ $row['total_value'] }}" readonly data-dt-inline-total>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['total_value'] }}" data-dt-sync-value="{{ $row['total_value'] }}" readonly data-dt-inline-total>
                                             </div>
                                             @if ($row['is_foreign_currency'])
                                                 <div class="dt-item-money-helper" data-dt-inline-total-idr>{{ $row['total_idr_equivalent'] }}</div>
@@ -1152,6 +1302,7 @@
                                                 type="number"
                                                 class="dt-item-inline-input"
                                                 value="{{ $row['tax_value'] }}"
+                                                data-dt-sync-value="{{ $row['tax_value'] }}"
                                                 data-dt-inline-tax
                                                 readonly
                                             >
@@ -1160,7 +1311,7 @@
                                             <label>Tax nominal</label>
                                             <div class="dt-item-money-wrap">
                                                 <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
-                                                <input type="text" class="dt-item-inline-input" value="{{ $row['tax_nominal_value'] }}" readonly data-dt-inline-tax-nominal>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['tax_nominal_value'] }}" data-dt-sync-value="{{ $row['tax_nominal_value'] }}" readonly data-dt-inline-tax-nominal>
                                             </div>
                                             @if ($row['is_foreign_currency'])
                                                 <div class="dt-item-money-helper" data-dt-inline-tax-nominal-idr>{{ $row['tax_nominal_idr_equivalent'] }}</div>
@@ -1170,7 +1321,7 @@
                                             <label>Subtotal</label>
                                             <div class="dt-item-money-wrap">
                                                 <span class="dt-item-money-prefix">{{ $row['currency_symbol'] }}</span>
-                                                <input type="text" class="dt-item-inline-input" value="{{ $row['subtotal_value'] }}" readonly data-dt-inline-subtotal>
+                                                <input type="text" class="dt-item-inline-input" value="{{ $row['subtotal_value'] }}" data-dt-sync-value="{{ $row['subtotal_value'] }}" readonly data-dt-inline-subtotal>
                                             </div>
                                             @if ($row['is_foreign_currency'])
                                                 <div class="dt-item-money-helper" data-dt-inline-subtotal-idr>{{ $row['subtotal_idr_equivalent'] }}</div>

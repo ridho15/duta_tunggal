@@ -544,13 +544,36 @@ class PurchaseOrderResource extends Resource
         ?string $search = null,
         ?string $taxFilter = null,
         ?string $sourceFilter = null,
-        mixed $cabangFilter = null
+        mixed $cabangFilter = null,
+        array $drafts = [],
+        array $dirtyItems = [],
+        array $validationErrors = []
     ): \Illuminate\Support\HtmlString {
         $search = trim((string) $search);
         $taxFilter = filled($taxFilter) ? self::normalizeTaxTypeValue($taxFilter) : null;
         $sourceFilter = filled($sourceFilter) ? (string) $sourceFilter : null;
         $cabangFilter = filled($cabangFilter) ? (int) $cabangFilter : null;
-        $itemCollection = collect($items)->map(function ($item, $key) {
+        $displayItems = collect($items)
+            ->map(function ($item, $key) use ($drafts, $dirtyItems) {
+                $item = is_array($item) ? $item : [];
+
+                if (is_array($drafts[$key] ?? null)) {
+                    $item = $drafts[$key];
+                    $item['_is_dirty'] = ! empty($dirtyItems[$key]);
+                }
+
+                return $item;
+            })
+            ->all();
+
+        $baseItemCollection = collect($items)->map(function ($item, $key) {
+            $item = is_array($item) ? $item : [];
+            $item['_navigator_key'] = (string) $key;
+
+            return $item;
+        });
+
+        $itemCollection = collect($displayItems)->map(function ($item, $key) {
             $item = is_array($item) ? $item : [];
             $item['_navigator_key'] = (string) $key;
 
@@ -638,7 +661,7 @@ class PurchaseOrderResource extends Resource
             ->map(fn (\App\Models\Cabang $cabang) => "({$cabang->kode}) {$cabang->nama}")
             ->all();
 
-        $rows = $matched->values()->map(function ($item, int $index) use ($products, $referItems, $currencies, $productOptions, $currencyOptions): array {
+        $rows = $matched->values()->map(function ($item, int $index) use ($products, $referItems, $currencies, $productOptions, $currencyOptions, $validationErrors): array {
             $key = (string) ($item['_navigator_key'] ?? $item['id'] ?? $index);
             $product = $products->get($item['product_id'] ?? null);
             $referItem = $referItems->get($item['refer_item_model_id'] ?? null);
@@ -673,6 +696,8 @@ class PurchaseOrderResource extends Resource
                 'is_order_request_backed' => $isOrderRequestBacked,
                 'refer_item_model_id' => $item['refer_item_model_id'] ?? null,
                 'cabang_id' => $referItem?->cabang_id ?? $product?->cabang_id,
+                'is_dirty' => ! empty($item['_is_dirty']),
+                'validation_errors' => array_values(array_filter($validationErrors[$key] ?? [])),
             ];
         })->all();
 
@@ -680,14 +705,15 @@ class PurchaseOrderResource extends Resource
             'rows' => $rows,
             'totalItems' => count($items),
             'matchedCount' => count($rows),
-            'totalQty' => $itemCollection->sum(fn ($item) => (float) ($item['quantity'] ?? 0)),
-            'totalSubtotal' => $itemCollection->sum(fn ($item) => self::parseCurrencyState($item['subtotal'] ?? 0)),
+            'totalQty' => $baseItemCollection->sum(fn ($item) => (float) ($item['quantity'] ?? 0)),
+            'totalSubtotal' => $baseItemCollection->sum(fn ($item) => self::parseCurrencyState($item['subtotal'] ?? 0)),
             'search' => $search,
             'taxFilter' => $taxFilter,
             'sourceFilter' => $sourceFilter,
             'cabangFilter' => $cabangFilter,
             'cabangOptions' => $cabangOptions,
             'taxOptions' => TaxTypeHelper::options(),
+            'validationErrors' => $validationErrors,
         ])->render());
     }
 
@@ -918,6 +944,23 @@ class PurchaseOrderResource extends Resource
             'allocated_po_quantity' => $allocatedPoQuantity,
             'remaining_for_po_resource' => max(0, $orQuantity - $accountedForPoResource),
         ];
+    }
+
+    public static function resolvePurchaseOrderItemIdFromValidationAttribute(string $attribute, array $items = []): ?int
+    {
+        $segments = explode('.', $attribute);
+        $purchaseOrderItemIndex = array_search('purchaseOrderItem', $segments, true);
+        $itemKey = $purchaseOrderItemIndex !== false ? ($segments[$purchaseOrderItemIndex + 1] ?? null) : null;
+
+        if (is_string($itemKey) && preg_match('/^record-(\d+)$/', $itemKey, $matches)) {
+            return (int) $matches[1];
+        }
+
+        if ($itemKey !== null && is_array($items[$itemKey] ?? null) && is_numeric($items[$itemKey]['id'] ?? null)) {
+            return (int) $items[$itemKey]['id'];
+        }
+
+        return null;
     }
 
     public static function shouldAutoApproveOrderRequestPurchaseOrder(PurchaseOrder $purchaseOrder): bool
@@ -1610,6 +1653,15 @@ class PurchaseOrderResource extends Resource
                             ->native(false)
                             ->live()
                             ->dehydrated(false),
+                        Hidden::make('_purchase_order_item_drafts')
+                            ->default([])
+                            ->dehydrated(false),
+                        Hidden::make('_purchase_order_item_dirty')
+                            ->default([])
+                            ->dehydrated(false),
+                        Hidden::make('_purchase_order_item_validation_errors')
+                            ->default([])
+                            ->dehydrated(false),
                         Placeholder::make('_purchase_order_item_summary')
                             ->label('Ringkasan Item PO')
                             ->content(fn (Get $get) => self::renderPurchaseOrderItemNavigator(
@@ -1617,7 +1669,10 @@ class PurchaseOrderResource extends Resource
                                 $get('_purchase_order_item_search'),
                                 $get('_purchase_order_item_tax_filter'),
                                 $get('_purchase_order_item_source_filter'),
-                                $get('_purchase_order_item_cabang_filter')
+                                $get('_purchase_order_item_cabang_filter'),
+                                is_array($get('_purchase_order_item_drafts')) ? $get('_purchase_order_item_drafts') : [],
+                                is_array($get('_purchase_order_item_dirty')) ? $get('_purchase_order_item_dirty') : [],
+                                is_array($get('_purchase_order_item_validation_errors')) ? $get('_purchase_order_item_validation_errors') : []
                             ))
                             ->columnSpanFull(),
                         Repeater::make('purchaseOrderItem')
@@ -1848,7 +1903,8 @@ class PurchaseOrderResource extends Resource
                                     ->helperText(function (Get $get) {
                                         $orItemId = $get('refer_item_model_id');
                                         if (!$orItemId) return null;
-                                        $max = self::orderRequestItemResourceLimit((int) $orItemId)['remaining_for_po_resource'];
+                                        $currentItemId = is_numeric($get('id')) ? (int) $get('id') : null;
+                                        $max = self::orderRequestItemResourceLimit((int) $orItemId, $currentItemId)['remaining_for_po_resource'];
                                         return "Maks: {$max} (sisa OR)";
                                     })
                                     ->rules([function (Get $get) {
@@ -1856,14 +1912,11 @@ class PurchaseOrderResource extends Resource
                                             $orItemId = $get('refer_item_model_id');
                                             if (!$orItemId) return;
 
-                                            // Mengurai index repeater dari path atribut (misal: 'purchaseOrderItem.0.quantity')
-                                            $segments = explode('.', $attribute);
-                                            $index = $segments[1] ?? null;
-                                            $itemId = null;
-                                            if ($index !== null) {
-                                                $items = $get('../../purchaseOrderItem') ?? [];
-                                                $itemId = $items[$index]['id'] ?? null;
-                                            }
+                                            $items = $get('../../purchaseOrderItem') ?? [];
+                                            $itemId = self::resolvePurchaseOrderItemIdFromValidationAttribute(
+                                                $attribute,
+                                                is_array($items) ? $items : []
+                                            );
 
                                             $max = self::orderRequestItemResourceLimit(
                                                 (int) $orItemId,

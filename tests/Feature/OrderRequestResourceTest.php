@@ -108,6 +108,41 @@ it('creates an order request through the Filament create page', function () {
     expect((float) $item->subtotal)->toBeGreaterThan(0.0);
 });
 
+it('shows localized item validation messages and opens the first invalid inline item', function () {
+    $component = Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->fillForm([
+            'request_number' => 'OR-TEST-VALIDATION-'.uniqid(),
+            'request_date' => now()->format('Y-m-d'),
+        ])
+        ->set('data.orderRequestItem', [
+            'first-item' => [
+                'product_id' => null,
+                'cabang_id' => null,
+                'currency_id' => null,
+                'quantity' => null,
+                'unit_price' => null,
+                'tipe_pajak' => null,
+                'discount' => 0,
+            ],
+        ])
+        ->call('create');
+
+    $component->assertHasFormErrors([
+        'orderRequestItem.first-item.product_id' => 'required',
+        'orderRequestItem.first-item.cabang_id' => 'required',
+        'orderRequestItem.first-item.currency_id' => 'required',
+        'orderRequestItem.first-item.quantity' => 'required',
+        'orderRequestItem.first-item.unit_price' => 'required',
+        'orderRequestItem.first-item.tipe_pajak' => 'required',
+    ]);
+
+    expect($component->get('data._order_request_item_active_key'))->toBe('first-item')
+        ->and($component->get('data._order_request_item_expanded_key'))->toBe('first-item')
+        ->and($component->get('data._order_request_item_validation_error_key'))->toBe('first-item')
+        ->and($component->get('data._order_request_item_validation_errors'))->toContain('Produk wajib dipilih.');
+});
+
 it('only offers active warehouses for order request selection', function () {
     $activeWarehouse = Warehouse::factory()->create([
         'cabang_id' => $this->cabang->id,
@@ -411,7 +446,7 @@ it('keeps inline UOM and original price server controlled and recalculates curre
     $or = OrderRequest::factory()->create([
         'currency_id' => $this->defaultCurrency->id,
     ]);
-    OrderRequestItem::factory()->create([
+    $item = OrderRequestItem::factory()->create([
         'order_request_id' => $or->id,
         'product_id' => $this->product->id,
         'supplier_id' => $this->supplier->id,
@@ -437,7 +472,7 @@ it('keeps inline UOM and original price server controlled and recalculates curre
         ->call('updateInlineOrderRequestItemField', $key, 'original_price', '1,00')
         ->call('updateInlineOrderRequestItemField', $key, 'required_date', '2026-06-24');
 
-    $item = $component->get("data.orderRequestItem.{$key}");
+    $item = $component->get("data._order_request_item_drafts.{$key}");
 
     expect($item['unit'])->toBe('box')
         ->and($item['original_price'])->toBe('160.000,00')
@@ -449,7 +484,7 @@ it('keeps inline UOM and original price server controlled and recalculates curre
         ->call('updateInlineOrderRequestItemField', $key, 'discount', 10)
         ->call('updateInlineOrderRequestItemField', $key, 'currency_id', $usd->id);
 
-    $item = $component->get("data.orderRequestItem.{$key}");
+    $item = $component->get("data._order_request_item_drafts.{$key}");
 
     expect($item['currency_id'])->toBe($usd->id)
         ->and($item['original_price'])->toBe('10,00')
@@ -459,6 +494,13 @@ it('keeps inline UOM and original price server controlled and recalculates curre
         ->and($item['discount_nominal'])->toBe('2,00')
         ->and($item['tax_nominal'])->toBe('1,98')
         ->and($item['subtotal'])->toBe('19,98');
+
+    expect($component->get("data.orderRequestItem.{$key}.currency_id"))->toBe($this->defaultCurrency->id);
+
+    $component->call('applyInlineOrderRequestItem', $key);
+
+    expect($component->get("data.orderRequestItem.{$key}.currency_id"))->toBe($usd->id)
+        ->and($component->get("data._order_request_item_drafts.{$key}"))->toBeNull();
 });
 
 it('shows foreign currency rate and IDR equivalents in inline navigator', function () {
@@ -834,7 +876,7 @@ it('lists order requests on the index page', function () {
 it('shows fulfilled quantity summary on the index page', function () {
     $or = OrderRequest::factory()->create();
 
-    OrderRequestItem::factory()->create([
+    $item = OrderRequestItem::factory()->create([
         'order_request_id' => $or->id,
         'product_id' => $this->product->id,
         'quantity' => 10,
@@ -863,7 +905,7 @@ it('views order request details on the Filament view page', function () {
         'currency_id' => $usd->id,
     ]);
 
-    OrderRequestItem::factory()->create([
+    $item = OrderRequestItem::factory()->create([
         'order_request_id' => $or->id,
         'product_id' => $this->product->id,
         'supplier_id' => $this->supplier->id,
@@ -1026,6 +1068,361 @@ it('approves an order request from the view page action and updates status', fun
     expect($or->fresh()->purchaseOrders()->count())->toBe(0);
 });
 
+it('loads item approval decisions from current item status in the approve modal', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $draftItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    $approvedItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_APPROVED,
+    ]);
+
+    $rejectedItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_REJECTED,
+        'rejection_note' => 'Tidak sesuai kebutuhan',
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertActionVisible('approve')
+        ->mountAction('approve');
+
+    $mountedData = $component->get('mountedActionsData');
+    $selectedItems = collect(end($mountedData)['selected_items'] ?? [])->keyBy('item_id');
+
+    expect($selectedItems[$draftItem->id]['approval_status'])->toBe(OrderRequestItem::STATUS_DRAFT)
+        ->and($selectedItems[$approvedItem->id]['approval_status'])->toBe(OrderRequestItem::STATUS_APPROVED)
+        ->and($selectedItems[$rejectedItem->id]['approval_status'])->toBe(OrderRequestItem::STATUS_REJECTED)
+        ->and($selectedItems[$rejectedItem->id]['rejection_note'])->toBe('Tidak sesuai kebutuhan');
+});
+
+it('loads item approval decisions from current item status in the create purchase order modal', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'approved',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $draftItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    $approvedItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_APPROVED,
+    ]);
+
+    $rejectedItem = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 1,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_REJECTED,
+        'rejection_note' => 'Ditolak dari proses approval',
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertActionVisible('create_purchase_order')
+        ->mountAction('create_purchase_order');
+
+    $mountedData = $component->get('mountedActionsData');
+    $selectedItems = collect(end($mountedData)['selected_items'] ?? [])->keyBy('item_id');
+
+    expect($selectedItems[$draftItem->id]['approval_status'])->toBe(OrderRequestItem::STATUS_DRAFT)
+        ->and($selectedItems[$approvedItem->id]['approval_status'])->toBe(OrderRequestItem::STATUS_APPROVED)
+        ->and($selectedItems[$rejectedItem->id]['approval_status'])->toBe(OrderRequestItem::STATUS_REJECTED)
+        ->and($selectedItems[$rejectedItem->id]['rejection_note'])->toBe('Ditolak dari proses approval');
+});
+
+it('hides create purchase order action when no approved item has remaining quantity', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'partial',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 2,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_REJECTED,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertActionHidden('create_purchase_order');
+});
+
+it('shows create purchase order action when an approved item has remaining quantity', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'partial',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_APPROVED,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->assertActionVisible('create_purchase_order')
+        ->mountAction('create_purchase_order')
+        ->assertSee('Hanya item berstatus Approved dengan sisa qty yang akan dibuatkan Purchase Order.');
+});
+
+it('uses contextual empty approved item messages for purchase order actions', function () {
+    $viewPage = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource/Pages/ViewOrderRequest.php'));
+    $resource = file_get_contents(base_path('app/Filament/Resources/OrderRequestResource.php'));
+
+    expect($resource)->toContain('Order Request tidak dapat di-approve karena tidak ada item yang disetujui. Approve minimal satu item atau reject Order Request.')
+        ->and($viewPage)->toContain('Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.')
+        ->and($resource)->toContain('Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.')
+        ->and($viewPage)->toContain('Keputusan Item Order Request')
+        ->and($resource)->toContain('Keputusan Item Order Request')
+        ->and($viewPage)->toContain('Tentukan keputusan setiap item. Checkbox Sertakan memilih item Approved yang akan dibuatkan Purchase Order otomatis.')
+        ->and($resource)->toContain('Tentukan keputusan setiap item. Checkbox Sertakan memilih item Approved yang akan dibuatkan Purchase Order otomatis.')
+        ->and($viewPage)->toContain('Tentukan keputusan setiap item. Purchase Order tidak akan dibuat otomatis.')
+        ->and($resource)->toContain('Tentukan keputusan setiap item. Purchase Order tidak akan dibuat otomatis.')
+        ->and($viewPage)->toContain('includeDependsOnAutoPurchaseOrder: true')
+        ->and($resource)->toContain('includeDependsOnAutoPurchaseOrder: true')
+        ->and($viewPage)->not->toContain("message: 'Pilih minimal satu item.'")
+        ->and($resource)->not->toContain("message: 'Pilih minimal satu item.'");
+});
+
+it('blocks approval from the view action when any item is still draft', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->callAction('approve', data: [
+            'create_purchase_order' => true,
+            'multi_supplier' => false,
+            'order_date' => now()->toDateString(),
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 3,
+                'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_DRAFT,
+                'include' => true,
+            ]],
+        ])
+        ->assertNotified();
+
+    expect($or->fresh()->status)->toBe('request_approve');
+    expect($item->fresh()->status)->toBe(OrderRequestItem::STATUS_DRAFT);
+    expect($or->fresh()->purchaseOrders()->count())->toBe(0);
+});
+
+it('rejects an order request from the view action when all items are rejected', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->callAction('approve', data: [
+            'create_purchase_order' => true,
+            'multi_supplier' => false,
+            'order_date' => now()->toDateString(),
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 3,
+                'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_REJECTED,
+                'rejection_note' => 'Tidak jadi dibeli',
+                'include' => true,
+            ]],
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($or->fresh()->status)->toBe('rejected');
+    expect($or->fresh()->purchaseOrders()->count())->toBe(0);
+});
+
+it('approves from the view action without purchase order when approved item is not included', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->callAction('approve', data: [
+            'create_purchase_order' => true,
+            'multi_supplier' => false,
+            'order_date' => now()->toDateString(),
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 3,
+                'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'include' => false,
+            ]],
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect($item->fresh()->status)->toBe(OrderRequestItem::STATUS_APPROVED);
+    expect($or->fresh()->purchaseOrders()->count())->toBe(0);
+});
+
+it('approves from the view action without automatic purchase order when item decisions are provided', function () {
+    $or = OrderRequest::factory()->create([
+        'status' => 'request_approve',
+        'currency_id' => $this->defaultCurrency->id,
+    ]);
+
+    $item = OrderRequestItem::factory()->create([
+        'order_request_id' => $or->id,
+        'product_id' => $this->product->id,
+        'supplier_id' => $this->supplier->id,
+        'cabang_id' => $this->cabang->id,
+        'quantity' => 3,
+        'fulfilled_quantity' => 0,
+        'unit_price' => 1000,
+        'original_price' => 1000,
+        'currency_id' => $this->defaultCurrency->id,
+        'status' => OrderRequestItem::STATUS_DRAFT,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(ViewOrderRequest::class, ['record' => $or->getKey()])
+        ->callAction('approve', data: [
+            'create_purchase_order' => false,
+            'multi_supplier' => false,
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 3,
+                'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'include' => true,
+            ]],
+        ])
+        ->assertHasNoActionErrors();
+
+    expect($or->fresh()->status)->toBe('approved');
+    expect($item->fresh()->status)->toBe(OrderRequestItem::STATUS_APPROVED);
+    expect($or->fresh()->purchaseOrders()->count())->toBe(0);
+});
+
 it('approves an order request from the view page action and auto-generates a purchase order number', function () {
     $or = OrderRequest::factory()->create([
         'status' => 'request_approve',
@@ -1057,6 +1454,7 @@ it('approves an order request from the view page action and auto-generates a pur
                 'currency_id' => $this->defaultCurrency->id,
                 'quantity' => 3,
                 'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
                 'include' => true,
             ]],
         ])
@@ -1077,7 +1475,7 @@ it('approves an order request from the list table action without creating purcha
         'currency_id' => $this->defaultCurrency->id,
     ]);
 
-    OrderRequestItem::factory()->create([
+    $item = OrderRequestItem::factory()->create([
         'order_request_id' => $or->id,
         'product_id' => $this->product->id,
         'supplier_id' => $this->supplier->id,
@@ -1093,6 +1491,16 @@ it('approves an order request from the list table action without creating purcha
         ->test(ListOrderRequests::class)
         ->callTableAction('approve', $or, data: [
             'create_purchase_order' => false,
+            'selected_items' => [[
+                'item_id' => $item->id,
+                'item_supplier_id' => $this->supplier->id,
+                'item_cabang_id' => $this->cabang->id,
+                'currency_id' => $this->defaultCurrency->id,
+                'quantity' => 2,
+                'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
+                'include' => true,
+            ]],
         ])
         ->assertHasNoTableActionErrors();
 
@@ -1133,6 +1541,7 @@ it('approves an order request from the list table action and creates a single pu
                 'currency_id' => $this->defaultCurrency->id,
                 'quantity' => 3,
                 'unit_price' => 1000,
+                'approval_status' => OrderRequestItem::STATUS_APPROVED,
                 'include' => true,
             ]],
         ])
@@ -1191,6 +1600,7 @@ it('approves an order request from the list table action and creates grouped pur
                     'currency_id' => $this->defaultCurrency->id,
                     'quantity' => 2,
                     'unit_price' => 1000,
+                    'approval_status' => OrderRequestItem::STATUS_APPROVED,
                     'include' => true,
                 ],
                 [
@@ -1200,6 +1610,7 @@ it('approves an order request from the list table action and creates grouped pur
                     'currency_id' => $this->defaultCurrency->id,
                     'quantity' => 4,
                     'unit_price' => 2000,
+                    'approval_status' => OrderRequestItem::STATUS_APPROVED,
                     'include' => true,
                 ],
             ],
@@ -1381,11 +1792,21 @@ it('adds an inline order request item through edit state and can remove it befor
         ->call('updateInlineOrderRequestItemField', (string) $newKey, 'unit_price', '100.000,00');
 
     $updatedItems = $component->get('data.orderRequestItem');
+    $draftItems = $component->get('data._order_request_item_drafts');
+
+    expect($updatedItems[$newKey]['product_id'])->toBeNull()
+        ->and($draftItems[$newKey]['product_id'])->toBe($this->product->id)
+        ->and((float) $draftItems[$newKey]['quantity'])->toBe(2.0)
+        ->and($draftItems[$newKey]['total'])->toBe('200.000,00')
+        ->and($draftItems[$newKey]['subtotal'])->not->toBe('0,00')
+        ->and($component->get("data._order_request_item_dirty.{$newKey}"))->toBeTrue();
+
+    $component->call('applyInlineOrderRequestItem', (string) $newKey);
+
+    $updatedItems = $component->get('data.orderRequestItem');
 
     expect($updatedItems[$newKey]['product_id'])->toBe($this->product->id)
-        ->and((float) $updatedItems[$newKey]['quantity'])->toBe(2.0)
-        ->and($updatedItems[$newKey]['total'])->toBe('200.000,00')
-        ->and($updatedItems[$newKey]['subtotal'])->not->toBe('0,00');
+        ->and($component->get("data._order_request_item_drafts.{$newKey}"))->toBeNull();
 
     $component->call('removeInlineOrderRequestItem', (string) $newKey);
 
@@ -1445,11 +1866,21 @@ it('adds an inline order request item through create state and can remove it bef
         ->call('updateInlineOrderRequestItemField', (string) $newKey, 'unit_price', '100.000,00');
 
     $updatedItems = $component->get('data.orderRequestItem');
+    $draftItems = $component->get('data._order_request_item_drafts');
+
+    expect($updatedItems[$newKey]['product_id'])->toBeNull()
+        ->and($draftItems[$newKey]['product_id'])->toBe($this->product->id)
+        ->and((float) $draftItems[$newKey]['quantity'])->toBe(2.0)
+        ->and($draftItems[$newKey]['total'])->toBe('200.000,00')
+        ->and($draftItems[$newKey]['subtotal'])->not->toBe('0,00')
+        ->and($component->get("data._order_request_item_dirty.{$newKey}"))->toBeTrue();
+
+    $component->call('applyInlineOrderRequestItem', (string) $newKey);
+
+    $updatedItems = $component->get('data.orderRequestItem');
 
     expect($updatedItems[$newKey]['product_id'])->toBe($this->product->id)
-        ->and((float) $updatedItems[$newKey]['quantity'])->toBe(2.0)
-        ->and($updatedItems[$newKey]['total'])->toBe('200.000,00')
-        ->and($updatedItems[$newKey]['subtotal'])->not->toBe('0,00');
+        ->and($component->get("data._order_request_item_drafts.{$newKey}"))->toBeNull();
 
     $component->call('removeInlineOrderRequestItem', (string) $newKey);
 
