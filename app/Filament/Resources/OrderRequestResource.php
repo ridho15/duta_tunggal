@@ -399,6 +399,19 @@ class OrderRequestResource extends Resource
             ->sortBy('kode')
             ->map(fn (\App\Models\Cabang $cabang) => "({$cabang->kode}) {$cabang->nama}")
             ->all();
+        $bulkSupplierOptions = self::resolveSupplierOptions(limit: 100);
+        $bulkCabangQuery = \App\Models\Cabang::query();
+        $user = Auth::user();
+        $manageType = $user?->manage_type ?? [];
+        if (! (is_array($manageType) && in_array('all', $manageType, true))) {
+            $bulkCabangQuery->whereKey($user?->cabang_id);
+        }
+        $bulkCabangOptions = $bulkCabangQuery
+            ->orderBy('kode')
+            ->limit(100)
+            ->get(['id', 'kode', 'nama'])
+            ->mapWithKeys(fn (\App\Models\Cabang $cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
+            ->all();
         $taxOptions = [
             'inklusif' => 'Inklusif',
             'eklusif' => 'Eklusif',
@@ -476,7 +489,7 @@ class OrderRequestResource extends Resource
                     'cabang' => $cabangLabel,
                     'product_options' => ($item['product_id'] ?? null) && $product
                         ? [(int) $item['product_id'] => $productLabel]
-                        : [],
+                        : self::resolveProductOptions(limit: 50),
                     'supplier_options' => ($item['supplier_id'] ?? null) && $supplier
                         ? [
                             (int) $item['supplier_id'] => self::resolveSupplierLabel(
@@ -572,6 +585,8 @@ class OrderRequestResource extends Resource
             'taxFilter' => $taxFilter,
             'supplierOptions' => $supplierOptions,
             'cabangOptions' => $cabangOptions,
+            'bulkSupplierOptions' => $bulkSupplierOptions,
+            'bulkCabangOptions' => $bulkCabangOptions,
             'currencyOptions' => $currencyOptions,
             'taxOptions' => $taxOptions,
             'activeKey' => filled($activeKey) ? (string) $activeKey : null,
@@ -843,7 +858,7 @@ class OrderRequestResource extends Resource
 
     public static function resolveProductOptions(?string $search = null, int $limit = 50): array
     {
-        $query = Product::query()->orderBy('name');
+        $query = Product::withoutGlobalScope('product_cabang')->orderBy('name');
 
         if ($search !== null && $search !== '') {
             $query->where(function ($productQuery) use ($search) {
@@ -2762,6 +2777,7 @@ class OrderRequestResource extends Resource
                         ->action(function (array $data, $record) {
                             try {
                                 $orderRequestService = app(OrderRequestService::class);
+                                self::validateApprovalGateItemDecisions($data);
 
                                 if ($data['create_purchase_order']) {
                                     $includedItems = self::selectedPurchaseOrderApprovedItems($data['selected_items'] ?? []);
@@ -2849,6 +2865,8 @@ class OrderRequestResource extends Resource
                                 $orderRequestService->approve($record, $data);
                                 $record->refresh();
                                 HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
+                            } catch (ValidationException $exception) {
+                                throw $exception;
                             } catch (Throwable $exception) {
                                 ProcurementFailureNotifier::danger(
                                     'Gagal Memproses Order Request',

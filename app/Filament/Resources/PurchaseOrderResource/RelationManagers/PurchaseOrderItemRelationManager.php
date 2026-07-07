@@ -265,45 +265,79 @@ class PurchaseOrderItemRelationManager extends RelationManager
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->recordTitleAttribute('id')
+            ->modifyQueryUsing(fn (Builder $query) => $query->with([
+                'product:id,sku,name,uom_id,cabang_id',
+                'product.uom:id,name,abbreviation',
+                'product.cabang:id,kode,nama',
+                'currency:id,code,name,symbol',
+                'referItemModel.cabang:id,kode,nama',
+                'purchaseOrder.cabang:id,kode,nama',
+                'purchaseReceiptItem',
+                'qualityControls',
+            ]))
             ->columns([
                 TextColumn::make('product.sku')
                     ->label('SKU')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('product.name')
-                    ->label('Product Name')
-                    ->searchable(),
+                    ->label('Product')
+                    ->searchable()
+                    ->sortable()
+                    ->limit(45)
+                    ->tooltip(fn ($record) => $record->product?->name),
+                TextColumn::make('source')
+                    ->label('Source')
+                    ->getStateUsing(fn ($record) => static::sourceLabel($record))
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        $search = Str::lower($search);
+
+                        if (str_contains('order request', $search) || str_contains('dari order request', $search)) {
+                            return $query->orWhereNotNull('refer_item_model_id');
+                        }
+
+                        if (str_contains('manual', $search)) {
+                            return $query->orWhereNull('refer_item_model_id');
+                        }
+
+                        return $query;
+                    })
+                    ->badge()
+                    ->color(fn ($state) => $state === 'Order Request' ? 'info' : 'gray'),
+                TextColumn::make('refer_item')
+                    ->label('Refer Item')
+                    ->getStateUsing(fn ($record) => static::referItemLabel($record))
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        $numericSearch = preg_replace('/\D+/', '', $search);
+
+                        return $query
+                            ->when($numericSearch !== '', fn (Builder $query) => $query->orWhere('refer_item_model_id', (int) $numericSearch))
+                            ->orWhere('refer_item_model_type', 'like', "%{$search}%");
+                    })
+                    ->toggleable(),
                 TextColumn::make('currency')
                     ->label('Mata Uang')
                     ->searchable(query: function (Builder $query, $search) {
                         $query->whereHas('currency', function ($query) use ($search) {
                             $query->where('name', 'LIKE', '%' . $search . '%')
+                                ->orWhere('code', 'LIKE', '%' . $search . '%')
                                 ->orWhere('symbol', 'LIKE', '%' . $search . '%');
                         });
                     })
-                    ->formatStateUsing(function ($state) {
-                        return "{$state->name} ({$state->symbol})";
-                    }),
+                    ->formatStateUsing(fn ($state) => $state?->exists ? "{$state->name} ({$state->symbol})" : '-')
+                    ->toggleable(),
                 TextColumn::make('quantity')
-                    ->label('Quantity')
+                    ->label('Qty')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('source')
-                    ->label('Sumber')
-                    ->getStateUsing(fn ($record) => $record->refer_item_model_id ? 'Order Request' : 'Manual')
-                    ->badge()
-                    ->color(fn ($state) => $state === 'Order Request' ? 'info' : 'gray'),
+                TextColumn::make('uom')
+                    ->label('UOM')
+                    ->getStateUsing(fn ($record) => $record->product?->uom?->abbreviation ?? $record->product?->uom?->name ?? '-')
+                    ->toggleable(),
                 TextColumn::make('item_cabang')
                     ->label('Cabang')
-                    ->getStateUsing(function ($record) {
-                        $record->loadMissing('referItemModel.cabang', 'product.cabang');
-                        $cabang = $record->referItemModel?->cabang ?? $record->product?->cabang;
-
-                        if (! $cabang || ! $cabang->exists) {
-                            return '-';
-                        }
-
-                        return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
-                    })
+                    ->getStateUsing(fn ($record) => static::itemCabangLabel($record))
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where(function (Builder $branchQuery) use ($search) {
                             $branchQuery->whereHasMorph('referItemModel', [OrderRequestItem::class], function (Builder $query) use ($search) {
@@ -314,29 +348,53 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             })->orWhereHas('product.cabang', function (Builder $query) use ($search) {
                                 $query->where('kode', 'like', "%{$search}%")
                                     ->orWhere('nama', 'like', "%{$search}%");
+                            })->orWhereHas('purchaseOrder.cabang', function (Builder $query) use ($search) {
+                                $query->where('kode', 'like', "%{$search}%")
+                                    ->orWhere('nama', 'like', "%{$search}%");
                             });
                         });
-                    }),
+                    })
+                    ->limit(35)
+                    ->tooltip(fn ($state) => $state)
+                    ->toggleable(),
                 TextColumn::make('unit_price')
                     ->label('Unit Price')
-                        ->formatStateUsing(function ($state, $record) {
-                        return \App\Filament\Resources\PurchaseOrderResource::formatCurrencyPreviewState($state, $record->currency_id ?? null);
-                    })
+                    ->formatStateUsing(fn ($state, $record) => static::moneyLabel($record, $state))
                     ->sortable(),
                 TextColumn::make('discount')
                     ->label('Discount')
                     ->suffix('%')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('tax')
                     ->label('Tax')
                     ->suffix('%')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('tipe_pajak')
                     ->label('Tipe Pajak')
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })
-                    ->badge(),
+                    ->formatStateUsing(fn ($state) => Str::upper(PurchaseOrderResource::normalizeTaxTypeValue($state)))
+                    ->badge()
+                    ->sortable(),
+                TextColumn::make('subtotal_preview')
+                    ->label('Subtotal')
+                    ->getStateUsing(fn ($record) => static::subtotalLabel($record)),
+                TextColumn::make('qty_received')
+                    ->label('Qty Received')
+                    ->getStateUsing(fn ($record) => static::formatQty(static::receiptTotals($record)['received']))
+                    ->toggleable(),
+                TextColumn::make('qty_accepted')
+                    ->label('Qty Accepted')
+                    ->getStateUsing(fn ($record) => static::formatQty(static::receiptTotals($record)['accepted']))
+                    ->toggleable(),
+                TextColumn::make('qty_rejected')
+                    ->label('Qty Rejected')
+                    ->getStateUsing(fn ($record) => static::formatQty(static::receiptTotals($record)['rejected']))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('remaining_qty')
+                    ->label('Remaining Qty')
+                    ->getStateUsing(fn ($record) => static::formatQty(static::remainingQty($record)))
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('tipe_pajak')
@@ -376,6 +434,8 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             $branchQuery->whereHasMorph('referItemModel', [OrderRequestItem::class], function (Builder $query) use ($cabangId) {
                                 $query->where('cabang_id', $cabangId);
                             })->orWhereHas('product', function (Builder $query) use ($cabangId) {
+                                $query->where('cabang_id', $cabangId);
+                            })->orWhereHas('purchaseOrder', function (Builder $query) use ($cabangId) {
                                 $query->where('cabang_id', $cabangId);
                             });
                         });
@@ -555,5 +615,114 @@ class PurchaseOrderItemRelationManager extends RelationManager
                 ])
             ])
             ->bulkActions([]);
+    }
+
+    protected static function sourceLabel($record): string
+    {
+        return filled($record->refer_item_model_id) ? 'Order Request' : 'Manual';
+    }
+
+    protected static function referItemLabel($record): string
+    {
+        if (! filled($record->refer_item_model_id)) {
+            return '-';
+        }
+
+        return class_basename($record->refer_item_model_type ?: OrderRequestItem::class) . ' #' . $record->refer_item_model_id;
+    }
+
+    protected static function itemCabangLabel($record): string
+    {
+        $record->loadMissing('referItemModel.cabang', 'product.cabang', 'purchaseOrder.cabang');
+
+        $cabang = $record->referItemModel?->cabang;
+        if (! $cabang || ! $cabang->exists) {
+            $cabang = $record->product?->cabang;
+        }
+        if (! $cabang || ! $cabang->exists) {
+            $cabang = $record->purchaseOrder?->cabang;
+        }
+
+        if (! $cabang || ! $cabang->exists) {
+            return '-';
+        }
+
+        return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
+    }
+
+    protected static function currencyLabel($record): string
+    {
+        $record->loadMissing('currency');
+
+        if (! $record->currency || ! $record->currency->exists) {
+            return '-';
+        }
+
+        $code = $record->currency->code ? "{$record->currency->code} - " : '';
+
+        return "{$code}{$record->currency->name} ({$record->currency->symbol})";
+    }
+
+    protected static function moneyLabel($record, mixed $amount): string
+    {
+        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+
+        return \App\Support\CurrencyConversionResolver::resolveSymbol($currencyId) . ' '
+            . PurchaseOrderResource::formatCurrencyPreviewState($amount ?? 0, $currencyId);
+    }
+
+    protected static function preview($record): array
+    {
+        $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
+
+        return PurchaseOrderResource::calculateCurrencyPreview(
+            (float) ($record->quantity ?? 0),
+            (float) ($record->unit_price ?? 0),
+            (float) ($record->discount ?? 0),
+            (float) ($record->tax ?? 0),
+            PurchaseOrderResource::normalizeTaxTypeValue($record->tipe_pajak ?? null),
+            $currencyId
+        );
+    }
+
+    protected static function subtotalLabel($record): string
+    {
+        return static::moneyLabel($record, static::preview($record)['subtotal'] ?? 0);
+    }
+
+    protected static function taxNominalLabel($record): string
+    {
+        return static::moneyLabel($record, static::preview($record)['tax_nominal'] ?? 0);
+    }
+
+    protected static function discountNominalLabel($record): string
+    {
+        return static::moneyLabel($record, static::preview($record)['discount_nominal'] ?? 0);
+    }
+
+    protected static function totalLabel($record): string
+    {
+        return static::moneyLabel($record, static::preview($record)['total'] ?? 0);
+    }
+
+    protected static function receiptTotals($record): array
+    {
+        $record->loadMissing('purchaseReceiptItem');
+
+        return [
+            'received' => (float) $record->purchaseReceiptItem->sum('qty_received'),
+            'accepted' => (float) $record->purchaseReceiptItem->sum('qty_accepted'),
+            'rejected' => (float) $record->purchaseReceiptItem->sum('qty_rejected'),
+        ];
+    }
+
+    protected static function remainingQty($record): float
+    {
+        return max(0, (float) ($record->quantity ?? 0) - static::receiptTotals($record)['accepted']);
+    }
+
+    protected static function formatQty(mixed $qty): string
+    {
+        return number_format((float) $qty, 2, ',', '.');
     }
 }

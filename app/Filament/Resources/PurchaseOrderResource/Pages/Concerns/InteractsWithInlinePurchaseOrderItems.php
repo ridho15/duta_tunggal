@@ -22,7 +22,7 @@ trait InteractsWithInlinePurchaseOrderItems
             return;
         }
 
-        $allowedFields = ['product_id', 'currency_id', 'quantity', 'discount', 'tipe_pajak'];
+        $allowedFields = ['product_id', 'currency_id', 'quantity', 'unit_price', 'discount', 'tipe_pajak'];
 
         if (! in_array($field, $allowedFields, true)) {
             return;
@@ -40,7 +40,7 @@ trait InteractsWithInlinePurchaseOrderItems
         $isOrderRequestBacked = ($item['refer_item_model_type'] ?? null) === OrderRequestItem::class
             || filled($item['refer_item_model_id'] ?? null);
 
-        if ($isOrderRequestBacked && in_array($field, ['product_id', 'currency_id', 'discount', 'tipe_pajak'], true)) {
+        if ($isOrderRequestBacked && in_array($field, ['product_id', 'currency_id', 'unit_price', 'discount', 'tipe_pajak'], true)) {
             return;
         }
 
@@ -52,6 +52,14 @@ trait InteractsWithInlinePurchaseOrderItems
 
         if (in_array($field, ['quantity', 'discount'], true)) {
             $normalizedValue = is_numeric($normalizedValue) ? (float) $normalizedValue : 0.0;
+        }
+
+        if ($field === 'unit_price') {
+            $currencyId = is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : null;
+            $normalizedValue = PurchaseOrderResource::formatPurchaseOrderCurrencyInputState(
+                PurchaseOrderResource::parsePurchaseOrderCurrencyState($normalizedValue),
+                $currencyId
+            );
         }
 
         if ($field === 'tipe_pajak') {

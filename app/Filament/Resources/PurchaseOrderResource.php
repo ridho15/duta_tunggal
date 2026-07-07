@@ -1000,6 +1000,10 @@ class PurchaseOrderResource extends Resource
     {
         return $orderRequest->orderRequestItem
             ->map(function (OrderRequestItem $orderRequestItem) use ($orderRequest) {
+                if (! static::isOrderRequestItemEligibleForPurchaseOrder($orderRequestItem)) {
+                    return null;
+                }
+
                 $remainingQuantity = static::orderRequestItemResourceLimit((int) $orderRequestItem->id)['remaining_for_po_resource'];
 
                 if ($remainingQuantity <= 0) {
@@ -1066,6 +1070,11 @@ class PurchaseOrderResource extends Resource
     public static function hasAvailableOrderRequestSupplier(OrderRequest $orderRequest): bool
     {
         return count(static::getAvailableOrderRequestItemGroups($orderRequest)) > 0;
+    }
+
+    public static function isOrderRequestItemEligibleForPurchaseOrder(OrderRequestItem $orderRequestItem): bool
+    {
+        return OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED;
     }
 
     /**
@@ -3196,6 +3205,10 @@ class PurchaseOrderResource extends Resource
         $items = [];
 
         foreach ($orderRequest->orderRequestItem as $orderRequestItem) {
+            if (! static::isOrderRequestItemEligibleForPurchaseOrder($orderRequestItem)) {
+                continue;
+            }
+
             // Skip items that belong to a different supplier when a filter is active
             if (
                 $filterSupplierId !== null
@@ -3369,128 +3382,18 @@ class PurchaseOrderResource extends Resource
                             }),
                     ]),
                 \Filament\Infolists\Components\Section::make('Detail Item Purchase Order')
+                    ->description('Detail item ditampilkan pada tabel review berikut agar pencarian, filter, dan pemeriksaan per item tetap ringan.')
                     ->columnSpanFull()
                     ->schema([
-                        \Filament\Infolists\Components\RepeatableEntry::make('purchaseOrderItem')
+                        \Filament\Infolists\Components\TextEntry::make('purchase_order_items_table_note')
                             ->label('')
-                            ->columnSpanFull()
-                            ->schema([
-                                \Filament\Infolists\Components\Section::make(function ($record) {
-                                    $productName = $record->product ? "({$record->product->sku}) {$record->product->name}" : '-';
-                                    $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                    $preview = self::calculateCurrencyPreview(
-                                        (float) ($record->quantity ?? 0),
-                                        (float) ($record->unit_price ?? 0),
-                                        (float) ($record->discount ?? 0),
-                                        (float) ($record->tax ?? 0),
-                                        self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
-                                        $currencyId
-                                    );
-
-                                    return 'Product: ' . $productName
-                                        . ' | Qty: ' . (float) ($record->quantity ?? 0)
-                                        . ' | Subtotal: ' . CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
-                                })
-                                    ->collapsible()
-                                    ->collapsed()
-                                    ->schema([
-                                        \Filament\Infolists\Components\Grid::make(2)
-                                            ->schema([
-                                                \Filament\Infolists\Components\Group::make([
-                                                    self::detailColumnEntry(
-                                                        'product_column',
-                                                        'Produk',
-                                                        [
-                                                            ['Product', fn($record) => $record->product ? "({$record->product->sku}) {$record->product->name}" : '-'],
-                                                            ['Satuan', fn($record) => $record->product?->uom?->abbreviation ?? $record->product?->uom?->name ?? '-'],
-                                                            ['Qty', fn($record) => $record->quantity],
-                                                            ['Cabang', function ($record) {
-                                                                $refer = $record->referItemModel;
-                                                                $cabang = $refer?->cabang ?? $record->purchaseOrder?->cabang ?? $record->product?->cabang;
-
-                                                                if (! $cabang) {
-                                                                    return '-';
-                                                                }
-
-                                                                return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
-                                                            }],
-                                                            ['Refer Item', function ($record) {
-                                                                $refer = $record->referItemModel;
-                                                                if (! $refer) {
-                                                                    return '-';
-                                                                }
-
-                                                                return class_basename($record->refer_item_model_type) . ' #' . ($refer->id ?? $record->refer_item_model_id);
-                                                            }],
-                                                            ['Qty Received', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_received')],
-                                                            ['Qty Accepted', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_accepted')],
-                                                            ['Qty Rejected', fn($record) => (float) $record->purchaseReceiptItem()->sum('qty_rejected')],
-                                                            ['Sisa Qty Belum Diterima', fn($record) => max(0, (float) ($record->quantity ?? 0) - (float) $record->purchaseReceiptItem()->sum('qty_accepted'))],
-                                                        ]
-                                                    ),
-                                                ])
-                                                    ->columnSpan(1)
-                                                    ->columns(1),
-                                                \Filament\Infolists\Components\Group::make([
-                                                    self::detailColumnEntry(
-                                                        'price_column',
-                                                        'Price',
-                                                        [
-                                                            ['Mata Uang', fn($record) => $record->currency?->code ?? '-'],
-                                                            ['Unit Price', function ($record) {
-                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-
-                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($record->unit_price ?? 0, $currencyId);
-                                                            }],
-                                                            ['Discount', fn($record) => number_format((float) ($record->discount ?? 0), 0, ',', '.') . '%'],
-                                                            ['Nominal Discount', function ($record) {
-                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                                $nominal = ((float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0)) * ((float) ($record->discount ?? 0) / 100);
-
-                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($nominal, $currencyId);
-                                                            }],
-                                                            ['Total (Harga x Qty)', function ($record) {
-                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                                $total = (float) ($record->quantity ?? 0) * (float) ($record->unit_price ?? 0);
-
-                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($total, $currencyId);
-                                                            }],
-                                                            ['Tipe Pajak', fn($record) => self::normalizeTaxTypeValue($record->tipe_pajak ?? null)],
-                                                            ['Tax (%)', fn($record) => number_format((float) ($record->tax ?? 0), 0, ',', '.') . '%'],
-                                                            ['Nominal Pajak', function ($record) {
-                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                                $preview = self::calculateCurrencyPreview(
-                                                                    (float) ($record->quantity ?? 0),
-                                                                    (float) ($record->unit_price ?? 0),
-                                                                    (float) ($record->discount ?? 0),
-                                                                    (float) ($record->tax ?? 0),
-                                                                    self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
-                                                                    $currencyId
-                                                                );
-
-                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['tax_nominal'], $currencyId);
-                                                            }],
-                                                            ['Subtotal', function ($record) {
-                                                                $currencyId = is_numeric($record->currency_id ?? null) ? (int) $record->currency_id : null;
-                                                                $preview = self::calculateCurrencyPreview(
-                                                                    (float) ($record->quantity ?? 0),
-                                                                    (float) ($record->unit_price ?? 0),
-                                                                    (float) ($record->discount ?? 0),
-                                                                    (float) ($record->tax ?? 0),
-                                                                    self::normalizeTaxTypeValue($record->tipe_pajak ?? null),
-                                                                    $currencyId
-                                                                );
-
-                                                                return CurrencyConversionResolver::resolveSymbol($currencyId) . ' ' . self::formatCurrencyPreviewState($preview['subtotal'], $currencyId);
-                                                            }],
-                                                        ]
-                                                    ),
-                                                ])
-                                                    ->columnSpan(1)
-                                                    ->columns(1),
-                                            ]),
-                                    ]),
-                            ]),
+                            ->getStateUsing(fn($record) => 'Gunakan tabel review berikut untuk melihat semua item dengan pencarian produk/currency/cabang, filter tipe pajak/source, dan detail expand per item. Total item: ' . number_format($record->purchaseOrderItem()->count(), 0, ',', '.'))
+                            ->badge()
+                            ->color('info'),
+                        \Filament\Infolists\Components\ViewEntry::make('purchase_order_items_review')
+                            ->label('')
+                            ->view('filament.infolists.purchase-order-items-review')
+                            ->columnSpanFull(),
                     ]),
                 \Filament\Infolists\Components\Section::make('Ringkasan Total')
                     ->columns(3)

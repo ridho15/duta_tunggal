@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\OrderRequestResource\Pages;
 
 use App\Filament\Resources\OrderRequestResource;
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\OrderRequestItem;
@@ -30,6 +31,7 @@ use Filament\Forms\Components\Radio;
 use Filament\Forms\Get;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class ViewOrderRequest extends ViewRecord
@@ -222,9 +224,10 @@ class ViewOrderRequest extends ViewRecord
                                 ->columnSpanFull(),
                         ]),
                     Section::make('Keputusan Item Order Request')
-                        ->description(fn (Get $get): string => $get('create_purchase_order')
-                            ? 'Tentukan keputusan setiap item. Checkbox Sertakan memilih item Approved yang akan dibuatkan Purchase Order otomatis.'
-                            : 'Tentukan keputusan setiap item. Purchase Order tidak akan dibuat otomatis.'
+                        ->description(
+                            fn(Get $get): string => $get('create_purchase_order')
+                                ? 'Tentukan keputusan setiap item. Checkbox Sertakan memilih item Approved yang akan dibuatkan Purchase Order otomatis.'
+                                : 'Tentukan keputusan setiap item. Purchase Order tidak akan dibuat otomatis.'
                         )
                         ->icon('heroicon-o-shopping-cart')
                         ->collapsible()
@@ -306,6 +309,8 @@ class ViewOrderRequest extends ViewRecord
                         $orderRequestService->approve($record, $data);
                         $record->refresh();
                         HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
+                    } catch (ValidationException $exception) {
+                        throw $exception;
                     } catch (Throwable $exception) {
                         ProcurementFailureNotifier::danger(
                             'Gagal Memproses Order Request',
@@ -322,7 +327,11 @@ class ViewOrderRequest extends ViewRecord
                 ->modalHeading('Buat Purchase Order')
                 ->modalDescription('Pilih item yang akan dimasukkan ke Purchase Order baru. Harga Override dapat diubah.')
                 ->fillForm(function ($record) {
-                    $items = $record->orderRequestItem->map(function ($item) use($record) {
+                    $items = $record->orderRequestItem->map(function ($item) use ($record) {
+                        if (! PurchaseOrderResource::isOrderRequestItemEligibleForPurchaseOrder($item)) {
+                            return null;
+                        }
+
                         $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id)['remaining_for_po'];
                         if ($remainingQty <= 0) {
                             return null;
@@ -387,8 +396,8 @@ class ViewOrderRequest extends ViewRecord
                         ->unique();
                     $isMultiSupplier = $groups->count() > 1;
 
-                    // Pre-fill supplier from the first item that has one
-                    $firstSupplierId = $record->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+                    // Pre-fill supplier from the first eligible item that has one.
+                    $firstSupplierId = collect($items)->first(fn($item) => filled($item['item_supplier_id'] ?? null))['item_supplier_id'] ?? null;
 
                     return [
                         'supplier_id'    => $isMultiSupplier ? null : $firstSupplierId,

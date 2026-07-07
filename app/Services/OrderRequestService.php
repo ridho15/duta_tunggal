@@ -17,8 +17,7 @@ class OrderRequestService
 {
     public function __construct(
         private readonly ProductSupplierSyncService $productSupplierSyncService
-    ) {
-    }
+    ) {}
 
     /**
      * Build the list of OrderRequestItems to convert to PO items.
@@ -56,7 +55,7 @@ class OrderRequestService
                     $lockedQty    = (float) \App\Models\PurchaseOrderItem::query()
                         ->where('refer_item_model_type', \App\Models\OrderRequestItem::class)
                         ->where('refer_item_model_id', $orderRequestItem->id)
-                        ->whereHas('purchaseOrder', fn ($q) => $q->whereNotIn('status', ['draft', 'closed', 'cancelled', 'rejected']))
+                        ->whereHas('purchaseOrder', fn($q) => $q->whereNotIn('status', ['draft', 'closed', 'cancelled', 'rejected']))
                         ->sum('quantity');
                     $maxQty = max(0, $orderRequestItem->quantity - max($fulfilledQty, $lockedQty));
                     if ($qty > $maxQty) {
@@ -97,29 +96,29 @@ class OrderRequestService
 
         // No selection provided — use all approved items with remaining quantity.
         return $orderRequest->orderRequestItem
-            ->filter(fn ($orderRequestItem) => OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED)
+            ->filter(fn($orderRequestItem) => OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED)
             ->map(function ($orderRequestItem) use ($supplier) {
-            $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
-            if ($remainingQty <= 0) {
-                return null;
-            }
+                $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
+                if ($remainingQty <= 0) {
+                    return null;
+                }
 
-            if (($orderRequestItem->unit_price ?? 0) > 0) {
-                $unitPrice = (float) $orderRequestItem->unit_price;
-            } else {
-                $product = $orderRequestItem->product;
-                $sp = $product ? $product->suppliers()->where('suppliers.id', $supplier->id)->first() : null;
-                $unitPrice = $sp ? (float) $sp->pivot->supplier_price : (float) ($product->cost_price ?? 0);
-            }
+                if (($orderRequestItem->unit_price ?? 0) > 0) {
+                    $unitPrice = (float) $orderRequestItem->unit_price;
+                } else {
+                    $product = $orderRequestItem->product;
+                    $sp = $product ? $product->suppliers()->where('suppliers.id', $supplier->id)->first() : null;
+                    $unitPrice = $sp ? (float) $sp->pivot->supplier_price : (float) ($product->cost_price ?? 0);
+                }
 
-            return [
-                'order_request_item' => $orderRequestItem,
-                'quantity'           => $remainingQty,
-                'unit_price'         => $unitPrice,
-                'discount'           => $orderRequestItem->discount ?? 0,
-                'tax'                => $orderRequestItem->tax ?? 0,
-            ];
-        })
+                return [
+                    'order_request_item' => $orderRequestItem,
+                    'quantity'           => $remainingQty,
+                    'unit_price'         => $unitPrice,
+                    'discount'           => $orderRequestItem->discount ?? 0,
+                    'tax'                => $orderRequestItem->tax ?? 0,
+                ];
+            })
             ->filter();
     }
 
@@ -151,8 +150,8 @@ class OrderRequestService
         }
 
         $selectedByItemId = $selectedItems
-            ->filter(fn ($row) => ! empty($row['item_id']))
-            ->keyBy(fn ($row) => (int) $row['item_id']);
+            ->filter(fn($row) => ! empty($row['item_id']))
+            ->keyBy(fn($row) => (int) $row['item_id']);
 
         foreach ($orderRequest->orderRequestItem as $item) {
             $row = $selectedByItemId->get((int) $item->id);
@@ -250,7 +249,7 @@ class OrderRequestService
         $orderRequest->load('orderRequestItem');
 
         $hasDraftItem = $orderRequest->orderRequestItem
-            ->contains(fn (OrderRequestItem $item): bool => OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT);
+            ->contains(fn(OrderRequestItem $item): bool => OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT);
 
         if ($hasDraftItem) {
             throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
@@ -268,8 +267,8 @@ class OrderRequestService
         if ($createPurchaseOrder) {
             $hasIncludedApprovedItem = ! empty($data['selected_items'])
                 && collect($data['selected_items'])
-                    ->filter(fn ($row) => ! empty($row['include']))
-                    ->contains(fn ($row) => OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED);
+                ->filter(fn($row) => ! empty($row['include']))
+                ->contains(fn($row) => OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED);
 
             if (! $hasIncludedApprovedItem) {
                 return $orderRequest->fresh(['purchaseOrder.purchaseOrderItem']);
@@ -295,7 +294,7 @@ class OrderRequestService
                 'po_number'    => $data['po_number'],
                 'supplier_id'  => $supplier->id,
                 'order_date'   => $data['order_date'],
-                'expected_date'=> $data['expected_date'] ?? null,
+                'expected_date' => $data['expected_date'] ?? null,
                 'note'         => $data['note'] ?? null,
                 'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
@@ -357,7 +356,7 @@ class OrderRequestService
             // Auto-approve PO when created from Order Request approval flow.
             app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
         } else {
-            foreach($orderRequest->orderRequestItem as $item) {
+            foreach ($orderRequest->orderRequestItem as $item) {
                 $productId = $item->product_id;
                 $supplierId = $item->supplier_id;
 
@@ -401,7 +400,7 @@ class OrderRequestService
             'po_number'    => $data['po_number'],
             'supplier_id'  => $supplier->id,
             'order_date'   => $data['order_date'],
-            'expected_date'=> $data['expected_date'] ?? null,
+            'expected_date' => $data['expected_date'] ?? null,
             'note'         => $data['note'] ?? null,
             'status'       => 'draft', // PO dimulai dari draft; fulfilled_quantity diupdate saat PO diapprove
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
@@ -475,4 +474,3 @@ class OrderRequestService
         $orderRequest->update(['status' => 'request_approve']);
     }
 }
-
