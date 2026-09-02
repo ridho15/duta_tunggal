@@ -1105,8 +1105,9 @@ class HelperController extends Controller
         $date = now()->format('Ymd');
         $prefix = 'PO-' . $date . '-';
 
-        // Find the latest PO number for today
-        $latest = \App\Models\PurchaseOrder::where('po_number', 'like', $prefix . '%')
+        // Find the latest PO number for today including soft deleted
+        $latest = \App\Models\PurchaseOrder::withTrashed()
+            ->where('po_number', 'like', $prefix . '%')
             ->orderBy('po_number', 'desc')
             ->first();
 
@@ -1117,6 +1118,12 @@ class HelperController extends Controller
             $nextNumber = 1;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $candidate = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        while (\App\Models\PurchaseOrder::withTrashed()->where('po_number', $candidate)->exists()) {
+            $nextNumber++;
+            $candidate = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        }
+
+        return $candidate;
     }
 }

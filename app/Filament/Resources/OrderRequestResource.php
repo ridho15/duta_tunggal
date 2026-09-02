@@ -1048,6 +1048,52 @@ class OrderRequestResource extends Resource
             ]);
     }
 
+    public static function resolveApprovalGateStatus(?string $status): ?string
+    {
+        $normalized = OrderRequestItem::normalizeApprovalStatus($status);
+
+        return in_array($normalized, [
+            OrderRequestItem::STATUS_APPROVED,
+            OrderRequestItem::STATUS_REJECTED,
+        ], true) ? $normalized : OrderRequestItem::STATUS_APPROVED;
+    }
+
+    public static function validateApprovalGateItemDecisions(array $data): void
+    {
+        $selectedItems = collect($data['selected_items'] ?? []);
+        $validDecisions = [
+            OrderRequestItem::STATUS_APPROVED,
+            OrderRequestItem::STATUS_REJECTED,
+        ];
+
+        if ($selectedItems->isEmpty()) {
+            throw ValidationException::withMessages([
+                'selected_items' => 'Pilih keputusan untuk semua item sebelum menyetujui Order Request.',
+            ]);
+        }
+
+        $hasMissingDecision = $selectedItems->contains(
+            fn (array $row): bool => ! in_array($row['approval_status'] ?? null, $validDecisions, true)
+        );
+
+        if ($hasMissingDecision) {
+            throw ValidationException::withMessages([
+                'selected_items' => 'Pilih keputusan untuk semua item sebelum menyetujui Order Request.',
+            ]);
+        }
+
+        $hasRejectedWithoutNote = $selectedItems->contains(
+            fn (array $row): bool => ($row['approval_status'] ?? null) === OrderRequestItem::STATUS_REJECTED
+                && trim((string) ($row['rejection_note'] ?? '')) === ''
+        );
+
+        if ($hasRejectedWithoutNote) {
+            throw ValidationException::withMessages([
+                'selected_items' => 'Alasan reject wajib diisi untuk item yang ditolak.',
+            ]);
+        }
+    }
+
     public static function hasApprovedItemsAvailableForPurchaseOrder(OrderRequest $record): bool
     {
         $record->loadMissing('orderRequestItem');
@@ -2691,7 +2737,7 @@ class OrderRequestResource extends Resource
                                     'total_cost'       => self::formatMoneyPreviewState(max(0, $remainingQty) * $supplierPrice),
                                     'subtotal'         => $subtotal,
                                     'max_quantity'     => max(0, $remainingQty),
-                                    'approval_status'  => OrderRequestItem::normalizeApprovalStatus($item->status ?? null),
+                                    'approval_status'  => self::resolveApprovalGateStatus($item->status ?? null),
                                     'rejection_note'   => $item->rejection_note,
                                     'include'          => $remainingQty > 0,
                                     'tipe_pajak'       => self::normalizeItemTaxType($item->tipe_pajak ?? null),
@@ -2713,6 +2759,7 @@ class OrderRequestResource extends Resource
                             return [
                                 'supplier_id'           => $isMultiSupplier ? null : ($items[0]['item_supplier_id'] ?? null),
                                 'cabang_id'             => $isMultiSupplier ? null : $firstCabangId,
+                                'order_date'            => now()->format('Y-m-d'),
                                 'create_purchase_order' => true,
                                 'multi_supplier'        => $isMultiSupplier,
                                 'selected_items'        => $items,
@@ -2744,6 +2791,7 @@ class OrderRequestResource extends Resource
                                 ->schema([
                                     DatePicker::make('order_date')
                                         ->label('Tanggal Pembelian')
+                                        ->default(now())
                                         ->required()
                                         ->native(false)
                                         ->displayFormat('d M Y'),

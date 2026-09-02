@@ -83,7 +83,10 @@ export const SearchableSelect: React.FC<Props> = ({
             : 'border-gray-300 hover:border-gray-400'
         } ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
       >
-        <div className="flex-1 truncate mr-2">
+        <div
+          className="flex-1 truncate mr-2"
+          title={selectedOption ? `${selectedOption.label} ${selectedOption.sublabel ? `(${selectedOption.sublabel})` : ''}` : undefined}
+        >
           {selectedOption ? (
             <div className="flex items-center gap-1.5 truncate">
               {selectedOption.badge && (
@@ -114,6 +117,7 @@ export const SearchableSelect: React.FC<Props> = ({
                 onChange(null);
               }}
               className="p-0.5 hover:text-gray-600 rounded"
+              title="Hapus Pilihan"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -126,9 +130,9 @@ export const SearchableSelect: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Dropdown Menu (Pure Light Mode) */}
+      {/* Dropdown Menu (Pure Light Mode - Min Width Expanded for No Clipping) */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-50 mt-1 left-0 min-w-full md:min-w-[340px] max-w-xl bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
           {/* Search Input */}
           <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
             <Search className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
@@ -160,9 +164,11 @@ export const SearchableSelect: React.FC<Props> = ({
             ) : (
               filteredOptions.map((opt) => {
                 const isSelected = String(opt.value) === String(value);
+                const fullText = `${opt.label} ${opt.sublabel ? `(${opt.sublabel})` : ''}`;
                 return (
                   <div
                     key={opt.value}
+                    title={fullText}
                     onClick={() => {
                       onChange(opt.value);
                       setIsOpen(false);

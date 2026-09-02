@@ -303,6 +303,7 @@ class OrderRequestApiController extends Controller
             'items.*.tipe_pajak' => 'required|string|in:none,eklusif,inklusif',
             'items.*.tax' => 'nullable|numeric|min:0|max:100',
             'items.*.note' => 'nullable|string',
+            'items.*.status' => 'nullable|string|in:draft,approved,rejected',
             'items.*.unit_price_idr' => 'nullable|numeric|min:0',
             'items.*.original_price_idr' => 'nullable|numeric|min:0',
         ], [
@@ -387,6 +388,20 @@ class OrderRequestApiController extends Controller
                     'note' => $itemData['note'] ?? null,
                 ];
 
+                $itemStatus = isset($itemData['status'])
+                    ? OrderRequestItem::normalizeApprovalStatus($itemData['status'])
+                    : null;
+                if ($itemStatus) {
+                    $itemPayload['status'] = $itemStatus;
+                    if ($itemStatus === OrderRequestItem::STATUS_APPROVED) {
+                        $itemPayload['approved_by'] = Auth::id() ?? 1;
+                        $itemPayload['approved_at'] = now();
+                    } elseif ($itemStatus === OrderRequestItem::STATUS_REJECTED) {
+                        $itemPayload['rejected_by'] = Auth::id() ?? 1;
+                        $itemPayload['rejected_at'] = now();
+                    }
+                }
+
                 if (! empty($itemData['id'])) {
                     $existingItem = OrderRequestItem::where('id', $itemData['id'])
                         ->where('order_request_id', $orderRequest->id)
@@ -402,7 +417,7 @@ class OrderRequestApiController extends Controller
                 // If new item row
                 $newItem = OrderRequestItem::create(array_merge($itemPayload, [
                     'fulfilled_quantity' => 0,
-                    'status' => OrderRequestItem::STATUS_DRAFT,
+                    'status' => $itemPayload['status'] ?? OrderRequestItem::STATUS_DRAFT,
                 ]));
                 $submittedItemIds[] = $newItem->id;
             }
@@ -411,6 +426,10 @@ class OrderRequestApiController extends Controller
             OrderRequestItem::where('order_request_id', $orderRequest->id)
                 ->whereNotIn('id', $submittedItemIds)
                 ->delete();
+
+            $orderRequest->refresh();
+            $orderRequest->syncItemApprovalStatus();
+            $orderRequest->refresh();
 
             Log::info('OrderRequestApiController: Updated Order Request', [
                 'order_request_id' => $orderRequest->id,

@@ -29,6 +29,8 @@ class EditPurchaseOrder extends EditRecord
 
     protected static ?string $title = 'Ubah Pembelian';
 
+    protected static string $view = 'filament.resources.purchase-order-resource.pages.edit-purchase-order';
+
     protected function getHeaderActions(): array
     {
         return [

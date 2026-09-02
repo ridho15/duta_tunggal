@@ -14,6 +14,8 @@ class CreateQuotation extends CreateRecord
 {
     protected static string $resource = QuotationResource::class;
 
+    protected static string $view = 'filament.resources.quotation-resource.pages.create-quotation';
+
     protected $quotationService;
     public function boot()
     {

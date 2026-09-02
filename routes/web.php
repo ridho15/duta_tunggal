@@ -70,6 +70,30 @@ if (app()->environment('local')) {
         }
         return redirect('/admin/order-requests/create');
     });
+
+    Route::get('/dev-autologin-po', function () {
+        $user = \App\Models\User::first();
+        if ($user) {
+            \Illuminate\Support\Facades\Auth::login($user);
+        }
+        return redirect('/admin/purchase-orders/create');
+    });
+
+    Route::get('/dev-autologin-qo', function () {
+        $user = \App\Models\User::first();
+        if ($user) {
+            \Illuminate\Support\Facades\Auth::login($user);
+        }
+        return redirect('/admin/quotations/create');
+    });
+
+    Route::get('/dev-autologin-so', function () {
+        $user = \App\Models\User::first();
+        if ($user) {
+            \Illuminate\Support\Facades\Auth::login($user);
+        }
+        return redirect('/admin/sale-orders/create');
+    });
 }
 
 // Reports preview routes

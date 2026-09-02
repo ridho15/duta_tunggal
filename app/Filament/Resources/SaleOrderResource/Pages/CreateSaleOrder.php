@@ -22,7 +22,7 @@ class CreateSaleOrder extends CreateRecord
 {
     protected static string $resource = SaleOrderResource::class;
 
-    // protected static string $view = 'filament.components.sale-order.form';
+    protected static string $view = 'filament.resources.sale-order-resource.pages.create-sale-order';
 
     protected static ?string $title = 'Buat Sales Order';
 

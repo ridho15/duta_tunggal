@@ -23,6 +23,8 @@ class CreatePurchaseOrder extends CreateRecord
 
     protected static ?string $title = 'Buat Pembelian';
 
+    protected static string $view = 'filament.resources.purchase-order-resource.pages.create-purchase-order';
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $this->applyPendingInlinePurchaseOrderItemDrafts();

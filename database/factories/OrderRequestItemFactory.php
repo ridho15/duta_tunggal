@@ -40,6 +40,10 @@ class OrderRequestItemFactory extends Factory
         // inherit currency from parent order request when available
         $currencyId = $orderRequest->currency_id ?? Currency::where('code', 'IDR')->value('id') ?? Currency::query()->inRandomOrder()->value('id');
 
+        $status = in_array($orderRequest->status, ['approved', 'partial', 'complete', 'closed'], true)
+            ? 'approved'
+            : ($orderRequest->status === 'rejected' ? 'rejected' : 'draft');
+
         return [
             'order_request_id' => $orderRequest->id,
             'cabang_id' => $cabangId,
@@ -50,6 +54,7 @@ class OrderRequestItemFactory extends Factory
             'original_price' => $unitPrice,
             'tax' => 0,
             'tipe_pajak' => 'eklusif',
+            'status' => $status,
             'currency_id' => $currencyId,
             'note' => $this->faker->sentence()
         ];

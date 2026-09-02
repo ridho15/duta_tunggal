@@ -156,7 +156,7 @@ class ViewOrderRequest extends ViewRecord
                             'total_cost'       => OrderRequestResource::formatMoneyPreviewState($preview['total_cost']),
                             'subtotal'         => OrderRequestResource::formatMoneyPreviewState($preview['subtotal']),
                             'max_quantity'     => max(0, $remainingQty),
-                            'approval_status'  => OrderRequestItem::normalizeApprovalStatus($item->status ?? null),
+                            'approval_status'  => OrderRequestResource::resolveApprovalGateStatus($item->status ?? null),
                             'rejection_note'   => $item->rejection_note,
                             'include'          => $remainingQty > 0,
                             'tipe_pajak'       => OrderRequestResource::normalizeItemTaxType($item->tipe_pajak ?? null),
@@ -177,6 +177,7 @@ class ViewOrderRequest extends ViewRecord
 
                     return [
                         'supplier_id'           => $isMultiSupplier ? null : $firstSupplierId,
+                        'order_date'            => now()->format('Y-m-d'),
                         'create_purchase_order' => true,
                         'multi_supplier'        => $isMultiSupplier,
                         'selected_items'        => $items,
@@ -206,6 +207,7 @@ class ViewOrderRequest extends ViewRecord
                         ->schema([
                             DatePicker::make('order_date')
                                 ->label('Tanggal Pembelian')
+                                ->default(now())
                                 ->required()
                                 ->native(false)
                                 ->displayFormat('d M Y')
@@ -241,6 +243,8 @@ class ViewOrderRequest extends ViewRecord
                 ->action(function (array $data, $record) {
                     try {
                         $orderRequestService = app(OrderRequestService::class);
+                        OrderRequestResource::validateApprovalGateItemDecisions($data);
+
                         if ($data['create_purchase_order']) {
                             $includedItems = OrderRequestResource::selectedPurchaseOrderApprovedItems($data['selected_items'] ?? []);
                             if ($includedItems->isEmpty()) {
