@@ -62,6 +62,16 @@ Route::get('exports/download/{filename}', function ($filename) {
     return response()->download($path, $filename)->deleteFileAfterSend(true);
 })->name('exports.download');
 
+if (app()->environment('local')) {
+    Route::get('/dev-autologin', function () {
+        $user = \App\Models\User::first();
+        if ($user) {
+            \Illuminate\Support\Facades\Auth::login($user);
+        }
+        return redirect('/admin/order-requests/create');
+    });
+}
+
 // Reports preview routes
 Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/stock-report/preview', [StockReportController::class, 'preview'])

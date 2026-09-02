@@ -15,6 +15,19 @@ class CreateOrderRequest extends CreateRecord
 
     protected static string $resource = OrderRequestResource::class;
 
+    protected static string $view = 'filament.resources.order-request-resource.pages.create-order-request';
+
+    public function getViewData(): array
+    {
+        $apiController = app(\App\Http\Controllers\Api\OrderRequestApiController::class);
+        $res = $apiController->dependencies(request());
+        $initialData = $res->getData(true)['data'] ?? [];
+
+        return [
+            'initialDependencies' => $initialData,
+        ];
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $this->applyPendingInlineOrderRequestItemDrafts();

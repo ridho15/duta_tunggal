@@ -62,6 +62,7 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->profile()
             ->defaultThemeMode(ThemeMode::Light)
+            ->darkMode(false)
             ->colors([
                 'primary' => Color::Blue,
             ])

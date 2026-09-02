@@ -15,6 +15,27 @@ class EditOrderRequest extends EditRecord
 
     protected static string $resource = OrderRequestResource::class;
 
+    protected static string $view = 'filament.resources.order-request-resource.pages.edit-order-request';
+
+    public function getViewData(): array
+    {
+        $apiController = app(\App\Http\Controllers\Api\OrderRequestApiController::class);
+        $res = $apiController->dependencies(request());
+        $initialData = $res->getData(true)['data'] ?? [];
+
+        $recordData = $this->record->load([
+            'orderRequestItem.product.uom',
+            'orderRequestItem.supplier',
+            'orderRequestItem.cabang',
+            'currency',
+        ])->toArray();
+
+        return [
+            'initialDependencies' => $initialData,
+            'recordData' => $recordData,
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [

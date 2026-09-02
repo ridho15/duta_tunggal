@@ -11,6 +11,71 @@
 }
 
 @layer base {
+    html,
+    body,
+    .fi-body,
+    .fi-main,
+    .fi-page {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+    }
+
+    .fi-topbar,
+    .fi-topbar nav,
+    .fi-sidebar-header {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
+    }
+
+    .fi-topbar button,
+    .fi-topbar a,
+    .fi-topbar svg,
+    .fi-sidebar-header a,
+    .fi-sidebar-header span,
+    .fi-sidebar-header div {
+        color: #0f172a !important;
+    }
+
+    .fi-header-heading {
+        color: #0f172a !important;
+    }
+
+    .fi-breadcrumbs-item-label,
+    .fi-breadcrumbs-item-separator {
+        color: #64748b !important;
+    }
+
+    /* ── Filament Sidebar Protection & Sharp Contrast ── */
+    .fi-sidebar-item-label,
+    .fi-sidebar-group-label,
+    .fi-sidebar-item-button span,
+    .fi-sidebar-group-button span {
+        color: #334155 !important;
+        font-weight: 600 !important;
+    }
+
+    .fi-sidebar-item-icon,
+    .fi-sidebar-group-icon,
+    .fi-sidebar-item-button svg,
+    .fi-sidebar-group-button svg {
+        color: #64748b !important;
+    }
+
+    /* Hover & Active States */
+    .fi-sidebar-item-button:hover .fi-sidebar-item-label,
+    .fi-sidebar-group-button:hover span,
+    .fi-sidebar-item-button.fi-active .fi-sidebar-item-label,
+    .fi-sidebar-group-button.fi-active span {
+        color: #1d4ed8 !important;
+    }
+
+    .fi-sidebar-item-button:hover svg,
+    .fi-sidebar-item-button.fi-active svg,
+    .fi-sidebar-group-button:hover svg,
+    .fi-sidebar-group-button.fi-active svg {
+        color: #2563eb !important;
+    }
 
     *,
     ::after,
@@ -46,3 +111,29 @@ select:focus[data-flux-control] {
 .select2-dropdown {
     z-index: 9999 !important;
 }
+
+/* Chrome, Safari, Edge, Opera number input arrow reset */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
