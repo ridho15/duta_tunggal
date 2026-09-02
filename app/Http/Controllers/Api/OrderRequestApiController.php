@@ -24,9 +24,9 @@ use Throwable;
 class OrderRequestApiController extends Controller
 {
     /**
-     * Get all dependencies needed to populate the Order Request form.
+     * Get raw dependencies array (low memory, no JsonResponse overhead).
      */
-    public function dependencies(Request $request): JsonResponse
+    public function getDependenciesData(?Request $request = null): array
     {
         try {
             $user = Auth::user();
@@ -52,8 +52,14 @@ class OrderRequestApiController extends Controller
                 ->orderBy('perusahaan')
                 ->get(['id', 'code', 'perusahaan', 'kontak_person', 'phone', 'cabang_id']);
 
-            // 4. Fetch Products with UOM and Supplier pivots
+            // 4. Resolve default tax rate once before loop (prevents N+1 query memory bloat)
+            $activeTaxRate = (float) (\App\Models\TaxSetting::activeRate('PPN') ?? 11.0);
+
+            // 5. Fetch Products with UOM and Supplier pivots
             $products = Product::withoutGlobalScope('product_cabang')
+                ->where(function ($q) {
+                    $q->whereNull('is_active')->orWhere('is_active', true);
+                })
                 ->with([
                     'uom:id,name,abbreviation',
                     'suppliers' => function ($query) {
@@ -62,9 +68,10 @@ class OrderRequestApiController extends Controller
                     },
                 ])
                 ->orderBy('name')
-                ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id'])
-                ->map(function (Product $product) {
-                    $defaultTaxRate = TaxDefaultResolver::resolveForProductId((int) $product->id, 'PPN Excluded');
+                ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak'])
+                ->map(function (Product $product) use ($activeTaxRate) {
+                    $productTax = (float) ($product->pajak ?? 0);
+                    $defaultTaxRate = $productTax > 0 ? $productTax : $activeTaxRate;
                     
                     // Recommended supplier with lowest price
                     $recommendedSupplier = $product->suppliers
@@ -79,7 +86,7 @@ class OrderRequestApiController extends Controller
                         'uom_id' => $product->uom_id,
                         'uom' => $product->uom?->abbreviation ?? $product->uom?->name ?? 'PCS',
                         'cabang_id' => $product->cabang_id,
-                        'default_tax_rate' => (float) $defaultTaxRate,
+                        'default_tax_rate' => $defaultTaxRate,
                         'suppliers' => $product->suppliers->map(function ($s) {
                             return [
                                 'id' => $s->id,
@@ -97,27 +104,46 @@ class OrderRequestApiController extends Controller
                     ];
                 });
 
-            // 5. Generate fresh request number & default date
+            // 6. Generate fresh request number & default date
             $nextRequestNumber = HelperController::generateRequestNumber();
             $defaultDate = now()->format('Y-m-d');
 
+            return [
+                'next_request_number' => $nextRequestNumber,
+                'default_request_date' => $defaultDate,
+                'default_currency_id' => $defaultCurrencyId,
+                'default_cabang_id' => $user?->cabang_id ?? $cabangs->first()?->id ?? null,
+                'cabangs' => $cabangs,
+                'currencies' => $currencies,
+                'suppliers' => $suppliers,
+                'products' => $products,
+                'tax_types' => [
+                    ['value' => 'none', 'label' => 'Non PPN (0%)'],
+                    ['value' => 'eklusif', 'label' => 'PPN Excluded (11%)'],
+                    ['value' => 'inklusif', 'label' => 'PPN Included (11%)'],
+                ],
+            ];
+        } catch (Throwable $e) {
+            Log::error('OrderRequestApiController::getDependenciesData failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Get dependencies via JsonResponse API
+     */
+    public function dependencies(Request $request): JsonResponse
+    {
+        try {
+            $data = $this->getDependenciesData($request);
+
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'next_request_number' => $nextRequestNumber,
-                    'default_request_date' => $defaultDate,
-                    'default_currency_id' => $defaultCurrencyId,
-                    'default_cabang_id' => $user?->cabang_id ?? $cabangs->first()?->id ?? null,
-                    'cabangs' => $cabangs,
-                    'currencies' => $currencies,
-                    'suppliers' => $suppliers,
-                    'products' => $products,
-                    'tax_types' => [
-                        ['value' => 'none', 'label' => 'Non PPN (0%)'],
-                        ['value' => 'eklusif', 'label' => 'PPN Excluded (11%)'],
-                        ['value' => 'inklusif', 'label' => 'PPN Included (11%)'],
-                    ],
-                ],
+                'data' => $data,
             ]);
         } catch (Throwable $e) {
             Log::error('OrderRequestApiController::dependencies failed', [

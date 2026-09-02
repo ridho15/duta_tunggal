@@ -2,10 +2,6 @@
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    <script>
-        window.__ORDER_REQUEST_INITIAL_DATA__ = @js($initialDependencies);
-    </script>
-
     <div id="order-request-next-app">
         {{-- Loading Skeleton while React mounts --}}
         <div class="space-y-6 animate-pulse">

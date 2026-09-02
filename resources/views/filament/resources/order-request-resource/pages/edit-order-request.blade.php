@@ -3,7 +3,6 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <script>
-        window.__ORDER_REQUEST_INITIAL_DATA__ = @js($initialDependencies);
         window.__ORDER_REQUEST_RECORD__ = @js($recordData);
     </script>
 

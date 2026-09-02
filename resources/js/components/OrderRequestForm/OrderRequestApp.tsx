@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   FormDependencies,
   OrderRequestHeader,
@@ -27,7 +27,8 @@ interface Props {
 }
 
 export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord }) => {
-  const dependencies = initialData || null;
+  const [dependencies, setDependencies] = useState<FormDependencies | null>(initialData || null);
+  const [isDepsLoading, setIsDepsLoading] = useState<boolean>(!initialData);
   const isEditMode = Boolean(initialRecord && initialRecord.id);
 
   // Header State
@@ -57,7 +58,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
         product_id: null,
         unit: '-',
         quantity: 1,
-        cabang_id: defaultCabangId ?? initialData?.default_cabang_id ?? null,
+        cabang_id: defaultCabangId ?? dependencies?.default_cabang_id ?? null,
         supplier_id: null,
         currency_id: defaultCurrencyId,
         original_price: 0,
@@ -83,7 +84,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
         isSelected: false,
       };
     },
-    [initialData]
+    [dependencies?.default_cabang_id]
   );
 
   // Items State
@@ -134,8 +135,65 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
       });
     }
 
-    return [createEmptyRow(initialData?.default_cabang_id, initialData?.default_currency_id || 1, true)];
+    return [createEmptyRow(dependencies?.default_cabang_id, dependencies?.default_currency_id || 1, true)];
   });
+
+  // Asynchronously fetch dependencies if not passed via initialData
+  useEffect(() => {
+    if (initialData) return;
+    let isMounted = true;
+    setIsDepsLoading(true);
+
+    fetch('/api/v1/order-requests/dependencies', {
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (!isMounted) return;
+        if (res && res.success && res.data) {
+          const deps = res.data as FormDependencies;
+          setDependencies(deps);
+
+          if (!isEditMode) {
+            setHeader((prev) => ({
+              ...prev,
+              request_number: prev.request_number || deps.next_request_number || '',
+              request_date: prev.request_date || deps.default_request_date || new Date().toISOString().split('T')[0],
+              currency_id: prev.currency_id || deps.default_currency_id || 1,
+            }));
+            setItems([createEmptyRow(deps.default_cabang_id, deps.default_currency_id || 1, true)]);
+          } else if (initialRecord && Array.isArray(initialRecord.order_request_item)) {
+            setItems((prevItems) =>
+              prevItems.map((row) => {
+                const prod = deps.products.find((p) => p.id === row.product_id);
+                if (prod) {
+                  return {
+                    ...row,
+                    unit: prod.uom || row.unit,
+                    recommended_supplier: prod.recommended_supplier || null,
+                    product_suppliers: prod.suppliers || [],
+                  };
+                }
+                return row;
+              })
+            );
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load order request dependencies', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsDepsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialData, isEditMode, initialRecord, createEmptyRow]);
 
   // Table Filters & Pagination State
   const [searchQuery, setSearchQuery] = useState('');
@@ -181,10 +239,10 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
       const collapsedExisting = prev.map((r) => ({ ...r, isExpanded: false }));
       return [
         ...collapsedExisting,
-        createEmptyRow(initialData?.default_cabang_id, header.currency_id, true),
+        createEmptyRow(dependencies?.default_cabang_id, header.currency_id, true),
       ];
     });
-  }, [createEmptyRow, initialData, header.currency_id]);
+  }, [createEmptyRow, dependencies?.default_cabang_id, header.currency_id]);
 
   // Remove Row
   const handleRemoveRow = useCallback((rowId: string) => {
@@ -322,7 +380,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
                 product_id: product.id,
                 unit: product.uom,
                 supplier_id: defaultSupplier,
-                cabang_id: row.cabang_id || product.cabang_id || initialData?.default_cabang_id || null,
+                cabang_id: row.cabang_id || product.cabang_id || dependencies?.default_cabang_id || null,
                 unit_price_idr: rawPriceIdr,
                 original_price_idr: rawPriceIdr,
                 unit_price: convertedPrice,
@@ -619,7 +677,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
         if (stayOnPage) {
           // Reset for creating another document
           handleGenerateNumber();
-          setItems([createEmptyRow(initialData?.default_cabang_id, header.currency_id, true)]);
+          setItems([createEmptyRow(dependencies?.default_cabang_id, header.currency_id, true)]);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           window.location.href = result.data?.redirect_url || '/admin/order-requests';
@@ -641,6 +699,26 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
   const handleCancel = () => {
     window.location.href = '/admin/order-requests';
   };
+
+  if (isDepsLoading && !dependencies) {
+    return (
+      <div className="space-y-6 animate-pulse p-4">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs space-y-4">
+          <div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="h-10 bg-gray-100 dark:bg-gray-800/60 rounded-lg"></div>
+            <div className="h-10 bg-gray-100 dark:bg-gray-800/60 rounded-lg"></div>
+            <div className="h-10 bg-gray-100 dark:bg-gray-800/60 rounded-lg"></div>
+            <div className="h-10 bg-gray-100 dark:bg-gray-800/60 rounded-lg"></div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xs space-y-4">
+          <div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-1/3"></div>
+          <div className="h-40 bg-gray-100 dark:bg-gray-800/60 rounded-xl"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-20">

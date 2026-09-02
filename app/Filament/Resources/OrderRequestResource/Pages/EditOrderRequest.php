@@ -19,10 +19,6 @@ class EditOrderRequest extends EditRecord
 
     public function getViewData(): array
     {
-        $apiController = app(\App\Http\Controllers\Api\OrderRequestApiController::class);
-        $res = $apiController->dependencies(request());
-        $initialData = $res->getData(true)['data'] ?? [];
-
         $recordData = $this->record->load([
             'orderRequestItem.product.uom',
             'orderRequestItem.supplier',
@@ -31,7 +27,6 @@ class EditOrderRequest extends EditRecord
         ])->toArray();
 
         return [
-            'initialDependencies' => $initialData,
             'recordData' => $recordData,
         ];
     }

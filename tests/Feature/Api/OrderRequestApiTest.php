@@ -158,7 +158,6 @@ class OrderRequestApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('order-request-next-app');
-        $response->assertSee('__ORDER_REQUEST_INITIAL_DATA__');
     }
 
     public function test_filament_edit_order_request_page_renders_successfully()
@@ -174,7 +173,6 @@ class OrderRequestApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('order-request-next-app');
-        $response->assertSee('__ORDER_REQUEST_INITIAL_DATA__');
         $response->assertSee('__ORDER_REQUEST_RECORD__');
     }
 }
