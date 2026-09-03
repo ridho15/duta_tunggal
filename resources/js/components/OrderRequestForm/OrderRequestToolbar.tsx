@@ -6,7 +6,6 @@ import {
   Filter,
   ChevronsDownUp,
   ChevronsUpDown,
-  Plus,
   ShieldCheck,
   XCircle,
   FileEdit,
@@ -25,7 +24,7 @@ interface Props {
   onTaxFilterChange: (val: TaxType | 'all') => void;
   allCollapsed: boolean;
   onToggleCollapseAll: () => void;
-  onAddItem: () => void;
+  onAddItem?: () => void;
   selectedCount: number;
   onBulkSetSupplier: (supplierId: number) => void;
   onBulkSetCabang: (cabangId: number) => void;
@@ -172,17 +171,6 @@ export const OrderRequestToolbar: React.FC<Props> = ({
                 <span>Collapse All</span>
               </>
             )}
-          </button>
-
-          {/* + Tambah Item Button */}
-          <button
-            type="button"
-            onClick={onAddItem}
-            disabled={disabled}
-            className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors shadow-2xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Tambah Item</span>
           </button>
         </div>
       </div>

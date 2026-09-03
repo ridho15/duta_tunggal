@@ -19,7 +19,7 @@ export const SaleOrderFloatingSummary: React.FC<Props> = ({
   onCancel,
 }) => {
   return (
-    <div className="sticky bottom-4 z-40 mt-8 bg-white/95 backdrop-blur-md border border-gray-200 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+    <div className="sticky bottom-4 z-40 mt-8 bg-white border border-gray-200 rounded-xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
       {/* Summary KPI Pills */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {/* Total Items */}
@@ -49,14 +49,14 @@ export const SaleOrderFloatingSummary: React.FC<Props> = ({
         {/* Grand Total */}
         <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 font-bold">
           <span className="text-emerald-600 mr-1">Grand Total:</span>
-          <span className="font-mono text-sm">{formatCurrency(summary.grand_total, summary.currency_symbol)}</span>
+          <span className="tabular-nums text-sm">{formatCurrency(summary.grand_total, summary.currency_symbol)}</span>
         </div>
 
         {/* Foreign currency IDR equivalent */}
         {summary.currency_symbol !== 'Rp' && (
           <div className="px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900">
             <span className="text-amber-600 mr-1">Setara IDR:</span>
-            <span className="font-mono font-semibold">{formatCurrency(summary.grand_total_idr, 'Rp')}</span>
+            <span className="tabular-nums font-semibold">{formatCurrency(summary.grand_total_idr, 'Rp')}</span>
           </div>
         )}
       </div>

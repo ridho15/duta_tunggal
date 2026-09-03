@@ -6,7 +6,7 @@ import {
 } from './types';
 import { formatMoney } from './calculations';
 import { SearchableSelect, SelectOption } from './SearchableSelect';
-import { Trash2, Copy, Sparkles, Check } from 'lucide-react';
+import { Trash2, Copy, TrendingDown, Check } from 'lucide-react';
 
 interface Props {
   item: OrderRequestItemRow;
@@ -83,7 +83,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
           <span className="text-sm font-semibold text-gray-800">
             {selectedProduct ? (
               <>
-                <span className="text-gray-500 font-mono text-xs mr-1.5 font-bold">
+                <span className="text-gray-500 tabular-nums text-xs mr-1.5 font-semibold">
                   [{selectedProduct.sku}]
                 </span>
                 {selectedProduct.name}
@@ -125,7 +125,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-start">
           {/* Produk Select with Searchable Combobox */}
           <div className="md:col-span-5">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Produk <span className="text-rose-500">*</span>
             </label>
             <SearchableSelect
@@ -143,17 +143,17 @@ export const OrderRequestItemCard: React.FC<Props> = ({
 
           {/* Satuan: LIVE BADGE PILL (Clean 38px Standard) */}
           <div className="md:col-span-1">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Satuan
             </label>
-            <div className="h-[38px] flex items-center justify-center px-2.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-700 tracking-wider">
+            <div className="h-[38px] flex items-center justify-center px-2.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">
               {item.unit || '-'}
             </div>
           </div>
 
           {/* Quantity Input */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Qty <span className="text-rose-500">*</span>
             </label>
             <input
@@ -163,7 +163,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
               value={item.quantity === 0 ? '' : item.quantity}
               onChange={(e) => onUpdate('quantity', parseFloat(e.target.value) || 0)}
               placeholder="0"
-              className={`w-full h-[38px] px-3 text-sm font-mono border rounded-lg bg-white text-gray-900 text-right focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors shadow-xs ${
+              className={`w-full h-[38px] px-3 text-sm tabular-nums border rounded-lg bg-white text-gray-900 text-right focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors shadow-xs ${
                 qtyError
                   ? 'border-rose-400 text-rose-800'
                   : 'border-gray-300'
@@ -176,7 +176,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
 
           {/* Cabang Tujuan */}
           <div className="md:col-span-4">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Cabang Tujuan <span className="text-rose-500">*</span>
             </label>
             <SearchableSelect
@@ -197,7 +197,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-center pt-2 border-t border-gray-100">
           {/* Supplier Select */}
           <div className="md:col-span-5">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Supplier (Pemasok)
             </label>
             <SearchableSelect
@@ -211,8 +211,8 @@ export const OrderRequestItemCard: React.FC<Props> = ({
 
           {/* Smart Recommendation Chip: LIVE WIDGET */}
           <div className="md:col-span-5">
-            <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+              <TrendingDown className="w-3.5 h-3.5 text-emerald-600" />
               Rekomendasi Supplier Termurah
             </label>
             {item.recommended_supplier ? (
@@ -221,7 +221,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
                   <span className="font-semibold text-emerald-900">
                     {item.recommended_supplier.perusahaan}
                   </span>
-                  <span className="text-emerald-700 font-mono ml-1.5">
+                  <span className="text-emerald-700 tabular-nums ml-1.5">
                     ({formatMoney(item.recommended_supplier.price, currencySymbol)})
                   </span>
                 </div>
@@ -245,7 +245,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
 
           {/* Mata Uang Item */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Valas Item
             </label>
             <select
@@ -269,7 +269,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
             <span className="text-[11px] font-semibold text-gray-500 block mb-0.5">
               Harga Master
             </span>
-            <span className="text-sm font-bold font-mono text-gray-800 block truncate">
+            <span className="text-sm font-semibold tabular-nums text-gray-800 block truncate">
               {formatMoney(item.original_price, currencySymbol)}
             </span>
             <span className="text-[10px] text-gray-400 block mt-0.5">
@@ -283,7 +283,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
               Harga Satuan <span className="text-rose-500">*</span>
             </label>
             <div className="flex rounded-lg shadow-xs">
-              <span className="inline-flex items-center px-2.5 rounded-l-lg border border-r-0 border-gray-300 bg-gray-100 text-gray-700 text-xs font-mono font-bold h-[34px]">
+              <span className="inline-flex items-center px-2.5 rounded-l-lg border border-r-0 border-gray-300 bg-gray-100 text-gray-700 text-xs tabular-nums font-semibold h-[34px]">
                 {currencySymbol}
               </span>
               <input
@@ -293,7 +293,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
                 value={item.unit_price === 0 ? '' : item.unit_price}
                 onChange={(e) => onUpdate('unit_price', parseFloat(e.target.value) || 0)}
                 placeholder="0"
-                className="w-full h-[34px] px-2 text-sm font-mono border border-gray-300 bg-white text-gray-900 rounded-r-lg text-right focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full h-[34px] px-2 text-sm tabular-nums border border-gray-300 bg-white text-gray-900 rounded-r-lg text-right focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
           </div>
@@ -303,7 +303,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
             <label className="block text-[11px] font-semibold text-gray-700 mb-1 flex items-center justify-between">
               <span>Diskon (%)</span>
               {item.discount > 0 && (
-                <span className="text-[10px] font-mono font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded">
+                <span className="text-[10px] tabular-nums font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded">
                   -{formatMoney(item.discount_nominal, currencySymbol)}
                 </span>
               )}
@@ -317,7 +317,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
                 value={item.discount === 0 ? '' : item.discount}
                 onChange={(e) => onUpdate('discount', parseFloat(e.target.value) || 0)}
                 placeholder="0"
-                className="w-full h-[34px] px-2 text-sm font-mono border border-r-0 border-gray-300 bg-white text-gray-900 rounded-l-lg text-right focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full h-[34px] px-2 text-sm tabular-nums border border-r-0 border-gray-300 bg-white text-gray-900 rounded-l-lg text-right focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               />
               <span className="inline-flex items-center px-2.5 rounded-r-lg border border-gray-300 bg-gray-100 text-gray-700 text-xs font-semibold h-[34px]">
                 %
@@ -330,7 +330,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
             <span className="text-[11px] font-semibold text-gray-500 block mb-0.5">
               Total Kotor
             </span>
-            <span className="text-sm font-bold font-mono text-gray-800 block truncate">
+            <span className="text-sm font-semibold tabular-nums text-gray-800 block truncate">
               {formatMoney(item.total_cost, currencySymbol)}
             </span>
             <span className="text-[10px] text-gray-400 block mt-0.5">
@@ -343,7 +343,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-center">
           {/* Tipe Pajak Radio Options */}
           <div className="lg:col-span-5">
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Tipe Pajak
             </label>
             <div className="flex items-center gap-2">
@@ -376,12 +376,12 @@ export const OrderRequestItemCard: React.FC<Props> = ({
 
           {/* Live Tax Breakdown Chip */}
           <div className="lg:col-span-3">
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Pajak Terhitung
             </label>
             <div className="h-[38px] flex items-center justify-between px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs shadow-2xs">
               <span className="font-semibold text-gray-600">Rate: {item.tax}%</span>
-              <span className="font-mono font-bold text-primary-600">
+              <span className="tabular-nums font-semibold text-primary-600">
                 +{formatMoney(item.tax_nominal, currencySymbol)}
               </span>
             </div>
@@ -395,7 +395,7 @@ export const OrderRequestItemCard: React.FC<Props> = ({
               </span>
             </div>
             <div className="text-right">
-              <span className="text-base font-extrabold font-mono text-blue-800">
+              <span className="text-base font-bold tabular-nums text-blue-800">
                 {formatMoney(item.subtotal, currencySymbol)}
               </span>
             </div>

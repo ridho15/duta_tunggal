@@ -28,7 +28,7 @@ export const PurchaseOrderFloatingSummary: React.FC<Props> = ({
   isEditMode = false,
 }) => {
   return (
-    <div className="sticky bottom-4 z-20 mt-6 bg-white/95 backdrop-blur-md border border-gray-200 rounded-2xl shadow-xl p-4 transition-all">
+    <div className="sticky bottom-4 z-20 mt-6 bg-white border border-gray-200 rounded-xl shadow-md p-4 transition-all">
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Metric Badges */}
         <div className="flex flex-wrap items-center gap-4 text-xs">

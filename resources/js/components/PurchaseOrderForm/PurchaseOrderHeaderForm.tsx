@@ -112,12 +112,12 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-100">
-        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+        <h3 className="text-base font-semibold text-gray-950 flex items-center gap-2">
           <FileText className="w-5 h-5 text-blue-600" />
           Form Pembelian (Purchase Order)
         </h3>
         {header.status && (
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
             Status: {header.status}
           </span>
         )}
@@ -125,7 +125,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
       {/* Row 1: Reference Selector */}
       <div className="bg-gray-50/80 p-3.5 rounded-lg border border-gray-200/80 mb-4">
-        <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+        <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
           <LinkIcon className="w-4 h-4 text-blue-500" />
           Referensi Dokumen (Opsional)
         </div>
@@ -214,7 +214,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         {/* PO Number (col-span-3) */}
         <div className="md:col-span-3">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Nomor PO <span className="text-red-500">*</span>
           </label>
           <div className="flex items-center gap-1.5">
@@ -244,7 +244,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
         {/* Supplier (col-span-5 for wide company name and tempo badge) */}
         <div className="md:col-span-5">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Supplier <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -261,7 +261,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
         {/* Cabang (col-span-4 - Locked when referencing Order Request) */}
         <div className="md:col-span-4">
-          <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center justify-between">
             <span>Cabang <span className="text-red-500">*</span></span>
             {selectedOr && (
               <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-0.5">
@@ -283,7 +283,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
         {/* Tanggal PO (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tanggal PO <span className="text-red-500">*</span>
           </label>
           <input
@@ -296,7 +296,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
         {/* Estimasi Datang (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Estimasi Datang
           </label>
           <input
@@ -309,7 +309,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
         {/* TOP Type (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Terms of Payment (TOP)
           </label>
           <select
@@ -333,7 +333,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
         {/* Tempo Hutang (col-span-1) */}
         <div className="col-span-1 md:col-span-1">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tempo (Hari)
           </label>
           <input
@@ -373,7 +373,7 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
 
         {/* Notes (col-span-3) */}
         <div className="col-span-1 md:col-span-3">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Catatan Dokumen
           </label>
           <textarea

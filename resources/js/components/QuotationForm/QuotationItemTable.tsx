@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, Trash2, Tag, Percent, DollarSign, StickyNote, Package } from 'lucide-react';
+import { ChevronDown, Trash2, Tag, Percent, DollarSign, StickyNote, Package, Plus } from 'lucide-react';
 import { SearchableSelect, SelectOption } from '../OrderRequestForm/SearchableSelect';
 import { QuotationItemRow, QuotationDependencies, ProductOption } from './types';
 import { calculateItemPreview, formatCurrency, formatNumber } from './calculations';
@@ -9,6 +9,7 @@ interface Props {
   currencySymbol: string;
   dependencies: QuotationDependencies;
   onChangeItems: (items: QuotationItemRow[]) => void;
+  onAddItem?: () => void;
   errors?: Record<string, string[]>;
 }
 
@@ -17,6 +18,7 @@ export const QuotationItemTable: React.FC<Props> = ({
   currencySymbol,
   dependencies,
   onChangeItems,
+  onAddItem,
   errors = {},
 }) => {
   const [activeItemRowId, setActiveItemRowId] = useState<string | null>(items[0]?.row_id || null);
@@ -130,7 +132,7 @@ export const QuotationItemTable: React.FC<Props> = ({
                   <span className="font-semibold text-sm text-gray-900 truncate">
                     {item.product_name ? (
                       <>
-                        <span className="font-mono text-gray-500 mr-1.5">({item.product_sku})</span>
+                        <span className="tabular-nums text-gray-500 mr-1.5">({item.product_sku})</span>
                         {item.product_name}
                       </>
                     ) : (
@@ -184,7 +186,7 @@ export const QuotationItemTable: React.FC<Props> = ({
               <div className="p-4 border-t border-gray-100 bg-white space-y-4 animate-in fade-in-50 duration-150">
                 {/* Product Selection */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Produk <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelect
@@ -203,7 +205,7 @@ export const QuotationItemTable: React.FC<Props> = ({
                 <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
                   {/* Qty (col-span-2) */}
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Qty <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -223,7 +225,7 @@ export const QuotationItemTable: React.FC<Props> = ({
 
                   {/* Satuan UOM (col-span-1 - Read-only text badge) */}
                   <div className="col-span-1 md:col-span-1">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Satuan
                     </label>
                     <div className="px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 font-medium text-center truncate">
@@ -233,7 +235,7 @@ export const QuotationItemTable: React.FC<Props> = ({
 
                   {/* Harga Satuan (col-span-3 - Live Rupiah Currency formatting) */}
                   <div className="col-span-2 md:col-span-3">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Harga Satuan ({currencySymbol}) <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -249,14 +251,14 @@ export const QuotationItemTable: React.FC<Props> = ({
                         const raw = e.target.value.replace(/[^0-9.]/g, '');
                         handleItemChange(index, { unit_price: parseFloat(raw) || 0 });
                       }}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none font-mono"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none tabular-nums"
                       placeholder="0,00"
                     />
                   </div>
 
                   {/* Diskon (%) (col-span-2) */}
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Diskon (%)
                     </label>
                     <div className="relative">
@@ -279,7 +281,7 @@ export const QuotationItemTable: React.FC<Props> = ({
 
                   {/* Tipe Pajak (col-span-4 - wide container so PPN text is never clipped) */}
                   <div className="col-span-1 md:col-span-4">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Tipe Pajak
                     </label>
                     <select
@@ -302,28 +304,28 @@ export const QuotationItemTable: React.FC<Props> = ({
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                   <div>
                     <span className="text-gray-500 block mb-0.5">Total Kotor:</span>
-                    <span className="text-gray-900 font-semibold font-mono text-sm">
+                    <span className="text-gray-900 font-semibold tabular-nums text-sm">
                       {formatCurrency(preview.total, currencySymbol)}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-gray-500 block mb-0.5">Potongan Diskon:</span>
-                    <span className="text-amber-700 font-semibold font-mono text-sm">
+                    <span className="text-amber-700 font-semibold tabular-nums text-sm">
                       - {formatCurrency(preview.discount_nominal, currencySymbol)}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-gray-500 block mb-0.5">Nominal PPN (11%):</span>
-                    <span className="text-blue-700 font-semibold font-mono text-sm">
+                    <span className="text-blue-700 font-semibold tabular-nums text-sm">
                       + {formatCurrency(preview.tax_nominal, currencySymbol)}
                     </span>
                   </div>
 
                   <div>
                     <span className="text-gray-500 block mb-0.5">Subtotal Akhir:</span>
-                    <span className="text-emerald-700 font-bold font-mono text-sm">
+                    <span className="text-emerald-700 font-bold tabular-nums text-sm">
                       {formatCurrency(preview.subtotal, currencySymbol)}
                     </span>
                   </div>
@@ -331,7 +333,7 @@ export const QuotationItemTable: React.FC<Props> = ({
 
                 {/* Item Notes */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Catatan Item (Opsional)
                   </label>
                   <input
@@ -347,6 +349,22 @@ export const QuotationItemTable: React.FC<Props> = ({
           </div>
         );
       })}
+
+      {/* Tombol Tambah Item di Bawah Card Item */}
+      {onAddItem && (
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onAddItem}
+            className="w-full py-2.5 px-4 bg-white hover:bg-blue-50/50 active:bg-blue-100/60 border border-dashed border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-700 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs group"
+          >
+            <div className="w-5 h-5 rounded-full bg-blue-50 group-hover:bg-blue-600 text-blue-600 group-hover:text-white flex items-center justify-center transition-colors">
+              <Plus className="w-3.5 h-3.5" />
+            </div>
+            <span>Tambah Item Penawaran Baru</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

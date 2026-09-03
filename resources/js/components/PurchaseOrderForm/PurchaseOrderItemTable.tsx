@@ -4,12 +4,13 @@ import {
   Edit2,
   ChevronDown,
   ChevronRight,
-  Sparkles,
+  TrendingDown,
   Info,
   Check,
   Building2,
   Layers,
   Lock,
+  Plus,
 } from 'lucide-react';
 import { SearchableSelect, SelectOption } from '../OrderRequestForm/SearchableSelect';
 import {
@@ -24,6 +25,8 @@ interface Props {
   items: PurchaseOrderItemRow[];
   dependencies: PurchaseOrderDependencies;
   onChangeItems: (items: PurchaseOrderItemRow[]) => void;
+  onAddItem?: () => void;
+  isOrderRequestReference?: boolean;
   errors?: Record<string, string[]>;
 }
 
@@ -31,6 +34,8 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
   items,
   dependencies,
   onChangeItems,
+  onAddItem,
+  isOrderRequestReference = false,
   errors = {},
 }) => {
   const [activeItemRowId, setActiveItemRowId] = useState<string | null>(items[0]?.row_id || null);
@@ -149,9 +154,9 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
     if (recSupplier) {
       options.push({
         value: recSupplier.id,
-        label: `★ (REKOMENDASI) (${recSupplier.code}) ${recSupplier.perusahaan}`,
-        sublabel: `Harga Rekomendasi: ${formatMoney(recSupplier.price)}`,
-        badge: '★ Rek.',
+        label: `(Termurah) (${recSupplier.code}) ${recSupplier.perusahaan}`,
+        sublabel: `Harga Termurah: ${formatMoney(recSupplier.price)}`,
+        badge: 'Termurah',
       });
       addedIds.add(recSupplier.id);
     }
@@ -265,7 +270,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right">
                   <div className="text-xs text-gray-400">Subtotal</div>
-                  <div className="text-sm font-bold text-gray-900 font-mono">
+                  <div className="text-sm font-semibold text-gray-900 tabular-nums">
                     {formatMoney(calc.subtotal, currSymbol)}
                   </div>
                 </div>
@@ -290,7 +295,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   {/* Product (col-span-5 for wider SKU & Name) */}
                   <div className="md:col-span-5">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Produk <span className="text-red-500">*</span>
                     </label>
                     {isOrBacked ? (
@@ -314,7 +319,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Supplier (col-span-4 for recommendation badge & vendor name) */}
                   <div className="md:col-span-4">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Supplier Pemasok
                     </label>
                     <SearchableSelect
@@ -345,8 +350,8 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
                         className="mt-1.5 w-full flex items-center justify-between px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-xs transition-colors"
                       >
                         <span className="flex items-center gap-1 font-medium truncate mr-1">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span className="truncate">Rek: ({recSupplier.code}) {recSupplier.perusahaan}</span>
+                          <TrendingDown className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">Termurah: ({recSupplier.code}) {recSupplier.perusahaan}</span>
                         </span>
                         <strong className="text-emerald-700 shrink-0">{formatMoney(recSupplier.price)}</strong>
                       </button>
@@ -355,7 +360,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Cabang (col-span-3) */}
                   <div className="md:col-span-3">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Cabang Penerima
                     </label>
                     <SearchableSelect
@@ -375,7 +380,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
                 <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
                   {/* Qty (col-span-2) */}
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Qty ({item.uom}) <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -402,7 +407,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Currency (col-span-2) */}
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Mata Uang</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mata Uang</label>
                     <select
                       value={item.currency_id}
                       disabled={isOrBacked}
@@ -424,7 +429,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Harga Satuan (col-span-3 - Live Rupiah formatting on blur, readOnly when OR-backed) */}
                   <div className="col-span-2 md:col-span-3">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Harga Satuan <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -452,7 +457,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Diskon % (col-span-2 - readOnly when OR-backed) */}
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Diskon (%)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Diskon (%)</label>
                     <input
                       type="number"
                       min="0"
@@ -474,7 +479,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Pajak (PPN) & Tipe Pajak (col-span-3 - disabled when OR-backed) */}
                   <div className="col-span-1 md:col-span-3">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Pajak (PPN {item.tax}%)
                     </label>
                     <div className={`flex items-center gap-1 text-xs p-1 rounded-lg border border-gray-200 ${
@@ -561,7 +566,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                     <div className="pt-2 mt-2 border-t border-gray-200/80 flex items-center justify-between font-bold text-sm">
                       <span className="text-gray-900">Subtotal Baris Item:</span>
-                      <span className="text-blue-600 text-base font-mono">
+                      <span className="text-blue-600 text-base font-bold tabular-nums">
                         {formatMoney(calc.subtotal, currSymbol)}
                       </span>
                     </div>
@@ -572,6 +577,22 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
           </div>
         );
       })}
+
+      {/* Tombol Tambah Item di Bawah Card Item */}
+      {!isOrderRequestReference && onAddItem && (
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onAddItem}
+            className="w-full py-2.5 px-4 bg-white hover:bg-blue-50/50 active:bg-blue-100/60 border border-dashed border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-700 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs group"
+          >
+            <div className="w-5 h-5 rounded-full bg-blue-50 group-hover:bg-blue-600 text-blue-600 group-hover:text-white flex items-center justify-center transition-colors">
+              <Plus className="w-3.5 h-3.5" />
+            </div>
+            <span>Tambah Item Pembelian Baru</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

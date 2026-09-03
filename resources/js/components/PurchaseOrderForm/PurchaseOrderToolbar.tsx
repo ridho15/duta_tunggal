@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   Search,
   Filter,
-  Plus,
   ChevronsUpDown,
   X,
   Layers,
@@ -16,7 +15,7 @@ interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   dependencies: PurchaseOrderDependencies;
-  onAddItem: () => void;
+  onAddItem?: () => void;
   onToggleCollapseAll: () => void;
   isAllCollapsed: boolean;
   onBulkSetSupplier: (supplierId: number | null) => void;
@@ -98,25 +97,16 @@ export const PurchaseOrderToolbar: React.FC<Props> = ({
           </button>
         </div>
 
-        {isOrderRequestReference ? (
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold shadow-xs">
+        {isOrderRequestReference && (
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold shadow-xs shrink-0">
             Item Terkunci dari Order Request
           </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onAddItem}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm transition-all shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Item</span>
-          </button>
         )}
       </div>
 
       {/* Bulk Action Bar */}
       <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
-        <span className="font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+        <span className="font-medium text-gray-700 flex items-center gap-1">
           <Layers className="w-3.5 h-3.5" /> Aksi Massal Item:
         </span>
 

@@ -22,7 +22,7 @@ export const OrderRequestHeaderForm: React.FC<Props> = ({
 }) => {
   return (
     <div className="mb-6">
-      <h2 className="text-sm font-bold text-gray-900 mb-3">
+      <h2 className="text-base font-semibold text-gray-950 mb-3">
         Form Order Request
       </h2>
 
@@ -30,7 +30,7 @@ export const OrderRequestHeaderForm: React.FC<Props> = ({
         <div className="flex flex-wrap items-start gap-4">
           {/* Request number (compact width) */}
           <div className="w-64">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Request number <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex rounded-lg shadow-2xs">
@@ -40,7 +40,7 @@ export const OrderRequestHeaderForm: React.FC<Props> = ({
                 onChange={(e) => onChange('request_number', e.target.value)}
                 disabled={disabled}
                 placeholder="OR-YYYYMMDD-XXXX"
-                className={`w-full h-[38px] px-3 text-sm font-mono border rounded-l-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                className={`w-full h-[38px] px-3 text-sm tabular-nums border rounded-l-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
                   errors.request_number
                     ? 'border-rose-400 text-rose-900 bg-rose-50/50'
                     : 'border-gray-300 text-gray-900'
@@ -63,7 +63,7 @@ export const OrderRequestHeaderForm: React.FC<Props> = ({
 
           {/* Request date (compact width) */}
           <div className="w-44">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Request date <span className="text-rose-500">*</span>
             </label>
             <input
@@ -84,7 +84,7 @@ export const OrderRequestHeaderForm: React.FC<Props> = ({
 
           {/* Note (fills remaining space) */}
           <div className="flex-1 min-w-[280px]">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Note
             </label>
             <input

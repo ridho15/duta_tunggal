@@ -398,7 +398,7 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
   return (
     <div className="max-w-7xl mx-auto pb-12">
       {errorMessage && (
-        <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800 text-sm shadow-sm animate-shake">
+        <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800 text-sm shadow-sm">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div className="flex-1 font-medium">{errorMessage}</div>
         </div>
@@ -436,6 +436,10 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
         items={filteredItems}
         dependencies={dependencies}
         onChangeItems={setItems}
+        onAddItem={handleAddItem}
+        isOrderRequestReference={
+          header.refer_model_type === 'OrderRequest' || header.refer_model_type === 'App\\Models\\OrderRequest'
+        }
         errors={errors}
       />
 

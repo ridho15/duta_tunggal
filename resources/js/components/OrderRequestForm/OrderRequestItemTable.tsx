@@ -12,6 +12,7 @@ import {
   Check,
   X,
   Trash2,
+  TrendingDown,
 } from 'lucide-react';
 
 interface Props {
@@ -53,7 +54,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           {/* Table Header */}
-          <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-700 font-bold">
+          <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-700 font-semibold">
             <tr>
               <th className="py-2.5 px-3 w-10 text-center">
                 <input
@@ -168,12 +169,12 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                     </td>
 
                     {/* Price */}
-                    <td className="py-2 px-3 text-xs text-right font-mono text-gray-800">
+                    <td className="py-2 px-3 text-xs text-right tabular-nums text-gray-800">
                       {currencySymbol} {formatMoney(item.unit_price)}
                     </td>
 
                     {/* Subtotal */}
-                    <td className="py-2 px-3 text-xs text-right font-mono font-bold text-gray-900">
+                    <td className="py-2 px-3 text-xs text-right tabular-nums font-semibold text-gray-900">
                       {currencySymbol} {formatMoney(item.subtotal)}
                     </td>
 
@@ -242,13 +243,13 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                           {/* Editor Top Header Bar */}
                           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-100">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-bold text-gray-900">
+                              <span className="text-sm font-semibold text-gray-900">
                                 Editor Item #{index + 1}
                               </span>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-700 border border-gray-200">
+                              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
                                 {item.status || 'Draft'}
                               </span>
-                              <span className="text-[11px] text-gray-500">
+                              <span className="text-xs text-gray-500 font-normal">
                                 Perubahan data otomatis tersimpan langsung ke form.
                               </span>
                             </div>
@@ -345,8 +346,8 @@ export const OrderRequestItemTable: React.FC<Props> = ({
 
                                       return {
                                         value: s.id,
-                                        label: `(${s.code}) ${s.perusahaan}${priceText}${isRecommended ? ' ✨' : ''}`,
-                                        badge: isRecommended ? '★ Rek.' : (hasPrice ? 'Partner' : undefined),
+                                        label: `(${s.code}) ${s.perusahaan}${priceText}`,
+                                        badge: isRecommended ? 'Termurah' : (hasPrice ? 'Partner' : undefined),
                                       };
                                     });
                                   })()}
@@ -372,9 +373,12 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                       }`}
                                       title="Klik untuk menerapkan supplier rekomendasi ini"
                                     >
-                                      <span>✨ Rekomendasi:</span>
+                                      <span className="flex items-center gap-1 font-semibold">
+                                        <TrendingDown className="w-3 h-3 text-emerald-600 shrink-0" />
+                                        <span>Harga Termurah:</span>
+                                      </span>
                                       <span className="underline">({item.recommended_supplier.code}) {item.recommended_supplier.perusahaan}</span>
-                                      <span className="font-mono font-bold">({currencySymbol} {formatMoney(item.recommended_supplier.price)})</span>
+                                      <span className="tabular-nums font-semibold">({currencySymbol} {formatMoney(item.recommended_supplier.price)})</span>
                                     </button>
                                   </div>
                                 )}
@@ -479,11 +483,11 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                     }}
                                     disabled={disabled}
                                     placeholder="0"
-                                    className="w-full h-[38px] px-2.5 text-xs text-right font-mono border border-gray-300 rounded-r-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900"
+                                    className="w-full h-[38px] px-2.5 text-xs text-right tabular-nums border border-gray-300 rounded-r-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900"
                                   />
                                 </div>
                                 <div className="mt-1 text-[11px] text-gray-500 truncate" title={`Harga Asli: ${currencySymbol} ${formatMoney(item.original_price)}`}>
-                                  Harga Asli: <span className="font-mono text-gray-700 font-medium">{currencySymbol} {formatMoney(item.original_price)}</span>
+                                  Harga Asli: <span className="tabular-nums text-gray-700 font-medium">{currencySymbol} {formatMoney(item.original_price)}</span>
                                 </div>
                               </div>
 
@@ -508,7 +512,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                   </span>
                                 </div>
                                 {item.discount > 0 && (
-                                  <div className="mt-1 text-[11px] text-rose-600 font-mono">
+                                  <div className="mt-1 text-[11px] text-rose-600 tabular-nums">
                                     -{currencySymbol} {formatMoney(item.discount_nominal)}
                                   </div>
                                 )}
@@ -575,7 +579,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                   </div>
                                 </div>
                                 {item.tipe_pajak !== 'none' && item.tax > 0 && (
-                                  <div className="mt-1 text-[11px] text-gray-600 font-mono">
+                                  <div className="mt-1 text-[11px] text-gray-600 tabular-nums">
                                     Nominal Pajak: +{currencySymbol} {formatMoney(item.tax_nominal)}
                                   </div>
                                 )}
@@ -604,19 +608,19 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                             <div className="flex items-center gap-6 flex-wrap text-xs">
                               <div>
                                 <span className="text-gray-500 block text-[11px]">Total Kotor:</span>
-                                <span className="font-mono text-gray-800 font-medium">
+                                <span className="tabular-nums text-gray-800 font-medium">
                                   {currencySymbol} {formatMoney(item.total_cost)}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-gray-500 block text-[11px]">Diskon:</span>
-                                <span className="font-mono text-rose-600 font-medium">
+                                <span className="tabular-nums text-rose-600 font-medium">
                                   -{currencySymbol} {formatMoney(item.discount_nominal)}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-gray-500 block text-[11px]">Total Setelah Diskon:</span>
-                                <span className="font-mono text-gray-800 font-medium">
+                                <span className="tabular-nums text-gray-800 font-medium">
                                   {currencySymbol} {formatMoney(item.after_discount)}
                                 </span>
                               </div>
@@ -624,7 +628,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                 <span className="text-gray-500 block text-[11px]">
                                   Pajak ({item.tipe_pajak === 'none' ? '0%' : `${item.tax}%`}):
                                 </span>
-                                <span className="font-mono text-gray-800 font-medium">
+                                <span className="tabular-nums text-gray-800 font-medium">
                                   +{currencySymbol} {formatMoney(item.tax_nominal)}
                                 </span>
                               </div>
@@ -635,7 +639,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                               <span className="text-gray-500 block text-[11px] font-semibold uppercase tracking-wider">
                                 Subtotal Baris Item
                               </span>
-                              <span className="font-mono font-extrabold text-base text-blue-900">
+                              <span className="tabular-nums font-bold text-base text-blue-900">
                                 {currencySymbol} {formatMoney(item.subtotal)}
                               </span>
                             </div>

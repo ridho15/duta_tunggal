@@ -300,6 +300,7 @@ export const QuotationApp: React.FC<Props> = ({ recordId }) => {
         currencySymbol={currencySymbol}
         dependencies={dependencies}
         onChangeItems={setItems}
+        onAddItem={handleAddItem}
         errors={errors}
       />
 

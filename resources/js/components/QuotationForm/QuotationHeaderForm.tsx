@@ -95,13 +95,13 @@ export const QuotationHeaderForm: React.FC<Props> = ({
     <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs mb-6">
       {/* Form Header Title */}
       <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-        <div className="flex items-center gap-2 text-gray-900 font-bold text-base">
+        <div className="flex items-center gap-2 text-gray-950 font-semibold text-base">
           <FileText className="w-5 h-5 text-primary-600" />
           <span>Form Penawaran Harga (Quotation)</span>
         </div>
         {header.status && (
           <span
-            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+            className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${
               header.status === 'approve'
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : header.status === 'reject'
@@ -120,7 +120,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         {/* Quotation Number (col-span-3) */}
         <div className="md:col-span-3">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Nomor Quotation <span className="text-red-500">*</span>
           </label>
           <div className="flex items-center gap-1.5">
@@ -150,7 +150,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
 
         {/* Customer (col-span-5 for wider customer name, code badge, and corporate info) */}
         <div className="md:col-span-5">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Customer <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -167,7 +167,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
 
         {/* Cabang (col-span-4 for branch name and address) */}
         <div className="md:col-span-4">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Cabang <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -188,7 +188,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
         {/* Tanggal Quotation (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tanggal Quotation <span className="text-red-500">*</span>
           </label>
           <input
@@ -206,7 +206,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
 
         {/* Valid Until (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Valid Until
           </label>
           <input
@@ -219,7 +219,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
 
         {/* Currency & Exchange Rate (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Mata Uang <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -237,7 +237,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
 
         {/* Tempo Pembayaran (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tempo Pembayaran (Hari)
           </label>
           <div className="relative">
@@ -255,7 +255,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
 
         {/* Catatan Dokumen (col-span-4) */}
         <div className="col-span-1 md:col-span-4">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Catatan Dokumen
           </label>
           <textarea

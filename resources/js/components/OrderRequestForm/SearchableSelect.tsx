@@ -90,7 +90,7 @@ export const SearchableSelect: React.FC<Props> = ({
           {selectedOption ? (
             <div className="flex items-center gap-1.5 truncate">
               {selectedOption.badge && (
-                <span className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-gray-100 border border-gray-200 text-gray-800 shrink-0">
+                <span className="px-1.5 py-0.5 rounded-md text-xs tabular-nums font-medium bg-gray-100 border border-gray-200 text-gray-700 shrink-0">
                   {selectedOption.badge}
                 </span>
               )}
@@ -182,7 +182,7 @@ export const SearchableSelect: React.FC<Props> = ({
                     <div className="flex items-center gap-2 truncate pr-2">
                       {opt.badge && (
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold shrink-0 ${
+                          className={`px-1.5 py-0.5 rounded-md text-xs tabular-nums font-medium shrink-0 ${
                             isSelected
                               ? 'bg-primary-100 text-primary-800 border border-primary-200'
                               : 'bg-gray-100 text-gray-700 border border-gray-200'

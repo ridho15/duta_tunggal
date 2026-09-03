@@ -143,7 +143,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
     <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs mb-6">
       {/* Top Header: Title, Status, & Reference Options */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-gray-100 pb-4 mb-4 gap-3">
-        <div className="flex items-center gap-2 text-gray-900 font-bold text-base">
+        <div className="flex items-center gap-2 text-gray-950 font-semibold text-base">
           <FileSpreadsheet className="w-5 h-5 text-primary-600" />
           <span>Form Pesanan Penjualan (Sales Order)</span>
         </div>
@@ -181,7 +181,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {header.status && (
           <span
-            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+            className={`px-2.5 py-0.5 rounded-md text-xs font-medium ${
               header.status === 'approved' || header.status === 'completed'
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : header.status === 'reject' || header.status === 'canceled'
@@ -218,7 +218,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         {/* SO Number (col-span-3) */}
         <div className="md:col-span-3">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Nomor SO <span className="text-red-500">*</span>
           </label>
           <div className="flex items-center gap-1.5">
@@ -248,7 +248,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Customer (col-span-5 for wider customer name, code badge, and corporate info) */}
         <div className="md:col-span-5">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Customer <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -266,7 +266,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Cabang (col-span-4 for branch name and address) */}
         <div className="md:col-span-4">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Cabang <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -317,7 +317,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
               {selectedCustomer.credit_summary.overdue_count > 0 && (
                 <div className="px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 font-semibold flex items-center gap-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                  <span>⚠️ {selectedCustomer.credit_summary.overdue_count} tagihan jatuh tempo ({formatCurrency(selectedCustomer.credit_summary.overdue_total, 'Rp')})</span>
+                  <span>{selectedCustomer.credit_summary.overdue_count} tagihan jatuh tempo ({formatCurrency(selectedCustomer.credit_summary.overdue_total, 'Rp')})</span>
                 </div>
               )}
             </>
@@ -329,7 +329,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
         {/* Tanggal Order (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tanggal Order <span className="text-red-500">*</span>
           </label>
           <input
@@ -347,7 +347,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Tanggal Pengiriman (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tanggal Kirim
           </label>
           <input
@@ -360,7 +360,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Tipe Pengiriman (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tipe Pengiriman <span className="text-red-500">*</span>
           </label>
           <select
@@ -380,7 +380,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Mata Uang (col-span-2) */}
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Mata Uang <span className="text-red-500">*</span>
           </label>
           <SearchableSelect
@@ -398,7 +398,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Tempo Pembayaran (col-span-1) */}
         <div className="col-span-1 md:col-span-1">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Tempo (Hari)
           </label>
           <input
@@ -418,7 +418,7 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
 
         {/* Alamat Pengiriman (Shipped To) (col-span-3) */}
         <div className="col-span-1 md:col-span-3">
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Alamat Pengiriman (Shipped To)
           </label>
           <input

@@ -19,7 +19,7 @@ import {
   OrderRequestBottomSection,
   OrderRequestItemSummaryBox,
 } from './OrderRequestFloatingSummary';
-import { AlertCircle, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertCircle, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 interface Props {
   initialData?: FormDependencies;
@@ -753,11 +753,11 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
 
       {/* 2. Main Panel: Ringkasan Item OR (Blue Bordered Box matching reference) */}
       <div className="mb-6">
-        <h2 className="text-sm font-bold text-gray-900 mb-3">
+        <h2 className="text-base font-semibold text-gray-950 mb-3">
           Ringkasan Item OR
         </h2>
 
-        <div className="bg-white rounded-xl border border-blue-600 shadow-2xs p-5 space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 space-y-4">
           {/* Toolbar */}
           <OrderRequestToolbar
             dependencies={dependencies}
@@ -803,6 +803,21 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
             canRemove={items.length > 1}
             disabled={isSubmitting}
           />
+
+          {/* Tombol Tambah Item di Bawah Tabel */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleAddItem}
+              disabled={isSubmitting}
+              className="w-full py-2.5 px-4 bg-white hover:bg-blue-50/50 active:bg-blue-100/60 border border-dashed border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-700 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs group"
+            >
+              <div className="w-5 h-5 rounded-full bg-blue-50 group-hover:bg-blue-600 text-blue-600 group-hover:text-white flex items-center justify-center transition-colors">
+                <Plus className="w-3.5 h-3.5" />
+              </div>
+              <span>Tambah Item Permintaan Baru</span>
+            </button>
+          </div>
 
           {/* Pagination Controls */}
           {totalPages > 1 && (

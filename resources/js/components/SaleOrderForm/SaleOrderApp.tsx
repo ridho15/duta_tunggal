@@ -371,6 +371,7 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
         dependencies={dependencies}
         onChangeItems={setItems}
         isReferQuotation={header.options_form === 2 && !!header.quotation_id}
+        onAddItem={handleAddItem}
         errors={errors}
       />
 

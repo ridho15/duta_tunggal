@@ -70,7 +70,7 @@ export const OrderRequestItemSummaryBox: React.FC<{
       <div>Total Items: {totalItems}</div>
       <div className="flex items-center gap-2">
         <span>Total Subtotal (IDR)</span>
-        <span className="px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-md font-mono text-gray-900 font-bold">
+        <span className="px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-md tabular-nums text-gray-900 font-semibold">
           Rp {formatMoney(totalSubtotalIdr)}
         </span>
       </div>

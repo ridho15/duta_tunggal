@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Plus, Layers } from 'lucide-react';
+import { Search, Layers } from 'lucide-react';
 
 interface Props {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onAddItem: () => void;
+  onAddItem?: () => void;
   onBulkSetTaxType: (taxType: string) => void;
   onBulkSetDiscount: (discount: number) => void;
   itemCount: number;
@@ -35,18 +35,6 @@ export const SaleOrderToolbar: React.FC<Props> = ({
             placeholder="Cari nama produk, SKU, atau catatan item..."
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white"
           />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={onAddItem}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Item</span>
-          </button>
         </div>
       </div>
 
