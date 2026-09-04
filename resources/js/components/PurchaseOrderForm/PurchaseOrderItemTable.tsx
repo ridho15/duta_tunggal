@@ -59,17 +59,6 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [dependencies.products]);
 
-  // Alphabetically sorted branches
-  const cabangOptions: SelectOption[] = useMemo(() => {
-    return (dependencies.cabangs || [])
-      .map((c) => ({
-        value: c.id,
-        label: `(${c.kode}) ${c.nama}`,
-        badge: c.kode,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [dependencies.cabangs]);
-
   const toggleAccordion = (rowId: string) => {
     setActiveItemRowId((prev) => (prev === rowId ? null : rowId));
   };
@@ -142,51 +131,6 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
     });
   };
 
-  const getSupplierOptionsForItem = (item: PurchaseOrderItemRow): SelectOption[] => {
-    const linkedSuppliers = item.product_suppliers || [];
-    const prod = dependencies.products.find((p) => p.id === item.product_id);
-    const recSupplier = prod?.recommended_supplier;
-
-    const options: SelectOption[] = [];
-    const addedIds = new Set<number>();
-
-    // Tier 1: Recommended Supplier (Top)
-    if (recSupplier) {
-      options.push({
-        value: recSupplier.id,
-        label: `(Termurah) (${recSupplier.code}) ${recSupplier.perusahaan}`,
-        sublabel: `Harga Termurah: ${formatMoney(recSupplier.price)}`,
-        badge: 'Termurah',
-      });
-      addedIds.add(recSupplier.id);
-    }
-
-    // Tier 2: Other Linked Partner Suppliers
-    linkedSuppliers.forEach((s) => {
-      if (!addedIds.has(s.id)) {
-        options.push({
-          value: s.id,
-          label: `(${s.code}) ${s.perusahaan}`,
-          sublabel: s.supplier_price !== null ? `Harga Partner: ${formatMoney(s.supplier_price)}` : undefined,
-          badge: 'Partner',
-        });
-        addedIds.add(s.id);
-      }
-    });
-
-    // Tier 3: All 24 master suppliers fallback sorted alphabetically
-    const otherSuppliers = dependencies.suppliers
-      .filter((s) => !addedIds.has(s.id))
-      .map((s) => ({
-        value: s.id,
-        label: `(${s.code}) ${s.perusahaan}`,
-        sublabel: s.phone ? `Tel: ${s.phone}` : undefined,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-    return [...options, ...otherSuppliers];
-  };
-
   return (
     <div className="space-y-4">
       {items.map((item, index) => {
@@ -203,9 +147,7 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
           item.tax,
           item.tipe_pajak
         );
-        const supplierOptions = getSupplierOptionsForItem(item);
         const prod = dependencies.products.find((p) => p.id === item.product_id);
-        const recSupplier = prod?.recommended_supplier;
         const currencyObj = dependencies.currencies.find((c) => c.id === item.currency_id);
         const currSymbol = currencyObj?.symbol || 'Rp';
 
@@ -291,89 +233,28 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
             {/* Accordion Expanded Detail Form */}
             {isOpen && (
               <div className="p-4 bg-white space-y-4">
-                {/* Row 1: Product (5), Supplier (4), Cabang (3) - 12-Col Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  {/* Product (col-span-5 for wider SKU & Name) */}
-                  <div className="md:col-span-5">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Produk <span className="text-red-500">*</span>
-                    </label>
-                    {isOrBacked ? (
-                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm flex items-center justify-between text-gray-700 font-medium">
-                        <span className="truncate">
-                          <span className="text-gray-500 font-normal">({item.product_sku})</span> {item.product_name}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
-                          <Lock className="w-3 h-3" /> Terkunci
-                        </span>
-                      </div>
-                    ) : (
-                      <SearchableSelect
-                        options={productOptions}
-                        value={item.product_id}
-                        placeholder="-- Pilih Produk --"
-                        onChange={(val) => handleSelectProduct(item.row_id, val)}
-                      />
-                    )}
-                  </div>
-
-                  {/* Supplier (col-span-4 for recommendation badge & vendor name) */}
-                  <div className="md:col-span-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Supplier Pemasok
-                    </label>
+                {/* Row 1: Product (col-span-12 full-width) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Produk <span className="text-red-500">*</span>
+                  </label>
+                  {isOrBacked ? (
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm flex items-center justify-between text-gray-700 font-medium">
+                      <span className="truncate">
+                        <span className="text-gray-500 font-normal">({item.product_sku})</span> {item.product_name}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+                        <Lock className="w-3 h-3" /> Terkunci
+                      </span>
+                    </div>
+                  ) : (
                     <SearchableSelect
-                      options={supplierOptions}
-                      value={item.supplier_id}
-                      placeholder="-- Pilih Supplier --"
-                      disabled={isOrBacked}
-                      onChange={(val) => {
-                        if (isOrBacked) return;
-                        const supId = val ? Number(val) : null;
-                        const linked = item.product_suppliers?.find((s) => s.id === supId);
-                        const newPrice = linked && linked.supplier_price !== null ? linked.supplier_price : item.unit_price;
-                        handleUpdateItem(item.row_id, {
-                          supplier_id: supId,
-                          unit_price: newPrice,
-                        });
-                      }}
+                      options={productOptions}
+                      value={item.product_id}
+                      placeholder="-- Pilih Produk --"
+                      onChange={(val) => handleSelectProduct(item.row_id, val)}
                     />
-                    {!isOrBacked && recSupplier && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateItem(item.row_id, {
-                            supplier_id: recSupplier.id,
-                            unit_price: recSupplier.price,
-                          })
-                        }
-                        className="mt-1.5 w-full flex items-center justify-between px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-xs transition-colors"
-                      >
-                        <span className="flex items-center gap-1 font-medium truncate mr-1">
-                          <TrendingDown className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span className="truncate">Termurah: ({recSupplier.code}) {recSupplier.perusahaan}</span>
-                        </span>
-                        <strong className="text-emerald-700 shrink-0">{formatMoney(recSupplier.price)}</strong>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Cabang (col-span-3) */}
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cabang Penerima
-                    </label>
-                    <SearchableSelect
-                      options={cabangOptions}
-                      value={item.cabang_id}
-                      placeholder="-- Pilih Cabang --"
-                      disabled={isOrBacked}
-                      onChange={(val) => {
-                        if (isOrBacked) return;
-                        handleUpdateItem(item.row_id, { cabang_id: val ? Number(val) : null });
-                      }}
-                    />
-                  </div>
+                  )}
                 </div>
 
                 {/* Row 2: Qty (2), Currency (2), Harga Satuan (3), Diskon (2), Pajak (3) - 12-Col Grid */}
@@ -542,33 +423,31 @@ export const PurchaseOrderItemTable: React.FC<Props> = ({
 
                   {/* Pure-Text Live Calculations Panel */}
                   <div className="bg-gray-50/90 rounded-lg p-3 border border-gray-200 flex flex-col justify-between text-xs">
-                    <div className="grid grid-cols-2 gap-y-1 text-gray-600">
-                      <span>Total Kotor:</span>
-                      <span className="text-right font-medium text-gray-900">
-                        {formatMoney(calc.grossTotal, currSymbol)}
-                      </span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-gray-600">
+                      <div>
+                        <span className="text-gray-500 block mb-0.5">Total Kotor:</span>
+                        <span className="font-medium text-gray-900 tabular-nums">
+                          {formatMoney(calc.grossTotal, currSymbol)}
+                        </span>
+                      </div>
 
-                      <span>Diskon ({item.discount}%):</span>
-                      <span className="text-right font-medium text-red-600">
-                        - {formatMoney(calc.discountNominal, currSymbol)}
-                      </span>
+                      {item.discount > 0 && (
+                        <div>
+                          <span className="text-gray-500 block mb-0.5">Diskon ({item.discount}%):</span>
+                          <span className="font-medium text-red-600 tabular-nums">
+                            - {formatMoney(calc.discountNominal, currSymbol)}
+                          </span>
+                        </div>
+                      )}
 
-                      <span>DPP (Dasar Pengenaan Pajak):</span>
-                      <span className="text-right font-medium text-gray-900">
-                        {formatMoney(calc.dpp, currSymbol)}
-                      </span>
-
-                      <span>PPN ({item.tipe_pajak === 'none' ? '0%' : `${item.tax}%`}):</span>
-                      <span className="text-right font-medium text-blue-700">
-                        + {formatMoney(calc.taxNominal, currSymbol)}
-                      </span>
-                    </div>
-
-                    <div className="pt-2 mt-2 border-t border-gray-200/80 flex items-center justify-between font-bold text-sm">
-                      <span className="text-gray-900">Subtotal Baris Item:</span>
-                      <span className="text-blue-600 text-base font-bold tabular-nums">
-                        {formatMoney(calc.subtotal, currSymbol)}
-                      </span>
+                      {item.tipe_pajak !== 'none' && item.tax > 0 && (
+                        <div>
+                          <span className="text-gray-500 block mb-0.5">PPN ({item.tax}%):</span>
+                          <span className="font-medium text-blue-700 tabular-nums">
+                            + {formatMoney(calc.taxNominal, currSymbol)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

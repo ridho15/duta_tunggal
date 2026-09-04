@@ -85,11 +85,6 @@ export const SaleOrderToolbar: React.FC<Props> = ({
               Set Diskon
             </button>
           </div>
-
-          <span className="text-gray-400">|</span>
-          <span className="text-gray-500 font-semibold">
-            Total: <b className="text-gray-900">{itemCount}</b> item
-          </span>
         </div>
       </div>
     </div>

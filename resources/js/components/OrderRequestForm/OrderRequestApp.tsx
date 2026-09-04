@@ -17,7 +17,6 @@ import { OrderRequestToolbar } from './OrderRequestToolbar';
 import { OrderRequestItemTable } from './OrderRequestItemTable';
 import {
   OrderRequestBottomSection,
-  OrderRequestItemSummaryBox,
 } from './OrderRequestFloatingSummary';
 import { AlertCircle, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
@@ -855,11 +854,6 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
             </div>
           )}
 
-          {/* Summary Box */}
-          <OrderRequestItemSummaryBox
-            totalItems={summary.total_items}
-            totalSubtotalIdr={summary.grand_subtotal}
-          />
         </div>
       </div>
 

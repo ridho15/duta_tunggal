@@ -1,15 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Search,
-  Filter,
   ChevronsUpDown,
   X,
   Layers,
-  Building2,
-  Users,
 } from 'lucide-react';
-import { SearchableSelect, SelectOption } from '../OrderRequestForm/SearchableSelect';
-import { PurchaseOrderDependencies } from './types';
+import { PurchaseOrderDependencies, TaxType } from './types';
 
 interface Props {
   searchQuery: string;
@@ -18,10 +14,8 @@ interface Props {
   onAddItem?: () => void;
   onToggleCollapseAll: () => void;
   isAllCollapsed: boolean;
-  onBulkSetSupplier: (supplierId: number | null) => void;
-  onBulkSetCabang: (cabangId: number | null) => void;
-  selectedCount?: number;
-  totalCount: number;
+  onBulkSetTaxType?: (taxType: string) => void;
+  onBulkSetDiscount?: (discount: number) => void;
   isOrderRequestReference?: boolean;
 }
 
@@ -32,39 +26,16 @@ export const PurchaseOrderToolbar: React.FC<Props> = ({
   onAddItem,
   onToggleCollapseAll,
   isAllCollapsed,
-  onBulkSetSupplier,
-  onBulkSetCabang,
-  selectedCount = 0,
-  totalCount,
+  onBulkSetTaxType,
+  onBulkSetDiscount,
   isOrderRequestReference = false,
 }) => {
-  const [showFilters, setShowFilters] = useState(false);
-  const [bulkSupplierTarget, setBulkSupplierTarget] = useState<number | null>(null);
-  const [bulkCabangTarget, setBulkCabangTarget] = useState<number | null>(null);
-
-  const supplierOptions: SelectOption[] = useMemo(() => {
-    return (dependencies.suppliers || [])
-      .map((s) => ({
-        value: s.id,
-        label: `(${s.code}) ${s.perusahaan}`,
-        sublabel: s.phone ? `Tel: ${s.phone}` : undefined,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [dependencies.suppliers]);
-
-  const cabangOptions: SelectOption[] = useMemo(() => {
-    return (dependencies.cabangs || [])
-      .map((c) => ({
-        value: c.id,
-        label: `(${c.kode}) ${c.nama}`,
-        badge: c.kode,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [dependencies.cabangs]);
+  const [bulkTaxType, setBulkTaxType] = useState<string>('eklusif');
+  const [bulkDiscount, setBulkDiscount] = useState<number>(0);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4 space-y-3">
-      {/* Top Row: Search, Collapse All, Tambah Item */}
+      {/* Top Row: Search, Collapse All, Locked Indicator */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-[260px]">
           <div className="relative flex-1">
@@ -73,7 +44,7 @@ export const PurchaseOrderToolbar: React.FC<Props> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Cari item / produk / supplier..."
+              placeholder="Cari item / produk..."
               className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
             {searchQuery && (
@@ -104,66 +75,56 @@ export const PurchaseOrderToolbar: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Bulk Action Bar */}
-      <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
-        <span className="font-medium text-gray-700 flex items-center gap-1">
-          <Layers className="w-3.5 h-3.5" /> Aksi Massal Item:
-        </span>
+      {/* Bulk Action Bar (Tax & Discount, hidden if OR locked) */}
+      {!isOrderRequestReference && onBulkSetTaxType && onBulkSetDiscount && (
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
+          <span className="font-medium text-gray-700 flex items-center gap-1">
+            <Layers className="w-3.5 h-3.5 text-blue-600" /> Aksi Massal Item:
+          </span>
 
-        {/* Bulk Supplier */}
-        <div className="flex items-center gap-1.5 min-w-[320px]">
-          <div className="w-60 min-w-[240px]">
-            <SearchableSelect
-              options={supplierOptions}
-              value={bulkSupplierTarget}
-              placeholder="Pilih supplier target"
-              onChange={(val) => setBulkSupplierTarget(val ? Number(val) : null)}
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Bulk Tax Type */}
+            <div className="flex items-center gap-1.5">
+              <select
+                value={bulkTaxType}
+                onChange={(e) => setBulkTaxType(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none"
+              >
+                <option value="none">Pajak: None (0%)</option>
+                <option value="inklusif">Pajak: PPN Inklusif (11%)</option>
+                <option value="eklusif">Pajak: PPN Eksklusif (11%)</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => onBulkSetTaxType(bulkTaxType)}
+                className="px-2.5 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg font-medium text-gray-700 transition-colors"
+              >
+                Terapkan
+              </button>
+            </div>
+
+            {/* Bulk Discount */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={bulkDiscount}
+                onChange={(e) => setBulkDiscount(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-center focus:outline-none"
+                placeholder="0%"
+              />
+              <button
+                type="button"
+                onClick={() => onBulkSetDiscount(bulkDiscount)}
+                className="px-2.5 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg font-medium text-gray-700 transition-colors"
+              >
+                Set Diskon
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            disabled={!bulkSupplierTarget}
-            onClick={() => {
-              if (bulkSupplierTarget) {
-                onBulkSetSupplier(bulkSupplierTarget);
-                setBulkSupplierTarget(null);
-              }
-            }}
-            className="px-2.5 py-1.5 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40 border border-gray-300 rounded-lg font-medium text-gray-700 transition-colors shrink-0"
-          >
-            Terapkan Supplier
-          </button>
         </div>
-
-        {/* Bulk Cabang */}
-        <div className="flex items-center gap-1.5 min-w-[320px]">
-          <div className="w-60 min-w-[240px]">
-            <SearchableSelect
-              options={cabangOptions}
-              value={bulkCabangTarget}
-              placeholder="Pilih cabang target"
-              onChange={(val) => setBulkCabangTarget(val ? Number(val) : null)}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={!bulkCabangTarget}
-            onClick={() => {
-              if (bulkCabangTarget) {
-                onBulkSetCabang(bulkCabangTarget);
-                setBulkCabangTarget(null);
-              }
-            }}
-            className="px-2.5 py-1.5 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40 border border-gray-300 rounded-lg font-medium text-gray-700 transition-colors shrink-0"
-          >
-            Terapkan Cabang
-          </button>
-        </div>
-
-        <div className="ml-auto text-gray-500 shrink-0">
-          Total: <strong className="text-gray-900">{totalCount}</strong> item
-        </div>
-      </div>
+      )}
     </div>
   );
 };

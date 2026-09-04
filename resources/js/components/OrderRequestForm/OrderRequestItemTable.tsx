@@ -511,11 +511,6 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                     %
                                   </span>
                                 </div>
-                                {item.discount > 0 && (
-                                  <div className="mt-1 text-[11px] text-rose-600 tabular-nums">
-                                    -{currencySymbol} {formatMoney(item.discount_nominal)}
-                                  </div>
-                                )}
                               </div>
 
                               {/* Pajak (PPN) */}
@@ -578,11 +573,6 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                     </span>
                                   </div>
                                 </div>
-                                {item.tipe_pajak !== 'none' && item.tax > 0 && (
-                                  <div className="mt-1 text-[11px] text-gray-600 tabular-nums">
-                                    Nominal Pajak: +{currencySymbol} {formatMoney(item.tax_nominal)}
-                                  </div>
-                                )}
                               </div>
                             </div>
 
@@ -612,26 +602,32 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                   {currencySymbol} {formatMoney(item.total_cost)}
                                 </span>
                               </div>
-                              <div>
-                                <span className="text-gray-500 block text-[11px]">Diskon:</span>
-                                <span className="tabular-nums text-rose-600 font-medium">
-                                  -{currencySymbol} {formatMoney(item.discount_nominal)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500 block text-[11px]">Total Setelah Diskon:</span>
-                                <span className="tabular-nums text-gray-800 font-medium">
-                                  {currencySymbol} {formatMoney(item.after_discount)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500 block text-[11px]">
-                                  Pajak ({item.tipe_pajak === 'none' ? '0%' : `${item.tax}%`}):
-                                </span>
-                                <span className="tabular-nums text-gray-800 font-medium">
-                                  +{currencySymbol} {formatMoney(item.tax_nominal)}
-                                </span>
-                              </div>
+                              {item.discount > 0 && (
+                                <>
+                                  <div>
+                                    <span className="text-gray-500 block text-[11px]">Diskon:</span>
+                                    <span className="tabular-nums text-rose-600 font-medium">
+                                      -{currencySymbol} {formatMoney(item.discount_nominal)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500 block text-[11px]">Total Setelah Diskon:</span>
+                                    <span className="tabular-nums text-gray-800 font-medium">
+                                      {currencySymbol} {formatMoney(item.after_discount)}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                              {item.tipe_pajak !== 'none' && item.tax > 0 && (
+                                <div>
+                                  <span className="text-gray-500 block text-[11px]">
+                                    Pajak ({item.tax}%):
+                                  </span>
+                                  <span className="tabular-nums text-gray-800 font-medium">
+                                    +{currencySymbol} {formatMoney(item.tax_nominal)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
 
                             {/* Subtotal in prominent text */}

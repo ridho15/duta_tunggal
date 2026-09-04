@@ -60,20 +60,3 @@ export const OrderRequestBottomSection: React.FC<Props> = ({
     </div>
   );
 };
-
-export const OrderRequestItemSummaryBox: React.FC<{
-  totalItems: number;
-  totalSubtotalIdr: number;
-}> = ({ totalItems, totalSubtotalIdr }) => {
-  return (
-    <div className="pt-3 border-t border-gray-200 flex items-center justify-between text-xs font-bold text-gray-900 flex-wrap gap-2">
-      <div>Total Items: {totalItems}</div>
-      <div className="flex items-center gap-2">
-        <span>Total Subtotal (IDR)</span>
-        <span className="px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-md tabular-nums text-gray-900 font-semibold">
-          Rp {formatMoney(totalSubtotalIdr)}
-        </span>
-      </div>
-    </div>
-  );
-};

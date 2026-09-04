@@ -284,22 +284,28 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
   };
 
   // 5. Bulk Actions
-  const handleBulkSetSupplier = (supplierId: number | null) => {
+  const handleBulkSetTaxType = (taxType: string) => {
     setItems((prev) =>
       prev.map((item) => {
-        const linked = item.product_suppliers?.find((s) => s.id === supplierId);
-        const newPrice = linked && linked.supplier_price !== null ? linked.supplier_price : item.unit_price;
+        const isOrBacked = !!(item.refer_item_model_type || item.refer_item_model_id);
+        if (isOrBacked) return item;
         return {
           ...item,
-          supplier_id: supplierId,
-          unit_price: newPrice,
+          tipe_pajak: taxType as TaxType,
+          tax: taxType === 'none' ? 0 : 11,
         };
       })
     );
   };
 
-  const handleBulkSetCabang = (cabangId: number | null) => {
-    setItems((prev) => prev.map((item) => ({ ...item, cabang_id: cabangId })));
+  const handleBulkSetDiscount = (discount: number) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        const isOrBacked = !!(item.refer_item_model_type || item.refer_item_model_id);
+        if (isOrBacked) return item;
+        return { ...item, discount };
+      })
+    );
   };
 
   const handleToggleCollapseAll = () => {
@@ -423,9 +429,8 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
         onAddItem={handleAddItem}
         onToggleCollapseAll={handleToggleCollapseAll}
         isAllCollapsed={isAllCollapsed}
-        onBulkSetSupplier={handleBulkSetSupplier}
-        onBulkSetCabang={handleBulkSetCabang}
-        totalCount={items.length}
+        onBulkSetTaxType={handleBulkSetTaxType}
+        onBulkSetDiscount={handleBulkSetDiscount}
         isOrderRequestReference={
           header.refer_model_type === 'OrderRequest' || header.refer_model_type === 'App\\Models\\OrderRequest'
         }

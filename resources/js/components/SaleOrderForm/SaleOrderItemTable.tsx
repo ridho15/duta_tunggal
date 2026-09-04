@@ -316,26 +316,23 @@ export const SaleOrderItemTable: React.FC<Props> = ({
                     </span>
                   </div>
 
-                  <div>
-                    <span className="text-gray-500 block mb-0.5">Potongan Diskon:</span>
-                    <span className="text-amber-700 font-semibold tabular-nums text-sm">
-                      - {formatCurrency(preview.discount_nominal, currencySymbol)}
-                    </span>
-                  </div>
+                  {item.discount > 0 && (
+                    <div>
+                      <span className="text-gray-500 block mb-0.5">Potongan Diskon ({item.discount}%):</span>
+                      <span className="text-amber-700 font-semibold tabular-nums text-sm">
+                        - {formatCurrency(preview.discount_nominal, currencySymbol)}
+                      </span>
+                    </div>
+                  )}
 
-                  <div>
-                    <span className="text-gray-500 block mb-0.5">Nominal PPN (11%):</span>
-                    <span className="text-blue-700 font-semibold tabular-nums text-sm">
-                      + {formatCurrency(preview.tax_nominal, currencySymbol)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-gray-500 block mb-0.5">Subtotal Akhir:</span>
-                    <span className="text-emerald-700 font-bold tabular-nums text-sm">
-                      {formatCurrency(preview.subtotal, currencySymbol)}
-                    </span>
-                  </div>
+                  {item.tax_type !== 'None' && preview.tax_nominal > 0 && (
+                    <div>
+                      <span className="text-gray-500 block mb-0.5">Nominal PPN ({item.tax}%):</span>
+                      <span className="text-blue-700 font-semibold tabular-nums text-sm">
+                        + {formatCurrency(preview.tax_nominal, currencySymbol)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Item Notes */}
