@@ -9,6 +9,7 @@ import {
 import { PurchaseOrderHeaderForm } from './PurchaseOrderHeaderForm';
 import { PurchaseOrderItemTable } from './PurchaseOrderItemTable';
 import { PurchaseOrderToolbar } from './PurchaseOrderToolbar';
+import { PurchaseOrderGrandTotal } from './PurchaseOrderGrandTotal';
 import { PurchaseOrderFloatingSummary } from './PurchaseOrderFloatingSummary';
 import { calculatePurchaseOrderSummary } from './calculations';
 
@@ -447,6 +448,9 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
         }
         errors={errors}
       />
+
+      {/* Grand Total Transaksi */}
+      <PurchaseOrderGrandTotal summary={summary} />
 
       {/* Floating Summary Footer */}
       <PurchaseOrderFloatingSummary

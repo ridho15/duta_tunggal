@@ -10,6 +10,7 @@ import {
 import { SaleOrderHeaderForm } from './SaleOrderHeaderForm';
 import { SaleOrderItemTable } from './SaleOrderItemTable';
 import { SaleOrderToolbar } from './SaleOrderToolbar';
+import { SaleOrderGrandTotal } from './SaleOrderGrandTotal';
 import { SaleOrderFloatingSummary } from './SaleOrderFloatingSummary';
 import { calculateSaleOrderSummary } from './calculations';
 
@@ -374,6 +375,9 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
         onAddItem={handleAddItem}
         errors={errors}
       />
+
+      {/* Grand Total Transaksi */}
+      <SaleOrderGrandTotal summary={summary} />
 
       {/* Floating Summary Bar */}
       <SaleOrderFloatingSummary

@@ -18,6 +18,7 @@ import { OrderRequestItemTable } from './OrderRequestItemTable';
 import {
   OrderRequestBottomSection,
 } from './OrderRequestFloatingSummary';
+import { OrderRequestGrandTotal } from './OrderRequestGrandTotal';
 import { AlertCircle, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 interface Props {
@@ -856,6 +857,9 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
 
         </div>
       </div>
+
+      {/* Grand Total Transaksi */}
+      <OrderRequestGrandTotal summary={summary} />
 
       {/* 3. Bottom Form Actions */}
       <OrderRequestBottomSection

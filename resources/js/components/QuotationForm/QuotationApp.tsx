@@ -10,6 +10,7 @@ import {
 import { QuotationHeaderForm } from './QuotationHeaderForm';
 import { QuotationItemTable } from './QuotationItemTable';
 import { QuotationToolbar } from './QuotationToolbar';
+import { QuotationGrandTotal } from './QuotationGrandTotal';
 import { QuotationFloatingSummary } from './QuotationFloatingSummary';
 import { calculateQuotationSummary } from './calculations';
 
@@ -303,6 +304,9 @@ export const QuotationApp: React.FC<Props> = ({ recordId }) => {
         onAddItem={handleAddItem}
         errors={errors}
       />
+
+      {/* Grand Total Transaksi */}
+      <QuotationGrandTotal summary={summary} />
 
       {/* Floating Summary Bar */}
       <QuotationFloatingSummary
