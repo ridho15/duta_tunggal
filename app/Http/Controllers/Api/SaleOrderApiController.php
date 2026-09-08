@@ -42,6 +42,8 @@ class SaleOrderApiController extends Controller
      */
     public function dependencies(Request $request): JsonResponse
     {
+        ini_set('memory_limit', '512M');
+
         $user = Auth::user();
         $manageType = $user?->manage_type ?? [];
         $canAccessAllCabang = is_array($manageType) && in_array('all', $manageType);
@@ -125,24 +127,34 @@ class SaleOrderApiController extends Controller
             ->groupBy('product_id')
             ->pluck('free_stock', 'product_id');
 
-        $products = Product::withoutGlobalScope('product_cabang')
+        $products = DB::table('products')
+            ->leftJoin('unit_of_measures', 'products.uom_id', '=', 'unit_of_measures.id')
+            ->whereNull('products.deleted_at')
             ->where(function ($q) {
-                $q->whereNull('is_active')->orWhere('is_active', true);
+                $q->whereNull('products.is_active')->orWhere('products.is_active', true);
             })
-            ->with(['uom:id,name,abbreviation'])
-            ->orderBy('name')
-            ->get(['id', 'sku', 'name', 'sell_price', 'uom_id'])
+            ->orderBy('products.name')
+            ->select([
+                'products.id',
+                'products.sku',
+                'products.name',
+                'products.sell_price',
+                'unit_of_measures.id as uom_id',
+                'unit_of_measures.name as uom_name',
+                'unit_of_measures.abbreviation as uom_abbreviation',
+            ])
+            ->get()
             ->map(function ($p) use ($freeStockByProduct) {
                 return [
-                    'id' => $p->id,
-                    'sku' => $p->sku,
-                    'name' => $p->name,
+                    'id' => (int) $p->id,
+                    'sku' => (string) ($p->sku ?? ''),
+                    'name' => (string) ($p->name ?? ''),
                     'sell_price' => (float) $p->sell_price,
                     'free_stock' => (float) ($freeStockByProduct[$p->id] ?? 0),
-                    'uom' => $p->uom ? [
-                        'id' => $p->uom->id,
-                        'name' => $p->uom->name,
-                        'abbreviation' => $p->uom->abbreviation,
+                    'uom' => $p->uom_id ? [
+                        'id' => (int) $p->uom_id,
+                        'name' => (string) $p->uom_name,
+                        'abbreviation' => (string) $p->uom_abbreviation,
                     ] : null,
                 ];
             });

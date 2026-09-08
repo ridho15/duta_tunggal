@@ -35,6 +35,8 @@ class PurchaseOrderApiController extends Controller
      */
     public function dependencies(Request $request): JsonResponse
     {
+        ini_set('memory_limit', '512M');
+
         try {
             $user = Auth::user();
             $manageType = $user?->manage_type ?? [];

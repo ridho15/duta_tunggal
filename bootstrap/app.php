@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(\App\Http\Middleware\IncreaseMemoryLimit::class);
+        $middleware->api(\App\Http\Middleware\IncreaseMemoryLimit::class);
         $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
     })
     ->withProviders([
