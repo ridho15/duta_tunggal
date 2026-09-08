@@ -18,6 +18,7 @@ import {
   SaleOrderHeader,
   SaleOrderDependencies,
   CustomerOption,
+  CustomerCreditSummary,
   ApprovedQuotationOption,
   CabangOption,
   CurrencyOption,
@@ -33,6 +34,8 @@ interface Props {
   isGeneratingNumber: boolean;
   isEditMode: boolean;
   errors?: Record<string, string[]>;
+  creditSummary?: CustomerCreditSummary | null;
+  isLoadingCredit?: boolean;
 }
 
 export const SaleOrderHeaderForm: React.FC<Props> = ({
@@ -44,6 +47,8 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
   isGeneratingNumber,
   isEditMode,
   errors = {},
+  creditSummary = null,
+  isLoadingCredit = false,
 }) => {
   // Alphabetically sorted customer options
   const customerOptions: SelectOption[] = useMemo(() => {
@@ -303,24 +308,36 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
           )}
 
           {/* Credit limit */}
-          {selectedCustomer.tipe_pembayaran === 'Kredit' && selectedCustomer.credit_summary && (
-            <>
-              <div className="px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 font-medium flex items-center gap-1">
+          {selectedCustomer.tipe_pembayaran === 'Kredit' && (
+            isLoadingCredit ? (
+              <div className="px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 font-medium flex items-center gap-1.5 text-xs animate-pulse">
                 <CreditCard className="w-3.5 h-3.5 text-blue-600" />
-                <span>Limit: <b>{formatCurrency(selectedCustomer.credit_summary.credit_limit, 'Rp')}</b></span>
-                <span className="text-gray-400">|</span>
-                <span>Terpakai: <b>{formatCurrency(selectedCustomer.credit_summary.current_usage, 'Rp')}</b> ({selectedCustomer.credit_summary.usage_percentage}%)</span>
-                <span className="text-gray-400">|</span>
-                <span>Sisa: <b>{formatCurrency(selectedCustomer.credit_summary.available_credit, 'Rp')}</b></span>
+                <span>Memeriksa limit kredit...</span>
               </div>
+            ) : (creditSummary || selectedCustomer.credit_summary) ? (
+              (() => {
+                const activeSummary = creditSummary || selectedCustomer.credit_summary!;
+                return (
+                  <>
+                    <div className="px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 font-medium flex items-center gap-1">
+                      <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Limit: <b>{formatCurrency(activeSummary.credit_limit, 'Rp')}</b></span>
+                      <span className="text-gray-400">|</span>
+                      <span>Terpakai: <b>{formatCurrency(activeSummary.current_usage, 'Rp')}</b> ({activeSummary.usage_percentage}%)</span>
+                      <span className="text-gray-400">|</span>
+                      <span>Sisa: <b>{formatCurrency(activeSummary.available_credit, 'Rp')}</b></span>
+                    </div>
 
-              {selectedCustomer.credit_summary.overdue_count > 0 && (
-                <div className="px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 font-semibold flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                  <span>{selectedCustomer.credit_summary.overdue_count} tagihan jatuh tempo ({formatCurrency(selectedCustomer.credit_summary.overdue_total, 'Rp')})</span>
-                </div>
-              )}
-            </>
+                    {activeSummary.overdue_count > 0 && (
+                      <div className="px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 font-semibold flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>{activeSummary.overdue_count} tagihan jatuh tempo ({formatCurrency(activeSummary.overdue_total, 'Rp')})</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()
+            ) : null
           )}
         </div>
       )}

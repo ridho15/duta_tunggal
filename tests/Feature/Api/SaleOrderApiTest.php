@@ -328,4 +328,25 @@ class SaleOrderApiTest extends TestCase
         $this->assertEquals('Kirim Langsung', $saleOrder->tipe_pengiriman);
         $this->assertEquals(400000, (float) $saleOrder->total_amount);
     }
+
+    public function test_can_fetch_customer_credit_on_demand(): void
+    {
+        $customer = Customer::factory()->create([
+            'kredit_limit' => 50000000,
+            'tempo_kredit' => 30,
+            'tipe_pembayaran' => 'Kredit',
+        ]);
+
+        $response = $this->getJson("/api/v1/sales-orders/customer-credit/{$customer->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'credit_limit' => 50000000,
+                    'tempo_kredit_days' => 30,
+                    'payment_type' => 'Kredit',
+                ],
+            ]);
+    }
 }

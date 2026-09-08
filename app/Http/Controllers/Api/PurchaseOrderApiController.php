@@ -59,8 +59,14 @@ class PurchaseOrderApiController extends Controller
                 ->orderBy('perusahaan')
                 ->get(['id', 'code', 'perusahaan', 'kontak_person', 'phone', 'cabang_id', 'tempo_hutang']);
 
-            // 4. Fetch Products with UOM and Supplier pivots
+            // 4. Resolve default tax rate once before loop (prevents N+1 query memory bloat)
+            $activeTaxRate = (float) (\App\Models\TaxSetting::activeRate('PPN') ?? 11.0);
+
+            // 5. Fetch Products with UOM and Supplier pivots (active only)
             $products = Product::withoutGlobalScope('product_cabang')
+                ->where(function ($q) {
+                    $q->whereNull('is_active')->orWhere('is_active', true);
+                })
                 ->with([
                     'uom:id,name,abbreviation',
                     'suppliers' => function ($query) {
@@ -69,9 +75,10 @@ class PurchaseOrderApiController extends Controller
                     },
                 ])
                 ->orderBy('name')
-                ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id'])
-                ->map(function (Product $product) {
-                    $defaultTaxRate = TaxDefaultResolver::resolveForProductId((int) $product->id, 'PPN Excluded');
+                ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak'])
+                ->map(function (Product $product) use ($activeTaxRate) {
+                    $productTax = (float) ($product->pajak ?? 0);
+                    $defaultTaxRate = $productTax > 0 ? $productTax : $activeTaxRate;
 
                     // Recommended supplier with lowest price
                     $recommendedSupplier = $product->suppliers
@@ -86,7 +93,7 @@ class PurchaseOrderApiController extends Controller
                         'uom_id' => $product->uom_id,
                         'uom' => $product->uom?->abbreviation ?? $product->uom?->name ?? 'PCS',
                         'cabang_id' => $product->cabang_id,
-                        'default_tax_rate' => (float) $defaultTaxRate,
+                        'default_tax_rate' => $defaultTaxRate,
                         'suppliers' => $product->suppliers->map(function ($s) {
                             return [
                                 'id' => $s->id,
@@ -104,10 +111,15 @@ class PurchaseOrderApiController extends Controller
                     ];
                 });
 
-            // 5. Fetch Available Order Requests with remaining approved items for PO
+            // 6. Fetch Available Order Requests with remaining approved items for PO
             $orderRequests = OrderRequest::query()
                 ->whereIn('status', ['approved', 'partial', 'approve'])
-                ->with(['orderRequestItem.product', 'orderRequestItem.supplier'])
+                ->with([
+                    'orderRequestItem' => function ($q) {
+                        $q->select('id', 'order_request_id', 'product_id', 'supplier_id', 'cabang_id', 'quantity', 'fulfilled_quantity', 'status')
+                            ->with('supplier:id,code,perusahaan,tempo_hutang');
+                    },
+                ])
                 ->orderByDesc('id')
                 ->limit(50)
                 ->get()
@@ -123,8 +135,11 @@ class PurchaseOrderApiController extends Controller
                             continue;
                         }
 
-                        $lock = OrderRequestQuantityLock::orderRequestItemLimit((int) $item->id);
-                        if (($lock['remaining_for_po'] ?? 0) > 0) {
+                        $qty = (float) ($item->quantity ?? 0);
+                        $fulfilled = (float) ($item->fulfilled_quantity ?? 0);
+                        $rem = max(0, $qty - $fulfilled);
+
+                        if ($rem > 0) {
                             $remainingCount++;
                             if ($item->supplier_id) {
                                 $supplierIds[] = (int) $item->supplier_id;

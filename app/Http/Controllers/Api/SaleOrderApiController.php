@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class SaleOrderApiController extends Controller
 {
@@ -60,7 +61,7 @@ class SaleOrderApiController extends Controller
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
             ?? Currency::query()->orderBy('id')->value('id');
 
-        // Customer query with credit & deposit information
+        // Customer query with deposit information (credit summary is loaded on-demand per customer)
         $customers = Customer::query()
             ->with(['deposit'])
             ->orderBy('name')
@@ -80,7 +81,6 @@ class SaleOrderApiController extends Controller
                 'tipe',
             ])
             ->map(function ($cust) {
-                $creditSummary = $this->creditValidationService->getCreditSummary($cust);
                 return [
                     'id' => $cust->id,
                     'code' => $cust->code,
@@ -96,49 +96,29 @@ class SaleOrderApiController extends Controller
                     'tipe_pembayaran' => $cust->tipe_pembayaran,
                     'tipe' => $cust->tipe,
                     'deposit_balance' => (float) ($cust->deposit?->remaining_amount ?? 0),
-                    'credit_summary' => $creditSummary,
+                    'credit_summary' => null, // Loaded on-demand via customerCredit endpoint
                 ];
             });
 
-        // Approved Quotations query for Refer Quotation option
+        // Approved Quotations query for Refer Quotation option (lightweight metadata for dropdown)
         $approvedQuotations = Quotation::query()
             ->where('status', 'approve')
-            ->with(['customer', 'quotationItem.product.uom'])
+            ->with(['customer:id,code,name'])
             ->orderByDesc('id')
-            ->limit(100)
-            ->get()
+            ->limit(50)
+            ->get(['id', 'quotation_number', 'customer_id', 'total_amount'])
             ->map(function ($q) {
                 return [
                     'id' => $q->id,
                     'quotation_number' => $q->quotation_number,
                     'customer_id' => $q->customer_id,
-                    'customer_name' => $q->customer?->name,
-                    'customer_code' => $q->customer?->code,
-                    'cabang_id' => $q->cabang_id,
-                    'currency_id' => $q->currency_id,
-                    'exchange_rate' => (float) ($q->exchange_rate ?? 1.0),
-                    'tempo_pembayaran' => $q->tempo_pembayaran ?? 0,
-                    'shipped_to' => $q->customer?->address,
+                    'customer_name' => $q->customer?->name ?? 'Customer',
+                    'customer_code' => $q->customer?->code ?? '-',
                     'total_amount' => (float) ($q->total_amount ?? 0),
-                    'notes' => $q->notes,
-                    'items' => $q->quotationItem->map(function ($item) {
-                        return [
-                            'product_id' => $item->product_id,
-                            'product_sku' => $item->product?->sku,
-                            'product_name' => $item->product?->name,
-                            'unit' => $item->product?->uom?->abbreviation ?? 'PCS',
-                            'quantity' => (float) $item->quantity,
-                            'unit_price' => (float) $item->unit_price,
-                            'discount' => (float) ($item->discount ?? 0),
-                            'tax_type' => $item->tax_type ?? 'None',
-                            'tax' => (float) ($item->tax ?? 0),
-                            'notes' => $item->notes ?? '',
-                        ];
-                    }),
                 ];
             });
 
-        // Products query with free inventory stock aggregation
+        // Products query with free inventory stock aggregation (active products only)
         $freeStockByProduct = InventoryStock::query()
             ->selectRaw('product_id, SUM(qty_available - qty_reserved) as free_stock')
             ->where('qty_available', '>', 0)
@@ -146,7 +126,10 @@ class SaleOrderApiController extends Controller
             ->pluck('free_stock', 'product_id');
 
         $products = Product::withoutGlobalScope('product_cabang')
-            ->with('uom')
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
+            ->with(['uom:id,name,abbreviation'])
             ->orderBy('name')
             ->get(['id', 'sku', 'name', 'sell_price', 'uom_id'])
             ->map(function ($p) use ($freeStockByProduct) {

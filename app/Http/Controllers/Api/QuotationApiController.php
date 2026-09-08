@@ -58,8 +58,11 @@ class QuotationApiController extends Controller
                     'tipe_pembayaran', 'tipe'
                 ]);
 
-            // 4. Fetch Products with UOM (Sorted Alphabetically by name)
+            // 4. Fetch Products with UOM (Sorted Alphabetically by name, active only)
             $products = Product::withoutGlobalScope('product_cabang')
+                ->where(function ($q) {
+                    $q->whereNull('is_active')->orWhere('is_active', true);
+                })
                 ->with(['uom:id,name,abbreviation'])
                 ->orderBy('name')
                 ->get(['id', 'sku', 'name', 'sell_price', 'uom_id'])

@@ -6,6 +6,7 @@ import {
   SaleOrderHeader,
   SaleOrderItemRow,
   ApprovedQuotationOption,
+  CustomerCreditSummary,
 } from './types';
 import { SaleOrderHeaderForm } from './SaleOrderHeaderForm';
 import { SaleOrderItemTable } from './SaleOrderItemTable';
@@ -30,6 +31,8 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+  const [customerCreditSummary, setCustomerCreditSummary] = useState<CustomerCreditSummary | null>(null);
+  const [isLoadingCredit, setIsLoadingCredit] = useState<boolean>(false);
 
   // Form Header State
   const [header, setHeader] = useState<SaleOrderHeader>({
@@ -135,6 +138,41 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
 
     fetchData();
   }, [recordId, isEditMode, initialQuotationId]);
+
+  // Fetch Customer Credit Summary on-demand when customer_id changes
+  useEffect(() => {
+    if (!header.customer_id) {
+      setCustomerCreditSummary(null);
+      return;
+    }
+
+    const selectedCust = dependencies?.customers?.find((c) => c.id === header.customer_id);
+    if (!selectedCust || selectedCust.tipe_pembayaran !== 'Kredit') {
+      setCustomerCreditSummary(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingCredit(true);
+
+    axios
+      .get(`/api/v1/sales-orders/customer-credit/${header.customer_id}`)
+      .then((res) => {
+        if (isMounted && res.data.success && res.data.data) {
+          setCustomerCreditSummary(res.data.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load customer credit summary', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingCredit(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [header.customer_id, dependencies?.customers]);
 
   const createEmptyItem = (): SaleOrderItemRow => ({
     row_id: 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -353,6 +391,8 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
         isGeneratingNumber={isGeneratingNumber}
         isEditMode={isEditMode}
         errors={errors}
+        creditSummary={customerCreditSummary}
+        isLoadingCredit={isLoadingCredit}
       />
 
       {/* Toolbar */}
