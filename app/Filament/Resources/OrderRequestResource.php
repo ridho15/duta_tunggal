@@ -1092,6 +1092,29 @@ class OrderRequestResource extends Resource
                 'selected_items' => 'Alasan reject wajib diisi untuk item yang ditolak.',
             ]);
         }
+
+        if (! empty($data['create_purchase_order'])) {
+            $approvedIncludedItems = self::selectedPurchaseOrderApprovedItems($selectedItems);
+            $itemsWithoutSupplier = $approvedIncludedItems->filter(
+                fn (array $row): bool => empty($row['item_supplier_id'])
+            );
+
+            if ($itemsWithoutSupplier->isNotEmpty()) {
+                $productNames = $itemsWithoutSupplier
+                    ->pluck('product_name')
+                    ->filter()
+                    ->take(3)
+                    ->implode(', ');
+
+                $suffix = $itemsWithoutSupplier->count() > 3 ? ', dan item lainnya' : '';
+                $msg = "Item ({$productNames}{$suffix}) belum memiliki supplier. Tentukan supplier terlebih dahulu atau matikan opsi Buat Purchase Order otomatis.";
+
+                throw ValidationException::withMessages([
+                    'create_purchase_order' => $msg,
+                    'selected_items' => $msg,
+                ]);
+            }
+        }
     }
 
     public static function hasApprovedItemsAvailableForPurchaseOrder(OrderRequest $record): bool
