@@ -25,7 +25,7 @@ class TaxTypeHelper
         return [
             self::NONE => 'Non Pajak',
             self::INKLUSIF => 'Inklusif',
-            self::EKLUSIF => 'Eklusif',
+            self::EKLUSIF => 'Eksklusif',
         ];
     }
 

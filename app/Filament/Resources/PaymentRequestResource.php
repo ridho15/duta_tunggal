@@ -105,18 +105,25 @@ class PaymentRequestResource extends Resource
                             ->schema([
                                 CheckboxList::make('selected_invoices')
                                     ->label('')
-                                    ->options(function ($get) {
+                                    ->options(function ($get, $record) {
                                         $supplierId = $get('supplier_id');
                                         if (!$supplierId) return [];
 
                                         // restrict to invoices issued from purchase orders belonging to the selected supplier
-                                            $poIds = \App\Models\PurchaseOrder::where('supplier_id', $supplierId)->pluck('id');
+                                        $poIds = \App\Models\PurchaseOrder::where('supplier_id', $supplierId)->pluck('id');
+                                        $currentPrId = $record?->id;
 
-                                            return Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
-                                                ->whereIn('from_model_id', $poIds)
-                                                ->whereIn('status', ['unpaid', 'draft', 'sent', 'overdue', 'partially_paid'])
-                                                ->get()
-                                            ->mapWithKeys(function ($invoice) {
+                                        return Invoice::with('accountPayable')
+                                            ->where('from_model_type', \App\Models\PurchaseOrder::class)
+                                            ->whereIn('from_model_id', $poIds)
+                                            ->whereNotIn('status', ['draft', Invoice::STATUS_PAID])
+                                            ->get()
+                                            ->filter(function ($invoice) use ($currentPrId) {
+                                                // Exclude invoices that are fully paid or have no remaining debt
+                                                $remainingPayable = PaymentRequest::getInvoiceRemainingPayable($invoice, $currentPrId);
+                                                return $remainingPayable > 0.01;
+                                            })
+                                            ->mapWithKeys(function ($invoice) use ($currentPrId) {
                                                 try {
                                                     $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date)->format('d/m/Y') : '-';
                                                     $isOverdue = $invoice->due_date && Carbon::parse($invoice->due_date)->isPast();
@@ -124,29 +131,44 @@ class PaymentRequestResource extends Resource
                                                     $dueDate = '-';
                                                     $isOverdue = false;
                                                 }
-                                                $total = PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $invoice->total);
-                                                $label = "{$invoice->invoice_number} - {$total} (Due: {$dueDate})";
-                                                if ($isOverdue) $label .= ' ⚠ TERLAMBAT';
+
+                                                $remainingPayable = PaymentRequest::getInvoiceRemainingPayable($invoice, $currentPrId);
+                                                $remainingFormatted = PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $remainingPayable);
+                                                $totalFormatted = PurchaseInvoiceResource::formatInvoiceCurrencyPair($invoice, $invoice->total);
+                                                $activePrAmount = PaymentRequest::getActivePrAmountForInvoice((int) $invoice->id, $currentPrId);
+
+                                                $label = "{$invoice->invoice_number} - Sisa Hutang: {$remainingFormatted} (Total: {$totalFormatted}, Due: {$dueDate})";
+                                                if ($isOverdue) {
+                                                    $label .= ' ⚠ TERLAMBAT';
+                                                }
+                                                if ($activePrAmount > 0) {
+                                                    $label .= ' [Sebagian di PR Aktif Lain]';
+                                                }
+
                                                 return [$invoice->id => $label];
                                             });
                                     })
                                     ->columns(1)
                                     ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                    ->afterStateUpdated(function ($set, $get, $state, $record) {
                                         if (!$state || empty($state)) {
                                             $set('cabang_id', Auth::user()?->cabang_id);
                                             $set('total_amount', 0);
                                             return;
                                         }
 
-                                        $invoice = Invoice::whereIn('id', $state)->orderBy('id')->first();
-                                        if ($invoice && $invoice->cabang_id) {
-                                            $set('cabang_id', $invoice->cabang_id);
+                                        $invoices = Invoice::with('accountPayable')->whereIn('id', (array) $state)->get();
+                                        $firstInvoice = $invoices->first();
+                                        if ($firstInvoice && $firstInvoice->cabang_id) {
+                                            $set('cabang_id', $firstInvoice->cabang_id);
                                         }
 
-                                        $total = Invoice::whereIn('id', $state)
-                                            ->get()
-                                            ->sum(fn (Invoice $invoice) => PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $invoice->total));
+                                        $currentPrId = $record?->id;
+                                        $total = $invoices->sum(function (Invoice $invoice) use ($currentPrId) {
+                                            $remainingPayable = PaymentRequest::getInvoiceRemainingPayable($invoice, $currentPrId);
+                                            return PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $remainingPayable);
+                                        });
+
                                         $set('total_amount', number_format((float) $total, 0, ',', '.'));
                                     }),
                             ]),
@@ -247,7 +269,13 @@ class PaymentRequestResource extends Resource
                         ->label('Setujui')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
-                        ->visible(fn ($record) => $record->status === 'pending_approval')
+                        ->visible(function ($record) {
+                            if ($record->status !== 'pending_approval') {
+                                return false;
+                            }
+                            $check = app(\App\Services\ApprovalControlService::class)->canApprovePaymentRequest(Auth::user(), $record);
+                            return $check['allowed'];
+                        })
                         ->requiresConfirmation()
                         ->form([
                             Textarea::make('approval_notes')
@@ -255,6 +283,12 @@ class PaymentRequestResource extends Resource
                                 ->rows(2),
                         ])
                         ->action(function ($record, array $data) {
+                            $check = app(\App\Services\ApprovalControlService::class)->canApprovePaymentRequest(Auth::user(), $record);
+                            if (! $check['allowed']) {
+                                Notification::make()->title('Akses Ditolak')->body($check['reason'])->danger()->send();
+                                return;
+                            }
+
                             $record->update([
                                 'status' => 'approved',
                                 'approved_by' => Auth::id(),

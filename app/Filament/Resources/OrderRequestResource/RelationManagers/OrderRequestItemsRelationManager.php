@@ -184,7 +184,7 @@ class OrderRequestItemsRelationManager extends RelationManager
                     ->label('Tipe Pajak')
                     ->options([
                         'inklusif' => 'Inklusif',
-                        'eklusif' => 'Eklusif',
+                        'eklusif' => 'Eksklusif',
                         'none' => 'Non Pajak',
                     ]),
                 SelectFilter::make('status')

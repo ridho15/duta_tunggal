@@ -22,6 +22,48 @@ class CreateVendorPayment extends CreateRecord
 {
     protected static string $resource = VendorPaymentResource::class;
 
+    public function mount(): void
+    {
+        parent::mount();
+
+        $paymentRequestId = request()->query('payment_request_id');
+        if ($paymentRequestId) {
+            $pr = PaymentRequest::with('supplier')->find($paymentRequestId);
+            if ($pr) {
+                $prInvoiceIds = $pr->selected_invoices ?? [];
+                $eligibleInvoices = empty($prInvoiceIds)
+                    ? collect()
+                    : Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get()
+                        ->filter(fn ($invoice) => ((float)($invoice->accountPayable->remaining ?? $invoice->total)) > 0);
+
+                $selectedInvoices = $eligibleInvoices->pluck('id')->values()->toArray();
+                $total = VendorPaymentResource::calculateSelectedInvoiceTotal($eligibleInvoices);
+
+                $supplier = $pr->supplier;
+                $targetAccount = null;
+                if ($supplier) {
+                    $bankName = $supplier->nama_bank ?? $supplier->bank_name ?? '';
+                    $bankNum = $supplier->nomor_rekening ?? $supplier->rekening_bank ?? '';
+                    $holder = $supplier->nama_rekening ?? $supplier->atas_nama ?? $supplier->perusahaan ?? '';
+                    if ($bankNum || $bankName) {
+                        $targetAccount = trim("{$bankName} - {$bankNum} (a.n. {$holder})", ' -()');
+                    }
+                }
+
+                $this->form->fill([
+                    'payment_request_id' => $pr->id,
+                    'supplier_id' => $pr->supplier_id,
+                    'cabang_id' => $pr->cabang_id ?? null,
+                    'selected_invoices' => $selectedInvoices,
+                    'total_payment' => VendorPaymentResource::formatMoneyState($total),
+                    'payment_details' => VendorPaymentResource::buildPaymentDetails($eligibleInvoices),
+                    'target_bank_account' => $targetAccount,
+                    'payment_date' => now()->toDateString(),
+                ]);
+            }
+        }
+    }
+
     protected function beforeCreate(): void
     {
         $data = $this->form->getState();

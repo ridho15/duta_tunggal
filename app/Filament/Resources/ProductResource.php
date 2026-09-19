@@ -953,7 +953,7 @@ class ProductResource extends Resource
                                             ->options([
                                                 'Non Pajak' => 'Non Pajak',
                                                 'Inklusif' => 'Inklusif',
-                                                'Eksklusif' => 'Eklusif'
+                                                'Eksklusif' => 'Eksklusif'
                                             ])
                                             ->required(),
                                         TextInput::make('pajak')

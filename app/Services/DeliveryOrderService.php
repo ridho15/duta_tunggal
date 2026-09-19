@@ -118,22 +118,28 @@ class DeliveryOrderService
         float $quantity,
         $rakId = null,
     ): WarehouseConfirmation {
+        $product = $item->product ?? $item->saleOrderItem?->product;
+        $productName = $product?->name ?? $item->product_name ?? '-';
+        $productSku = $product?->sku ?? '-';
+
         $warehouseConfirmation = WarehouseConfirmation::create([
             'confirmable_type' => DeliveryOrder::class,
             'confirmable_id' => $deliveryOrder->id,
             'confirmation_type' => 'delivery_order',
             'status' => 'request',
             'note' => sprintf(
-                'Auto-created dari DO %s | SO Item #%s | Gudang #%s',
+                'Auto-created dari DO %s | Produk: %s (%s) | Gudang #%s',
                 $deliveryOrder->do_number,
-                $item->sale_order_item_id ?? '-',
+                $productName,
+                $productSku,
                 $warehouseId,
             ),
         ]);
 
         $warehouseConfirmation->warehouseConfirmationItems()->create([
             'sale_order_item_id' => $item->sale_order_item_id,
-            'product_name' => $item->product->name ?? '-',
+            'product_id' => $item->product_id ?? $product?->id,
+            'product_name' => $productName,
             'requested_qty' => $quantity,
             'confirmed_qty' => $quantity,
             'warehouse_id' => $warehouseId,

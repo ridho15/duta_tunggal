@@ -48,17 +48,7 @@ class PurchaseReceiptService
 
     public function generateReceiptNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'RN-' . $date . '-';
-
-        // pick random suffix; retry if collision
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = PurchaseReceipt::where('receipt_number', $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\SequentialNumberGenerator::generate('purchase_receipts', 'receipt_number', 'RN-', 4, 'Ymd');
     }
 
     /**

@@ -23,7 +23,9 @@ class PurchaseOrderItem extends Model
         'tipe_pajak', // Non Pajak, Inklusif, Eklusif
         'refer_item_model_id',
         'refer_item_model_type',
-        'currency_id'
+        'currency_id',
+        'original_unit_price',
+        'price_change_reason',
     ];
 
     public function purchaseOrder()
@@ -111,6 +113,11 @@ class PurchaseOrderItem extends Model
     public function qualityControls()
     {
         return $this->morphMany(QualityControl::class, 'from_model');
+    }
+
+    public function qualityControlItems()
+    {
+        return $this->hasMany(QualityControlItem::class, 'purchase_order_item_id');
     }
 
     public function currency()

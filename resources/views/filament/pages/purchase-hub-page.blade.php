@@ -27,7 +27,6 @@
             'title' => 'Pembayaran & Kas Bank',
             'items' => [
                 ['label' => 'Permintaan Pembayaran',      'url' => \App\Filament\Resources\PaymentRequestResource::getUrl(),        'icon' => 'document-text',    'desc' => 'Ajukan permintaan dana ke keuangan', 'class' => \App\Filament\Resources\PaymentRequestResource::class],
-                ['label' => 'Penerimaan Pelanggan',       'url' => \App\Filament\Resources\CustomerReceiptResource::getUrl(),       'icon' => 'inbox-arrow-down', 'desc' => 'Catat pembayaran masuk dari pelanggan', 'class' => \App\Filament\Resources\CustomerReceiptResource::class],
                 ['label' => 'Pembayaran Vendor',          'url' => \App\Filament\Resources\VendorPaymentResource::getUrl(),         'icon' => 'arrow-up-circle',  'desc' => 'Proses pelunasan ke vendor/supplier', 'class' => \App\Filament\Resources\VendorPaymentResource::class],
                 ['label' => 'Transaksi Kas & Bank',       'url' => \App\Filament\Resources\CashBankTransactionResource::getUrl(),   'icon' => 'banknotes',        'desc' => 'Catat penerimaan & pengeluaran kas/bank', 'class' => \App\Filament\Resources\CashBankTransactionResource::class],
                 ['label' => 'Deposit',                    'url' => \App\Filament\Resources\DepositResource::getUrl(),               'icon' => 'circle-stack',     'desc' => 'Kelola deposit & uang muka', 'class' => \App\Filament\Resources\DepositResource::class],

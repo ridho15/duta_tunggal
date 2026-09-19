@@ -604,7 +604,7 @@ class SaleOrderResource extends Resource
                             })
                             ->relationship('customer', 'name')
                             ->getOptionLabelFromRecordUsing(function (Customer $customer) {
-                                return "({$customer->code}) {$customer->name}";
+                                return $customer->getDisplayName();
                             })
                             ->validationMessages([
                                 'required' => 'Customer wajib dipilih'
@@ -1071,6 +1071,7 @@ class SaleOrderResource extends Resource
                                                     return;
                                                 }
 
+                                                $productId = $get('product_id');
                                                 foreach ($allocations as $allocation) {
                                                     $allocationWarehouseId = $allocation['warehouse_id'] ?? null;
                                                     $allocationItemQty = (float) ($allocation['quantity'] ?? 0);
@@ -1078,6 +1079,16 @@ class SaleOrderResource extends Resource
                                                     if (!$allocationWarehouseId || $allocationItemQty <= 0) {
                                                         $fail('Setiap alokasi wajib memiliki gudang dan qty > 0.');
                                                         return;
+                                                    }
+
+                                                    if ($productId) {
+                                                        $freeStock = (float) InventoryStock::freeQtyFor($productId, $allocationWarehouseId);
+                                                        if ($allocationItemQty > $freeStock) {
+                                                            $warehouse = \App\Models\Warehouse::find($allocationWarehouseId);
+                                                            $whName = $warehouse ? $warehouse->name : "Gudang #{$allocationWarehouseId}";
+                                                            $fail("Kuantitas alokasi ({$allocationItemQty}) melebihi stok bebas di {$whName} (tersedia: " . number_format($freeStock, 0, ',', '.') . ").");
+                                                            return;
+                                                        }
                                                     }
                                                 }
                                             };
@@ -1102,8 +1113,9 @@ class SaleOrderResource extends Resource
                                         }
 
                                         $allocations = collect($get('warehouseAllocations') ?? []);
+                                        $totalStock = (float) InventoryStock::freeQtyFor($productId);
+
                                         if ($allocations->isEmpty()) {
-                                            $totalStock = InventoryStock::freeQtyFor($productId);
                                             return "📦 Total stok bebas: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
                                         }
 
@@ -1112,7 +1124,20 @@ class SaleOrderResource extends Resource
                                             return "❌ Total alokasi ({$allocationQty}) tidak sama dengan quantity ({$quantity})";
                                         }
 
-                                        return "✅ Total alokasi gudang: " . number_format($allocationQty, 0, ',', '.');
+                                        foreach ($allocations as $allocation) {
+                                            $whId = $allocation['warehouse_id'] ?? null;
+                                            $itemQty = (float) ($allocation['quantity'] ?? 0);
+                                            if ($whId && $itemQty > 0) {
+                                                $whStock = (float) InventoryStock::freeQtyFor($productId, $whId);
+                                                if ($itemQty > $whStock) {
+                                                    $warehouse = \App\Models\Warehouse::find($whId);
+                                                    $whName = $warehouse ? $warehouse->name : "Gudang #{$whId}";
+                                                    return "⚠️ Stok tidak cukup di {$whName}: Butuh {$itemQty}, tersedia {$whStock}!";
+                                                }
+                                            }
+                                        }
+
+                                        return "✅ Total alokasi gudang: " . number_format($allocationQty, 0, ',', '.') . " (Stok bebas: " . number_format($totalStock, 0, ',', '.') . ")";
                                     })
                                     ->required()
                                     ->default(0),
@@ -1621,7 +1646,7 @@ class SaleOrderResource extends Resource
                     ->searchable()
                     ->relationship('customer', 'name')
                     ->getOptionLabelFromRecordUsing(function (Customer $customer) {
-                        return "({$customer->code}) {$customer->name}";
+                        return $customer->getDisplayName();
                     }),
                 SelectFilter::make('stock_status')
                     ->label('Status Stok')
@@ -1671,42 +1696,100 @@ class SaleOrderResource extends Resource
                 return trim(implode(' ', array_filter($classes)));
             })
             ->actions([
+                ViewAction::make()
+                    ->label('Lihat')
+                    ->color('primary'),
+                EditAction::make()
+                    ->label('Ubah')
+                    ->color('primary')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('update sales order') &&
+                            in_array($record->status, ['draft', 'request_approve']);
+                    }),
+                Action::make('request_approve')
+                    ->label('Ajukan Persetujuan')
+                    ->requiresConfirmation()
+                    ->modalHeading('Ajukan Persetujuan Sales Order')
+                    ->modalDescription(function ($record) {
+                        $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
+                        $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
+                        return "Ajukan Sales Order {$record->so_number} untuk customer {$cust} senilai {$total} ke Manajer Sales. Lanjutkan?";
+                    })
+                    ->modalSubmitActionLabel('Ya, Ajukan')
+                    ->color('success')
+                    ->icon('heroicon-o-arrow-uturn-up')
+                    ->visible(function ($record) {
+                        return Auth::user()->hasPermissionTo('request sales order')
+                            && $record->status == 'draft';
+                    })
+                    ->action(function ($record) {
+                        try {
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->requestApprove($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                        } catch (ValidationException $e) {
+                            $messages = collect($e->errors())->flatten()->implode(' ');
+
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: $messages ?: 'Validasi pengajuan persetujuan gagal.');
+                        }
+                    }),
+                Action::make('approve')
+                    ->label('Setujui')
+                    ->requiresConfirmation()
+                    ->modalHeading('Setujui Sales Order')
+                    ->modalDescription(function ($record) {
+                        $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
+                        $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
+                        return "Dengan menyetujui SO {$record->so_number} ({$cust} - {$total}), status pesanan menjadi Disetujui dan tim logistik dapat membuat Delivery Order (DO). Lanjutkan?";
+                    })
+                    ->modalSubmitActionLabel('Ya, Setujui SO')
+                    ->color('success')
+                    ->visible(function ($record) {
+                        if ($record->status !== 'request_approve') {
+                            return false;
+                        }
+                        $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                        return $check['allowed'];
+                    })
+                    ->action(function ($record) {
+                        try {
+                            $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                            if (! $check['allowed']) {
+                                HelperController::sendNotification(isSuccess: false, title: "Persetujuan Ditolak", message: $check['reason'] ?? 'Akses persetujuan ditolak.');
+                                return;
+                            }
+
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->approve($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                        } catch (ValidationException $e) {
+                            $messages = collect($e->errors())->flatten()->implode(' ');
+
+                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
+                        }
+                    }),
                 ActionGroup::make([
-                    ViewAction::make()
-                        ->color('primary'),
-                    EditAction::make()
-                        ->color('primary')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('update sales order') &&
-                                in_array($record->status, ['draft', 'request_approve', 'approved']);
-                        }),
                     DeleteAction::make()
+                        ->label('Hapus')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('delete sales order') &&
-                                in_array($record->status, ['draft', 'request_approve']);
+                                $record->status === 'draft';
                         }),
-                    Action::make('request_approve')
-                        ->label('Request Approve')
+                    Action::make('reject')
+                        ->label('Tolak')
                         ->requiresConfirmation()
-                        ->color('success')
-                        ->icon('heroicon-o-arrow-uturn-up')
+                        ->color('danger')
+                        ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request sales order')
-                                && $record->status == 'draft';
+                            return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
                         })
                         ->action(function ($record) {
-                            try {
-                                $salesOrderService = app(SalesOrderService::class);
-                                $salesOrderService->requestApprove($record);
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
-                            } catch (ValidationException $e) {
-                                $messages = collect($e->errors())->flatten()->implode(' ');
-
-                                HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: $messages ?: 'Validasi request approve gagal.');
-                            }
+                            $salesOrderService = app(SalesOrderService::class);
+                            $salesOrderService->reject($record);
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah ditolak. Proses selanjutnya: Tim Sales perlu merevisi data pesanan sesuai feedback dan mengajukan kembali untuk disetujui.");
                         }),
                     Action::make('request_close')
-                        ->label('Request Close')
+                        ->label('Minta Tutup')
                         ->requiresConfirmation()
                         ->color('danger')
                         ->icon('heroicon-o-x-circle')
@@ -1718,7 +1801,7 @@ class SaleOrderResource extends Resource
                             function ($record) {
                                 return [
                                     Textarea::make('reason_close')
-                                        ->label('Reason Close')
+                                        ->label('Alasan Penutupan')
                                         ->string()
                                         ->required(),
                                 ];
@@ -1728,32 +1811,10 @@ class SaleOrderResource extends Resource
                             $record->update($data);
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->requestClose($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Permintaan penutupan Sales Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Sales.");
-                        }),
-                    Action::make('approve')
-                        ->label('Setujui')
-                        ->requiresConfirmation()
-                        ->modalHeading('Setujui Sales Order')
-                        ->modalDescription('Dengan menyetujui Sales Order ini, Anda mengkonfirmasi bahwa persyaratan pembayaran dan pengiriman telah disepakati.')
-                        ->color('success')
-                        ->icon('heroicon-o-check-badge')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response sales order')
-                                && $record->status == 'request_approve';
-                        })
-                        ->action(function ($record) {
-                            try {
-                                $salesOrderService = app(SalesOrderService::class);
-                                $salesOrderService->approve($record);
-                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
-                            } catch (ValidationException $e) {
-                                $messages = collect($e->errors())->flatten()->implode(' ');
-
-                                HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
-                            }
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Permintaan penutupan Sales Order telah diajukan. Proses selanjutnya: Konfirmasi penutupan oleh Manajer Sales.");
                         }),
                     Action::make('closed')
-                        ->label('Close')
+                        ->label('Tutup SO')
                         ->requiresConfirmation()
                         ->color('warning')
                         ->icon('heroicon-o-x-circle')
@@ -1761,7 +1822,7 @@ class SaleOrderResource extends Resource
                             function ($record) {
                                 return [
                                     Textarea::make('reason_close')
-                                        ->label('Reason Close')
+                                        ->label('Alasan Penutupan')
                                         ->string()
                                         ->required()
                                         ->default($record->reason_close),
@@ -1774,31 +1835,10 @@ class SaleOrderResource extends Resource
                         ->action(function ($record) {
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->close($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan semua Invoice terkait telah diselesaikan dan tidak ada pembayaran yang tertunggak.");
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan semua Invoice terkait telah diselesaikan dan tidak ada pembayaran yang tertunggak.");
                         }),
-                    Action::make('reject')
-                        ->label('Reject')
-                        ->requiresConfirmation()
-                        ->color('danger')
-                        ->icon('heroicon-o-x-circle')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
-                        })
-                        ->action(function ($record) {
-                            $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->reject($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah ditolak. Proses selanjutnya: Tim Sales perlu merevisi data pesanan sesuai feedback dan mengajukan kembali untuk disetujui.");
-                        }),
-                    Action::make('pdf_sale_order')
-                        ->label('Preview / Download PDF')
-                        ->color('info')
-                        ->icon('heroicon-o-document-arrow-down')
-                        ->visible(fn ($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received']))
-                        ->url(fn ($record) => route('pdf-stream', ['type' => 'sale-order', 'id' => $record->id]))
-                        ->openUrlInNewTab(),
-
                     Action::make('completed')
-                        ->label('Complete')
+                        ->label('Selesaikan')
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
@@ -1823,8 +1863,15 @@ class SaleOrderResource extends Resource
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->completed($record);
 
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Sales Order telah selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
+                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah selesai. Proses selanjutnya: Penerbitan Invoice oleh Tim Finance.");
                         }),
+                    Action::make('pdf_sale_order')
+                        ->label('Cetak / Unduh PDF')
+                        ->color('info')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->visible(fn ($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received']))
+                        ->url(fn ($record) => route('pdf-stream', ['type' => 'sale-order', 'id' => $record->id]))
+                        ->openUrlInNewTab(),
                     Action::make('btn_titip_saldo')
                         ->label('Saldo Titip Customer')
                         ->icon('heroicon-o-banknotes')
@@ -2006,7 +2053,7 @@ class SaleOrderResource extends Resource
                         }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')
-                        ->label('Sync Total Amount')
+                        ->label('Hitung Ulang Total')
                         ->color('primary')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('update sales order');
@@ -2068,7 +2115,7 @@ class SaleOrderResource extends Resource
                     '</div>' .
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
-                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partially Received)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SO diterima sebagian</span></div>' .
+                    '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partially Delivered)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SO terkirim sebagian</span></div>' .
                     '</div>' .
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .

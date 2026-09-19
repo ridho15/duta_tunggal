@@ -359,8 +359,8 @@
     .dt-item-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 980px;
-        font-size: 13px
+        min-width: 800px;
+        font-size: 12.5px;
     }
 
     .dt-item-table th {
@@ -498,7 +498,16 @@
     .dt-item-product {
         font-weight: 700;
         color: #111827;
-        max-width: 310px
+        max-width: 220px;
+        word-break: break-word;
+    }
+
+    .dt-item-supplier {
+        color: #374151;
+        max-width: 170px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .dt-item-product small {
@@ -526,15 +535,25 @@
     .dt-item-action-col {
         position: sticky;
         right: 0;
+        z-index: 2;
         background: #fff;
-        box-shadow: -8px 0 12px -12px rgba(15, 23, 42, .45);
+        box-shadow: -6px 0 10px -4px rgba(15, 23, 42, .15);
         text-align: center;
-        min-width: 112px
+        min-width: 104px;
+        padding: 8px !important;
     }
 
     .dt-item-table th.dt-item-action-col {
         background: #f8fafc;
-        z-index: 1
+        z-index: 3;
+    }
+
+    .dt-item-row:hover td.dt-item-action-col {
+        background: #fbfdff;
+    }
+
+    .dt-item-row.is-expanded td.dt-item-action-col {
+        background: #fcfdff;
     }
 
     .dt-item-row-actions {
@@ -2410,14 +2429,14 @@
                     <th class="dt-item-expand-col"></th>
                     <th class="dt-item-check-col"></th>
                     <th>No</th>
-                    <th>Product</th>
+                    <th>Produk</th>
                     <th>Supplier</th>
                     <th class="dt-item-number">Qty</th>
                     <th>UOM</th>
-                    <th class="dt-item-number">Price</th>
+                    <th class="dt-item-number">Harga</th>
                     <th class="dt-item-number">Subtotal</th>
                     <th>Status</th>
-                    <th class="dt-item-action-col">Action</th>
+                    <th class="dt-item-action-col">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -2444,7 +2463,7 @@
                             {{ $row['product'] }}
                             <small>{{ $row['cabang'] }}</small>
                         </td>
-                        <td>{{ $row['supplier'] }}</td>
+                        <td class="dt-item-supplier" title="{{ $row['supplier'] }}">{{ $row['supplier'] }}</td>
                         <td class="dt-item-number">{{ $row['qty'] }}</td>
                         <td>{{ $row['uom'] }}</td>
                         <td class="dt-item-number">
@@ -2510,7 +2529,9 @@
                     <tr class="dt-item-detail-row" wire:key="dt-or-detail-{{ $row['key'] }}" x-cloak
                         x-show="isExpanded(@js($row['key']))">
                         <td colspan="11">
-                            <div class="dt-item-detail-card">
+                            <div class="dt-item-detail-card"
+                                x-on:input="const err = $el.querySelector('[data-dt-inline-validation-errors]'); if (err) err.style.display = 'none';"
+                                x-on:change="const err = $el.querySelector('[data-dt-inline-validation-errors]'); if (err) err.style.display = 'none';">
                                 <div class="dt-item-detail-summary">
                                     <div>
                                         <strong>Editor item #{{ $row['number'] }}</strong>

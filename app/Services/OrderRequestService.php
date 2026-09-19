@@ -43,7 +43,8 @@ class OrderRequestService
                         return null;
                     }
 
-                    if (OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) !== OrderRequestItem::STATUS_APPROVED) {
+                    $itemStatus = OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null);
+                    if ($itemStatus === OrderRequestItem::STATUS_REJECTED) {
                         return null;
                     }
 
@@ -84,11 +85,12 @@ class OrderRequestService
                     }
 
                     return [
-                        'order_request_item' => $orderRequestItem,
-                        'quantity'           => $qty,
-                        'unit_price'         => $unitPrice,
-                        'discount'           => $orderRequestItem->discount ?? 0,
-                        'tax'                => $orderRequestItem->tax ?? 0,
+                        'order_request_item'  => $orderRequestItem,
+                        'quantity'            => $qty,
+                        'unit_price'          => $unitPrice,
+                        'discount'            => $orderRequestItem->discount ?? 0,
+                        'tax'                 => $orderRequestItem->tax ?? 0,
+                        'price_change_reason' => $row['price_change_reason'] ?? null,
                     ];
                 })
                 ->filter();
@@ -96,7 +98,14 @@ class OrderRequestService
 
         // No selection provided — use all approved items with remaining quantity.
         return $orderRequest->orderRequestItem
-            ->filter(fn($orderRequestItem) => OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED)
+            ->filter(function ($orderRequestItem) use ($orderRequest) {
+                $itemStatus = OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null);
+                if ($itemStatus === OrderRequestItem::STATUS_REJECTED) {
+                    return false;
+                }
+
+                return $itemStatus === OrderRequestItem::STATUS_APPROVED || $orderRequest->status === 'approved';
+            })
             ->map(function ($orderRequestItem) use ($supplier) {
                 $remainingQty = OrderRequestQuantityLock::orderRequestItemLimit((int) $orderRequestItem->id)['remaining_for_po'];
                 if ($remainingQty <= 0) {
@@ -146,7 +155,19 @@ class OrderRequestService
         $selectedItems = collect($data['selected_items'] ?? []);
 
         if ($selectedItems->isEmpty()) {
-            throw new \InvalidArgumentException('Keputusan item wajib diisi sebelum Order Request dapat di-approve.');
+            foreach ($orderRequest->orderRequestItem as $item) {
+                if (OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT) {
+                    $item->update([
+                        'status' => OrderRequestItem::STATUS_APPROVED,
+                        'approved_by' => Auth::id() ?? $orderRequest->created_by,
+                        'approved_at' => now(),
+                        'rejected_by' => null,
+                        'rejected_at' => null,
+                        'rejection_note' => null,
+                    ]);
+                }
+            }
+            return;
         }
 
         $selectedByItemId = $selectedItems
@@ -158,20 +179,22 @@ class OrderRequestService
 
             if (! $row) {
                 if (OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT) {
-                    throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
+                    $item->update([
+                        'status' => OrderRequestItem::STATUS_APPROVED,
+                        'approved_by' => Auth::id() ?? $orderRequest->created_by,
+                        'approved_at' => now(),
+                        'rejected_by' => null,
+                        'rejected_at' => null,
+                        'rejection_note' => null,
+                    ]);
                 }
 
                 continue;
             }
 
-            if (! array_key_exists('approval_status', $row)) {
-                throw new \InvalidArgumentException('Keputusan item wajib diisi sebelum Order Request dapat di-approve.');
-            }
-
-            $decision = OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null);
-            if ($decision === OrderRequestItem::STATUS_DRAFT) {
-                throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
-            }
+            $decision = array_key_exists('approval_status', $row)
+                ? OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null)
+                : OrderRequestItem::STATUS_APPROVED;
 
             if ($decision === OrderRequestItem::STATUS_REJECTED && trim((string) ($row['rejection_note'] ?? '')) === '') {
                 throw new \InvalidArgumentException('Alasan reject wajib diisi untuk item yang ditolak.');
@@ -189,56 +212,36 @@ class OrderRequestService
                 continue;
             }
 
-            $decision = OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null);
-            if (! isset($row['approval_status']) || $decision === OrderRequestItem::STATUS_DRAFT) {
-                $item->update([
-                    'status' => OrderRequestItem::STATUS_DRAFT,
-                    'approved_by' => null,
-                    'approved_at' => null,
-                    'rejected_by' => null,
-                    'rejected_at' => null,
-                    'rejection_note' => null,
-                ]);
-                continue;
-            }
+            $decision = array_key_exists('approval_status', $row)
+                ? OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null)
+                : OrderRequestItem::STATUS_APPROVED;
 
             if ($decision === OrderRequestItem::STATUS_APPROVED) {
-                $item->update([
+                $payload = [
                     'status' => OrderRequestItem::STATUS_APPROVED,
-                    'approved_by' => Auth::id(),
+                    'approved_by' => Auth::id() ?? $orderRequest->created_by,
                     'approved_at' => now(),
                     'rejected_by' => null,
                     'rejected_at' => null,
                     'rejection_note' => null,
-                ]);
-                continue;
-            }
+                ];
 
-            if ($decision === OrderRequestItem::STATUS_REJECTED) {
-                $note = trim((string) ($row['rejection_note'] ?? ''));
-                if ($note === '') {
-                    throw new \InvalidArgumentException('Alasan reject wajib diisi untuk item yang ditolak.');
+                if (array_key_exists('unit_price', $row) && $row['unit_price'] !== null && $row['unit_price'] !== '') {
+                    $payload['unit_price'] = \App\Helpers\MoneyHelper::safeParse($row['unit_price']);
                 }
 
+                $item->update($payload);
+            } elseif ($decision === OrderRequestItem::STATUS_REJECTED) {
+                $note = trim((string) ($row['rejection_note'] ?? ''));
                 $item->update([
                     'status' => OrderRequestItem::STATUS_REJECTED,
                     'approved_by' => null,
                     'approved_at' => null,
-                    'rejected_by' => Auth::id(),
+                    'rejected_by' => Auth::id() ?? $orderRequest->created_by,
                     'rejected_at' => now(),
-                    'rejection_note' => $note,
+                    'rejection_note' => $note !== '' ? $note : 'Item ditolak saat approval Order Request.',
                 ]);
-                continue;
             }
-
-            $item->update([
-                'status' => OrderRequestItem::STATUS_DRAFT,
-                'approved_by' => null,
-                'approved_at' => null,
-                'rejected_by' => null,
-                'rejected_at' => null,
-                'rejection_note' => null,
-            ]);
         }
 
         $orderRequest->syncItemApprovalStatus();
@@ -252,7 +255,17 @@ class OrderRequestService
             ->contains(fn(OrderRequestItem $item): bool => OrderRequestItem::normalizeApprovalStatus($item->status ?? null) === OrderRequestItem::STATUS_DRAFT);
 
         if ($hasDraftItem) {
-            throw new \InvalidArgumentException('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.');
+            $orderRequest->orderRequestItem()
+                ->where(function ($q) {
+                    $q->whereNull('status')->orWhere('status', OrderRequestItem::STATUS_DRAFT);
+                })
+                ->update([
+                    'status' => OrderRequestItem::STATUS_APPROVED,
+                    'approved_by' => Auth::id() ?? $orderRequest->created_by,
+                    'approved_at' => now(),
+                ]);
+
+            $orderRequest->load('orderRequestItem');
         }
     }
 
@@ -263,15 +276,27 @@ class OrderRequestService
         $this->applyItemApprovalDecisions($orderRequest, $data);
         $orderRequest->refresh();
         $this->ensureAllItemsHaveApprovalDecision($orderRequest);
+        $orderRequest->refresh();
+        $orderRequest->syncItemApprovalStatus();
+        $orderRequest->refresh();
 
         if ($createPurchaseOrder) {
-            $hasIncludedApprovedItem = ! empty($data['selected_items'])
-                && collect($data['selected_items'])
-                ->filter(fn($row) => ! empty($row['include']))
-                ->contains(fn($row) => OrderRequestItem::normalizeApprovalStatus($row['approval_status'] ?? null) === OrderRequestItem::STATUS_APPROVED);
+            if (! empty($data['selected_items'])) {
+                $hasIncludedApprovedItem = collect($data['selected_items'])
+                    ->filter(fn($row) => ! empty($row['include']))
+                    ->contains(function ($row) use ($orderRequest) {
+                        $status = $row['approval_status'] ?? null;
+                        if ($status === null) {
+                            $item = $orderRequest->orderRequestItem->firstWhere('id', (int) ($row['item_id'] ?? 0));
+                            $status = $item?->status ?? OrderRequestItem::STATUS_APPROVED;
+                        }
 
-            if (! $hasIncludedApprovedItem) {
-                return $orderRequest->fresh(['purchaseOrder.purchaseOrderItem']);
+                        return OrderRequestItem::normalizeApprovalStatus($status) === OrderRequestItem::STATUS_APPROVED;
+                    });
+
+                if (! $hasIncludedApprovedItem) {
+                    return $orderRequest->fresh(['purchaseOrder.purchaseOrderItem']);
+                }
             }
 
             $supplier = Supplier::findOrFail($data['supplier_id']);
@@ -300,9 +325,11 @@ class OrderRequestService
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
                 'created_by'   => Auth::id() ?? $orderRequest->created_by,
                 'cabang_id'    => $cabangId,
+                'warehouse_id' => $data['warehouse_id'] ?? null,
             ]);
 
             $itemsForPivotSync = [];
+            $hasPriceDeviation = false;
 
             foreach ($resolvedItems as $row) {
                 /** @var OrderRequestItem $orderRequestItem */
@@ -310,19 +337,38 @@ class OrderRequestService
 
                 $itemCurrencyId = $orderRequestItem->currency_id ?? $defaultCurrency->id;
 
+                $orPrice = (float) ($orderRequestItem->unit_price ?? 0);
+                if ($orPrice <= 0) {
+                    $product = $orderRequestItem->product;
+                    $sp = $product ? $product->suppliers()->where('suppliers.id', $supplier->id)->first() : null;
+                    $orPrice = $sp ? (float) $sp->pivot->supplier_price : (float) ($product->cost_price ?? 0);
+                }
+                $poPrice = (float) $row['unit_price'];
+                $itemDeviation = abs($poPrice - $orPrice) > 0.0001;
+                if ($itemDeviation) {
+                    $hasPriceDeviation = true;
+                }
+
+                $reason = $row['price_change_reason'] ?? $data['price_change_reason'] ?? null;
+                if ($itemDeviation && empty($reason)) {
+                    $reason = 'Perubahan harga dari Rp ' . number_format($orPrice, 2, ',', '.') . ' menjadi Rp ' . number_format($poPrice, 2, ',', '.');
+                }
+
                 $orderRequestItem->purchaseOrderItem()->create([
-                    'purchase_order_id' => $purchaseOrder->id,
-                    'product_id'        => $orderRequestItem->product_id,
-                    'quantity'          => $row['quantity'],
-                    'unit_price'        => $row['unit_price'],
-                    'discount'          => $row['discount'],
-                    'tax'               => $row['tax'],
-                    'tipe_pajak'        => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
-                    'currency_id'       => $itemCurrencyId,
+                    'purchase_order_id'   => $purchaseOrder->id,
+                    'product_id'          => $orderRequestItem->product_id,
+                    'quantity'            => $row['quantity'],
+                    'unit_price'          => $poPrice,
+                    'original_unit_price' => $orPrice,
+                    'price_change_reason' => $reason,
+                    'discount'            => $row['discount'],
+                    'tax'                 => $row['tax'],
+                    'tipe_pajak'          => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
+                    'currency_id'         => $itemCurrencyId,
                 ]);
 
                 $rate = CurrencyConversionResolver::resolveRate((int)$itemCurrencyId);
-                $idrPrice = $row['unit_price'] * $rate;
+                $idrPrice = $poPrice * $rate;
 
                 $itemsForPivotSync[] = [
                     'product_id' => (int) $orderRequestItem->product_id,
@@ -353,8 +399,19 @@ class OrderRequestService
                 );
             }
 
-            // Auto-approve PO when created from Order Request approval flow.
-            app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
+            if ($hasPriceDeviation) {
+                $purchaseOrder->update([
+                    'status' => 'request_approval',
+                    'note' => trim(($purchaseOrder->note ?? '') . "\n[PO memerlukan persetujuan harga: Terdapat perbedaan harga dari Order Request/standar]"),
+                ]);
+                Log::info('OrderRequestService approve: PO requires price approval due to price deviation', [
+                    'po_id' => $purchaseOrder->id,
+                    'po_number' => $purchaseOrder->po_number,
+                ]);
+            } else {
+                // Auto-approve PO when created from Order Request approval flow without price deviation.
+                app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
+            }
         } else {
             foreach ($orderRequest->orderRequestItem as $item) {
                 $productId = $item->product_id;
@@ -406,7 +463,10 @@ class OrderRequestService
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
             'created_by'   => Auth::id() ?? $orderRequest->created_by,
             'cabang_id'    => $cabangId,
+            'warehouse_id' => $data['warehouse_id'] ?? null,
         ]);
+
+        $hasPriceDeviation = false;
 
         foreach ($resolvedItems as $row) {
             /** @var OrderRequestItem $orderRequestItem */
@@ -414,15 +474,34 @@ class OrderRequestService
 
             $itemCurrencyId = $orderRequestItem->currency_id ?? $defaultCurrency->id;
 
+            $orPrice = (float) ($orderRequestItem->unit_price ?? 0);
+            if ($orPrice <= 0) {
+                $product = $orderRequestItem->product;
+                $sp = $product ? $product->suppliers()->where('suppliers.id', $supplier->id)->first() : null;
+                $orPrice = $sp ? (float) $sp->pivot->supplier_price : (float) ($product->cost_price ?? 0);
+            }
+            $poPrice = (float) $row['unit_price'];
+            $itemDeviation = abs($poPrice - $orPrice) > 0.0001;
+            if ($itemDeviation) {
+                $hasPriceDeviation = true;
+            }
+
+            $reason = $row['price_change_reason'] ?? $data['price_change_reason'] ?? null;
+            if ($itemDeviation && empty($reason)) {
+                $reason = 'Perubahan harga dari Rp ' . number_format($orPrice, 2, ',', '.') . ' menjadi Rp ' . number_format($poPrice, 2, ',', '.');
+            }
+
             $orderRequestItem->purchaseOrderItem()->create([
-                'purchase_order_id' => $purchaseOrder->id,
-                'product_id'        => $orderRequestItem->product_id,
-                'quantity'          => $row['quantity'],
-                'unit_price'        => $row['unit_price'],
-                'discount'          => $row['discount'],
-                'tax'               => $row['tax'],
-                'tipe_pajak'        => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
-                'currency_id'       => $itemCurrencyId,
+                'purchase_order_id'   => $purchaseOrder->id,
+                'product_id'          => $orderRequestItem->product_id,
+                'quantity'            => $row['quantity'],
+                'unit_price'          => $poPrice,
+                'original_unit_price' => $orPrice,
+                'price_change_reason' => $reason,
+                'discount'            => $row['discount'],
+                'tax'                 => $row['tax'],
+                'tipe_pajak'          => $this->resolveTipePajak($orderRequestItem->tipe_pajak ?? null, $row['tax']),
+                'currency_id'         => $itemCurrencyId,
             ]);
             // fulfilled_quantity akan diupdate saat PO diapprove, bukan saat PO dibuat
         }
@@ -438,7 +517,18 @@ class OrderRequestService
             ]);
         }
 
-        $purchaseOrder = app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
+        if ($hasPriceDeviation) {
+            $purchaseOrder->update([
+                'status' => 'request_approval',
+                'note' => trim(($purchaseOrder->note ?? '') . "\n[PO memerlukan persetujuan harga: Terdapat perbedaan harga dari Order Request/standar]"),
+            ]);
+            Log::info('OrderRequestService createPurchaseOrder: PO requires price approval due to price deviation', [
+                'po_id' => $purchaseOrder->id,
+                'po_number' => $purchaseOrder->po_number,
+            ]);
+        } else {
+            $purchaseOrder = app(PurchaseOrderService::class)->approvePo($purchaseOrder, Auth::id());
+        }
 
         return $purchaseOrder->fresh(['purchaseOrderItem']);
     }
@@ -455,18 +545,27 @@ class OrderRequestService
         return TaxTypeHelper::normalize($itemTaxType);
     }
 
-    public function reject($orderRequest)
+    public function reject($orderRequest, ?string $reason = null)
     {
+        $note = !empty(trim((string) $reason)) ? trim($reason) : 'Order Request ditolak pada level header.';
+
         $orderRequest->orderRequestItem()->update([
             'status' => OrderRequestItem::STATUS_REJECTED,
             'approved_by' => null,
             'approved_at' => null,
             'rejected_by' => Auth::id(),
             'rejected_at' => now(),
-            'rejection_note' => 'Order Request ditolak pada level header.',
+            'rejection_note' => $note,
         ]);
 
-        $orderRequest->update(['status' => 'rejected']);
+        $updateData = ['status' => 'rejected'];
+        if (!empty(trim((string) $reason))) {
+            $existingNote = trim((string) ($orderRequest->note ?? ''));
+            $appendNote = "[Alasan Penolakan: {$note}]";
+            $updateData['note'] = $existingNote !== '' ? "{$existingNote}\n{$appendNote}" : $appendNote;
+        }
+
+        $orderRequest->update($updateData);
     }
 
     public function submitForApproval($orderRequest)

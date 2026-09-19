@@ -33,6 +33,8 @@ class Invoice extends Model
     protected $table = 'invoices';
     protected $fillable = [
         'invoice_number',
+        'supplier_invoice_number',
+        'tax_invoice_number',
         'from_model_type',
         'from_model_id',
         'currency_id',
@@ -44,6 +46,7 @@ class Invoice extends Model
         'bea_masuk_amount',
         'other_fee',
         'total',
+        'price_variance_amount',
         'due_date',
         'status', // draft, sent, paid, partially_paid, overdue
         'ppn_rate',
@@ -51,6 +54,7 @@ class Invoice extends Model
         'dpp', //Dasar penggunaan pajak,
         'customer_name',
         'customer_phone',
+        'supplier_id',
         'supplier_name',
         'supplier_phone',
         'delivery_orders',
@@ -461,5 +465,60 @@ class Invoice extends Model
     public function cabang()
     {
         return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(\App\Models\Supplier::class, 'supplier_id');
+    }
+
+    /**
+     * Check if the invoice is overdue (past due date and still has outstanding balance).
+     */
+    public function isOverdue(): bool
+    {
+        if (in_array(strtolower((string) $this->status), [self::STATUS_DRAFT, self::STATUS_PAID, 'cancelled', 'canceled'], true)) {
+            return false;
+        }
+
+        if (!$this->due_date) {
+            return false;
+        }
+
+        $dueDate = $this->due_date instanceof \Carbon\Carbon
+            ? $this->due_date->copy()->startOfDay()
+            : \Illuminate\Support\Carbon::parse($this->due_date)->startOfDay();
+
+        if ($dueDate->isPast() && !$dueDate->isToday()) {
+            return $this->getRemainingAmount() > 0.01;
+        }
+
+        return false;
+    }
+
+    /**
+     * Calculate remaining payable / receivable balance for this invoice.
+     */
+    public function getRemainingAmount(): float
+    {
+        if ($this->relationLoaded('accountPayable') && $this->accountPayable && $this->accountPayable->exists) {
+            return (float) $this->accountPayable->remaining;
+        }
+
+        if ($this->relationLoaded('accountReceivable') && $this->accountReceivable && $this->accountReceivable->exists) {
+            return (float) $this->accountReceivable->remaining;
+        }
+
+        $ap = $this->accountPayable;
+        if ($ap && $ap->exists) {
+            return (float) $ap->remaining;
+        }
+
+        $ar = $this->accountReceivable;
+        if ($ar && $ar->exists) {
+            return (float) $ar->remaining;
+        }
+
+        return (float) ($this->total ?? 0);
     }
 }

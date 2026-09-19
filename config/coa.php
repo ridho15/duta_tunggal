@@ -16,7 +16,7 @@ return [
     // --- Assets ---
     'cash_and_bank'          => '1112.01', // Kas / Bank default
     'accounts_receivable'    => '1120',    // Piutang Dagang
-    'inventory'              => '1140.01', // Persediaan Barang
+    'inventory'              => '1140.10', // Persediaan Barang Dagangan
     'ppn_masukan'            => '1170.06', // PPN Masukan
     'pph22'                  => '1170.02', // PPh Pasal 22
     'fixed_asset'            => '1500',    // Harga Perolehan Aset Tetap
@@ -35,9 +35,9 @@ return [
     // --- Product Master Defaults ---
     'product' => [
         'inventory_coa_id' => [
-            'standard' => ['1140.01', '1140.10'],
+            'standard' => ['1140.10', '1140.01'],
             'manufacture' => ['1140.02', '1140.01'],
-            'raw_material' => ['1-101', '1140.10', '1140.01'],
+            'raw_material' => ['1-101', '1140.01', '1140.10'],
         ],
         'sales_coa_id' => ['4100.10'],
         'sales_return_coa_id' => ['4120.10'],
@@ -54,5 +54,6 @@ return [
     // --- Expenses ---
     'import_duty'            => '5130',    // Bea Masuk
     'general_expense'        => '6100',    // Beban Umum
+    'purchase_price_variance'=> '5160',    // Selisih Pembelian
 
 ];

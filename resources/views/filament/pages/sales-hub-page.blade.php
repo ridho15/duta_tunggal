@@ -17,10 +17,11 @@
         [
             'title' => 'Keuangan Penjualan',
             'items' => [
-                ['label' => 'Piutang Usaha',     'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',            'desc' => 'Kelola hak tagih dari pelanggan', 'class' => \App\Filament\Resources\AccountReceivableResource::class],
-                ['label' => 'Invoice Penjualan', 'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text',        'desc' => 'Tagihan penjualan kepada pelanggan', 'class' => \App\Filament\Resources\SalesInvoiceResource::class],
-                ['label' => 'Penjualan Lainnya', 'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Transaksi penjualan non-standar', 'class' => \App\Filament\Resources\OtherSaleResource::class],
-                ['label' => 'Sales Report',      'url' => \App\Filament\Pages\SalesReportPage::getUrl(),            'icon' => 'chart-bar-square',     'desc' => 'Pantau ringkasan dan performa penjualan', 'class' => \App\Filament\Pages\SalesReportPage::class],
+                ['label' => 'Piutang Usaha',        'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',            'desc' => 'Kelola hak tagih dari pelanggan', 'class' => \App\Filament\Resources\AccountReceivableResource::class],
+                ['label' => 'Invoice Penjualan',    'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text',        'desc' => 'Tagihan penjualan kepada pelanggan', 'class' => \App\Filament\Resources\SalesInvoiceResource::class],
+                ['label' => 'Penerimaan Pelanggan', 'url' => \App\Filament\Resources\CustomerReceiptResource::getUrl(),  'icon' => 'inbox-arrow-down',     'desc' => 'Catat pembayaran masuk dari pelanggan', 'class' => \App\Filament\Resources\CustomerReceiptResource::class],
+                ['label' => 'Penjualan Lainnya',    'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',         'desc' => 'Transaksi penjualan non-standar', 'class' => \App\Filament\Resources\OtherSaleResource::class],
+                ['label' => 'Sales Report',         'url' => \App\Filament\Pages\SalesReportPage::getUrl(),            'icon' => 'chart-bar-square',     'desc' => 'Pantau ringkasan dan performa penjualan', 'class' => \App\Filament\Pages\SalesReportPage::class],
             ],
         ],
     ];

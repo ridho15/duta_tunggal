@@ -35,6 +35,17 @@ class OrderRequestQuantityLock
             ];
         }
 
+        $itemStatus = OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? $orderRequestItem->approval_status ?? null);
+        if ($itemStatus === OrderRequestItem::STATUS_REJECTED) {
+            return [
+                'or_quantity' => (float) ($orderRequestItem->quantity ?? 0),
+                'active_po_quantity' => 0.0,
+                'accepted_receipt_quantity' => 0.0,
+                'remaining_for_po' => 0.0,
+                'remaining_for_receipt' => 0.0,
+            ];
+        }
+
         $orQuantity = (float) ($orderRequestItem->quantity ?? 0);
         $activePoQuantity = self::activePurchaseOrderItemQuantity($orderRequestItemId, $excludePurchaseOrderItemId);
         $acceptedReceiptQuantity = self::receiptQuantityForOrderRequestItem($orderRequestItemId, 'qty_accepted');

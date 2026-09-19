@@ -216,23 +216,11 @@ class PaymentRequest extends Model
     }
 
     /**
-     * Generate next PR number.
+     * Generate next Payment Request number (format: PAY-REQ-YYYYMMDD-XXXX).
      */
     public static function generateNumber(): string
     {
-        $today = now()->format('Ymd');
-        $prefix = "PR-{$today}-";
-        $lastNumber = static::where('request_number', 'like', $prefix . '%')
-            ->orderByDesc('request_number')
-            ->value('request_number');
-
-        $sequence = 1;
-        if ($lastNumber) {
-            $parts = explode('-', $lastNumber);
-            $sequence = (int) end($parts) + 1;
-        }
-
-        return $prefix . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+        return \App\Services\SequentialNumberGenerator::generate('payment_requests', 'request_number', 'PAY-REQ-', 4, 'Ymd');
     }
 
     public function getPaidAmountAttribute(): float
@@ -244,5 +232,65 @@ class PaymentRequest extends Model
     {
         $total = MoneyHelper::safeParse($this->total_amount ?? 0);
         return max(0, $total - $this->paid_amount);
+    }
+
+    /**
+     * Calculate active PR amounts allocated for a given invoice (excluding given PR id).
+     */
+    public static function getActivePrAmountForInvoice(int $invoiceId, ?int $excludePrId = null): float
+    {
+        $activePrs = static::query()
+            ->when($excludePrId, fn ($q) => $q->where('id', '!=', $excludePrId))
+            ->whereIn('status', [
+                self::STATUS_PENDING,
+                self::STATUS_APPROVED,
+                self::STATUS_PARTIAL,
+            ])
+            ->get();
+
+        $allocated = 0.0;
+        foreach ($activePrs as $pr) {
+            $selected = $pr->selected_invoices;
+            if (is_string($selected)) {
+                $selected = json_decode($selected, true);
+            }
+            if (! is_array($selected) || ! in_array($invoiceId, $selected)) {
+                continue;
+            }
+
+            $prRemaining = (float) $pr->remaining_amount;
+            if ($prRemaining <= 0) {
+                continue;
+            }
+
+            if (count($selected) === 1) {
+                $allocated += $prRemaining;
+            } else {
+                $invoices = Invoice::whereIn('id', $selected)->get();
+                $sumTotals = (float) $invoices->sum('total');
+                $thisInvoice = $invoices->firstWhere('id', $invoiceId);
+                $thisTotal = (float) ($thisInvoice?->total ?? 0);
+                $proportion = $sumTotals > 0 ? ($thisTotal / $sumTotals) : (1 / count($selected));
+                $allocated += ($prRemaining * $proportion);
+            }
+        }
+
+        return $allocated;
+    }
+
+    /**
+     * Calculate remaining payable debt for an invoice, deducting other active PRs.
+     */
+    public static function getInvoiceRemainingPayable(Invoice $invoice, ?int $excludePrId = null): float
+    {
+        $invoice->load('accountPayable');
+        $ap = $invoice->accountPayable;
+        $remainingAp = ($ap && $ap->exists)
+            ? (float) ($ap->remaining_original ?? $ap->remaining ?? $invoice->total)
+            : (float) $invoice->total;
+
+        $activePrAmount = static::getActivePrAmountForInvoice((int) $invoice->id, $excludePrId);
+
+        return max(0.0, $remainingAp - $activePrAmount);
     }
 }

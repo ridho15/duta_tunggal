@@ -404,9 +404,22 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 Select::make('selected_supplier')
                                     ->label('Supplier')
-                                    ->options(fn () => self::getSupplierOptions())
                                     ->searchable()
-                                    ->preload()
+                                    ->getSearchResultsUsing(function (string $search): array {
+                                        return Supplier::query()
+                                            ->where(function ($q) use ($search) {
+                                                $q->where('perusahaan', 'like', "%{$search}%")
+                                                  ->orWhere('code', 'like', "%{$search}%");
+                                            })
+                                            ->orderBy('perusahaan')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(fn ($s) => [$s->id => "({$s->code}) {$s->perusahaan}"])
+                                            ->toArray();
+                                    })
+                                    ->getOptionLabelUsing(fn ($value) => optional(Supplier::find($value))->perusahaan
+                                        ? "(" . optional(Supplier::find($value))->code . ") " . optional(Supplier::find($value))->perusahaan
+                                        : null)
                                     ->reactive()
                                     ->required()
                                     ->validationMessages([
@@ -420,18 +433,30 @@ class PurchaseInvoiceResource extends Resource
                                         self::clearDerivedPurchaseInvoiceState($set);
                                     }),
 
-                                // Task 14: Select Order Request to filter POs
+                                // Select Order Request to filter POs (Opsional)
                                 Select::make('selected_order_request')
-                                    ->label('Order Request (OR)')
-                                    ->options(function ($get) {
-                                        return self::getOrderRequestOptions(
-                                            $get('selected_supplier')
-                                        );
-                                    })
+                                    ->label('Order Request (OR) — Opsional')
                                     ->searchable()
+                                    ->getSearchResultsUsing(function (string $search, $get): array {
+                                        $supplierId = $get('selected_supplier');
+                                        if (!$supplierId) return [];
+
+                                        return OrderRequest::query()
+                                            ->where(function ($q) use ($supplierId) {
+                                                $q->whereHas('orderRequestItem', fn ($iq) => $iq->where('supplier_id', $supplierId))
+                                                  ->orWhereHas('purchaseOrders', fn ($pq) => $pq->where('supplier_id', $supplierId));
+                                            })
+                                            ->where('request_number', 'like', "%{$search}%")
+                                            ->orderByDesc('request_date')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(fn ($or) => [$or->id => $or->request_number])
+                                            ->toArray();
+                                    })
+                                    ->getOptionLabelUsing(fn ($value) => optional(OrderRequest::find($value))->request_number)
                                     ->reactive()
-                                    ->required()
-                                    ->helperText('Pilih Order Request terlebih dahulu. Purchase Order akan muncul setelah OR dipilih.')
+                                    ->nullable()
+                                    ->helperText('Kosongkan jika PO dibuat langsung tanpa OR (Direct PO). Pilih OR untuk memfilter daftar PO.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_purchase_orders', []);
                                         self::clearDerivedPurchaseInvoiceState($set);
@@ -455,7 +480,7 @@ class PurchaseInvoiceResource extends Resource
                                 // Task 14: Multiple PO selection filtered by OR
                                 Forms\Components\CheckboxList::make('selected_purchase_orders')
                                     ->label('Purchase Orders')
-                                    ->hidden(fn($get) => blank($get('selected_order_request')))
+                                    ->hidden(fn($get) => blank($get('selected_supplier')))
                                     ->options(function ($get) {
                                         return self::getPurchaseOrderOptions(
                                             $get('selected_supplier'),
@@ -467,15 +492,17 @@ class PurchaseInvoiceResource extends Resource
                                         $supplierId = $get('selected_supplier');
                                         $orId = $get('selected_order_request');
                                         $cabangId = self::resolveInvoiceCabangId($get('cabang_id'));
-                                        if (!$supplierId || !$orId) {
+                                        if (!$supplierId) {
                                             return false;
                                         }
 
                                         $po = PurchaseOrder::query()
                                             ->where('supplier_id', $supplierId)
                                             ->whereIn('status', ['approved', 'partially_received', 'completed'])
-                                            ->where('refer_model_type', OrderRequest::class)
-                                            ->where('refer_model_id', $orId)
+                                            ->when($orId, fn ($q) => $q
+                                                ->where('refer_model_type', OrderRequest::class)
+                                                ->where('refer_model_id', $orId)
+                                            )
                                             ->whereHas('purchaseReceipt', fn($receiptQuery) => $receiptQuery
                                                 ->whereIn('status', ['partial', 'completed'])
                                                 ->when($cabangId, fn ($query) => $query->where('cabang_id', $cabangId)))
@@ -600,6 +627,26 @@ class PurchaseInvoiceResource extends Resource
                                             })
                                     )
                                     ->maxLength(255),
+
+                                TextInput::make('supplier_invoice_number')
+                                    ->label('No. Invoice Supplier')
+                                    ->placeholder('Contoh: INV-SUP-2026/001')
+                                    ->required()
+                                    ->maxLength(100)
+                                    ->helperText('Nomor invoice resmi dari supplier. Wajib diisi dan tidak boleh duplikat.')
+                                    ->validationMessages([
+                                        'required' => 'Nomor invoice supplier wajib diisi.',
+                                    ]),
+
+                                TextInput::make('tax_invoice_number')
+                                    ->label('No. Faktur Pajak')
+                                    ->placeholder('Contoh: 010.000-26.12345678')
+                                    ->required()
+                                    ->maxLength(50)
+                                    ->helperText('Nomor faktur pajak resmi untuk rekonsiliasi PPN Masukan.')
+                                    ->validationMessages([
+                                        'required' => 'Nomor faktur pajak wajib diisi.',
+                                    ]),
 
                                 DatePicker::make('invoice_date')
                                     ->label('Invoice Date')
@@ -854,15 +901,49 @@ class PurchaseInvoiceResource extends Resource
                             ->schema([
                                 Placeholder::make('invoice_item_readonly_info')
                                     ->label('')
-                                    ->content('Harga mengikuti Purchase Receipt / Purchase Order dan tidak dapat diubah manual.'),
+                                    ->content('Harga satuan dapat disesuaikan dengan faktur supplier dalam batas toleransi (maksimal 1% atau Rp 10.000 dari harga PO). Selisih dalam toleransi akan dialokasikan otomatis ke akun Selisih Pembelian.'),
                                 Repeater::make('invoiceItem')
                                     ->label('')
+                                    ->itemLabel(function (array $state): string {
+                                        $productId = $state['product_id'] ?? null;
+                                        $productName = '-';
+                                        if ($productId) {
+                                            $p = \App\Models\Product::find($productId);
+                                            $productName = $p ? ($p->sku ? "{$p->sku} - {$p->name}" : $p->name) : (string) $productId;
+                                        }
+                                        $qty = $state['quantity'] ?? '0';
+                                        return "Produk: {$productName} | Qty: {$qty}";
+                                    })
                                     ->schema([
                                         Select::make('product_id')
                                             ->label('Produk')
-                                            ->options(\App\Models\Product::query()->orderBy('name')->limit(50)->get()->mapWithKeys(function ($product) {
-                                                return [$product->id => $product->name];
-                                            }))
+                                            ->options(function () {
+                                                return \App\Models\Product::query()
+                                                    ->orderBy('sku')
+                                                    ->limit(50)
+                                                    ->get()
+                                                    ->mapWithKeys(fn ($product) => [$product->id => ($product->sku ? "{$product->sku} - {$product->name}" : $product->name)]);
+                                            })
+                                            ->getSearchResultsUsing(function (string $search) {
+                                                return \App\Models\Product::query()
+                                                    ->where(function ($q) use ($search) {
+                                                        $q->where('name', 'like', "%{$search}%")
+                                                          ->orWhere('sku', 'like', "%{$search}%");
+                                                    })
+                                                    ->limit(50)
+                                                    ->get()
+                                                    ->mapWithKeys(fn ($product) => [$product->id => ($product->sku ? "{$product->sku} - {$product->name}" : $product->name)]);
+                                            })
+                                            ->getOptionLabelUsing(function ($value): ?string {
+                                                if (! $value) {
+                                                    return null;
+                                                }
+                                                $product = \App\Models\Product::find($value);
+                                                if (! $product) {
+                                                    return (string) $value;
+                                                }
+                                                return $product->sku ? "{$product->sku} - {$product->name}" : $product->name;
+                                            })
                                             ->searchable()
                                             ->required()
                                             ->validationMessages([
@@ -880,8 +961,27 @@ class PurchaseInvoiceResource extends Resource
                                             ])
                                             ->disabled()
                                             ->dehydrated(true),
-                                        Hidden::make('price')
+                                        Hidden::make('po_price')
+                                            ->dehydrated(true),
+                                        TextInput::make('price')
+                                            ->label('Harga Satuan Faktur')
+                                            ->numeric()
                                             ->required()
+                                            ->live(debounce: 500)
+                                            ->helperText(function (Get $get) {
+                                                $poPrice = (float) ($get('po_price') ?? $get('price') ?? 0);
+                                                return 'Harga PO: ' . number_format($poPrice, 2, ',', '.');
+                                            })
+                                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                                $qty = (float) ($get('quantity') ?? 0);
+                                                $unitPrice = (float) MoneyHelper::safeParse($state ?? 0);
+                                                $taxRate = (float) ($get('tax_rate') ?? 0);
+                                                $lineTotal = round($unitPrice * $qty, 2);
+                                                $lineTaxAmount = round($lineTotal * ($taxRate / 100), 2);
+                                                $set('subtotal', $lineTotal);
+                                                $set('total', $lineTotal);
+                                                $set('tax_amount', $lineTaxAmount);
+                                            })
                                             ->dehydrated(true),
                                         Hidden::make('subtotal')
                                             ->dehydrated(true),
@@ -894,13 +994,6 @@ class PurchaseInvoiceResource extends Resource
                                         Hidden::make('tax_amount')
                                             ->default(0)
                                             ->dehydrated(true),
-                                        Placeholder::make('unit_price_preview')
-                                            ->label('Harga Satuan')
-                                            ->content(fn ($get) => self::formatTransactionForCurrencyState(
-                                                $get('price'),
-                                                $get('../../currency_id'),
-                                                $get('../../exchange_rate')
-                                            )),
                                         Placeholder::make('line_dpp_preview')
                                             ->label('DPP Baris')
                                             ->content(fn ($get) => self::formatTransactionForCurrencyState(
@@ -1055,15 +1148,16 @@ class PurchaseInvoiceResource extends Resource
                         // Status Invoice
                         Section::make('Status Invoice')
                             ->schema([
-                                Select::make('status')
+                                TextInput::make('status_display')
                                     ->label('Status')
-                                    ->options(Invoice::getStatusOptions())
-                                    ->default(Invoice::STATUS_DRAFT)
-                                    ->visible(fn () => static::canManuallySetStatus())
-                                    ->disabled(fn () => !static::canManuallySetStatus()),
+                                    ->default('Draft')
+                                    ->formatStateUsing(fn ($record) => $record ? (Invoice::STATUS_LABELS[$record->status] ?? ucfirst($record->status)) : 'Draft')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->helperText('Status dikelola sistem otomatis (Draft -> Terposting -> Dibayar Sebagian -> Lunas).'),
                                 Hidden::make('status')
                                     ->default(Invoice::STATUS_DRAFT)
-                                    ->visible(fn () => !static::canManuallySetStatus()),
+                                    ->dehydrated(fn ($context) => $context === 'create'),
                             ]),
 
                         // COA Selection
@@ -1107,7 +1201,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->searchable(['code', 'name'])
                                     ->preload()
                                     ->default(function () {
-                                        return \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
+                                        return \App\Models\ChartOfAccount::where('code', config('coa.inventory', '1140.10'))->first()?->id;
                                     }),
 
                                 Select::make('expense_coa_id')
@@ -1195,6 +1289,12 @@ class PurchaseInvoiceResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('invoice_number')
                             ->label('Invoice Number'),
+                        Infolists\Components\TextEntry::make('supplier_invoice_number')
+                            ->label('No. Invoice Supplier')
+                            ->placeholder('-'),
+                        Infolists\Components\TextEntry::make('tax_invoice_number')
+                            ->label('No. Faktur Pajak')
+                            ->placeholder('-'),
                         Infolists\Components\TextEntry::make('display_currency')
                             ->label('Mata Uang')
                             ->state(fn (Invoice $record) => $record->displayCurrency?->code ? ($record->displayCurrency?->symbol . ' ' . $record->displayCurrency?->code) : '-'),
@@ -1296,6 +1396,16 @@ class PurchaseInvoiceResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('supplier_invoice_number')
+                    ->label('No. Inv Supplier')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('tax_invoice_number')
+                    ->label('Faktur Pajak')
+                    ->searchable()
+                    ->toggleable(),
+
                 TextColumn::make('cabang')
                     ->label('Cabang')
                     ->formatStateUsing(function ($state) {
@@ -1358,8 +1468,10 @@ class PurchaseInvoiceResource extends Resource
             ->actions([
                 ActionGroup::make([
                     ViewAction::make(),
-                    EditAction::make(),
-                    DeleteAction::make(),
+                    EditAction::make()
+                        ->visible(fn ($record) => $record->status === Invoice::STATUS_DRAFT),
+                    DeleteAction::make()
+                        ->visible(fn ($record) => $record->status === Invoice::STATUS_DRAFT),
                     \Filament\Tables\Actions\Action::make('view_journal_entries')
                         ->label('Lihat Journal Entries')
                         ->icon('heroicon-o-book-open')
@@ -1380,21 +1492,34 @@ class PurchaseInvoiceResource extends Resource
                                 return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
                             }
                         }),
-                    \Filament\Tables\Actions\Action::make('mark_as_sent')
-                        ->label('Mark as Sent')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->color('warning')
+                    \Filament\Tables\Actions\Action::make('post_invoice')
+                        ->label('Posting Invoice')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
                         ->visible(fn($record) => $record->status === Invoice::STATUS_DRAFT)
                         ->requiresConfirmation()
-                        ->modalHeading('Mark Invoice as Sent')
-                        ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
-                        ->modalSubmitActionLabel('Yes, Mark as Sent')
+                        ->modalHeading('Posting Invoice Pembelian')
+                        ->modalDescription('Apakah Anda yakin ingin memposting invoice ini? Tindakan ini akan membentuk Hutang Usaha (Account Payable) dan memposting jurnal ke Buku Besar.')
+                        ->modalSubmitActionLabel('Ya, Posting Invoice')
                         ->action(function ($record) {
-                            $record->update(['status' => Invoice::STATUS_SENT]);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Invoice marked as sent')
-                                ->success()
-                                ->send();
+                            try {
+                                app(\App\Services\PurchaseInvoiceAccountingService::class)->postAndApproveInvoice($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Invoice Berhasil Diposting')
+                                    ->body('Hutang dan jurnal telah berhasil dibukukan.')
+                                    ->success()
+                                    ->send();
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::error('Posting invoice failed', [
+                                    'invoice_id' => $record->id,
+                                    'error' => $e->getMessage(),
+                                ]);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Posting Invoice')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -1772,7 +1897,7 @@ class PurchaseInvoiceResource extends Resource
         $orderRequestId = filled($orderRequestId) ? (int) $orderRequestId : null;
         $cabangId = self::resolveInvoiceCabangId($selectedCabangId);
 
-        if (!$supplierId || !$orderRequestId) {
+        if (!$supplierId) {
             return [];
         }
 
@@ -1790,9 +1915,11 @@ class PurchaseInvoiceResource extends Resource
                     ->whereIn('status', ['partial', 'completed'])
                     ->when($cabangId, fn($branchReceiptQuery) => $branchReceiptQuery->where('cabang_id', $cabangId))
             )
-            // Allow PO selection once QC has produced a partial or completed receipt.
-            ->where('refer_model_type', 'App\\Models\\OrderRequest')
-            ->where('refer_model_id', $orderRequestId);
+            // Jika OR dipilih, filter PO by OR. Jika tidak, tampilkan semua PO valid dari supplier.
+            ->when($orderRequestId, function ($q) use ($orderRequestId) {
+                $q->where('refer_model_type', 'App\\Models\\OrderRequest')
+                  ->where('refer_model_id', $orderRequestId);
+            });
 
         return $query->get()
             ->mapWithKeys(function ($po) {
@@ -1807,7 +1934,11 @@ class PurchaseInvoiceResource extends Resource
 
                 $fullyInvoiced = !empty($allReceiptIds) && count($invoicedReceiptIds) >= count($allReceiptIds);
                 $branchLabel = self::formatCabangLabel($po->purchaseReceipt->first()?->cabang) ?? 'Cabang tidak tersedia';
-                $label = $po->po_number . ' — ' . $branchLabel;
+                // Tampilkan label OR jika PO berasal dari OR, atau "Direct PO" jika tidak
+                $orLabel = ($po->refer_model_type === 'App\\Models\\OrderRequest' && $po->refer_model_id)
+                    ? ''
+                    : ' [Direct PO]';
+                $label = $po->po_number . $orLabel . ' — ' . $branchLabel;
                 if ($fullyInvoiced) {
                     $label .= ' [Sudah di-invoice]';
                 }

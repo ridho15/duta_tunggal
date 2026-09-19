@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VendorPaymentResource\Pages;
 use App\Filament\Resources\VendorPaymentResource;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -15,11 +16,28 @@ class EditVendorPayment extends EditRecord
 {
     protected static string $resource = VendorPaymentResource::class;
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        if (strtolower((string) $this->record->status) !== 'draft') {
+            Notification::make()
+                ->title('Pembayaran Terkunci')
+                ->body('Pembayaran vendor dengan status ' . ucfirst($this->record->status) . ' sudah diproses dan tidak dapat diubah.')
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\DeleteAction::make()
+                ->visible(fn ($record) => strtolower((string) $record->status) === 'draft')
+                ->icon('heroicon-o-trash'),
         ];
     }
 

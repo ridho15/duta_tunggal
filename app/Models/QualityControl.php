@@ -14,12 +14,13 @@ class QualityControl extends Model
     protected $table = 'quality_controls';
     protected $fillable = [
         'qc_number',
+        'purchase_order_id',
         'inspected_by',
         'passed_quantity',
         'rejected_quantity',
         'quantity_received',
         'notes',
-        'status',  // send to stock / send return product
+        'status',  // 0: draft / belum diproses, 1: selesai / sudah diproses, 2: cancelled / batal
         'warehouse_id',
         'reason_reject',
         'product_id',
@@ -52,6 +53,21 @@ class QualityControl extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id')->withDefault();
+    }
+
+    public function items()
+    {
+        return $this->hasMany(QualityControlItem::class, 'quality_control_id');
+    }
+
+    public function qualityControlItems()
+    {
+        return $this->hasMany(QualityControlItem::class, 'quality_control_id');
     }
 
     public function product()

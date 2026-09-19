@@ -35,7 +35,7 @@
                         <td class="border border-gray-300 px-3 py-2">({{ $item->product->sku ?? '-' }}) {{ $item->product->name ?? '-' }}</td>
                         <td class="border border-gray-300 px-3 py-2 text-right">{{ number_format((float) ($item->quantity ?? 0), 2, ',', '.') }}</td>
                         <td class="border border-gray-300 px-3 py-2">{{ $warehouse ? '(' . $warehouse->kode . ') ' . $warehouse->name : '-' }}</td>
-                        <td class="border border-gray-300 px-3 py-2">{{ $item->rak ? '(' . $item->rak->code . ') ' . $item->rak->name : '-' }}</td>
+                        <td class="border border-gray-300 px-3 py-2">{{ $item->rak ? (filled($item->rak->code) ? '(' . $item->rak->code . ') ' : '') . $item->rak->name : '-' }}</td>
                         <td class="border border-gray-300 px-3 py-2 text-right font-medium {{ $metrics['available'] >= (float) ($item->quantity ?? 0) ? 'text-green-600' : 'text-red-600' }}">
                             {{ number_format((float) $metrics['available'], 2, ',', '.') }}
                         </td>

@@ -37,6 +37,10 @@ class SaleOrderPolicy
      */
     public function update(User $user, SaleOrder $saleOrder): bool
     {
+        if (! in_array($saleOrder->status, ['draft', 'request_approve'])) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update sales order');
     }
 
@@ -45,6 +49,10 @@ class SaleOrderPolicy
      */
     public function delete(User $user, SaleOrder $saleOrder): bool
     {
+        if ($saleOrder->status !== 'draft') {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete sales order');
     }
 
@@ -71,6 +79,8 @@ class SaleOrderPolicy
 
     public function response(User $user, SaleOrder $saleOrder): bool
     {
-        return $user->hasPermissionTo('response sales order');
+        $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder($user, $saleOrder);
+
+        return $check['allowed'];
     }
 }

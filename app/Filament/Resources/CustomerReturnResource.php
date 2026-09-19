@@ -101,9 +101,36 @@ class CustomerReturnResource extends Resource
                     Forms\Components\Grid::make(2)->schema([
                         Forms\Components\Select::make('customer_id')
                             ->label('Pelanggan')
-                            ->options(fn () => Customer::orderBy('name')->pluck('name', 'id'))
                             ->searchable()
-                            ->preload()
+                            ->getSearchResultsUsing(function (string $search) {
+                                return Customer::query()
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('name', 'like', "%{$search}%")
+                                            ->orWhere('code', 'like', "%{$search}%")
+                                            ->orWhere('phone', 'like', "%{$search}%");
+                                    })
+                                    ->limit(50)
+                                    ->get()
+                                    ->mapWithKeys(function ($customer) {
+                                        $label = $customer->code ? "({$customer->code}) {$customer->name}" : $customer->name;
+                                        if ($customer->phone) {
+                                            $label .= " - {$customer->phone}";
+                                        }
+                                        return [$customer->id => $label];
+                                    })
+                                    ->toArray();
+                            })
+                            ->getOptionLabelUsing(function ($value) {
+                                $customer = Customer::find($value);
+                                if (!$customer) {
+                                    return null;
+                                }
+                                $label = $customer->code ? "({$customer->code}) {$customer->name}" : $customer->name;
+                                if ($customer->phone) {
+                                    $label .= " - {$customer->phone}";
+                                }
+                                return $label;
+                            })
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn (Forms\Set $set) => $set('invoice_id', null))

@@ -20,6 +20,8 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\ShowJournalEntriesForPayment::class,
         \App\Console\Commands\ListRecommendedCoa::class,
         \App\Console\Commands\GenerateMonthlyDepreciation::class,
+        \App\Console\Commands\CheckOverdueInvoicesCommand::class,
+        \App\Console\Commands\SyncProductInventoryCoaCommand::class,
     ];
 
     /**
@@ -27,7 +29,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // No scheduled depreciation - manual calculation only
+        // Evaluasi harian invoice yang melewati tanggal jatuh tempo menjadi Overdue
+        $schedule->command('invoices:check-overdue')->dailyAt('00:05')->runInBackground();
     }
 
     /**

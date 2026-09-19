@@ -1067,31 +1067,12 @@ class HelperController extends Controller
      */
     public static function generateUniqueCode(string $table, string $column, string $prefix, int $digits = 4): string
     {
-        // produce random numeric suffix of specified length and loop until unique
-        $max = (int) pow(10, $digits) - 1;
-
-        do {
-            $random = str_pad(rand(0, $max), $digits, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = DB::table($table)->where($column, $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\SequentialNumberGenerator::generate($table, $column, $prefix, $digits, null);
     }
 
     public static function generateRequestNumber(): string
     {
-        $date = now()->format('Ymd');
-        $prefix = 'OR-' . $date . '-';
-
-        // generate random 4-digit suffix and ensure uniqueness by checking database
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = \App\Models\OrderRequest::where('request_number', $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\SequentialNumberGenerator::generate('order_requests', 'request_number', 'OR-', 4, 'Ymd');
     }
 
     /**

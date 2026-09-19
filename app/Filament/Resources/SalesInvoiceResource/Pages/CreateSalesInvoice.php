@@ -37,6 +37,34 @@ class CreateSalesInvoice extends CreateRecord
             }
         }
 
+        // Validasi agar DO yang sudah ditagih tidak dapat ditagih kembali (Poin 2)
+        $selectedDos = $data['selected_delivery_orders'] ?? $data['delivery_orders'] ?? [];
+        if (!empty($selectedDos)) {
+            $alreadyInvoicedDos = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
+                ->where('status', '!=', 'canceled')
+                ->where(function ($q) use ($selectedDos) {
+                    foreach ((array) $selectedDos as $doId) {
+                        $q->orWhereJsonContains('delivery_orders', (int) $doId);
+                    }
+                })
+                ->get();
+
+            if ($alreadyInvoicedDos->isNotEmpty()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'selected_delivery_orders' => 'Delivery Order yang dipilih sudah pernah ditagih pada invoice aktif: ' . $alreadyInvoicedDos->pluck('invoice_number')->implode(', '),
+                ]);
+            }
+        }
+
+        // Validasi agar invoice bernilai Rp 0 tidak dapat diterbitkan (Poin 3)
+        $totalAmount = (float) ($data['total'] ?? 0);
+        $subtotalAmount = (float) ($data['subtotal'] ?? 0);
+        if ($totalAmount <= 0 && $subtotalAmount <= 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'selected_delivery_orders' => 'Invoice bernilai Rp 0 tidak dapat diterbitkan. Pastikan harga satuan dan kuantitas valid.',
+            ]);
+        }
+
         // Remove temporary fields
         unset($data['selected_customer']);
         unset($data['selected_sale_order']);
@@ -71,8 +99,8 @@ class CreateSalesInvoice extends CreateRecord
             }
         }
 
-        // Post journal entries for sales invoice
-        if ($this->record->from_model_type === 'App\Models\SaleOrder') {
+        // Post journal entries for sales invoice (only if not draft)
+        if ($this->record->from_model_type === 'App\Models\SaleOrder' && strtolower((string) $this->record->status) !== \App\Models\Invoice::STATUS_DRAFT) {
             $invoiceObserver = new \App\Observers\InvoiceObserver();
             $invoiceObserver->postSalesInvoice($this->record);
         }

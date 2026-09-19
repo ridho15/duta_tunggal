@@ -414,7 +414,7 @@ class OrderRequestResource extends Resource
             ->all();
         $taxOptions = [
             'inklusif' => 'Inklusif',
-            'eklusif' => 'Eklusif',
+            'eklusif' => 'Eksklusif',
             'none' => 'Non Pajak',
         ];
 
@@ -942,7 +942,7 @@ class OrderRequestResource extends Resource
                     ->numeric()
                     ->minValue(0)
                     ->reactive()
-                    ->live()
+                    ->live(debounce: 500)
                     ->helperText(fn($get) => 'Maks qty: ' . ($get('max_quantity') ?? '-'))
                     ->rules([
                         fn($get) => function ($attribute, $value, $fail) use ($get) {
@@ -956,7 +956,21 @@ class OrderRequestResource extends Resource
                         'required' => 'Qty wajib diisi.',
                         'numeric' => 'Qty harus berupa angka.',
                         'min' => 'Qty minimal 0.',
-                    ]),
+                    ])
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $taxType = self::normalizeTaxTypeValue($get('tipe_pajak') ?? null);
+                        $preview = self::calculateApprovalItemPreview(
+                            (float) ($state ?? 0),
+                            self::parseCurrencyState($get('unit_price') ?? 0),
+                            0,
+                            (float) ($get('tax') ?? 0),
+                            $taxType
+                        );
+
+                        $set('total_cost', self::formatMoneyPreviewState($preview['total_cost']));
+                        $set('subtotal', self::formatMoneyPreviewState($preview['subtotal']));
+                        $set('tax_nominal', self::formatMoneyPreviewState($preview['tax_nominal']));
+                    }),
                 TextInput::make('original_price')
                     ->label('Harga Asli')
                     ->prefix(fn(Get $get) => self::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : null))
@@ -1008,6 +1022,14 @@ class OrderRequestResource extends Resource
                     ->validationMessages([
                         'required' => 'Harga override wajib diisi.',
                         'regex' => 'Harga override harus berupa angka (contoh: 12.000.000).',
+                    ]),
+                TextInput::make('price_change_reason')
+                    ->label('Alasan Perubahan Harga')
+                    ->placeholder('Contoh: Negosiasi vendor / diskon volume')
+                    ->visible(fn(Get $get) => abs(self::parseCurrencyState($get('unit_price') ?? 0) - self::parseCurrencyState($get('original_price') ?? 0)) > 0.0001)
+                    ->required(fn(Get $get) => abs(self::parseCurrencyState($get('unit_price') ?? 0) - self::parseCurrencyState($get('original_price') ?? 0)) > 0.0001)
+                    ->validationMessages([
+                        'required' => 'Alasan perubahan harga wajib diisi jika harga berbeda.',
                     ]),
                 Radio::make('tipe_pajak')
                     ->label('Tipe Pajak')
@@ -1330,8 +1352,11 @@ class OrderRequestResource extends Resource
                 Fieldset::make('Form Order Request')
                     ->schema([
                         TextInput::make('request_number')
+                            ->default(fn () => HelperController::generateRequestNumber())
                             ->required()
                             ->unique(ignoreRecord: true)
+                            ->disabled(fn ($context) => $context === 'edit')
+                            ->dehydrated()
                             ->maxLength(255)
                             ->validationMessages([
                                 'required' => 'Nomor request wajib diisi.',
@@ -1341,15 +1366,28 @@ class OrderRequestResource extends Resource
                             ->suffixAction(
                                 FormAction::make('generateRequestNumber')
                                     ->icon('heroicon-o-arrow-path')
+                                    ->visible(fn ($context) => $context === 'create')
                                     ->action(function ($set) {
                                         $set('request_number', HelperController::generateRequestNumber());
                                     })
                             ),
                         DatePicker::make('request_date')
+                            ->label('Tanggal Request')
                             ->required()
+                            ->default(now())
                             ->validationMessages([
                                 'required' => 'Tanggal request wajib diisi.',
                             ]),
+                        DatePicker::make('required_date')
+                            ->label('Tanggal Dibutuhkan')
+                            ->nullable()
+                            ->helperText('Perkiraan tanggal barang dibutuhkan oleh pemohon.'),
+                        TextInput::make('purpose')
+                            ->label('Peminta / Keperluan')
+                            ->maxLength(255)
+                            ->nullable()
+                            ->placeholder('Contoh: Kebutuhan Divisi Operasional / Perbaikan Mesin')
+                            ->helperText('Tuliskan divisi/nama peminta dan keperluan pengadaan barang.'),
                         Hidden::make('currency_id')
                             ->default(fn() => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'))
                             ->dehydrated(true),
@@ -1716,14 +1754,11 @@ class OrderRequestResource extends Resource
                                                     return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                                 });
                                             })
-                                            ->default(fn() => null)
+                                            ->default(fn() => Auth::user()?->cabang_id)
                                             ->searchable()
                                             ->preload()
-                                            ->required()
-                                            ->helperText('Cabang per item dipakai untuk memecah Purchase Order bila supplier sama tetapi cabang berbeda.')
-                                            ->validationMessages([
-                                                'required' => 'Cabang wajib dipilih.',
-                                            ]),
+                                            ->nullable()
+                                            ->helperText('Opsional. Default mengikuti cabang Anda bila dikosongkan.'),
                                     ]),
                                 \Filament\Forms\Components\Grid::make(2)
                                     ->schema([
@@ -1838,7 +1873,7 @@ class OrderRequestResource extends Resource
                                             ->preload()
                                             ->searchable()
                                             ->reactive()
-                                            ->required()
+                                            ->nullable()
                                             ->afterStateUpdated(function ($state, $old, callable $set, callable $get) {
                                                 $newCurrencyId = is_numeric($state)
                                                     ? (int) $state
@@ -1928,10 +1963,7 @@ class OrderRequestResource extends Resource
                                                     });
                                             })
                                             ->default(fn() => CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'))
-                                            ->helperText('Mata uang item')
-                                            ->validationMessages([
-                                                'required' => 'Mata uang item wajib dipilih.',
-                                            ]),
+                                            ->helperText('Mata uang item (default IDR)'),
                                         TextInput::make('original_price')
                                             ->label('Harga Asli (Master)')
                                             ->columnSpan(1)
@@ -1956,9 +1988,11 @@ class OrderRequestResource extends Resource
                                             })
                                             ->helperText('Harga dari master produk'),
                                         TextInput::make('unit_price')
-                                            ->label('Harga Override')
+                                            ->label('Harga Satuan')
                                             ->columnSpan(1)
                                             ->live(debounce: 500)
+                                            ->default(0)
+                                            ->helperText('Opsional bagi pemohon (dapat dilengkapi saat persetujuan/PO)')
                                             ->prefix(fn(Get $get) => self::resolveCurrencySymbol(
                                                 is_numeric($get('currency_id'))
                                                     ? (int) $get('currency_id')
@@ -1999,10 +2033,8 @@ class OrderRequestResource extends Resource
                                                 $set('tax_nominal', self::formatMoneyPreviewState($taxNominal));
                                                 $set('discount_nominal', self::formatMoneyPreviewState(round(($quantity * $unitPrice) * ($discPct / 100), 2)));
                                             })
-                                            ->required()
                                             ->validationMessages([
-                                                'required' => 'Harga override wajib diisi.',
-                                                'numeric' => 'Harga override harus berupa angka.',
+                                                'numeric' => 'Harga satuan harus berupa angka.',
                                             ]),
                                         TextInput::make('discount')
                                             ->label('Discount (%)')
@@ -2246,14 +2278,14 @@ class OrderRequestResource extends Resource
                     ->label('Status')
                     ->formatStateUsing(function ($state) {
                         return match ($state) {
-                            'draft'           => 'DRAFT',
-                            'request_approve' => 'REQUEST APPROVE',
-                            'approved'        => 'APPROVED',
-                            'partial'         => 'PARTIAL',
-                            'complete'        => 'COMPLETE',
-                            'closed'          => 'CLOSED',
-                            'rejected'        => 'REJECTED',
-                            default           => Str::upper($state),
+                            'draft'           => 'Draft',
+                            'request_approve' => 'Menunggu Persetujuan',
+                            'approved'        => 'Disetujui',
+                            'partial'         => 'Sebagian Dipenuhi',
+                            'complete'        => 'Selesai',
+                            'closed'          => 'Ditutup',
+                            'rejected'        => 'Ditolak',
+                            default           => ucfirst(str_replace('_', ' ', (string) $state)),
                         };
                     })
                     ->color(function ($state) {
@@ -2394,15 +2426,15 @@ class OrderRequestResource extends Resource
                     ->label('Status')
                     ->options([
                         'draft'           => 'Draft',
-                        'request_approve' => 'Request Approve',
-                        'approved'        => 'Approved',
-                        'partial'         => 'Partial',
-                        'complete'        => 'Complete',
-                        'rejected'        => 'Rejected',
-                        'closed'          => 'Closed',
+                        'request_approve' => 'Menunggu Persetujuan',
+                        'approved'        => 'Disetujui',
+                        'partial'         => 'Sebagian Dipenuhi',
+                        'complete'        => 'Selesai',
+                        'rejected'        => 'Ditolak',
+                        'closed'          => 'Ditutup',
                     ])
                     ->preload()
-                    ->placeholder('All Statuses'),
+                    ->placeholder('Semua Status'),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier (per Item)')
                     ->options(function () {
@@ -2472,8 +2504,10 @@ class OrderRequestResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
+                        ->visible(fn ($record) => in_array($record->status, ['draft', 'request_approve']) && ! $record->purchaseOrders()->exists())
                         ->color('success'),
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->visible(fn ($record) => $record->status === 'draft' && ! $record->purchaseOrders()->exists()),
                     Action::make('preview_pdf')
                         ->label('Preview / Download PDF')
                         ->icon('heroicon-o-document-text')
@@ -2843,10 +2877,20 @@ class OrderRequestResource extends Resource
                         ->visible(function ($record) {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
-                            return $user && $user->hasPermissionTo('approve order request') && $record->status == 'request_approve';
+                            if (! $user || $record->status !== 'request_approve') {
+                                return false;
+                            }
+                            $check = app(\App\Services\ApprovalControlService::class)->canApproveOrderRequest($user, $record);
+                            return $check['allowed'];
                         })
                         ->action(function (array $data, $record) {
                             try {
+                                $check = app(\App\Services\ApprovalControlService::class)->canApproveOrderRequest(Auth::user(), $record);
+                                if (! $check['allowed']) {
+                                    HelperController::sendNotification(isSuccess: false, title: 'Persetujuan Ditolak', message: $check['reason'] ?? 'Akses persetujuan ditolak.');
+                                    return;
+                                }
+
                                 $orderRequestService = app(OrderRequestService::class);
                                 self::validateApprovalGateItemDecisions($data);
 
@@ -2946,8 +2990,36 @@ class OrderRequestResource extends Resource
                                 );
                             }
                         }),
+                    Action::make('reject')
+                        ->label('Reject')
+                        ->color('danger')
+                        ->icon('heroicon-o-x-circle')
+                        ->modalWidth('lg')
+                        ->modalHeading('Tolak Order Request')
+                        ->modalDescription('Masukkan alasan penolakan Order Request ini. Alasan wajib diisi agar pemohon dapat melakukan revisi.')
+                        ->modalSubmitActionLabel('Tolak Order Request')
+                        ->form([
+                            Textarea::make('rejection_note')
+                                ->label('Alasan Penolakan')
+                                ->placeholder('Contoh: Spesifikasi barang tidak sesuai, anggaran melebihi batas, dsb.')
+                                ->required()
+                                ->rows(3)
+                                ->validationMessages([
+                                    'required' => 'Alasan penolakan wajib diisi.',
+                                ]),
+                        ])
+                        ->visible(function ($record) {
+                            /** @var \App\Models\User $user */
+                            $user = Auth::user();
+                            return $user && $user->hasPermissionTo('approve order request') && $record->status === 'request_approve';
+                        })
+                        ->action(function ($record, array $data) {
+                            $orderRequestService = app(OrderRequestService::class);
+                            $orderRequestService->reject($record, $data['rejection_note'] ?? null);
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah ditolak. Proses selanjutnya: Pemohon dapat merevisi data dan mengajukan kembali untuk mendapatkan persetujuan.");
+                        }),
                     Action::make('request_approve')
-                        ->label('Request Approve')
+                        ->label('Ajukan Persetujuan')
                         ->color('gray')
                         ->icon('heroicon-o-paper-airplane')
                         ->requiresConfirmation()
@@ -2961,7 +3033,7 @@ class OrderRequestResource extends Resource
                             HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah diajukan untuk persetujuan.");
                         }),
                     Action::make('close')
-                        ->label('Close')
+                        ->label('Tutup OR')
                         ->color('warning')
                         ->icon('heroicon-o-lock-closed')
                         ->requiresConfirmation()
@@ -3047,14 +3119,34 @@ class OrderRequestResource extends Resource
                     ->columns(3)
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('request_number')
-                            ->label('Request Number'),
+                            ->label('Nomor Permintaan'),
                         \Filament\Infolists\Components\TextEntry::make('status')
                             ->label('Status')
-                            ->badge(),
+                            ->badge()
+                            ->formatStateUsing(fn ($state) => match ($state) {
+                                'draft' => 'Draft',
+                                'request_approve' => 'Menunggu Persetujuan',
+                                'approved' => 'Disetujui',
+                                'partially_fulfilled' => 'Sebagian Dipenuhi',
+                                'fulfilled' => 'Selesai',
+                                'closed' => 'Ditutup',
+                                'rejected' => 'Ditolak',
+                                default => $state ? ucfirst(str_replace('_', ' ', $state)) : '-',
+                            })
+                            ->color(fn ($state) => match ($state) {
+                                'approved', 'fulfilled' => 'success',
+                                'rejected', 'closed' => 'danger',
+                                'request_approve', 'partially_fulfilled' => 'warning',
+                                default => 'gray',
+                            }),
                         // header-level warehouse removed; per-item/PO selection determines warehouse assignment
                         \Filament\Infolists\Components\TextEntry::make('request_date')
-                            ->label('Request Date')
+                            ->label('Tanggal Permintaan')
                             ->date('d/m/Y'),
+                        \Filament\Infolists\Components\TextEntry::make('note')
+                            ->label('Catatan')
+                            ->placeholder('Tidak ada catatan')
+                            ->columnSpanFull(),
                     ]),
                 \Filament\Infolists\Components\Section::make('Ringkasan Quantity')
                     ->description('Nilai dihitung dari qty accepted pada penerimaan barang, bukan dari approval PO.')

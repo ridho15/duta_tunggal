@@ -18,11 +18,22 @@ class EditPurchaseInvoice extends EditRecord
 {
     protected static string $resource = PurchaseInvoiceResource::class;
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        if (strtolower((string) $this->record->status) !== \App\Models\Invoice::STATUS_DRAFT) {
+            abort(403, 'Invoice yang sudah diposting/disetujui tidak dapat diedit secara langsung.');
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\ViewAction::make()->icon('heroicon-o-eye'),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->visible(fn () => strtolower((string) $this->record->status) === \App\Models\Invoice::STATUS_DRAFT),
         ];
     }
 

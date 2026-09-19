@@ -34,6 +34,9 @@ class CreatePurchaseOrder extends CreateRecord
 
         $data['created_by'] = Auth::id();
         $data['status']     = 'draft'; // PO dimulai dari draft, perlu disetujui manual
+        if (empty($data['cabang_id'])) {
+            $data['cabang_id'] = \App\Models\Cabang::where('kode', 'CBG-001')->orWhere('nama', 'like', '%pusat%')->value('id') ?? 1;
+        }
         return PurchaseOrderResource::syncPurchaseOrderCurrencyData($data);
     }
 

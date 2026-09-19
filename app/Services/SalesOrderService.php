@@ -184,9 +184,38 @@ class SalesOrderService
             }
         }
 
+        // Validate warehouse free stock for all allocations
+        $saleOrder->loadMissing(['saleOrderItem.warehouseAllocations.warehouse', 'saleOrderItem.product']);
+        $insufficientItems = [];
+        foreach ($saleOrder->saleOrderItem as $item) {
+            foreach ($item->warehouseAllocations as $allocation) {
+                $whId = $allocation->warehouse_id;
+                $whQty = (float) $allocation->quantity;
+                $freeStock = (float) \App\Models\InventoryStock::freeQtyFor($item->product_id, $whId);
+                if ($whQty > $freeStock) {
+                    $whName = $allocation->warehouse?->name ?? "Gudang #{$whId}";
+                    $prodName = $item->product?->name ?? "Produk #{$item->product_id}";
+                    $insufficientItems[] = "{$prodName} di {$whName} (Dibutuhkan: {$whQty}, Stok bebas: {$freeStock})";
+                }
+            }
+        }
+
+        if (! empty($insufficientItems)) {
+            $msg = 'Stok gudang tidak mencukupi untuk item: ' . implode('; ', $insufficientItems);
+            Notification::make()
+                ->title('Persetujuan Ditolak: Stok Kurang')
+                ->body($msg)
+                ->danger()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'stock' => $msg,
+            ]);
+        }
+
         return $saleOrder->update([
             'status' => 'approved',
-            'approve_by' => Auth::user()->id,
+            'approve_by' => Auth::id() ?? auth()->id(),
             'approve_at' => Carbon::now()
         ]);
     }
@@ -195,7 +224,7 @@ class SalesOrderService
     {
         return $saleOrder->update([
             'status' => 'closed',
-            'close_by' => Auth::user()->id,
+            'close_by' => Auth::id() ?? auth()->id(),
             'close_at' => Carbon::now()
         ]);
     }
@@ -204,7 +233,7 @@ class SalesOrderService
     {
         return $saleOrder->update([
             'status' => 'reject',
-            'reject_by' => Auth::user()->id,
+            'reject_by' => Auth::id() ?? auth()->id(),
             'reject_at' => Carbon::now()
         ]);
     }

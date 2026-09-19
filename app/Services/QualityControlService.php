@@ -49,30 +49,12 @@ class QualityControlService
 
     public function generateQcNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'QC-' . $date . '-';
-
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = QualityControl::where('qc_number', $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\SequentialNumberGenerator::generate('quality_controls', 'qc_number', 'QC-', 4, 'Ymd');
     }
 
     public function generateQcManufactureNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'QC-M-' . $date . '-';
-
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = QualityControl::where('qc_number', $candidate)->exists();
-        } while ($exists);
-
-        return $candidate;
+        return \App\Services\SequentialNumberGenerator::generate('quality_controls', 'qc_number', 'QC-M-', 4, 'Ymd');
     }
 
     private function purchaseOrderItemReceiptLimitForQualityControl(QualityControl $qualityControl, int $purchaseOrderItemId): array
@@ -208,7 +190,7 @@ class QualityControlService
         return $qualityControl;
     }
 
-    public function completeQualityControl($qualityControl, $data)
+    public function completeQualityControl($qualityControl, array $data = [])
     {
         $productService = app(ProductService::class);
 
@@ -241,6 +223,30 @@ class QualityControlService
 
             if ($targetQuantity > 0 && ($passedQuantity + $rejectedQuantity) > $targetQuantity) {
                 throw new \Exception("Total passed dan rejected ({$passedQuantity} + {$rejectedQuantity}) tidak boleh melebihi quantity produksi ({$targetQuantity}).");
+            }
+        }
+
+        if ($qualityControl->items()->exists()) {
+            foreach ($qualityControl->items as $qcItem) {
+                $limit = $this->purchaseOrderItemReceiptLimitForQualityControl($qualityControl, (int) $qcItem->purchase_order_item_id);
+                $inspectedQuantity = (float) $qcItem->passed_quantity + (float) $qcItem->rejected_quantity;
+                $quantityReceived = (float) ($qcItem->quantity_received ?? 0);
+
+                if ((float) $qcItem->passed_quantity > $quantityReceived) {
+                    throw new \Exception("QC passed quantity ({$qcItem->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $quantityReceived) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+                }
+
+                if ($inspectedQuantity > $limit['remaining_received']) {
+                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+                }
+
+                if ((float) $qcItem->passed_quantity > $limit['remaining_accepted']) {
+                    throw new \Exception("QC passed quantity ({$qcItem->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+                }
             }
         }
 
@@ -281,37 +287,12 @@ class QualityControlService
             }
         }
 
-        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
-            $purchaseOrderItem = $qualityControl->fromModel;
-            if ($purchaseOrderItem) {
-                $limit = $this->purchaseOrderItemReceiptLimitForQualityControl($qualityControl, (int) $purchaseOrderItem->id);
-                $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
-                $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
-
-                if ((float) $qualityControl->passed_quantity > $quantityReceived) {
-                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
-                }
-
-                if ($inspectedQuantity > $quantityReceived) {
-                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
-                }
-
-                if ($inspectedQuantity > $limit['remaining_received']) {
-                    throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
-                }
-
-                if ((float) $qualityControl->passed_quantity > $limit['remaining_accepted']) {
-                    throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
-                }
-            }
-        }
-
         if ($qualityControl->rejected_quantity > 0) {
             // Only create a sales-side ReturnProduct for non-purchase QC types.
             // Purchase QC (from PurchaseOrderItem) uses PurchaseReturn instead,
             // which is created by PurchaseReturnService::createFromQualityControl()
             // BEFORE completeQualityControl() is called (from the process_qc action form).
-            if ($qualityControl->from_model_type !== 'App\Models\PurchaseOrderItem') {
+            if ($qualityControl->from_model_type !== 'App\Models\PurchaseOrderItem' && !$qualityControl->items()->exists()) {
                 $returnProductService = app(ReturnProductService::class);
                 $returnData = array_merge($data, [
                     'return_number' => $returnProductService->generateReturnNumber(),
@@ -351,45 +332,25 @@ class QualityControlService
             'date_send_stock' => Carbon::now()
         ]);
 
-        // Note: qty_accepted on PurchaseReceiptItem should NOT be updated here
-        // QC only provides inspection results, acceptance decision is separate process
-        // Update qty_accepted on PurchaseReceiptItem if QC is from PurchaseReceiptItem
-        // if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
-        //     $purchaseReceiptItem = $qualityControl->fromModel;
-        //     if ($purchaseReceiptItem) {
-        //         $purchaseReceiptItem->update([
-        //             'qty_accepted' => $qualityControl->passed_quantity
-        //         ]);
-        //     }
-        // }
-
-        // Create journal entries and inventory stock for passed QC items from PurchaseOrderItem or PurchaseReceiptItem
-        // For PurchaseReceiptItem QC (legacy flow), journal entries are created when the receipt is posted
-        // For PurchaseOrderItem QC (new flow), journal entries are created here since receipt posting happens later
-        // if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
-        //     $this->createJournalEntriesAndInventoryForQC($qualityControl);
-        // }
-
         // Handle Purchase Receipt and Purchase Order completion based on QC results
         if ($qualityControl->from_model_type === 'App\Models\PurchaseReceiptItem') {
             $this->handlePurchaseReceiptCompletion($qualityControl);
         }
 
-        // NEW FLOW: Auto-create Purchase Receipt after QC for PurchaseOrderItem
-        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
+        // Multi-item QC flow: generates 1 single GRN (PurchaseReceipt) for all items
+        if ($qualityControl->items()->exists()) {
+            $this->handleMultiItemPurchaseOrderQcCompletion($qualityControl, $data);
+        } elseif ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem' && $qualityControl->passed_quantity > 0) {
+            // Legacy single-item QC flow
             $purchaseReceipt = $this->autoCreatePurchaseReceiptFromQC($qualityControl, $data);
             if ($purchaseReceipt) {
                 try {
-                    // Post the receipt so journals and stock movements are created via PurchaseReceiptService
-                    // Add retry-with-backoff to handle transient ordering/race conditions where
-                    // the receipt items may not be fully available immediately after creation.
                     $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
                     $maxAttempts = config('procurement.auto_post_retries', 3);
                     $delayMs = [200, 500, 1000];
                     $result = null;
 
                     for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-                        // Refresh receipt to pick up any related items that may have been attached
                         $purchaseReceipt = $purchaseReceipt->fresh();
                         $result = $purchaseReceiptService->postPurchaseReceipt($purchaseReceipt);
 
@@ -400,34 +361,20 @@ class QualityControlService
                             'result' => $result,
                         ]);
 
-                        // Stop retrying when posted or an explicit error occurred
                         if (($result['status'] ?? null) === 'posted' || ($result['status'] ?? null) === 'error') {
                             break;
                         }
 
-                        // Backoff before next attempt
                         if ($attempt < $maxAttempts) {
                             $sleepMs = $delayMs[$attempt - 1] ?? 500;
                             usleep($sleepMs * 1000);
                         }
                     }
-
-                    if (($result['status'] ?? null) !== 'posted') {
-                        Log::warning('Auto postPurchaseReceipt did not post after retries', [
-                            'qc' => $qualityControl->id,
-                            'receipt_id' => $purchaseReceipt->id,
-                            'final_result' => $result,
-                            'attempts' => $maxAttempts,
-                        ]);
-                    }
                 } catch (\Exception $e) {
                     Log::error('Auto postPurchaseReceipt failed for QC ' . $qualityControl->id . ': ' . $e->getMessage(), ['qc' => $qualityControl->id]);
                 }
             }
-        }
 
-        // NEW: Check and auto-complete Purchase Order if all items are received
-        if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
             $this->checkAndCompletePurchaseOrder($qualityControl);
         }
 
@@ -1088,34 +1035,164 @@ class QualityControlService
     }
 
     /**
-     * Generate receipt number
+     * Generate receipt number (standard: GRN-YYYYMMDD-XXXX)
      */
     protected function generateReceiptNumber()
     {
-        $date = now()->format('Ymd');
-        $prefix = 'PR-' . $date . '-';
+        return \App\Services\SequentialNumberGenerator::generate('purchase_receipts', 'receipt_number', 'GRN-', 4, 'Ymd');
+    }
 
-        do {
-            $random = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $exists = \App\Models\PurchaseReceipt::where('receipt_number', $candidate)->exists();
-        } while ($exists);
+    /**
+     * Handle completion for multi-item QC: creates 1 single PurchaseReceipt with multiple items,
+     * processes reject actions per item (reduce_stock, return_supplier, wait_next_delivery),
+     * posts the receipt, and checks PO completion.
+     */
+    public function handleMultiItemPurchaseOrderQcCompletion(QualityControl $qualityControl, array $data = []): ?\App\Models\PurchaseReceipt
+    {
+        $qualityControl->loadMissing(['items.purchaseOrderItem.purchaseOrder', 'purchaseOrder']);
 
-        return $candidate;
+        $purchaseOrder = $qualityControl->purchaseOrder
+            ?: $qualityControl->items->first()?->purchaseOrderItem?->purchaseOrder;
+
+        if (!$purchaseOrder) {
+            Log::error('handleMultiItemPurchaseOrderQcCompletion: No purchase order found for QC ' . $qualityControl->id);
+            return null;
+        }
+
+        // 1. Create ONE single PurchaseReceipt for the arrival
+        $receiptNumber = $this->generateReceiptNumber();
+        $purchaseReceipt = \App\Models\PurchaseReceipt::create([
+            'receipt_number'    => $receiptNumber,
+            'purchase_order_id' => $purchaseOrder->id,
+            'receipt_date'      => now(),
+            'received_by'       => Auth::id() ?? $data['received_by'] ?? $qualityControl->inspected_by ?? 1,
+            'notes'             => 'Auto-created from QC: ' . $qualityControl->qc_number,
+            'currency_id'       => $this->resolveAutoReceiptCurrencyId($purchaseOrder->purchaseOrderItem->first(), $purchaseOrder),
+            'status'            => 'completed',
+            'cabang_id'         => $purchaseOrder->cabang_id,
+        ]);
+
+        $purchaseReturnService = app(\App\Services\PurchaseReturnService::class);
+        $returnSupplierItems = [];
+
+        // 2. Create PurchaseReceiptItem for each QC item and handle reject actions
+        foreach ($qualityControl->items as $qcItem) {
+            $qtyReceived = (float) $qcItem->quantity_received;
+            $qtyAccepted = (float) $qcItem->passed_quantity;
+            $qtyRejected = (float) $qcItem->rejected_quantity;
+
+            $receiptItem = \App\Models\PurchaseReceiptItem::create([
+                'purchase_receipt_id'    => $purchaseReceipt->id,
+                'purchase_order_item_id' => $qcItem->purchase_order_item_id,
+                'product_id'             => $qcItem->product_id,
+                'qty_received'           => $qtyReceived,
+                'qty_accepted'           => $qtyAccepted,
+                'qty_rejected'           => $qtyRejected,
+                'reason_rejected'        => $qtyRejected > 0 ? ($qcItem->reason_reject ?? 'Failed QC inspection') : null,
+                'warehouse_id'           => $qualityControl->warehouse_id,
+                'rak_id'                 => $qcItem->rak_id ?? $qualityControl->rak_id,
+                'status'                 => 'completed',
+            ]);
+
+            // Update QC item status to completed
+            $qcItem->update(['status' => 1]);
+
+            // Handle reject actions per item
+            if ($qtyRejected > 0) {
+                $action = $qcItem->failed_qc_action ?? $data['failed_qc_action'] ?? \App\Models\PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY;
+
+                if ($action === \App\Models\PurchaseReturn::QC_ACTION_REDUCE_STOCK) {
+                    // Option: Kurangi Qty PO (misal pesan 100, datang 100, reject 5 -> qty PO jadi 95, PO Completed)
+                    $poItem = \App\Models\PurchaseOrderItem::find($qcItem->purchase_order_item_id);
+                    if ($poItem) {
+                        $oldQty = (float) $poItem->quantity;
+                        $newQty = max(0, $oldQty - $qtyRejected);
+                        $poItem->update(['quantity' => $newQty]);
+                        Log::info("QC {$qualityControl->qc_number} reduced PO item {$poItem->id} qty from {$oldQty} to {$newQty}");
+                    }
+                } elseif ($action === \App\Models\PurchaseReturn::QC_ACTION_RETURN_SUPPLIER) {
+                    // Option: Retur ke supplier (buat dokumen retur otomatis)
+                    $returnSupplierItems[] = [
+                        'qc_item' => $qcItem,
+                        'receipt_item' => $receiptItem,
+                        'qty_rejected' => $qtyRejected,
+                    ];
+                }
+                // Option: wait_next_delivery -> PO tetap terbuka untuk sisa qty
+            }
+        }
+
+        // If any items are to be returned to supplier, create draft PurchaseReturn document
+        if (!empty($returnSupplierItems)) {
+            $purchaseReturn = \App\Models\PurchaseReturn::create([
+                'quality_control_id'  => $qualityControl->id,
+                'purchase_receipt_id' => $purchaseReceipt->id,
+                'failed_qc_action'    => \App\Models\PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
+                'nota_retur'          => $purchaseReturnService->generateNotaRetur(),
+                'return_date'         => now(),
+                'created_by'          => Auth::id() ?? 1,
+                'status'              => 'draft',
+                'cabang_id'           => $purchaseOrder->cabang_id,
+                'notes'               => "Retur otomatis dari QC #{$qualityControl->qc_number} untuk penerimaan #{$purchaseReceipt->receipt_number}.",
+            ]);
+
+            foreach ($returnSupplierItems as $retItem) {
+                $qItem = $retItem['qc_item'];
+                $poItem = $qItem->purchaseOrderItem;
+                \App\Models\PurchaseReturnItem::create([
+                    'purchase_return_id'       => $purchaseReturn->id,
+                    'purchase_receipt_item_id' => $retItem['receipt_item']->id,
+                    'product_id'               => $qItem->product_id,
+                    'qty_returned'             => $retItem['qty_rejected'],
+                    'unit_price'               => $poItem?->unit_price ?? 0,
+                    'reason'                   => $qItem->reason_reject ?? 'Rejected in QC: ' . $qualityControl->qc_number,
+                ]);
+            }
+
+            $qualityControl->update(['purchase_return_processed' => now()]);
+        }
+
+        // 3. Copy biaya and post receipt
+        $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
+        $purchaseReceiptService->copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $purchaseReceipt);
+
+        try {
+            $purchaseReceiptService->postPurchaseReceipt($purchaseReceipt);
+        } catch (\Exception $e) {
+            Log::error('Auto postPurchaseReceipt failed for multi-item QC ' . $qualityControl->id . ': ' . $e->getMessage());
+        }
+
+        // 4. Check and auto-complete PO if all items fully received / resolved
+        $this->checkAndCompletePurchaseOrder($qualityControl, $purchaseOrder);
+
+        Log::info('Multi-item QC completed and 1 GRN generated', [
+            'qc_number' => $qualityControl->qc_number,
+            'receipt_number' => $purchaseReceipt->receipt_number,
+            'items_count' => $qualityControl->items->count(),
+        ]);
+
+        return $purchaseReceipt;
     }
 
     /**
      * Check and auto-complete Purchase Order if all items are fully received
-     * NEW: Auto-complete PO when all items have receipts
+     * Supports single-item QC, multi-item QC, or direct PurchaseOrder parameter.
      */
-    protected function checkAndCompletePurchaseOrder($qualityControl)
+    public function checkAndCompletePurchaseOrder($qualityControl, ?PurchaseOrder $purchaseOrder = null)
     {
-        $purchaseOrderItem = $qualityControl->fromModel;
-        if (!$purchaseOrderItem) {
-            return;
+        if (!$purchaseOrder) {
+            if ($qualityControl instanceof QualityControl && $qualityControl->purchase_order_id) {
+                $purchaseOrder = PurchaseOrder::find($qualityControl->purchase_order_id);
+            } elseif ($qualityControl instanceof QualityControl && $qualityControl->fromModel instanceof \App\Models\PurchaseOrderItem) {
+                $purchaseOrder = $qualityControl->fromModel->purchaseOrder;
+            } elseif ($qualityControl instanceof QualityControl && $qualityControl->items()->exists()) {
+                $firstItem = $qualityControl->items()->first();
+                $purchaseOrder = $firstItem?->purchaseOrderItem?->purchaseOrder;
+            } elseif ($qualityControl instanceof PurchaseOrder) {
+                $purchaseOrder = $qualityControl;
+            }
         }
 
-        $purchaseOrder = $purchaseOrderItem->purchaseOrder;
         if (!$purchaseOrder) {
             return;
         }

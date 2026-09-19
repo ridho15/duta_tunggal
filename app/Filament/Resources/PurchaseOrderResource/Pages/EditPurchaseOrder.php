@@ -31,10 +31,26 @@ class EditPurchaseOrder extends EditRecord
 
     protected static string $view = 'filament.resources.purchase-order-resource.pages.edit-purchase-order';
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        if (! in_array($this->record->status, ['draft', 'request_approve'])) {
+            Notification::make()
+                ->title('Purchase Order Terkunci')
+                ->body('Purchase Order dengan status ' . ucfirst(str_replace('_', ' ', $this->record->status)) . ' sudah tidak dapat diubah.')
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             DeleteAction::make()
+                ->visible(fn ($record) => $record->status === 'draft')
                 ->icon('heroicon-o-trash'),
             Action::make('konfirmasi')
                 ->label('Konfirmasi')

@@ -88,6 +88,14 @@ class SaleOrderObserver
         // Load relationships
         $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.currency', 'deliveryOrder', 'customer');
 
+        // Jika SO dikirim melalui Delivery Order, invoice diterbitkan per Delivery Order, bukan tagihan borongan penuh SO
+        if ($saleOrder->deliveryOrder()->exists()) {
+            Log::info('SaleOrderObserver: Skipping invoice creation because SO uses delivery orders', [
+                'sale_order_id' => $saleOrder->id,
+            ]);
+            return;
+        }
+
         // Cek apakah sudah ada invoice untuk sale order ini
         $existingInvoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $saleOrder->id)

@@ -373,9 +373,9 @@ class QuotationResource extends Resource
     {
         return match ($status) {
             'draft' => 'Draft',
-            'request_approve' => 'Request Approve',
-            'approve' => 'Approved',
-            'reject' => 'Rejected',
+            'request_approve' => 'Menunggu Persetujuan',
+            'approve' => 'Disetujui',
+            'reject' => 'Ditolak',
             default => '-',
         };
     }
@@ -1505,7 +1505,7 @@ class QuotationResource extends Resource
                         }),
                     Action::make('sync_total_amount')
                         ->icon('heroicon-o-arrow-path-rounded-square')
-                        ->label('Sync Total Amount')
+                        ->label('Hitung Ulang Total')
                         ->color('primary')
                         ->action(function ($record) {
                             $quotationService = app(QuotationService::class);
@@ -1698,7 +1698,7 @@ class QuotationResource extends Resource
                                                     if ($warehouseId) {
                                                         return \App\Models\Rak::where('warehouse_id', $warehouseId)->pluck('name', 'id')->map(function ($name, $id) {
                                                             $rak = \App\Models\Rak::find($id);
-                                                            return "({$rak->code}) {$name}";
+                                                            return filled($rak?->code) ? "({$rak->code}) {$name}" : $name;
                                                         });
                                                     }
                                                     return [];

@@ -67,13 +67,15 @@ class CustomerResource extends Resource
                             ]),
                         TextInput::make('code')
                             ->label('Kode Customer')
+                            ->default(fn () => app(\App\Services\CustomerService::class)->generateCode())
+                            ->helperText('Kode internal customer (contoh: CUST-0001). Jangan mengisi dengan nomor NIK pribadi.')
                             ->required()
                             ->reactive()
                             ->suffixAction(Action::make('generateCode')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Kode Customer')
                                 ->action(function ($set, $get, $state) {
-                                    $customerService = app(CustomerService::class);
+                                    $customerService = app(\App\Services\CustomerService::class);
                                     $set('code', $customerService->generateCode());
                                 }))
                             ->validationMessages([
@@ -325,6 +327,17 @@ class CustomerResource extends Resource
                 TextColumn::make('nik_npwp')
                     ->label('NIK / NPWP')
                     ->searchable()
+                    ->formatStateUsing(function ($state) {
+                        if (empty($state)) return '-';
+                        $clean = trim((string) $state);
+                        if (strlen($clean) >= 12) {
+                            return substr($clean, 0, 4) . '********' . substr($clean, -4);
+                        }
+                        if (strlen($clean) >= 6) {
+                            return substr($clean, 0, 2) . '****' . substr($clean, -2);
+                        }
+                        return $clean;
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')
                     ->label('Handphone')

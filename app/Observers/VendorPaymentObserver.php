@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Models\ChartOfAccount;
 use App\Models\Deposit;
 use App\Models\Invoice;
+use App\Models\PaymentRequest;
 use App\Models\VendorPayment;
 use App\Services\LedgerPostingService;
 use App\Support\ProcurementFailureNotifier;
@@ -171,6 +172,9 @@ class VendorPaymentObserver
                     : ($newPaidOriginal > 0 ? Invoice::STATUS_PARTIALLY_PAID : $accountPayable->invoice->status);
                 $accountPayable->invoice->save();
             }
+
+            // Sync related PaymentRequests
+            $this->syncPaymentRequestsForInvoice($accountPayable->invoice_id);
         }
     }
 
@@ -211,6 +215,9 @@ class VendorPaymentObserver
                     : ($newPaidOriginal > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
             }
+
+            // Sync related PaymentRequests
+            $this->syncPaymentRequestsForInvoice($accountPayable->invoice_id);
         }
     }
 
@@ -218,6 +225,50 @@ class VendorPaymentObserver
     {
         // Delete existing journal entries to prepare for re-posting
         $payment->journalEntries()->delete();
+    }
+
+    /**
+     * Sync status of any PaymentRequest records referencing the given invoice.
+     */
+    public function syncPaymentRequestsForInvoice(int|string $invoiceId): void
+    {
+        $prs = PaymentRequest::where('status', '!=', PaymentRequest::STATUS_PAID)
+            ->where('status', '!=', PaymentRequest::STATUS_REJECTED)
+            ->get();
+
+        foreach ($prs as $pr) {
+            $selected = $pr->selected_invoices;
+            if (is_string($selected)) {
+                $selected = json_decode($selected, true);
+            }
+            if (! is_array($selected) || ! in_array($invoiceId, $selected)) {
+                continue;
+            }
+
+            $invoices = Invoice::with('accountPayable')->whereIn('id', $selected)->get();
+            if ($invoices->isEmpty()) {
+                continue;
+            }
+
+            $allPaid = $invoices->every(function ($inv) {
+                $ap = $inv->accountPayable;
+                return $inv->status === Invoice::STATUS_PAID 
+                    || ($ap && (float) ($ap->remaining_original ?? $ap->remaining ?? 1) <= 0.01);
+            });
+
+            if ($allPaid) {
+                $pr->update(['status' => PaymentRequest::STATUS_PAID]);
+            } else {
+                $anyPaid = $invoices->contains(function ($inv) {
+                    $ap = $inv->accountPayable;
+                    return in_array($inv->status, [Invoice::STATUS_PAID, Invoice::STATUS_PARTIALLY_PAID])
+                        || ($ap && (float) ($ap->paid_original ?? $ap->paid ?? 0) > 0);
+                });
+                if ($anyPaid && in_array($pr->status, [PaymentRequest::STATUS_DRAFT, PaymentRequest::STATUS_PENDING, PaymentRequest::STATUS_APPROVED])) {
+                    $pr->update(['status' => PaymentRequest::STATUS_PARTIAL]);
+                }
+            }
+        }
     }
 
     protected function validatePaymentAmount(VendorPayment $payment)
@@ -342,7 +393,7 @@ class VendorPaymentObserver
                 'amount' => $paymentAmount,
                 'amount_idr' => round($paymentAmount * $exchangeRate, 2),
                 'method' => $payment->payment_method ?? 'Cash',
-                'payment_date' => $payment->payment_date,
+                'payment_date' => $payment->payment_date ?? now(),
                 'coa_id' => $payment->coa_id,
             ]);
 

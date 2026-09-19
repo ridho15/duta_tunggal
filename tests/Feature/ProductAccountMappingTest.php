@@ -19,7 +19,7 @@ beforeEach(function () {
 it('sets default chart of accounts on newly created products', function () {
     $product = Product::factory()->create();
 
-    expect($product->inventoryCoa?->code)->toBe('1140.01')
+    expect($product->inventoryCoa?->code)->toBe('1140.10')
         ->and($product->salesCoa?->code)->toBe('4100.10')
         ->and($product->salesReturnCoa?->code)->toBe('4120.10')
         ->and($product->salesDiscountCoa?->code)->toBe('4110.10')

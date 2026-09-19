@@ -29,6 +29,7 @@ class LedgerPostingService
             $query = JournalEntry::withoutGlobalScopes()
                 ->where('source_type', Invoice::class)
                 ->where('source_id', $invoice->id)
+                ->whereNull('deleted_at')
                 ->lockForUpdate();
 
             if ($allowRepostAfterReversal) {
@@ -139,14 +140,18 @@ class LedgerPostingService
                 $debitCoa = $inventoryCoa;
             }
 
-            // Debit for subtotal
-            if ($subtotal > 0 && $debitCoa) {
+            // Debit for subtotal and purchase price variance
+            $varianceOriginal = (float) ($invoice->price_variance_amount ?? 0);
+            $variance = $isForeignCurrencyInvoice ? round($varianceOriginal * $exchangeRate, 2) : $varianceOriginal;
+            $unbilledAmount = $hasReceipts ? round($subtotal - $variance, 2) : $subtotal;
+
+            if ($unbilledAmount > 0 && $debitCoa) {
                 $debitEntry = $this->createJournalEntry([
                     'coa_id' => $debitCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
                     'description' => 'Purchase invoice - ' . ($hasReceipts ? 'unbilled purchase' : 'inventory') . ' for ' . $invoice->invoice_number,
-                    'debit' => $subtotal,
+                    'debit' => $unbilledAmount,
                     'credit' => 0,
                     'amounts_are_idr' => true,
                     'journal_type' => 'purchase',
@@ -162,6 +167,30 @@ class LedgerPostingService
                     'subtotal' => $subtotal,
                     'unbilledPurchaseCoa_exists' => $unbilledPurchaseCoa ? true : false
                 ]);
+            }
+
+            // Post variance to Selisih Pembelian (COA 5160) if present
+            if ($hasReceipts && abs($variance) > 0.001) {
+                $varianceCoa = ChartOfAccount::where('code', config('coa.purchase_price_variance', '5160'))->first()
+                    ?? ChartOfAccount::where('name', 'like', '%Selisih Pembelian%')->first();
+                if ($varianceCoa) {
+                    $isDebit = $variance > 0;
+                    $entries[] = $this->createJournalEntry([
+                        'coa_id' => $varianceCoa->id,
+                        'date' => $date,
+                        'reference' => $invoice->invoice_number,
+                        'description' => 'Selisih harga pembelian PO vs Invoice untuk ' . $invoice->invoice_number,
+                        'debit' => $isDebit ? abs($variance) : 0,
+                        'credit' => ! $isDebit ? abs($variance) : 0,
+                        'amounts_are_idr' => true,
+                        'journal_type' => 'purchase',
+                        'cabang_id' => $branchId,
+                        'department_id' => $departmentId,
+                        'project_id' => $projectId,
+                        'source_type' => Invoice::class,
+                        'source_id' => $invoice->id,
+                    ], $currencyId, $exchangeRate);
+                }
             }
 
             // Calculate PPN amount — prefer ppn_rate (percentage) as single source of truth.
@@ -450,8 +479,14 @@ class LedgerPostingService
 
             $entries = [];
 
-            // Resolve branch from source
-            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($payment);
+            // Prepare official document reference & narrative description
+            $docRef = $payment->payment_number ?: ('VP-' . str_pad($payment->id, 5, '0', STR_PAD_LEFT));
+            $supplierName = $payment->supplier?->perusahaan ?? $payment->supplier?->name ?? 'Vendor';
+            $trfRef = $payment->transfer_reference_number ? " [Ref Bank: {$payment->transfer_reference_number}]" : '';
+            $baseDesc = "Pembayaran Hutang: {$supplierName} ({$docRef}){$trfRef}";
+
+            // Resolve branch from source (prioritize direct property cabang_id)
+            $branchId = $payment->cabang_id ?: app(\App\Services\JournalBranchResolver::class)->resolve($payment);
             $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($payment);
             $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($payment);
 
@@ -459,8 +494,8 @@ class LedgerPostingService
                 $entries[] = $this->createJournalEntry([
                     'coa_id' => $utangCoa->id,
                     'date' => $date,
-                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                    'description' => 'Payment to supplier for payment id ' . $payment->id,
+                    'reference' => $docRef,
+                    'description' => $baseDesc,
                     'debit' => $total,
                     'credit' => 0,
                     'amounts_are_idr' => true,
@@ -500,8 +535,8 @@ class LedgerPostingService
                 $entries[] = $this->createJournalEntry([
                     'coa_id' => $depositCoa->id,
                     'date' => $date,
-                    'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                    'description' => 'Deposit / Uang Muka usage for payment id ' . $payment->id,
+                    'reference' => $docRef,
+                    'description' => "Pemotongan Deposit/Uang Muka: {$supplierName} ({$docRef})",
                     'debit' => 0,
                     'credit' => $depositAmount,
                     'amounts_are_idr' => true,
@@ -545,11 +580,12 @@ class LedgerPostingService
                         throw new \Exception('Akun COA untuk metode pembayaran tidak ditemukan (COA ID: ' . $coaKey . '). Jurnal pembayaran tidak dapat dibuat. Silakan periksa konfigurasi akun di Chart of Accounts.');
                     }
 
+                    $methodName = $group->first()->method ?? $payment->payment_method ?? 'Kas/Bank';
                     $entries[] = $this->createJournalEntry([
                         'coa_id' => $coa->id,
                         'date' => $date,
-                        'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                        'description' => 'Bank/Cash for payment id ' . $payment->id . ' via ' . ($group->first()->method ?? 'Cash/Bank'),
+                        'reference' => $docRef,
+                        'description' => "Pengeluaran {$methodName}: {$supplierName} ({$docRef}){$trfRef}",
                         'debit' => 0,
                         'credit' => $amount,
                         'amounts_are_idr' => true,
@@ -565,11 +601,12 @@ class LedgerPostingService
                 // If no details or all details are deposit, use payment's coa_id or default bank coa
                 $coa = $defaultBankCoa ?: ($payment->coa_id ? ChartOfAccount::find($payment->coa_id) : null);
                 if ($coa) {
+                    $methodName = $payment->payment_method ?: 'Kas/Bank';
                     $entries[] = $this->createJournalEntry([
                         'coa_id' => $coa->id,
                         'date' => $date,
-                        'reference' => 'PAY-' . ($payment->id ?? 'N/A'),
-                        'description' => 'Bank/Cash for payment id ' . $payment->id,
+                        'reference' => $docRef,
+                        'description' => "Pengeluaran {$methodName}: {$supplierName} ({$docRef}){$trfRef}",
                         'debit' => 0,
                         'credit' => $cashBankAmount,
                         'amounts_are_idr' => true,

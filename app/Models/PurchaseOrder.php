@@ -7,6 +7,8 @@ use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseOrder extends Model
 {
@@ -39,7 +41,8 @@ class PurchaseOrder extends Model
         'created_by',
         'refer_model_type',
         'refer_model_id',
-        'is_import'
+        'is_import',
+        'warehouse_id',  // Gudang tujuan penerimaan default untuk seluruh item PO
     ];
 
     protected function casts(): array
@@ -106,6 +109,11 @@ class PurchaseOrder extends Model
     public function purchaseReceipt()
     {
         return $this->hasMany(PurchaseReceipt::class, 'purchase_order_id');
+    }
+
+    public function qualityControls()
+    {
+        return $this->hasMany(QualityControl::class, 'purchase_order_id');
     }
 
     public function closeRequestedBy()
@@ -193,6 +201,42 @@ class PurchaseOrder extends Model
             } catch (\Throwable $e) {
                 // ignore
             }
+        });
+
+        // Auto-cancel semua draft QC yang menggantung saat PO selesai/ditutup
+        static::updated(function (PurchaseOrder $po) {
+            $terminalStatuses = ['completed', 'closed', 'cancelled', 'canceled'];
+            if (! in_array($po->status, $terminalStatuses, true)) {
+                return;
+            }
+
+            // Hanya jalankan jika status baru berubah (isDirty)
+            if (! $po->wasChanged('status')) {
+                return;
+            }
+
+            $draftQcIds = QualityControl::query()
+                ->where('status', 0) // draft / belum diproses
+                ->whereHasMorph(
+                    'fromModel',
+                    [PurchaseOrderItem::class],
+                    fn ($q) => $q->where('purchase_order_id', $po->id)
+                )
+                ->pluck('id');
+
+            if ($draftQcIds->isEmpty()) {
+                return;
+            }
+
+            $timestamp = now()->toDateTimeString();
+            QualityControl::whereIn('id', $draftQcIds)->update([
+                'status' => -1, // -1 = cancelled (dibatalkan otomatis oleh sistem)
+                'notes'  => DB::raw(
+                    "CONCAT(COALESCE(notes, ''), ' [AUTO-CANCELLED: PO status berubah ke {$po->status} pada {$timestamp}]')"
+                ),
+            ]);
+
+            Log::info("[PurchaseOrder] Auto-cancelled {$draftQcIds->count()} draft QC untuk PO #{$po->id} (status: {$po->status}).");
         });
     }
 

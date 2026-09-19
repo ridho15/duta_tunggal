@@ -94,7 +94,7 @@ class OrderRequestItem extends Model
     {
         static::saving(function (OrderRequestItem $item) {
             $item->loadMissing('orderRequest');
-            $item->status = static::normalizeApprovalStatus($item->status ?? null);
+            $item->status = static::normalizeApprovalStatus($item->status ?? $item->approval_status ?? null);
 
             $quantity    = (float) ($item->quantity ?? 0);
             $unitPrice   = MoneyHelper::safeParse($item->unit_price ?? 0);

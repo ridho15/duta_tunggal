@@ -37,6 +37,10 @@ class OrderRequestPolicy
      */
     public function update(User $user, OrderRequest $orderRequest): bool
     {
+        if ($orderRequest->purchaseOrders()->exists() || ! in_array($orderRequest->status, ['draft', 'request_approve'])) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update order request');
     }
 
@@ -45,6 +49,10 @@ class OrderRequestPolicy
      */
     public function delete(User $user, OrderRequest $orderRequest): bool
     {
+        if ($orderRequest->purchaseOrders()->exists() || $orderRequest->status !== 'draft') {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete order request');
     }
 
@@ -69,7 +77,9 @@ class OrderRequestPolicy
      */
     public function approve(User $user, OrderRequest $orderRequest): bool
     {
-        return $user->hasPermissionTo('approve order request');
+        $check = app(\App\Services\ApprovalControlService::class)->canApproveOrderRequest($user, $orderRequest);
+
+        return $check['allowed'];
     }
 
     /**

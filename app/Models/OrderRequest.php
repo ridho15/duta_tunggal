@@ -14,6 +14,8 @@ class OrderRequest extends Model
     protected $fillable = [
         'request_number',
         'request_date',
+        'required_date',
+        'purpose',
         'status', // draft, approved, rejected, closed
         'note',
         'created_by',
@@ -21,6 +23,14 @@ class OrderRequest extends Model
         'cabang_id',
         // header-level warehouse intentionally removed; per-item cabang retained on OrderRequestItem
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'request_date'  => 'date',
+            'required_date' => 'date',
+        ];
+    }
 
     public function warehouse()
     {
@@ -121,8 +131,17 @@ class OrderRequest extends Model
             return;
         }
 
-        $allFulfilled = $items->every(fn ($i) => ($i->fulfilled_quantity ?? 0) >= $i->quantity);
-        $anyFulfilled = $items->some(fn ($i) => ($i->fulfilled_quantity ?? 0) > 0);
+        // Hanya evaluasi item yang disetujui (Approved). Item yang ditolak tidak dihitung dalam sisa/pemenuhan.
+        $approvedItems = $items->filter(
+            fn ($i) => OrderRequestItem::normalizeApprovalStatus($i->status ?? $i->approval_status ?? null) === OrderRequestItem::STATUS_APPROVED
+        );
+
+        if ($approvedItems->isEmpty()) {
+            return;
+        }
+
+        $allFulfilled = $approvedItems->every(fn ($i) => ($i->fulfilled_quantity ?? 0) >= $i->quantity);
+        $anyFulfilled = $approvedItems->some(fn ($i) => ($i->fulfilled_quantity ?? 0) > 0);
 
         if ($allFulfilled) {
             $this->update(['status' => 'complete']);

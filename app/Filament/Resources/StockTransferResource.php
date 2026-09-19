@@ -110,11 +110,12 @@ class StockTransferResource extends Resource
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('warehouse_id', $get('../../from_warehouse_id'))
                                             ->where('product_id', $get('product_id'))->first();
-                                        if ($inventoryStock) {
-                                            return "Rak : ({$inventoryStock->rak->code}) {$inventoryStock->rak->name}";
+                                        if ($inventoryStock && $inventoryStock->rak) {
+                                            $codeStr = filled($inventoryStock->rak->code) ? "({$inventoryStock->rak->code}) " : '';
+                                            return "Rak: " . $codeStr . ($inventoryStock->rak->name ?? '-');
                                         }
 
-                                        return "Rak : -";
+                                        return "Rak: -";
                                     })
                                     ->relationship('product', 'id', function (Builder $query, $get) {
                                         $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
@@ -163,7 +164,7 @@ class StockTransferResource extends Resource
                                         $query->where('warehouse_id', $get('from_warehouse_id'));
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return "({$rak->code}) {$rak->name}";
+                                        return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     })
                                     ->required(),
                                 Select::make('to_warehouse_id')
@@ -199,7 +200,7 @@ class StockTransferResource extends Resource
                                         $query->where('warehouse_id', $get('to_warehouse_id'));
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return "({$rak->code}) {$rak->name}";
+                                        return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     })
                                     ->required()
                             ])

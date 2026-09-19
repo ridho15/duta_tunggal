@@ -246,7 +246,7 @@ class WarehouseConfirmationResource extends Resource
                                             return Rak::where('warehouse_id', $warehouseId)
                                                 ->get()
                                                 ->mapWithKeys(function ($rak) {
-                                                    return [$rak->id => "({$rak->code}) {$rak->name}"];
+                                                    return [$rak->id => filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-')];
                                                 });
                                         }
 

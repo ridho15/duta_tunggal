@@ -22,6 +22,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -111,10 +112,32 @@ class VendorPaymentResource extends Resource
                             ])
                             ->collapsible(),
 
-                        // Header Section - Vendor and Payment Date
+                        // Header Section - Payment Number, Branch, Vendor, and Date
                         Section::make()
-                            ->columns(2)
+                            ->columns(3)
                             ->schema([
+                                TextInput::make('payment_number')
+                                    ->label('Nomor Pembayaran (VP)')
+                                    ->placeholder('Otomatis: VP-YYYYMM-XXXX')
+                                    ->readOnly()
+                                    ->columnSpan(1),
+
+                                Select::make('cabang_id')
+                                    ->label('Cabang Operasional')
+                                    ->options(fn () => \App\Models\Cabang::pluck('nama', 'id'))
+                                    ->searchable()
+                                    ->nullable()
+                                    ->columnSpan(1),
+
+                                DatePicker::make('payment_date')
+                                    ->label('Payment Date')
+                                    ->required()
+                                    ->default(now())
+                                    ->validationMessages([
+                                        'required' => 'Tanggal pembayaran belum diisi'
+                                    ])
+                                    ->columnSpan(1),
+
                                 Select::make('supplier_id')
                                     ->label('Vendor')
                                     ->options(function () {
@@ -138,13 +161,22 @@ class VendorPaymentResource extends Resource
                                             $set('total_payment', self::formatMoneyState(0));
                                             $set('payment_details', []);
                                         }
-                                    })
-                                    ->required(),
 
-                                DatePicker::make('payment_date')
-                                    ->label('Payment Date')
-                                    ->required()
-                                    ->default(now()),
+                                        // Auto prefill target bank account from supplier master
+                                        if ($state) {
+                                            $supplier = Supplier::find($state);
+                                            if ($supplier) {
+                                                $bankName = $supplier->nama_bank ?? $supplier->bank_name ?? '';
+                                                $bankNum = $supplier->nomor_rekening ?? $supplier->rekening_bank ?? '';
+                                                $holder = $supplier->nama_rekening ?? $supplier->atas_nama ?? $supplier->perusahaan ?? '';
+                                                if ($bankNum || $bankName) {
+                                                    $set('target_bank_account', trim("{$bankName} - {$bankNum} (a.n. {$holder})", ' -()'));
+                                                }
+                                            }
+                                        }
+                                    })
+                                    ->columnSpan(3)
+                                    ->required(),
                             ]),
 
                         // Invoice Selection Section
@@ -538,6 +570,37 @@ class VendorPaymentResource extends Resource
                                     ->columnSpan(1),
                             ]),
 
+                        // Bank Account & Transfer Reference
+                        Section::make('Informasi Bank & Bukti Transfer')
+                            ->columns(3)
+                            ->schema([
+                                TextInput::make('target_bank_account')
+                                    ->label('Rekening Bank Tujuan (Vendor)')
+                                    ->placeholder('Contoh: BCA - 1234567890 (a.n. PT Supplier)')
+                                    ->required(fn(Get $get) => in_array($get('payment_method'), ['Bank Transfer', 'Transfer']))
+                                    ->helperText('Nomor rekening bank tujuan supplier. Wajib untuk metode Transfer.')
+                                    ->columnSpan(1),
+
+                                TextInput::make('transfer_reference_number')
+                                    ->label('No. Referensi Transfer / Bukti Bank')
+                                    ->placeholder('Contoh: TRF-20260918-0012')
+                                    ->required(fn(Get $get) => in_array($get('payment_method'), ['Bank Transfer', 'Transfer']))
+                                    ->helperText('Nomor referensi atau bukti transfer bank. Wajib untuk metode Transfer.')
+                                    ->columnSpan(1),
+
+                                FileUpload::make('proof_file')
+                                    ->label('Unggah Bukti Transfer')
+                                    ->disk('public')
+                                    ->directory('vendor-payments/proofs')
+                                    ->acceptedFileTypes(['image/*', 'application/pdf'])
+                                    ->maxSize(10240)
+                                    ->openable()
+                                    ->downloadable()
+                                    ->previewable()
+                                    ->helperText('Unggah berkas bukti resi transfer (PDF atau Gambar).')
+                                    ->columnSpan(1),
+                            ]),
+
                         // Payment Details Section
                         Section::make()
                             ->columns(3)
@@ -839,6 +902,24 @@ class VendorPaymentResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('payment_number')
+                    ->label('No. Pembayaran')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->placeholder(fn ($record) => 'VP-' . str_pad($record->id, 5, '0', STR_PAD_LEFT)),
+
+                TextColumn::make('transfer_reference_number')
+                    ->label('No. Ref Transfer')
+                    ->searchable()
+                    ->placeholder('-')
+                    ->toggleable(),
+
+                TextColumn::make('cabang.name')
+                    ->label('Cabang')
+                    ->sortable()
+                    ->placeholder('-'),
+
                 TextColumn::make('supplier')
                     ->label('Supplier')
                     ->formatStateUsing(function ($state) {
@@ -961,7 +1042,8 @@ class VendorPaymentResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
-                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn ($record) => strtolower((string) $record->status) === 'draft'),
                     Tables\Actions\Action::make('view_journal_entries')
                         ->label('Journal Entries')
                         ->icon('heroicon-o-document-text')
@@ -971,12 +1053,25 @@ class VendorPaymentResource extends Resource
                             'tableFilters[source_id][value]' => $record->id
                         ]))
                         ->openUrlInNewTab(),
-                    Tables\Actions\DeleteAction::make(),
+                    Tables\Actions\DeleteAction::make()
+                        ->visible(fn ($record) => strtolower((string) $record->status) === 'draft'),
                 ]),
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->action(function ($records) {
+                            $drafts = $records->filter(fn ($r) => strtolower((string) $r->status) === 'draft');
+                            $nonDrafts = $records->count() - $drafts->count();
+                            $drafts->each->delete();
+                            if ($nonDrafts > 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->warning()
+                                    ->title('Sebagian Pembayaran Tidak Dihapus')
+                                    ->body("Hanya {$drafts->count()} pembayaran status Draft yang dihapus. {$nonDrafts} pembayaran yang sudah diproses tidak dapat dihapus.")
+                                    ->send();
+                            }
+                        }),
                 ]),
             ])
             ->defaultSort('created_at', 'desc')

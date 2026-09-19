@@ -75,7 +75,7 @@ it('backfill command fills product coa fields using create-form defaults', funct
     $manufacture->refresh();
     $rawMaterial->refresh();
 
-    expect($standard->inventoryCoa?->code)->toBe('1140.01')
+    expect($standard->inventoryCoa?->code)->toBe('1140.10')
         ->and($standard->salesCoa?->code)->toBe('4100.10')
         ->and($standard->salesReturnCoa?->code)->toBe('4120.10')
         ->and($standard->salesDiscountCoa?->code)->toBe('4110.10')

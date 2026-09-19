@@ -25,9 +25,7 @@ class ListAccountPayables extends ListRecords
 
     public function getTitle(): string
     {
-        $totalAmount = $this->getFilteredQuery()->sum('account_payables.remaining');
-
-        return 'Account Payable - ' . MoneyHelper::rupiah($totalAmount);
+        return 'Hutang Usaha (Account Payable)';
     }
 
     protected function getFilteredQuery(): Builder

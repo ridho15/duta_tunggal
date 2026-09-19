@@ -58,7 +58,7 @@ class ViewQuotation extends ViewRecord
                         return asset('storage' . $record->po_file_path);
                     }),
                 Action::make('request_approve')
-                    ->label('Request Approve')
+                    ->label('Ajukan Persetujuan')
                     ->icon('heroicon-o-arrow-uturn-up')
                     ->color('success')
                     ->hidden(function ($record) {
@@ -71,7 +71,7 @@ class ViewQuotation extends ViewRecord
                         HelperController::sendNotification(isSuccess: true, title: "Information", message: "Pengajuan persetujuan Quotation berhasil. Proses selanjutnya: Manajer Sales perlu mereview dan memberikan persetujuan atas Quotation ini.");
                     }),
                 Action::make('approve')
-                    ->label('Approve')
+                    ->label('Setujui')
                     ->icon('heroicon-o-check-badge')
                     ->hidden(function ($record) {
                         return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('approve quotation');
@@ -84,7 +84,7 @@ class ViewQuotation extends ViewRecord
                         HelperController::sendNotification(isSuccess: true, title: "Success", message: "Quotation berhasil disetujui. Proses selanjutnya: Tim Sales perlu membuat Sale Order berdasarkan Quotation yang telah disetujui ini.");
                     }),
                 Action::make('reject')
-                    ->label('Reject')
+                    ->label('Tolak')
                     ->icon('heroicon-o-x-circle')
                     ->hidden(function ($record) {
                         return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('reject quotation');
@@ -98,7 +98,7 @@ class ViewQuotation extends ViewRecord
                     }),
                 Action::make('sync_total_amount')
                     ->icon('heroicon-o-arrow-path-rounded-square')
-                    ->label('Sync Total Amount')
+                    ->label('Hitung Ulang Total')
                     ->color('primary')
                     ->action(function ($record) {
                         $quotationService = app(QuotationService::class);
@@ -287,7 +287,7 @@ class ViewQuotation extends ViewRecord
                                                 if ($warehouseId) {
                                                     return \App\Models\Rak::where('warehouse_id', $warehouseId)->pluck('name', 'id')->map(function ($name, $id) {
                                                         $rak = \App\Models\Rak::find($id);
-                                                        return "({$rak->code}) {$name}";
+                                                        return filled($rak?->code) ? "({$rak->code}) {$name}" : $name;
                                                     });
                                                 }
                                                 return [];

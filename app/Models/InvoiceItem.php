@@ -22,10 +22,12 @@ class InvoiceItem extends Model
         'subtotal',
         'total',
         'coa_id',
+        'po_price',
     ];
     protected $casts = [
         'quantity' => 'decimal:2',
         'price' => 'decimal:2',
+        'po_price' => 'decimal:2',
         'discount' => 'decimal:2',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',

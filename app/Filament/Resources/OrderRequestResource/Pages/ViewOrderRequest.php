@@ -68,26 +68,47 @@ class ViewOrderRequest extends ViewRecord
     {
         return [
             EditAction::make()
+                ->visible(fn ($record) => in_array($record->status, ['draft', 'request_approve']) && ! $record->purchaseOrders()->exists())
                 ->icon('heroicon-o-pencil-square'),
-            DeleteAction::make()->icon('heroicon-o-trash')
+            DeleteAction::make()
+                ->visible(fn ($record) => $record->status === 'draft' && ! $record->purchaseOrders()->exists())
+                ->icon('heroicon-o-trash')
                 ->color('danger'),
             Action::make('reject')
                 ->label('Reject')
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
-                ->requiresConfirmation()
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
+                ->modalWidth('lg')
+                ->modalHeading('Tolak Order Request')
+                ->modalDescription('Masukkan alasan penolakan Order Request ini. Alasan wajib diisi agar pemohon dapat melakukan revisi.')
+                ->modalSubmitActionLabel('Tolak Order Request')
+                ->form([
+                    Textarea::make('rejection_note')
+                        ->label('Alasan Penolakan')
+                        ->placeholder('Contoh: Spesifikasi barang tidak sesuai, anggaran melebihi batas, dsb.')
+                        ->required()
+                        ->rows(3)
+                        ->validationMessages([
+                            'required' => 'Alasan penolakan wajib diisi.',
+                        ]),
+                ])
                 ->visible(function ($record) {
-                    return Auth::user()->hasPermissionTo('approve order request') && $record->status == 'draft';
+                    return Auth::user()->hasPermissionTo('approve order request') && $record->status === 'request_approve';
                 })
-                ->action(function ($record) {
+                ->action(function ($record, array $data) {
                     $orderRequestService = app(OrderRequestService::class);
-                    $orderRequestService->reject($record);
+                    $orderRequestService->reject($record, $data['rejection_note'] ?? null);
                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah ditolak. Proses selanjutnya: Pemohon dapat merevisi data dan mengajukan kembali untuk mendapatkan persetujuan.");
+                    $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                 }),
             Action::make('request_approve')
                 ->label('Request Approve')
                 ->color('primary')
                 ->icon('heroicon-o-paper-airplane')
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                 ->requiresConfirmation()
                 ->modalHeading('Ajukan Persetujuan')
                 ->modalDescription('Apakah Anda yakin ingin mengajukan order request ini untuk disetujui?')
@@ -102,6 +123,8 @@ class ViewOrderRequest extends ViewRecord
                 ->label('Approve')
                 ->color('success')
                 ->icon('heroicon-o-check-badge')
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                 ->modalWidth('6xl')
                 ->modalHeading('Approve Order Request')
                 ->modalDescription('Tinjau dan setujui Order Request ini. Pilih item yang akan dibuatkan Purchase Order.')
@@ -219,6 +242,24 @@ class ViewOrderRequest extends ViewRecord
                                 ->nullable()
                                 ->native(false)
                                 ->displayFormat('d M Y'),
+                            Select::make('warehouse_id')
+                                ->label('Gudang Tujuan Penerimaan')
+                                ->options(function () {
+                                    return \App\Models\Warehouse::withoutGlobalScopes()
+                                        ->where('status', 1)
+                                        ->orderBy('name')
+                                        ->get()
+                                        ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"])
+                                        ->all();
+                                })
+                                ->searchable()
+                                ->preload()
+                                ->required(fn(Get $get) => (bool) $get('create_purchase_order'))
+                                ->validationMessages([
+                                    'required' => 'Gudang tujuan penerimaan wajib dipilih.',
+                                ])
+                                ->helperText('Gudang tujuan penerimaan fisik barang untuk PO yang akan dibuat.')
+                                ->columnSpanFull(),
                             Textarea::make('note')
                                 ->label('Catatan')
                                 ->nullable()
@@ -238,10 +279,20 @@ class ViewOrderRequest extends ViewRecord
                         ]),
                 ])
                 ->visible(function ($record) {
-                    return $record->status == 'request_approve' && Auth::user()->hasPermissionTo('approve order request');
+                    if ($record->status !== 'request_approve') {
+                        return false;
+                    }
+                    $check = app(\App\Services\ApprovalControlService::class)->canApproveOrderRequest(Auth::user(), $record);
+                    return $check['allowed'];
                 })
                 ->action(function (array $data, $record) {
                     try {
+                        $check = app(\App\Services\ApprovalControlService::class)->canApproveOrderRequest(Auth::user(), $record);
+                        if (! $check['allowed']) {
+                            \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: 'Persetujuan Ditolak', message: $check['reason'] ?? 'Akses persetujuan ditolak.');
+                            return;
+                        }
+
                         $orderRequestService = app(OrderRequestService::class);
                         OrderRequestResource::validateApprovalGateItemDecisions($data);
 
@@ -256,6 +307,7 @@ class ViewOrderRequest extends ViewRecord
                                     $notification['message'] = 'Order Request disetujui, tetapi tidak ada Purchase Order dibuat karena tidak ada item Approved yang dicentang untuk dibuatkan PO otomatis.';
                                 }
                                 HelperController::sendNotification(...$notification);
+                                $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                                 return;
                             }
 
@@ -275,14 +327,16 @@ class ViewOrderRequest extends ViewRecord
                                 foreach ($groups as $groupItems) {
                                     $firstItem = $groupItems->first();
                                     $supplierId = $firstItem['item_supplier_id'] ?? null;
-                                    $cabangId = $firstItem['item_cabang_id'] ?? null;
-                                    if (empty($supplierId) || empty($cabangId)) {
+                                    $pusatCabangId = \App\Models\Cabang::where('kode', 'CBG-001')->orWhere('nama', 'like', '%pusat%')->value('id') ?? 1;
+                                    $cabangId = $firstItem['item_cabang_id'] ?? $pusatCabangId;
+                                    if (empty($supplierId)) {
                                         continue;
                                     }
 
                                     $poData = array_merge($data, [
                                         'supplier_id'    => $supplierId,
                                         'cabang_id'      => $cabangId,
+                                        'warehouse_id'   => $data['warehouse_id'] ?? null,
                                         'po_number'      => self::generateUniquePoNumber(),
                                         'selected_items' => $groupItems->values()->toArray(),
                                         'multi_supplier' => false,
@@ -296,12 +350,12 @@ class ViewOrderRequest extends ViewRecord
                                 $record->syncItemApprovalStatus();
                                 $record->refresh();
                                 HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. {$created} Purchase Order berhasil dibuat per supplier.");
+                                $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                                 return;
                             }
 
-                            $data['po_number'] = self::generateUniquePoNumber();
-                            $data['supplier_id'] = $data['supplier_id'] ?? self::resolveFirstIncludedSupplierId($includedItems);
-                            $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? null);
+                            $pusatCabangId = \App\Models\Cabang::where('kode', 'CBG-001')->orWhere('nama', 'like', '%pusat%')->value('id') ?? 1;
+                            $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? $pusatCabangId);
 
                             $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
                             if ($purchaseOrder) {
@@ -313,6 +367,7 @@ class ViewOrderRequest extends ViewRecord
                         $orderRequestService->approve($record, $data);
                         $record->refresh();
                         HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Order Request telah disetujui. Purchase Order dari proses ini otomatis disetujui jika dibuat.");
+                        $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                     } catch (ValidationException $exception) {
                         throw $exception;
                     } catch (Throwable $exception) {
@@ -486,6 +541,7 @@ class ViewOrderRequest extends ViewRecord
                         }
 
                         HelperController::sendNotification(isSuccess: true, title: 'Information', message: "{$created} Purchase Order berhasil dibuat per supplier.");
+                        $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                         return;
                     }
 
@@ -501,6 +557,7 @@ class ViewOrderRequest extends ViewRecord
 
                     $orderRequestService->createPurchaseOrder($record, $data);
                     HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
+                    $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                 })
         ];
     }

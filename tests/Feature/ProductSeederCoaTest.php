@@ -17,6 +17,6 @@ it('seeds products with the canonical inventory and temporary procurement coa de
     $product = Product::query()->orderBy('id')->first();
 
     expect($product)->not->toBeNull()
-        ->and($product->inventoryCoa?->code)->toBe('1140.01')
+        ->and($product->inventoryCoa?->code)->toBe('1140.10')
         ->and($product->temporaryProcurementCoa?->code)->toBe('1400.01');
 });

@@ -44,7 +44,43 @@ class PurchaseInvoiceAccountingService
         );
 
         if ($receiptBacked !== null) {
-            $data['invoiceItem'] = $receiptBacked['invoice_items'];
+            $submittedItems = collect($data['invoiceItem'] ?? []);
+            $expectedItems = $receiptBacked['invoice_items'];
+            $mergedItems = [];
+            $totalVariance = 0.0;
+
+            foreach ($expectedItems as $idx => $expItem) {
+                $subItem = $submittedItems->firstWhere('product_id', $expItem['product_id'])
+                    ?? ($submittedItems->get($idx) ?? null);
+
+                $poPrice = (float) $expItem['price'];
+                $quantity = (float) $expItem['quantity'];
+                $unitPrice = $poPrice;
+
+                if ($subItem && isset($subItem['price']) && $subItem['price'] !== '') {
+                    $enteredPrice = (float) MoneyHelper::safeParse($subItem['price']);
+                    if ($enteredPrice > 0) {
+                        $unitPrice = $enteredPrice;
+                    }
+                }
+
+                $taxRate = (float) ($expItem['tax_rate'] ?? 0);
+                $lineTotal = round($unitPrice * $quantity, 2);
+                $lineTaxAmount = round($lineTotal * ($taxRate / 100), 2);
+                $lineVariance = round(($unitPrice - $poPrice) * $quantity, 2);
+                $totalVariance += $lineVariance;
+
+                $mergedItems[] = array_merge($expItem, [
+                    'price' => $unitPrice,
+                    'po_price' => $poPrice,
+                    'subtotal' => $lineTotal,
+                    'total' => $lineTotal,
+                    'tax_amount' => $lineTaxAmount,
+                ]);
+            }
+
+            $data['invoiceItem'] = $mergedItems;
+            $data['price_variance_amount'] = round($totalVariance, 2);
 
             if (! empty($receiptBacked['purchase_order_ids'])) {
                 $data['purchase_order_ids'] = $receiptBacked['purchase_order_ids'];
@@ -195,7 +231,9 @@ class PurchaseInvoiceAccountingService
             ]);
         }
 
-        $supplierId = is_numeric($data['selected_supplier'] ?? null) ? (int) $data['selected_supplier'] : null;
+        $supplierId = is_numeric($data['selected_supplier'] ?? null)
+            ? (int) $data['selected_supplier']
+            : (is_numeric($data['supplier_id'] ?? null) ? (int) $data['supplier_id'] : null);
         if (! $supplierId || $purchaseOrders->contains(fn (PurchaseOrder $purchaseOrder) => (int) $purchaseOrder->supplier_id !== $supplierId)) {
             throw ValidationException::withMessages([
                 'selected_supplier' => 'Supplier tidak sesuai dengan Purchase Order yang dipilih.',
@@ -203,7 +241,7 @@ class PurchaseInvoiceAccountingService
         }
 
         $orderRequestId = is_numeric($data['selected_order_request'] ?? null) ? (int) $data['selected_order_request'] : null;
-        if (! $orderRequestId || $purchaseOrders->contains(fn (PurchaseOrder $purchaseOrder) => $purchaseOrder->refer_model_type !== OrderRequest::class || (int) $purchaseOrder->refer_model_id !== $orderRequestId)) {
+        if ($orderRequestId && $purchaseOrders->contains(fn (PurchaseOrder $purchaseOrder) => $purchaseOrder->refer_model_type === OrderRequest::class && (int) $purchaseOrder->refer_model_id !== $orderRequestId)) {
             throw ValidationException::withMessages([
                 'selected_order_request' => 'Order Request tidak sesuai dengan Purchase Order yang dipilih.',
             ]);
@@ -252,14 +290,71 @@ class PurchaseInvoiceAccountingService
             ]);
         }
 
-        $orderedPurchaseOrderIds = $receipts->pluck('purchase_order_id')->map(fn ($id) => (int) $id)->unique()->values();
-        $firstPurchaseOrder = $purchaseOrders->get($orderedPurchaseOrderIds->first());
+        $supplierInvoiceNumber = trim((string) ($data['supplier_invoice_number'] ?? ''));
+        if (!empty($supplierInvoiceNumber) && $supplierId) {
+            $existing = Invoice::withoutGlobalScopes()
+                ->whereNull('deleted_at')
+                ->where('from_model_type', PurchaseOrder::class)
+                ->where('supplier_invoice_number', $supplierInvoiceNumber)
+                ->where('supplier_id', $supplierId);
+            if (!empty($data['id'])) {
+                $existing->where('id', '!=', $data['id']);
+            }
+            if ($existing->exists()) {
+                throw ValidationException::withMessages([
+                    'supplier_invoice_number' => "Nomor invoice supplier '{$supplierInvoiceNumber}' sudah pernah digunakan untuk supplier ini.",
+                ]);
+            }
+        }
+
+        $taxInvoiceNumber = trim((string) ($data['tax_invoice_number'] ?? ''));
+        if (!empty($taxInvoiceNumber)) {
+            $existingTax = Invoice::withoutGlobalScopes()
+                ->whereNull('deleted_at')
+                ->where('tax_invoice_number', $taxInvoiceNumber);
+            if (!empty($data['id'])) {
+                $existingTax->where('id', '!=', $data['id']);
+            }
+            if ($existingTax->exists()) {
+                throw ValidationException::withMessages([
+                    'tax_invoice_number' => "Nomor faktur pajak '{$taxInvoiceNumber}' sudah pernah digunakan pada invoice lain.",
+                ]);
+            }
+        }
+
+        // 3-Way Match Price Tolerance check (Issue #5)
+        // Batas toleransi: 1% atau Rp 10.000 (mana yang lebih besar)
+        $tolerancePct = 0.01; // 1%
+        $toleranceMinNominal = 10000.0; // Rp 10.000
+
+        if (! empty($data['invoiceItem']) && is_array($data['invoiceItem'])) {
+            foreach ($data['invoiceItem'] as $item) {
+                $poPrice = (float) ($item['po_price'] ?? $item['price'] ?? 0);
+                $price = (float) MoneyHelper::safeParse($item['price'] ?? 0);
+                $qty = (float) ($item['quantity'] ?? 1);
+                $poLineTotal = round($poPrice * $qty, 2);
+                $invoiceLineTotal = round($price * $qty, 2);
+                $lineVariance = abs($invoiceLineTotal - $poLineTotal);
+                $allowedTolerance = max($poLineTotal * $tolerancePct, $toleranceMinNominal);
+
+                if ($lineVariance > $allowedTolerance) {
+                    $prod = \App\Models\Product::find($item['product_id'] ?? null);
+                    $prodName = $prod ? ($prod->sku ? "{$prod->sku} - {$prod->name}" : $prod->name) : 'Produk';
+                    throw ValidationException::withMessages([
+                        'invoiceItem' => "Selisih harga untuk '{$prodName}' (Invoice: Rp " . number_format($price, 2, ',', '.') . " vs PO: Rp " . number_format($poPrice, 2, ',', '.') . ") sebesar Rp " . number_format($lineVariance, 2, ',', '.') . " melebihi batas toleransi yang diizinkan (maksimal 1% atau Rp 10.000). Silakan revisi PO terlebih dahulu.",
+                    ]);
+                }
+            }
+        }
+
+        $firstPurchaseOrder = $purchaseOrders->get($selectedPurchaseOrderIds->first());
 
         return array_merge($data, [
             'from_model_type' => PurchaseOrder::class,
-            'from_model_id' => $orderedPurchaseOrderIds->first(),
-            'purchase_order_ids' => $orderedPurchaseOrderIds->all(),
+            'from_model_id' => $selectedPurchaseOrderIds->first(),
+            'purchase_order_ids' => $selectedPurchaseOrderIds->all(),
             'purchase_receipts' => $selectedReceiptIds->all(),
+            'supplier_id' => $supplierId ?: $firstPurchaseOrder?->supplier_id,
             'supplier_name' => $firstPurchaseOrder?->supplier?->perusahaan,
             'supplier_phone' => $firstPurchaseOrder?->supplier?->phone ?? '',
             'cabang_id' => $cabangId,
@@ -545,6 +640,7 @@ class PurchaseInvoiceAccountingService
 
                 $item['quantity'] = $quantity;
                 $item['price'] = $price;
+                $item['po_price'] = isset($item['po_price']) ? (float) MoneyHelper::safeParse($item['po_price']) : $price;
                 $item['total'] = $total;
                 $item['subtotal'] = (float) MoneyHelper::safeParse($item['subtotal'] ?? $total);
                 $item['tax_rate'] = (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0);
@@ -580,28 +676,47 @@ class PurchaseInvoiceAccountingService
 
             $cabangId = $this->resolveInvoiceCabangId($invoice) ?? $invoice->cabang_id;
 
+            $totalVariance = 0.0;
+            foreach ($invoice->invoiceItem as $item) {
+                if ($item->po_price !== null && (float) $item->po_price > 0) {
+                    $totalVariance += round(((float)$item->price - (float)$item->po_price) * (float)$item->quantity, 2);
+                }
+            }
+
             $invoice->forceFill([
                 'subtotal' => $subtotal,
                 'dpp' => $subtotal,
                 'tax' => $ppnRate,
                 'ppn_rate' => $ppnRate,
                 'total' => $total,
+                'price_variance_amount' => round($totalVariance, 2),
                 'cabang_id' => $cabangId,
             ])->saveQuietly();
 
-            $this->syncAccountPayable($invoice->fresh(), $total, $cabangId);
+            // Only sync AP and post journals if invoice is NOT in draft status
+            if (strtolower((string) $invoice->status) !== Invoice::STATUS_DRAFT) {
+                $this->syncAccountPayable($invoice->fresh(), $total, $cabangId);
 
-            if ($replaceExistingJournals) {
-                JournalEntry::withoutGlobalScopes()
-                    ->where('source_type', Invoice::class)
-                    ->where('source_id', $invoice->id)
-                    ->where('is_reversal', false)
-                    ->delete();
+                if ($replaceExistingJournals) {
+                    JournalEntry::withoutGlobalScopes()
+                        ->where('source_type', Invoice::class)
+                        ->where('source_id', $invoice->id)
+                        ->where('is_reversal', false)
+                        ->forceDelete();
+                }
+
+                app(LedgerPostingService::class)->postInvoice($invoice->fresh(), allowRepostAfterReversal: ! $replaceExistingJournals);
             }
 
-            app(LedgerPostingService::class)->postInvoice($invoice->fresh(), allowRepostAfterReversal: ! $replaceExistingJournals);
-
             return $invoice->fresh(['invoiceItem', 'accountPayable']);
+        });
+    }
+
+    public function postAndApproveInvoice(Invoice $invoice): Invoice
+    {
+        return DB::transaction(function () use ($invoice): Invoice {
+            $invoice->forceFill(['status' => Invoice::STATUS_SENT])->saveQuietly();
+            return $this->finaliseInvoice($invoice);
         });
     }
 
@@ -733,7 +848,7 @@ class PurchaseInvoiceAccountingService
         $subtotal = 0.0;
         $hasSourceLines = $sourceLines->isNotEmpty();
 
-        $items = collect($items)->map(function (array $item) use (&$remainingLines, &$taxAmount, &$subtotal): array {
+        $items = collect($items)->map(function (array $item) use (&$remainingLines, &$taxAmount, &$subtotal, $hasSourceLines, $defaultPpnRate): array {
             $lineTotal = (float) MoneyHelper::safeParse($item['total'] ?? $item['subtotal'] ?? 0);
             $sourceIndex = $remainingLines->search(fn (array $line) => (int) ($line['product_id'] ?? 0) === (int) ($item['product_id'] ?? 0));
             $sourceLine = $sourceIndex === false ? null : $remainingLines->get($sourceIndex);
@@ -741,11 +856,22 @@ class PurchaseInvoiceAccountingService
             if ($sourceLine) {
                 $remainingLines->forget($sourceIndex);
                 $taxRate = (float) ($sourceLine['tax_rate'] ?? 0);
-                $lineTaxAmount = round($lineTotal * $taxRate / 100, 2);
+                if ($taxRate > 100 && $lineTotal > 0) {
+                    $lineTaxAmount = $taxRate;
+                    $taxRate = min(100.0, round(($lineTaxAmount / $lineTotal) * 100, 2));
+                } else {
+                    $taxRate = min(100.0, max(0.0, $taxRate));
+                    $lineTaxAmount = round($lineTotal * $taxRate / 100, 2);
+                }
             } else {
                 $taxRate = (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0);
                 if (! $hasSourceLines && $taxRate <= 0 && $defaultPpnRate !== null) {
                     $taxRate = $defaultPpnRate;
+                }
+                if ($taxRate > 100 && $lineTotal > 0) {
+                    $taxRate = min(100.0, round(($taxRate / $lineTotal) * 100, 2));
+                } else {
+                    $taxRate = min(100.0, max(0.0, $taxRate));
                 }
                 $lineTaxAmount = (float) MoneyHelper::safeParse($item['tax_amount'] ?? 0);
                 if ($lineTaxAmount <= 0 && $lineTotal > 0 && $taxRate > 0) {

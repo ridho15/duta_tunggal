@@ -52,6 +52,7 @@ class PurchaseReturnService
             PurchaseReturn::QC_ACTION_REDUCE_STOCK,
             PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY,
             PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER,
+            PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
         ];
         if (!in_array($action, $validActions, true)) {
             throw new \Exception("Invalid failed_qc_action: {$action}");
@@ -150,10 +151,29 @@ class PurchaseReturnService
                 $this->resolveByWaitingNextDelivery($purchaseReturn, $poItem);
                 break;
 
+            case PurchaseReturn::QC_ACTION_RETURN_SUPPLIER:
+                $this->resolveByReturnSupplier($purchaseReturn, $poItem);
+                break;
+
             case PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER:
                 $this->resolveByMergingNextOrder($purchaseReturn, $poItem);
                 break;
         }
+    }
+
+    private function resolveByReturnSupplier(PurchaseReturn $purchaseReturn, PurchaseOrderItem $poItem): void
+    {
+        $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
+        $purchaseReturn->update([
+            'supplier_response' => 'return_to_supplier',
+            'tracking_notes'    => ($purchaseReturn->tracking_notes ?? '')
+                . "\n[Dokumen Retur] Barang ditolak sebanyak {$totalRejected} unit untuk dikembalikan ke supplier.",
+        ]);
+
+        Log::info('QC return resolved: return_supplier', [
+            'return_id'  => $purchaseReturn->id,
+            'po_item_id' => $poItem->id,
+        ]);
     }
 
     /**

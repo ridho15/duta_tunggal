@@ -37,6 +37,10 @@ class VendorPaymentPolicy
      */
     public function update(User $user, VendorPayment $vendorPayment): bool
     {
+        if (strtolower((string) $vendorPayment->status) !== 'draft') {
+            return false;
+        }
+
         return $user->hasPermissionTo('update vendor payment');
     }
 
@@ -45,6 +49,10 @@ class VendorPaymentPolicy
      */
     public function delete(User $user, VendorPayment $vendorPayment): bool
     {
+        if (strtolower((string) $vendorPayment->status) !== 'draft') {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete vendor payment');
     }
 

@@ -212,25 +212,25 @@ class AccountPayableResource extends Resource
                     
                 TextColumn::make('invoice.invoice_date')
                     ->label('Invoice Date')
-                    ->date('M j, Y')
                     ->sortable()
                     ->formatStateUsing(function ($state, $record) {
+                        $dateStr = $state ? \Illuminate\Support\Carbon::parse($state)->format('d M Y') : '-';
                         if ($record->overdue_group === 'DELETED INVOICE') {
-                            return $state . ' 🗑️';
+                            return $dateStr . ' 🗑️';
                         }
-                        return $state;
+                        return $dateStr;
                     }),
                     
                 TextColumn::make('invoice.due_date')
                     ->label('Due Date')
-                    ->date('M j, Y')
                     ->sortable()
                     ->color(fn ($record) => self::overdueStatusPresenter()->dueDateColor($record))
                     ->formatStateUsing(function ($state, $record) {
+                        $dateStr = $state ? \Illuminate\Support\Carbon::parse($state)->format('d M Y') : '-';
                         if ($record->overdue_group === 'DELETED INVOICE') {
-                            return $state . ' 🗑️ (DELETED)';
+                            return $dateStr . ' 🗑️ (DELETED)';
                         }
-                        return $state;
+                        return $dateStr;
                     }),
                     
                 TextColumn::make('total')

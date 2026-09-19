@@ -140,11 +140,32 @@ class PurchaseOrderResource extends Resource
     protected static function topTypeOptions(): array
     {
         return [
-            'cod' => 'COD',
-            'advance_before_delivery' => 'Advance Before Delivery',
-            'deposit_balance' => 'Deposit + Balance',
-            'credit_days' => 'Credit ... Days',
+            'cod' => 'COD (Cash on Delivery)',
+            'advance_before_delivery' => 'Advance Before Delivery (Bayar di Muka)',
+            'deposit_balance' => 'Deposit + Pelunasan',
+            'credit_days' => 'Kredit (Hari)',
         ];
+    }
+
+    public static function formatPurchaseOrderTop($record): string
+    {
+        $topType = self::normalizeTopTypeValue($record->top_type ?? null);
+        $tempoHutang = (int) ($record->tempo_hutang ?? ($record->supplier?->tempo_hutang ?? 0));
+
+        if (empty($topType)) {
+            if ($tempoHutang > 0) {
+                return "Kredit {$tempoHutang} hari";
+            }
+            return '-';
+        }
+
+        return match ($topType) {
+            'cod' => 'Cash / Tunai (COD)',
+            'advance_before_delivery' => 'Advance Before Delivery (Bayar di Muka)',
+            'deposit_balance' => 'Deposit + Pelunasan',
+            'credit_days' => $tempoHutang > 0 ? "Kredit {$tempoHutang} hari" : 'Kredit',
+            default => ucfirst(str_replace('_', ' ', $topType)),
+        };
     }
 
     protected static function normalizeTopTypeValue(?string $topType): string
@@ -156,11 +177,11 @@ class PurchaseOrderResource extends Resource
         }
 
         return match ($normalized) {
-            'cod' => 'cod',
+            'cash', 'tunai', 'cod' => 'cod',
             'advance before delivery', 'advance_before_delivery', 'advance-before-delivery', 'advance' => 'advance_before_delivery',
             'deposit + balance', 'deposit_balance', 'deposit-balance', 'deposit balance' => 'deposit_balance',
             'credit', 'credit_days', 'credit days', 'days' => 'credit_days',
-            default => 'credit_days',
+            default => $normalized,
         };
     }
 
@@ -180,12 +201,18 @@ class PurchaseOrderResource extends Resource
         $data['purchaseOrderCurrency'] = $currencyIds
             ->map(function (int $currencyId) use ($existingRates) {
                 $nominal = $existingRates->get($currencyId);
+                $isIdr = $currencyId === 1 || \App\Support\CurrencyConversionResolver::resolveSymbol($currencyId) === 'Rp';
+                $rate = is_numeric($nominal) && (float) $nominal > 0
+                    ? (float) $nominal
+                    : CurrencyConversionResolver::resolveRate($currencyId);
+
+                if ($isIdr && $rate <= 0) {
+                    $rate = 1.0;
+                }
 
                 return [
                     'currency_id' => $currencyId,
-                    'nominal' => is_numeric($nominal) && (float) $nominal > 0
-                        ? (float) $nominal
-                        : CurrencyConversionResolver::resolveRate($currencyId),
+                    'nominal' => $rate,
                 ];
             })
             ->all();
@@ -1074,7 +1101,7 @@ class PurchaseOrderResource extends Resource
 
     public static function isOrderRequestItemEligibleForPurchaseOrder(OrderRequestItem $orderRequestItem): bool
     {
-        return OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED;
+        return OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) !== OrderRequestItem::STATUS_REJECTED;
     }
 
     /**
@@ -1565,7 +1592,7 @@ class PurchaseOrderResource extends Resource
                             })
                             ->required(),
                         Select::make('cabang_id')
-                            ->label('Cabang')
+                            ->label('Cabang Akuntansi (Pusat)')
                             ->options(function () {
                                 return \App\Models\Cabang::query()
                                     ->orderBy('nama')
@@ -1573,10 +1600,30 @@ class PurchaseOrderResource extends Resource
                                     ->mapWithKeys(fn($cabang) => [$cabang->id => "({$cabang->kode}) {$cabang->nama}"])
                                     ->all();
                             })
-                            ->default(fn() => Auth::user()?->cabang_id)
-                            ->disabled(fn(Get $get) => $get('refer_model_type') === 'App\\Models\\OrderRequest')
+                            ->default(fn() => \App\Models\Cabang::where('kode', 'CBG-001')->orWhere('nama', 'like', '%pusat%')->value('id') ?? 1)
+                            ->disabled()
                             ->dehydrated()
-                            ->required(),
+                            ->required()
+                            ->helperText('Beban akuntansi otomatis dialokasikan ke Pusat.'),
+                        Select::make('warehouse_id')
+                            ->label('Gudang Tujuan Penerimaan')
+                            ->options(function () {
+                                return \App\Models\Warehouse::withoutGlobalScopes()
+                                    ->where('status', 1)
+                                    ->orderBy('name')
+                                    ->get()
+                                    ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"])
+                                    ->all();
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->reactive()
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Gudang tujuan penerimaan wajib dipilih.',
+                            ])
+                            ->helperText('Gudang tujuan penerimaan fisik barang untuk PO ini (1 PO = 1 Gudang).')
+                            ->dehydrated(),
                         Select::make('top_type')
                             ->label('TOP (Term Of Payment)')
                             ->options(self::topTypeOptions())
@@ -1621,7 +1668,7 @@ class PurchaseOrderResource extends Resource
                             ->label('Filter Tipe Pajak Item')
                             ->options([
                                 'inklusif' => 'Inklusif',
-                                'eklusif' => 'Eklusif',
+                                'eklusif' => 'Eksklusif',
                                 'none' => 'Non Pajak',
                             ])
                             ->hidden()
@@ -3004,14 +3051,10 @@ class PurchaseOrderResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
-                        ->hidden(function ($record) {
-                            return $record->status == 'completed';
-                        })
+                        ->visible(fn ($record) => in_array($record->status, ['draft', 'request_approval', 'request_approve']))
                         ->color('success'),
                     DeleteAction::make()
-                        ->hidden(function ($record) {
-                            return $record->status == 'completed';
-                        }),
+                        ->visible(fn ($record) => $record->status === 'draft'),
                     Action::make('konfirmasi')
                         ->label('Konfirmasi')
                         ->visible(function ($record) {
@@ -3061,12 +3104,16 @@ class PurchaseOrderResource extends Resource
                         ->label('Setujui PO')
                         ->visible(function ($record) {
                             return Gate::allows('response purchase order')
-                                && $record->status === 'draft';
+                                && in_array($record->status, ['draft', 'request_approval', 'request_approve']);
                         })
                         ->requiresConfirmation()
                         ->modalHeading('Setujui Purchase Order')
-                        ->modalDescription('Apakah Anda yakin ingin menyetujui Purchase Order ini?')
-                        ->modalSubmitActionLabel('Ya, Setujui')
+                        ->modalDescription(function ($record) {
+                            $supplierName = $record->supplier?->perusahaan ?: 'Supplier';
+                            $totalFormatted = self::formatMoneyState($record->total_amount, $record->currency_id);
+                            return "Menyetujui PO {$record->po_number} akan mengesahkan pemesanan ke {$supplierName} dengan total {$totalFormatted}, serta mengaktifkan proses inspeksi Quality Control (QC) saat barang datang. Lanjutkan?";
+                        })
+                        ->modalSubmitActionLabel('Ya, Setujui PO')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->action(function ($record) {
@@ -3119,7 +3166,7 @@ class PurchaseOrderResource extends Resource
                         ->url(fn ($record) => route('pdf-stream', ['type' => 'purchase-order', 'id' => $record->id]))
                         ->openUrlInNewTab(),
                     Action::make('update_total_amount')
-                        ->label('Sync Total Amount')
+                        ->label('Hitung Ulang Total')
                         ->color('primary')
                         ->hidden(function ($record) {
                             return $record->status == 'completed';
@@ -3313,6 +3360,21 @@ class PurchaseOrderResource extends Resource
 
                                 return $cabang->kode ? "({$cabang->kode}) {$cabang->nama}" : ($cabang->nama ?? '-');
                             }),
+                        \Filament\Infolists\Components\TextEntry::make('warehouse_display')
+                            ->label('Gudang Tujuan Penerimaan')
+                            ->getStateUsing(function ($record) {
+                                if (! $record->warehouse_id) {
+                                    return 'Tidak ditetapkan';
+                                }
+                                $record->loadMissing('warehouse');
+                                $wh = $record->warehouse;
+                                if (! $wh) {
+                                    return '-';
+                                }
+
+                                return $wh->kode ? "({$wh->kode}) {$wh->name}" : ($wh->name ?? '-');
+                            })
+                            ->icon('heroicon-o-building-office-2'),
                         \Filament\Infolists\Components\TextEntry::make('order_date')
                             ->label('Tanggal Pembelian')
                             ->date('d/m/Y'),
@@ -3322,11 +3384,7 @@ class PurchaseOrderResource extends Resource
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('top_type')
                             ->label('TOP')
-                            ->getStateUsing(function ($record) {
-                                $value = self::normalizeTopTypeValue($record->top_type ?? null);
-
-                                return self::topTypeOptions()[$value] ?? '-';
-                            }),
+                            ->getStateUsing(fn($record) => self::formatPurchaseOrderTop($record)),
                         \Filament\Infolists\Components\TextEntry::make('tempo_hutang')
                             ->label('Masa Kredit (Hari)')
                             ->getStateUsing(fn($record) => (int) ($record->tempo_hutang ?? 0)),
@@ -3411,11 +3469,19 @@ class PurchaseOrderResource extends Resource
                             ->getStateUsing(function ($record) {
                                 $record->loadMissing('purchaseOrderCurrency.currency');
                                 if ($record->purchaseOrderCurrency->isEmpty()) {
-                                    return '-';
+                                    return 'IDR: ' . self::formatMoneyState(1.0);
                                 }
 
                                 return $record->purchaseOrderCurrency
-                                    ->map(fn($row) => ($row->currency?->code ?? '-') . ': ' . self::formatMoneyState($row->nominal ?? 0))
+                                    ->map(function ($row) {
+                                        $code = strtoupper((string) ($row->currency?->code ?? 'IDR'));
+                                        $nominal = (float) ($row->nominal ?? 0);
+                                        if ($code === 'IDR' || $nominal <= 0) {
+                                            $nominal = 1.0;
+                                        }
+
+                                        return $code . ': ' . self::formatMoneyState($nominal);
+                                    })
                                     ->implode(', ');
                             }),
                     ]),

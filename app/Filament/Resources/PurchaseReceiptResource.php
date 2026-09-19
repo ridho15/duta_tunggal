@@ -649,16 +649,22 @@ class PurchaseReceiptResource extends Resource
 
                         return '';
                     }),
-                SelectColumn::make('status')
-                    ->options(function () {
-                        return [
-                            'draft' => 'Draft',
-                            'partial' => 'Partial',
-                            'completed' => 'Completed'
-                        ];
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => match (strtolower((string) $state)) {
+                        'draft' => 'Draft',
+                        'partial' => 'Partial',
+                        'completed' => 'Completed',
+                        default => ucfirst((string) $state),
+                    })
+                    ->color(fn ($state) => match (strtolower((string) $state)) {
+                        'draft' => 'gray',
+                        'partial' => 'warning',
+                        'completed' => 'success',
+                        default => 'gray',
                     })
                     ->tooltip(function ($state) {
-                        switch ($state) {
+                        switch (strtolower((string) $state)) {
                             case 'draft':
                                 return 'Status Draft: Belum ada item yang dikirim ke Quality Control. Purchase receipt masih dalam proses penerimaan barang.';
                             case 'partial':

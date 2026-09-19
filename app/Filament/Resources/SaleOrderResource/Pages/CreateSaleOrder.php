@@ -101,4 +101,9 @@ class CreateSaleOrder extends CreateRecord
         $salesOrderService = app(SalesOrderService::class);
         $salesOrderService->updateTotalAmount($this->getRecord());
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
+    }
 }

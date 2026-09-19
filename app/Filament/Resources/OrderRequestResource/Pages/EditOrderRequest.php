@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrderRequestResource\Pages;
 use App\Filament\Resources\OrderRequestResource;
 use App\Filament\Resources\OrderRequestResource\Pages\Concerns\InteractsWithInlineOrderRequestItems;
 use Filament\Actions\DeleteAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,21 @@ class EditOrderRequest extends EditRecord
     protected static string $resource = OrderRequestResource::class;
 
     protected static string $view = 'filament.resources.order-request-resource.pages.edit-order-request';
+
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        if ($this->record->purchaseOrders()->exists() || ! in_array($this->record->status, ['draft', 'request_approve'])) {
+            Notification::make()
+                ->title('Order Request Terkunci')
+                ->body('Order Request yang sudah disetujui atau sudah memiliki Purchase Order tidak dapat diubah.')
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+        }
+    }
 
     public function getViewData(): array
     {
@@ -35,6 +51,7 @@ class EditOrderRequest extends EditRecord
     {
         return [
             DeleteAction::make()
+                ->visible(fn ($record) => $record->status === 'draft' && ! $record->purchaseOrders()->exists())
                 ->icon('heroicon-o-trash'),
         ];
     }

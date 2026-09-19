@@ -22,7 +22,9 @@ class ViewPurchaseInvoice extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            Actions\EditAction::make()
+                ->icon('heroicon-o-pencil')
+                ->visible(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT),
             Actions\Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-book-open')
@@ -43,34 +45,37 @@ class ViewPurchaseInvoice extends ViewRecord
                         return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
                     }
                 }),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
-            Actions\Action::make('mark_as_sent')
-                ->label('Mark as Sent')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('warning')
-                ->visible(fn ($record) => $record->status === 'draft' && $this->canManageStatus())
+            Actions\DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->visible(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT),
+            Actions\Action::make('post_invoice')
+                ->label('Posting Invoice')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT)
                 ->requiresConfirmation()
-                ->modalHeading('Mark Invoice as Sent')
-                ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
-                ->modalSubmitActionLabel('Yes, Mark as Sent')
+                ->modalHeading('Posting Invoice Pembelian')
+                ->modalDescription('Apakah Anda yakin ingin memposting invoice ini? Tindakan ini akan membentuk Hutang Usaha (Account Payable) dan memposting jurnal ke Buku Besar.')
+                ->modalSubmitActionLabel('Ya, Posting Invoice')
                 ->action(function ($record) {
                     try {
-                        $record->update(['status' => 'sent']);
+                        app(\App\Services\PurchaseInvoiceAccountingService::class)->postAndApproveInvoice($record);
 
                         \Filament\Notifications\Notification::make()
-                            ->title('Invoice berhasil ditandai sebagai terkirim')
+                            ->title('Invoice Berhasil Diposting')
+                            ->body('Hutang dan jurnal telah berhasil dibukukan.')
                             ->success()
                             ->send();
                     } catch (Throwable $exception) {
-                        Log::error('ViewPurchaseInvoice mark_as_sent failed', [
+                        Log::error('ViewPurchaseInvoice post_invoice failed', [
                             'invoice_id' => $record->id,
                             'error' => $exception->getMessage(),
                         ]);
 
                         ProcurementFailureNotifier::danger(
-                            'Gagal Mengubah Status Invoice',
+                            'Gagal Memposting Invoice',
                             $exception,
-                            'Status invoice pembelian belum berhasil diperbarui. Silakan coba lagi.'
+                            'Invoice pembelian belum berhasil diposting. Silakan coba lagi.'
                         );
                     }
                 }),

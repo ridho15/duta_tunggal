@@ -31,6 +31,8 @@ class VendorPayment extends Model
     ];
 
     protected $fillable = [
+        'payment_number',
+        'cabang_id',
         'payment_request_id', // Task 15c: link to PaymentRequest
         'supplier_id',
         'selected_invoices',
@@ -43,6 +45,9 @@ class VendorPayment extends Model
         'total_payment_idr',
         'coa_id',
         'payment_method',
+        'target_bank_account',
+        'transfer_reference_number',
+        'proof_file',
         'notes',
         'diskon',
         'payment_adjustment',
@@ -179,11 +184,41 @@ class VendorPayment extends Model
         return $this->vendorPaymentDetail()->sum('amount');
     }
 
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    protected static function booted()
+    {
+        static::creating(function (VendorPayment $payment) {
+            if (empty($payment->payment_number)) {
+                $payment->payment_number = static::generatePaymentNumber();
+            }
+        });
+    }
+
+    public static function generatePaymentNumber(): string
+    {
+        $prefix = 'VP-' . date('Ym') . '-';
+        $last = static::withoutGlobalScopes()
+            ->where('payment_number', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->value('payment_number');
+
+        $seq = 1;
+        if ($last && preg_match('/' . preg_quote($prefix, '/') . '(\d+)/', $last, $matches)) {
+            $seq = ((int) $matches[1]) + 1;
+        }
+
+        return $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
+    }
+
     /**
      * Get reference for journal entries
      */
     public function getReferenceAttribute()
     {
-        return $this->ntpn ?: 'VP-' . $this->id;
+        return $this->payment_number ?: ($this->ntpn ?: 'VP-' . $this->id);
     }
 }

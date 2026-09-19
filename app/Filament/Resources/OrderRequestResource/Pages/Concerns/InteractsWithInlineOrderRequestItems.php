@@ -458,6 +458,15 @@ trait InteractsWithInlineOrderRequestItems
                 $item['rejected_at'] = $now;
                 $item['rejection_note'] = $note;
             } else {
+                if (! empty($item['id']) && PurchaseOrderItem::where('order_request_item_id', $item['id'])->exists()) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Item tidak dapat diubah ke Draft')
+                        ->body('Item sudah terikat dengan Purchase Order dan tidak dapat dikembalikan ke status Draft.')
+                        ->send();
+                    continue;
+                }
+
                 $item['status'] = OrderRequestItem::STATUS_DRAFT;
                 $item['approved_by'] = null;
                 $item['approved_at'] = null;

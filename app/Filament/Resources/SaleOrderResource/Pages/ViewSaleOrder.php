@@ -40,19 +40,21 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-pencil-square')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('update sales order') &&
-                            in_array($record->status, ['draft', 'request_approve', 'approved']);
+                            in_array($record->status, ['draft', 'request_approve']);
                     }),
                 DeleteAction::make()
                     ->icon('heroicon-o-trash')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('delete sales order') &&
-                            in_array($record->status, ['draft', 'request_approve']);
+                            $record->status === 'draft';
                     }),
                 Action::make('request_approve')
                     ->label('Request Approve')
                     ->requiresConfirmation()
                     ->color('success')
                     ->icon('heroicon-o-arrow-uturn-up')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('request sales order')
                             && $record->status == 'draft';
@@ -82,6 +84,8 @@ class ViewSaleOrder extends ViewRecord
                     ->requiresConfirmation()
                     ->color('danger')
                     ->icon('heroicon-o-x-circle')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('request sales order') &&
                             in_array($record->status, ['approved', 'confirmed', 'completed']);
@@ -107,12 +111,23 @@ class ViewSaleOrder extends ViewRecord
                     ->requiresConfirmation()
                     ->color('success')
                     ->icon('heroicon-o-check-badge')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                     ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('response sales order')
-                            && ($record->status == 'request_approve');
+                        if ($record->status !== 'request_approve') {
+                            return false;
+                        }
+                        $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                        return $check['allowed'];
                     })
                     ->action(function ($record) {
                         try {
+                            $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                            if (! $check['allowed']) {
+                                HelperController::sendNotification(isSuccess: false, title: "Persetujuan Ditolak", message: $check['reason'] ?? 'Akses persetujuan ditolak.');
+                                return;
+                            }
+
                             $salesOrderService = app(SalesOrderService::class);
                             $salesOrderService->approve($record);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
@@ -136,6 +151,8 @@ class ViewSaleOrder extends ViewRecord
                     ->requiresConfirmation()
                     ->color('warning')
                     ->icon('heroicon-o-x-circle')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_close');
                     })
@@ -160,6 +177,8 @@ class ViewSaleOrder extends ViewRecord
                     ->requiresConfirmation()
                     ->color('danger')
                     ->icon('heroicon-o-x-circle')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('response sales order') && ($record->status == 'request_approve');
                     })
@@ -367,7 +386,7 @@ class ViewSaleOrder extends ViewRecord
                     }),
                 Action::make('sync_total_amount')
                     ->icon('heroicon-o-arrow-path-rounded-square')
-                    ->label('Sync Total Amount')
+                    ->label('Hitung Ulang Total')
                     ->color('primary')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('update sales order');

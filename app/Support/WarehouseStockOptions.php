@@ -25,32 +25,36 @@ class WarehouseStockOptions
                 ->pluck('total_qty', 'warehouse_id');
         }
 
-        $warehouseIds = collect($stockByWarehouse->keys())
-            ->when($selectedWarehouseId, fn (Collection $ids) => $ids->push($selectedWarehouseId))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($warehouseIds->isEmpty()) {
-            return [];
-        }
-
-        $query = Warehouse::query()
-            ->where('status', 1)
-            ->whereIn('id', $warehouseIds->all());
+        $query = Warehouse::query()->where('status', 1);
 
         if (! $user || ! is_array($manageType) || ! in_array('all', $manageType)) {
-            $query->where('cabang_id', $user?->cabang_id);
+            if ($user?->cabang_id) {
+                $query->where('cabang_id', $user->cabang_id);
+            }
         }
 
-        return $query
-            ->orderBy('name')
-            ->get()
+        $warehouses = $query->orderBy('name')->get();
+
+        // If branch filtering resulted in 0 warehouses, fallback to all active warehouses
+        if ($warehouses->isEmpty()) {
+            $warehouses = Warehouse::query()->where('status', 1)->orderBy('name')->get();
+        }
+
+        // Include selected warehouse if not already in collection
+        if ($selectedWarehouseId && ! $warehouses->contains('id', $selectedWarehouseId)) {
+            $selected = Warehouse::find($selectedWarehouseId);
+            if ($selected) {
+                $warehouses->push($selected);
+            }
+        }
+
+        return $warehouses
             ->mapWithKeys(function (Warehouse $warehouse) use ($stockByWarehouse, $includeStockLabel) {
                 $stockLabel = '';
 
-                if ($includeStockLabel && isset($stockByWarehouse[$warehouse->id])) {
-                    $stockLabel = ' - Stok: ' . number_format((float) $stockByWarehouse[$warehouse->id], 0, ',', '.');
+                if ($includeStockLabel) {
+                    $qty = (float) ($stockByWarehouse[$warehouse->id] ?? 0);
+                    $stockLabel = ' - Stok: ' . number_format($qty, 0, ',', '.');
                 }
 
                 return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}{$stockLabel}"];

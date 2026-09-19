@@ -37,7 +37,8 @@ class InvoicePolicy
      */
     public function update(User $user, Invoice $invoice): bool
     {
-        return $user->hasPermissionTo('update invoice');
+        return $user->hasPermissionTo('update invoice')
+            && strtolower((string) $invoice->status) === Invoice::STATUS_DRAFT;
     }
 
     /**
@@ -45,7 +46,8 @@ class InvoicePolicy
      */
     public function delete(User $user, Invoice $invoice): bool
     {
-        return $user->hasPermissionTo('delete invoice');
+        return $user->hasPermissionTo('delete invoice')
+            && strtolower((string) $invoice->status) === Invoice::STATUS_DRAFT;
     }
 
     /**

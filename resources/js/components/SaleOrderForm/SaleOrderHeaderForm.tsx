@@ -299,6 +299,22 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
             <span>Info Customer:</span>
           </div>
 
+          {/* Tipe Pembayaran */}
+          <div className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-gray-700 font-medium flex items-center gap-1 shadow-sm">
+            <Clock className="w-3.5 h-3.5 text-gray-500" />
+            <span>
+              Pembayaran: <b>{selectedCustomer.tipe_pembayaran || 'Bebas'}</b>
+              {selectedCustomer.tempo_kredit ? ` (${selectedCustomer.tempo_kredit} hari)` : ''}
+            </span>
+          </div>
+
+          {/* Tipe Pajak / Status */}
+          {selectedCustomer.tipe && (
+            <div className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-gray-700 font-medium flex items-center gap-1 shadow-sm">
+              <span>Tipe: <b>{selectedCustomer.tipe}</b></span>
+            </div>
+          )}
+
           {/* Deposit */}
           {selectedCustomer.deposit_balance !== undefined && selectedCustomer.deposit_balance > 0 && (
             <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 font-medium flex items-center gap-1">

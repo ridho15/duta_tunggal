@@ -125,7 +125,7 @@ class SaleOrderItemRelationManager extends RelationManager
                             ->options([
                                 'none' => 'Non Pajak',
                                 'inklusif' => 'Inklusif',
-                                'eklusif' => 'Eklusif',
+                                'eklusif' => 'Eksklusif',
                             ])
                             ->default('eklusif')
                             ->reactive()

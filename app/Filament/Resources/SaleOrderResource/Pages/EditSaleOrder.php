@@ -22,6 +22,21 @@ class EditSaleOrder extends EditRecord
 
     protected static ?string $title = 'Ubah Sales Order';
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        if (! in_array($this->record->status, ['draft', 'request_approve'])) {
+            Notification::make()
+                ->title('Sales Order Terkunci')
+                ->body('Sales Order dengan status ' . ucfirst(str_replace('_', ' ', $this->record->status)) . ' sudah tidak dapat diubah.')
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getResource()::getUrl('view', ['record' => $this->record]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -31,6 +46,7 @@ class EditSaleOrder extends EditRecord
                 ->color('primary')
                 ->url(fn () => route('filament.admin.resources.sale-orders.view', $this->getRecord())),
             DeleteAction::make()
+                ->visible(fn ($record) => $record->status === 'draft')
                 ->icon('heroicon-o-trash'),
         ];
     }
@@ -97,5 +113,10 @@ class EditSaleOrder extends EditRecord
     {
         $salesOrderService = new SalesOrderService;
         $salesOrderService->updateTotalAmount($this->getRecord());
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('view', ['record' => $this->getRecord()]);
     }
 }

@@ -229,7 +229,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                             ->options([
                                 'none' => 'Non Pajak',
                                 'inklusif' => 'Inklusif',
-                                'eklusif' => 'Eklusif'
+                                'eklusif' => 'Eksklusif'
                             ])
                             ->default('inklusif')
                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
@@ -253,7 +253,11 @@ class PurchaseOrderItemRelationManager extends RelationManager
                                     'tipe_pajak' => $normalizedState,
                                 ]);
                                 $set('subtotal', $subtotal);
-                            })
+                            }),
+                        TextInput::make('price_change_reason')
+                            ->label('Alasan Perubahan Harga')
+                            ->placeholder('Contoh: Negosiasi ulang / penyesuaian supplier')
+                            ->columnSpanFull(),
                     ])
             ]);
     }
@@ -282,13 +286,13 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('product.name')
-                    ->label('Product')
+                    ->label('Produk')
                     ->searchable()
                     ->sortable()
                     ->limit(45)
                     ->tooltip(fn ($record) => $record->product?->name),
                 TextColumn::make('source')
-                    ->label('Source')
+                    ->label('Sumber')
                     ->getStateUsing(fn ($record) => static::sourceLabel($record))
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         $search = Str::lower($search);
@@ -306,7 +310,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->badge()
                     ->color(fn ($state) => $state === 'Order Request' ? 'info' : 'gray'),
                 TextColumn::make('refer_item')
-                    ->label('Refer Item')
+                    ->label('Dokumen Asal')
                     ->getStateUsing(fn ($record) => static::referItemLabel($record))
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         $numericSearch = preg_replace('/\D+/', '', $search);
@@ -337,6 +341,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->toggleable(),
                 TextColumn::make('item_cabang')
                     ->label('Cabang')
+                    ->hidden(true)
                     ->getStateUsing(fn ($record) => static::itemCabangLabel($record))
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where(function (Builder $branchQuery) use ($search) {
@@ -361,6 +366,11 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->label('Unit Price')
                     ->formatStateUsing(fn ($state, $record) => static::moneyLabel($record, $state))
                     ->sortable(),
+                TextColumn::make('price_change_reason')
+                    ->label('Alasan Ubah Harga')
+                    ->limit(25)
+                    ->tooltip(fn ($record) => $record->price_change_reason)
+                    ->toggleable(),
                 TextColumn::make('discount')
                     ->label('Discount')
                     ->suffix('%')
@@ -401,7 +411,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                     ->label('Tipe Pajak')
                     ->options([
                         'inklusif' => 'Inklusif',
-                        'eklusif' => 'Eklusif',
+                        'eklusif' => 'Eksklusif',
                         'none' => 'Non Pajak',
                     ]),
                 SelectFilter::make('source')
@@ -622,13 +632,21 @@ class PurchaseOrderItemRelationManager extends RelationManager
         return filled($record->refer_item_model_id) ? 'Order Request' : 'Manual';
     }
 
-    protected static function referItemLabel($record): string
+    public static function referItemLabel($record): string
     {
         if (! filled($record->refer_item_model_id)) {
             return '-';
         }
 
-        return class_basename($record->refer_item_model_type ?: OrderRequestItem::class) . ' #' . $record->refer_item_model_id;
+        if ($record->refer_item_model_type === OrderRequestItem::class || ! $record->refer_item_model_type) {
+            $record->loadMissing('referItemModel.orderRequest');
+            $orNumber = $record->referItemModel?->orderRequest?->request_number;
+            if ($orNumber) {
+                return $orNumber;
+            }
+        }
+
+        return 'Ref #' . $record->refer_item_model_id;
     }
 
     protected static function itemCabangLabel($record): string

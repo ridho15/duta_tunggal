@@ -29,8 +29,13 @@ class ViewVendorPayment extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make()->icon('heroicon-o-pencil')->color('warning'),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\EditAction::make()
+                ->visible(fn ($record) => strtolower((string) $record->status) === 'draft')
+                ->icon('heroicon-o-pencil')
+                ->color('warning'),
+            Actions\DeleteAction::make()
+                ->visible(fn ($record) => strtolower((string) $record->status) === 'draft')
+                ->icon('heroicon-o-trash'),
             Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-document-text')
@@ -67,6 +72,22 @@ class ViewVendorPayment extends ViewRecord
                                     ->label('Metode Pembayaran'),
                                 Infolists\Components\TextEntry::make('status')
                                     ->label('Status'),
+                                Infolists\Components\TextEntry::make('target_bank_account')
+                                    ->label('Rekening Bank Tujuan')
+                                    ->placeholder('-'),
+                                Infolists\Components\TextEntry::make('transfer_reference_number')
+                                    ->label('No. Referensi Transfer')
+                                    ->placeholder('-'),
+                                Infolists\Components\ImageEntry::make('proof_file')
+                                    ->label('Bukti Transfer')
+                                    ->disk('public')
+                                    ->visible(fn ($record) => filled($record->proof_file) && preg_match('/\.(jpg|jpeg|png|webp|gif)$/i', (string) $record->proof_file)),
+                                Infolists\Components\TextEntry::make('proof_file_link')
+                                    ->label('Berkas Bukti Transfer')
+                                    ->state(fn ($record) => filled($record->proof_file) ? 'Unduh Berkas' : '-')
+                                    ->url(fn ($record) => filled($record->proof_file) ? asset('storage/' . $record->proof_file) : null)
+                                    ->openUrlInNewTab()
+                                    ->visible(fn ($record) => filled($record->proof_file) && ! preg_match('/\.(jpg|jpeg|png|webp|gif)$/i', (string) $record->proof_file)),
                             ]),
                         Infolists\Components\TextEntry::make('notes')
                             ->label('Catatan')

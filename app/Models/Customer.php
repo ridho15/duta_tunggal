@@ -135,4 +135,25 @@ class Customer extends Model
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
+
+    /**
+     * Mengembalikan kode customer yang aman untuk ditampilkan ke antarmuka.
+     * Jika kode berisi nomor NIK (15-18 digit angka), otomatis digantikan format CUST-XXXX.
+     */
+    public function getDisplayCode(): string
+    {
+        $code = trim((string) $this->code);
+        if ($code === '' || preg_match('/^[0-9]{15,18}$/', $code)) {
+            return 'CUST-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        }
+        return $code;
+    }
+
+    /**
+     * Mengembalikan label tampilan customer tanpa mengekspos NIK.
+     */
+    public function getDisplayName(): string
+    {
+        return "({$this->getDisplayCode()}) {$this->name}";
+    }
 }

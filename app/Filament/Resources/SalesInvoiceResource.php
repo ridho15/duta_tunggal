@@ -165,10 +165,10 @@ class SalesInvoiceResource extends Resource
 
                         // Invoice Info Section
                         Section::make()
-                            ->columns(2)
+                            ->columns(3)
                             ->schema([
                                 TextInput::make('invoice_number')
-                                    ->label('Invoice Number')
+                                    ->label('Nomor Invoice')
                                     ->required()
                                     ->unique(table: 'invoices', column: 'invoice_number', ignoreRecord: true)
                                     ->validationMessages([
@@ -187,54 +187,29 @@ class SalesInvoiceResource extends Resource
                                     )
                                     ->maxLength(255),
 
-                                TextInput::make('due_date_display')
-                                    ->label('Due Date')
-                                    ->disabled()
-                                    ->placeholder('Auto calculated')
-                                    ->dehydrated(false)
-                                    ->extraInputAttributes(static::readonlyInputAttributes())
-                                    ->afterStateHydrated(function ($component, $state, $get) {
-                                        $due = $get('due_date');
-                                        $invoice = $get('invoice_date') ?? now();
-                                        if ($due) {
-                                            $days = \Illuminate\Support\Carbon::parse($invoice)
-                                                ->diffInDays(\Illuminate\Support\Carbon::parse($due));
-                                            $component->state("{$due} ({$days} hari)");
-                                        }
-                                    }),
-
                                 DatePicker::make('invoice_date')
-                                    ->label('Invoice Date')
+                                    ->label('Tanggal Invoice')
                                     ->required()
                                     ->reactive()
                                     ->validationMessages([
                                         'required' => 'Tanggal invoice harus diisi'
                                     ])
-                                    ->default(now())
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        // recalc due_date_display when invoice date changes
-                                        $due = $get('due_date');
-                                        if ($due) {
-                                            $days = \Illuminate\Support\Carbon::parse($state)
-                                                ->diffInDays(\Illuminate\Support\Carbon::parse($due));
-                                            $set('due_date_display', "{$due} ({$days} hari)");
-                                        }
-                                    }),
+                                    ->default(now()),
 
                                 DatePicker::make('due_date')
-                                    ->label('Due Date')
+                                    ->label('Tanggal Jatuh Tempo')
                                     ->required()
+                                    ->reactive()
                                     ->validationMessages([
                                         'required' => 'Tanggal jatuh tempo harus diisi'
                                     ])
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($set, $get, $state) {
-                                        if ($state) {
-                                            $invoice = $get('invoice_date') ?? now();
-                                            $days = \Illuminate\Support\Carbon::parse($invoice)
-                                                ->diffInDays(\Illuminate\Support\Carbon::parse($state));
-                                            $set('due_date_display', "{$state} ({$days} hari)");
-                                        }
+                                    ->helperText(function ($get) {
+                                        $due = $get('due_date');
+                                        if (!$due) return null;
+                                        $invoice = $get('invoice_date') ?? now();
+                                        $days = (int) \Illuminate\Support\Carbon::parse($invoice)
+                                            ->diffInDays(\Illuminate\Support\Carbon::parse($due), false);
+                                        return $days >= 0 ? "Tenor: {$days} hari" : "Jatuh tempo terlewat " . abs($days) . " hari";
                                     }),
                             ]),
 
@@ -268,9 +243,10 @@ class SalesInvoiceResource extends Resource
                                         // Get current invoice record if editing (for allowing already selected DOs)
                                         $currentInvoiceId = $get('id') ?? null;
 
-                                        // Check which DOs are already invoiced (exclude current invoice if editing)
+                                        // Check which DOs are already invoiced (exclude canceled invoices and current invoice if editing)
                                         $invoicedDOIds = Invoice::where('from_model_type', 'App\Models\SaleOrder')
                                             ->whereNotNull('delivery_orders')
+                                            ->where('status', '!=', 'canceled')
                                             ->when($currentInvoiceId, function ($query) use ($currentInvoiceId) {
                                                 return $query->where('id', '!=', $currentInvoiceId);
                                             })
@@ -287,9 +263,8 @@ class SalesInvoiceResource extends Resource
                                             $label = "{$do->do_number} - " . MoneyHelper::rupiah($total);
 
                                             if ($isInvoiced) {
-                                                $label .= " (Sudah di-invoice)";
-                                                // Don't add to options if already invoiced
-                                                // continue;
+                                                // Exclude already invoiced DO from selectable options
+                                                continue;
                                             }
 
                                             $options[$do->id] = $label;
@@ -370,15 +345,20 @@ class SalesInvoiceResource extends Resource
 
                                         foreach ($deliveryOrders as $do) {
                                             foreach ($do->deliveryOrderItem as $item) {
-                                                if ($item->product && $item->saleOrderItem) {
-                                                    // FIX #3: discount is a percentage, not an IDR amount
-                                                    $discountPct = max(0.0, min(100.0, (float) $item->saleOrderItem->discount));
-                                                    $originalPrice = (float) $item->saleOrderItem->unit_price * (1 - $discountPct / 100);
+                                                $product = $item->product ?: $item->saleOrderItem?->product;
+                                                $saleOrderItem = $item->saleOrderItem;
+                                                if ($product) {
+                                                    // Net DPP price = unit_price * (1 - discount/100)
+                                                    $rawUnitPrice = $saleOrderItem && (float) $saleOrderItem->unit_price > 0
+                                                        ? (float) $saleOrderItem->unit_price
+                                                        : (float) ($product->sell_price ?? 0);
+                                                    $discountPct = $saleOrderItem ? max(0.0, min(100.0, (float) $saleOrderItem->discount)) : 0.0;
+                                                    $originalPrice = round($rawUnitPrice * (1 - $discountPct / 100), 2);
 
                                                     // For edit, try to find existing invoice item data
-                                                    $invoiceQuantity = $item->quantity;
+                                                    $invoiceQuantity = (float) $item->quantity;
                                                     $invoicePrice = $originalPrice;
-                                                    $invoiceCoaId = $item->product->sales_coa_id;
+                                                    $invoiceCoaId = $product->sales_coa_id;
 
                                                     if ($currentInvoiceId) {
                                                         // Find matching invoice item for this product
@@ -390,14 +370,14 @@ class SalesInvoiceResource extends Resource
                                                         if ($matchingItem) {
                                                             $invoiceQuantity = $matchingItem['quantity'] ?? $item->quantity;
                                                             $invoicePrice = $matchingItem['price'] ?? $originalPrice;
-                                                            $invoiceCoaId = $matchingItem['coa_id'] ?? $item->product->sales_coa_id;
+                                                            $invoiceCoaId = $matchingItem['coa_id'] ?? $product->sales_coa_id;
                                                         }
                                                     }
 
                                                     $deliveryOrderItems[] = [
                                                         'do_number' => $do->do_number,
-                                                        'product_id' => $item->product_id,
-                                                        'product_name' => $item->product->name . ' (' . $item->product->sku . ')',
+                                                        'product_id' => $item->product_id ?: $product->id,
+                                                        'product_name' => $product->name . ($product->sku ? ' (' . $product->sku . ')' : ''),
                                                         'original_quantity' => $item->quantity,
                                                         'invoice_quantity' => $invoiceQuantity,
                                                         'original_price' => $originalPrice,
@@ -583,8 +563,6 @@ class SalesInvoiceResource extends Resource
                                             ->label('Harga Satuan')
                                             ->indonesianMoney()
                                             ->required()
-                                            ->readOnly()
-                                            ->extraInputAttributes(static::readonlyInputAttributes())
                                             ->default(function ($get) {
                                                 return $get('original_price') ?? 0;
                                             })
@@ -821,6 +799,8 @@ class SalesInvoiceResource extends Resource
                                         return \App\Models\Product::query()->orderBy('name')->limit(50)->pluck('name', 'id');
                                     })
                                     ->searchable()
+                                    ->disabled()
+                                    ->dehydrated(true)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Produk harus dipilih'
@@ -828,6 +808,8 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
+                                    ->readOnly()
+                                    ->dehydrated(true)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Qty tidak boleh kosong',
@@ -837,6 +819,7 @@ class SalesInvoiceResource extends Resource
                                     ->label('Price')
                                     ->indonesianMoney()
                                     ->readOnly()
+                                    ->dehydrated(true)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Harga tidak boleh kosong',
@@ -845,6 +828,8 @@ class SalesInvoiceResource extends Resource
                                 TextInput::make('total')
                                     ->label('Total')
                                     ->indonesianMoney()
+                                    ->readOnly()
+                                    ->dehydrated(true)
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Total tidak boleh kosong',
@@ -854,7 +839,11 @@ class SalesInvoiceResource extends Resource
                             ->columns(2)
                             ->defaultItems(0)
                             ->collapsed()
-                            ->cloneable(),
+                            ->addable(false)
+                            ->deletable(false)
+                            ->reorderable(false)
+                            ->cloneable(false)
+                            ->helperText('Kuantitas dan harga dikunci otomatis sesuai Delivery Order & Sales Order yang telah disepakati.'),
                     ])
             ]);
     }

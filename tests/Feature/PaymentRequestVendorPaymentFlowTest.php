@@ -127,7 +127,7 @@ class PaymentRequestVendorPaymentFlowTest extends TestCase
     public function payment_request_generates_unique_request_number(): void
     {
         $number1 = PaymentRequest::generateNumber();
-        $this->assertStringStartsWith('PR-', $number1);
+        $this->assertStringStartsWith('PAY-REQ-', $number1);
 
         // Persisting the first number advances the sequence counter
         PaymentRequest::create([

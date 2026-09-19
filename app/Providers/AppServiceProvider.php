@@ -151,7 +151,7 @@ class AppServiceProvider extends ServiceProvider
 
             return $this
                 ->prefix('Rp')
-                ->placeholder('500.000,00')
+                ->placeholder('0,00')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
             $money($input, ',', '.', 2)
         JS))

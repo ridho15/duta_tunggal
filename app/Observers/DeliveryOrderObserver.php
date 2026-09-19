@@ -273,26 +273,6 @@ class DeliveryOrderObserver
         // di handleReservationReleaseStatus()
         // =========================================================
 
-        // Get all sales orders related to this delivery order
-        $salesOrders = $deliveryOrder->salesOrders;
-
-        foreach ($salesOrders as $saleOrder) {
-            // Only update if not already completed
-            if ($saleOrder->status !== 'completed') {
-                Log::info('DeliveryOrderObserver: Updating sale order to completed', [
-                    'sale_order_id' => $saleOrder->id,
-                    'so_number' => $saleOrder->so_number,
-                    'delivery_order_id' => $deliveryOrder->id,
-                ]);
-
-                // Update sale order status to completed
-                $saleOrder->update([
-                    'status' => 'completed',
-                    'completed_at' => now()
-                ]);
-            }
-        }
-
         // Update delivered_quantity untuk semua sale order items yang terkait.
         // Lock to prevent concurrent DO completions from corrupting the total.
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
@@ -317,6 +297,183 @@ class DeliveryOrderObserver
                 });
             }
         }
+
+        // Get all sales orders related to this delivery order and update status based on full delivery
+        $salesOrders = $deliveryOrder->salesOrders;
+
+        foreach ($salesOrders as $saleOrder) {
+            $saleOrder->load('saleOrderItem');
+            $allItemsDelivered = $saleOrder->saleOrderItem->isNotEmpty() && $saleOrder->saleOrderItem->every(function ($soItem) {
+                return (float) ($soItem->delivered_quantity ?? 0) >= (float) ($soItem->quantity ?? 0);
+            });
+
+            if ($allItemsDelivered) {
+                Log::info('DeliveryOrderObserver: All items delivered. Updating sale order to completed', [
+                    'sale_order_id' => $saleOrder->id,
+                    'so_number' => $saleOrder->so_number,
+                    'delivery_order_id' => $deliveryOrder->id,
+                ]);
+
+                $saleOrder->update([
+                    'status' => 'completed',
+                    'completed_at' => now()
+                ]);
+            } else {
+                Log::info('DeliveryOrderObserver: Partial delivery. Updating sale order to partially_delivered', [
+                    'sale_order_id' => $saleOrder->id,
+                    'so_number' => $saleOrder->so_number,
+                    'delivery_order_id' => $deliveryOrder->id,
+                ]);
+
+                $saleOrder->update([
+                    'status' => 'partially_delivered',
+                    'completed_at' => null,
+                ]);
+            }
+        }
+
+        // Terbitkan invoice otomatis khusus untuk item dan kuantitas yang dikirim pada Delivery Order ini
+        $this->createInvoiceForCompletedDeliveryOrder($deliveryOrder);
+    }
+
+    /**
+     * Create invoice automatically for the items delivered in this Delivery Order
+     */
+    protected function createInvoiceForCompletedDeliveryOrder(DeliveryOrder $deliveryOrder): void
+    {
+        $deliveryOrder->loadMissing('salesOrders.customer', 'deliveryOrderItem.saleOrderItem', 'deliveryOrderItem.product');
+
+        $primarySo = $deliveryOrder->salesOrders->first();
+        if (!$primarySo) {
+            Log::warning('DeliveryOrderObserver: Cannot create invoice, no related sale order found', [
+                'delivery_order_id' => $deliveryOrder->id,
+            ]);
+            return;
+        }
+
+        // Cek apakah DO ini sudah pernah dibuatkan invoice aktif
+        $existingInvoice = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
+            ->where('status', '!=', 'canceled')
+            ->whereJsonContains('delivery_orders', $deliveryOrder->id)
+            ->first();
+
+        if ($existingInvoice) {
+            Log::info('DeliveryOrderObserver: Invoice already exists for delivery order', [
+                'do_id' => $deliveryOrder->id,
+                'invoice_id' => $existingInvoice->id,
+            ]);
+            return;
+        }
+
+        $taxResolver = app(\App\Services\SalesInvoiceTaxResolver::class);
+        $invoiceTaxData = $taxResolver->resolveFromSaleOrder($primarySo);
+        $ppnRate = (float) ($invoiceTaxData['ppn_rate'] ?? 0);
+        $tipePajak = $invoiceTaxData['tipe_pajak'] ?? 'None';
+
+        $subtotal = 0;
+        $totalTax = 0;
+        $invoiceItems = [];
+
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            $qty = (float) ($item->quantity ?? 0);
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $saleOrderItem = $item->saleOrderItem;
+            $unitPrice = $saleOrderItem ? (float) $saleOrderItem->unit_price : (float) ($item->product?->sell_price ?? 0);
+            $discountPct = $saleOrderItem ? max(0.0, min(100.0, (float) $saleOrderItem->discount)) : 0.0;
+            $netPrice = $unitPrice * (1 - $discountPct / 100);
+            $lineSubtotal = round($qty * $netPrice, 2);
+
+            $lineTax = 0;
+            if ($tipePajak !== 'None' && $ppnRate > 0) {
+                $lineTax = round($lineSubtotal * ($ppnRate / 100), 2);
+            }
+
+            $subtotal += $lineSubtotal;
+            $totalTax += $lineTax;
+
+            $invoiceItems[] = [
+                'product_id' => $item->product_id,
+                'quantity' => $qty,
+                'price' => $netPrice,
+                'discount' => $discountPct,
+                'tax_rate' => $ppnRate,
+                'tax_amount' => $lineTax,
+                'subtotal' => $lineSubtotal,
+                'total' => $lineSubtotal + $lineTax,
+                'coa_id' => $item->product?->sales_coa_id,
+            ];
+        }
+
+        if (empty($invoiceItems) || $subtotal <= 0) {
+            Log::warning('DeliveryOrderObserver: Skipping invoice creation, no valid items or subtotal is 0', [
+                'do_id' => $deliveryOrder->id,
+                'subtotal' => $subtotal,
+            ]);
+            return;
+        }
+
+        $additionalCosts = (float) ($deliveryOrder->additional_cost ?? 0);
+        $otherFees = [];
+        if ($additionalCosts > 0) {
+            $otherFees[] = [
+                'amount' => $additionalCosts,
+                'description' => $deliveryOrder->additional_cost_description ?: 'Biaya pengiriman DO ' . $deliveryOrder->do_number,
+                'type' => 'delivery_cost',
+                'reference' => $deliveryOrder->do_number,
+            ];
+        }
+
+        $grandTotal = round($subtotal + $totalTax + $additionalCosts, 2);
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
+
+        $invoiceData = [
+            'invoice_number' => $invoiceNumber,
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $primarySo->id,
+            'customer_name' => $primarySo->customer?->name,
+            'customer_phone' => $primarySo->customer?->phone,
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(
+                $primarySo->tempo_pembayaran
+                    ?? $primarySo->customer?->tempo_kredit
+                    ?? 30
+            )->toDateString(),
+            'subtotal' => $subtotal,
+            'tax' => $ppnRate,
+            'ppn_rate' => $ppnRate,
+            'tipe_pajak' => $tipePajak,
+            'dpp' => $subtotal,
+            'total' => $grandTotal,
+            'currency_id' => $primarySo->currency_id ?? \App\Support\CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'),
+            'exchange_rate' => (float) ($primarySo->exchange_rate ?? 1.0),
+            'other_fee' => $otherFees,
+            'delivery_orders' => [$deliveryOrder->id],
+            'cabang_id' => $deliveryOrder->cabang_id ?? $primarySo->cabang_id,
+            'status' => 'unpaid',
+            'notes' => 'Auto-generated dari Delivery Order ' . $deliveryOrder->do_number,
+        ];
+
+        $invoice = new \App\Models\Invoice($invoiceData);
+        $invoice->save();
+
+        foreach ($invoiceItems as $itemData) {
+            \App\Models\InvoiceItem::create(array_merge($itemData, ['invoice_id' => $invoice->id]));
+        }
+
+        // Post journal entries immediately
+        $invoiceObserver = new \App\Observers\InvoiceObserver();
+        $invoiceObserver->postSalesInvoice($invoice);
+
+        Log::info('DeliveryOrderObserver: Invoice auto-created for DO', [
+            'delivery_order_id' => $deliveryOrder->id,
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'subtotal' => $subtotal,
+            'total' => $grandTotal,
+        ]);
     }
 
     /**

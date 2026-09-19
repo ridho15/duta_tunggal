@@ -38,6 +38,7 @@ class ViewPurchaseOrder extends ViewRecord
     {
         return [
             EditAction::make()
+                ->visible(fn ($record) => in_array($record->status, ['draft', 'request_approval', 'request_approve']))
                 ->icon('heroicon-o-pencil-square'),
 
             // Setujui PO dari status draft; juga update fulfilled_quantity di Order Request terkait
@@ -45,7 +46,7 @@ class ViewPurchaseOrder extends ViewRecord
                 ->label('Setujui PO')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->visible(fn ($record) => Auth::user()->can('response purchase order') && $record->status === 'draft')
+                ->visible(fn ($record) => Auth::user()->can('response purchase order') && in_array($record->status, ['draft', 'request_approval', 'request_approve']))
                 ->requiresConfirmation()
                 ->modalHeading('Setujui Purchase Order')
                 ->modalDescription('Apakah Anda yakin ingin menyetujui PO ini? Kuantitas pada Order Request terkait akan berkurang sesuai qty PO saat ini.')
@@ -79,7 +80,16 @@ class ViewPurchaseOrder extends ViewRecord
                 ->icon('heroicon-o-magnifying-glass-circle')
                 ->color('warning')
                 ->url(fn ($record) => '/admin/quality-control-purchases/create?purchase_order_id=' . $record->id)
-                ->visible(fn ($record) => in_array($record->status, ['approved', 'partially_received'])),
+                ->visible(function ($record) {
+                    if (! in_array($record->status, ['approved', 'partially_received'])) {
+                        return false;
+                    }
+                    $user = \Illuminate\Support\Facades\Auth::user();
+                    if ($user && $user->warehouse_id && $record->warehouse_id && (int) $user->warehouse_id !== (int) $record->warehouse_id && ! $user->hasRole(['super_admin', 'Super Admin', 'Owner', 'owner'])) {
+                        return false;
+                    }
+                    return true;
+                }),
 
             Action::make('complete')
                 ->label('Complete Purchase Order')

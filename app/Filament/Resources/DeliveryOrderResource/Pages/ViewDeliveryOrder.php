@@ -40,6 +40,8 @@ class ViewDeliveryOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                 ->visible(function () {
                     $record = $this->record;
                     return Auth::user()->hasPermissionTo('request delivery order') &&
@@ -56,6 +58,8 @@ class ViewDeliveryOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('success')
                 ->icon('heroicon-o-check-badge')
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                 ->visible(function () {
                     $record = $this->record;
                     return Auth::user()->hasPermissionTo('response delivery order') &&
@@ -83,6 +87,8 @@ class ViewDeliveryOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('danger')
                 ->icon('heroicon-o-x-circle')
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                 ->visible(function () {
                     $record = $this->record;
                     return Auth::user()->hasPermissionTo('response delivery order') &&
@@ -99,39 +105,13 @@ class ViewDeliveryOrder extends ViewRecord
                     $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'reject', comments: $data['comments'], action: 'rejected');
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditolak.");
                 }),
-            // Legacy manual approve (for request_approve status, backward compat with existing records)
-            Actions\Action::make('approve')
-                ->label('Approve Delivery Order')
-                ->requiresConfirmation()
-                ->color('success')
-                ->icon('heroicon-o-check-badge')
-                ->visible(function () {
-                    $record = $this->record;
-                    return Auth::user()->hasPermissionTo('response delivery order') &&
-                        $record->status == 'request_approve' &&
-                        $record->suratJalan()->exists();
-                })
-                ->form([
-                    \Filament\Forms\Components\Textarea::make('comments')
-                        ->label('Comments')
-                        ->placeholder('Optional approval comments...')
-                        ->nullable()
-                ])
-                ->action(function ($record, array $data) {
-                    try {
-                        $deliveryOrderService = app(\App\Services\DeliveryOrderService::class);
-                        $deliveryOrderService->updateStatus(deliveryOrder: $record, status: 'approved', comments: $data['comments'] ?? null, action: 'approved');
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah disetujui.");
-                    } catch (\Exception $e) {
-                        \App\Http\Controllers\HelperController::sendNotification(isSuccess: false, title: "Error", message: $e->getMessage());
-                        throw $e;
-                    }
-                }),
             Actions\Action::make('closed')
                 ->label('Close')
                 ->requiresConfirmation()
                 ->color('warning')
                 ->icon('heroicon-o-x-circle')
+                ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                 ->visible(function () {
                     $record = $this->record;
                     return Auth::user()->hasPermissionTo('response delivery order') &&

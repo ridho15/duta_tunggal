@@ -177,7 +177,7 @@ class PurchaseInvoiceTest extends TestCase
             'status' => 'completed'
         ]);
 
-        // Create Purchase Invoice - this should trigger the observer
+        // Create Purchase Invoice with sent status - this should trigger the observer
         $invoice = Invoice::factory()->create([
             'invoice_number' => 'PINV-20251101-0002',
             'from_model_type' => PurchaseOrder::class,
@@ -187,7 +187,7 @@ class PurchaseInvoiceTest extends TestCase
             'subtotal' => 50000,
             'tax' => 5500,
             'total' => 55500,
-            'status' => 'draft'
+            'status' => Invoice::STATUS_SENT
         ]);
 
         // Assertions - Account Payable should be created
@@ -240,7 +240,7 @@ class PurchaseInvoiceTest extends TestCase
             'tax' => 11,
             'ppn_rate' => 11,
             'total' => 111000,
-            'status' => 'draft',
+            'status' => Invoice::STATUS_SENT,
         ]);
 
         $entries = JournalEntry::where('source_type', Invoice::class)

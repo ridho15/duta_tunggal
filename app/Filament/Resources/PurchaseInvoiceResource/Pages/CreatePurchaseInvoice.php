@@ -21,12 +21,6 @@ class CreatePurchaseInvoice extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if (!empty($data['selected_purchase_orders']) && empty($data['selected_order_request'])) {
-            throw ValidationException::withMessages([
-                'selected_order_request' => 'Order Request harus dipilih terlebih dahulu sebelum memilih Purchase Order.',
-            ]);
-        }
-
         $service = app(PurchaseInvoiceAccountingService::class);
         $data = $service->validateReceiptBackedCreateData($data);
 
@@ -48,7 +42,7 @@ class CreatePurchaseInvoice extends CreateRecord
         // Ensure COA fields are set with defaults if not provided
         $data['accounts_payable_coa_id'] = $data['accounts_payable_coa_id'] ?? \App\Models\ChartOfAccount::where('code', config('coa.accounts_payable', '2110'))->first()?->id;
         $data['ppn_masukan_coa_id'] = $data['ppn_masukan_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1170.06')->first()?->id;
-        $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '1140.01')->first()?->id;
+        $data['inventory_coa_id'] = $data['inventory_coa_id'] ?? \App\Models\ChartOfAccount::where('code', config('coa.inventory', '1140.10'))->first()?->id;
         $data['expense_coa_id'] = $data['expense_coa_id'] ?? \App\Models\ChartOfAccount::where('code', '6100.02')->first()?->id;
 
         $data = $service->normalizeFormData($data);

@@ -317,7 +317,7 @@ test('quality control purchase create query filters multiple eligible items to s
         ->actingAs($context['user'])
         ->test(CreateQualityControlPurchase::class)
         ->assertFormSet([
-            'from_model_id' => null,
+            'from_model_id' => $context['purchaseOrderItem']->id,
         ]);
 });
 
@@ -418,7 +418,7 @@ test('quality control purchase batch action rejects items from different cabang'
         ->assertHasErrors();
 });
 
-test('quality control purchase create allows owner to choose inspector', function () {
+test('quality control purchase create strictly locks inspector to authenticated user even for owner', function () {
     $context = createQualityControlPurchaseContext();
     $role = Role::firstOrCreate(['name' => 'Owner', 'guard_name' => 'web']);
     $context['user']->assignRole($role);
@@ -439,7 +439,7 @@ test('quality control purchase create allows owner to choose inspector', functio
         ->assertHasNoFormErrors();
 
     expect(QualityControl::where('qc_number', 'QC-P-OWNER-INSPECTOR-001')->value('inspected_by'))
-        ->toBe($context['otherUser']->id);
+        ->toBe($context['user']->id);
 });
 
 test('quality control purchase create form validates passed quantity against received quantity via auto-correction', function () {

@@ -22,18 +22,15 @@
 
         // TOP / credit term is the payment term; expected date remains the logistics date.
         $topType = strtolower(trim((string) ($purchaseOrder->top_type ?? '')));
-        if ($topType === '') {
-            $topType =
-                ((int) ($purchaseOrder->tempo_hutang ?? ($purchaseOrder->supplier->tempo_hutang ?? 0))) > 0
-                    ? 'credit_days'
-                    : 'cod';
-        }
         $tempoHutang = (int) ($purchaseOrder->tempo_hutang ?? ($purchaseOrder->supplier->tempo_hutang ?? 0));
+        if ($topType === '') {
+            $topType = $tempoHutang > 0 ? 'credit_days' : 'cod';
+        }
         $topLabel = match ($topType) {
-            'advance_before_delivery' => 'Advance Before Delivery',
-            'deposit_balance' => 'Deposit + Balance',
-            'credit_days' => 'Credit ' . ($tempoHutang > 0 ? $tempoHutang . ' hari' : '... Days'),
-            default => 'COD',
+            'advance_before_delivery' => 'Advance Before Delivery (Bayar di Muka)',
+            'deposit_balance' => 'Deposit + Pelunasan',
+            'credit_days' => 'Kredit ' . ($tempoHutang > 0 ? "{$tempoHutang} hari" : 'hari'),
+            default => 'COD (Cash on Delivery)',
         };
         $jatuhTempoDate =
             $topType === 'credit_days' && $tempoHutang > 0

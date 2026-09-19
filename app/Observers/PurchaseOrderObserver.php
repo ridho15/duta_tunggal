@@ -72,6 +72,36 @@ class PurchaseOrderObserver
         if ($purchaseOrder->wasChanged('total_amount')) {
             $this->syncJournalEntries($purchaseOrder);
         }
+
+        // Auto cancel draft QCs if PO is completed, closed, or cancelled
+        if ($purchaseOrder->wasChanged('status') && in_array($purchaseOrder->status, ['completed', 'closed', 'cancelled'], true)) {
+            $this->cancelPendingDraftQc($purchaseOrder);
+        }
+    }
+
+    /**
+     * Auto cancel pending draft QCs when PO is completed or closed.
+     */
+    protected function cancelPendingDraftQc(PurchaseOrder $purchaseOrder): void
+    {
+        // Cancel multi-item draft QCs linked directly to this PO
+        \App\Models\QualityControl::where('purchase_order_id', $purchaseOrder->id)
+            ->where('status', 0)
+            ->update(['status' => 2]); // 2: cancelled
+
+        // Cancel draft QCs linked via purchase_order_items
+        $poItemIds = $purchaseOrder->purchaseOrderItem()->pluck('id')->all();
+        if (!empty($poItemIds)) {
+            \App\Models\QualityControl::where('from_model_type', \App\Models\PurchaseOrderItem::class)
+                ->whereIn('from_model_id', $poItemIds)
+                ->where('status', 0)
+                ->update(['status' => 2]);
+
+            \App\Models\QualityControlItem::whereIn('purchase_order_item_id', $poItemIds)
+                ->where('status', 0)
+                ->whereHas('qualityControl', fn($q) => $q->where('status', 0))
+                ->update(['status' => 2]);
+        }
     }
 
     /**

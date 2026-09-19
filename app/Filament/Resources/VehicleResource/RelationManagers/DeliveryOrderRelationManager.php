@@ -38,7 +38,7 @@ class DeliveryOrderRelationManager extends RelationManager
                 Fieldset::make('Form Delivery Order')
                     ->schema([
                         TextInput::make('do_number')
-                            ->label('Develiry Order Number')
+                            ->label('Delivery Order Number')
                             ->maxLength(255)
                             ->required()
                             ->unique(ignoreRecord: true),
@@ -64,7 +64,7 @@ class DeliveryOrderRelationManager extends RelationManager
                                 $set('deliveryOrderItem', $items);
                             })
                             ->relationship('salesOrders', 'so_number', function (Builder $query) {
-                                $query->whereIn('status', ['approved', 'completed']);
+                                $query->whereIn('status', ['approved', 'confirmed']);
                             })
                             ->multiple()
                             ->nullable(),
