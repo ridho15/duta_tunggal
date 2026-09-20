@@ -153,7 +153,7 @@ class AppServiceProvider extends ServiceProvider
                 ->prefix('Rp')
                 ->placeholder('0,00')
                 ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, '.', ',', 2)
+            $money($input, ',', '.', 2)
         JS))
                 ->extraInputAttributes([
                     'x-on:blur' => <<<'JS'
