@@ -177,6 +177,12 @@
                         <td><strong>No. Invoice:</strong></td>
                         <td>{{ $invoice->invoice_number }}</td>
                     </tr>
+                    @if(filled($invoice->tax_invoice_number))
+                    <tr>
+                        <td><strong>No. Faktur Pajak:</strong></td>
+                        <td>{{ $invoice->tax_invoice_number }}</td>
+                    </tr>
+                    @endif
                     <tr>
                         <td><strong>Tanggal:</strong></td>
                         <td>{{ \Carbon\Carbon::parse($invoice->invoice_date)->locale('id')->format('d M Y') }}</td>

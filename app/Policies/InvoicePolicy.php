@@ -42,6 +42,16 @@ class InvoicePolicy
     }
 
     /**
+     * Mengisi/mengubah No. Faktur Pajak pada invoice yang sudah terbit (kolom non-keuangan, tidak memicu jurnal).
+     * Memakai izin `update invoice` (izin khusus menyusul di T3); invoice draft memakai form biasa, invoice batal ditolak.
+     */
+    public function updateTaxNumber(User $user, Invoice $invoice): bool
+    {
+        return $user->hasPermissionTo('update invoice')
+            && \App\Services\SalesInvoiceTaxNumber::canSetOn($invoice);
+    }
+
+    /**
      * Determine whether the user can delete the model.
      */
     public function delete(User $user, Invoice $invoice): bool

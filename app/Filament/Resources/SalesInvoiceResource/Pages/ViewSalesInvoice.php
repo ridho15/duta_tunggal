@@ -43,6 +43,11 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('invoice_number')
                                     ->label('Invoice Number'),
+                                TextEntry::make('tax_invoice_number')
+                                    ->label('No. Faktur Pajak')
+                                    ->badge()
+                                    ->placeholder(fn ($record) => \App\Services\SalesInvoiceTaxNumber::isMissing($record) ? 'Belum diisi' : '–')
+                                    ->color(fn ($state, $record) => filled($state) ? 'success' : (\App\Services\SalesInvoiceTaxNumber::isMissing($record) ? 'danger' : 'gray')),
                                 TextEntry::make('currency_display')
                                     ->label('Mata Uang')
                                     ->state(fn ($record) => $record->displayCurrency?->code ? ($record->displayCurrency?->symbol . ' ' . $record->displayCurrency?->code) : '-'),
@@ -200,6 +205,7 @@ class ViewSalesInvoice extends ViewRecord
     {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            SalesInvoiceResource::taxNumberPageAction(),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')

@@ -82,6 +82,61 @@ class SalesInvoiceResource extends Resource
         return null;
     }
 
+    /** Isian modal aksi "Isi No. Faktur Pajak". */
+    public static function taxNumberFormSchema(): array
+    {
+        return [
+            TextInput::make('tax_invoice_number')
+                ->label('No. Faktur Pajak')
+                ->placeholder('010.000-26.12345678')
+                ->maxLength(50)
+                ->helperText('16 digit. Kosongkan untuk menghapus nomor. Perubahan tercatat di riwayat aktivitas.')
+                ->rules(fn (?\Illuminate\Database\Eloquent\Model $record) => [new \App\Rules\TaxInvoiceNumber($record?->getKey())]),
+        ];
+    }
+
+    /** Simpan lewat layanan (validasi ulang di server + otorisasi); dipakai aksi tabel dan aksi halaman View. */
+    public static function saveTaxNumber(Invoice $record, array $data): void
+    {
+        \Illuminate\Support\Facades\Gate::authorize('updateTaxNumber', $record);
+
+        app(\App\Services\SalesInvoiceTaxNumber::class)->set($record, $data['tax_invoice_number'] ?? null);
+
+        \Filament\Notifications\Notification::make()
+            ->title(filled($data['tax_invoice_number'] ?? null) ? 'No. Faktur Pajak disimpan' : 'No. Faktur Pajak dihapus')
+            ->body('Jurnal dan piutang tidak berubah.')
+            ->success()
+            ->send();
+    }
+
+    public static function taxNumberTableAction(): \Filament\Tables\Actions\Action
+    {
+        return \Filament\Tables\Actions\Action::make('set_tax_invoice_number')
+            ->label(fn (Invoice $record) => filled($record->tax_invoice_number) ? 'Ubah No. Faktur Pajak' : 'Isi No. Faktur Pajak')
+            ->icon('heroicon-o-document-text')
+            ->color('warning')
+            ->visible(fn (Invoice $record) => Auth::user()?->can('updateTaxNumber', $record) ?? false)
+            ->modalHeading('No. Faktur Pajak')
+            ->modalSubmitActionLabel('Simpan')
+            ->form(static::taxNumberFormSchema())
+            ->fillForm(fn (Invoice $record) => ['tax_invoice_number' => $record->tax_invoice_number])
+            ->action(fn (Invoice $record, array $data) => static::saveTaxNumber($record, $data));
+    }
+
+    public static function taxNumberPageAction(): \Filament\Actions\Action
+    {
+        return \Filament\Actions\Action::make('set_tax_invoice_number')
+            ->label(fn (Invoice $record) => filled($record->tax_invoice_number) ? 'Ubah No. Faktur Pajak' : 'Isi No. Faktur Pajak')
+            ->icon('heroicon-o-document-text')
+            ->color('warning')
+            ->visible(fn (Invoice $record) => Auth::user()?->can('updateTaxNumber', $record) ?? false)
+            ->modalHeading('No. Faktur Pajak')
+            ->modalSubmitActionLabel('Simpan')
+            ->form(static::taxNumberFormSchema())
+            ->fillForm(fn (Invoice $record) => ['tax_invoice_number' => $record->tax_invoice_number])
+            ->action(fn (Invoice $record, array $data) => static::saveTaxNumber($record, $data));
+    }
+
     public static function normalizeInvoiceTaxTypeValue(?string $taxType): string
     {
         return match (\App\Services\TaxService::normalizeType($taxType)) {
@@ -206,6 +261,14 @@ class SalesInvoiceResource extends Resource
                                         'required' => 'Tanggal invoice harus diisi'
                                     ])
                                     ->default(now()),
+
+                                TextInput::make('tax_invoice_number')
+                                    ->label('No. Faktur Pajak')
+                                    ->placeholder('010.000-26.12345678')
+                                    ->maxLength(50)
+                                    ->rules(fn (?\Illuminate\Database\Eloquent\Model $record) => [new \App\Rules\TaxInvoiceNumber($record?->getKey())])
+                                    ->dehydrateStateUsing(fn ($state) => \App\Rules\TaxInvoiceNumber::normalize($state))
+                                    ->helperText('16 digit untuk rekonsiliasi PPN Keluaran. Boleh dikosongkan dan diisi setelah invoice terbit (lewat aksi "Isi No. Faktur Pajak").'),
 
                                 DatePicker::make('due_date')
                                     ->label('Tanggal Jatuh Tempo')
@@ -884,6 +947,14 @@ class SalesInvoiceResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('tax_invoice_number')
+                    ->label('No. Faktur Pajak')
+                    ->searchable()
+                    ->placeholder('–')
+                    ->formatStateUsing(fn ($state, Invoice $record) => filled($state) ? $state : (\App\Services\SalesInvoiceTaxNumber::isMissing($record) ? 'Belum diisi' : '–'))
+                    ->color(fn ($state, Invoice $record) => filled($state) ? null : (\App\Services\SalesInvoiceTaxNumber::isMissing($record) ? 'danger' : 'gray'))
+                    ->toggleable(),
+
                 TextColumn::make('customer_name')
                     ->label('Customer')
                     ->searchable()
@@ -928,6 +999,22 @@ class SalesInvoiceResource extends Resource
                         'partially_paid' => 'Dibayar Sebagian',
                         'overdue' => 'Terlambat',
                     ]),
+                SelectFilter::make('tax_invoice_state')
+                    ->label('Faktur Pajak')
+                    ->options([
+                        'ada' => 'Sudah ada',
+                        'belum' => 'Belum ada (invoice ber-PPN yang sudah terbit)',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return match ($data['value'] ?? null) {
+                            'ada' => $query->whereNotNull('tax_invoice_number')->where('tax_invoice_number', '!=', ''),
+                            'belum' => $query
+                                ->where(fn (Builder $q) => $q->whereNull('tax_invoice_number')->orWhere('tax_invoice_number', ''))
+                                ->whereNotIn('status', [Invoice::STATUS_DRAFT, 'canceled', 'cancelled'])
+                                ->where(fn (Builder $q) => $q->where('ppn_rate', '>', 0)->orWhere('tax', '>', 0)),
+                            default => $query,
+                        };
+                    }),
                 SelectFilter::make('customer_name')
                     ->label('Customer')
                     ->options(function () {
@@ -986,6 +1073,7 @@ class SalesInvoiceResource extends Resource
                         ->color('primary')
                         ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
                         ->openUrlInNewTab(),
+                    static::taxNumberTableAction(),
                     Tables\Actions\Action::make('view_journal_entries')
                         ->label('Lihat Journal Entries')
                         ->icon('heroicon-o-book-open')
