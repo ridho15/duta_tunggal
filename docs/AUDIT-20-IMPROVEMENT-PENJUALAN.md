@@ -540,7 +540,7 @@ Setiap butir usulan dipecah menjadi deliverable yang dapat dicentang. **Tidak ad
 | 7 | Kebijakan kredit per tipe + limit 0 ≠ tak terbatas | T3 | ☐ |
 | 7 | Paparan (AR + SO belum ditagih) di blokir & peringatan | T3 | ☐ |
 | 7 | Info Customer semua tipe (piutang, umur, SO terbuka) | T3 | ☐ |
-| 7 | `customers:audit-credit-limit` | T1 | ☐ |
+| 7 | `customers:audit-credit-limit` | T1 | ☑ |
 | 8 | `DocumentLock` + matriks; tes dokumen × status | T3 | ☐ |
 | 8 | DO tabel, Penerimaan (pembatalan), Jadwal, Retur terkunci | T3 | ☐ |
 | 8 | X8: rapikan peran "Super Sales" | T3 | ☐ |
@@ -548,26 +548,26 @@ Setiap butir usulan dipecah menjadi deliverable yang dapat dicentang. **Tidak ad
 | 9 | Migrasi titik hard-code alur penjualan (pemindai) | T3 | ☐ |
 | 9 | Hapus COA bebas (Deposit, Penyesuaian, Penjualan Lain, item SO/invoice) | T3 | ☐ |
 | 9 | `master:readiness` diperluas | T3 | ☐ |
-| 10 | Referensi + bukti + bank + peringatan duplikat | T1 | ☐ |
+| 10 | Referensi + bukti + bank + peringatan duplikat | T1 | ☑ |
 | 11 | Partial kop/TTD/rekening + `DocumentPrintBuilder` | T6 | ☐ |
 | 11 | Templat Invoice, DO, Kwitansi, Nota Kredit, Retur | T6 | ☐ |
 | 11 | Watermark DRAFT/DIBATALKAN + tes isi PDF | T6 | ☐ |
 | 12 | `DocumentNumberService` + `document_sequences` (atomik) | T4 | ☐ |
 | 12 | Migrasi semua generator + kode invoice pajak/non-pajak Cabang | T4 | ☐ |
 | 12 | `documents:check-numbering` | T4 | ☐ |
-| 13 | Faktur pajak: form/View/daftar/PDF/filter/ekspor | T1 | ☐ |
+| 13 | Faktur pajak: form/View/daftar/PDF/filter/ekspor | T1 | ☑ *(ekspor ditunda — K-D)* |
 | 14 | `DocumentActions` + penerapan View & tabel | T7 | ☐ |
-| 15 | `lang/id/*` (validation dkk.) | T1 | ☐ |
+| 15 | `lang/id/*` (validation dkk.) | T1 | ☑ |
 | 15 | `StatusLabels` terpusat + 25 kolom + pemindai bahasa | T7 | ☐ |
 | 16 | `ImpactPreview` (preview = eksekusi) + modal berdampak | T7 | ☐ |
 | 16 | Konfirmasi untuk Invoice/Penerimaan/Nota Kredit/Retur | T7 | ☐ |
 | 17 | Endpoint pencarian sisi-server + macro Filament + React remote | T7 | ☐ |
 | 17 | Hapus `Customer::all()+preload`, "muat semua" API, `limit(50)` quotation | T7 | ☐ |
-| 18 | Label SO/DO/Quotation informatif; nilai DO via `LineAmounts`; kolom Sisa Qty | T1 | ☐ |
+| 18 | Label SO/DO/Quotation informatif; nilai DO via `LineAmounts`; kolom Sisa Qty | T1 | ☑ |
 | 18 | Info stok/limit/sisa di tempat relevan | T7 | ☐ |
-| 19 | Profiler request + `perf:report` + panduan env/opcache | T1 | ☐ |
+| 19 | Profiler request + `perf:report` + panduan env/opcache | T1 | ☑ |
 | 19 | Anggaran query, hapus N+1, antrean, penjaga klik ganda | T7 | ☐ |
-| 20 | `customers:audit-duplicates` (read-only) | T1 | ☐ |
+| 20 | `customers:audit-duplicates` (read-only) | T1 | ☑ |
 | 20 | `customers:merge` + cadangan + uji sebelum/sesudah | T4 | ☐ |
 | 20 | Kode `CUST-…`, `legacy_code`, NIK keluar dari kode | T4 | ☐ |
 | 20 | `CustomerService::create` tunggal (X10) | T4 | ☐ |
@@ -605,3 +605,57 @@ Setiap butir usulan dipecah menjadi deliverable yang dapat dicentang. **Tidak ad
 | Pekerjaan paralel lain di repo (`docs/audit_dan_rencana_…`, perubahan `AppSettings`) | Periksa konflik `git status` di awal tiap tahap |
 
 **Batasan yang saya tidak dapat verifikasi:** angka respons 8–15 detik dan data ganda customer di lingkungan UAT Anda; format resmi faktur pajak/nota retur (perlu akuntan/pajak); kebijakan bisnis pada D1–D16.
+
+
+---
+
+## Status pelaksanaan — T0 & T1 (20 September 2026)
+
+**Cabang:** `feat/penjualan-t1-quick-wins` (13 commit di atas `chore/cleanup-artifacts`; 3 commit pembuka T0.1 di cabang itu). **Gerbang T1 lulus:** suite penuh lewat runner terpotong —
+3.061 tes · 2.853 lolos · **201 gagal = seluruhnya sudah ada di baseline (0 kegagalan baru)** · 7 dilewati · 0 crash · 24,4 menit (`tests/baseline-failures.txt`).
+
+### T0 — selesai
+| Tugas | Hasil |
+|---|---|
+| T0.1 | 3 commit: revert mask (format Indonesia), perbaikan audit ulang Fase 1–6, dokumen; cabang kerja dibuat |
+| T0.2 | Keputusan T1 (A-1, A-2, K-A…K-F, D16) tercatat; **D1–D15 masih menunggu konfirmasi sebelum T2/T3** |
+| T0.3 | `App\Support\MemoryLimit::raiseTo()` (hanya menaikkan) menggantikan 5 `ini_set('memory_limit','512M')`. Suite dalam **satu proses** kini selesai tuntas (sebelumnya crash memori) |
+| T0.4 | `scripts/run-tests-chunked.php` (JUnit XML, isolasi crash per berkas, `--db`, `--compare`, `--write-baseline`) + `scripts/compare-test-failures.php` + `composer test:chunked/test:compare` |
+| T0.5 | 13 tes usang diperbaiki (fixture) — menghasilkan regresi baru yang berharga (mis. jurnal ongkir 43 assertion). Baseline dikunci 201 + analisis di `docs/BASELINE-TES.md` |
+| T0.6 | Perintah diagnostik UAT untuk Anda jalankan (lihat di bawah) |
+
+### T1 — selesai (8 tugas, ±110 tes baru)
+| Tugas | Ringkas | Tes baru |
+|---|---|---|
+| T1.1 `lang/id` | validation/auth/passwords/pagination lengkap + atribut penjualan | 14 |
+| T1.4 nilai DO | `DeliveryOrderValuation` (LineAmounts) dipakai observer invoice, `DeliveryOrder::total`, label pilihan, PDF DO (2 desimal); `DocumentLabels` | 8 |
+| T1.5 sisa qty | kolom "Sisa Belum Dikirim" di daftar SO, batch (jumlah query tetap) | 4 |
+| T1.8 teks bantu | pilihan SO form Invoice menjelaskan SO Selesai vs invoice otomatis per DO | 2 |
+| T1.2 faktur pajak | aturan 16 digit + unik, aksi "Isi No. Faktur Pajak" (invoice `unpaid` tidak bisa diedit via form), kolom, filter, View, PDF; jurnal/piutang terbukti tak berubah | 11 |
+| T1.3 referensi & bukti | referensi wajib Transfer/Giro/Cheque, bukti privat + rute berotorisasi, peringatan duplikat, kolom & filter "tanpa bukti"; migrasi aditif | 14 |
+| T1.6 profiler | `PERF_PROFILE` (default mati), `perf:report`, panduan `.env`/opcache, opcache dev aktif | 13 |
+| T1.7 audit customer | `customers:audit-duplicates` + `customers:audit-credit-limit` (read-only, terbukti oleh sidik jari data + uji mutasi) | 14 (+8 unit) |
+
+Semua penjaga kritis diuji mutasi (dirusak → tes gagal → dipulihkan).
+
+### Penyimpangan dari rencana & temuan baru
+- **Middleware profiler dipasang global**, bukan di grup `web`: rute panel Filament memakai daftar middleware panel sendiri sehingga grup `web` tidak menjangkau halaman panel (ditemukan tes rute nyata).
+- **Item DO tanpa tautan item SO bernilai Rp0** karena relasi `saleOrderItem` memakai `withDefault()` (model kosong → harga 0). Ini kemungkinan besar sumber "Rp0" pada UAT. Perilaku invoice otomatis **sengaja tidak diubah** (tidak menebak harga jual); kini ditandai `⚠ ada item tanpa tautan SO` di label + peringatan log. Perlu diputuskan bisnis bila ada DO seperti itu di UAT.
+- **Tes Fase 5A & e2e** diberi `payment_reference` (aturan baru: referensi wajib untuk Transfer).
+- Enum status invoice tidak memuat `canceled` (X6) — kunci aksi faktur untuk status itu diuji pada modelnya; enum ditambahkan di T5.
+- PDF DO kini menampilkan uang **2 desimal** (sebelumnya 0) agar sama dengan invoice; kwitansi belum tersambung ke penerimaan → T6; ekspor PPN Keluaran ditunda (K-D).
+- Satu kegagalan sporadis tunggal pada `CustomerReceiptFeatureTest::can allocate payment to single invoice` teramati sekali dan tidak dapat direproduksi dalam 13 percobaan berikutnya (termasuk gerbang penuh) — **dipantau**; jika muncul lagi, cek status static `CustomerReceiptObserver`.
+
+### Yang perlu Anda lakukan
+1. **`php artisan migrate`** di dev/UAT (satu migrasi baru: `2026_09_20_210000_add_reference_and_proof_to_customer_receipts_table`).
+2. **T0.6 — diagnostik UAT** (kirim keluarannya, tanpa rahasia):
+   ```bash
+   php artisan about --only=environment,cache,drivers
+   php -i | grep -E "^opcache\.(enable|memory_consumption|validate_timestamps)|^memory_limit|^max_execution_time"
+   ls -lh storage/logs | tail -5
+   php artisan tinker --execute='foreach(["customers","products","sale_orders","delivery_orders","invoices","stock_movements","journal_entries","activity_log"] as $t){ echo str_pad($t,20), DB::table($t)->count(), PHP_EOL; }'
+   ```
+3. **UAT manual T1** — skrip di `docs/PLAN-T0-T1-PENJUALAN.md` §7 (12 langkah).
+4. **Jalankan audit di UAT** dan kirim CSV/ringkasannya: `php artisan customers:audit-duplicates` dan `php artisan customers:audit-credit-limit` (read-only) → dasar keputusan D14.
+5. **Ukur performa:** `PERF_PROFILE=true` + `php artisan config:clear` di UAT beberapa hari → `php artisan perf:report --since=1d` → dasar T7.
+6. **Konfirmasi D1–D15** sebelum T2 dimulai.

@@ -1,6 +1,6 @@
 # Rencana Pelaksanaan T0 & T1 — Penjualan
 
-> Dibuat 20 September 2026 · Turunan dari `docs/AUDIT-20-IMPROVEMENT-PENJUALAN.md` (§7). **Dokumen ini hanya rencana — belum ada kode yang diubah.** Pelaksanaan dimulai setelah Anda menyetujui bagian §9 (keputusan & prasyarat).
+> Dibuat 20 September 2026 · Turunan dari `docs/AUDIT-20-IMPROVEMENT-PENJUALAN.md` (§7). **STATUS: T0 & T1 SELESAI dan lulus gerbang regresi — lihat "Status pelaksanaan — T0 & T1" di dokumen audit.** Isi di bawah adalah rencana aslinya. Pelaksanaan dimulai setelah Anda menyetujui bagian §9 (keputusan & prasyarat).
 > Cakupan: **T0** (baseline, keputusan, tooling uji) dan **T1** (quick wins: usulan 10, 13, 15a, 18a, 19a, 20a, X7).
 
 ## Daftar Isi
