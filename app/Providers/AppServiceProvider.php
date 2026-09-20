@@ -87,6 +87,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Profiler request (config/perf.php): satu instance per aplikasi agar handle() dan terminate() berbagi state.
+        $this->app->singleton(\App\Support\Perf\ProfileRecorder::class);
+
         $loader = AliasLoader::getInstance();
         if (class_exists(Debugbar::class)) {
             $loader->alias('Debugbar', Debugbar::class);
