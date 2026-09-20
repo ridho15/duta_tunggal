@@ -78,6 +78,12 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "test:chunked": [
+            "@php scripts/run-tests-chunked.php"
+        ],
+        "test:compare": [
+            "@php scripts/compare-test-failures.php"
+        ],
         "test:safe": [
             "@php scripts/run-tests-safe.php"
         ],
