@@ -412,6 +412,22 @@ Bila tidak dijawab, saya memakai **rekomendasi** (kolom kanan) — sama seperti 
 | D15 | Stok negatif saat Dikirim | Blokir / izinkan+peringatan | **Blokir** (kecuali izin khusus) |
 | D16 | No. Faktur Pajak wajib? | Wajib untuk PKP ber-PPN / peringatan saja | **Peringatan** sampai proses pajak siap 🧾 |
 
+### Keputusan (final) — dicatat 20 September 2026
+
+Pemilik menjawab **"lanjut"** atas rencana T0/T1 (`docs/PLAN-T0-T1-PENJUALAN.md` §9) sehingga rekomendasi berikut **berlaku**:
+
+| Kode | Keputusan | Status |
+|---|---|---|
+| A-1 | Commit revert mask Indonesia + perbaikan audit + dokumen (3 commit) lalu cabang `feat/penjualan-t1-quick-wins` | ✅ dilaksanakan |
+| A-2 | Tes usang `RekonsiliasiBankPage*` dibiarkan di baseline | ✅ |
+| K-A = D16 | No. Faktur Pajak: **peringatan saja** (boleh kosong; format & duplikat divalidasi bila diisi) | ✅ |
+| K-B | Referensi wajib untuk Transfer/Giro/Cheque; bukti opsional (daftar menandai "tanpa bukti") | ✅ |
+| K-C | Aksi "Isi No. Faktur Pajak" memakai izin `update invoice` (izin khusus di T3) | ✅ |
+| K-D | Ekspor PPN Keluaran **ditunda** (T5/T6) | ✅ |
+| K-E | `LOG_LEVEL` UAT = `warning` (produksi `error`) | ✅ |
+| K-F | Ambang limit kredit mencurigakan ≥ Rp1.000.000.000 | ✅ |
+| **D1–D15** | Rekomendasi pada tabel di atas **belum dikonfirmasi eksplisit**; wajib dijawab **sebelum T2/T3 dimulai** (tidak menghambat T1) | ⏳ menunggu |
+
 ---
 
 ## 7. Roadmap bertahap T0–T8
