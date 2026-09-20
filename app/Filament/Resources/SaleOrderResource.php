@@ -346,6 +346,29 @@ class SaleOrderResource extends Resource
         return app(\App\Services\SaleOrderDeliveryProgress::class)->forItems([$item->getKey()])[$item->getKey()] ?? [];
     }
 
+    /**
+     * Sisa qty belum dikirim untuk daftar SO: dihitung SEKALI per halaman (jumlah query tetap), bukan per baris.
+     * WeakMap terikat ke instance komponen Livewire → hilang bersama komponen, tidak pernah basi lintas request.
+     */
+    protected static function remainingQtyForList(object $livewire, SaleOrder $record): ?float
+    {
+        if (! in_array($record->status, SaleOrder::DELIVERABLE_STATUSES, true)) {
+            return null;   // draft / selesai / ditutup: "sisa belum dikirim" tidak bermakna
+        }
+
+        static $memo = null;
+        $memo ??= new \WeakMap();
+
+        if (! isset($memo[$livewire])) {
+            $records = method_exists($livewire, 'getTableRecords') ? $livewire->getTableRecords() : [];
+            // Paginator: collect() akan memakai toArray() (meta halaman), jadi ambil items() halaman ini.
+            $ids = collect($records instanceof \Illuminate\Contracts\Pagination\Paginator ? $records->items() : $records)->pluck('id');
+            $memo[$livewire] = app(\App\Services\SaleOrderDeliveryProgress::class)->forSaleOrders($ids);
+        }
+
+        return $memo[$livewire][$record->id]['remaining'] ?? null;
+    }
+
     protected static function formatQty(float|int|string|null $value): string
     {
         return number_format((float) $value, 0, ',', '.');
@@ -1550,6 +1573,14 @@ class SaleOrderResource extends Resource
                     })
                     ->placeholder('-')
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('remaining_qty')
+                    ->label('Sisa Belum Dikirim')
+                    ->alignEnd()
+                    ->getStateUsing(fn (SaleOrder $record, $livewire) => static::remainingQtyForList($livewire, $record))
+                    ->formatStateUsing(fn ($state) => $state === null ? '–' : static::formatQty($state))
+                    ->color(fn ($state) => $state !== null && (float) $state > 0 ? 'warning' : 'gray')
+                    ->tooltip('Qty pesanan yang belum berstatus dikirim (Dikirim/Diterima/Selesai). Rincian per item ada di halaman Lihat.')
+                    ->toggleable(),
                 TextColumn::make('stock_status')
                     ->label('Status Stok')
                     ->badge()

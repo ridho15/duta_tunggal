@@ -122,6 +122,42 @@ class SaleOrderDeliveryProgress
     }
 
     /**
+     * Ringkasan BANYAK SO sekaligus (mis. satu halaman daftar SO): jumlah query tetap, bukan per SO.
+     * Angkanya sama persis dengan forSaleOrder() (memakai forItems()).
+     *
+     * @param  iterable<int>  $saleOrderIds
+     * @return array<int, array{ordered: float, delivered: float, in_process: float, remaining: float, available: float}>  total per SO
+     */
+    public function forSaleOrders(iterable $saleOrderIds): array
+    {
+        $ids = collect($saleOrderIds)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $itemRows = DB::table('sale_order_items')
+            ->whereIn('sale_order_id', $ids)
+            ->whereNull('deleted_at')
+            ->get(['id', 'sale_order_id']);
+
+        $progress = $this->forItems($itemRows->pluck('id'));
+
+        $zero = ['ordered' => 0.0, 'delivered' => 0.0, 'in_process' => 0.0, 'remaining' => 0.0, 'available' => 0.0];
+        $result = $ids->mapWithKeys(fn (int $id) => [$id => $zero])->all();
+
+        foreach ($itemRows as $row) {
+            if (! isset($progress[$row->id])) {
+                continue;
+            }
+            foreach ($zero as $key => $_) {
+                $result[(int) $row->sale_order_id][$key] += $progress[$row->id][$key];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Ringkasan satu SO: per item + total.
      *
      * @return array{items: array<int, array>, totals: array{ordered: float, delivered: float, in_process: float, remaining: float, available: float}}
