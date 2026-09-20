@@ -76,6 +76,7 @@ export interface QuotationHeader {
   currency_id: number;
   exchange_rate: number;
   tempo_pembayaran: number;
+  shipped_to?: string;
   notes: string;
   status: string;
   total_amount?: number;

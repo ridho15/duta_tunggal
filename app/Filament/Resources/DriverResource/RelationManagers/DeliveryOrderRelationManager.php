@@ -43,23 +43,47 @@ class DeliveryOrderRelationManager extends RelationManager
                                     ->searchable()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $listSaleOrder = SaleOrder::whereIn('id', $state)->get();
+                                        $listSaleOrder = SaleOrder::whereIn('id', is_array($state) ? $state : [])->get();
                                         $items = [];
                                         foreach ($listSaleOrder as $saleOrder) {
                                             foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
+                                                $available = $saleOrderItem->availableQuantityForDelivery();
+                                                if ($available <= 0) {
+                                                    continue;
+                                                }
                                                 array_push($items, [
                                                     'options_from' => 2,
                                                     'sale_order_item_id' => $saleOrderItem->id,
                                                     'product_id' => $saleOrderItem->product_id,
-                                                    'quantity' => $saleOrderItem->quantity,
+                                                    'quantity' => $available,
                                                 ]);
                                             }
                                         }
 
                                         $set('deliveryOrderItem', $items);
                                     })
-                                    ->relationship('salesOrders', 'so_number', function (Builder $query) {
-                                        $query->whereIn('status', ['approved', 'confirmed']);
+                                    ->relationship('salesOrders', 'so_number', function (Builder $query, $record) {
+                                        // Hanya SO layak kirim yang masih punya sisa yang belum terikat DO manapun;
+                                        // SO yang sudah terhubung ke DO yang sedang diedit tetap tampil.
+                                        $linked = ($record instanceof \App\Models\DeliveryOrder && $record->exists)
+                                            ? $record->salesOrders()->withoutGlobalScopes()->pluck('sale_orders.id')->map(fn ($id) => (int) $id)->all()
+                                            : [];
+                                        $query->deliverable($linked);
+                                    })
+                                    ->rule(function ($record) {
+                                        return function (string $attribute, $value, \Closure $fail) use ($record) {
+                                            $linked = ($record instanceof \App\Models\DeliveryOrder && $record->exists)
+                                                ? $record->salesOrders()->withoutGlobalScopes()->pluck('sale_orders.id')->map(fn ($id) => (int) $id)->all()
+                                                : [];
+                                            $errors = app(\App\Services\DeliveryOrderSourceValidator::class)->errors(
+                                                is_array($value) ? $value : [],
+                                                ($record instanceof \App\Models\DeliveryOrder && $record->exists) ? (int) $record->id : null,
+                                                $linked
+                                            );
+                                            foreach ($errors as $message) {
+                                                $fail($message);
+                                            }
+                                        };
                                     })
                                     ->multiple()
                                     ->nullable(),
@@ -188,18 +212,9 @@ class DeliveryOrderRelationManager extends RelationManager
                         return $state->plate . ' - ' . $state->type;
                     }),
                 TextColumn::make('status')
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'request_close' => 'warning',
-                            'request_approve' => 'primary',
-                            'closed' => 'danger',
-                            'approved' => 'primary',
-                            'completed' => 'success',
-                        };
-                    })
+                    ->label('Status')
+                    ->formatStateUsing(fn ($state) => \App\Models\DeliveryOrder::statusLabel($state))
+                    ->color(fn ($state) => \App\Models\DeliveryOrder::statusColor($state))
                     ->badge(),
                 TextColumn::make('salesOrders.so_number')
                     ->label('Sales Orders')

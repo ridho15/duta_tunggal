@@ -56,6 +56,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -222,9 +223,10 @@ class QuotationResource extends Resource
             return '';
         }
 
-        $decimals = static::isIdrCurrency($currencyId) ? 0 : 2;
+        $numeric = static::parseCurrencyState($amount);
+        $decimals = 2;
 
-        return number_format(static::parseCurrencyState($amount), $decimals, ',', '.');
+        return number_format($numeric, $decimals, ',', '.');
     }
 
     protected static function formatCurrencyInputState(mixed $amount, ?int $currencyId): string
@@ -272,34 +274,25 @@ class QuotationResource extends Resource
         $taxType = static::normalizeTaxTypeValue($taxType);
         $tax = $taxType === TaxTypeHelper::NONE ? 0.0 : $tax;
 
-        // Base calculation: qty × unit_price
+        // Perhitungan baris tunggal (LineAmounts, kebijakan pembulatan D6): DPP dibulatkan lebih dulu, PPN dari DPP.
+        $amounts = \App\Support\LineAmounts::calculate($quantity, $unitPrice, $discount, $tax, $taxType);
         $total = $quantity * $unitPrice;
-        $discountNominal = $total * ($discount / 100);
-        $afterDiscount = $total - $discountNominal;
 
-        // Tax nominal calculated from afterDiscount base (same formula for all tax types)
-        // This ensures consistency between inclusive and exclusive tax types
-        $taxNominal = round($afterDiscount * ($tax / 100), 2);
-
-        // Subtotal differs based on tax type
-        // - Inklusif: price already includes tax, so subtotal = afterDiscount
-        // - Eksklusif: price excludes tax, so subtotal = afterDiscount + taxNominal
-        // - None: no tax, subtotal = afterDiscount
         if ($taxType === TaxTypeHelper::INKLUSIF) {
-            $subtotal = round($afterDiscount, 2);
-        } elseif ($taxType === TaxTypeHelper::EKLUSIF) {
-            $subtotal = round($afterDiscount + $taxNominal, 2);
-        } else {
-            // NONE
-            $subtotal = round($afterDiscount, 2);
-            $taxNominal = 0.0;
+            // Harga sudah termasuk PPN: subtotal = nilai setelah diskon (tampilan nominal PPN lama dipertahankan)
+            return [
+                'total' => $total,
+                'discount_nominal' => $amounts['discount_amount'],
+                'tax_nominal' => round(($total - ($total * ($discount / 100))) * ($tax / 100), 2),
+                'subtotal' => $amounts['total'],
+            ];
         }
 
         return [
             'total' => $total,
-            'discount_nominal' => round($discountNominal, 2),
-            'tax_nominal' => $taxNominal,
-            'subtotal' => $subtotal,
+            'discount_nominal' => $amounts['discount_amount'],
+            'tax_nominal' => $amounts['ppn'],
+            'subtotal' => $amounts['total'],
         ];
     }
 
@@ -376,6 +369,7 @@ class QuotationResource extends Resource
             'request_approve' => 'Menunggu Persetujuan',
             'approve' => 'Disetujui',
             'reject' => 'Ditolak',
+            'expired' => 'Kedaluwarsa',
             default => '-',
         };
     }
@@ -387,6 +381,7 @@ class QuotationResource extends Resource
             'request_approve' => 'gray',
             'approve' => 'info',
             'reject' => 'danger',
+            'expired' => 'warning',
             default => 'gray',
         };
     }
@@ -400,6 +395,7 @@ class QuotationResource extends Resource
             'request_approve' => ['bg' => '#e5e7eb', 'border' => '#d1d5db', 'text' => '#374151'],
             'approve' => ['bg' => '#dbeafe', 'border' => '#bfdbfe', 'text' => '#1e40af'],
             'reject' => ['bg' => '#fee2e2', 'border' => '#fecaca', 'text' => '#991b1b'],
+            'expired' => ['bg' => '#fef3c7', 'border' => '#fde68a', 'text' => '#92400e'],
             default => ['bg' => '#f3f4f6', 'border' => '#d1d5db', 'text' => '#4b5563'],
         };
         
@@ -1250,6 +1246,449 @@ class QuotationResource extends Resource
             ]);
     }
 
+    /**
+     * Skema form modal "Buat Sales Order dari Quotation".
+     *
+     * SATU definisi yang dipakai oleh aksi baris di tabel (QuotationResource) dan
+     * aksi header di halaman View (ViewQuotation). Sebelumnya dua salinan terpisah
+     * (±380 baris) yang mudah berbeda perilaku.
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function saleOrderModalSchema(): array
+    {
+        return [
+            Section::make('Informasi Quotation')
+                ->schema([
+                    Placeholder::make('quotation_number')
+                        ->label('Nomor Quotation')
+                        ->content(fn($record) => $record->quotation_number),
+                    Placeholder::make('customer_name')
+                        ->label('Customer')
+                        ->content(fn($record) => $record->customer->name ?? '-'),
+                    Placeholder::make('total_amount')
+                        ->label('Total Amount')
+                        ->content(fn($record) => static::quotationMoney($record->total_amount, is_numeric($record->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId())),
+                    Placeholder::make('currency_code')
+                        ->label('Mata Uang')
+                        ->content(fn($record) => $record->currency?->code ?? Currency::find(static::resolveDefaultCurrencyId())?->code ?? '-'),
+                    Placeholder::make('tempo_pembayaran')
+                        ->label('Tempo Pembayaran')
+                        ->content(fn($record) => app(SalesOrderService::class)->headerFromQuotation($record)['tempo_pembayaran'] . ' hari'),
+                    Placeholder::make('item_count')
+                        ->label('Jumlah Item')
+                        ->content(fn($record) => $record->quotationItem->count() . ' item(s)'),
+                ])->columns(2),
+            Section::make('Sales Order Baru')
+                ->schema([
+                    Grid::make(2)
+                        ->schema([
+                            TextInput::make('so_number')
+                                ->label('Nomor Sales Order')
+                                ->default(fn() => app(SalesOrderService::class)->generateSoNumber())
+                                ->required()
+                                ->unique(table: 'sale_orders', column: 'so_number')
+                                ->validationMessages([
+                                    'required' => 'Nomor Sales Order wajib diisi',
+                                    'unique' => 'Nomor Sales Order sudah digunakan'
+                                ])
+                                ->suffixAction(
+                                    \Filament\Forms\Components\Actions\Action::make('generateSoNumber')
+                                        ->icon('heroicon-o-arrow-path')
+                                        ->tooltip('Generate Nomor Sales Order Baru')
+                                        ->action(function ($set) {
+                                            $set('so_number', app(SalesOrderService::class)->generateSoNumber());
+                                        })
+                                ),
+                            DatePicker::make('order_date')
+                                ->label('Tanggal Order')
+                                ->default(now())
+                                ->required()
+                                ->validationMessages([
+                                    'required' => 'Tanggal order wajib dipilih'
+                                ]),
+                            DatePicker::make('delivery_date')
+                                ->label('Tanggal Pengiriman')
+                                ->validationMessages([
+                                    'required' => 'Tanggal pengiriman wajib dipilih'
+                                ]),
+                            Select::make('tipe_pengiriman')
+                                ->label('Tipe Pengiriman')
+                                ->options([
+                                    'Ambil Sendiri' => 'Ambil Sendiri',
+                                    'Kirim Langsung' => 'Kirim Langsung'
+                                ])
+                                ->default('Kirim Langsung')
+                                ->required()
+                                ->validationMessages([
+                                    'required' => 'Tipe pengiriman wajib dipilih'
+                                ]),
+                            TextInput::make('shipped_to')
+                                ->label('Alamat Kirim')
+                                ->default(fn($record) => app(SalesOrderService::class)->headerFromQuotation($record)['shipped_to'])
+                                ->required()
+                                ->maxLength(255)
+                                ->helperText('Diambil dari quotation; bila kosong dari alamat customer. Dapat diubah.')
+                                ->validationMessages(['required' => 'Alamat kirim wajib diisi'])
+                                ->columnSpanFull(),
+                        ]),
+                    Repeater::make('saleOrderItems')
+                        ->label('Item Sales Order')
+                        ->schema([
+                            Hidden::make('product_id'),
+                            Hidden::make('tax_type')->default('None'),
+                            Hidden::make('currency_id')
+                                ->default(fn($record) => is_numeric($record?->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId()),
+                            Placeholder::make('product_info')
+                                ->label('Produk')
+                                ->content(function ($get, $record) {
+                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
+                                    if ($quotationItem) {
+                                        return "({$quotationItem->product->sku}) {$quotationItem->product->name}";
+                                    }
+                                    return '-';
+                                })
+                                ->columnSpan(2),
+                            TextInput::make('quantity')
+                                ->label('Quantity')
+                                ->numeric()
+                                ->default(function ($get, $record) {
+                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
+                                    return $quotationItem ? $quotationItem->quantity : 0;
+                                })
+                                ->required()
+                                ->validationMessages([
+                                    'required' => 'Quantity wajib diisi',
+                                    'numeric' => 'Quantity harus berupa angka'
+                                ])
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function ($state, $set, $get) {
+                                    $quantity = $state ?? 0;
+                                    $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
+                                    $unitPrice = static::parseCurrencyState($get('unit_price') ?? 0);
+                                    $discount = $get('discount') ?? 0;
+                                    $tax = $get('tax') ?? 0;
+                                    $taxType = $get('tax_type') ?? 'None';
+                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
+                                    $set('subtotal', static::formatCurrencyPreviewState($subtotal, $currencyId));
+                                    $set('tax_nominal', static::formatCurrencyPreviewState(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType), $currencyId));
+                                }),
+                            TextInput::make('unit_price')
+                                ->label('Unit Price')
+                                ->default(function ($get, $record) {
+                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
+                                    $currencyId = is_numeric($record?->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId();
+                                    return $quotationItem
+                                        ? static::formatCurrencyInputState((float) $quotationItem->unit_price, $currencyId)
+                                        : 0;
+                                })
+                                ->prefix(fn($get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                                ->required()
+                                ->indonesianMoney()
+                                ->validationMessages([
+                                    'required' => 'Unit Price wajib diisi',
+                                    'numeric' => 'Unit Price harus berupa angka'
+                                ])
+                                ->live(debounce: 500)
+                                ->afterStateUpdated(function ($state, $set, $get) {
+                                    $quantity = $get('quantity') ?? 0;
+                                    $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
+                                    $unitPrice = static::parseCurrencyState($state ?? 0);
+                                    $discount = $get('discount') ?? 0;
+                                    $tax = $get('tax') ?? 0;
+                                    $taxType = $get('tax_type') ?? 'None';
+                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
+                                    $set('subtotal', static::formatCurrencyPreviewState($subtotal, $currencyId));
+                                    $set('tax_nominal', static::formatCurrencyPreviewState(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType), $currencyId));
+                                }),
+                            Select::make('warehouse_id')
+                                ->label('Gudang')
+                                ->searchable()
+                                ->preload()
+                                ->options(function ($get) {
+                                    return WarehouseStockOptions::forProduct(
+                                        $get('product_id'),
+                                        $get('warehouse_id'),
+                                    );
+                                })
+                                ->helperText('Hanya menampilkan gudang yang memiliki stok bebas untuk produk ini.')
+                                ->validationMessages([
+                                    'required' => 'Gudang wajib dipilih'
+                                ])
+                                ->default(function ($get) {
+                                    return array_key_first(WarehouseStockOptions::forProduct($get('product_id')));
+                                })
+                                ->reactive()
+                                ->afterStateUpdated(function ($set) {
+                                    $set('rak_id', null); // Reset rak when warehouse changes
+                                }),
+                            Select::make('rak_id')
+                                ->label('Rak')
+                                ->searchable(['code', 'name'])
+                                ->preload()
+                                ->options(function ($get) {
+                                    $warehouseId = $get('warehouse_id');
+                                    if ($warehouseId) {
+                                        return \App\Models\Rak::where('warehouse_id', $warehouseId)->pluck('name', 'id')->map(function ($name, $id) {
+                                            $rak = \App\Models\Rak::find($id);
+                                            return filled($rak?->code) ? "({$rak->code}) {$name}" : $name;
+                                        });
+                                    }
+                                    return [];
+                                })
+                                ->nullable(),
+                            TextInput::make('discount')
+                                ->label('Discount (%)')
+                                ->numeric()
+                                ->default(function ($get, $record) {
+                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
+                                    return $quotationItem ? $quotationItem->discount : 0;
+                                })
+                                ->minValue(0)
+                                ->maxValue(100)
+                                ->reactive()
+                                ->afterStateUpdated(function ($state, $set, $get) {
+                                    $quantity = $get('quantity') ?? 0;
+                                    $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
+                                    $unitPrice = static::parseCurrencyState($get('unit_price') ?? 0);
+                                    $discount = $state ?? 0;
+                                    $tax = $get('tax') ?? 0;
+                                    $taxType = $get('tax_type') ?? 'None';
+                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
+                                    $set('subtotal', static::formatCurrencyPreviewState($subtotal, $currencyId));
+                                    $set('tax_nominal', static::formatCurrencyPreviewState(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType), $currencyId));
+                                }),
+                            TextInput::make('tax')
+                                ->label('Tax (%)')
+                                ->numeric()
+                                ->readOnly(),
+                            // Field PREVIEW read-only: sengaja TANPA indonesianMoney(). State selalu string
+                            // berformat Indonesia dari formatCurrencyPreviewState() supaya tidak ditafsirkan
+                            // ulang oleh mask input (penyebab angka tampil 100x lipat).
+                            TextInput::make('tax_nominal')
+                                ->label('Tax Amount')
+                                ->prefix(fn($get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                                ->readOnly()
+                                ->dehydrated(false)
+                                ->default('0,00'),
+                            TextInput::make('subtotal')
+                                ->label('Subtotal')
+                                ->prefix(fn($get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
+                                ->readOnly()
+                                ->dehydrated(false)
+                                ->default('0,00'),
+                        ])
+                        ->columns(3)
+                        ->defaultItems(function ($record) {
+                            return $record && $record->quotationItem ? $record->quotationItem->count() : 0;
+                        })
+                        ->minItems(1)
+                        ->validationMessages([
+                            'minItems' => 'Minimal harus ada 1 item sales order'
+                        ])
+                        ->default(function ($record) {
+                            if ($record && $record->quotationItem) {
+                                $items = [];
+                                foreach ($record->quotationItem as $quotationItem) {
+                                    $currencyId = is_numeric($record->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId();
+                                    $items[] = [
+                                        'product_id' => $quotationItem->product_id,
+                                        'quantity' => $quotationItem->quantity,
+                                        'currency_id' => $currencyId,
+                                        'unit_price' => static::formatCurrencyInputState((float) $quotationItem->unit_price, $currencyId),
+                                        'discount' => $quotationItem->discount,
+                                        'tax' => $quotationItem->tax,
+                                        'tax_type' => $quotationItem->tax_type ?? 'None',
+                                        'warehouse_id' => null,
+                                        'rak_id' => null,
+                                        'tax_nominal' => static::formatCurrencyPreviewState(HelperController::hitungTaxNominal(
+                                            $quotationItem->quantity,
+                                            (float) $quotationItem->unit_price,
+                                            $quotationItem->discount,
+                                            $quotationItem->tax,
+                                            $quotationItem->tax_type ?? 'None'
+                                        ), $currencyId),
+                                        'subtotal' => static::formatCurrencyPreviewState(HelperController::hitungSubtotal(
+                                            $quotationItem->quantity,
+                                            (float) $quotationItem->unit_price,
+                                            $quotationItem->discount,
+                                            $quotationItem->tax,
+                                            $quotationItem->tax_type ?? 'None'
+                                        ), $currencyId)
+                                    ];
+                                }
+                                return $items;
+                            }
+                            return [];
+                        })
+                        ->columnSpanFull(),
+                    Textarea::make('notes')
+                        ->label('Catatan')
+                        ->default(fn($record) => $record?->notes)
+                        ->placeholder('Catatan tambahan untuk sales order (opsional)')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                ])
+        ];
+    }
+
+    /**
+     * Aksi "Buat Revisi": salin quotation terkunci (Disetujui/Kedaluwarsa) menjadi Draft baru.
+     * Dipakai oleh tabel dan halaman View agar perilakunya sama. $pageAction = true untuk aksi header halaman.
+     */
+    public static function reviseAction(bool $pageAction = false): \Filament\Actions\Action|Action
+    {
+        $action = $pageAction ? \Filament\Actions\Action::make('revise') : Action::make('revise');
+
+        return $action
+            ->label('Buat Revisi')
+            ->icon('heroicon-o-document-duplicate')
+            ->color('warning')
+            ->visible(function ($record) {
+                $user = Auth::user();
+
+                return $user !== null && $user->can('revise', $record);
+            })
+            ->requiresConfirmation()
+            ->modalHeading('Buat Revisi Quotation')
+            ->modalDescription(fn ($record) => "Quotation {$record->quotation_number} tidak dapat diubah. Revisi akan menyalin header dan item menjadi Draft baru yang dapat diubah, lalu diajukan untuk persetujuan. Versi lama tetap berlaku sampai revisi disetujui.")
+            ->modalSubmitActionLabel('Ya, Buat Revisi')
+            ->action(function ($record) {
+                try {
+                    $revision = app(QuotationService::class)->createRevision($record);
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    HelperController::sendNotification(isSuccess: false, title: 'Revisi Tidak Dapat Dibuat', message: collect($e->errors())->flatten()->implode(' '));
+
+                    return;
+                }
+
+                HelperController::sendNotification(isSuccess: true, title: 'Revisi Dibuat', message: "Revisi {$revision->quotation_number} berhasil dibuat sebagai Draft. Ubah bila perlu, lalu ajukan persetujuan.");
+
+                return redirect(static::getUrl('edit', ['record' => $revision]));
+            });
+    }
+
+    /**
+     * Jalankan aksi "Buat Sales Order" (tabel maupun halaman View) dengan satu perilaku.
+     * Status awal SO mengikuti config('sales.so_from_quotation_auto_approve'): default Draft (menunggu
+     * persetujuan Manajer Sales); true = langsung Approved (perilaku lama aksi tabel).
+     */
+    public static function runCreateSaleOrderAction(Quotation $record, array $data)
+    {
+        $autoApprove = (bool) config('sales.so_from_quotation_auto_approve', false);
+
+        try {
+            $saleOrder = static::createSaleOrderFromQuotation($record, $data, autoApprove: $autoApprove);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            HelperController::sendNotification(isSuccess: false, title: 'Sales Order Tidak Dapat Dibuat', message: collect($e->errors())->flatten()->implode(' '));
+
+            return null;
+        }
+
+        HelperController::sendNotification(
+            isSuccess: true,
+            title: 'Success',
+            message: $autoApprove
+                ? "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order."
+                : "Sale Order {$data['so_number']} berhasil dibuat dari Quotation. Proses selanjutnya: ajukan persetujuan, lalu Manajer Sales menyetujui Sales Order ini sebelum diproses lebih lanjut."
+        );
+
+        return redirect()->route('filament.admin.resources.sale-orders.edit', $saleOrder);
+    }
+
+    /**
+     * Aksi "Buat Sales Order" hanya untuk quotation Approved dan user berizin.
+     */
+    public static function canCreateSaleOrder(?Quotation $record): bool
+    {
+        $user = Auth::user();
+
+        return $record !== null
+            && $record->unusableReasonForSaleOrder() === null
+            && $user !== null
+            && $user->hasPermissionTo('create sales order');
+    }
+
+    /**
+     * Buat Sales Order dari quotation. Data header diambil dari pemetaan tunggal
+     * SalesOrderService::headerFromQuotation(); form modal hanya menimpa nomor SO,
+     * tanggal, tipe pengiriman, alamat kirim, catatan, dan item.
+     *
+     * @param  bool  $autoApprove  true = SO langsung Approved (perilaku aksi tabel),
+     *                             false = SO Draft menunggu approval manajer (perilaku halaman View).
+     */
+    public static function createSaleOrderFromQuotation(Quotation $record, array $data, bool $autoApprove = false): SaleOrder
+    {
+        $salesOrderService = app(SalesOrderService::class);
+        // Server-side: tidak bergantung pada visibilitas tombol (mis. modal terbuka sebelum quotation kedaluwarsa).
+        $salesOrderService->assertQuotationUsable($record);
+        $mapped = $salesOrderService->headerFromQuotation($record);
+        $currencyId = $mapped['currency_id'];
+
+        return DB::transaction(function () use ($record, $data, $mapped, $currencyId, $salesOrderService, $autoApprove) {
+            $saleOrder = SaleOrder::create([
+                'customer_id' => $mapped['customer_id'],
+                'quotation_id' => $mapped['quotation_id'],
+                'cabang_id' => $mapped['cabang_id'], // Warisi cabang dari quotation
+                'so_number' => $data['so_number'],
+                'order_date' => $data['order_date'],
+                'delivery_date' => $data['delivery_date'] ?? null,
+                'tipe_pengiriman' => $data['tipe_pengiriman'],
+                'status' => 'draft',
+                'total_amount' => CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($record->total_amount ?? 0), $currencyId, false),
+                'currency_id' => $currencyId,
+                'exchange_rate' => $mapped['exchange_rate'],
+                'tempo_pembayaran' => $mapped['tempo_pembayaran'],
+                'shipped_to' => filled($data['shipped_to'] ?? null) ? trim($data['shipped_to']) : $mapped['shipped_to'],
+                'created_by' => Auth::id(),
+                'notes' => filled($data['notes'] ?? null) ? $data['notes'] : $mapped['notes'],
+            ]);
+
+            if (! empty($data['saleOrderItems']) && is_array($data['saleOrderItems'])) {
+                foreach ($data['saleOrderItems'] as $item) {
+                    $saleOrder->saleOrderItem()->create([
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => static::parseCurrencyState($item['unit_price'] ?? 0),
+                        'discount' => $item['discount'] ?? 0,
+                        'tax' => $item['tax'] ?? 0,
+                        'tipe_pajak' => $item['tax_type'] ?? 'None',
+                        'currency_id' => is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : $currencyId,
+                        'warehouse_id' => $item['warehouse_id'] ?? null,
+                        'rak_id' => $item['rak_id'] ?? null,
+                    ]);
+                }
+            } else {
+                // Fallback: salin item quotation apa adanya bila data repeater tidak tersedia.
+                foreach ($record->quotationItem as $quotationItem) {
+                    $saleOrder->saleOrderItem()->create([
+                        'product_id' => $quotationItem->product_id,
+                        'quantity' => $quotationItem->quantity,
+                        'unit_price' => $quotationItem->unit_price,
+                        'discount' => $quotationItem->discount,
+                        'tax' => $quotationItem->tax,
+                        'tipe_pajak' => $quotationItem->tax_type ?? 'None',
+                        'currency_id' => $currencyId,
+                        'warehouse_id' => null,
+                        'rak_id' => null,
+                    ]);
+                }
+            }
+
+            $salesOrderService->updateTotalAmount($saleOrder);
+
+            if ($autoApprove) {
+                $saleOrder->update([
+                    'status' => 'approved',
+                    'approve_by' => Auth::id(),
+                    'approve_at' => now(),
+                ]);
+            }
+
+            return $saleOrder;
+        });
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -1314,6 +1753,7 @@ class QuotationResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('createdBy.name')
                     ->label('Created By')
+                    ->placeholder('Legacy / tidak tercatat')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
                 TextColumn::make('requestApproveBy.name')
@@ -1359,6 +1799,7 @@ class QuotationResource extends Resource
                 'request_approve' => 'bg-gray-100',
                 'approve' => 'bg-blue-100',
                 'reject' => 'bg-red-100',
+                'expired' => 'bg-yellow-100',
                 default => '',
             })
             ->filters([
@@ -1377,6 +1818,7 @@ class QuotationResource extends Resource
                         'request_approve' => 'Request Approve',
                         'approve' => 'Approved',
                         'reject' => 'Rejected',
+                        'expired' => 'Kedaluwarsa',
                     ])
                     ->default(null),
                 Filter::make('date')
@@ -1416,13 +1858,16 @@ class QuotationResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
-                        ->color('primary'),
-                    DeleteAction::make(),
+                        ->color('primary')
+                        ->visible(fn ($record) => $record->isEditable()),
+                    DeleteAction::make()
+                        ->visible(fn ($record) => $record->isEditable()),
+                    static::reviseAction(),
                     Action::make('pdf_quotation')
                         ->label('Preview / Download PDF')
                         ->color('info')
                         ->icon('heroicon-o-document-arrow-down')
-                        ->visible(fn ($record) => in_array($record->status, ['approve', 'declined']))
+                        ->visible(fn ($record) => in_array($record->status, ['approve', 'expired', 'declined']))
                         ->url(fn ($record) => route('pdf-stream', ['type' => 'quotation', 'id' => $record->id]))
                         ->openUrlInNewTab(),
                     Action::make('download_file')
@@ -1485,8 +1930,13 @@ class QuotationResource extends Resource
                             );
                         })
                         ->action(function ($record) {
-                            $quotationService = app(QuotationService::class);
-                            $quotationService->approve($record);
+                            try {
+                                app(QuotationService::class)->approve($record);
+                            } catch (\Illuminate\Validation\ValidationException $e) {
+                                HelperController::sendNotification(isSuccess: false, title: "Tidak Dapat Disetujui", message: collect($e->errors())->flatten()->implode(' '));
+
+                                return;
+                            }
 
                             HelperController::sendNotification(isSuccess: true, title: "Success", message: "Quotation berhasil disetujui. Proses selanjutnya: Tim Sales perlu membuat Sale Order berdasarkan Quotation yang telah disetujui ini.");
                         }),
@@ -1517,351 +1967,10 @@ class QuotationResource extends Resource
                         ->label('Buat Sales Order')
                         ->icon('heroicon-o-plus')
                         ->color('success')
-                        ->visible(function ($record) {
-                            $user = Auth::user();
-                            $hasPermission = $user && $user->hasPermissionTo('create sales order');
-                            $isApproved = $record->status == 'approve';
-
-                            Log::debug('QuotationResource: create_sale_order visibility check', [
-                                'quotation_id' => $record->id,
-                                'quotation_number' => $record->quotation_number,
-                                'status' => $record->status,
-                                'is_approved' => $isApproved,
-                                'user_id' => $user ? $user->id : null,
-                                'user_name' => $user ? $user->name : null,
-                                'has_permission' => $hasPermission,
-                                'visible' => $isApproved && $hasPermission
-                            ]);
-
-                            return $isApproved && $hasPermission;
-                        })
-                        ->form([
-                            Section::make('Informasi Quotation')
-                                ->schema([
-                                    Placeholder::make('quotation_number')
-                                        ->label('Nomor Quotation')
-                                        ->content(fn($record) => $record->quotation_number),
-                                    Placeholder::make('customer_name')
-                                        ->label('Customer')
-                                        ->content(fn($record) => $record->customer->name ?? '-'),
-                                    Placeholder::make('total_amount')
-                                        ->label('Total Amount')
-                                        ->content(fn($record) => static::quotationMoney($record->total_amount, is_numeric($record->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId())),
-                                    Placeholder::make('currency_code')
-                                        ->label('Mata Uang')
-                                        ->content(fn($record) => $record->currency?->code ?? Currency::find(static::resolveDefaultCurrencyId())?->code ?? '-'),
-                                    Placeholder::make('item_count')
-                                        ->label('Jumlah Item')
-                                        ->content(fn($record) => $record->quotationItem->count() . ' item(s)'),
-                                ])->columns(2),
-                            Section::make('Sales Order Baru')
-                                ->schema([
-                                    Grid::make(2)
-                                        ->schema([
-                                            TextInput::make('so_number')
-                                                ->label('Nomor Sales Order')
-                                                ->default(fn() => app(SalesOrderService::class)->generateSoNumber())
-                                                ->required()
-                                                ->unique(table: 'sale_orders', column: 'so_number')
-                                                ->validationMessages([
-                                                    'required' => 'Nomor Sales Order wajib diisi',
-                                                    'unique' => 'Nomor Sales Order sudah digunakan'
-                                                ])
-                                                ->suffixAction(
-                                                    \Filament\Forms\Components\Actions\Action::make('generateSoNumber')
-                                                        ->icon('heroicon-o-arrow-path')
-                                                        ->tooltip('Generate Nomor Sales Order Baru')
-                                                        ->action(function ($set) {
-                                                            $set('so_number', app(SalesOrderService::class)->generateSoNumber());
-                                                        })
-                                                ),
-                                            DatePicker::make('order_date')
-                                                ->label('Tanggal Order')
-                                                ->default(now())
-                                                ->required()
-                                                ->validationMessages([
-                                                    'required' => 'Tanggal order wajib dipilih'
-                                                ]),
-                                            DatePicker::make('delivery_date')
-                                                ->label('Tanggal Pengiriman')
-                                                ->validationMessages([
-                                                    'required' => 'Tanggal pengiriman wajib dipilih'
-                                                ]),
-                                            Select::make('tipe_pengiriman')
-                                                ->label('Tipe Pengiriman')
-                                                ->options([
-                                                    'Ambil Sendiri' => 'Ambil Sendiri',
-                                                    'Kirim Langsung' => 'Kirim Langsung'
-                                                ])
-                                                ->default('Kirim Langsung')
-                                                ->required()
-                                                ->validationMessages([
-                                                    'required' => 'Tipe pengiriman wajib dipilih'
-                                                ]),
-                                        ]),
-                                    Repeater::make('saleOrderItems')
-                                        ->label('Item Sales Order')
-                                        ->schema([
-                                            Hidden::make('product_id'),
-                                            Hidden::make('tax_type')->default('None'),
-                                            Hidden::make('currency_id')
-                                                ->default(fn($record) => is_numeric($record?->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId()),
-                                            Placeholder::make('product_info')
-                                                ->label('Produk')
-                                                ->content(function ($get, $record) {
-                                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                    if ($quotationItem) {
-                                                        return "({$quotationItem->product->sku}) {$quotationItem->product->name}";
-                                                    }
-                                                    return '-';
-                                                })
-                                                ->columnSpan(2),
-                                            TextInput::make('quantity')
-                                                ->label('Quantity')
-                                                ->numeric()
-                                                ->default(function ($get, $record) {
-                                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                    return $quotationItem ? $quotationItem->quantity : 0;
-                                                })
-                                                ->required()
-                                                ->validationMessages([
-                                                    'required' => 'Quantity wajib diisi',
-                                                    'numeric' => 'Quantity harus berupa angka'
-                                                ])
-                                                ->live(onBlur: true)
-                                                ->afterStateUpdated(function ($state, $set, $get) {
-                                                    $quantity = $state ?? 0;
-                                                    $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
-                                                    $unitPrice = static::parseCurrencyState($get('unit_price') ?? 0);
-                                                    $discount = $get('discount') ?? 0;
-                                                    $tax = $get('tax') ?? 0;
-                                                    $taxType = $get('tax_type') ?? 'None';
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
-                                                    $set('subtotal', static::formatCurrencyPreviewState($subtotal, $currencyId));
-                                                    $set('tax_nominal', static::formatCurrencyPreviewState(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType), $currencyId));
-                                                }),
-                                            TextInput::make('unit_price')
-                                                ->label('Unit Price')
-                                                ->default(function ($get, $record) {
-                                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                    $currencyId = is_numeric($record?->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId();
-                                                    return $quotationItem
-                                                        ? static::formatCurrencyInputState((float) $quotationItem->unit_price, $currencyId)
-                                                        : 0;
-                                                })
-                                                ->prefix(fn($get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
-                                                ->required()
-                                                ->indonesianMoney()
-                                                ->validationMessages([
-                                                    'required' => 'Unit Price wajib diisi',
-                                                    'numeric' => 'Unit Price harus berupa angka'
-                                                ])
-                                                ->live(debounce: 500)
-                                                ->afterStateUpdated(function ($state, $set, $get) {
-                                                    $quantity = $get('quantity') ?? 0;
-                                                    $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
-                                                    $unitPrice = static::parseCurrencyState($state ?? 0);
-                                                    $discount = $get('discount') ?? 0;
-                                                    $tax = $get('tax') ?? 0;
-                                                    $taxType = $get('tax_type') ?? 'None';
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
-                                                    $set('subtotal', static::formatCurrencyPreviewState($subtotal, $currencyId));
-                                                    $set('tax_nominal', static::formatCurrencyPreviewState(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType), $currencyId));
-                                                }),
-                                            Select::make('warehouse_id')
-                                                ->label('Gudang')
-                                                ->searchable()
-                                                ->preload()
-                                                ->options(function ($get) {
-                                                    return WarehouseStockOptions::forProduct(
-                                                        $get('product_id'),
-                                                        $get('warehouse_id'),
-                                                    );
-                                                })
-                                                ->helperText('Hanya menampilkan gudang yang memiliki stok bebas untuk produk ini.')
-                                                ->validationMessages([
-                                                    'required' => 'Gudang wajib dipilih'
-                                                ])
-                                                ->default(function ($get) {
-                                                    return array_key_first(WarehouseStockOptions::forProduct($get('product_id')));
-                                                })
-                                                ->reactive()
-                                                ->afterStateUpdated(function ($set) {
-                                                    $set('rak_id', null); // Reset rak when warehouse changes
-                                                }),
-                                            Select::make('rak_id')
-                                                ->label('Rak')
-                                                ->searchable(['code', 'name'])
-                                                ->preload()
-                                                ->options(function ($get) {
-                                                    $warehouseId = $get('warehouse_id');
-                                                    if ($warehouseId) {
-                                                        return \App\Models\Rak::where('warehouse_id', $warehouseId)->pluck('name', 'id')->map(function ($name, $id) {
-                                                            $rak = \App\Models\Rak::find($id);
-                                                            return filled($rak?->code) ? "({$rak->code}) {$name}" : $name;
-                                                        });
-                                                    }
-                                                    return [];
-                                                })
-                                                ->nullable(),
-                                            TextInput::make('discount')
-                                                ->label('Discount (%)')
-                                                ->numeric()
-                                                ->default(function ($get, $record) {
-                                                    $quotationItem = $record->quotationItem->where('product_id', $get('product_id'))->first();
-                                                    return $quotationItem ? $quotationItem->discount : 0;
-                                                })
-                                                ->minValue(0)
-                                                ->maxValue(100)
-                                                ->reactive()
-                                                ->afterStateUpdated(function ($state, $set, $get) {
-                                                    $quantity = $get('quantity') ?? 0;
-                                                    $currencyId = is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId();
-                                                    $unitPrice = static::parseCurrencyState($get('unit_price') ?? 0);
-                                                    $discount = $state ?? 0;
-                                                    $tax = $get('tax') ?? 0;
-                                                    $taxType = $get('tax_type') ?? 'None';
-                                                    $subtotal = HelperController::hitungSubtotal($quantity, $unitPrice, $discount, $tax, $taxType);
-                                                    $set('subtotal', static::formatCurrencyPreviewState($subtotal, $currencyId));
-                                                    $set('tax_nominal', static::formatCurrencyPreviewState(HelperController::hitungTaxNominal($quantity, $unitPrice, $discount, $tax, $taxType), $currencyId));
-                                                }),
-                                            TextInput::make('tax')
-                                                ->label('Tax (%)')
-                                                ->numeric()
-                                                ->readOnly()
-                                                ->default(0),
-                                            TextInput::make('subtotal')
-                                                ->label('Subtotal')
-                                                ->prefix(fn($get) => static::resolveCurrencySymbol(is_numeric($get('currency_id')) ? (int) $get('currency_id') : static::resolveDefaultCurrencyId()))
-                                                ->indonesianMoney()
-                                                ->readOnly()
-                                                ->default(0),
-                                        ])
-                                        ->columns(3)
-                                        ->defaultItems(function ($record) {
-                                            return $record && $record->quotationItem ? $record->quotationItem->count() : 0;
-                                        })
-                                        ->minItems(1)
-                                        ->validationMessages([
-                                            'minItems' => 'Minimal harus ada 1 item sales order'
-                                        ])
-                                        ->default(function ($record) {
-                                            if ($record && $record->quotationItem) {
-                                                $items = [];
-                                                foreach ($record->quotationItem as $quotationItem) {
-                                                    $currencyId = is_numeric($record->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId();
-                                                    $items[] = [
-                                                        'product_id' => $quotationItem->product_id,
-                                                        'quantity' => $quotationItem->quantity,
-                                                        'currency_id' => $currencyId,
-                                                        'unit_price' => static::formatCurrencyInputState((float) $quotationItem->unit_price, $currencyId),
-                                                        'discount' => $quotationItem->discount,
-                                                        'tax' => $quotationItem->tax,
-                                                        'tax_type' => $quotationItem->tax_type ?? 'None',
-                                                        'warehouse_id' => null,
-                                                        'rak_id' => null,
-                                                        'tax_nominal' => static::formatCurrencyPreviewState(HelperController::hitungTaxNominal(
-                                                            $quotationItem->quantity,
-                                                            (float) $quotationItem->unit_price,
-                                                            $quotationItem->discount,
-                                                            $quotationItem->tax,
-                                                            $quotationItem->tax_type ?? 'None'
-                                                        ), $currencyId),
-                                                        'subtotal' => static::formatCurrencyPreviewState(HelperController::hitungSubtotal(
-                                                            $quotationItem->quantity,
-                                                            (float) $quotationItem->unit_price,
-                                                            $quotationItem->discount,
-                                                            $quotationItem->tax,
-                                                            $quotationItem->tax_type ?? 'None'
-                                                        ), $currencyId)
-                                                    ];
-                                                }
-                                                return $items;
-                                            }
-                                            return [];
-                                        })
-                                        ->columnSpanFull(),
-                                    Textarea::make('notes')
-                                        ->label('Catatan')
-                                        ->placeholder('Catatan tambahan untuk sales order (opsional)')
-                                        ->rows(3)
-                                        ->columnSpanFull(),
-                                ])
-                        ])
+                        ->visible(fn ($record) => static::canCreateSaleOrder($record))
+                        ->form(static::saleOrderModalSchema())
                         ->action(function ($data, $record) {
-                            $salesOrderService = app(SalesOrderService::class);
-
-                            // Karena quotation sudah di-approve (termasuk discount & tempo pembayaran),
-                            // SO yang dibuat dari quotation approved langsung berstatus 'approved'.
-                            // Tidak perlu approval ulang di level SO karena sudah di-approve di Quotation.
-                            $soStatus = 'draft';
-                            $recordCurrencyId = is_numeric($record->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId();
-                            $saleOrder = SaleOrder::create([
-                                'customer_id' => $record->customer_id,
-                                'quotation_id' => $record->id,
-                                'cabang_id' => $record->cabang_id, // Warisi cabang dari quotation
-                                'so_number' => $data['so_number'],
-                                'order_date' => $data['order_date'],
-                                'delivery_date' => $data['delivery_date'],
-                                'tipe_pengiriman' => $data['tipe_pengiriman'],
-                                'status' => $soStatus,
-                                'total_amount' => CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($record->total_amount ?? 0), $recordCurrencyId, false),
-                                'currency_id' => $recordCurrencyId,
-                                'exchange_rate' => static::resolveExchangeRate($recordCurrencyId),
-                                'tempo_pembayaran' => $record->tempo_pembayaran, // Warisi tempo yang sudah disetujui
-                                'approve_by' => Auth::id(), // Marking as approved by the person creating SO from approved quotation
-                                'approve_at' => now(),
-                                'created_by' => Auth::id(),
-                                'notes' => $data['notes'] ?? null,
-                            ]);
-
-                            // Create sale order items from form data
-                            if (isset($data['saleOrderItems']) && is_array($data['saleOrderItems'])) {
-                                foreach ($data['saleOrderItems'] as $item) {
-                                    $saleOrder->saleOrderItem()->create([
-                                        'product_id' => $item['product_id'],
-                                        'quantity' => $item['quantity'],
-                                        'unit_price' => static::parseCurrencyState($item['unit_price']),
-                                        'discount' => $item['discount'] ?? 0,
-                                        'tax' => $item['tax'] ?? 0,
-                                        'tipe_pajak' => $item['tax_type'] ?? 'None',
-                                        'currency_id' => is_numeric($item['currency_id'] ?? null) ? (int) $item['currency_id'] : $recordCurrencyId,
-                                        'warehouse_id' => $item['warehouse_id'],
-                                        'rak_id' => $item['rak_id'] ?? null,
-                                    ]);
-                                }
-                            } else {
-                                // Fallback to quotation items if repeater data is not available
-                                foreach ($record->quotationItem as $quotationItem) {
-                                    $saleOrder->saleOrderItem()->create([
-                                        'product_id' => $quotationItem->product_id,
-                                        'quantity' => $quotationItem->quantity,
-                                        'unit_price' => $quotationItem->unit_price,
-                                        'discount' => $quotationItem->discount,
-                                        'tax' => $quotationItem->tax,
-                                        'tipe_pajak' => $quotationItem->tax_type ?? 'None',
-                                        'currency_id' => $recordCurrencyId,
-                                        'warehouse_id' => 1, // Default warehouse
-                                        'rak_id' => null,
-                                    ]);
-                                }
-                            }
-
-                            // Update total amount
-                            $salesOrderService->updateTotalAmount($saleOrder);
-
-                            $saleOrder->load('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
-
-                            $saleOrder->update([
-                                'status' => 'approved',
-                                'approve_by' => Auth::id(),
-                                'approve_at' => now(),
-                            ]);
-
-                            HelperController::sendNotification(isSuccess: true, title: "Success", message: "Sale Order {$data['so_number']} berhasil dibuat dari Quotation dan disetujui. Proses selanjutnya: Tim Gudang/Logistik dapat melanjutkan ke Delivery Order.");
-
-                            // Redirect to edit page
-                            return redirect()->route('filament.admin.resources.sale-orders.edit', $saleOrder);
+                            return static::runCreateSaleOrderAction($record, $data);
                         })
                         ->modalHeading('Buat Sales Order dari Quotation')
                         ->modalDescription('Buat sales order baru berdasarkan quotation ini. Periksa informasi dan isi nomor sales order.')
@@ -1875,7 +1984,22 @@ class QuotationResource extends Resource
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->action(function (DeleteBulkAction $action, $records) {
+                            // Hanya quotation yang masih boleh diubah (draft/reject) yang dapat dihapus.
+                            [$deletable, $locked] = $records->partition(fn (Quotation $r) => $r->isEditable());
+                            $deletable->each(fn (Quotation $r) => $r->delete());
+
+                            if ($locked->isNotEmpty()) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: $locked->count() . ' quotation dilewati',
+                                    message: 'Quotation yang sudah disetujui/kedaluwarsa tidak dapat dihapus.'
+                                );
+                            }
+
+                            $action->success();
+                        }),
                     BulkAction::make('sync_total_amounts')
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->color('primary')
@@ -1942,7 +2066,10 @@ class QuotationResource extends Resource
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('tempo_pembayaran')
                             ->label('Tempo Pembayaran')
-                            ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
+                            ->formatStateUsing(fn($state) => ($state !== null && $state !== '') ? $state . ' Hari' : '-'),
+                        \Filament\Infolists\Components\TextEntry::make('shipped_to')
+                            ->label('Alamat Kirim')
+                            ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('currency.code')
                             ->label('Mata Uang')
                             ->placeholder(fn($record) => Currency::find(static::resolveDefaultCurrencyId())?->code ?? '-'),
@@ -1951,6 +2078,10 @@ class QuotationResource extends Resource
                             ->formatStateUsing(fn($state, $record) => static::quotationMoney($state, is_numeric($record->currency_id) ? (int) $record->currency_id : static::resolveDefaultCurrencyId())),
                         \Filament\Infolists\Components\TextEntry::make('createdBy.name')
                             ->label('Created By')
+                            ->placeholder('Legacy / tidak tercatat'),
+                        \Filament\Infolists\Components\TextEntry::make('revision_no')
+                            ->label('Revisi')
+                            ->formatStateUsing(fn ($state, $record) => $state ? 'R' . $state . ' dari ' . ($record->revisionOf?->quotation_number ?? '-') : 'Versi awal')
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('notes')
                             ->label('Notes')

@@ -104,7 +104,7 @@ class SaleOrderApiController extends Controller
 
         // Approved Quotations query for Refer Quotation option (lightweight metadata for dropdown)
         $approvedQuotations = Quotation::query()
-            ->where('status', 'approve')
+            ->usable()
             ->with(['customer:id,code,name'])
             ->orderByDesc('id')
             ->limit(50)
@@ -221,19 +221,25 @@ class SaleOrderApiController extends Controller
             ], 404);
         }
 
+        // Quotation kedaluwarsa / belum disetujui / sudah digantikan revisi tidak boleh dijadikan SO.
+        $this->salesOrderService->assertQuotationUsable($quotation, 'quotation_id');
+
+        // Pemetaan tunggal quotation -> SO (sama dengan modal View & aksi tabel Quotation).
+        $mapped = $this->salesOrderService->headerFromQuotation($quotation);
+
         return response()->json([
             'success' => true,
             'data' => [
                 'id' => $quotation->id,
                 'quotation_number' => $quotation->quotation_number,
-                'customer_id' => $quotation->customer_id,
-                'cabang_id' => $quotation->cabang_id,
-                'currency_id' => $quotation->currency_id,
-                'exchange_rate' => (float) ($quotation->exchange_rate ?? 1.0),
-                'tempo_pembayaran' => $quotation->tempo_pembayaran ?? 0,
-                'shipped_to' => $quotation->customer?->address,
+                'customer_id' => $mapped['customer_id'],
+                'cabang_id' => $mapped['cabang_id'],
+                'currency_id' => $mapped['currency_id'],
+                'exchange_rate' => (float) $mapped['exchange_rate'],
+                'tempo_pembayaran' => (int) $mapped['tempo_pembayaran'],
+                'shipped_to' => $mapped['shipped_to'] ?? '',
                 'total_amount' => (float) ($quotation->total_amount ?? 0),
-                'notes' => $quotation->notes,
+                'notes' => $mapped['notes'] ?? '',
                 'items' => $quotation->quotationItem->map(function ($item) {
                     return [
                         'product_id' => $item->product_id,
@@ -250,6 +256,27 @@ class SaleOrderApiController extends Controller
                 }),
             ],
         ]);
+    }
+
+    /**
+     * Tentukan tempo pembayaran dari header request.
+     *
+     * Nilai eksplisit (termasuk 0 = tunai) selalu dihormati. Bila klien tidak
+     * mengirim nilai (null), pakai tempo quotation lalu tempo customer, dan
+     * simpan sebagai ANGKA — jangan biarkan NULL/0 tanpa sengaja karena
+     * menentukan due date invoice.
+     */
+    private function resolveHeaderTempo(array $headerData, ?Customer $customer): int
+    {
+        $quotation = ! empty($headerData['quotation_id'])
+            ? Quotation::find($headerData['quotation_id'])
+            : null;
+
+        return $this->salesOrderService->resolveTempoPembayaran(
+            $headerData['tempo_pembayaran'] ?? null,
+            $customer,
+            $quotation
+        );
     }
 
     /**
@@ -278,6 +305,22 @@ class SaleOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (! Auth::user()?->can('create', SaleOrder::class)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk membuat Sales Order.',
+            ], 403);
+        }
+
+        // Persetujuan SO (approved) HANYA lewat aksi persetujuan ber-izin (anti-self-approval & batas nominal),
+        // bukan lewat payload API. Pengajuan (request_approve) membutuhkan izin yang sama dengan aksi UI-nya.
+        if ($request->input('header.status') === 'request_approve' && ! Auth::user()?->can('request', SaleOrder::class)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengajukan persetujuan Sales Order.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'header.so_number' => 'required|string|max:255|unique:sale_orders,so_number',
             'header.customer_id' => 'required|exists:customers,id',
@@ -291,7 +334,7 @@ class SaleOrderApiController extends Controller
             'header.tempo_pembayaran' => 'nullable|integer|min:0',
             'header.quotation_id' => 'nullable|exists:quotations,id',
             'header.notes' => 'nullable|string',
-            'header.status' => 'nullable|string|in:draft,request_approve,approved,canceled,reject',
+            'header.status' => 'nullable|string|in:draft,request_approve',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
@@ -317,10 +360,16 @@ class SaleOrderApiController extends Controller
         $headerData = $validated['header'];
         $itemsData = $validated['items'];
 
+        // SO baru dari quotation: quotation harus Approved, belum kedaluwarsa, dan belum digantikan revisi.
+        if (! empty($headerData['quotation_id'])) {
+            $this->salesOrderService->assertQuotationUsable(Quotation::findOrFail($headerData['quotation_id']), 'header.quotation_id');
+        }
+
         $customer = Customer::find($headerData['customer_id']);
         $currencyId = (int) $headerData['currency_id'];
         $currency = Currency::find($currencyId);
         $exchangeRate = $headerData['exchange_rate'] ?? ($currency?->to_rupiah ?? 1.0);
+        $tempoPembayaran = $this->resolveHeaderTempo($headerData, $customer);
 
         // Precalculate estimated total for credit validation check
         $estimatedTotalIdr = 0;
@@ -355,7 +404,7 @@ class SaleOrderApiController extends Controller
         }
 
         try {
-            $saleOrder = DB::transaction(function () use ($headerData, $itemsData, $exchangeRate, $currencyId) {
+            $saleOrder = DB::transaction(function () use ($headerData, $itemsData, $exchangeRate, $currencyId, $tempoPembayaran) {
                 $so = SaleOrder::create([
                     'so_number' => $headerData['so_number'],
                     'customer_id' => $headerData['customer_id'],
@@ -367,8 +416,9 @@ class SaleOrderApiController extends Controller
                     'shipped_to' => $headerData['shipped_to'] ?? null,
                     'currency_id' => $currencyId,
                     'exchange_rate' => $exchangeRate,
-                    'tempo_pembayaran' => $headerData['tempo_pembayaran'] ?? 0,
-                    'status' => $headerData['status'] ?? 'draft',
+                    'tempo_pembayaran' => $tempoPembayaran,
+                    'notes' => $headerData['notes'] ?? null,
+                    'status' => 'draft',
                     'created_by' => Auth::id(),
                     'total_amount' => 0,
                 ]);
@@ -398,6 +448,11 @@ class SaleOrderApiController extends Controller
 
                 return $so;
             });
+
+            // Pengajuan persetujuan dicatat oleh service (status + pengaju + waktu), bukan diisi dari payload.
+            if ($request->input('header.status') === 'request_approve') {
+                $this->salesOrderService->requestApprove($saleOrder);
+            }
 
             return response()->json([
                 'success' => true,
@@ -466,9 +521,15 @@ class SaleOrderApiController extends Controller
                     'delivery_date' => $saleOrder->delivery_date ? $saleOrder->delivery_date->format('Y-m-d') : null,
                     'tipe_pengiriman' => $saleOrder->tipe_pengiriman ?? 'Kirim Langsung',
                     'shipped_to' => $saleOrder->shipped_to,
-                    'currency_id' => $saleOrder->currency_id,
+                    // SO lama (legacy) bisa tanpa mata uang -> jangan tampilkan placeholder kosong.
+                    'currency_id' => $saleOrder->currency_id ?? $this->salesOrderService->defaultCurrencyId(),
                     'exchange_rate' => (float) ($saleOrder->exchange_rate ?? 1.0),
-                    'tempo_pembayaran' => $saleOrder->tempo_pembayaran ?? 0,
+                    'tempo_pembayaran' => $this->salesOrderService->resolveTempoPembayaran(
+                        $saleOrder->tempo_pembayaran,
+                        $saleOrder->customer?->exists ? $saleOrder->customer : null,
+                        $saleOrder->quotation?->exists ? $saleOrder->quotation : null
+                    ),
+                    'notes' => $saleOrder->notes,
                     'status' => $saleOrder->status,
                     'total_amount' => (float) ($saleOrder->total_amount ?? 0),
                 ],
@@ -490,6 +551,31 @@ class SaleOrderApiController extends Controller
             ], 404);
         }
 
+        // Kunci status: SO hanya boleh diubah saat Draft / Menunggu Persetujuan (sama dengan SaleOrderPolicy &
+        // halaman Edit). Mengubah item SO yang sudah disetujui akan membuat ulang item dan memutus tautan DO.
+        if (! in_array($saleOrder->status, ['draft', 'request_approve'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Sales Order {$saleOrder->so_number} berstatus \"" . SaleOrder::statusLabel($saleOrder->status) . '" dan tidak dapat diubah.',
+            ], 422);
+        }
+
+        if (! Auth::user()?->can('update', $saleOrder)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengubah Sales Order.',
+            ], 403);
+        }
+
+        $wantsApproval = $request->input('header.status') === 'request_approve'
+            && $saleOrder->status === 'draft';
+        if ($wantsApproval && ! Auth::user()?->can('request', $saleOrder)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengajukan persetujuan Sales Order.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'header.so_number' => [
                 'required',
@@ -507,7 +593,8 @@ class SaleOrderApiController extends Controller
             'header.exchange_rate' => 'nullable|numeric|min:0',
             'header.tempo_pembayaran' => 'nullable|integer|min:0',
             'header.quotation_id' => 'nullable|exists:quotations,id',
-            'header.status' => 'nullable|string',
+            'header.status' => 'nullable|string|in:draft,request_approve',
+            'header.notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.001',
@@ -521,10 +608,16 @@ class SaleOrderApiController extends Controller
         $headerData = $validated['header'];
         $itemsData = $validated['items'];
 
+        // Quotation acuan yang DIGANTI harus masih dapat dipakai (quotation yang sama seperti semula tidak diperiksa ulang).
+        if (! empty($headerData['quotation_id']) && (int) $headerData['quotation_id'] !== (int) $saleOrder->quotation_id) {
+            $this->salesOrderService->assertQuotationUsable(Quotation::findOrFail($headerData['quotation_id']), 'header.quotation_id');
+        }
+
         $customer = Customer::find($headerData['customer_id']);
         $currencyId = (int) $headerData['currency_id'];
         $currency = Currency::find($currencyId);
         $exchangeRate = $headerData['exchange_rate'] ?? ($currency?->to_rupiah ?? 1.0);
+        $tempoPembayaran = $this->resolveHeaderTempo($headerData, $customer);
 
         // Precalculate estimated total for credit validation check
         $estimatedTotalIdr = 0;
@@ -559,7 +652,7 @@ class SaleOrderApiController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($saleOrder, $headerData, $itemsData, $exchangeRate, $currencyId) {
+            DB::transaction(function () use ($saleOrder, $headerData, $itemsData, $exchangeRate, $currencyId, $tempoPembayaran) {
                 $saleOrder->update([
                     'so_number' => $headerData['so_number'],
                     'customer_id' => $headerData['customer_id'],
@@ -571,8 +664,11 @@ class SaleOrderApiController extends Controller
                     'shipped_to' => $headerData['shipped_to'] ?? null,
                     'currency_id' => $currencyId,
                     'exchange_rate' => $exchangeRate,
-                    'tempo_pembayaran' => $headerData['tempo_pembayaran'] ?? 0,
-                    'status' => $headerData['status'] ?? $saleOrder->status,
+                    'tempo_pembayaran' => $tempoPembayaran,
+                    // Jangan menimpa catatan lama bila klien tidak mengirim field notes.
+                    'notes' => array_key_exists('notes', $headerData) ? $headerData['notes'] : $saleOrder->notes,
+                    // Status tidak diubah dari payload; pengajuan persetujuan lewat SalesOrderService::requestApprove().
+                    'status' => $saleOrder->status,
                 ]);
 
                 // Sync items
@@ -601,6 +697,10 @@ class SaleOrderApiController extends Controller
 
                 $this->salesOrderService->updateTotalAmount($saleOrder);
             });
+
+            if ($wantsApproval) {
+                $this->salesOrderService->requestApprove($saleOrder->fresh());
+            }
 
             return response()->json([
                 'success' => true,

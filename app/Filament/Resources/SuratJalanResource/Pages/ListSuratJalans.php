@@ -37,6 +37,8 @@ class ListSuratJalans extends ListRecords
                         ->options([
                             'all' => 'Semua',
                             '1' => 'Terbit',
+                            '2' => 'Dibatalkan',
+                            '0' => 'Draft',
                         ])
                         ->default('1')
                         ->required(),

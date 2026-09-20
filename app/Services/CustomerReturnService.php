@@ -56,7 +56,7 @@ class CustomerReturnService
                 }
 
                 $qty      = (float) $item->quantity;
-                $unitCost = (float) ($item->invoiceItem?->price ?? 0);
+                $unitCost = (float) ($item->invoiceItem?->net_unit_price ?? 0);
 
                 if ($qty <= 0) {
                     continue;
@@ -183,7 +183,7 @@ class CustomerReturnService
             if ($item->decision === CustomerReturnItem::DECISION_REJECT) {
                 continue;
             }
-            $itemValue = round((float) $item->quantity * (float) ($item->invoiceItem?->price ?? 0), 2);
+            $itemValue = round((float) $item->quantity * (float) ($item->invoiceItem?->net_unit_price ?? 0), 2);
             if ($item->decision === CustomerReturnItem::DECISION_REPAIR) {
                 $repairAmount += $itemValue;
             } else {

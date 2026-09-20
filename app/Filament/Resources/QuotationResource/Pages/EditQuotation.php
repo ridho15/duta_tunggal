@@ -17,6 +17,29 @@ class EditQuotation extends EditRecord
 
     protected static string $view = 'filament.resources.quotation-resource.pages.edit-quotation';
 
+    public function mount(int | string $record): void
+    {
+        // Quotation yang menunggu persetujuan / disetujui / kedaluwarsa terkunci. Beri penjelasan
+        // yang ramah dan arahkan ke halaman lihat, alih-alih 403 kosong.
+        $model = $this->resolveRecord($record);
+
+        if (! $model->isEditable()) {
+            \Filament\Notifications\Notification::make()
+                ->title('Quotation Terkunci')
+                ->body("Quotation {$model->quotation_number} berstatus \"{$model->statusLabel()}\" sehingga tidak dapat diubah. Gunakan aksi \"Buat Revisi\" untuk membuat versi baru.")
+                ->warning()
+                ->send();
+
+            // Isi record supaya render (bila Livewire tetap merender saat redirect) tidak gagal pada tipe Model.
+            $this->record = $model;
+            $this->redirect(static::getResource()::getUrl('view', ['record' => $model]));
+
+            return;
+        }
+
+        parent::mount($record);
+    }
+
     protected function getHeaderActions(): array
     {
         return [

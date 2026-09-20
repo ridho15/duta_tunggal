@@ -897,23 +897,9 @@ class HelperController extends Controller
         // directly (not through this helper), ensure you pass an explicit type to avoid discrepancies.
         $taxType   = (is_string($taxType) && trim($taxType) !== '') ? $taxType : 'Inklusif';
 
-        // Calculate base after discount
-        $subtotal = $quantity * $unit_price;
-        $discountAmount = $subtotal * ($discount / 100);
-        $afterDiscount = $subtotal - $discountAmount;
-
-        $normalizedTaxType = strtolower(trim((string) $taxType));
-        $normalizedTaxType = match ($normalizedTaxType) {
-            'inklusif', 'inclusive', 'included', 'ppn included', 'ppn-included' => 'inklusif',
-            'none', 'non pajak', 'non-pajak', 'nonpajak' => 'none',
-            default => 'eksklusif',
-        };
-
-        $taxAmount = round($afterDiscount * ($tax / 100.0), 2);
-
-        return in_array($normalizedTaxType, ['inklusif', 'none'], true)
-            ? round($afterDiscount, 2)
-            : round($afterDiscount + $taxAmount, 2);
+        // Satu-satunya perhitungan baris penjualan: LineAmounts (kebijakan pembulatan D6, config sales.line_rounding_decimals).
+        // Eksklusif: DPP + PPN; Inklusif / Non Pajak: nilai setelah diskon (PPN sudah termasuk / tidak ada).
+        return \App\Support\LineAmounts::calculate($quantity, $unit_price, $discount, $tax, $taxType)['total'];
     }
 
     public static function hitungTaxNominal($quantity, $unit_price, $discount, $tax, $taxType = null)

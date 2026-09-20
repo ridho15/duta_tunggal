@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
+use App\Models\Customer;
 use App\Models\InventoryStock;
+use App\Models\Quotation;
 use App\Models\SaleOrder;
 use App\Models\StockReservation;
 use App\Support\CurrencyConversionResolver;
@@ -18,6 +20,94 @@ use Illuminate\Validation\ValidationException;
 
 class SalesOrderService
 {
+    /**
+     * Tempo default (hari) bila tidak ada satu pun sumber yang terisi.
+     */
+    public const DEFAULT_TEMPO_PEMBAYARAN = 30;
+
+    /**
+     * Tentukan tempo pembayaran (hari) untuk Sales Order.
+     *
+     * Urutan: nilai eksplisit -> tempo quotation -> tempo master customer -> default.
+     * Nilai 0 (tunai/COD) adalah nilai SAH dan tidak boleh dianggap kosong; hanya
+     * null / string kosong / non-numerik yang jatuh ke sumber berikutnya. Aturan
+     * ini sengaja sama dengan perhitungan due date invoice (SO -> customer -> 30).
+     */
+    public function resolveTempoPembayaran(mixed $explicit = null, ?Customer $customer = null, ?Quotation $quotation = null): int
+    {
+        foreach ([$explicit, $quotation?->tempo_pembayaran, $customer?->tempo_kredit] as $candidate) {
+            if ($candidate !== null && $candidate !== '' && is_numeric($candidate)) {
+                return max(0, (int) $candidate);
+            }
+        }
+
+        return self::DEFAULT_TEMPO_PEMBAYARAN;
+    }
+
+    /**
+     * ID mata uang default (IDR; fallback mata uang pertama).
+     */
+    public function defaultCurrencyId(): ?int
+    {
+        return CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
+            ?? Currency::query()->orderBy('id')->value('id');
+    }
+
+    /**
+     * Guard sisi server: hanya quotation Approved, belum kedaluwarsa, dan belum digantikan revisi
+     * yang boleh dijadikan Sales Order. Dipakai modal Quotation, API getQuotation, dan store SO.
+     *
+     * @throws ValidationException
+     */
+    public function assertQuotationUsable(Quotation $quotation, string $field = 'quotation_id'): void
+    {
+        $reason = $quotation->unusableReasonForSaleOrder();
+
+        if ($reason !== null) {
+            throw ValidationException::withMessages([$field => $reason]);
+        }
+    }
+
+    /**
+     * SATU-SATUNYA pemetaan header Quotation -> Sales Order.
+     *
+     * Dipakai oleh modal di halaman View, aksi baris di tabel, dan endpoint API
+     * getQuotation() supaya ketiga jalur menyalin data yang identik.
+     * Nilai yang tidak tersedia dikembalikan null (bukan placeholder seperti '-').
+     */
+    public function headerFromQuotation(Quotation $quotation): array
+    {
+        $quotation->loadMissing('customer');
+
+        $customer = $quotation->customer;
+        $customer = ($customer && $customer->exists) ? $customer : null;
+
+        $currencyId = is_numeric($quotation->currency_id)
+            ? (int) $quotation->currency_id
+            : $this->defaultCurrencyId();
+
+        // Kurs snapshot dari quotation (kurs yang disepakati); fallback kurs saat ini.
+        $snapshotRate = (float) ($quotation->exchange_rate ?? 0);
+        $exchangeRate = $snapshotRate > 0
+            ? $snapshotRate
+            : CurrencyConversionResolver::resolveRate($currencyId);
+
+        $shippedTo = collect([$quotation->shipped_to, $customer?->address])
+            ->map(fn ($value) => is_string($value) ? trim($value) : '')
+            ->first(fn ($value) => $value !== '' && $value !== '-');
+
+        return [
+            'customer_id' => $quotation->customer_id,
+            'quotation_id' => $quotation->id,
+            'cabang_id' => $quotation->cabang_id,
+            'currency_id' => $currencyId,
+            'exchange_rate' => $exchangeRate,
+            'tempo_pembayaran' => $this->resolveTempoPembayaran(null, $customer, $quotation),
+            'shipped_to' => $shippedTo,
+            'notes' => filled($quotation->notes) ? $quotation->notes : null,
+        ];
+    }
+
     public function updateTotalAmount($salesOrder)
     {
         $total_amount = 0;

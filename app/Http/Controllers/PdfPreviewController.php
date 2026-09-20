@@ -68,7 +68,7 @@ class PdfPreviewController extends Controller
                 'blade'       => 'pdf.sale-order-invoice',
                 'bladeVar'    => 'invoice',
                 'paper'       => 'a4',
-                'orientation' => 'portrait',
+                'orientation' => 'landscape',   // 12 kolom rincian baris (Fase 5B)
                 'filename'    => fn($r) => "Invoice_Penjualan_{$r->invoice_number}.pdf",
                 'relations'   => ['invoiceItem.product.uom', 'cabang'],
             ],
@@ -97,7 +97,7 @@ class PdfPreviewController extends Controller
                 'paper'       => 'a4',
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Surat_Jalan_{$r->sj_number}.pdf",
-                'relations'   => ['deliveryOrder.customer', 'deliveryOrder.deliveryOrderItem.product'],
+                'relations'   => \App\Services\SuratJalanDocumentBuilder::RELATIONS,
             ],
         ];
     }
@@ -115,6 +115,11 @@ class PdfPreviewController extends Controller
 
         if ($type === 'delivery-schedule') {
             $viewData['deliveryOrders'] = $record->relatedDeliveryOrders();
+        }
+
+        if ($type === 'surat-jalan') {
+            // Data cetak disusun satu tempat (tanpa harga; driver/kendaraan dari jadwal; barang per DO).
+            $viewData['doc'] = app(\App\Services\SuratJalanDocumentBuilder::class)->build($record);
         }
 
         $pdf = Pdf::loadView($config['blade'], $viewData)

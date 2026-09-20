@@ -47,8 +47,9 @@ async function openCreateSoModal(page) {
   return modal
 }
 
+// Format Indonesia 2 desimal: "183.208,83" -> 183208.83
 function toNumber(value) {
-  return Number((value || '').replace(/\./g, '')) || 0
+  return Number((value || '').replace(/\./g, '').replace(',', '.')) || 0
 }
 
 test('Quotation create SO modal: live typing formats unit price as Rupiah and updates tax/subtotal', async ({ page }) => {
@@ -84,8 +85,8 @@ test('Quotation create SO modal: live typing formats unit price as Rupiah and up
   const taxAmountValue = await taxAmountInput.inputValue()
 
   expect(unitPriceValue).toBe('100.000')
-  expect(subtotalValue).toMatch(/^[\d.]+$/)
-  expect(taxAmountValue).toMatch(/^[\d.]+$/)
+  expect(subtotalValue).toMatch(/^[\d.]+(,\d{2})?$/)
+  expect(taxAmountValue).toMatch(/^[\d.]+(,\d{2})?$/)
   expect(toNumber(subtotalValue)).toBeGreaterThan(0)
   expect(toNumber(taxAmountValue)).toBeGreaterThanOrEqual(0)
 })
@@ -106,9 +107,10 @@ test('Quotation create SO modal: prefilled nominal (non-live) uses Rupiah format
   const taxAmountValue = await taxAmountInput.inputValue()
   const subtotalValue = await subtotalInput.inputValue()
 
-  expect(unitPriceValue).toMatch(/^[\d.]*$/)
-  expect(taxAmountValue).toMatch(/^[\d.]*$/)
-  expect(subtotalValue).toMatch(/^[\d.]*$/)
+  // Format Indonesia; boleh ber-desimal koma (2 digit), mis. "8.687,00"
+  expect(unitPriceValue).toMatch(/^[\d.]*(,\d{1,2})?$/)
+  expect(taxAmountValue).toMatch(/^[\d.]*(,\d{1,2})?$/)
+  expect(subtotalValue).toMatch(/^[\d.]*(,\d{1,2})?$/)
 
   if (toNumber(unitPriceValue) >= 1000) {
     expect(unitPriceValue).toContain('.')
@@ -133,7 +135,7 @@ test('Quotation create SO modal: fill+blur (paste-like) keeps Rupiah format on u
 
   await expect.poll(async () => await unitPriceInput.inputValue(), { timeout: 5000 }).toBe('2.500.000')
   const subtotalValue = await subtotalInput.inputValue()
-  expect(subtotalValue).toMatch(/^[\d.]+$/)
+  expect(subtotalValue).toMatch(/^[\d.]+(,\d{2})?$/)
   expect(toNumber(subtotalValue)).toBeGreaterThan(0)
 })
 

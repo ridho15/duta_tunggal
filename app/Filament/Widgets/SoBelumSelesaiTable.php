@@ -21,8 +21,10 @@ class SoBelumSelesaiTable extends BaseWidget
         return $table
             ->defaultSort('created_at', 'desc')
             ->query(function () {
+                // Hanya SO yang benar-benar masih berjalan (disetujui, belum selesai) — bukan draft/menunggu
+                // persetujuan/ditutup/dibatalkan/ditolak, yang sebelumnya ikut terhitung "belum selesai".
                 return SaleOrder::query()
-                    ->where('status', '!=', 'completed');
+                    ->whereIn('status', SaleOrder::OUTSTANDING_STATUSES);
             })->actions([
                 ViewAction::make()
                     ->color('primary')
@@ -49,25 +51,8 @@ class SoBelumSelesaiTable extends BaseWidget
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status')
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })
-                    ->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'process' => 'warning',
-                            'completed' => 'success',
-                            'received' => 'primary',
-                            'approved' => 'success',
-                            'confirmed' => 'success',
-                            'canceled' => 'danger',
-                            'reject' => 'danger',
-                            'request_approve' => 'primary',
-                            'request_close' => 'warning',
-                            'closed' => 'danger',
-                            default => '-'
-                        };
-                    })
+                    ->formatStateUsing(fn ($state) => \App\Models\SaleOrder::statusLabel($state))
+                    ->color(fn ($state) => \App\Models\SaleOrder::statusColor($state))
                     ->badge(),
                 TextColumn::make('shipped_to')
                     ->label('Shipped To')

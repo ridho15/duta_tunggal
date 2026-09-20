@@ -69,6 +69,10 @@ class CreateDeliveryOrder extends CreateRecord
             throw new ValidationException($validator);
         }
 
+        // Aturan sumber DO tunggal (sama dengan form & Edit): status SO, sisa kuantitas yang belum terikat DO
+        // lain, customer sama, dan alamat kirim sama. Pesan kesalahan dikirim ke field salesOrders.
+        app(\App\Services\DeliveryOrderSourceValidator::class)->assertValid($salesOrderIds);
+
         // Validate warehouse confirmation for all selected sales orders
         if (!empty($salesOrderIds)) {
             $sourceCabangIds = [];
@@ -83,30 +87,6 @@ class CreateDeliveryOrder extends CreateRecord
 
                     $validator = Validator::make([], []);
                     $validator->errors()->add('salesOrders', "Sales Order dengan ID {$salesOrderId} tidak ditemukan.");
-                    throw new ValidationException($validator);
-                }
-
-                if ($salesOrder->status === 'canceled' || $salesOrder->status === 'closed') {
-                    \Filament\Notifications\Notification::make()
-                        ->title('Validation Error')
-                        ->body("Sales Order {$salesOrder->so_number} sudah {$salesOrder->status} dan tidak bisa digunakan untuk membuat Delivery Order.")
-                        ->danger()
-                        ->send();
-
-                    $validator = Validator::make([], []);
-                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} sudah {$salesOrder->status}.");
-                    throw new ValidationException($validator);
-                }
-
-                if (!in_array($salesOrder->status, ['approved', 'confirmed', 'completed'])) {
-                    \Filament\Notifications\Notification::make()
-                        ->title('Validation Error')
-                        ->body("Sales Order {$salesOrder->so_number} belum di-approve (status: {$salesOrder->status}).")
-                        ->danger()
-                        ->send();
-
-                    $validator = Validator::make([], []);
-                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} belum di-approve (status: {$salesOrder->status}).");
                     throw new ValidationException($validator);
                 }
 
@@ -151,7 +131,7 @@ class CreateDeliveryOrder extends CreateRecord
 
             foreach ($listSaleOrder as $saleOrder) {
                 foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
-                    $remainingQty = $saleOrderItem->remaining_quantity;
+                    $remainingQty = $saleOrderItem->availableQuantityForDelivery();
                     // Only add items that still have remaining quantity
                     if ($remainingQty > 0) {
                         $warehouseSources = $saleOrderItem->warehouseAllocations
@@ -262,16 +242,17 @@ class CreateDeliveryOrder extends CreateRecord
                 }
 
                 // Additional validation: Check against remaining quantity
-                if ($quantity > $saleOrderItem->remaining_quantity) {
+                $availableQty = $saleOrderItem->availableQuantityForDelivery();
+                if ($quantity > $availableQty) {
                     $productName = $saleOrderItem->product->name ?? 'produk';
                     \Filament\Notifications\Notification::make()
                         ->title('Validation Error')
-                        ->body("Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).")
+                        ->body("Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$availableQty}).")
                         ->danger()
                         ->send();
 
                     $validator = Validator::make([], []);
-                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
+                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$availableQty}).");
                     throw new ValidationException($validator);
                 }
 

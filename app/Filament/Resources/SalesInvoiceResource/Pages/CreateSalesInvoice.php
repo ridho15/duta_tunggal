@@ -78,25 +78,16 @@ class CreateSalesInvoice extends CreateRecord
 
     protected function afterCreate(): void
     {
-        // Create invoice items
+        // Create invoice items — rincian baku (harga gross, diskon %, gross_amount, discount_amount, DPP, PPN, total)
+        // lewat SalesInvoiceLineBuilder, sama dengan jalur otomatis dari SO/DO.
         if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            foreach ($this->data['invoiceItem'] as $item) {
-                // Calculate subtotal if not provided
-                $quantity = (float) ($item['quantity'] ?? 0);
-                $price = (float) MoneyHelper::safeParse($item['price'] ?? 0);
-                $subtotal = $quantity * $price;
-                
-                $itemData = array_merge($item, [
-                    'price' => $price,
-                    'subtotal' => (float) MoneyHelper::safeParse($item['subtotal'] ?? $subtotal),
-                    'discount' => (float) MoneyHelper::safeParse($item['discount'] ?? 0),
-                    'tax_rate' => (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0),
-                    'tax_amount' => (float) MoneyHelper::safeParse($item['tax_amount'] ?? 0),
-                    'total' => (float) MoneyHelper::safeParse($item['total'] ?? $subtotal),
-                ]);
-                
+            $built = app(\App\Services\SalesInvoiceLineBuilder::class)->fromFormItems($this->record, $this->data['invoiceItem']);
+
+            foreach ($built['items'] as $itemData) {
                 $this->record->invoiceItem()->create($itemData);
             }
+
+            $this->syncHeaderFromLines($built);
         }
 
         // Post journal entries for sales invoice (only if not draft)
@@ -104,5 +95,27 @@ class CreateSalesInvoice extends CreateRecord
             $invoiceObserver = new \App\Observers\InvoiceObserver();
             $invoiceObserver->postSalesInvoice($this->record);
         }
+    }
+
+    /**
+     * Header dihitung ulang dari baris bila SEMUA baris berpasangan dengan item SO, supaya Σ baris = header
+     * (tidak ada selisih sen antara footer/PDF dan total invoice).
+     *
+     * @param  array{items: array<int, array<string, mixed>>, matched: bool}  $built
+     */
+    protected function syncHeaderFromLines(array $built): void
+    {
+        if (! $built['matched'] || $built['items'] === []) {
+            return;
+        }
+
+        $items = collect($built['items']);
+        $otherFees = app(\App\Services\SalesInvoiceLineBuilder::class)->otherFeeTotal($this->record);
+
+        $this->record->update([
+            'subtotal' => round((float) $items->sum('subtotal'), 2),
+            'dpp' => round((float) $items->sum('subtotal'), 2),
+            'total' => round((float) $items->sum('total') + $otherFees, 2),
+        ]);
     }
 }

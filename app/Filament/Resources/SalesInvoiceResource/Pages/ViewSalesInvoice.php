@@ -15,6 +15,7 @@ use Filament\Infolists\Components\ViewEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 use App\Support\CurrencyConversionResolver;
+use App\Support\LineAmounts;
 
 class ViewSalesInvoice extends ViewRecord
 {
@@ -83,10 +84,10 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('dpp')
                                     ->label('DPP')
-                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id)),
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
-                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id)),
                                 TextEntry::make('tax_type_display')
                                     ->label('Tipe Pajak')
                                     ->badge()
@@ -105,14 +106,14 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('ppn_amount')
                                     ->label('Nominal PPN (Rp)')
-                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state))
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id))
                                     ->visible(fn ($record) => (float) ($record->ppn_amount ?? 0) > 0),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
-                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id)),
                                 TextEntry::make('total')
                                     ->label('Grand Total')
-                                    ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state))
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id))
                                     ->weight('bold')
                                     ->size('lg'),
                             ]),
@@ -135,6 +136,7 @@ class ViewSalesInvoice extends ViewRecord
                     ]),
 
                 Section::make('Invoice Items')
+                    ->description('Harga Satuan × Qty = Jumlah · Diskon · DPP · PPN · Total baris. Angka identik dengan PDF invoice.')
                     ->schema([
                         RepeatableEntry::make('invoiceItem')
                             ->label('')
@@ -145,15 +147,38 @@ class ViewSalesInvoice extends ViewRecord
                                             ->label('Product')
                                             ->formatStateUsing(function($state){
                                                 return "{$state['sku']} - {$state['name']}";
+                                            })
+                                            ->columnSpan(2),
+                                        TextEntry::make('quantity_display')
+                                            ->label('Qty')
+                                            ->getStateUsing(fn ($record) => rtrim(rtrim(number_format($record->breakdown()['quantity'], 2, ',', '.'), '0'), ',')),
+                                        TextEntry::make('unit_price_display')
+                                            ->label('Harga Satuan')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['unit_price'])),
+                                        TextEntry::make('gross_display')
+                                            ->label('Jumlah (Harga × Qty)')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['gross'])),
+                                        TextEntry::make('discount_display')
+                                            ->label('Diskon')
+                                            ->getStateUsing(function ($record) {
+                                                $b = $record->breakdown();
+
+                                                return number_format($b['discount_pct'], 2, ',', '.') . '% = ' . LineAmounts::money($b['discount_amount']);
                                             }),
-                                        TextEntry::make('quantity')
-                                            ->label('Quantity'),
-                                        TextEntry::make('price')
-                                            ->label('Price')
-                                            ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
-                                        TextEntry::make('total')
-                                            ->label('Total')
-                                            ->formatStateUsing(fn ($state, $record) => CurrencyConversionResolver::formatAmount($record->display_currency_id, (float) $state)),
+                                        TextEntry::make('dpp_display')
+                                            ->label('DPP')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['dpp'])),
+                                        TextEntry::make('ppn_display')
+                                            ->label('PPN')
+                                            ->getStateUsing(function ($record) {
+                                                $b = $record->breakdown();
+
+                                                return number_format($b['tax_rate'], 2, ',', '.') . '% = ' . LineAmounts::money($b['ppn']);
+                                            }),
+                                        TextEntry::make('total_display')
+                                            ->label('Total Baris')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['total']))
+                                            ->weight('bold'),
                                     ]),
                             ])
                             ->columnSpanFull(),

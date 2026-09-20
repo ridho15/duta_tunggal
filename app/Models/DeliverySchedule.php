@@ -13,6 +13,33 @@ class DeliverySchedule extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
 
+    public const STATUS_LABELS = [
+        'pending' => 'Menunggu Keberangkatan',
+        'on_the_way' => 'Sedang Berjalan',
+        'delivered' => 'Selesai / Terkirim',
+        'partial_delivered' => 'Sebagian Terkirim',
+        'failed' => 'Gagal',
+        'cancelled' => 'Dibatalkan',
+    ];
+
+    public const STATUS_COLORS = [
+        'pending' => 'warning',
+        'on_the_way' => 'info',
+        'delivered' => 'success',
+        'partial_delivered' => 'primary',
+        'failed' => 'danger',
+        'cancelled' => 'gray',
+    ];
+
+    public const METHOD_LABELS = [
+        'internal' => 'Internal (Driver Perusahaan)',
+        'kurir_internal' => 'Kurir Internal',
+        'ekspedisi' => 'Ekspedisi / Pihak Ketiga',
+    ];
+
+    /** Metode yang memakai driver & kendaraan dari master. Data lama tanpa metode dianggap internal. */
+    public const INTERNAL_METHODS = ['internal', 'kurir_internal'];
+
     protected $table = 'delivery_schedules';
 
     protected $fillable = [
@@ -23,7 +50,8 @@ class DeliverySchedule extends Model
         'vehicle_id',
         'driver_name',
         'vehicle_info',
-        'status', // pending, on_the_way, delivered, failed, cancelled
+        'tracking_number',
+        'status', // pending, on_the_way, delivered, partial_delivered, failed, cancelled
         'notes',
         'created_by',
         'cabang_id',
@@ -125,26 +153,51 @@ class DeliverySchedule extends Model
         return $this->relatedDeliveryOrders()->count();
     }
 
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUS_LABELS[$status ?? ''] ?? ($status ? ucfirst(str_replace('_', ' ', $status)) : '-');
+    }
+
+    public static function statusColor(?string $status): string
+    {
+        return self::STATUS_COLORS[$status ?? ''] ?? 'gray';
+    }
+
     public function getStatusLabelAttribute(): string
     {
-        return match ($this->status) {
-            'pending'           => 'Menunggu Keberangkatan',
-            'on_the_way'        => 'Sedang Berjalan',
-            'delivered'         => 'Selesai / Terkirim',
-            'failed'            => 'Gagal',
-            'cancelled'         => 'Dibatalkan',
-            default             => ucfirst($this->status),
-        };
+        return self::statusLabel($this->status);
     }
 
     public function getDeliveryMethodLabelAttribute(): string
     {
-        return match ($this->delivery_method) {
-            'internal'       => 'Internal (Driver Perusahaan)',
-            'kurir_internal' => 'Kurir Internal',
-            'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
-            default          => $this->delivery_method ? ucfirst(str_replace('_', ' ', $this->delivery_method)) : '-',
-        };
+        return self::METHOD_LABELS[$this->delivery_method ?? '']
+            ?? ($this->delivery_method ? ucfirst(str_replace('_', ' ', $this->delivery_method)) : '-');
+    }
+
+    public function usesInternalFleet(): bool
+    {
+        return in_array($this->delivery_method, [...self::INTERNAL_METHODS, null, ''], true);
+    }
+
+    /** Nama driver (internal) atau nama driver/ekspedisi (pihak ketiga); '-' bila belum diketahui. */
+    public function senderName(): string
+    {
+        if ($this->delivery_method === 'ekspedisi') {
+            return $this->driver_name ?: $this->vehicle_info ?: '-';
+        }
+
+        return $this->driver?->name ?: $this->driver_name ?: '-';
+    }
+
+    /** "B 1234 ABC (Truck)" untuk armada internal; info kendaraan bebas untuk ekspedisi; '-' bila kosong. */
+    public function vehicleLabel(): string
+    {
+        $plate = $this->vehicle?->plate;
+        if ($plate) {
+            return $this->vehicle->type ? "{$plate} ({$this->vehicle->type})" : $plate;
+        }
+
+        return $this->vehicle_info ?: '-';
     }
 
     protected static function booted()

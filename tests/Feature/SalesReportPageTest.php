@@ -45,6 +45,7 @@ class SalesReportPageTest extends TestCase
             'customer_id' => $customer1->id,
             'so_number' => 'SO-FILTER-A',
             'total_amount' => 1000000,
+            'order_date' => now()->subDay(),
             'created_at' => now()->subDay(),
         ]);
 
@@ -52,13 +53,15 @@ class SalesReportPageTest extends TestCase
             'customer_id' => $customer2->id,
             'so_number' => 'SO-FILTER-B',
             'total_amount' => 2000000,
+            'order_date' => now(),
             'created_at' => now(),
         ]);
 
         $this->actingAs($this->createUserWithRole('admin'));
 
-        // Test filter by customer
+        // Test filter by customer (mode Pesanan/SO — default halaman kini Penjualan/Invoice)
         Livewire::test(SalesReportPage::class)
+            ->set('mode', 'order')
             ->set('customer_id', $customer1->id)
             ->assertSee('SO-FILTER-A')
             ->assertDontSee('SO-FILTER-B');

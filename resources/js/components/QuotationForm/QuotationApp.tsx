@@ -40,6 +40,7 @@ export const QuotationApp: React.FC<Props> = ({ recordId }) => {
     currency_id: 1,
     exchange_rate: 1.0,
     tempo_pembayaran: 0,
+    shipped_to: '',
     notes: '',
     status: 'draft',
   });

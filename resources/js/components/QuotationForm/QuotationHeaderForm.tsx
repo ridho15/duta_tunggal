@@ -60,11 +60,16 @@ export const QuotationHeaderForm: React.FC<Props> = ({
   const handleCustomerChange = (customerId: string | number | null) => {
     const id = customerId ? Number(customerId) : null;
     let newTempo = header.tempo_pembayaran;
+    let newShippedTo = header.shipped_to || '';
 
     if (id) {
       const selectedCustomer = dependencies.customers?.find((c) => c.id === id);
       if (selectedCustomer && selectedCustomer.tempo_kredit !== undefined && selectedCustomer.tempo_kredit > 0) {
         newTempo = selectedCustomer.tempo_kredit;
+      }
+      // Alamat kirim awal = alamat customer (hanya bila belum diisi manual)
+      if (!newShippedTo && selectedCustomer?.address) {
+        newShippedTo = selectedCustomer.address;
       }
     }
 
@@ -72,6 +77,7 @@ export const QuotationHeaderForm: React.FC<Props> = ({
       ...header,
       customer_id: id,
       tempo_pembayaran: newTempo,
+      shipped_to: newShippedTo,
     });
   };
 
@@ -264,6 +270,21 @@ export const QuotationHeaderForm: React.FC<Props> = ({
             onChange={(e) => onChange({ ...header, notes: e.target.value })}
             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all resize-none"
             placeholder="Catatan tambahan untuk penawaran harga..."
+          />
+        </div>
+
+        {/* Alamat Kirim yang disepakati (col-span-12) — disalin ke Sales Order */}
+        <div className="col-span-1 md:col-span-12">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Alamat Kirim
+          </label>
+          <input
+            type="text"
+            maxLength={255}
+            value={header.shipped_to || ''}
+            onChange={(e) => onChange({ ...header, shipped_to: e.target.value })}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all"
+            placeholder="Alamat tujuan pengiriman yang disepakati (otomatis dari alamat customer)..."
           />
         </div>
       </div>

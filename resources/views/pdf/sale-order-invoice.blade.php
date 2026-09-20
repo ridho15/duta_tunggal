@@ -7,7 +7,7 @@
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
         @page {
-            size: A4 portrait;
+            size: A4 landscape;
             margin: 15mm 20mm;
             @bottom-right {
                 content: "Hal. " counter(page) " dari " counter(pages);
@@ -223,37 +223,56 @@
         </div>
     </div>
 
+    @php
+        // Rincian baris baku (Fase 5B): Harga Satuan × Qty = Jumlah · Diskon (% dan Rp) · DPP · PPN (% dan Rp) · Total.
+        // Satu sumber: InvoiceItem::breakdown() — sama dengan halaman Lihat Invoice, sehingga PDF = layar.
+        $rows = $invoiceItems->map(function ($item) use ($invoice) {
+            $item->setRelation('invoice', $invoice);
+
+            return [$item, $item->breakdown()];
+        });
+        $sumGross = (float) $rows->sum(fn ($r) => $r[1]['gross']);
+        $sumDiscount = (float) $rows->sum(fn ($r) => $r[1]['discount_amount']);
+        $sumDpp = (float) $rows->sum(fn ($r) => $r[1]['dpp']);
+        $sumPpn = (float) $rows->sum(fn ($r) => $r[1]['ppn']);
+        $sumLines = (float) $rows->sum(fn ($r) => $r[1]['total']);
+        $otherFees = round((float) $invoice->total - $sumLines, 2);
+        $money = fn ($amount) => \App\Support\LineAmounts::money($amount);
+    @endphp
+
     <table class="invoice-table">
         <thead>
             <tr>
+                <th class="text-center">No</th>
                 <th class="text-left">SKU</th>
                 <th class="text-left">Produk</th>
                 <th class="text-center">Qty</th>
                 <th class="text-right">Harga Satuan</th>
-                <th class="text-right">Discount (%)</th>
-                <th class="text-right">Tax (%)</th>
-                <th class="text-right">Tax Amount</th>
-                <th class="text-right">Subtotal</th>
+                <th class="text-right">Jumlah</th>
+                <th class="text-right">Diskon (%)</th>
+                <th class="text-right">Diskon (Rp)</th>
+                <th class="text-right">DPP</th>
+                <th class="text-right">PPN (%)</th>
+                <th class="text-right">PPN (Rp)</th>
                 <th class="text-right">Total</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($invoiceItems as $item)
-            @php
-                $taxRate = (float) ($item->tax_rate ?? 0);
-                $discountPct = (float) ($item->discount ?? 0);
-                $product = $item->product;
-            @endphp
+            @foreach($rows as $index => [$item, $line])
+            @php $product = $item->product; @endphp
             <tr>
+                <td class="text-center">{{ $index + 1 }}</td>
                 <td class="text-left">{{ optional($product)->sku ?? 'N/A' }}</td>
                 <td class="text-left">{{ optional($product)->name ?? 'N/A' }}</td>
-                <td class="text-center">{{ $item->quantity }}</td>
-                <td class="text-right rupiah">Rp {{ number_format($item->price, 0, ',', '.') }}</td>
-                <td class="text-right">{{ number_format($discountPct, 2) }}%</td>
-                <td class="text-right">{{ number_format($taxRate, 2) }}%</td>
-                <td class="text-right rupiah">Rp {{ number_format($item->tax_amount, 0, ',', '.') }}</td>
-                <td class="text-right rupiah">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
-                <td class="text-right rupiah">Rp {{ number_format($item->total, 0, ',', '.') }}</td>
+                <td class="text-center">{{ rtrim(rtrim(number_format($line['quantity'], 2, ',', '.'), '0'), ',') }}</td>
+                <td class="text-right rupiah">{{ $money($line['unit_price']) }}</td>
+                <td class="text-right rupiah">{{ $money($line['gross']) }}</td>
+                <td class="text-right">{{ number_format($line['discount_pct'], 2, ',', '.') }}%</td>
+                <td class="text-right rupiah">{{ $money($line['discount_amount']) }}</td>
+                <td class="text-right rupiah">{{ $money($line['dpp']) }}</td>
+                <td class="text-right">{{ number_format($line['tax_rate'], 2, ',', '.') }}%</td>
+                <td class="text-right rupiah">{{ $money($line['ppn']) }}</td>
+                <td class="text-right rupiah">{{ $money($line['total']) }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -262,18 +281,34 @@
     <div class="totals-section">
         <table class="totals-table">
             <tr>
-                <td>Subtotal:</td>
-                <td class="text-right rupiah">Rp {{ number_format($invoice->subtotal, 0, ',', '.') }}</td>
+                <td>Jumlah (Harga × Qty):</td>
+                <td class="text-right rupiah">{{ $money($sumGross) }}</td>
+            </tr>
+            @if($sumDiscount > 0)
+            <tr>
+                <td>Diskon:</td>
+                <td class="text-right rupiah">- {{ $money($sumDiscount) }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td>Subtotal (DPP):</td>
+                <td class="text-right rupiah">{{ $money($sumDpp > 0 ? $sumDpp : $invoice->subtotal) }}</td>
             </tr>
             @if($displayRate > 0)
             <tr>
                 <td>PPN ({{ number_format($displayRate, 2, ',', '.') }}%) :</td>
-                <td class="text-right rupiah">Rp {{ number_format($ppnMonetary > 0 ? $ppnMonetary : $ppnAmount, 0, ',', '.') }}</td>
+                <td class="text-right rupiah">{{ $money($sumPpn > 0 ? $sumPpn : $ppnMonetary) }}</td>
+            </tr>
+            @endif
+            @if($otherFees > 0.005)
+            <tr>
+                <td>Biaya Lain:</td>
+                <td class="text-right rupiah">{{ $money($otherFees) }}</td>
             </tr>
             @endif
             <tr class="total-row">
                 <td><strong>TOTAL:</strong></td>
-                <td class="text-right rupiah"><strong>Rp {{ number_format($invoice->total, 0, ',', '.') }}</strong></td>
+                <td class="text-right rupiah"><strong>{{ $money($invoice->total) }}</strong></td>
             </tr>
         </table>
     </div>

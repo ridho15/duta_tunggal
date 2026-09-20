@@ -37,7 +37,8 @@ class QuotationPolicy
      */
     public function update(User $user, Quotation $quotation): bool
     {
-        return $user->hasPermissionTo('update quotation');
+        // Hanya Draft / Ditolak yang boleh diubah; selebihnya terkunci (revisi lewat versi baru).
+        return $quotation->isEditable() && $user->hasPermissionTo('update quotation');
     }
 
     /**
@@ -45,7 +46,7 @@ class QuotationPolicy
      */
     public function delete(User $user, Quotation $quotation): bool
     {
-        return $user->hasPermissionTo('delete quotation');
+        return $quotation->isEditable() && $user->hasPermissionTo('delete quotation');
     }
 
     /**
@@ -62,6 +63,16 @@ class QuotationPolicy
     public function forceDelete(User $user, Quotation $quotation): bool
     {
         return $user->hasPermissionTo('force-delete quotation');
+    }
+
+    /**
+     * Buat revisi (versi baru) dari quotation yang terkunci: Disetujui / Kedaluwarsa dan belum digantikan.
+     */
+    public function revise(User $user, Quotation $quotation): bool
+    {
+        return in_array($quotation->status, [Quotation::STATUS_APPROVE, Quotation::STATUS_EXPIRED], true)
+            && $quotation->superseded_at === null
+            && $user->hasPermissionTo('create quotation');
     }
 
     public function requestApprove(User $user, Quotation $quotation): bool

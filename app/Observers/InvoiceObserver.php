@@ -641,17 +641,24 @@ class InvoiceObserver
 
         $debitTotals = [];
         $creditTotals = [];
+        $snapshots = [];   // baris invoice + angka HPP yang SAMA dengan yang dijurnal (Fase 6: satu perhitungan → dua keluaran)
 
         foreach ($invoiceItems as $item) {
             $quantity = max(0, (float) ($item->quantity ?? 0));
             $costPrice = (float) ($item->product?->cost_price ?? 0);
 
             if ($quantity <= 0 || $costPrice <= 0) {
+                if ($item instanceof \App\Models\InvoiceItem) {
+                    $snapshots[] = [$item, $costPrice, 0.0];
+                }
                 continue;
             }
 
             $lineAmount = round($quantity * $costPrice, 2);
             if ($lineAmount <= 0) {
+                if ($item instanceof \App\Models\InvoiceItem) {
+                    $snapshots[] = [$item, $costPrice, 0.0];
+                }
                 continue;
             }
 
@@ -659,6 +666,16 @@ class InvoiceObserver
             $goodsDeliveryCoa = $item->product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
 
             $this->pushCostTotals($debitTotals, $creditTotals, $lineAmount, $cogsCoa, $goodsDeliveryCoa);
+
+            if ($item instanceof \App\Models\InvoiceItem) {
+                $snapshots[] = [$item, $costPrice, $lineAmount];
+            }
+        }
+
+        // Snapshot HPP per baris hanya bila jurnal HPP benar-benar berasal dari baris invoice ini
+        // (bukan dari fallback item Delivery Order di bawah), supaya Σ snapshot = Σ jurnal HPP invoice.
+        if (! empty($debitTotals) && ! empty($creditTotals)) {
+            $this->storeCogsSnapshots($snapshots);
         }
 
         if (empty($debitTotals) || empty($creditTotals)) {
@@ -699,6 +716,26 @@ class InvoiceObserver
                 'source_id' => $invoice->id,
                 'cabang_id' => $invoice->cabang_id,
             ]);
+        }
+    }
+
+    /**
+     * Simpan snapshot HPP (cost_price, cogs_amount) pada baris invoice tanpa memicu observer/log aktivitas.
+     *
+     * @param  array<int, array{0: \App\Models\InvoiceItem, 1: float, 2: float}>  $snapshots
+     */
+    protected function storeCogsSnapshots(array $snapshots): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('invoice_items', 'cogs_amount')) {
+            return;
+        }
+
+        foreach ($snapshots as [$item, $costPrice, $amount]) {
+            $item->forceFill([
+                'cost_price' => $costPrice,
+                'cogs_amount' => $amount,
+                'cogs_source' => \App\Models\InvoiceItem::COGS_SOURCE_JOURNAL,
+            ])->saveQuietly();
         }
     }
 

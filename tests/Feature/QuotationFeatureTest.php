@@ -193,7 +193,7 @@ test('quotation header currency converts item prices and persists exchange rate'
             'tax_type' => 'none',
         ]])
         ->set('data.quotationItem.0.product_id', $product->id)
-        ->assertSet('data.quotationItem.0.unit_price', '160.000')
+        ->assertSet('data.quotationItem.0.unit_price', '160.000,00')
         ->set('data.currency_id', $usd->id)
         ->assertSet('data.quotationItem.0.unit_price', '10,00')
         ->assertSet('data.quotationItem.0.total_price', '10,00')
@@ -201,9 +201,9 @@ test('quotation header currency converts item prices and persists exchange rate'
         ->assertSet('data.quotationItem.0.unit_price_idr', '160000.00')
         ->assertSet('data.quotationItem.0.currency_symbol', '$')
         ->set('data.currency_id', $this->idr->id)
-        ->assertSet('data.quotationItem.0.unit_price', '160.000')
-        ->assertSet('data.quotationItem.0.total_price', '160.000')
-        ->assertSet('data.total_amount', '160.000')
+        ->assertSet('data.quotationItem.0.unit_price', '160.000,00')
+        ->assertSet('data.quotationItem.0.total_price', '160.000,00')
+        ->assertSet('data.total_amount', '160.000,00')
         ->set('data.currency_id', $usd->id)
         ->assertSet('data.quotationItem.0.unit_price', '10,00');
 
@@ -1095,7 +1095,7 @@ test('view quotation renders expandable quotation item infolist', function () {
             ])
             ->set('data.quotationItem.0.quantity', 2);
 
-        $create->assertSet('data.total_amount', '200.000');
+        $create->assertSet('data.total_amount', '200.000,00');
         $create->call('create')->assertHasNoFormErrors();
 
         $quotation = Quotation::where('quotation_number', 'QO-TEST-FORM-0001')->first();
@@ -1111,6 +1111,6 @@ test('view quotation renders expandable quotation item infolist', function () {
             ->test(EditQuotation::class, ['record' => $quotation->id])
             ->assertFormExists()
             ->assertFormSet([
-                'total_amount' => '200.000',
+                'total_amount' => '200.000,00',
             ]);
     });

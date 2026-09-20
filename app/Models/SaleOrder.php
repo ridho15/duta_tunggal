@@ -6,6 +6,7 @@ use App\Models\InventoryStock;
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,90 @@ use Illuminate\Validation\ValidationException;
 class SaleOrder extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
+
+    /**
+     * SO yang boleh dibuatkan Delivery Order (selama masih ada sisa kuantitas).
+     */
+    public const DELIVERABLE_STATUSES = ['approved', 'confirmed', 'partially_delivered'];
+
+    /**
+     * Status SO yang dikelola otomatis dari progres pengiriman (SaleOrderStatusSynchronizer).
+     */
+    public const DELIVERY_MANAGED_STATUSES = ['approved', 'confirmed', 'partially_delivered', 'completed'];
+
+    /**
+     * SO yang invoice-nya boleh muncul di penerimaan customer. Invoice diterbitkan PER DO,
+     * jadi SO yang baru terkirim sebagian (partially_delivered) harus ikut.
+     */
+    public const INVOICEABLE_STATUSES = ['confirmed', 'received', 'completed', 'partially_delivered'];
+
+    /**
+     * SO yang masih berjalan (sudah disetujui tetapi belum selesai) — dasar widget "SO Belum Selesai".
+     * Draft / menunggu persetujuan belum berjalan; completed / closed / reject / canceled sudah berakhir.
+     */
+    public const OUTSTANDING_STATUSES = ['approved', 'confirmed', 'partial_confirmed', 'partially_delivered', 'request_close'];
+
+    public const STATUS_LABELS = [
+        'draft' => 'Draft',
+        'request_approve' => 'Menunggu Persetujuan',
+        'approved' => 'Disetujui',
+        'confirmed' => 'Dikonfirmasi',
+        'partial_confirmed' => 'Dikonfirmasi Sebagian',
+        'partially_delivered' => 'Dikirim Sebagian',
+        'completed' => 'Selesai',
+        'received' => 'Diterima',
+        'request_close' => 'Minta Ditutup',
+        'closed' => 'Ditutup',
+        'reject' => 'Ditolak',
+        'canceled' => 'Dibatalkan',
+    ];
+
+    public const STATUS_COLORS = [
+        'draft' => 'gray',
+        'request_approve' => 'primary',
+        'approved' => 'success',
+        'confirmed' => 'success',
+        'partial_confirmed' => 'warning',
+        'partially_delivered' => 'warning',
+        'completed' => 'success',
+        'received' => 'primary',
+        'request_close' => 'warning',
+        'closed' => 'danger',
+        'reject' => 'danger',
+        'canceled' => 'danger',
+    ];
+
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUS_LABELS[$status ?? ''] ?? ($status ? ucfirst(str_replace('_', ' ', $status)) : '-');
+    }
+
+    public static function statusColor(?string $status): string
+    {
+        return self::STATUS_COLORS[$status ?? ''] ?? 'gray';
+    }
+
+    /**
+     * SO yang masih bisa dikirim: status layak + masih ada item dengan sisa kuantitas yang
+     * belum terikat ke DO manapun (terkirim ATAU sedang diproses).
+     *
+     * @param  array<int,int>  $alwaysIncludeIds  SO yang tetap ditampilkan (mis. sudah terhubung ke DO yang sedang diedit)
+     */
+    public function scopeDeliverable(Builder $query, array $alwaysIncludeIds = []): Builder
+    {
+        return $query->where(function (Builder $outer) use ($alwaysIncludeIds) {
+            $outer->where(function (Builder $main) {
+                $main->whereIn($main->getModel()->getTable() . '.status', self::DELIVERABLE_STATUSES)
+                    ->whereHas('saleOrderItem', function (Builder $items) {
+                        $items->whereRaw(\App\Services\SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items') . ' > 0');
+                    });
+            });
+
+            if ($alwaysIncludeIds !== []) {
+                $outer->orWhereIn($outer->getModel()->getTable() . '.id', $alwaysIncludeIds);
+            }
+        });
+    }
     protected $table = 'sale_orders';
     protected $casts = [
         'order_date' => 'datetime',
@@ -54,7 +139,8 @@ class SaleOrder extends Model
         'exchange_rate',
         'created_by',
         'warehouse_confirmed_at',
-        'cabang_id'
+        'cabang_id',
+        'notes',
     ];
 
 

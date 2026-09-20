@@ -37,7 +37,17 @@ class EditSalesInvoice extends EditRecord
 
         // Load invoice items
         $this->record->load('invoiceItem.product');
-        $data['invoiceItem'] = $this->record->invoiceItem->toArray();
+        $data['invoiceItem'] = $this->record->invoiceItem->map(function ($item) {
+            $item->setRelation('invoice', $this->record);
+            $b = $item->breakdown();
+
+            return array_merge($item->toArray(), [
+                'bd_gross' => \App\Support\LineAmounts::money($b['gross']),
+                'bd_discount' => number_format($b['discount_pct'], 2, ',', '.') . '% = ' . \App\Support\LineAmounts::money($b['discount_amount']),
+                'bd_dpp' => \App\Support\LineAmounts::money($b['dpp']),
+                'bd_ppn' => number_format($b['tax_rate'], 2, ',', '.') . '% = ' . \App\Support\LineAmounts::money($b['ppn']),
+            ]);
+        })->all();
 
         // Load other_fees from the other_fee column (always ensure it's an array)
         $rawOtherFee = $this->record->getAttributes()['other_fee'] ?? null;
@@ -109,22 +119,20 @@ class EditSalesInvoice extends EditRecord
             // Soft-delete existing items before recreating
             $this->record->invoiceItem()->delete();
 
-            foreach ($this->data['invoiceItem'] as $item) {
-                $quantity = (float) ($item['quantity'] ?? 0);
-                $price    = (float) MoneyHelper::safeParse($item['price'] ?? 0);
+            // Rincian baku (harga gross, diskon, DPP, PPN, total) — sama dengan jalur otomatis.
+            $built = app(\App\Services\SalesInvoiceLineBuilder::class)->fromFormItems($this->record, $this->data['invoiceItem']);
 
-                // Ensure all NOT NULL columns are provided even when the
-                // Repeater only captured the 4 visible fields.
-                $itemData = array_merge($item, [
-                    'price'      => $price,
-                    'subtotal'   => (float) MoneyHelper::safeParse($item['subtotal'] ?? ($quantity * $price)),
-                    'discount'   => (float) MoneyHelper::safeParse($item['discount'] ?? 0),
-                    'tax_rate'   => (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0),
-                    'tax_amount' => (float) MoneyHelper::safeParse($item['tax_amount'] ?? 0),
-                    'total'      => (float) MoneyHelper::safeParse($item['total'] ?? ($quantity * $price)),
-                ]);
-
+            foreach ($built['items'] as $itemData) {
                 $this->record->invoiceItem()->create($itemData);
+            }
+
+            if ($built['matched'] && $built['items'] !== []) {
+                $items = collect($built['items']);
+                $this->record->update([
+                    'subtotal' => round((float) $items->sum('subtotal'), 2),
+                    'dpp' => round((float) $items->sum('subtotal'), 2),
+                    'total' => round((float) $items->sum('total') + app(\App\Services\SalesInvoiceLineBuilder::class)->otherFeeTotal($this->record), 2),
+                ]);
             }
         }
     }

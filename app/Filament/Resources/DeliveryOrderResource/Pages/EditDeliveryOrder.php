@@ -62,6 +62,14 @@ class EditDeliveryOrder extends EditRecord
             throw new ValidationException($validator);
         }
 
+        // Aturan sumber DO yang sama dengan halaman Create: status SO, sisa kuantitas, customer & alamat sama.
+        // SO yang sudah terhubung ke DO ini tidak diperiksa ulang status/sisanya.
+        app(\App\Services\DeliveryOrderSourceValidator::class)->assertValid(
+            (array) $salesOrderIds,
+            (int) $this->record->id,
+            $this->record->salesOrders->pluck('id')->all()
+        );
+
         // Additional validation before updating
         // Validate delivery order items against all selected sales orders
         $deliveryItems = $data['deliveryOrderItem'] ?? [];
@@ -127,13 +135,9 @@ class EditDeliveryOrder extends EditRecord
                     throw new ValidationException($validator);
                 }
 
-                // Additional validation: Check against remaining quantity
-                // For edit, we need to add back the current delivery order item's quantity to remaining_quantity
-                $currentDeliveryOrderItem = $this->record->deliveryOrderItem->where('sale_order_item_id', $saleOrderItemId)->first();
-                $adjustedRemainingQty = $saleOrderItem->remaining_quantity;
-                if ($currentDeliveryOrderItem) {
-                    $adjustedRemainingQty += $currentDeliveryOrderItem->quantity;
-                }
+                // Batas kuantitas: sisa SO yang belum terkirim/terikat DO LAIN. Kuantitas DO yang sedang
+                // diedit dikecualikan (tidak perlu lagi "menambah kembali" kuantitas item saat ini).
+                $adjustedRemainingQty = $saleOrderItem->availableQuantityForDelivery((int) $this->record->id);
 
                 if ($quantity > $adjustedRemainingQty) {
                     $productName = $saleOrderItem->product->name ?? 'produk';

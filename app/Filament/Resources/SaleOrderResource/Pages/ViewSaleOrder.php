@@ -88,7 +88,7 @@ class ViewSaleOrder extends ViewRecord
                     ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('request sales order') &&
-                            in_array($record->status, ['approved', 'confirmed', 'completed']);
+                            in_array($record->status, ['approved', 'confirmed', 'partially_delivered', 'completed']);
                     })
                     ->action(function ($record) {
                         try {
@@ -201,7 +201,7 @@ class ViewSaleOrder extends ViewRecord
                 Action::make('pdf_sale_order')
                     ->label('Preview / Download PDF')
                     ->color('info')
-                    ->visible(fn ($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received']))
+                    ->visible(fn ($record) => in_array($record->status, ['approved', 'partially_delivered', 'completed', 'confirmed', 'received']))
                     ->icon('heroicon-o-document-arrow-down')
                     ->url(fn ($record) => route('pdf-stream', ['type' => 'sale-order', 'id' => $record->id]))
                     ->openUrlInNewTab(),
@@ -237,7 +237,7 @@ class ViewSaleOrder extends ViewRecord
                     ->color('warning')
                     ->visible(function ($record) {
                         return Auth::user()->hasPermissionTo('update deposit') &&
-                            in_array($record->status, ['approved', 'confirmed', 'completed']);
+                            in_array($record->status, ['approved', 'confirmed', 'partially_delivered', 'completed']);
                     })
                     ->form(function () {
                         $record = $this->getRecord();

@@ -19,6 +19,8 @@ use App\Models\Warehouse;
 use App\Support\WarehouseStockOptions;
 use App\Exports\DeliveryOrderRecapExport;
 use App\Services\DeliveryOrderService;
+use App\Services\DeliveryOrderSourceValidator;
+use App\Services\SaleOrderDeliveryProgress;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Maatwebsite\Excel\Facades\Excel;
@@ -71,6 +73,44 @@ class DeliveryOrderResource extends Resource
     // Position Delivery Order after Penjualan groups
     protected static ?int $navigationSort = 1;
 
+    /**
+     * ID DO yang sedang diedit (null di halaman Create).
+     */
+    protected static function editingDeliveryOrderId(mixed $livewire = null): ?int
+    {
+        if ($livewire && method_exists($livewire, 'getRecord')) {
+            $record = $livewire->getRecord();
+            if ($record instanceof DeliveryOrder && $record->exists) {
+                return (int) $record->getKey();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * SO yang sudah terhubung ke DO yang sedang diedit (tetap ditampilkan/diizinkan walau kuantitasnya sudah terikat).
+     *
+     * @return array<int, int>
+     */
+    protected static function linkedSaleOrderIds(mixed $livewire = null): array
+    {
+        $id = static::editingDeliveryOrderId($livewire);
+        if ($id === null) {
+            return [];
+        }
+
+        return DeliveryOrder::withoutGlobalScopes()->find($id)?->salesOrders()->withoutGlobalScopes()->pluck('sale_orders.id')->map(fn ($v) => (int) $v)->all() ?? [];
+    }
+
+    /**
+     * Kuantitas item SO yang masih boleh dialokasikan ke DO ini (kuantitas DO yang sedang diedit tidak dihitung terikat).
+     */
+    protected static function availableFor(SaleOrderItem $saleOrderItem, mixed $livewire = null): float
+    {
+        return $saleOrderItem->availableQuantityForDelivery(static::editingDeliveryOrderId($livewire));
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -105,12 +145,11 @@ class DeliveryOrderResource extends Resource
                                 // Ensure we always send an array, even if empty
                                 return is_array($state) ? $state : [];
                             })
-                            ->options(function () {
+                            ->options(function ($livewire) {
+                                // SO layak kirim (Disetujui/Dikonfirmasi/Dikirim Sebagian) yang masih punya sisa yang belum
+                                // terikat DO manapun; SO yang sudah terhubung ke DO yang sedang diedit tetap tampil.
                                 return SaleOrder::with('customer')
-                                    ->whereIn('status', ['approved', 'confirmed', 'partially_delivered'])
-                                    ->whereHas('saleOrderItem', function ($q) {
-                                        $q->whereRaw('(quantity - COALESCE(delivered_quantity, 0)) > 0');
-                                    })
+                                    ->deliverable(static::linkedSaleOrderIds($livewire))
                                     ->latest('id')
                                     ->get()
                                     ->mapWithKeys(function ($so) {
@@ -124,26 +163,24 @@ class DeliveryOrderResource extends Resource
                             })
                             ->multiple()
                             ->required()
-                            ->rule(function () {
-                                return function (string $attribute, $value, \Closure $fail) {
-                                    if (!is_array($value) || count($value) <= 1) {
-                                        return;
-                                    }
+                            ->rule(function ($livewire) {
+                                return function (string $attribute, $value, \Closure $fail) use ($livewire) {
+                                    $errors = app(DeliveryOrderSourceValidator::class)->errors(
+                                        is_array($value) ? $value : [],
+                                        static::editingDeliveryOrderId($livewire),
+                                        static::linkedSaleOrderIds($livewire)
+                                    );
 
-                                    $customerIds = SaleOrder::whereIn('id', $value)
-                                        ->pluck('customer_id')
-                                        ->unique();
-
-                                    if ($customerIds->count() > 1) {
-                                        $fail('Semua Sales Order dalam satu Delivery Order harus berasal dari customer yang sama.');
+                                    foreach ($errors as $message) {
+                                        $fail($message);
                                     }
                                 };
                             })
                             ->validationMessages([
                                 'required' => 'Minimal satu Sales Order wajib dipilih',
                             ])
-                            ->helperText('Hanya Sales Order berstatus disetujui (Approved/Confirmed) yang memiliki sisa kuantitas kirim yang dapat dipilih.')
-                            ->afterStateUpdated(function ($set, $get, $state) {
+                            ->helperText('Hanya Sales Order berstatus Disetujui / Dikonfirmasi / Dikirim Sebagian yang masih memiliki sisa kuantitas dapat dipilih. SO yang digabung harus dari customer dan alamat kirim yang sama.')
+                            ->afterStateUpdated(function ($set, $get, $state, $livewire) {
                                 $selectedIds = is_array($state) ? $state : [];
                                 if (empty($selectedIds)) {
                                     $set('deliveryOrderItem', []);
@@ -154,12 +191,12 @@ class DeliveryOrderResource extends Resource
                                     ->whereIn('id', $selectedIds)
                                     ->get();
 
-                                // Cek kesamaan customer saat memilih multiple Sales Order
-                                $customerIds = $listSaleOrder->pluck('customer_id')->unique();
-                                if ($customerIds->count() > 1) {
+                                // Penggabungan SO hanya untuk customer DAN alamat kirim yang sama
+                                $mixErrors = app(DeliveryOrderSourceValidator::class)->mixErrors($selectedIds);
+                                if (! empty($mixErrors)) {
                                     \Filament\Notifications\Notification::make()
-                                        ->title('Customer Berbeda')
-                                        ->body('Sales Order yang dipilih berasal dari customer yang berbeda. Delivery Order hanya dapat menggabungkan SO dari satu customer yang sama.')
+                                        ->title('Sales Order Tidak Dapat Digabung')
+                                        ->body(implode(' ', $mixErrors))
                                         ->danger()
                                         ->send();
 
@@ -177,7 +214,7 @@ class DeliveryOrderResource extends Resource
                                 $deliveryItems = [];
                                 foreach ($listSaleOrder as $saleOrder) {
                                     foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
-                                        $remainingQty = $saleOrderItem->remaining_quantity;
+                                        $remainingQty = static::availableFor($saleOrderItem, $livewire);
                                         // Only add items that still have remaining quantity
                                         if ($remainingQty > 0) {
                                             $warehouseSources = $saleOrderItem->warehouseAllocations
@@ -278,13 +315,15 @@ class DeliveryOrderResource extends Resource
                                         }
                                         return "Product: {$productName} | Qty: {$qty}";
                                     })
-                                    ->defaultItems(function ($get) {
+                                    ->defaultItems(function ($get, $livewire) {
                                         $salesOrders = $get('salesOrders') ?? [];
                                         if (!empty($salesOrders)) {
                                             $count = 0;
                                             $listSaleOrder = SaleOrder::with('saleOrderItem')->whereIn('id', $salesOrders)->get();
                                             foreach ($listSaleOrder as $saleOrder) {
-                                                $count += $saleOrder->saleOrderItem->where('remaining_quantity', '>', 0)->count();
+                                                $count += $saleOrder->saleOrderItem
+                                                    ->filter(fn ($item) => static::availableFor($item, $livewire) > 0)
+                                                    ->count();
                                             }
                                             return $count;
                                         }
@@ -297,8 +336,8 @@ class DeliveryOrderResource extends Resource
                                         return $data;
                                     })
                                     ->rules([
-                                        function (Get $get) {
-                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        function (Get $get, $livewire) {
+                                            return function (string $attribute, $value, \Closure $fail) use ($get, $livewire) {
                                                 $salesOrderIds = $get('salesOrders') ?? [];
                                                 if (empty($salesOrderIds) || empty($value)) {
                                                     return;
@@ -349,10 +388,11 @@ class DeliveryOrderResource extends Resource
                                                                 return;
                                                             }
 
-                                                            // Validasi 2: Quantity delivery item tidak boleh lebih besar dari remaining quantity
-                                                            if ($deliveryItem['quantity'] > $saleOrderItem->remaining_quantity) {
+                                                            // Validasi 2: tidak boleh melebihi sisa yang belum terikat DO lain (terkirim/diproses)
+                                                            $availableQty = static::availableFor($saleOrderItem, $livewire);
+                                                            if ($deliveryItem['quantity'] > $availableQty) {
                                                                 $productName = $saleOrderItem->product->name ?? "Unknown Product";
-                                                                $fail("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) tidak boleh lebih besar dari sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
+                                                                $fail("Quantity untuk item '$productName' ({$deliveryItem['quantity']}) tidak boleh lebih besar dari sisa quantity yang tersedia ({$availableQty}).");
                                                                 return;
                                                             }
                                                         }
@@ -392,11 +432,11 @@ class DeliveryOrderResource extends Resource
                                             ->preload()
                                             ->reactive()
                                             ->hidden() // Hidden: auto-populated from Sales Order
-                                            ->afterStateUpdated(function ($set, $get, $state) {
+                                            ->afterStateUpdated(function ($set, $get, $state, $livewire) {
                                                 $saleOrderItem = SaleOrderItem::find($state);
                                                 if ($saleOrderItem) {
                                                     $set('product_id', $saleOrderItem->product_id);
-                                                    $set('quantity', $saleOrderItem->remaining_quantity);
+                                                    $set('quantity', static::availableFor($saleOrderItem, $livewire));
                                                 }
                                             })
                                             ->searchable()
@@ -442,7 +482,7 @@ class DeliveryOrderResource extends Resource
                                                 'numeric' => 'Quantity harus berupa angka',
                                                 'min' => 'Quantity minimal 1',
                                             ])
-                                            ->afterStateUpdated(function ($state, $set, $get, $component) {
+                                            ->afterStateUpdated(function ($state, $set, $get, $component, $livewire) {
                                                 $saleOrderItemId = $get('sale_order_item_id');
                                                 $optionsFrom = $get('options_from');
 
@@ -450,7 +490,7 @@ class DeliveryOrderResource extends Resource
                                                     $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
                                                     if ($saleOrderItem) {
                                                         $originalQuantity = $saleOrderItem->quantity;
-                                                        $remainingQuantity = $saleOrderItem->remaining_quantity;
+                                                        $remainingQuantity = static::availableFor($saleOrderItem, $livewire);
                                                         $warehouseSources = $saleOrderItem->warehouseAllocations
                                                             ->map(function ($allocation) {
                                                                 return [
@@ -517,18 +557,19 @@ class DeliveryOrderResource extends Resource
                                                     }
                                                 }
                                             })
-                                            ->helperText(function ($get) {
+                                            ->helperText(function ($get, $livewire) {
                                                 $saleOrderItemId = $get('sale_order_item_id');
                                                 $optionsFrom = $get('options_from');
 
                                                 if ($optionsFrom == 2 && $saleOrderItemId) {
                                                     $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
                                                     if ($saleOrderItem) {
-                                                        $remaining = $saleOrderItem->remaining_quantity;
-                                                        $delivered = $saleOrderItem->delivered_quantity;
-                                                        $total = $saleOrderItem->quantity;
+                                                        $row = app(SaleOrderDeliveryProgress::class)
+                                                            ->forItems([$saleOrderItem->id], static::editingDeliveryOrderId($livewire))[$saleOrderItem->id] ?? null;
 
-                                                        return "Total SO: {$total} | Sudah dikirim: {$delivered} | Sisa: {$remaining} | Max yang bisa dikirim: {$remaining}";
+                                                        if ($row) {
+                                                            return "Total SO: {$row['ordered']} | Sudah dikirim: {$row['delivered']} | Sedang diproses di DO lain: {$row['in_process']} | Maks yang bisa dikirim: {$row['available']}";
+                                                        }
                                                     }
                                                 }
 
@@ -652,7 +693,11 @@ class DeliveryOrderResource extends Resource
                     ->schema([
                         TextEntry::make('do_number')->label('DO Number'),
                         TextEntry::make('delivery_date')->dateTime(),
-                        TextEntry::make('status')->badge(),
+                        TextEntry::make('status')
+                            ->label('Status')
+                            ->formatStateUsing(fn ($state) => DeliveryOrder::statusLabel($state))
+                            ->color(fn ($state) => DeliveryOrder::statusColor($state))
+                            ->badge(),
                         TextEntry::make('shipping_method')
                             ->label('Metode Pengiriman')
                             ->getStateUsing(function ($record) {
@@ -680,7 +725,12 @@ class DeliveryOrderResource extends Resource
                                 TextEntry::make('so_number')->label('SO Number'),
                                 TextEntry::make('createdBy.name')->label('Sales'),
                                 TextEntry::make('customer.perusahaan')->label('Customer')->placeholder('-'),
-                                TextEntry::make('status')->label('SO Status')->placeholder('-'),
+                                TextEntry::make('status')
+                                    ->label('Status SO')
+                                    ->formatStateUsing(fn ($state) => SaleOrder::statusLabel($state))
+                                    ->color(fn ($state) => SaleOrder::statusColor($state))
+                                    ->badge()
+                                    ->placeholder('-'),
                             ])->columns(4),
                     ]),
                 Section::make('Delivery Order Items')
@@ -703,16 +753,10 @@ class DeliveryOrderResource extends Resource
                                 }),
                                 TextEntry::make('reason'),
                                 TextEntry::make('status')
-                                    ->badge()
-                                    ->color(fn($state) => match ($state) {
-                                        'confirmed'  => 'success',
-                                        'requested'  => 'warning',
-                                        'rejected'   => 'danger',
-                                        'partial'    => 'info',
-                                        'sent'       => 'primary',
-                                        'received'   => 'success',
-                                        default      => 'gray',
-                                    }),
+                                    ->label('Status')
+                                    ->formatStateUsing(fn ($state) => \App\Models\DeliveryOrderItem::statusLabel($state))
+                                    ->color(fn ($state) => \App\Models\DeliveryOrderItem::statusColor($state))
+                                    ->badge(),
                             ])->columns(4)
                             ->columnSpanFull(),
                     ])->columns(2),
@@ -827,42 +871,8 @@ class DeliveryOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'draft' => 'DRAFT',
-                            'request_stock' => 'REQUEST STOCK',
-                            'request_approve' => 'REQUEST APPROVE',
-                            'approved' => 'APPROVED',
-                            'partial' => 'PARTIAL',
-                            'sent' => 'SENT',
-                            'received' => 'RECEIVED',
-                            'completed' => 'COMPLETED',
-                            'request_close' => 'REQUEST CLOSE',
-                            'closed' => 'CLOSED',
-                            'reject' => 'REJECTED',
-                            'delivery_failed' => 'DELIVERY FAILED',
-                            'supplier' => 'SUPPLIER',
-                            default => Str::upper($state),
-                        };
-                    })
-                    ->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'request_stock' => 'warning',
-                            'request_approve' => 'gray',
-                            'approved' => 'info',
-                            'partial' => 'warning',
-                            'sent' => 'primary',
-                            'received' => 'info',
-                            'completed' => 'success',
-                            'request_close' => 'warning',
-                            'closed' => 'danger',
-                            'reject' => 'danger',
-                            'delivery_failed' => 'danger',
-                            'supplier' => 'warning',
-                            default => 'gray',
-                        };
-                    })
+                    ->formatStateUsing(fn ($state) => DeliveryOrder::statusLabel($state))
+                    ->color(fn ($state) => DeliveryOrder::statusColor($state))
                     ->badge(),
                 TextColumn::make('suratJalan')
                     ->label('Surat Jalan')
@@ -929,21 +939,8 @@ class DeliveryOrderResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->options([
-                        'draft' => 'Draft',
-                        'request_stock' => 'Request Stock',
-                        'partial' => 'Partial',
-                        'sent' => 'Sent',
-                        'received' => 'Received',
-                        'supplier' => 'Supplier',
-                        'completed' => 'Completed',
-                        'request_approve' => 'Request Approve',
-                        'approved' => 'Approved',
-                        'request_close' => 'Request Close',
-                        'closed' => 'Closed',
-                        'reject' => 'Reject',
-                        'delivery_failed' => 'Pengiriman Gagal',
-                    ]),
+                    ->label('Status')
+                    ->options(DeliveryOrder::STATUS_LABELS),
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 // Eager load relationships to prevent N+1 queries
@@ -1273,22 +1270,9 @@ class DeliveryOrderResource extends Resource
                                             'quantity' => $newQuantity
                                         ]);
 
-                                        // Update delivered_quantity di sale order item
-                                        if ($deliveryItem->sale_order_item_id) {
-                                            $saleOrderItem = $deliveryItem->saleOrderItem;
-                                            if ($saleOrderItem) {
-                                                // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
-                                                $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                                                    ->whereHas('deliveryOrder', function ($query) {
-                                                        $query->whereIn('status', ['sent', 'received', 'completed']);
-                                                    })
-                                                    ->sum('quantity');
-
-                                                $saleOrderItem->update([
-                                                    'delivered_quantity' => $totalDelivered
-                                                ]);
-                                            }
-                                        }
+                                        // Progres SO dihitung ulang oleh SaleOrderDeliveryProgress (hook item DO);
+                                        // tidak ada penulis delivered_quantity lain di sini.
+                                        app(SaleOrderDeliveryProgress::class)->syncForDeliveryOrder($record);
 
                                         // Log perubahan quantity
                                         \App\Models\DeliveryOrderLog::create([

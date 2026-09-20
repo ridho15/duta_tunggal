@@ -816,7 +816,7 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'Qty harus berupa angka'
                                     ]),
                                 TextInput::make('price')
-                                    ->label('Price')
+                                    ->label('Harga Satuan')
                                     ->indonesianMoney()
                                     ->readOnly()
                                     ->dehydrated(true)
@@ -826,7 +826,7 @@ class SalesInvoiceResource extends Resource
                                         'numeric' => 'Harga harus berupa angka'
                                     ]),
                                 TextInput::make('total')
-                                    ->label('Total')
+                                    ->label('Total Baris')
                                     ->indonesianMoney()
                                     ->readOnly()
                                     ->dehydrated(true)
@@ -835,6 +835,24 @@ class SalesInvoiceResource extends Resource
                                         'required' => 'Total tidak boleh kosong',
                                         'numeric' => 'Total harus berupa angka'
                                     ]),
+                                // Rincian baris (Fase 5B) — hanya tampilan, diisi dari InvoiceItem::breakdown() saat invoice diubah.
+                                // Baris disimpan ulang dengan rincian baku (gross, diskon, DPP, PPN, total) oleh SalesInvoiceLineBuilder.
+                                TextInput::make('bd_gross')
+                                    ->label('Jumlah (Harga × Qty)')
+                                    ->disabled()->dehydrated(false)
+                                    ->hidden(fn ($livewire) => $livewire instanceof \App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice),
+                                TextInput::make('bd_discount')
+                                    ->label('Diskon (% = Rp)')
+                                    ->disabled()->dehydrated(false)
+                                    ->hidden(fn ($livewire) => $livewire instanceof \App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice),
+                                TextInput::make('bd_dpp')
+                                    ->label('DPP')
+                                    ->disabled()->dehydrated(false)
+                                    ->hidden(fn ($livewire) => $livewire instanceof \App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice),
+                                TextInput::make('bd_ppn')
+                                    ->label('PPN (% = Rp)')
+                                    ->disabled()->dehydrated(false)
+                                    ->hidden(fn ($livewire) => $livewire instanceof \App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice),
                             ])
                             ->columns(2)
                             ->defaultItems(0)

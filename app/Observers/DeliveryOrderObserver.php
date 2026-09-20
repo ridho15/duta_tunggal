@@ -45,6 +45,29 @@ class DeliveryOrderObserver
         if ($newStatus === 'completed' && $this->hasQuantityChanges($deliveryOrder)) {
             $this->handleQuantityUpdateAfterCompleted($deliveryOrder);
         }
+
+        // Perubahan status lain (mis. delivery_failed, closed, reject, kembali ke draft) juga
+        // dapat mengubah kuantitas terkirim/terikat -> sinkronkan progres SO.
+        // sent & completed sudah disinkronkan di handler masing-masing.
+        if ($deliveryOrder->wasChanged('status') && ! in_array($newStatus, ['sent', 'completed'], true)) {
+            $this->syncDeliveryProgress($deliveryOrder);
+        }
+    }
+
+    /**
+     * DO dipulihkan dari soft-delete: kuantitasnya kembali terikat ke SO.
+     */
+    public function restored(DeliveryOrder $deliveryOrder): void
+    {
+        $this->syncDeliveryProgress($deliveryOrder);
+    }
+
+    /**
+     * Hitung ulang cache delivered_quantity dan status SO untuk SO yang disentuh DO ini.
+     */
+    protected function syncDeliveryProgress(DeliveryOrder $deliveryOrder): void
+    {
+        app(\App\Services\SaleOrderDeliveryProgress::class)->syncForDeliveryOrder($deliveryOrder);
     }
 
     /**
@@ -142,31 +165,8 @@ class DeliveryOrderObserver
         // Ini memastikan free_qty tidak berubah secara tidak sengaja
         // =========================================================
 
-        // Update delivered_quantity untuk semua sale order items yang terkait.
-        // Wrapped in a transaction with lockForUpdate to prevent race conditions
-        // when multiple DOs untuk SO yang sama diproses bersamaan.
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                DB::transaction(function () use ($item) {
-                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($saleOrderItem) {
-                        // Hitung total delivered quantity dari semua delivery orders yang sudah diproses/completed
-                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                            ->whereHas('deliveryOrder', function ($query) {
-                                $query->whereIn('status', ['sent', 'received', 'completed']);
-                            })
-                            ->sum('quantity');
-
-                        $saleOrderItem->update([
-                            'delivered_quantity' => $totalDelivered
-                        ]);
-                    }
-                });
-            }
-        }
+        // Progres SO (cache delivered_quantity + status SO) dihitung ulang oleh satu service.
+        $this->syncDeliveryProgress($deliveryOrder);
     }
 
     /**
@@ -273,64 +273,9 @@ class DeliveryOrderObserver
         // di handleReservationReleaseStatus()
         // =========================================================
 
-        // Update delivered_quantity untuk semua sale order items yang terkait.
-        // Lock to prevent concurrent DO completions from corrupting the total.
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                DB::transaction(function () use ($item) {
-                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($saleOrderItem) {
-                        // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
-                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                            ->whereHas('deliveryOrder', function ($query) {
-                                $query->whereIn('status', ['sent', 'received', 'completed']);
-                            })
-                            ->sum('quantity');
-
-                        $saleOrderItem->update([
-                            'delivered_quantity' => $totalDelivered
-                        ]);
-                    }
-                });
-            }
-        }
-
-        // Get all sales orders related to this delivery order and update status based on full delivery
-        $salesOrders = $deliveryOrder->salesOrders;
-
-        foreach ($salesOrders as $saleOrder) {
-            $saleOrder->load('saleOrderItem');
-            $allItemsDelivered = $saleOrder->saleOrderItem->isNotEmpty() && $saleOrder->saleOrderItem->every(function ($soItem) {
-                return (float) ($soItem->delivered_quantity ?? 0) >= (float) ($soItem->quantity ?? 0);
-            });
-
-            if ($allItemsDelivered) {
-                Log::info('DeliveryOrderObserver: All items delivered. Updating sale order to completed', [
-                    'sale_order_id' => $saleOrder->id,
-                    'so_number' => $saleOrder->so_number,
-                    'delivery_order_id' => $deliveryOrder->id,
-                ]);
-
-                $saleOrder->update([
-                    'status' => 'completed',
-                    'completed_at' => now()
-                ]);
-            } else {
-                Log::info('DeliveryOrderObserver: Partial delivery. Updating sale order to partially_delivered', [
-                    'sale_order_id' => $saleOrder->id,
-                    'so_number' => $saleOrder->so_number,
-                    'delivery_order_id' => $deliveryOrder->id,
-                ]);
-
-                $saleOrder->update([
-                    'status' => 'partially_delivered',
-                    'completed_at' => null,
-                ]);
-            }
-        }
+        // Progres SO: hitung ulang delivered_quantity dan turunkan status SO dari kuantitas
+        // (approved -> partially_delivered -> completed) lewat satu service, bukan dari event DO.
+        $this->syncDeliveryProgress($deliveryOrder);
 
         // Terbitkan invoice otomatis khusus untuk item dan kuantitas yang dikirim pada Delivery Order ini
         $this->createInvoiceForCompletedDeliveryOrder($deliveryOrder);
@@ -351,14 +296,30 @@ class DeliveryOrderObserver
             return;
         }
 
-        // Cek apakah DO ini sudah pernah dibuatkan invoice aktif
+        // Cek apakah DO ini atau SO terkait sudah pernah dibuatkan invoice aktif
         $existingInvoice = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
             ->where('status', '!=', 'canceled')
-            ->whereJsonContains('delivery_orders', $deliveryOrder->id)
+            ->where(function ($q) use ($deliveryOrder, $primarySo) {
+                $q->whereJsonContains('delivery_orders', $deliveryOrder->id)
+                  ->orWhere(function ($sub) use ($primarySo) {
+                      $sub->where('from_model_id', $primarySo->id)
+                          ->where(function ($emptyDo) {
+                              $emptyDo->whereNull('delivery_orders')
+                                      ->orWhereJsonLength('delivery_orders', 0);
+                          });
+                  });
+            })
             ->first();
 
         if ($existingInvoice) {
-            Log::info('DeliveryOrderObserver: Invoice already exists for delivery order', [
+            // Jika invoice SO sudah ada tanpa DO ID ini, kaitkan DO ke invoice tersebut
+            $currentDos = (array) ($existingInvoice->delivery_orders ?? []);
+            if (!in_array($deliveryOrder->id, $currentDos)) {
+                $currentDos[] = $deliveryOrder->id;
+                $existingInvoice->update(['delivery_orders' => array_values(array_unique($currentDos))]);
+            }
+
+            Log::info('DeliveryOrderObserver: Invoice already exists for delivery order or sale order', [
                 'do_id' => $deliveryOrder->id,
                 'invoice_id' => $existingInvoice->id,
             ]);
@@ -372,7 +333,9 @@ class DeliveryOrderObserver
 
         $subtotal = 0;
         $totalTax = 0;
+        $lineTotals = 0;
         $invoiceItems = [];
+        $lineBuilder = app(\App\Services\SalesInvoiceLineBuilder::class);
 
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             $qty = (float) ($item->quantity ?? 0);
@@ -383,28 +346,22 @@ class DeliveryOrderObserver
             $saleOrderItem = $item->saleOrderItem;
             $unitPrice = $saleOrderItem ? (float) $saleOrderItem->unit_price : (float) ($item->product?->sell_price ?? 0);
             $discountPct = $saleOrderItem ? max(0.0, min(100.0, (float) $saleOrderItem->discount)) : 0.0;
-            $netPrice = $unitPrice * (1 - $discountPct / 100);
-            $lineSubtotal = round($qty * $netPrice, 2);
 
-            $lineTax = 0;
-            if ($tipePajak !== 'None' && $ppnRate > 0) {
-                $lineTax = round($lineSubtotal * ($ppnRate / 100), 2);
-            }
+            // Pajak per baris dari item SO-nya (Eksklusif / Inklusif / Non Pajak); tanpa pajak bila invoice bertipe None.
+            // Sebelumnya semua baris diperlakukan Eksklusif dengan tarif baris pertama sehingga SO Inklusif ditambah PPN dua kali.
+            $lineRate = $tipePajak === 'None' ? 0.0 : ($saleOrderItem ? (float) $saleOrderItem->tax : $ppnRate);
+            $lineType = $tipePajak === 'None' ? 'Non Pajak' : ($saleOrderItem?->tipe_pajak ?: $tipePajak);
 
-            $subtotal += $lineSubtotal;
-            $totalTax += $lineTax;
+            // Satu-satunya perhitungan baris (LineAmounts); price disimpan GROSS + rincian diskon
+            $line = $lineBuilder->attributes(
+                $item->product_id, $qty, $unitPrice, $discountPct, $lineRate, $lineType, $item->product?->sales_coa_id
+            );
 
-            $invoiceItems[] = [
-                'product_id' => $item->product_id,
-                'quantity' => $qty,
-                'price' => $netPrice,
-                'discount' => $discountPct,
-                'tax_rate' => $ppnRate,
-                'tax_amount' => $lineTax,
-                'subtotal' => $lineSubtotal,
-                'total' => $lineSubtotal + $lineTax,
-                'coa_id' => $item->product?->sales_coa_id,
-            ];
+            $subtotal += $line['subtotal'];
+            $totalTax += $line['tax_amount'];
+            $lineTotals += $line['total'];
+
+            $invoiceItems[] = $line;
         }
 
         if (empty($invoiceItems) || $subtotal <= 0) {
@@ -426,7 +383,7 @@ class DeliveryOrderObserver
             ];
         }
 
-        $grandTotal = round($subtotal + $totalTax + $additionalCosts, 2);
+        $grandTotal = round($lineTotals + $additionalCosts, 2);
         $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
 
         $invoiceData = [
@@ -507,32 +464,8 @@ class DeliveryOrderObserver
             $reservation->delete();
         }
 
-        // Update delivered_quantity for related sale order items (set to 0 since DO is deleted).
-        // Lock to prevent concurrent updates.
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                $deletedDoId = $deliveryOrder->id;
-                DB::transaction(function () use ($item, $deletedDoId) {
-                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($saleOrderItem) {
-                        // Recalculate total delivered quantity excluding this deleted delivery order
-                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                            ->whereHas('deliveryOrder', function ($query) use ($deletedDoId) {
-                                $query->whereIn('status', ['sent', 'received', 'completed'])
-                                      ->where('id', '!=', $deletedDoId);
-                            })
-                            ->sum('quantity');
-
-                        $saleOrderItem->update([
-                            'delivered_quantity' => $totalDelivered
-                        ]);
-                    }
-                });
-            }
-        }
+        // DO dihapus: hitung ulang progres SO (kuantitas DO ini kembali ke SO).
+        $this->syncDeliveryProgress($deliveryOrder);
     }
 
     /**
@@ -578,30 +511,8 @@ class DeliveryOrderObserver
         // Recreate journal entries with updated quantities
         $this->createJournalEntriesForDelivery($deliveryOrder);
 
-        // Update delivered_quantity for related sale order items.
-        // Lock to prevent concurrent qty updates from corrupting totals.
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                DB::transaction(function () use ($item) {
-                    $saleOrderItem = \App\Models\SaleOrderItem::where('id', $item->sale_order_item_id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($saleOrderItem) {
-                        // Recalculate total delivered quantity from all delivery orders that are sent/completed
-                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                            ->whereHas('deliveryOrder', function ($query) {
-                                $query->whereIn('status', ['sent', 'received', 'completed']);
-                            })
-                            ->sum('quantity');
-
-                        $saleOrderItem->update([
-                            'delivered_quantity' => $totalDelivered
-                        ]);
-                    }
-                });
-            }
-        }
+        // Kuantitas berubah setelah completed: hitung ulang progres SO.
+        $this->syncDeliveryProgress($deliveryOrder);
     }
 
     /**

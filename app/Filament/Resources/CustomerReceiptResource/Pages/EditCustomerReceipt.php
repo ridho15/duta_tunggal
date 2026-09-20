@@ -6,7 +6,10 @@ use App\Filament\Resources\CustomerReceiptResource;
 use App\Helpers\MoneyHelper;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
+use App\Services\CustomerReceiptAllocator;
 use Filament\Actions;
+use Filament\Notifications\Notification;
+use Illuminate\Validation\ValidationException;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Log;
@@ -96,24 +99,40 @@ class EditCustomerReceipt extends EditRecord
             }
         }
 
-        // Validate total consistency
-        $calculatedTotal = 0;
-        if (!empty($data['invoice_receipts'])) {
-            foreach ($data['invoice_receipts'] as $amount) {
-                $calculatedTotal += $amount;
-            }
+        // Validasi & alokasi yang sama dengan halaman Buat: cabang = cabang invoice, akun penerima yang sah,
+        // dan nominal tidak boleh melebihi sisa tagihan (tidak ada pemotongan senyap).
+        $allocator = app(CustomerReceiptAllocator::class);
+        $errors = [];
+
+        try {
+            $allocator->assertAccountAllowed(isset($data['coa_id']) ? (int) $data['coa_id'] : null, $data['payment_method'] ?? 'Cash');
+        } catch (ValidationException $e) {
+            $errors = array_merge($errors, $e->errors());
         }
 
-        // Fix total_payment if inconsistent
-        if (abs($calculatedTotal - $data['total_payment']) > 0.01) {
-            Log::warning('Customer Receipt Edit: Fixing inconsistent total payment', [
-                'record_id' => $this->record->id ?? null,
-                'original_total' => $data['total_payment'],
-                'calculated_total' => $calculatedTotal,
-                'invoice_receipts' => $data['invoice_receipts']
-            ]);
-            $data['total_payment'] = $calculatedTotal;
+        try {
+            $plan = $allocator->plan(
+                (int) ($data['customer_id'] ?? $this->record->customer_id),
+                $data['invoice_receipts'] ?? [],
+                $data['payment_method'] ?? 'Cash',
+                false,
+                $this->record,
+            );
+        } catch (ValidationException $e) {
+            $plan = null;
+            $errors = array_merge($errors, $e->errors());
         }
+
+        if ($errors !== []) {
+            Notification::make()->danger()->title('Penerimaan tidak dapat disimpan')->body(collect($errors)->flatten()->implode(' '))->persistent()->send();
+
+            throw ValidationException::withMessages(collect($errors)->mapWithKeys(fn ($message, $key) => ['data.' . $key => $message])->all());
+        }
+
+        $data['invoice_receipts'] = $plan['applied'];
+        $data['selected_invoices'] = array_map('intval', array_keys($plan['applied']));
+        $data['total_payment'] = round(array_sum($plan['applied']), 2);
+        $data['cabang_id'] = $plan['cabang_id'] ?? ($data['cabang_id'] ?? $this->record->cabang_id);
     }
 
     protected function afterSave(): void

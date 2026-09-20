@@ -353,9 +353,9 @@ describe('Manual money inputs use debounced live updates when calculations must 
         'app/Filament/Resources/QuotationResource.php' => [
             'unit_price' => 2,
         ],
-        'app/Filament/Resources/QuotationResource/Pages/ViewQuotation.php' => [
-            'unit_price' => 1,
-        ],
+        // Modal "Buat Sales Order dari Quotation" kini SATU definisi di QuotationResource::saleOrderModalSchema()
+        // (form item + modal = 2 blok, sudah dihitung pada entri QuotationResource.php di atas);
+        // ViewQuotation tidak lagi memuat field uang sendiri.
         'app/Filament/Resources/QuotationResource/RelationManagers/QuotationItemRelationManager.php' => [
             'unit_price' => 1,
         ],

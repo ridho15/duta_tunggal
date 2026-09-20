@@ -325,11 +325,38 @@ class SaleOrderResource extends Resource
         ];
     }
 
+    /**
+     * Ringkasan progres pengiriman satu SO, dihitung ulang dari DO setiap dipanggil
+     * (sengaja tanpa memoisasi agar tidak menampilkan angka basi).
+     *
+     * @return array{ordered: float, delivered: float, in_process: float, remaining: float, available: float}
+     */
+    protected static function deliverySummary(SaleOrder $record): array
+    {
+        return app(\App\Services\SaleOrderDeliveryProgress::class)->forSaleOrder($record)['totals'];
+    }
+
+    /**
+     * Progres pengiriman satu item SO.
+     *
+     * @return array<string, float>
+     */
+    protected static function deliveryItemProgress($item): array
+    {
+        return app(\App\Services\SaleOrderDeliveryProgress::class)->forItems([$item->getKey()])[$item->getKey()] ?? [];
+    }
+
+    protected static function formatQty(float|int|string|null $value): string
+    {
+        return number_format((float) $value, 0, ',', '.');
+    }
+
     protected static function statusRowClass(?string $status): string
     {
         return match ($status) {
             'request_approve' => 'bg-gray-100',
             'approved', 'confirmed', 'received' => 'bg-blue-100',
+            'partially_delivered' => 'bg-yellow-100',
             'request_close' => 'bg-yellow-100',
             'completed' => 'bg-green-100',
             'closed', 'reject', 'rejected', 'canceled', 'cancelled' => 'bg-red-100',
@@ -492,7 +519,7 @@ class SaleOrderResource extends Resource
                             ->visible(function ($get) {
                                 return $get('options_form') == 2;
                             })
-                            ->options(Quotation::where('status', 'approve')->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
+                            ->options(Quotation::usable()->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
                             ->required()
                             ->validationMessages([
                                 'required' => 'Quotation wajib dipilih'
@@ -1496,37 +1523,8 @@ class SaleOrderResource extends Resource
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'draft'           => 'Draft',
-                            'request_approve' => 'Menunggu Persetujuan',
-                            'approved'        => 'Disetujui',
-                            'confirmed'       => 'Dikonfirmasi',
-                            'completed'       => 'Selesai',
-                            'request_close'   => 'Minta Ditutup',
-                            'closed'          => 'Ditutup',
-                            'reject'          => 'Ditolak',
-                            'canceled'        => 'Dibatalkan',
-                            'received'        => 'Diterima',
-                            default           => Str::upper($state),
-                        };
-                    })
-                    ->color(function ($state) {
-                        return match ($state) {
-                            'draft' => 'gray',
-                            'process' => 'warning',
-                            'completed' => 'success',
-                            'received' => 'primary',
-                            'approved' => 'success',
-                            'confirmed' => 'success',
-                            'canceled' => 'danger',
-                            'reject' => 'danger',
-                            'request_approve' => 'primary',
-                            'request_close' => 'warning',
-                            'closed' => 'danger',
-                            default => '-'
-                        };
-                    })
+                    ->formatStateUsing(fn ($state) => SaleOrder::statusLabel($state))
+                    ->color(fn ($state) => SaleOrder::statusColor($state))
                     ->badge(),
                 TextColumn::make('shipped_to')
                     ->label('Shipped To')
@@ -1795,7 +1793,7 @@ class SaleOrderResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('request sales order') &&
-                                in_array($record->status, ['approved', 'confirmed', 'completed']);
+                                in_array($record->status, ['approved', 'confirmed', 'partially_delivered', 'completed']);
                         })
                         ->form(
                             function ($record) {
@@ -1869,7 +1867,7 @@ class SaleOrderResource extends Resource
                         ->label('Cetak / Unduh PDF')
                         ->color('info')
                         ->icon('heroicon-o-document-arrow-down')
-                        ->visible(fn ($record) => in_array($record->status, ['approved', 'completed', 'confirmed', 'received']))
+                        ->visible(fn ($record) => in_array($record->status, ['approved', 'partially_delivered', 'completed', 'confirmed', 'received']))
                         ->url(fn ($record) => route('pdf-stream', ['type' => 'sale-order', 'id' => $record->id]))
                         ->openUrlInNewTab(),
                     Action::make('btn_titip_saldo')
@@ -1878,7 +1876,7 @@ class SaleOrderResource extends Resource
                         ->color('warning')
                         ->visible(function ($record) {
                             return Auth::user()->hasPermissionTo('update deposit') &&
-                                in_array($record->status, ['approved', 'confirmed', 'completed']);
+                                in_array($record->status, ['approved', 'confirmed', 'partially_delivered', 'completed']);
                         })
                         ->form(function ($record) {
                             if ($record->customer->deposit->id == null) {
@@ -2155,6 +2153,8 @@ class SaleOrderResource extends Resource
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('status')
                             ->label('Status')
+                            ->formatStateUsing(fn ($state) => SaleOrder::statusLabel($state))
+                            ->color(fn ($state) => SaleOrder::statusColor($state))
                             ->badge(),
                         \Filament\Infolists\Components\TextEntry::make('order_date')
                             ->label('Order Date')
@@ -2165,7 +2165,7 @@ class SaleOrderResource extends Resource
                             ->placeholder('-'),
                         \Filament\Infolists\Components\TextEntry::make('tempo_pembayaran')
                             ->label('Tempo Pembayaran')
-                            ->formatStateUsing(fn($state) => $state ? $state . ' Hari' : '-'),
+                            ->formatStateUsing(fn($state) => ($state !== null && $state !== '') ? $state . ' Hari' : '-'),
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
                             ->getStateUsing(fn($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->total_amount)),
@@ -2175,28 +2175,31 @@ class SaleOrderResource extends Resource
                         \Filament\Infolists\Components\TextEntry::make('shipped_to')
                             ->label('Shipped To')
                             ->placeholder('-'),
+                        \Filament\Infolists\Components\TextEntry::make('notes')
+                            ->label('Catatan')
+                            ->placeholder('-'),
                     ]),
                 \Filament\Infolists\Components\Section::make('Ringkasan Sales Order')
-                    ->columns(5)
+                    ->columns(4)
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('summary_item_count')
                             ->label('Jumlah Item')
                             ->getStateUsing(fn($record) => $record->saleOrderItem->count()),
                         \Filament\Infolists\Components\TextEntry::make('summary_total_qty')
-                            ->label('Total Qty')
-                            ->getStateUsing(fn($record) => number_format((float) $record->saleOrderItem->sum('quantity'), 0, ',', '.')),
+                            ->label('Total Qty Dipesan')
+                            ->getStateUsing(fn($record) => static::formatQty(static::deliverySummary($record)['ordered'])),
                         \Filament\Infolists\Components\TextEntry::make('summary_delivered_qty')
                             ->label('Total Qty Terkirim')
-                            ->getStateUsing(fn($record) => number_format((float) $record->saleOrderItem->sum('delivered_quantity'), 0, ',', '.')),
+                            ->getStateUsing(fn($record) => static::formatQty(static::deliverySummary($record)['delivered'])),
+                        \Filament\Infolists\Components\TextEntry::make('summary_in_process_qty')
+                            ->label('Dalam Proses DO')
+                            ->getStateUsing(fn($record) => static::formatQty(static::deliverySummary($record)['in_process'])),
                         \Filament\Infolists\Components\TextEntry::make('summary_remaining_qty')
                             ->label('Sisa Qty Belum Dikirim')
-                            ->getStateUsing(function ($record) {
-                                $remaining = $record->saleOrderItem->sum(function ($item) {
-                                    return (float) ($item->remaining_quantity ?? 0);
-                                });
-
-                                return number_format($remaining, 0, ',', '.');
-                            }),
+                            ->getStateUsing(fn($record) => static::formatQty(static::deliverySummary($record)['remaining'])),
+                        \Filament\Infolists\Components\TextEntry::make('summary_available_qty')
+                            ->label('Belum Dijadwalkan')
+                            ->getStateUsing(fn($record) => static::formatQty(static::deliverySummary($record)['available'])),
                         \Filament\Infolists\Components\TextEntry::make('summary_total_amount')
                             ->label('Total Amount')
                             ->getStateUsing(fn($record) => static::formatCurrencyAmount($record?->currency_id ?? static::resolveDefaultCurrencyId(), $record?->total_amount)),
@@ -2250,8 +2253,9 @@ class SaleOrderResource extends Resource
                                                                     ?? '-';
                                                             }],
                                                             ['Qty', fn($record) => number_format((float) ($record->quantity ?? 0), 0, ',', '.')],
-                                                            ['Qty Delivered', fn($record) => number_format((float) ($record->delivered_quantity ?? 0), 0, ',', '.')],
-                                                            ['Sisa Qty Belum Dikirim', fn($record) => number_format((float) ($record->remaining_quantity ?? 0), 0, ',', '.')],
+                                                            ['Qty Terkirim', fn($record) => static::formatQty(static::deliveryItemProgress($record)['delivered'] ?? 0)],
+                                                            ['Dalam Proses DO', fn($record) => static::formatQty(static::deliveryItemProgress($record)['in_process'] ?? 0)],
+                                                            ['Sisa Qty Belum Dikirim', fn($record) => static::formatQty(static::deliveryItemProgress($record)['remaining'] ?? 0)],
                                                             ['Mode Gudang', function ($record) {
                                                                 $allocCount = $record->warehouseAllocations->count();
 

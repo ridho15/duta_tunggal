@@ -165,6 +165,21 @@ class QuotationApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (! Auth::user()?->can('create', Quotation::class)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk membuat Quotation.',
+            ], 403);
+        }
+
+        $wantsApproval = $request->input('header.status') === Quotation::STATUS_REQUEST_APPROVE;
+        if ($wantsApproval && ! Auth::user()?->hasPermissionTo('request-approve quotation')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengajukan persetujuan Quotation.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'header.quotation_number' => 'required|string|max:255|unique:quotations,quotation_number',
             'header.customer_id' => 'required|integer|exists:customers,id',
@@ -173,8 +188,9 @@ class QuotationApiController extends Controller
             'header.valid_until' => 'nullable|date',
             'header.currency_id' => 'required|integer|exists:currencies,id',
             'header.tempo_pembayaran' => 'nullable|numeric|min:0',
+            'header.shipped_to' => 'nullable|string|max:255',
             'header.notes' => 'nullable|string',
-            'header.status' => 'nullable|string|in:draft,request_approve,approve,reject',
+            'header.status' => 'nullable|string|in:draft,request_approve',
 
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
@@ -223,8 +239,10 @@ class QuotationApiController extends Controller
                 'currency_id' => $currencyId,
                 'exchange_rate' => $exchangeRate,
                 'tempo_pembayaran' => isset($headerData['tempo_pembayaran']) ? (int) $headerData['tempo_pembayaran'] : 0,
+                'shipped_to' => filled($headerData['shipped_to'] ?? null) ? trim($headerData['shipped_to']) : null,
                 'notes' => $headerData['notes'] ?? null,
-                'status' => $headerData['status'] ?? 'draft',
+                // Selalu Draft; pengajuan persetujuan dilakukan lewat QuotationService::requestApprove() setelah item tersimpan.
+                'status' => Quotation::STATUS_DRAFT,
                 'created_by' => Auth::id(),
                 'total_amount' => 0,
             ]);
@@ -261,6 +279,10 @@ class QuotationApiController extends Controller
             // Sync total_amount via QuotationService
             $quotationService = app(QuotationService::class);
             $quotationService->updateTotalAmount($quotation);
+
+            if ($wantsApproval) {
+                $quotationService->requestApprove($quotation);
+            }
 
             DB::commit();
 
@@ -337,6 +359,7 @@ class QuotationApiController extends Controller
                         'currency_id' => $quotation->currency_id,
                         'exchange_rate' => (float) ($quotation->exchange_rate ?? 1.0),
                         'tempo_pembayaran' => (int) ($quotation->tempo_pembayaran ?? 0),
+                        'shipped_to' => $quotation->shipped_to ?? '',
                         'notes' => $quotation->notes ?? '',
                         'status' => $quotation->status ?? 'draft',
                         'total_amount' => (float) $quotation->total_amount,
@@ -369,6 +392,29 @@ class QuotationApiController extends Controller
             ], 404);
         }
 
+        // Kunci status: hanya Draft / Ditolak yang boleh diubah (sama dengan QuotationPolicy & halaman Edit).
+        if (! $quotation->isEditable()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Quotation {$quotation->quotation_number} berstatus \"{$quotation->statusLabel()}\" dan tidak dapat diubah. Gunakan \"Buat Revisi\" untuk membuat versi baru.",
+            ], 422);
+        }
+
+        if (! Auth::user()?->can('update', $quotation)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengubah Quotation.',
+            ], 403);
+        }
+
+        $wantsApproval = $request->input('header.status') === Quotation::STATUS_REQUEST_APPROVE;
+        if ($wantsApproval && ! Auth::user()?->hasPermissionTo('request-approve quotation')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengajukan persetujuan Quotation.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'header.quotation_number' => 'required|string|max:255|unique:quotations,quotation_number,' . $id,
             'header.customer_id' => 'required|integer|exists:customers,id',
@@ -377,8 +423,9 @@ class QuotationApiController extends Controller
             'header.valid_until' => 'nullable|date',
             'header.currency_id' => 'required|integer|exists:currencies,id',
             'header.tempo_pembayaran' => 'nullable|numeric|min:0',
+            'header.shipped_to' => 'nullable|string|max:255',
             'header.notes' => 'nullable|string',
-            'header.status' => 'nullable|string|in:draft,request_approve,approve,reject',
+            'header.status' => 'nullable|string|in:draft,request_approve',
 
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
@@ -427,8 +474,10 @@ class QuotationApiController extends Controller
                 'currency_id' => $currencyId,
                 'exchange_rate' => $exchangeRate,
                 'tempo_pembayaran' => isset($headerData['tempo_pembayaran']) ? (int) $headerData['tempo_pembayaran'] : 0,
+                'shipped_to' => filled($headerData['shipped_to'] ?? null) ? trim($headerData['shipped_to']) : null,
                 'notes' => $headerData['notes'] ?? null,
-                'status' => $headerData['status'] ?? $quotation->status,
+                // Quotation Ditolak yang diperbaiki kembali menjadi Draft supaya dapat diajukan ulang.
+                'status' => $quotation->status === Quotation::STATUS_REJECT ? Quotation::STATUS_DRAFT : $quotation->status,
             ]);
 
             // Sync Quotation Items
@@ -467,6 +516,10 @@ class QuotationApiController extends Controller
             // Sync total_amount via QuotationService
             $quotationService = app(QuotationService::class);
             $quotationService->updateTotalAmount($quotation);
+
+            if ($wantsApproval) {
+                $quotationService->requestApprove($quotation);
+            }
 
             DB::commit();
 

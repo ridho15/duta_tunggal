@@ -242,15 +242,11 @@ class ViewDeliveryOrder extends ViewRecord
                         if ($deliveryOrderItemId && $newQuantity != $currentQuantity) {
                             $deliveryItem = $record->deliveryOrderItem()->find($deliveryOrderItemId);
                             if ($deliveryItem) {
-                                $oldQuantity = $deliveryItem->quantity;
                                 $deliveryItem->update(['quantity' => $newQuantity]);
 
-                                // Update remaining quantity di sale order item
-                                if ($deliveryItem->saleOrderItem) {
-                                    $saleOrderItem = $deliveryItem->saleOrderItem;
-                                    $quantityDifference = $oldQuantity - $newQuantity;
-                                    $saleOrderItem->increment('remaining_quantity', $quantityDifference);
-                                }
+                                // Sisa/terkirim di SO dihitung ulang oleh SaleOrderDeliveryProgress. (Sebelumnya kode di sini
+                                // menjalankan increment('remaining_quantity') pada atribut yang bukan kolom DB -> error SQL.)
+                                app(\App\Services\SaleOrderDeliveryProgress::class)->syncForDeliveryOrder($record);
                             }
                         }
                     }

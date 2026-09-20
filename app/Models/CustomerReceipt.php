@@ -22,6 +22,8 @@ class CustomerReceipt extends Model
         'ntpn',
         'total_payment',
         'total_payment_idr',
+        'overpayment_amount',
+        'deposit_id',
         'notes',
         'diskon',
         'payment_adjustment',
@@ -39,6 +41,7 @@ class CustomerReceipt extends Model
         'invoice_receipts' => 'json',
         'total_payment' => 'float',
         'total_payment_idr' => 'float',
+        'overpayment_amount' => 'float',
         'exchange_rate' => 'float',
     ];
 
@@ -55,6 +58,12 @@ class CustomerReceipt extends Model
     public function customerReceiptItem()
     {
         return $this->hasMany(CustomerReceiptItem::class, 'customer_receipt_id');
+    }
+
+    /** Deposit Customer yang mencatat kelebihan bayar penerimaan ini (bila ada). */
+    public function deposit()
+    {
+        return $this->belongsTo(Deposit::class, 'deposit_id')->withDefault();
     }
 
     public function coa()

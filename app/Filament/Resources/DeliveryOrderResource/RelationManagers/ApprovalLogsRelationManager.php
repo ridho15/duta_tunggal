@@ -35,7 +35,8 @@ class ApprovalLogsRelationManager extends RelationManager
                     ->sortable(),
 
                 BadgeColumn::make('status')
-                    ->label('Action')
+                    ->label('Aksi')
+                    ->formatStateUsing(fn ($state) => \App\Models\DeliveryOrder::statusLabel($state))
                     ->colors([
                         'warning' => 'request_stock',
                         'primary' => 'request_approve',

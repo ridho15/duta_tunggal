@@ -41,14 +41,8 @@
 
         /* Ensure input fields have proper min-width */
         .receipt-input,
-        .balance-input,
-        .adjustment-select,
-        .adjustment-desc-input {
+        .balance-input {
             min-width: 140px !important;
-        }
-
-        .adjustment-select {
-            min-width: 180px !important;
         }
 
         /* Table cell padding consistency */
@@ -69,13 +63,6 @@
                 min-width: 120px !important;
             }
 
-            .adjustment-select {
-                min-width: 160px !important;
-            }
-
-            .adjustment-desc-input {
-                min-width: 120px !important;
-            }
         }
     </style>
 
@@ -90,8 +77,6 @@
                     <col style="width: 130px;"> <!-- Total Invoice -->
                     <col style="width: 160px;"> <!-- Receipt (wider) -->
                     <col style="width: 160px;"> <!-- Sisa (wider) -->
-                    <col style="width: 200px;"> <!-- Penyesuaian Sisa -->
-                    <col style="width: 180px;"> <!-- Keterangan -->
                 </colgroup>
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
@@ -115,12 +100,6 @@
                         <th
                             class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Sisa</th>
-                        <th
-                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Penyesuaian Sisa</th>
-                        <th
-                            class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Keterangan Penyesuaian</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -158,29 +137,6 @@
                                     class="balance-input block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-600 text-gray-500 dark:text-gray-400 sm:text-sm cursor-not-allowed"
                                     placeholder="0" readonly data-invoice-id="{{ $invoice['id'] }}"
                                     value="{{ $invoice['balance'] === '' || $invoice['balance'] === null ? '' : number_format((float) $invoice['balance'], 0, ',', '.') }}" style="min-width: 140px;">
-                            </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
-                                <select
-                                    class="adjustment-select block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                                    data-invoice-id="{{ $invoice['id'] }}" style="min-width: 180px;">
-                                    <option value="" class="text-gray-500 dark:text-gray-400">Pilih Salah Satu COA
-                                    </option>
-                                    @php
-                                        $chartOfAccounts = \App\Models\ChartOfAccount::all();
-                                    @endphp
-                                    @foreach ($chartOfAccounts as $coa)
-                                        <option value="{{ $coa->id }}">{{ $coa->code }} - {{ $coa->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <small class="text-xs text-gray-500 mt-1 block">Auto-terisi saat COA utama
-                                    dipilih</small>
-                            </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
-                                <input type="text"
-                                    class="adjustment-desc-input block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                                    placeholder="" value="{{ $invoice['adjustment_description'] }}"
-                                    data-invoice-id="{{ $invoice['id'] }}" style="min-width: 160px;">
                             </td>
                         </tr>
                     @endforeach
@@ -439,15 +395,13 @@
             const balanceInput = row.querySelector('.balance-input');
             const remaining = parseFloat(checkbox.dataset.remaining || 0);
 
-            // Validate amount doesn't exceed remaining
-            if (numericAmount > remaining) {
-                alert(`Pembayaran tidak boleh melebihi sisa tagihan: Rp. ${remaining.toLocaleString('id-ID')}`);
-                numericAmount = remaining;
-                receiptInput.value = formatRupiahAmount(remaining);
-            }
+            // Nominal di atas sisa tagihan TIDAK dipotong dan tidak memakai alert: tampilkan penjelasan
+            // di bawah kolom. Server menolak kelebihan, atau mencatatnya sebagai Deposit Customer bila
+            // opsi tersebut dinyalakan pada form.
+            showReceiptOverpaymentNote(receiptInput, numericAmount, remaining);
 
-            // Calculate and update balance (remaining - receipt)
-            const balance = remaining - numericAmount;
+            // Calculate and update balance (remaining - receipt); tidak pernah negatif
+            const balance = Math.max(0, remaining - numericAmount);
             balanceInput.value = formatRupiahAmount(balance);
 
             // Auto-check checkbox if amount > 0, uncheck if amount = 0
@@ -458,12 +412,22 @@
             }
 
             updateSelectedInvoices();
+        }
 
-            // Auto-fill adjustment COA if there's a balance
-            if (balance > 0) {
-                setTimeout(() => {
-                    autoFillAdjustmentCOA();
-                }, 100);
+        function showReceiptOverpaymentNote(receiptInput, amount, remaining) {
+            let note = receiptInput.parentElement.querySelector('.receipt-overpay-note');
+            const excess = Math.round(amount - remaining);
+
+            if (excess > 0) {
+                if (!note) {
+                    note = document.createElement('div');
+                    note.className = 'receipt-overpay-note text-xs text-red-600 dark:text-red-400 mt-1';
+                    receiptInput.parentElement.appendChild(note);
+                }
+                note.textContent = 'Melebihi sisa tagihan Rp ' + Math.round(remaining).toLocaleString('id-ID')
+                    + ' (kelebihan Rp ' + excess.toLocaleString('id-ID') + '). Akan ditolak kecuali opsi "Catat kelebihan sebagai Deposit Customer" dinyalakan.';
+            } else if (note) {
+                note.remove();
             }
         }
 
@@ -474,95 +438,8 @@
             }
         }
 
-        function updateAdjustmentBalance(invoiceId, coaId) {
-            // Handle adjustment COA selection
-        }
-
-        function autoFillAdjustmentCOA() {
-            // Get the main COA selection from the form - try multiple selectors
-            let mainCoaField = document.querySelector('#main-coa-field') ||
-                document.querySelector('[name="coa_id"]') ||
-                document.querySelector('select[name="coa_id"]') ||
-                document.querySelector('[data-field-name="coa_id"] select');
-
-            if (!mainCoaField || !mainCoaField.value) {
-                return;
-            }
-
-            const mainCoaId = mainCoaField.value;
-
-            // Auto-fill adjustment COA for invoices with remaining balance
-            const adjustmentSelects = document.querySelectorAll('.adjustment-select');
-            adjustmentSelects.forEach(select => {
-                const row = select.closest('tr');
-                const checkbox = row.querySelector('.invoice-checkbox');
-                const balanceInput = row.querySelector('.balance-input');
-                const balance = parseFloat(balanceInput.value || 0);
-
-                // If invoice is selected and has remaining balance, auto-select the same COA
-                if (checkbox.checked && balance > 0) {
-                    select.value = mainCoaId;
-                    // Trigger change event
-                    select.dispatchEvent(new Event('change'));
-                }
-            });
-        }
-
-        function updateAdjustmentDescription(invoiceId, description) {
-            // Handle adjustment description changes
-        }
-
-        // ─── Select2 for Adjustment COA ──────────────────────────────────────────
-
-        function loadSelect2Assets() {
-            return new Promise(function(resolve) {
-                var loadScript = function(src) {
-                    return new Promise(function(res) {
-                        if (document.querySelector('script[src="' + src + '"]')) return res();
-                        var s = document.createElement('script');
-                        s.src = src; s.onload = res; s.onerror = res;
-                        document.head.appendChild(s);
-                    });
-                };
-                var loadCss = function(href) {
-                    if (document.querySelector('link[href="' + href + '"]')) return;
-                    var l = document.createElement('link');
-                    l.rel = 'stylesheet'; l.href = href;
-                    document.head.appendChild(l);
-                };
-                var jqReady = (window.jQuery && typeof window.jQuery === 'function')
-                    ? Promise.resolve()
-                    : loadScript('https://code.jquery.com/jquery-3.6.0.min.js').then(function() {
-                        if (window.jQuery) window.$ = window.jQuery;
-                    });
-                jqReady.then(function() {
-                    loadCss('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css');
-                    return (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2)
-                        ? Promise.resolve()
-                        : loadScript('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js');
-                }).then(resolve).catch(resolve);
-            });
-        }
-
-        function applyAdjustmentSelect2() {
-            var $ = window.jQuery;
-            if (!$ || !$.fn || !$.fn.select2) return;
-            document.querySelectorAll('.adjustment-select').forEach(function(select) {
-                var $sel = $(select);
-                if ($sel.data('select2')) $sel.select2('destroy');
-                $sel.select2({
-                    placeholder: 'Cari / Pilih COA...',
-                    allowClear: true,
-                    width: '100%',
-                    minimumResultsForSearch: 0,
-                    dropdownParent: document.body
-                });
-                // Pastikan native change event tetap ter-trigger agar updateAdjustmentBalance berjalan
-                $sel.on('select2:select select2:clear', function() {
-                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                });
-            });
-        }
+        // Kolom adjustment sisa dihapus (Fase 5A): fitur tidak pernah menghapus piutang di server
+        // dan hanya menyesatkan. Bila dibutuhkan, dibuat sebagai dokumen write-off piutang ber-approval.
 
         // calculateTotalPayment function is now handled by the separate JavaScript init component
         // This ensures no conflicts and a single source of truth for calculations
@@ -653,22 +530,6 @@
                 }
             });
 
-            // Add event listeners for adjustment selects
-            document.querySelectorAll('.adjustment-select').forEach(select => {
-                select.addEventListener('change', function() {
-                    const invoiceId = this.getAttribute('data-invoice-id');
-                    updateAdjustmentBalance(invoiceId, this.value);
-                });
-            });
-
-            // Add event listeners for adjustment description inputs
-            document.querySelectorAll('.adjustment-desc-input').forEach(input => {
-                input.addEventListener('change', function() {
-                    const invoiceId = this.getAttribute('data-invoice-id');
-                    updateAdjustmentDescription(invoiceId, this.value);
-                });
-            });
-
             // Add event listeners for select-all checkbox
             const selectAllCheckbox = document.getElementById('select-all');
             if (selectAllCheckbox && !selectAllCheckbox.hasAttribute('data-events-attached')) {
@@ -689,27 +550,17 @@
                     initializeEventListeners();
                 }, 1000);
             }
-            // Inisialisasi Select2 pada dropdown Penyesuaian Sisa
-            loadSelect2Assets().then(function() {
-                applyAdjustmentSelect2();
-            });
         }, 500);
 
         window.addEventListener('refreshInvoiceTable', function () {
             setTimeout(function() {
                 initializeEventListeners();
-                loadSelect2Assets().then(function() {
-                    applyAdjustmentSelect2();
-                });
             }, 150);
         });
 
         document.addEventListener('livewire:navigated', function () {
             setTimeout(function() {
                 initializeEventListeners();
-                loadSelect2Assets().then(function() {
-                    applyAdjustmentSelect2();
-                });
             }, 150);
         });
     </script>

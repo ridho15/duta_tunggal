@@ -30,7 +30,12 @@ export function calculateItemPreview(
     taxRate = Number(tax) || 0;
   }
 
-  const taxNominal = Math.round(afterDiscount * (taxRate / 100) * 100) / 100;
+  // Kebijakan pembulatan D6 (sama dengan App\Support\LineAmounts): DPP dibulatkan lebih dulu, PPN dihitung dari DPP.
+  // Untuk tipe Inklusif nominal PPN pada tampilan tetap dihitung dari nilai setelah diskon (perilaku lama).
+  const dppRounded = Math.round(afterDiscount * 100) / 100;
+  const isInclusive = normalizedTaxType === 'inklusif' || normalizedTaxType === 'ppn included';
+  const taxBase = isInclusive ? afterDiscount : dppRounded;
+  const taxNominal = Math.round(taxBase * (taxRate / 100) * 100) / 100;
 
   let subtotal = 0;
   if (
@@ -42,7 +47,7 @@ export function calculateItemPreview(
     subtotal = Math.round(afterDiscount * 100) / 100;
   } else {
     // Eksklusif / PPN Excluded
-    subtotal = Math.round((afterDiscount + taxNominal) * 100) / 100;
+    subtotal = Math.round((dppRounded + taxNominal) * 100) / 100;
   }
 
   return {

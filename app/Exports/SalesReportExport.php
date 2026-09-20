@@ -16,9 +16,20 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
 {
     protected $query;
 
-    public function __construct($query)
+    protected string $mode;
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder  $query  query dari SalesReportService::query()
+     * @param  string|null  $mode  invoice | delivery | order; bila kosong disimpulkan dari model query
+     */
+    public function __construct($query, ?string $mode = null)
     {
         $this->query = $query;
+        $this->mode = $mode ?? match (true) {
+            $query->getModel() instanceof \App\Models\Invoice => SalesReportService::MODE_INVOICE,
+            $query->getModel() instanceof \App\Models\DeliveryOrder => SalesReportService::MODE_DELIVERY,
+            default => SalesReportService::MODE_ORDER,
+        };
     }
 
     public function collection()
@@ -28,31 +39,15 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
 
     public function headings(): array
     {
-        return [
-            'No. SO',
-            'Tanggal',
-            'Kode Customer',
-            'Nama Customer',
-            'Alamat Customer',
-            'No. Telp',
-            'Email',
-            'Produk',
-            'Qty',
-            'Harga Satuan',
-            'Discount (%)',
-            'Tax Rate (%)',
-            'Tipe Pajak',
-            'DPP',
-            'PPN Amount',
-            'Item Subtotal',
-            'Subtotal',
-            'Total SO',
-            'Status'
-        ];
+        return app(SalesReportService::class)->exportHeadings($this->mode);
     }
 
     public function styles(Worksheet $sheet)
     {
+        if ($this->mode !== SalesReportService::MODE_ORDER) {
+            return $this->flatStyles($sheet);
+        }
+
         // Style for headings
         $sheet->getStyle('A1:S1')->applyFromArray([
             'font' => [
@@ -165,8 +160,39 @@ class SalesReportExport implements FromCollection, WithHeadings, WithStyles, Wit
         return [];
     }
 
+    /** Mode invoice/pengiriman: satu baris per baris dokumen (datar) — header berwarna, baris TOTAL tebal. */
+    private function flatStyles(Worksheet $sheet): array
+    {
+        $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($this->headings()));
+        $sheet->getStyle("A1:{$lastColumn}1")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F81BD']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+
+        $highestRow = $sheet->getHighestRow();
+        $sheet->getStyle("A1:{$lastColumn}{$highestRow}")->applyFromArray([
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CCCCCC']]],
+        ]);
+        $sheet->getStyle("A{$highestRow}:{$lastColumn}{$highestRow}")->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E1BEE7']],
+        ]);
+
+        return [];
+    }
+
     public function columnWidths(): array
     {
+        if ($this->mode !== SalesReportService::MODE_ORDER) {
+            $widths = [];
+            foreach ($this->headings() as $index => $heading) {
+                $widths[\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index + 1)] = str_contains($heading, 'Nama') || str_contains($heading, 'Produk') ? 30 : 16;
+            }
+
+            return $widths;
+        }
+
         return [
             'A' => 15, // No. SO
             'B' => 12, // Tanggal

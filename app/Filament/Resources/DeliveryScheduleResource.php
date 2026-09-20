@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class DeliveryScheduleResource extends Resource
@@ -96,6 +97,12 @@ class DeliveryScheduleResource extends Resource
             ->schema([
                 Fieldset::make('Form Jadwal Pengiriman')
                     ->schema([
+                        Placeholder::make('master_readiness_notice')
+                            ->label('')
+                            ->columnSpanFull()
+                            ->visible(fn () => app(DeliveryScheduleService::class)->missingFleetMasters() !== [])
+                            ->content(fn () => static::fleetMasterNotice()),
+
                         TextInput::make('schedule_number')
                             ->label('Nomor Jadwal')
                             ->required()
@@ -195,15 +202,11 @@ class DeliveryScheduleResource extends Resource
 
                         Select::make('delivery_method')
                             ->label('Metode Pengiriman')
-                            ->options([
-                                'internal'       => 'Internal (Driver Perusahaan)',
-                                'kurir_internal' => 'Kurir Internal',
-                                'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
-                            ])
-                            ->default('internal')
+                            ->options(DeliverySchedule::METHOD_LABELS)
+                            ->default(fn () => app(DeliveryScheduleService::class)->defaultDeliveryMethod())
                             ->required()
                             ->reactive()
-                            ->helperText('Pilih metode pengiriman untuk jadwal ini')
+                            ->helperText('Internal / Kurir Internal: memakai driver & kendaraan dari master. Ekspedisi / Pihak Ketiga: cukup nama ekspedisi (dan nomor resi bila ada) — tidak butuh master driver/kendaraan.')
                             ->validationMessages(['required' => 'Metode pengiriman wajib dipilih']),
 
                         Select::make('driver_id')
@@ -211,6 +214,9 @@ class DeliveryScheduleResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('driver', 'name')
+                            ->createOptionForm(Auth::user()?->can('create driver') ? static::driverQuickCreateSchema() : null)
+                            ->rules([Rule::exists('drivers', 'id')->whereNull('deleted_at')])
+                            ->noSearchResultsMessage('Belum ada driver di master. Tambahkan dari Master Driver, atau pilih metode Ekspedisi.')
                             ->visible(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->required(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->validationMessages(['required' => 'Driver wajib dipilih']),
@@ -220,6 +226,9 @@ class DeliveryScheduleResource extends Resource
                             ->searchable()
                             ->preload()
                             ->relationship('vehicle', 'plate')
+                            ->createOptionForm(Auth::user()?->can('create vehicle') ? static::vehicleQuickCreateSchema() : null)
+                            ->rules([Rule::exists('vehicles', 'id')->whereNull('deleted_at')])
+                            ->noSearchResultsMessage('Belum ada kendaraan di master. Tambahkan dari Master Kendaraan, atau pilih metode Ekspedisi.')
                             ->visible(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->required(fn($get) => in_array($get('delivery_method'), ['internal', 'kurir_internal', null, '']))
                             ->validationMessages(['required' => 'Kendaraan wajib dipilih']),
@@ -233,22 +242,20 @@ class DeliveryScheduleResource extends Resource
                             ->validationMessages(['required' => 'Nama driver/ekspedisi wajib diisi']),
 
                         TextInput::make('vehicle_info')
-                            ->label('Info Kendaraan / Resi')
+                            ->label('Info Kendaraan')
                             ->maxLength(255)
                             ->visible(fn($get) => $get('delivery_method') === 'ekspedisi')
-                            ->helperText('Plat kendaraan, nama ekspedisi, atau nomor resi'),
+                            ->helperText('Plat kendaraan atau keterangan armada ekspedisi (opsional)'),
 
-
+                        TextInput::make('tracking_number')
+                            ->label('Nomor Resi')
+                            ->maxLength(255)
+                            ->visible(fn($get) => $get('delivery_method') === 'ekspedisi')
+                            ->helperText('Nomor resi / airway bill dari ekspedisi (opsional; dicetak di Surat Jalan)'),
 
                         Select::make('status')
                             ->label('Status')
-                            ->options([
-                                'pending'           => 'Menunggu Keberangkatan',
-                                'on_the_way'        => 'Sedang Berjalan',
-                                'delivered'         => 'Selesai / Terkirim',
-                                'failed'            => 'Gagal',
-                                'cancelled'         => 'Dibatalkan',
-                            ])
+                            ->options(DeliverySchedule::STATUS_LABELS)
                             ->default('pending')
                             ->required()
                             ->validationMessages(['required' => 'Status wajib dipilih']),
@@ -264,6 +271,91 @@ class DeliveryScheduleResource extends Resource
                     ])
                     ->columns(2),
             ]);
+    }
+
+    /**
+     * Empty-state: master driver/kendaraan belum diisi. Tanpa ini form hanya menampilkan dropdown kosong dan
+     * pesan "wajib dipilih". Tautan tambah hanya ditampilkan bila pengguna berizin.
+     */
+    public static function fleetMasterNotice(): HtmlString
+    {
+        $missing = app(DeliveryScheduleService::class)->missingFleetMasters();
+        if ($missing === []) {
+            return new HtmlString('');
+        }
+
+        $user = Auth::user();
+        $links = [];
+        if (in_array('driver', $missing, true)) {
+            $links[] = $user?->can('create driver')
+                ? '<a href="' . e(DriverResource::getUrl('index')) . '" class="underline font-semibold">Tambah Driver</a>'
+                : 'Driver (hubungi admin master data)';
+        }
+        if (in_array('kendaraan', $missing, true)) {
+            $links[] = $user?->can('create vehicle')
+                ? '<a href="' . e(VehicleResource::getUrl('index')) . '" class="underline font-semibold">Tambah Kendaraan</a>'
+                : 'Kendaraan (hubungi admin master data)';
+        }
+
+        return new HtmlString(
+            '<div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" style="border:1px solid #fcd34d;background:#fffbeb;border-radius:8px;padding:12px;color:#78350f;">'
+            . '<strong>Master ' . e(implode(' dan ', $missing)) . ' belum diisi.</strong> '
+            . 'Metode Internal / Kurir Internal membutuhkannya. Pilih <strong>Ekspedisi / Pihak Ketiga</strong> bila armada sendiri belum terdaftar, atau lengkapi master terlebih dahulu: '
+            . implode(' &middot; ', $links) . '.'
+            . '<br><span style="font-size:12px;">Catatan: Delivery Order baru berstatus Dikirim/Selesai setelah dijadwalkan di sini, sehingga stok dan status Sales Order tidak berubah tanpa jadwal.</span>'
+            . '</div>'
+        );
+    }
+
+    /** @return array<int, \Filament\Forms\Components\Component> */
+    protected static function driverQuickCreateSchema(): array
+    {
+        return [
+            TextInput::make('name')
+                ->label('Nama Driver')
+                ->required()
+                ->maxLength(255)
+                ->validationMessages(['required' => 'Nama driver tidak boleh kosong']),
+            TextInput::make('phone')
+                ->label('Telepon')
+                ->tel()
+                ->maxLength(50),
+            TextInput::make('license')
+                ->label('Nomor SIM / Kode Driver')
+                ->maxLength(255),
+            Hidden::make('cabang_id')
+                ->default(fn () => Auth::user()?->cabang_id),
+        ];
+    }
+
+    /** @return array<int, \Filament\Forms\Components\Component> */
+    protected static function vehicleQuickCreateSchema(): array
+    {
+        return [
+            TextInput::make('plate')
+                ->label('Plat Nomor')
+                ->placeholder('Contoh: B 1234 ABC')
+                ->required()
+                ->unique('vehicles', 'plate')
+                ->maxLength(255)
+                ->validationMessages([
+                    'required' => 'Plat nomor tidak boleh kosong',
+                    'unique' => 'Plat nomor sudah terdaftar',
+                ]),
+            Select::make('type')
+                ->label('Jenis Kendaraan')
+                ->options(collect(['Truck', 'Pickup', 'Van', 'Motor', 'Mobil Box', 'Container', 'Trailer', 'Lainnya'])->mapWithKeys(fn ($t) => [$t => $t])->all())
+                ->required()
+                ->validationMessages(['required' => 'Jenis kendaraan harus dipilih']),
+            TextInput::make('capacity')
+                ->label('Kapasitas')
+                ->placeholder('Contoh: 5 Ton, 1000 kg')
+                ->required()
+                ->maxLength(255)
+                ->validationMessages(['required' => 'Kapasitas tidak boleh kosong']),
+            Hidden::make('cabang_id')
+                ->default(fn () => Auth::user()?->cabang_id),
+        ];
     }
 
     public static function getSuratJalanOptions(?int $cabangId, bool $excludeAlreadyAssigned = false): array
@@ -486,12 +578,7 @@ class DeliveryScheduleResource extends Resource
                         TextEntry::make('scheduled_date')->label('Tanggal Keberangkatan')->dateTime('d/m/Y H:i'),
                         TextEntry::make('delivery_method')
                             ->label('Metode Pengiriman')
-                            ->formatStateUsing(fn($state) => match ($state) {
-                                'internal'       => 'Internal (Driver Perusahaan)',
-                                'kurir_internal' => 'Kurir Internal',
-                                'ekspedisi'      => 'Ekspedisi / Pihak Ketiga',
-                                default          => $state ?? '-',
-                            }),
+                            ->formatStateUsing(fn($state) => DeliverySchedule::METHOD_LABELS[$state ?? ''] ?? ($state ?? '-')),
                         TextEntry::make('driver.name')
                             ->label('Driver')
                             ->placeholder('-')
@@ -515,28 +602,18 @@ class DeliveryScheduleResource extends Resource
                             ->placeholder('-')
                             ->visible(fn($record) => $record?->delivery_method === 'ekspedisi'),
                         TextEntry::make('vehicle_info')
-                            ->label('Info Kendaraan / Resi')
+                            ->label('Info Kendaraan')
+                            ->placeholder('-')
+                            ->visible(fn($record) => $record?->delivery_method === 'ekspedisi'),
+                        TextEntry::make('tracking_number')
+                            ->label('Nomor Resi')
                             ->placeholder('-')
                             ->visible(fn($record) => $record?->delivery_method === 'ekspedisi'),
                         TextEntry::make('status')
                             ->label('Status')
                             ->badge()
-                            ->color(fn(string $state): string => match ($state) {
-                                'pending'           => 'warning',
-                                'on_the_way'        => 'info',
-                                'delivered'         => 'success',
-                                'failed'            => 'danger',
-                                'cancelled'         => 'gray',
-                                default             => 'gray',
-                            })
-                            ->formatStateUsing(fn(string $state): string => match ($state) {
-                                'pending'           => 'Menunggu Keberangkatan',
-                                'on_the_way'        => 'Sedang Berjalan',
-                                'delivered'         => 'Selesai / Terkirim',
-                                'failed'            => 'Gagal',
-                                'cancelled'         => 'Dibatalkan',
-                                default             => ucfirst($state),
-                            }),
+                            ->color(fn(string $state): string => DeliverySchedule::statusColor($state))
+                            ->formatStateUsing(fn(string $state): string => DeliverySchedule::statusLabel($state)),
                         TextEntry::make('cabang.kode')->label('Kode Cabang'),
                         TextEntry::make('cabang.nama')->label('Cabang'),
                         TextEntry::make('notes')->label('Catatan')->placeholder('-'),
@@ -579,13 +656,20 @@ class DeliveryScheduleResource extends Resource
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
                 TextColumn::make('driver.name')
-                    ->label('Driver')
-                    ->searchable()
-                    ->placeholder('-'),
+                    ->label('Driver / Ekspedisi')
+                    ->getStateUsing(fn (DeliverySchedule $record): string => $record->senderName())
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $q) use ($search) {
+                        $q->where('driver_name', 'like', "%{$search}%")
+                            ->orWhereHas('driver', fn (Builder $d) => $d->where('name', 'like', "%{$search}%"));
+                    })),
                 TextColumn::make('vehicle.plate')
                     ->label('Kendaraan')
-                    ->searchable()
-                    ->placeholder('-'),
+                    ->getStateUsing(fn (DeliverySchedule $record): string => $record->vehicleLabel())
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $q) use ($search) {
+                        $q->where('vehicle_info', 'like', "%{$search}%")
+                            ->orWhere('tracking_number', 'like', "%{$search}%")
+                            ->orWhereHas('vehicle', fn (Builder $v) => $v->where('plate', 'like', "%{$search}%"));
+                    })),
                 TextColumn::make('delivery_method')
                     ->label('Metode')
                     ->badge()
@@ -622,22 +706,8 @@ class DeliveryScheduleResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'pending'           => 'warning',
-                        'on_the_way'        => 'info',
-                        'delivered'         => 'success',
-                        'failed'            => 'danger',
-                        'cancelled'         => 'gray',
-                        default             => 'gray',
-                    })
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'pending'           => 'Menunggu Keberangkatan',
-                        'on_the_way'        => 'Sedang Berjalan',
-                        'delivered'         => 'Selesai / Terkirim',
-                        'failed'            => 'Gagal',
-                        'cancelled'         => 'Dibatalkan',
-                        default             => ucfirst($state),
-                    })
+                    ->color(fn(string $state): string => DeliverySchedule::statusColor($state))
+                    ->formatStateUsing(fn(string $state): string => DeliverySchedule::statusLabel($state))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('cabang.nama')
@@ -661,13 +731,7 @@ class DeliveryScheduleResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'pending'           => 'Menunggu Keberangkatan',
-                        'on_the_way'        => 'Sedang Berjalan',
-                        'delivered'         => 'Selesai / Terkirim',
-                        'failed'            => 'Gagal',
-                        'cancelled'         => 'Dibatalkan',
-                    ]),
+                    ->options(DeliverySchedule::STATUS_LABELS),
                 SelectFilter::make('driver_id')
                     ->relationship('driver', 'name')
                     ->label('Driver')

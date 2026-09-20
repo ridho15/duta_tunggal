@@ -80,9 +80,33 @@ class SaleOrderItem extends Model
         return $this->hasMany(SaleOrderItemWarehouseAllocation::class, 'sale_order_item_id');
     }
 
+    /**
+     * Sisa yang BELUM TERKIRIM (qty - terkirim). Untuk membuat DO baru pakai
+     * availableQuantityForDelivery(), yang juga memperhitungkan DO yang masih terbuka.
+     *
+     * delivered_quantity adalah cache yang hanya ditulis oleh SaleOrderDeliveryProgress.
+     */
     public function getRemainingQuantityAttribute()
     {
-        return $this->quantity - $this->delivered_quantity;
+        return max(0, (float) $this->quantity - (float) $this->delivered_quantity);
+    }
+
+    /**
+     * Kuantitas yang masih boleh dialokasikan ke Delivery Order baru:
+     * qty - terkirim - sedang diproses di DO lain.
+     *
+     * @param  int|null  $excludeDeliveryOrderId  DO yang sedang diedit (kuantitasnya tidak dihitung)
+     */
+    public function availableQuantityForDelivery(?int $excludeDeliveryOrderId = null): float
+    {
+        if (! $this->exists) {
+            return 0.0;
+        }
+
+        $progress = app(\App\Services\SaleOrderDeliveryProgress::class)
+            ->forItems([$this->getKey()], $excludeDeliveryOrderId);
+
+        return (float) ($progress[$this->getKey()]['available'] ?? 0.0);
     }
 
     protected static function booted(): void

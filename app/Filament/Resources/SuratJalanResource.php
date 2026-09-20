@@ -6,6 +6,7 @@ use App\Filament\Resources\SuratJalanResource\Pages;
 use App\Http\Controllers\HelperController;
 use App\Models\DeliveryOrder;
 use App\Models\SuratJalan;
+use App\Services\SuratJalanDocumentBuilder;
 use App\Services\SuratJalanService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
@@ -13,6 +14,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -24,6 +26,7 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -33,6 +36,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\Filter;
+use Illuminate\Validation\ValidationException;
 use App\Models\Customer;
 use App\Models\Cabang;
 
@@ -61,6 +65,7 @@ class SuratJalanResource extends Resource
                             ->label('Surat Jalan Number')
                             ->required()
                             ->reactive()
+                            ->default(fn () => app(SuratJalanService::class)->generateCode())
                             ->suffixAction(ActionsAction::make('generateCode')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Kode')
@@ -87,14 +92,20 @@ class SuratJalanResource extends Resource
                             ->preload()
                             ->required()
                             ->reactive()
-                            ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get) {
-                                // J1: create => only approved DOs, edit => allow linked sent/received for compatibility.
+                            ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get, ?SuratJalan $record) {
+                                // Buat: hanya DO approved yang belum tercantum di Surat Jalan lain yang masih berlaku.
+                                // Ubah (Draft): DO yang sudah tertaut tetap boleh dipilih untuk kompatibilitas.
                                 $isCreatePage = str_ends_with((string) request()->path(), 'surat-jalans/create');
                                 if ($isCreatePage) {
                                     $query->where('status', 'approved');
                                 } else {
                                     $query->whereIn('status', ['approved', 'sent', 'received']);
                                 }
+
+                                $query->whereDoesntHave('suratJalan', function (Builder $q) use ($record) {
+                                    $q->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES)
+                                        ->when($record?->getKey(), fn (Builder $q, $id) => $q->where('surat_jalans.id', '!=', $id));
+                                });
                             })
                             ->multiple()
                             ->afterStateUpdated(function ($state, $set, $get) {
@@ -189,35 +200,19 @@ class SuratJalanResource extends Resource
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('driver_info')
-                    ->label('Driver')
+                    ->label('Driver / Ekspedisi')
                     ->getStateUsing(function (SuratJalan $record): string {
-                        $drivers = $record->deliveryOrder->map(function ($deliveryOrder) {
-                            $driver = $deliveryOrder->driver;
-                            if ($driver) {
-                                $code = $driver->license ? "({$driver->license}) " : '';
-                                return $code . $driver->name;
-                            }
-                            return null;
-                        })->filter()->unique();
+                        $schedule = $record->primaryDeliverySchedule();
 
-                        return $drivers->implode(', ') ?: '-';
+                        return $schedule ? $schedule->senderName() : SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
                     })
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('vehicle_info')
                     ->label('Kendaraan')
                     ->getStateUsing(function (SuratJalan $record): string {
-                        $vehicles = $record->deliveryOrder->map(function ($deliveryOrder) {
-                            if ($deliveryOrder->vehicle) {
-                                $plate = $deliveryOrder->vehicle->plate ?? $deliveryOrder->vehicle->license_plate ?? null;
-                                $type = $deliveryOrder->vehicle->type ?? $deliveryOrder->vehicle->vehicle_type ?? null;
-                                if ($plate && $type) {
-                                    return "{$plate} ({$type})";
-                                }
-                                return $plate ?? $type;
-                            }
-                            return null;
-                        })->filter()->unique();
-                        return $vehicles->implode(', ') ?: '-';
+                        $schedule = $record->primaryDeliverySchedule();
+
+                        return $schedule ? $schedule->vehicleLabel() : SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('issued_at')
@@ -230,9 +225,17 @@ class SuratJalanResource extends Resource
                 TextColumn::make('signedBy.name')
                     ->label('Signed By')
                     ->searchable(),
-                IconColumn::make('status')
-                    ->label('Terbit')
-                    ->boolean(),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => SuratJalan::statusLabel($state))
+                    ->color(fn ($state) => SuratJalan::statusColor($state))
+                    ->sortable(),
+                TextColumn::make('cancel_reason')
+                    ->label('Alasan Batal')
+                    ->placeholder('-')
+                    ->limit(40)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('document_path')
                     ->label('Document')
                     ->getStateUsing(function (SuratJalan $record): string {
@@ -276,17 +279,16 @@ class SuratJalanResource extends Resource
                     
                 SelectFilter::make('status')
                     ->label('Filter Status')
-                    ->options([
-                        '1' => 'Terbit'
-                    ])
+                    ->options(collect(SuratJalan::STATUS_LABELS)->mapWithKeys(fn ($label, $value) => [(string) $value => $label])->all())
                     ->query(function (Builder $query, array $data): Builder {
-                        if (empty($data['value'])) {
+                        // '0' (Draft) valid; empty('0') bernilai true sehingga jangan dipakai.
+                        if (! isset($data['value']) || $data['value'] === '') {
                             return $query;
                         }
-                        
-                        return $query->where('status', $data['value']);
+
+                        return $query->where('status', (int) $data['value']);
                     }),
-                    
+
                 Filter::make('issued_date_range')
                     ->label('Filter Tanggal Terbit')
                     ->form([
@@ -311,10 +313,15 @@ class SuratJalanResource extends Resource
             ->headerActions([])
             ->actions([
                 ActionGroup::make([
+                    ViewAction::make(),
                     EditAction::make()
                         ->modal()
-                        ->color('success'),
-                    DeleteAction::make(),
+                        ->color('success')
+                        ->visible(fn (SuratJalan $record) => $record->isEditable()),
+                    DeleteAction::make()
+                        ->visible(fn (SuratJalan $record) => $record->isEditable()),
+                    static::issueAction(),
+                    static::uploadDocumentAction(),
                     Action::make('download_document')
                         ->label('Download Document')
                         ->icon('heroicon-o-document-arrow-down')
@@ -329,17 +336,37 @@ class SuratJalanResource extends Resource
                         ->label('Preview / Download PDF')
                         ->icon('heroicon-o-clipboard-document-check')
                         ->color('info')
-                        ->visible(fn ($record) => $record->status == 1)
                         ->url(fn ($record) => route('pdf-stream', ['type' => 'surat-jalan', 'id' => $record->id]))
                         ->openUrlInNewTab(),
+                    static::cancelAction(),
+                    static::reissueAction(),
                 ])
             ], position: ActionsPosition::BeforeCells)
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->action(function (DeleteBulkAction $action, $records) {
+                            // Hanya Draft yang boleh dihapus; yang terbit dikoreksi lewat Batalkan.
+                            [$deletable, $locked] = $records->partition(fn (SuratJalan $r) => $r->isEditable());
+                            $deletable->each(fn (SuratJalan $r) => $r->delete());
+
+                            if ($locked->isNotEmpty()) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: $locked->count() . ' Surat Jalan dilewati',
+                                    message: 'Surat Jalan yang sudah terbit/dibatalkan tidak dapat dihapus. Gunakan aksi Batalkan.'
+                                );
+                            }
+
+                            $action->success();
+                        }),
                 ]),
             ])
-            ->recordClasses(fn($record) => $record->terbit ? 'bg-blue-100' : 'bg-gray-100')
+            ->recordClasses(fn (SuratJalan $record) => match ($record->status) {
+                SuratJalan::STATUS_ISSUED => 'bg-blue-100',
+                SuratJalan::STATUS_CANCELLED => 'bg-red-100',
+                default => 'bg-gray-100',
+            })
             ->description(new \Illuminate\Support\HtmlString(
                 '<style>
                     .fi-ta-header:has(.sj-legend){display:block!important;width:100%}
@@ -364,7 +391,7 @@ class SuratJalanResource extends Resource
                     '<div class="mt-3 text-sm text-gray-600 dark:text-gray-400 space-y-2 pl-7 border-l-2 border-primary-500/30" style="margin-top:12px;font-size:14px;color:#4b5563;padding-left:28px;border-left:2px solid rgba(59,130,246,0.3);">' .
                     '<ul class="list-disc pl-0" style="list-style:none;padding-left:0;">' .
                     '<li><strong>Apa ini:</strong> Surat Jalan adalah dokumen resmi pengiriman barang yang mengelompokkan beberapa Delivery Order.</li>' .
-                    '<li><strong>Status:</strong> <em>Terbit</em> (otomatis saat dibuat).</li>' .
+                    '<li><strong>Status:</strong> <em>Terbit</em> saat dibuat. Surat Jalan yang terbit <strong>terkunci</strong> (tidak dapat diubah/dihapus); koreksi lewat <em>Batalkan</em> (alasan wajib) lalu <em>Terbitkan Ulang</em>. Hanya dokumen bertanda tangan yang dapat diunggah.</li>' .
                     '<li><strong>PDF:</strong> Download PDF tersedia untuk keperluan pengiriman.</li>' .
                     '</ul>' .
                     '</div>' .
@@ -376,7 +403,7 @@ class SuratJalanResource extends Resource
                     '</svg>' .
                     'Legenda Warna Status Baris Data' .
                     '</h4>' .
-                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">' .
+                    '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">' .
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: #f9fafb; border: 1px solid #e5e7eb;">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9ca3af; background-color: #ffffff; box-shadow: 0 1px 3px rgba(156, 163, 175, 0.4); flex-shrink: 0;"></div>' .
                     '<div class="leading-tight">' .
@@ -391,15 +418,158 @@ class SuratJalanResource extends Resource
                     '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SJ sudah terbit</span>' .
                     '</div>' .
                     '</div>' .
+                    '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
+                    '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
+                    '<div class="leading-tight">' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Dibatalkan)</span>' .
+                    '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">SJ tidak berlaku</span>' .
+                    '</div>' .
+                    '</div>' .
                     '</div>' .
                 '</div>' .
                 '</div>'
             ));
     }
 
+    /**
+     * Aksi siklus hidup dipakai di tabel DAN halaman Lihat (satu definisi).
+     * $page = true menghasilkan Filament\Actions\Action (header halaman), bila tidak Tables\Actions\Action.
+     */
+    protected static function makeAction(string $name, bool $page): \Filament\Actions\Action|Action
+    {
+        return $page ? \Filament\Actions\Action::make($name) : Action::make($name);
+    }
+
+    protected static function notifyValidation(string $title, ValidationException $e): void
+    {
+        HelperController::sendNotification(isSuccess: false, title: $title, message: collect($e->errors())->flatten()->implode(' '));
+    }
+
+    public static function issueAction(bool $page = false): \Filament\Actions\Action|Action
+    {
+        return static::makeAction('issue', $page)
+            ->label('Terbitkan')
+            ->icon('heroicon-o-check-badge')
+            ->color('success')
+            ->visible(fn ($record) => (bool) Auth::user()?->can('issue', $record))
+            ->requiresConfirmation()
+            ->modalHeading('Terbitkan Surat Jalan')
+            ->modalDescription('Setelah terbit, Surat Jalan tidak dapat diubah atau dihapus (hanya dapat dibatalkan). Lanjutkan?')
+            ->action(function ($record) {
+                try {
+                    app(SuratJalanService::class)->issue($record);
+                } catch (ValidationException $e) {
+                    static::notifyValidation('Surat Jalan Tidak Dapat Diterbitkan', $e);
+
+                    return;
+                }
+
+                HelperController::sendNotification(isSuccess: true, title: 'Surat Jalan Terbit', message: "Surat Jalan {$record->sj_number} berhasil diterbitkan.");
+            });
+    }
+
+    public static function cancelAction(bool $page = false): \Filament\Actions\Action|Action
+    {
+        return static::makeAction('cancel', $page)
+            ->label('Batalkan')
+            ->icon('heroicon-o-no-symbol')
+            ->color('danger')
+            ->visible(fn ($record) => (bool) Auth::user()?->can('cancel', $record))
+            ->modalHeading('Batalkan Surat Jalan')
+            ->modalDescription('Surat Jalan yang dibatalkan tidak berlaku lagi dan tidak dapat dipulihkan. Delivery Order-nya dapat dibuatkan Surat Jalan baru (Terbitkan Ulang).')
+            ->modalSubmitActionLabel('Ya, Batalkan')
+            ->form([
+                Textarea::make('cancel_reason')
+                    ->label('Alasan Pembatalan')
+                    ->required()
+                    ->minLength(SuratJalanService::MIN_CANCEL_REASON_LENGTH)
+                    ->maxLength(500)
+                    ->rows(3)
+                    ->validationMessages([
+                        'required' => 'Alasan pembatalan wajib diisi',
+                        'min' => 'Alasan pembatalan minimal ' . SuratJalanService::MIN_CANCEL_REASON_LENGTH . ' karakter',
+                    ]),
+            ])
+            ->action(function ($record, array $data) {
+                try {
+                    app(SuratJalanService::class)->cancel($record, (string) ($data['cancel_reason'] ?? ''));
+                } catch (ValidationException $e) {
+                    static::notifyValidation('Surat Jalan Tidak Dapat Dibatalkan', $e);
+
+                    return;
+                }
+
+                HelperController::sendNotification(isSuccess: true, title: 'Surat Jalan Dibatalkan', message: "Surat Jalan {$record->sj_number} dibatalkan.");
+            });
+    }
+
+    public static function reissueAction(bool $page = false): \Filament\Actions\Action|Action
+    {
+        return static::makeAction('reissue', $page)
+            ->label('Terbitkan Ulang')
+            ->icon('heroicon-o-arrow-path')
+            ->color('warning')
+            ->visible(fn ($record) => (bool) Auth::user()?->can('reissue', $record))
+            ->requiresConfirmation()
+            ->modalHeading('Terbitkan Ulang Surat Jalan')
+            ->modalDescription(fn ($record) => "Membuat Surat Jalan baru (nomor baru) untuk Delivery Order yang sama dengan {$record->sj_number}. Delivery Order harus masih Approved dan belum tercantum di Surat Jalan lain.")
+            ->action(function ($record) {
+                try {
+                    $new = app(SuratJalanService::class)->reissue($record);
+                } catch (ValidationException $e) {
+                    static::notifyValidation('Surat Jalan Tidak Dapat Diterbitkan Ulang', $e);
+
+                    return;
+                }
+
+                HelperController::sendNotification(isSuccess: true, title: 'Surat Jalan Diterbitkan Ulang', message: "Surat Jalan baru {$new->sj_number} berhasil diterbitkan.");
+
+                return redirect(static::getUrl('view', ['record' => $new]));
+            });
+    }
+
+    /** Satu-satunya perubahan yang diizinkan pada Surat Jalan terbit: unggah dokumen bertanda tangan. */
+    public static function uploadDocumentAction(bool $page = false): \Filament\Actions\Action|Action
+    {
+        return static::makeAction('upload_document', $page)
+            ->label('Unggah Dokumen Bertanda Tangan')
+            ->icon('heroicon-o-arrow-up-tray')
+            ->color('info')
+            ->visible(fn ($record) => (bool) Auth::user()?->can('uploadDocument', $record))
+            ->modalHeading('Unggah Bukti Serah-Terima')
+            ->form([
+                FileUpload::make('document_path')
+                    ->label('Dokumen bertanda tangan')
+                    ->directory('surat-jalan-documents')
+                    ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                    ->maxSize(5120)
+                    ->required()
+                    ->helperText('PDF, JPG, atau PNG, maksimal 5MB. Mengganti dokumen sebelumnya.')
+                    ->validationMessages([
+                        'required' => 'Pilih berkas yang akan diunggah',
+                        'acceptedFileTypes' => 'File harus berupa PDF, JPG, atau PNG',
+                        'maxSize' => 'Ukuran file maksimal 5MB',
+                    ]),
+            ])
+            ->action(function ($record, array $data) {
+                $record->update(['document_path' => $data['document_path']]);
+
+                HelperController::sendNotification(isSuccess: true, title: 'Dokumen Diunggah', message: "Dokumen Surat Jalan {$record->sj_number} tersimpan.");
+            });
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
+        // Muat relasi yang dipakai kolom tabel supaya daftar tidak N+1 (driver/kendaraan dari jadwal).
+        $query = parent::getEloquentQuery()->with([
+            'deliveryOrder.salesOrders.customer',
+            'deliveryOrder.cabang',
+            'deliverySchedules.driver',
+            'deliverySchedules.vehicle',
+            'cabang',
+            'createdBy',
+            'signedBy',
+        ]);
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {

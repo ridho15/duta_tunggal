@@ -4,7 +4,10 @@ namespace App\Services;
 
 use App\Models\DeliveryOrder;
 use App\Models\DeliverySchedule;
+use App\Models\Driver;
+use App\Models\Vehicle;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class DeliveryScheduleService
 {
@@ -31,6 +34,73 @@ class DeliveryScheduleService
         }
 
         return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Validasi pengirim di SERVER (bukan hanya `required` di form):
+     *  - internal / kurir internal : driver & kendaraan harus ada di master (dan belum dihapus);
+     *  - ekspedisi                 : nama driver/ekspedisi wajib; driver & kendaraan master tidak dibutuhkan.
+     *
+     * @param  array<string, mixed>  $data  data form jadwal
+     * @param  string  $prefix  awalan kunci galat ('data.' untuk halaman Filament)
+     *
+     * @throws ValidationException
+     */
+    public function validateSender(array $data, string $prefix = ''): void
+    {
+        $method = $data['delivery_method'] ?? null;
+        $errors = [];
+
+        if ($method === 'ekspedisi') {
+            if (blank($data['driver_name'] ?? null)) {
+                $errors[$prefix . 'driver_name'] = 'Nama driver / ekspedisi wajib diisi untuk pengiriman via ekspedisi.';
+            }
+        } else {
+            $driverId = $data['driver_id'] ?? null;
+            $vehicleId = $data['vehicle_id'] ?? null;
+
+            if (blank($driverId)) {
+                $errors[$prefix . 'driver_id'] = 'Driver wajib dipilih untuk pengiriman internal. Belum ada driver? Tambahkan di Master Driver atau pilih metode Ekspedisi.';
+            } elseif (! Driver::withoutGlobalScopes()->whereKey($driverId)->whereNull('deleted_at')->exists()) {
+                $errors[$prefix . 'driver_id'] = 'Driver yang dipilih tidak ditemukan atau sudah dihapus dari master.';
+            }
+
+            if (blank($vehicleId)) {
+                $errors[$prefix . 'vehicle_id'] = 'Kendaraan wajib dipilih untuk pengiriman internal. Belum ada kendaraan? Tambahkan di Master Kendaraan atau pilih metode Ekspedisi.';
+            } elseif (! Vehicle::withoutGlobalScopes()->whereKey($vehicleId)->whereNull('deleted_at')->exists()) {
+                $errors[$prefix . 'vehicle_id'] = 'Kendaraan yang dipilih tidak ditemukan atau sudah dihapus dari master.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * Master driver/kendaraan yang masih kosong (menurut cakupan cabang pengguna, sama dengan dropdown di form).
+     *
+     * @return array<int, string>  mis. ['driver', 'kendaraan']
+     */
+    public function missingFleetMasters(): array
+    {
+        $missing = [];
+
+        if (! Driver::query()->exists()) {
+            $missing[] = 'driver';
+        }
+
+        if (! Vehicle::query()->exists()) {
+            $missing[] = 'kendaraan';
+        }
+
+        return $missing;
+    }
+
+    /** Default metode: Ekspedisi bila armada internal belum terdaftar, selain itu Internal. */
+    public function defaultDeliveryMethod(): string
+    {
+        return $this->missingFleetMasters() === [] ? 'internal' : 'ekspedisi';
     }
 
     /**

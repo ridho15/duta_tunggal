@@ -12,6 +12,63 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class DeliveryOrder extends Model
 {
     use SoftDeletes, HasFactory,LogsGlobalActivity, CascadesJournalEntries;
+
+    /**
+     * Status DO yang kuantitasnya dihitung SUDAH TERKIRIM ke SO (barang sudah keluar gudang).
+     */
+    public const DELIVERED_STATUSES = ['sent', 'received', 'completed'];
+
+    /**
+     * Status DO yang kuantitasnya DILEPAS kembali ke SO (DO ditutup sebelum dikirim).
+     * Semua status lain (draft s/d approved, partial, reject, delivery_failed, dst.)
+     * masih "terikat" ke SO karena DO dapat diperbaiki / dijadwalkan ulang.
+     */
+    public const RELEASED_STATUSES = ['closed'];
+
+    public const STATUS_LABELS = [
+        'draft' => 'Draf',
+        'request_stock' => 'Menunggu Konfirmasi Stok',
+        'request_approve' => 'Menunggu Persetujuan',
+        'approved' => 'Disetujui',
+        'confirmed' => 'Dikonfirmasi',
+        'partial' => 'Sebagian',
+        'sent' => 'Sedang Dikirim',
+        'received' => 'Diterima',
+        'completed' => 'Selesai',
+        'supplier' => 'Dari Supplier',
+        'request_close' => 'Minta Ditutup',
+        'closed' => 'Ditutup',
+        'reject' => 'Ditolak',
+        'delivery_failed' => 'Pengiriman Gagal',
+    ];
+
+    public const STATUS_COLORS = [
+        'draft' => 'gray',
+        'request_stock' => 'warning',
+        'request_approve' => 'gray',
+        'approved' => 'info',
+        'confirmed' => 'info',
+        'partial' => 'warning',
+        'sent' => 'primary',
+        'received' => 'info',
+        'completed' => 'success',
+        'supplier' => 'warning',
+        'request_close' => 'warning',
+        'closed' => 'danger',
+        'reject' => 'danger',
+        'delivery_failed' => 'danger',
+    ];
+
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUS_LABELS[$status ?? ''] ?? ($status ? ucfirst(str_replace('_', ' ', $status)) : '-');
+    }
+
+    public static function statusColor(?string $status): string
+    {
+        return self::STATUS_COLORS[$status ?? ''] ?? 'gray';
+    }
+
     protected $table = 'delivery_orders';
     protected $fillable = [
         'do_number',

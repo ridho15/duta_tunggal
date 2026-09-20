@@ -14,6 +14,9 @@ use App\Models\CustomerReceipt;
 use App\Models\CustomerReceiptItem;
 use App\Models\JournalEntry;
 use App\Models\Invoice;
+use App\Models\SaleOrder;
+use App\Services\CustomerReceiptAllocator;
+use App\Support\CustomerReceiptAccounts;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -22,6 +25,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -72,79 +76,65 @@ class CustomerReceiptResource extends Resource
         ];
     }
 
+    /**
+     * Akun penerima uang menurut metode pembayaran (satu definisi: CustomerReceiptAccounts).
+     * Akun induk (1110/1111/1112), DEPOSITO, dan INVESTASI tidak pernah muncul.
+     */
     protected static function getCoaQueryByPaymentMethod(?string $paymentMethod): Builder
     {
-        $normalizedPaymentMethod = strtolower(trim((string) $paymentMethod));
-
-        return match ($normalizedPaymentMethod) {
-            'cash' => ChartOfAccount::query()
-                ->where('is_active', true)
-                ->where(function ($builder) {
-                    $builder->where('code', 'LIKE', '111%')
-                        ->where(function ($nested) {
-                            $nested->where('name', 'LIKE', '%kas%')
-                                ->orWhere('name', 'LIKE', '%tunai%');
-                        });
-                }),
-            'transfer', 'bank transfer', 'cheque', 'giro' => ChartOfAccount::query()
-                ->where('is_active', true)
-                ->where(function ($builder) {
-                    $builder->where('code', 'LIKE', '111%')
-                        ->where(function ($nested) {
-                            $nested->where('name', 'LIKE', '%bank%')
-                                ->orWhere('name', 'LIKE', '%rekening%')
-                                ->orWhere('name', 'LIKE', '%giro%')
-                                ->orWhere('name', 'LIKE', '%cek%')
-                                ->orWhere('name', 'LIKE', '%cheque%');
-                        });
-                }),
-            'deposit' => ChartOfAccount::query()
-                ->where('is_active', true)
-                ->where(function ($builder) {
-                    $builder->where('code', config('coa.customer_deposit'))
-                        ->orWhere(function ($nested) {
-                            $nested->where('type', 'liability')
-                                ->where(function ($liabilityBuilder) {
-                                    $liabilityBuilder->where('name', 'LIKE', '%deposit%')
-                                        ->orWhere('name', 'LIKE', '%titipan%')
-                                        ->orWhere('name', 'LIKE', '%uang muka pelanggan%');
-                                });
-                        });
-                }),
-            default => ChartOfAccount::query()->where('is_active', true),
-        };
+        return CustomerReceiptAccounts::query($paymentMethod);
     }
 
+    /**
+     * Invoice penjualan milik customer yang boleh muncul di penerimaan: yang MASIH MEMILIKI SISA PIUTANG
+     * (Account Receivable remaining > 0) — bukan dari status SO. Invoice diterbitkan PER Delivery Order,
+     * sehingga SO yang baru terkirim sebagian (partially_delivered) otomatis ikut.
+     *
+     * Cakupan cabang pengguna TETAP berlaku (user non-"all" hanya melihat invoice cabangnya); dahulu dilepas
+     * sehingga invoice cabang lain ikut muncul.
+     *
+     * @param  array<int>  $includeInvoiceIds  invoice yang tetap ditampilkan walau sudah lunas (mode ubah)
+     */
+    public static function invoiceableInvoicesQuery(int $customerId, array $includeInvoiceIds = []): \Illuminate\Database\Eloquent\Builder
+    {
+        return Invoice::query()
+            ->where('invoices.from_model_type', SaleOrder::class)
+            ->join('sale_orders', function ($join) use ($customerId) {
+                $join->on('invoices.from_model_id', '=', 'sale_orders.id')
+                    ->where('sale_orders.customer_id', '=', $customerId)
+                    ->whereNull('sale_orders.deleted_at');
+            })
+            ->where(function ($query) use ($includeInvoiceIds) {
+                $query->whereExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from('account_receivables')
+                        ->whereColumn('account_receivables.invoice_id', 'invoices.id')
+                        ->where('account_receivables.remaining', '>', 0)
+                        ->whereNull('account_receivables.deleted_at');
+                });
+
+                if ($includeInvoiceIds !== []) {
+                    $query->orWhereIn('invoices.id', $includeInvoiceIds);
+                }
+            })
+            ->select('invoices.*') // Select only invoice columns to avoid conflicts
+            ->distinct(); // Ensure no duplicates
+    }
+
+    /** Default HANYA bila kandidatnya tepat satu; bila lebih, user memilih sendiri. */
     public static function getDefaultCoaIdByPaymentMethod(?string $paymentMethod): ?int
     {
-        $query = static::getCoaQueryByPaymentMethod($paymentMethod);
-
-        return $query->orderBy('code')->value('id');
+        return CustomerReceiptAccounts::defaultId($paymentMethod);
     }
 
     public static function getCoaOptionsByPaymentMethod(?string $paymentMethod): array
     {
-        return static::getCoaQueryByPaymentMethod($paymentMethod)
-            ->orderBy('code')
-            ->get()
-            ->mapWithKeys(fn (ChartOfAccount $coa) => [$coa->id => "({$coa->code}) {$coa->name}"])
-            ->toArray();
+        return CustomerReceiptAccounts::options($paymentMethod);
     }
 
     public static function resolveInvoiceRemainingAmount(Invoice $invoice): float
     {
-        $accountReceivable = $invoice->accountReceivable;
-
-        if ($accountReceivable?->getKey()) {
-            return max(0, (float) MoneyHelper::safeParse($accountReceivable->remaining ?? 0));
-        }
-
-        $paidTotal = (float) CustomerReceiptItem::query()
-            ->where('invoice_id', $invoice->id)
-            ->selectRaw('COALESCE(SUM(amount), 0) as paid_total')
-            ->value('paid_total');
-
-        return max(0, (float) MoneyHelper::safeParse($invoice->total ?? 0) - $paidTotal);
+        return app(CustomerReceiptAllocator::class)->remainingFor($invoice);
     }
 
     public static function form(Form $form): Form
@@ -170,15 +160,13 @@ class CustomerReceiptResource extends Resource
                                     })
                                     ->relationship('customer', 'name')
                                     ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                        if ($state) {
-                                            $customer = Customer::find($state);
-
-                                            if ($customer?->cabang_id) {
-                                                $set('cabang_id', $customer->cabang_id);
-                                            }
-                                        }
-
+                                        // Cabang TIDAK diambil dari customer: cabang penerimaan mengikuti cabang invoice
+                                        // yang dipilih (customer dapat dilayani banyak cabang).
                                         $set('selected_invoices', []);
+                                        $set('invoice_receipts', '{}');
+                                        if (in_array('all', (array) (Auth::user()?->manage_type ?? []), true)) {
+                                            $set('cabang_id', null);
+                                        }
                                         $set('total_payment', self::formatMoneyState(0));
                                         $set('payment_adjustment', 0);
 
@@ -198,7 +186,7 @@ class CustomerReceiptResource extends Resource
                                     ->label('Cabang')
                                     ->preload()
                                     ->searchable()
-                                    ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
+                                    ->options(Cabang::orderBy('kode')->get()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     }))
                                     ->visible(function () {
@@ -211,11 +199,10 @@ class CustomerReceiptResource extends Resource
 
                                         return in_array('all', is_array($manageType) ? $manageType : [$manageType]) ? null : Auth::user()?->cabang_id;
                                     })
-                                    ->required()
-                                    ->helperText('Pilih cabang untuk customer receipt ini')
-                                    ->validationMessages([
-                                        'required' => 'Cabang wajib dipilih',
-                                    ]),
+                                    // Diisi otomatis dari invoice yang dipilih; tidak dipilih manual supaya tidak dapat berbeda dari invoice.
+                                    ->disabled()
+                                    ->dehydrated()
+                                    ->helperText('Otomatis mengikuti cabang invoice yang dipilih. Satu penerimaan hanya untuk satu cabang.'),
                             ]),
 
                         // Invoice Selection Section
@@ -265,16 +252,10 @@ class CustomerReceiptResource extends Resource
 
                                         // Query invoices that are from SaleOrder for this customer
                                         // Use join instead of whereHas to avoid polymorphic relation issues
-                                        $invoicesQuery = Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
-                                            ->where('invoices.from_model_type', 'App\Models\SaleOrder')
-                                            ->join('sale_orders', function ($join) use ($customerId) {
-                                                $join->on('invoices.from_model_id', '=', 'sale_orders.id')
-                                                    ->where('sale_orders.customer_id', '=', $customerId)
-                                                    ->whereIn('sale_orders.status', ['confirmed', 'received', 'completed']) // Only invoiceable orders
-                                                    ->whereNull('sale_orders.deleted_at');
-                                            })
-                                            ->select('invoices.*') // Select only invoice columns to avoid conflicts
-                                            ->distinct(); // Ensure no duplicates
+                                        $invoicesQuery = static::invoiceableInvoicesQuery(
+                                            (int) $customerId,
+                                            array_map('intval', $existingSelectedInvoices)
+                                        );
 
                                         logger()->info('Invoice query built', [
                                             'sql' => $invoicesQuery->toSql(),
@@ -303,7 +284,6 @@ class CustomerReceiptResource extends Resource
                                                     'receipt' => $receiptAmount > 0 ? $receiptAmount : '',
                                                     'balance' => $balance,
                                                     'payment_balance' => '',
-                                                    'adjustment_description' => '',
                                                 ];
                                             });
 
@@ -353,14 +333,16 @@ class CustomerReceiptResource extends Resource
                                             return;
                                         }
 
-                                            $lastSelectedInvoiceId = (int) end($selectedInvoices);
-                                        $invoiceCabangId = Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
-                                                ->whereKey($lastSelectedInvoiceId)
-                                            ->value('cabang_id');
+                                        // Cabang = cabang invoice. Bila invoice berasal dari beberapa cabang, kosongkan
+                                        // (server menolak dengan pesan jelas — satu penerimaan hanya untuk satu cabang).
+                                        $invoiceCabangIds = Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
+                                            ->whereIn('id', array_map('intval', $selectedInvoices))
+                                            ->pluck('cabang_id')
+                                            ->filter()
+                                            ->unique()
+                                            ->values();
 
-                                        if ($invoiceCabangId) {
-                                            $set('cabang_id', $invoiceCabangId);
-                                        }
+                                        $set('cabang_id', $invoiceCabangIds->count() === 1 ? $invoiceCabangIds->first() : null);
                                     })
                                     ->extraAttributes([
                                         'wire:model' => 'data.selected_invoices',
@@ -398,8 +380,17 @@ class CustomerReceiptResource extends Resource
                                     ->native(false)
                                     ->live()
                                     ->afterStateUpdated(function ($set, $state) {
+                                        // Default hanya bila akun penerimanya tepat satu; selain itu dikosongkan (wajib dipilih).
                                         $set('coa_id', static::getDefaultCoaIdByPaymentMethod($state));
                                     }),
+
+                                Toggle::make('overpayment_as_deposit')
+                                    ->label('Catat kelebihan sebagai Deposit Customer')
+                                    ->default(false)
+                                    ->live()
+                                    ->visible(fn ($get, $livewire) => $livewire instanceof Pages\CreateCustomerReceipt
+                                        && strtolower((string) $get('payment_method')) !== 'deposit')
+                                    ->helperText('Bila nominal melebihi sisa tagihan, kelebihan DITOLAK. Nyalakan opsi ini agar kelebihan dicatat sebagai Deposit Customer (jurnal Kas/Bank → Deposit Pelanggan) — tidak ada pemotongan senyap.'),
 
                                 Textarea::make('notes')
                                     ->label('Catatan')
@@ -429,7 +420,7 @@ class CustomerReceiptResource extends Resource
                                         'data-field' => 'total_payment',
                                         'style' => 'background-color: #f9fafb;', // Light gray background to indicate it's auto-calculated
                                     ])
-                                    ->helperText('Total ini mengikuti jumlah receipt yang diisi manual untuk invoice yang dipilih')
+                                    ->helperText('Total ini mengikuti jumlah receipt yang diisi untuk invoice yang dipilih. Nominal di atas sisa tagihan tidak dipotong otomatis: ditolak, atau dicatat sebagai Deposit Customer bila opsinya dinyalakan.')
                                     ->validationMessages([
                                         'required' => 'Total pembayaran wajib diisi',
                                         'numeric' => 'Total pembayaran harus berupa angka',
@@ -457,7 +448,7 @@ class CustomerReceiptResource extends Resource
                                     ->validationMessages([
                                         'required' => 'COA belum dipilih',
                                     ])
-                                    ->helperText('Daftar COA menyesuaikan metode pembayaran, namun tetap bisa dipilih manual.')
+                                    ->helperText('Hanya akun kas/bank penerima uang (akun induk, Deposito, dan Investasi tidak ditampilkan). Bila ada lebih dari satu, pilih sendiri.')
                                     ->required(),
                             ]),
 
@@ -646,7 +637,7 @@ class CustomerReceiptResource extends Resource
                     '<li><strong>Integration:</strong> Terintegrasi dengan <em>Invoice</em> (pelunasan), <em>Account Receivable</em> (pengurangan piutang), <em>Journal Entry</em> (otomatis buat jurnal), dan <em>Cash/Bank Account</em> (penambahan saldo).</li>' .
                     '<li><strong>Actions:</strong> <em>View</em> (lihat detail receipt), <em>Edit</em> (ubah receipt), <em>Delete</em> (hapus receipt).</li>' .
                     '<li><strong>Permissions:</strong> <em>view any customer receipt</em>, <em>create customer receipt</em>, <em>update customer receipt</em>, <em>delete customer receipt</em>, <em>restore customer receipt</em>, <em>force-delete customer receipt</em>.</li>' .
-                    '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Cash/Bank Account dan credit Account Receivable. Overpayment akan dicatat sebagai customer deposit.</li>' .
+                    '<li><strong>Journal Impact:</strong> Otomatis membuat journal entry dengan debit Cash/Bank Account dan credit Account Receivable. Kelebihan bayar tidak dipotong senyap: ditolak, atau dicatat sebagai Deposit Customer (jurnal Kas/Bank debit, Deposit Pelanggan kredit) bila opsi "Catat kelebihan sebagai Deposit Customer" dinyalakan.</li>' .
                     '<li><strong>Reporting:</strong> Menyediakan data untuk accounts receivable aging, cash receipt journal, dan customer payment history tracking.</li>' .
                     '</ul>' .
                     '</div>' .
@@ -863,6 +854,14 @@ class CustomerReceiptResource extends Resource
                                 'Paid' => 'success',
                                 default => 'gray',
                             }),
+                        TextEntry::make('cabang.nama')
+                            ->label('Cabang (mengikuti invoice)')
+                            ->placeholder('-'),
+                        TextEntry::make('overpayment_amount')
+                            ->label('Kelebihan Bayar → Deposit Customer')
+                            ->rupiah()
+                            ->visible(fn ($record) => (float) $record->overpayment_amount > 0)
+                            ->helperText(fn ($record) => $record->deposit_id ? 'Deposit ' . ($record->deposit->deposit_number ?? '#' . $record->deposit_id) : null),
                         TextEntry::make('notes')
                             ->label('Catatan')
                             ->columnSpanFull(),

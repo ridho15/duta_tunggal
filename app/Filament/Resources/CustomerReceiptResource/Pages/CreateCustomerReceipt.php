@@ -7,12 +7,17 @@ use App\Filament\Resources\CustomerReceiptResource;
 use App\Helpers\MoneyHelper;
 use App\Models\Invoice;
 use App\Models\AccountReceivable;
+use App\Models\Customer;
 use App\Models\CustomerReceiptItem;
+use App\Models\Deposit;
+use App\Services\CustomerReceiptAllocator;
+use App\Services\DepositNumberGenerator;
 use App\Services\LedgerPostingService;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -58,6 +63,10 @@ class CreateCustomerReceipt extends CreateRecord
         $data['total_payment'] = MoneyHelper::safeParse($data['total_payment'] ?? 0);
         $data['payment_method'] = $data['payment_method'] ?? 'Cash';
 
+        // Opsi kelebihan bayar -> Deposit Customer (bukan kolom tabel; hanya memengaruhi validasi).
+        $allowDepositOverpayment = (bool) ($data['overpayment_as_deposit'] ?? ($this->data['overpayment_as_deposit'] ?? false));
+        unset($data['overpayment_as_deposit']);
+
         // Extract data from Livewire component data if not in form data
         if (empty($data['selected_invoices']) || empty($data['invoice_receipts'])) {
             // Try to get data from current component state
@@ -96,41 +105,8 @@ class CreateCustomerReceipt extends CreateRecord
             $data['invoice_receipts'] = json_decode($data['invoice_receipts'], true) ?? [];
         }
         
-        // FALLBACK: If invoice selection is still empty, auto-select based on customer
-        if (empty($data['selected_invoices']) && !empty($data['customer_id']) && !empty($data['total_payment'])) {
-            
-            $customerId = $data['customer_id'];
-            $totalPayment = (float) $data['total_payment'];
-            
-            // Get available invoices for this customer
-            $invoices = DB::table('invoices')
-                ->join('sale_orders', function($join) use ($customerId) {
-                    $join->on('invoices.from_model_id', '=', 'sale_orders.id')
-                         ->where('sale_orders.customer_id', $customerId)
-                         ->whereIn('sale_orders.status', ['confirmed', 'received', 'completed'])
-                         ->whereNull('sale_orders.deleted_at');
-                })
-                ->where('invoices.from_model_type', 'App\\Models\\SaleOrder')
-                ->whereExists(function($query) {
-                    $query->select(DB::raw(1))
-                          ->from('account_receivables')
-                          ->whereRaw('invoices.id = account_receivables.invoice_id')
-                          ->where('remaining', '>', 0)
-                          ->whereNull('account_receivables.deleted_at');
-                })
-                ->whereNull('invoices.deleted_at')
-                ->select('invoices.*')
-                ->distinct()
-                ->get();
-            
-            if ($invoices->count() > 0) {
-                // Auto-assign payment to first available invoice
-                $firstInvoice = $invoices->first();
-                $data['selected_invoices'] = [$firstInvoice->id];
-                $data['invoice_receipts']  = [$firstInvoice->id => $totalPayment];
-                $data['invoice_id']        = $firstInvoice->id;
-            }
-        }
+        // Tidak ada lagi "auto-pilih invoice pertama" saat invoice tidak dipilih: uang tidak boleh
+        // dialokasikan diam-diam ke invoice yang tidak dipilih user. Invoice wajib dipilih (lihat allocator).
 
         // Handle backward compatibility for single invoice
         if (!empty($data['selected_invoices']) && empty($data['invoice_id'])) {
@@ -146,8 +122,8 @@ class CreateCustomerReceipt extends CreateRecord
             }
         }
 
-        // Validate and fix data consistency
-        $this->validateAndFixDataConsistency($data);
+        // Validasi & alokasi (cabang, kelebihan bayar, akun penerima) — satu aturan, tanpa pemotongan senyap
+        $this->validateAndFixDataConsistency($data, $allowDepositOverpayment);
         $currencyInvoiceIds = ! empty($data['invoice_receipts'])
             ? array_keys($data['invoice_receipts'])
             : ($data['selected_invoices'] ?? []);
@@ -161,13 +137,13 @@ class CreateCustomerReceipt extends CreateRecord
         return $data;
     }
 
-    protected function validateAndFixDataConsistency(array &$data): void
+    protected function validateAndFixDataConsistency(array &$data, bool $allowDepositOverpayment = false): void
     {
         // Parse JSON strings if needed
         if (isset($data['selected_invoices']) && is_string($data['selected_invoices'])) {
             $data['selected_invoices'] = json_decode($data['selected_invoices'], true) ?? [];
         }
-        
+
         if (isset($data['invoice_receipts']) && is_string($data['invoice_receipts'])) {
             $data['invoice_receipts'] = json_decode($data['invoice_receipts'], true) ?? [];
         }
@@ -176,94 +152,118 @@ class CreateCustomerReceipt extends CreateRecord
         if (!isset($data['selected_invoices']) || !is_array($data['selected_invoices'])) {
             $data['selected_invoices'] = [];
         }
-        
+
         // Ensure invoice_receipts is array
         if (!isset($data['invoice_receipts']) || !is_array($data['invoice_receipts'])) {
             $data['invoice_receipts'] = [];
         }
 
-        // Fix missing invoice_receipts data
+        $allocator = app(CustomerReceiptAllocator::class);
+
+        // JS tidak mengirim nominal per invoice: turunkan dari total_payment. Satu invoice = seluruh total.
+        // Beberapa invoice: berurutan (terlama dahulu) sampai sisa tagihan; sisanya dilaporkan sebagai
+        // KELEBIHAN oleh allocator (ditolak / dicatat sebagai deposit) — tidak hilang.
         if (empty($data['invoice_receipts']) && !empty($data['selected_invoices']) && $data['total_payment'] > 0) {
-            
-            // If only one invoice selected, use full payment amount
-            if (count($data['selected_invoices']) === 1) {
-                $data['invoice_receipts'] = [
-                    $data['selected_invoices'][0] => $data['total_payment']
-                ];
-            } else {
-                // For multiple invoices, distribute payment proportionally
-                $totalRemaining = 0;
-                $invoiceRemainingAmounts = [];
-                
-                foreach ($data['selected_invoices'] as $invoiceId) {
-                    $ar = \App\Models\AccountReceivable::where('invoice_id', $invoiceId)->first();
-                    if ($ar) {
-                        $remaining = $ar->remaining;
-                        $invoiceRemainingAmounts[$invoiceId] = $remaining;
-                        $totalRemaining += $remaining;
-                    }
-                }
-                
-                // Distribute payment proportionally
-                if ($totalRemaining > 0) {
-                    $remainingPayment = $data['total_payment'];
-                    foreach ($invoiceRemainingAmounts as $invoiceId => $remaining) {
-                        if ($remainingPayment <= 0) break;
-                        
-                        $proportionalAmount = min($remaining, ($remaining / $totalRemaining) * $data['total_payment']);
-                        $data['invoice_receipts'][$invoiceId] = $proportionalAmount;
-                        $remainingPayment -= $proportionalAmount;
-                    }
-                }
-            }
+            $data['invoice_receipts'] = $this->distributeTotalAcrossInvoices($data['selected_invoices'], (float) $data['total_payment'], $allocator);
         }
 
-        // Validate payment amounts against Account Receivable
-        if (!empty($data['invoice_receipts'])) {
-            $hasAutoFix = false;
-            
-            foreach ($data['invoice_receipts'] as $invoiceId => $paymentAmount) {
-                if ($paymentAmount > 0) {
-                    $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
-                    
-                    if ($accountReceivable) {
-                        if ($paymentAmount > $accountReceivable->remaining) {
-                            
-                            // Auto-fix: reduce payment to remaining amount
-                            $data['invoice_receipts'][$invoiceId] = $accountReceivable->remaining;
-                            $hasAutoFix = true;
-                            
-                        }
-                    } else {
-                    }
-                }
-            }
-            
-            if ($hasAutoFix) {
-                Notification::make()
-                    ->warning()
-                    ->title('Payment amounts adjusted')
-                    ->body('Some payment amounts exceeded remaining invoice balances and were automatically adjusted.')
-                    ->send();
-            }
+        try {
+            $allocator->assertAccountAllowed(isset($data['coa_id']) ? (int) $data['coa_id'] : null, $data['payment_method'] ?? 'Cash');
+            $accountError = null;
+        } catch (ValidationException $e) {
+            $accountError = $e;
         }
+
+        try {
+            $plan = $allocator->plan(
+                (int) ($data['customer_id'] ?? 0),
+                $data['invoice_receipts'],
+                $data['payment_method'] ?? 'Cash',
+                $allowDepositOverpayment,
+            );
+            $planError = null;
+        } catch (ValidationException $e) {
+            $plan = null;
+            $planError = $e;
+        }
+
+        if ($accountError || $planError) {
+            $messages = array_merge($accountError?->errors() ?? [], $planError?->errors() ?? []);
+            $this->failWithMessages($messages);
+        }
+
+        if ($plan['overpayment'] > 0
+            && ! \App\Models\ChartOfAccount::where('code', config('coa.customer_deposit'))->exists()) {
+            $this->failWithMessages(['total_payment' => ['Akun Deposit Pelanggan (' . config('coa.customer_deposit') . ') belum ada di Chart of Account, sehingga kelebihan bayar belum dapat dicatat sebagai deposit.']]);
+        }
+
+        // Nominal yang benar-benar dialokasikan ke invoice (sudah sama dengan / di bawah sisa tagihan).
+        $data['invoice_receipts'] = $plan['applied'];
+        $data['selected_invoices'] = array_map('intval', array_keys($plan['applied']));
+        $data['invoice_id'] = $data['invoice_id'] ?? ($data['selected_invoices'][0] ?? null);
+        $data['total_payment'] = round(array_sum($plan['applied']), 2);
+        $data['overpayment_amount'] = $plan['overpayment'];
+
+        // Cabang penerimaan = cabang invoice (bukan cabang customer).
+        $data['cabang_id'] = $plan['cabang_id'] ?? ($data['cabang_id'] ?? Auth::user()?->cabang_id);
 
         $this->resolveReceiptCurrencyContext(array_keys($data['invoice_receipts'] ?? []));
+    }
 
-        // Validate total consistency
-        $calculatedTotal = 0;
-        if (!empty($data['invoice_receipts'])) {
-            foreach ($data['invoice_receipts'] as $amount) {
-                $calculatedTotal += $amount;
+    /**
+     * @param  array<int|string>  $invoiceIds
+     * @return array<int, float>
+     */
+    private function distributeTotalAcrossInvoices(array $invoiceIds, float $total, CustomerReceiptAllocator $allocator): array
+    {
+        $invoiceIds = collect($invoiceIds)->map(fn ($id) => (int) $id)->filter()->unique()->sort()->values();
+
+        if ($invoiceIds->count() === 1) {
+            return [$invoiceIds->first() => $total];
+        }
+
+        $left = $total;
+        $receipts = [];
+        foreach ($invoiceIds as $invoiceId) {
+            $invoice = Invoice::withoutGlobalScopes()->find($invoiceId);
+            $remaining = $invoice ? $allocator->remainingFor($invoice) : 0.0;
+            $portion = min($left, $remaining);
+            if ($portion > 0) {
+                $receipts[$invoiceId] = $portion;
+                $left -= $portion;
             }
         }
 
-        // Fix total_payment if inconsistent
-        if (abs($calculatedTotal - $data['total_payment']) > 0.01) {
-            $data['total_payment'] = $calculatedTotal;
+        // Sisa yang tidak tertampung dilekatkan pada invoice terakhir agar terdeteksi sebagai kelebihan.
+        if ($left > 0.009 && $receipts !== []) {
+            $lastId = array_key_last($receipts);
+            $receipts[$lastId] += $left;
+        } elseif ($receipts === []) {
+            $receipts[$invoiceIds->last()] = $total;
         }
-        
-        // Final validation log
+
+        return $receipts;
+    }
+
+    /**
+     * Tampilkan galat pada field terkait (awalan "data.") dan sebagai notifikasi, lalu hentikan penyimpanan.
+     *
+     * @param  array<string, array<int, string>|string>  $messages
+     */
+    private function failWithMessages(array $messages): never
+    {
+        $flat = collect($messages)->flatten()->implode(' ');
+
+        Notification::make()
+            ->danger()
+            ->title('Penerimaan tidak dapat disimpan')
+            ->body($flat)
+            ->persistent()
+            ->send();
+
+        throw ValidationException::withMessages(
+            collect($messages)->mapWithKeys(fn ($message, $key) => ['data.' . $key => $message])->all()
+        );
     }
 
     private function resolveReceiptCurrencyContext(array $invoiceIds): ?array
@@ -409,12 +409,65 @@ class CreateCustomerReceipt extends CreateRecord
         // finished updating Account Receivable balances.
         $this->syncReceiptStatusFromReceivables($record);
 
+        // Kelebihan bayar (bila user memilih mencatatnya) menjadi Deposit Customer dalam transaksi yang sama.
+        $deposit = $this->recordOverpaymentAsDeposit($record);
+
         // Show success notification
+        $depositNote = $deposit
+            ? ' Kelebihan ' . \App\Helpers\MoneyHelper::rupiah($deposit->amount) . " dicatat sebagai Deposit Customer {$deposit->deposit_number}."
+            : '';
+
         Notification::make()
             ->success()
             ->title('Customer Receipt created successfully')
-            ->body("Payment of " . \App\Helpers\MoneyHelper::rupiah($finalTotal) . " processed for {$itemsCreated} invoice(s). {$arUpdated} Account Receivable record(s) updated.")
+            ->body("Payment of " . \App\Helpers\MoneyHelper::rupiah($finalTotal) . " processed for {$itemsCreated} invoice(s). {$arUpdated} Account Receivable record(s) updated." . $depositNote)
             ->send();
+    }
+
+    /**
+     * Catat kelebihan bayar sebagai Deposit Customer: Dr Kas/Bank (akun penerimaan), Cr Deposit Pelanggan (2160.04),
+     * di cabang penerimaan. Bila jurnal gagal, seluruh penerimaan dibatalkan (transaksi Filament) —
+     * uang tidak boleh diterima tanpa tercatat.
+     */
+    private function recordOverpaymentAsDeposit($record): ?Deposit
+    {
+        $overpayment = round((float) ($record->overpayment_amount ?? 0), 2);
+
+        if ($overpayment <= 0 || $record->deposit_id) {
+            return null;
+        }
+
+        try {
+            $deposit = Deposit::create([
+                'deposit_number' => app(DepositNumberGenerator::class)->generate(),
+                'from_model_type' => Customer::class,
+                'from_model_id' => $record->customer_id,
+                'amount' => $overpayment,
+                'used_amount' => 0,
+                'remaining_amount' => $overpayment,
+                'coa_id' => $record->coa_id,
+                'payment_coa_id' => $record->coa_id,
+                'note' => 'Kelebihan bayar dari Penerimaan Customer #' . $record->id,
+                'status' => 'active',
+                'created_by' => Auth::id(),
+            ]);
+
+            app(LedgerPostingService::class)->postDeposit($deposit, $record->cabang_id ? (int) $record->cabang_id : null);
+
+            $record->update(['deposit_id' => $deposit->id]);
+
+            return $deposit;
+        } catch (Throwable $exception) {
+            ProcurementFailureNotifier::danger(
+                'Gagal Mencatat Deposit dari Kelebihan Bayar',
+                $exception,
+                'Penerimaan dibatalkan karena kelebihan bayar tidak dapat dicatat sebagai Deposit Customer.'
+            );
+
+            $this->halt(true);
+
+            return null;
+        }
     }
 
     private function syncReceiptStatusFromReceivables($record): void

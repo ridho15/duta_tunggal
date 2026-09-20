@@ -54,7 +54,7 @@ beforeEach(function () {
     $this->customer = Customer::factory()->create(['cabang_id' => $this->customerCabang->id]);
 });
 
-test('customer receipt create form keeps JSON state fields hidden and auto-fills cabang', function () {
+test('customer receipt create form keeps JSON state fields hidden and does NOT copy cabang from the customer', function () {
     Livewire::actingAs($this->user)
         ->test(CreateCustomerReceipt::class)
         ->assertSuccessful()
@@ -67,7 +67,8 @@ test('customer receipt create form keeps JSON state fields hidden and auto-fills
             'payment_date' => now()->toDateString(),
             'payment_method' => 'Transfer',
         ])
-        ->assertSet('data.cabang_id', $this->customerCabang->id);
+        // Fase 5A: cabang mengikuti invoice yang dipilih, bukan cabang customer.
+        ->assertSet('data.cabang_id', $this->cabang->id);
 });
 
 test('customer receipt create form no longer shows payment mode controls', function () {

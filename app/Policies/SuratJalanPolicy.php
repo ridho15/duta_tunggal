@@ -37,7 +37,8 @@ class SuratJalanPolicy
      */
     public function update(User $user, SuratJalan $suratJalan): bool
     {
-        return $user->hasPermissionTo('update surat jalan');
+        // Surat Jalan yang sudah terbit terkunci; koreksi lewat Batalkan + terbitkan ulang.
+        return $suratJalan->isEditable() && $user->hasPermissionTo('update surat jalan');
     }
 
     /**
@@ -45,7 +46,31 @@ class SuratJalanPolicy
      */
     public function delete(User $user, SuratJalan $suratJalan): bool
     {
-        return $user->hasPermissionTo('delete surat jalan');
+        return $suratJalan->isEditable() && $user->hasPermissionTo('delete surat jalan');
+    }
+
+    /** Terbitkan Draft. */
+    public function issue(User $user, SuratJalan $suratJalan): bool
+    {
+        return $suratJalan->isDraft() && $user->hasPermissionTo('update surat jalan');
+    }
+
+    /** Batalkan Surat Jalan yang sudah terbit (memakai izin ubah; tidak menambah izin baru). */
+    public function cancel(User $user, SuratJalan $suratJalan): bool
+    {
+        return $suratJalan->isIssued() && $user->hasPermissionTo('update surat jalan');
+    }
+
+    /** Terbitkan ulang dari Surat Jalan yang dibatalkan. */
+    public function reissue(User $user, SuratJalan $suratJalan): bool
+    {
+        return $suratJalan->isCancelled() && $user->hasPermissionTo('create surat jalan');
+    }
+
+    /** Unggah dokumen bertanda tangan (bukti serah-terima): satu-satunya perubahan yang boleh pada SJ terbit. */
+    public function uploadDocument(User $user, SuratJalan $suratJalan): bool
+    {
+        return ! $suratJalan->isCancelled() && $user->hasPermissionTo('update surat jalan');
     }
 
     /**

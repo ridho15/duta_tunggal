@@ -48,6 +48,7 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
     currency_id: 1,
     exchange_rate: 1.0,
     tempo_pembayaran: 0,
+    notes: '',
     status: 'draft',
   });
 
@@ -95,8 +96,9 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
               delivery_date: dep.default_delivery_date || '',
               currency_id: q.currency_id || dep.default_currency_id,
               exchange_rate: q.exchange_rate || 1.0,
-              tempo_pembayaran: q.tempo_pembayaran || 0,
+              tempo_pembayaran: q.tempo_pembayaran ?? 30, // 0 = tunai (valid), jangan dianggap kosong
               shipped_to: q.shipped_to || '',
+              notes: q.notes || '',
             }));
 
             const importedItems: SaleOrderItemRow[] = (q.items || []).map((item: any, idx: number) => ({
@@ -220,10 +222,11 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
           quotation_id: q.id,
           customer_id: q.customer_id,
           cabang_id: q.cabang_id,
-          currency_id: q.currency_id,
+          currency_id: q.currency_id || dependencies?.default_currency_id || prev.currency_id,
           exchange_rate: q.exchange_rate || 1.0,
-          tempo_pembayaran: q.tempo_pembayaran || 0,
+          tempo_pembayaran: q.tempo_pembayaran ?? 30, // 0 = tunai (valid), jangan dianggap kosong
           shipped_to: q.shipped_to || prev.shipped_to,
+          notes: q.notes || prev.notes || '',
         }));
 
         const importedItems: SaleOrderItemRow[] = (q.items || []).map((item: any, idx: number) => ({
@@ -242,8 +245,16 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
 
         setItems(importedItems.length > 0 ? importedItems : [createEmptyItem()]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch quotation details:', err);
+      // Quotation kedaluwarsa / belum disetujui / sudah digantikan revisi ditolak server (422): tampilkan alasannya,
+      // dan kosongkan pilihan quotation agar tidak tersimpan setengah terisi.
+      setGeneralError(
+        err.response?.data?.errors?.quotation_id?.[0] ||
+          err.response?.data?.message ||
+          'Gagal memuat data quotation.'
+      );
+      setHeader((prev) => ({ ...prev, quotation_id: null }));
     }
   };
 

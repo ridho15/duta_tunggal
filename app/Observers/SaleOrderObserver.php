@@ -129,59 +129,34 @@ class SaleOrderObserver
             // Keeping both paths consistent prevents SO total_amount diverging from invoice total.
             $tipePajak = $item->tipe_pajak ?? 'Eksklusif';
 
-            // Calculate subtotal using HelperController for consistency
-            $lineSubtotal = \App\Http\Controllers\HelperController::hitungSubtotal($item->quantity, $item->unit_price, $item->discount, $item->tax, $tipePajak);
-            // Use TaxService to get correct breakdown
-            $taxService = \App\Services\TaxService::class;
-            $baseAmount = $item->quantity * $item->unit_price * (1 - $item->discount / 100);
-            
-            try {
-                $taxResult = $taxService::compute($baseAmount, $item->tax, $tipePajak);
-                $lineTax = $taxResult['ppn'];
-                $subtotalBeforeTax = $taxResult['dpp'];
-            } catch (\Throwable $e) {
-                Log::error('SaleOrderObserver: TaxService error', [
-                    'item_id' => $item->id,
-                    'base_amount' => $baseAmount,
-                    'tax' => $item->tax,
-                    'error' => $e->getMessage(),
-                ]);
-                // Fallback
-                $lineTax = 0;
-                $subtotalBeforeTax = $baseAmount;
-            }
+            // Satu-satunya perhitungan baris: LineAmounts (via SalesInvoiceLineBuilder). Total baris identik dengan
+            // Sales Order (SalesOrderService::updateTotalAmount -> HelperController::hitungSubtotal -> LineAmounts).
+            // Nilai dikonversi ke IDR per komponen; price disimpan GROSS beserta rincian diskon.
+            $toIdr = fn (float $amount): float => (float) CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($amount), $itemCurrencyId, false);
+            $line = app(\App\Services\SalesInvoiceLineBuilder::class)->attributes(
+                $item->product_id,
+                (float) $item->quantity,
+                (float) MoneyHelper::parseHighPrecision($item->unit_price),
+                (float) $item->discount,
+                (float) $item->tax,
+                $tipePajak,
+                $item->product?->sales_coa_id, // sales COA dari produk
+                $toIdr,
+            );
 
-            $subtotalBeforeTaxIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($subtotalBeforeTax), $itemCurrencyId, false);
-            $lineTaxIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($lineTax), $itemCurrencyId, false);
-            $lineTotalIdr = CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($lineSubtotal), $itemCurrencyId, false);
-            
-            $subtotal += $subtotalBeforeTaxIdr;
-            $tax += $lineTaxIdr;
+            $subtotal += $line['subtotal'];
+            $tax += $line['tax_amount'];
 
             Log::info('SaleOrderObserver: Calculated values', [
                 'item_id' => $item->id,
-                'base_amount' => $baseAmount,
-                'tax_result' => $taxResult ?? 'error',
-                'subtotal_before_tax' => $subtotalBeforeTaxIdr,
-                'line_subtotal' => $lineTotalIdr,
+                'subtotal_before_tax' => $line['subtotal'],
+                'tax_amount' => $line['tax_amount'],
+                'line_total' => $line['total'],
                 'currency_id' => $itemCurrencyId,
                 'exchange_rate' => $itemExchangeRate,
             ]);
 
-            // Get sales COA from product
-            $salesCoaId = $item->product?->sales_coa_id;
-
-            $invoiceItems[] = [
-                'product_id' => $item->product_id,
-                'quantity' => $item->quantity,
-                'price' => CurrencyConversionResolver::convertToIdr(MoneyHelper::parseHighPrecision($item->unit_price), $itemCurrencyId, false),
-                'discount' => $item->discount,
-                'tax_rate' => $item->tax,
-                'tax_amount' => $lineTaxIdr,
-                'subtotal' => $subtotalBeforeTaxIdr,
-                'total' => $lineTotalIdr,
-                'coa_id' => $salesCoaId, // Add sales COA ID from product
-            ];
+            $invoiceItems[] = $line;
         }
 
         // Hitung biaya tambahan dari delivery orders yang terkait

@@ -528,11 +528,12 @@ describe('PDF generators include required item columns and totals', function () 
         });
 
         $html = view('pdf.sale-order-invoice', ['invoice' => $invoice])->render();
+        // Fase 5B (Isu 10): rincian baris baku — Harga Satuan × Qty = Jumlah · Diskon (% dan Rp) · DPP · PPN (% dan Rp) · Total
         assertPdfHasColumns($html, [
-            'SKU', 'Produk', 'Qty', 'Harga Satuan', 'Discount (%)', 'Tax (%)', 'Tax Amount', 'Subtotal', 'Total'
+            'SKU', 'Produk', 'Qty', 'Harga Satuan', 'Jumlah', 'Diskon (%)', 'Diskon (Rp)', 'DPP', 'PPN (%)', 'PPN (Rp)', 'Total'
         ]);
         expect($html)->toContain('PPN (11,00%)');
-        expect($html)->toContain('Rp 33.000');
+        expect($html)->toContain('Rp 33.000,00');   // 2 desimal konsisten dengan layar
     });
 
     it('delivery order PDF includes all columns', function () {
@@ -582,14 +583,19 @@ describe('PDF generators include required item columns and totals', function () 
         $item->sale_order_item_id=$soItem->id; $item->save();
         $do->salesOrders()->attach($so->id);
 
-        $html = view('pdf.surat-jalan', ['suratJalan'=>$sj])->render();
+        $html = view('pdf.surat-jalan', [
+            'suratJalan' => $sj,
+            'doc' => app(\App\Services\SuratJalanDocumentBuilder::class)->build($sj->fresh()),
+        ])->render();
         // verify customer and address and branch present in surat jalan output
         expect($html)->toContain($this->customer->name);
         expect($html)->toContain($so->shipped_to);
-        expect($html)->toContain($this->cabang->name);
-        assertPdfHasColumns($html, [
-            'Nama Barang', 'Qty', 'Harga Satuan', 'Discount', 'Tax (%)', 'Tax Amount', 'Subtotal'
-        ]);
+        expect($html)->toContain($this->cabang->nama);
+        // Surat Jalan = dokumen serah-terima (Fase 4, keputusan D3): daftar barang TANPA harga/diskon/pajak.
+        assertPdfHasColumns($html, ['SKU', 'Nama Barang', 'Qty', 'Satuan', 'Keterangan']);
+        foreach (['Harga Satuan', 'Discount', 'Tax Amount', 'Subtotal'] as $priceColumn) {
+            expect($html)->not->toContain($priceColumn);
+        }
     });
 
 // ─── SECTION 6b: Excel export audit for sales orders ─────────────────────────

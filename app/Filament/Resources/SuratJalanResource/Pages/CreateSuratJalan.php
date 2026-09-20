@@ -4,10 +4,10 @@ namespace App\Filament\Resources\SuratJalanResource\Pages;
 
 use App\Filament\Resources\SuratJalanResource;
 use App\Models\DeliveryOrder;
-use Filament\Actions;
+use App\Models\SuratJalan;
+use App\Services\SuratJalanService;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
 class CreateSuratJalan extends CreateRecord
 {
@@ -25,35 +25,17 @@ class CreateSuratJalan extends CreateRecord
 
         $deliveryOrders = DeliveryOrder::whereIn('id', $deliveryOrderIds)->get();
 
-        $invalidCount = $deliveryOrders->where('status', '!=', 'approved')->count();
+        // Aturan yang sama dengan Terbitkan Ulang: approved, satu cabang, belum di Surat Jalan lain yang berlaku.
+        app(SuratJalanService::class)->assertDeliveryOrdersUsable($deliveryOrders);
 
-        if ($invalidCount > 0) {
-            throw ValidationException::withMessages([
-                'deliveryOrder' => 'Surat Jalan hanya dapat dibuat dari Delivery Order berstatus approved.',
-            ]);
-        }
-
-        $sourceCabangIds = $deliveryOrders
-            ->pluck('cabang_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->toArray();
-
-        if (count($sourceCabangIds) > 1) {
-            throw ValidationException::withMessages([
-                'deliveryOrder' => 'Semua Delivery Order yang dipilih harus berasal dari cabang yang sama.',
-            ]);
-        }
-
-        if (!empty($sourceCabangIds)) {
+        $sourceCabangIds = $deliveryOrders->pluck('cabang_id')->filter()->unique()->values();
+        if ($sourceCabangIds->isNotEmpty()) {
             // Enforce branch inheritance from source Delivery Order(s)
-            $data['cabang_id'] = $sourceCabangIds[0];
+            $data['cabang_id'] = (int) $sourceCabangIds->first();
         }
 
         $data['created_by'] = Auth::user()->id;
-        $data['status'] = 1;
+        $data['status'] = SuratJalan::STATUS_ISSUED;   // auto-terbit (J2), langsung terkunci
         return $data;
     }
 }

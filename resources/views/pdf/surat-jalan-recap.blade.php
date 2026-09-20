@@ -25,11 +25,9 @@
     </div>
 
     @php
-        $statusLabel = match ((string) $statusPengiriman) {
-            'all' => 'Semua',
-            '1' => 'Terbit',
-            default => 'Tidak Terbit',
-        };
+        $statusLabel = (string) $statusPengiriman === 'all'
+            ? 'Semua'
+            : \App\Models\SuratJalan::statusLabel($statusPengiriman);
     @endphp
 
     <table class="meta-table">
@@ -98,7 +96,7 @@
                         <td>{{ $suratJalan->cabang->nama ?? $suratJalan->cabang->name ?? '-' }}</td>
                         <td>{{ $customers->unique()->implode(', ') ?: '-' }}</td>
                         <td>{{ $deliveryOrders->pluck('do_number')->implode(', ') ?: '-' }}</td>
-                        <td>{{ (int) $suratJalan->status === 1 ? 'Terbit' : 'Draft' }}</td>
+                        <td>{{ \App\Models\SuratJalan::statusLabel($suratJalan->status) }}</td>
                     </tr>
                 @endforeach
             </tbody>

@@ -11,7 +11,10 @@ class DeliveryScheduleObserver
     {
         $originalStatus = $schedule->getOriginal('status');
 
-        if ($originalStatus !== 'on_the_way' && $schedule->status === 'on_the_way') {
+        // "Sebagian terkirim": barang sudah keluar gudang, jadi DO ikut berstatus sent (tidak completed
+        // karena sebagian belum terkirim). Penyelesaian tetap hanya lewat status "delivered".
+        if (! in_array($originalStatus, ['on_the_way', 'partial_delivered', 'delivered'], true)
+            && in_array($schedule->status, ['on_the_way', 'partial_delivered'], true)) {
             app(DeliveryScheduleService::class)->startRelatedDeliveryOrders($schedule);
         }
 

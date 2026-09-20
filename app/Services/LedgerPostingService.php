@@ -334,7 +334,11 @@ class LedgerPostingService
      * Post deposit creation to general ledger. Ensures deposit creation always
      * generates corresponding journal entries regardless of UI path.
      */
-    public function postDeposit(\App\Models\Deposit $deposit): array
+    /**
+     * @param  int|null  $cabangId  cabang jurnal; bila null, ditentukan JournalBranchResolver (mis. dari pembuat).
+     *                              Deposit dari kelebihan penerimaan wajib memakai cabang invoice/penerimaan.
+     */
+    public function postDeposit(\App\Models\Deposit $deposit, ?int $cabangId = null): array
     {
         // Atomic duplicate-posting guard.
         $alreadyPosted = DB::transaction(function () use ($deposit) {
@@ -347,7 +351,7 @@ class LedgerPostingService
             return ['status' => 'skipped', 'message' => 'Deposit already posted to ledger'];
         }
 
-        $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($deposit);
+        $branchId = $cabangId ?? app(\App\Services\JournalBranchResolver::class)->resolve($deposit);
         $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($deposit);
         $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($deposit);
 

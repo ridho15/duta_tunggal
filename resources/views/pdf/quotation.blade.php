@@ -4,7 +4,7 @@
 <head>
     @php
         $formatMoney = function (float $amount) {
-            return 'Rp ' . number_format($amount, 0, ',', '.');
+            return \App\Support\LineAmounts::money($amount);
         };
     @endphp
     <style>
@@ -256,16 +256,14 @@
             @endphp
             @foreach ($quotation->quotationItem as $index => $item)
                 @php
-                    $lineBase = $item->quantity * $item->unit_price;
-                    $discountAmount = $lineBase * ($item->discount / 100);
-                    $afterDiscount = $lineBase - $discountAmount;
                     $taxType = \App\Services\TaxService::normalizeType($item->tax_type ?? 'PPN Excluded');
                     $displayTaxType = match ($taxType) {
                         'Inklusif' => 'PPN Included',
                         'Eksklusif' => 'PPN Excluded',
                         default => 'Non Pajak',
                     };
-                    $taxResult = \App\Services\TaxService::compute($afterDiscount, (float) $item->tax, $taxType);
+                    // Perhitungan baris tunggal (LineAmounts, kebijakan pembulatan D6) — sama dengan layar dan Sales Order
+                    $taxResult = \App\Support\LineAmounts::calculate($item->quantity, $item->unit_price, $item->discount, (float) $item->tax, $taxType);
                     $itemDpp = $taxResult['dpp'];
                     $taxAmount = $taxResult['ppn'];
                     $lineSubtotal = $taxResult['total'];

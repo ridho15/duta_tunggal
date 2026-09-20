@@ -12,6 +12,9 @@ class CreateDeliverySchedule extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        // Validasi pengirim di server (driver+kendaraan master untuk internal; nama ekspedisi untuk ekspedisi).
+        app(DeliveryScheduleService::class)->validateSender($data, 'data.');
+
         if (empty($data['schedule_number'])) {
             $data['schedule_number'] = app(DeliveryScheduleService::class)->generateScheduleNumber();
         }

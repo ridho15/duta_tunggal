@@ -15,6 +15,15 @@ Schedule::command('asset:depreciate --force')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Tandai quotation Approved yang melewati Valid Until sebagai Kedaluwarsa.
+// Didaftarkan di sini (bukan app/Console/Kernel.php): bootstrap/app.php Laravel 12 tidak memakai
+// Kernel::schedule(), hanya routes/console.php. Guard tanggal di server tetap berlaku bila job belum jalan.
+Schedule::command('quotations:expire')
+    ->dailyAt('00:10')
+    ->name('quotations-expire')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Purchase return automation removed - now handled manually or through UI triggers
 // Schedule::command('purchase:automate-return')
 //     ->dailyAt('08:00')

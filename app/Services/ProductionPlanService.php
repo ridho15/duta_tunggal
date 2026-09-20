@@ -24,7 +24,7 @@ class ProductionPlanService
 
     public function getSaleOrderOptions(?int $cabangId = null)
     {
-        $query = \App\Models\SaleOrder::whereIn('status', ['approved', 'confirmed']);
+        $query = \App\Models\SaleOrder::whereIn('status', \App\Models\SaleOrder::DELIVERABLE_STATUSES);
 
         $user = Auth::user();
         if ($cabangId) {

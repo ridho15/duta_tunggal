@@ -122,6 +122,7 @@ export interface SaleOrderHeader {
   currency_id: number;
   exchange_rate: number;
   tempo_pembayaran: number;
+  notes?: string;
   status: string;
   total_amount?: number;
 }

@@ -24,6 +24,7 @@ class SalesReportServiceTest extends TestCase
             'so_number' => 'SO-SERVICE-001',
             'status' => 'confirmed',
             'total_amount' => 1_008_000,
+            'order_date' => '2026-04-03',
             'created_at' => '2026-04-03 10:00:00',
         ]);
 
@@ -42,6 +43,7 @@ class SalesReportServiceTest extends TestCase
             'so_number' => 'SO-SERVICE-002',
             'status' => 'canceled',
             'total_amount' => 250_000,
+            'order_date' => '2026-04-04',
             'created_at' => '2026-04-04 11:00:00',
         ]);
 
@@ -55,7 +57,9 @@ class SalesReportServiceTest extends TestCase
             'tipe_pajak' => 'Eksklusif',
         ]);
 
+        // Mode Pesanan (SO): tanggal mengikuti order_date; default laporan kini Penjualan (Invoice)
         $payload = app(SalesReportService::class)->pdfPayload([
+            'mode' => 'order',
             'start_date' => '2026-04-01',
             'end_date' => '2026-04-30',
         ]);

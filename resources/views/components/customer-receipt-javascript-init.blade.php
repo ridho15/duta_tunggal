@@ -618,11 +618,19 @@ function handleReceiptInputChange(input, eventType) {
         const remaining = parseFloat(checkbox.dataset.remaining || 0);
         const remainingInteger = Math.round(remaining);
         
-        // Validate amount doesn't exceed remaining
+        // Nominal di atas sisa tagihan TIDAK dipotong dan tanpa alert(): tampilkan penjelasan di bawah kolom.
+        // Server menolak kelebihan, atau mencatatnya sebagai Deposit Customer bila opsinya dinyalakan.
+        let overNote = input.parentElement.querySelector('.receipt-overpay-note');
         if (cleanValue > remainingInteger) {
-            alert(`Pembayaran tidak boleh melebihi sisa tagihan: Rp. ${remainingInteger.toLocaleString('id-ID')}`);
-            input.value = formatRupiahAmount(remainingInteger);
-            cleanValue = remainingInteger;
+            if (!overNote) {
+                overNote = document.createElement('div');
+                overNote.className = 'receipt-overpay-note text-xs text-red-600 dark:text-red-400 mt-1';
+                input.parentElement.appendChild(overNote);
+            }
+            overNote.textContent = 'Melebihi sisa tagihan Rp ' + remainingInteger.toLocaleString('id-ID')
+                + ' (kelebihan Rp ' + (cleanValue - remainingInteger).toLocaleString('id-ID') + '). Akan ditolak kecuali opsi "Catat kelebihan sebagai Deposit Customer" dinyalakan.';
+        } else if (overNote) {
+            overNote.remove();
         }
         
         // Auto-check/uncheck checkbox based on amount
