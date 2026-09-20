@@ -18,6 +18,7 @@ use App\Models\SaleOrder;
 use App\Services\CustomerReceiptAllocator;
 use App\Support\CustomerReceiptAccounts;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -41,6 +42,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -392,6 +394,44 @@ class CustomerReceiptResource extends Resource
                                         && strtolower((string) $get('payment_method')) !== 'deposit')
                                     ->helperText('Bila nominal melebihi sisa tagihan, kelebihan DITOLAK. Nyalakan opsi ini agar kelebihan dicatat sebagai Deposit Customer (jurnal Kas/Bank → Deposit Pelanggan) — tidak ada pemotongan senyap.'),
 
+                                TextInput::make('payment_reference')
+                                    ->label(fn ($get) => \App\Services\CustomerReceiptReference::label($get('payment_method')))
+                                    ->placeholder('Contoh: TRF-20260918-0012')
+                                    ->maxLength(100)
+                                    ->required(fn ($get) => \App\Services\CustomerReceiptReference::requiresReference($get('payment_method')))
+                                    ->visible(fn ($get) => \App\Services\CustomerReceiptReference::isNonCash($get('payment_method')))
+                                    ->dehydratedWhenHidden()
+                                    ->dehydrateStateUsing(fn ($state, $get) => \App\Services\CustomerReceiptReference::isNonCash($get('payment_method')) ? (trim((string) $state) ?: null) : null)
+                                    ->helperText('Wajib untuk Transfer, Giro, dan Cheque. Kombinasi referensi + akun + nominal yang sama pada penerimaan lain akan diperingatkan.')
+                                    ->validationMessages(['required' => 'Nomor referensi wajib diisi untuk pembayaran non-tunai (transfer/giro/cek).']),
+
+                                TextInput::make('bank_name')
+                                    ->label('Nama Bank')
+                                    ->maxLength(100)
+                                    ->visible(fn ($get) => \App\Services\CustomerReceiptReference::isNonCash($get('payment_method')))
+                                    ->dehydratedWhenHidden()
+                                    ->dehydrateStateUsing(fn ($state, $get) => \App\Services\CustomerReceiptReference::isNonCash($get('payment_method')) ? (trim((string) $state) ?: null) : null),
+
+                                FileUpload::make('proof_path')
+                                    ->label('Bukti Pembayaran')
+                                    ->disk('local')
+                                    ->directory('customer-receipts/proofs')
+                                    ->visibility('private')
+                                    ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                                    ->maxSize(2048)
+                                    ->openable(false)
+                                    ->downloadable(false)
+                                    ->previewable(false)
+                                    ->visible(fn ($get) => \App\Services\CustomerReceiptReference::isNonCash($get('payment_method')))
+                                    ->helperText('PDF/JPG/PNG maksimal 2 MB, disimpan privat. Opsional, tetapi daftar menandai penerimaan non-tunai tanpa bukti.'),
+
+                                Placeholder::make('proof_link')
+                                    ->label('Bukti tersimpan')
+                                    ->content(fn ($record) => new \Illuminate\Support\HtmlString(
+                                        '<a href="' . e(route('customer-receipts.proof', $record)) . '" target="_blank" class="text-primary-600 underline">Lihat bukti</a>'
+                                    ))
+                                    ->visible(fn ($record) => filled($record?->proof_path)),
+
                                 Textarea::make('notes')
                                     ->label('Catatan')
                                     ->rows(3)
@@ -510,6 +550,12 @@ class CustomerReceiptResource extends Resource
                     ->rupiah()
                     ->sortable(),
 
+                TextColumn::make('payment_reference')
+                    ->label('No. Referensi')
+                    ->searchable()
+                    ->placeholder('–')
+                    ->toggleable(),
+
                 TextColumn::make('payment_count')
                     ->label('Invoice Count')
                     ->getStateUsing(function ($record) {
@@ -601,6 +647,12 @@ class CustomerReceiptResource extends Resource
                 SelectFilter::make('payment_method')
                     ->label('Payment Method')
                     ->options(static::getPaymentMethodOptions()),
+                Filter::make('tanpa_bukti')
+                    ->label('Non-tunai tanpa bukti')
+                    ->toggle()
+                    ->query(fn ($query) => $query
+                        ->whereIn('payment_method', \App\Services\CustomerReceiptReference::NON_CASH_METHODS)
+                        ->where(fn ($q) => $q->whereNull('proof_path')->orWhere('proof_path', ''))),
                 SelectFilter::make('status')
                     ->label('Status')
                     ->options([
@@ -839,6 +891,23 @@ class CustomerReceiptResource extends Resource
                             ->placeholder('Not set')
                             ->hidden()
                             ->copyable(),
+                        TextEntry::make('payment_reference')
+                            ->label(fn ($record) => \App\Services\CustomerReceiptReference::label($record?->payment_method))
+                            ->placeholder('–')
+                            ->copyable()
+                            ->visible(fn ($record) => \App\Services\CustomerReceiptReference::isNonCash($record?->payment_method) || filled($record?->payment_reference)),
+                        TextEntry::make('bank_name')
+                            ->label('Nama Bank')
+                            ->placeholder('–')
+                            ->visible(fn ($record) => filled($record?->bank_name)),
+                        TextEntry::make('proof_path')
+                            ->label('Bukti Pembayaran')
+                            ->state(fn ($record) => filled($record->proof_path) ? 'Lihat bukti' : null)
+                            ->placeholder('Belum ada bukti')
+                            ->url(fn ($record) => filled($record->proof_path) ? route('customer-receipts.proof', $record) : null)
+                            ->openUrlInNewTab()
+                            ->color(fn ($record) => filled($record->proof_path) ? 'primary' : 'gray')
+                            ->visible(fn ($record) => \App\Services\CustomerReceiptReference::isNonCash($record?->payment_method) || filled($record?->proof_path)),
                         TextEntry::make('coa.name')
                             ->label('Chart of Account')
                             ->formatStateUsing(function ($state, $record) {

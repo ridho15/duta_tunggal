@@ -110,6 +110,7 @@ function phase5Form(array $ctx, array $overrides = []): array
         'customer_id' => $ctx['customer']->id,
         'payment_date' => now()->toDateString(),
         'payment_method' => 'Transfer',
+        'payment_reference' => 'TRF-' . strtoupper(uniqid()),   // T1.3: referensi wajib untuk non-tunai
         'coa_id' => $ctx['coa']['bca']->id,
         'status' => 'Draft',
     ], $overrides);

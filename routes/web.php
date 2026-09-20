@@ -131,6 +131,11 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::get('/reports/inventory-card/download-pdf',   [InventoryCardController::class, 'downloadPdf'])->name('inventory-card.pdf');
     Route::get('/reports/inventory-card/download-excel', [InventoryCardController::class, 'downloadExcel'])->name('inventory-card.excel');
 
+    // Bukti penerimaan customer (disk privat, berotorisasi lewat CustomerReceiptPolicy::view)
+    Route::get('/customer-receipts/{receipt}/proof', [\App\Http\Controllers\CustomerReceiptProofController::class, 'show'])
+        ->name('customer-receipts.proof')
+        ->whereNumber('receipt');
+
     // Document PDF streaming (opens in new tab)
     Route::get('/pdf/{type}/{id}', [PdfPreviewController::class, 'stream'])
         ->name('pdf-stream')

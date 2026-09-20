@@ -304,6 +304,8 @@ class CreateCustomerReceipt extends CreateRecord
     {
         $record = $this->record;
 
+        app(\App\Services\CustomerReceiptReference::class)->warnIfDuplicate($record);
+
         // Mark early so CustomerReceiptObserver does not double-count AR while
         // CustomerReceiptItemObserver triggers receipt status updates during item creation.
         \App\Observers\CustomerReceiptObserver::markArUpdatedInCreate($record->id);

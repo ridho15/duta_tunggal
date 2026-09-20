@@ -138,6 +138,8 @@ class EditCustomerReceipt extends EditRecord
     protected function afterSave(): void
     {
         $record = $this->record;
+
+        app(\App\Services\CustomerReceiptReference::class)->warnIfDuplicate($record);
         
         // Delete existing customer receipt items
         $record->customerReceiptItem()->delete();

@@ -28,6 +28,9 @@ class CustomerReceipt extends Model
         'diskon',
         'payment_adjustment',
         'payment_method',
+        'payment_reference',
+        'bank_name',
+        'proof_path',
         'coa_id',
         'status', // 'Draft','Partial','Paid'
         'created_by',

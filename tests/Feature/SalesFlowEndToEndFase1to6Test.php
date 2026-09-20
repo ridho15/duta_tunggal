@@ -210,7 +210,7 @@ it('Alur lengkap fase 1-6: Quotation → SO → 2 pengiriman → 2 invoice → p
     Livewire::actingAs($ctx['user'])
         ->test(CreateCustomerReceipt::class)
         ->fillForm([
-            'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Transfer', 'coa_id' => $ctx['bank']->id,
+            'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Transfer', 'payment_reference' => 'TRF-E2E-' . strtoupper(uniqid()), 'coa_id' => $ctx['bank']->id,
             'selected_invoices' => json_encode([$invoice1->id]), 'invoice_receipts' => json_encode([$invoice1->id => $remaining1 + 5000]),
             'total_payment' => (string) ($remaining1 + 5000), 'overpayment_as_deposit' => true, 'status' => 'Draft',
         ])
@@ -231,7 +231,7 @@ it('Alur lengkap fase 1-6: Quotation → SO → 2 pengiriman → 2 invoice → p
     Livewire::actingAs($ctx['user'])
         ->test(CreateCustomerReceipt::class)
         ->fillForm([
-            'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Transfer', 'coa_id' => $ctx['bankDeposito']->id,
+            'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Transfer', 'payment_reference' => 'TRF-E2E-' . strtoupper(uniqid()), 'coa_id' => $ctx['bankDeposito']->id,
             'selected_invoices' => json_encode([$invoice2->id]), 'invoice_receipts' => json_encode([$invoice2->id => 1000]), 'total_payment' => '1000', 'status' => 'Draft',
         ])
         ->call('create')
@@ -242,7 +242,7 @@ it('Alur lengkap fase 1-6: Quotation → SO → 2 pengiriman → 2 invoice → p
     Livewire::actingAs($ctx['user'])
         ->test(CreateCustomerReceipt::class)
         ->fillForm([
-            'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Transfer', 'coa_id' => $ctx['bank']->id,
+            'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Transfer', 'payment_reference' => 'TRF-E2E-' . strtoupper(uniqid()), 'coa_id' => $ctx['bank']->id,
             'selected_invoices' => json_encode([$invoice2->id]), 'invoice_receipts' => json_encode([$invoice2->id => $remaining2 + 1]),
             'total_payment' => (string) ($remaining2 + 1), 'status' => 'Draft',
         ])
