@@ -16,7 +16,7 @@ class IncreaseMemoryLimit
      */
     public function handle(Request $request, Closure $next)
     {
-        ini_set('memory_limit', '512M');
+        \App\Support\MemoryLimit::raiseTo('512M');
 
         return $next($request);
     }

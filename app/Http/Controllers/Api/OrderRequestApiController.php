@@ -28,7 +28,7 @@ class OrderRequestApiController extends Controller
      */
     public function getDependenciesData(?Request $request = null): array
     {
-        ini_set('memory_limit', '512M');
+        \App\Support\MemoryLimit::raiseTo('512M');
 
         try {
             $user = Auth::user();
