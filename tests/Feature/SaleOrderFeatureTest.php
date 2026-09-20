@@ -468,6 +468,7 @@ test('sales order approval workflow works correctly', function () {
         'email' => 'test@example.com',
     ]);
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('id')->andReturn($user->id);   // SalesOrderService memakai Auth::id()
     Auth::shouldReceive('guard')->andReturnSelf();
 
     $customer = Customer::create([
@@ -730,6 +731,7 @@ test('sales order can be closed', function () {
         'email' => 'close@example.com',
     ]);
     Auth::shouldReceive('user')->andReturn($user);
+    Auth::shouldReceive('id')->andReturn($user->id);   // SalesOrderService memakai Auth::id()
     Auth::shouldReceive('guard')->andReturnSelf();
 
     $customer = Customer::create([

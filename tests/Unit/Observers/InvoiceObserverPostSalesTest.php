@@ -88,10 +88,11 @@ class InvoiceObserverPostSalesTest extends TestCase
         InvoiceItem::factory()->create(array_merge([
             'invoice_id' => $invoice->id,
             'product_id' => $product->id,
+            // Baris harus konsisten dengan header (subtotal 100 jt): observer menolak jurnal tak seimbang.
             'quantity' => 2,
-            'price' => 50_000,
-            'subtotal' => 100_000,
-            'total' => 100_000,
+            'price' => 50_000_000,
+            'subtotal' => 100_000_000,
+            'total' => 100_000_000,
             'tax_rate' => 0,
             'tax_amount' => 0,
         ], $overrides['item'] ?? []));
@@ -159,14 +160,12 @@ class InvoiceObserverPostSalesTest extends TestCase
     {
         $this->makeCoas();
 
-        // invoice->tax = 11 (rate %), subtotal = 100,000,000
-        // derived from total = 111_500_000 - 100_000_000 = 11_500_000  (deliberately different)
-        // expected PPN credit = subtotal * rate/100 = 100,000,000 * 11% = 11,000,000
-        // (rate-based, not "total - subtotal" derived)
+        // invoice->tax = 11 (tarif %), subtotal = 100.000.000, total = 111.000.000 (seimbang).
+        // PPN kredit = subtotal * tarif/100 = 11.000.000 (dari tarif tersimpan, bukan diturunkan dari total).
         $invoice = $this->makeInvoice([
             'subtotal'  => 100_000_000,
-            'tax'       => 11,          // rate in percent (NOT monetary amount)
-            'total'     => 111_500_000, // intentional 500k discrepancy to verify derived is NOT used
+            'tax'       => 11,          // tarif dalam persen (BUKAN nominal)
+            'total'     => 111_000_000,
         ]);
         $this->attachInvoiceItemWithCostBasis($invoice);
 
@@ -177,11 +176,31 @@ class InvoiceObserverPostSalesTest extends TestCase
             ->where('description', 'LIKE', '%PPn Keluaran%')
             ->first();
 
-        $this->assertNotNull($ppnEntry, 'PPn Keluaran entry should have been created');
-        // With no invoice items, falls back to: subtotal * (tax_rate / 100) = 100,000,000 * 11% = 11,000,000
-        $this->assertEquals(11_000_000, (float) $ppnEntry->credit,
-            'credit must equal subtotal * rate/100 = 11,000,000, NOT derived (total - subtotal) = 11,500,000'
-        );
+        $this->assertNotNull($ppnEntry, 'Entri PPn Keluaran harus terbentuk');
+        $this->assertEquals(11_000_000, (float) $ppnEntry->credit, 'kredit PPN harus = subtotal * tarif/100');
+    }
+
+    #[Test]
+    public function invoice_whose_header_total_does_not_match_lines_is_rejected_by_balance_guard(): void
+    {
+        $this->makeCoas();
+
+        // Selisih 500 rb antara total header dan (subtotal + PPN): penjaga saldo menolak (bukan menebak nilai turunan).
+        $invoice = $this->makeInvoice([
+            'subtotal' => 100_000_000,
+            'tax'      => 11,
+            'total'    => 111_500_000,
+        ]);
+        $this->attachInvoiceItemWithCostBasis($invoice);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('tidak seimbang');
+
+        try {
+            $this->observer->postSalesInvoice($invoice);
+        } finally {
+            $this->assertSame(0, JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->count());
+        }
     }
 
     // ─── Bug D: Duplicate posting guard ──────────────────────────────────────
@@ -246,6 +265,8 @@ class InvoiceObserverPostSalesTest extends TestCase
         $this->makeCoas();
 
         $invoice = $this->makeInvoice();
+        // Baris ada (pendapatan seimbang) tetapi produk tanpa harga pokok → HPP tak dapat diturunkan.
+        $this->attachInvoiceItemWithCostBasis($invoice, ['product' => ['cost_price' => 0]]);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Sales invoice tidak dapat diposting karena HPP / release barang terkirim tidak dapat dihitung');
@@ -280,6 +301,7 @@ class InvoiceObserverPostSalesTest extends TestCase
         $invoice = $this->makeInvoice([
             'tax' => 0,
             'ppn_rate' => 0,
+            'total' => 100_000_000,
             'ar_coa_id' => ChartOfAccount::where('code', '1120.10')->value('id'),
             'revenue_coa_id' => ChartOfAccount::where('code', '4111')->value('id'),
             'ppn_keluaran_coa_id' => ChartOfAccount::where('code', '2120.99')->value('id'),

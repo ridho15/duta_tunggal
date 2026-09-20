@@ -70,9 +70,12 @@ test('sales invoice inherits cabang from sale order source', function () {
 
     $page = new CreateSalesInvoice();
 
+    // subtotal/total > 0: invoice bernilai Rp 0 ditolak oleh guard CreateSalesInvoice (Poin 3).
     $result = invokeMutateBeforeCreate($page, [
         'selected_sale_order' => $saleOrder->id,
         'cabang_id' => $cabangWrong->id,
+        'subtotal' => 100000,
+        'total' => 111000,
     ]);
 
     expect((int) $result['cabang_id'])->toBe((int) $cabangSource->id);
@@ -98,6 +101,8 @@ test('sales invoice inherits tax fields from sale order source', function () {
 
     $result = invokeMutateBeforeCreate($page, [
         'selected_sale_order' => $saleOrder->id,
+        'subtotal' => 100000,
+        'total' => 111000,
     ]);
 
     expect((float) $result['tax'])->toBe(11.0)

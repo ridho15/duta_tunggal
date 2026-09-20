@@ -41,24 +41,30 @@ class UATUIUXAuditVerificationTest extends TestCase
 
     public function test_po_item_refer_item_label_displays_order_request_number()
     {
+        // Data dibuat sendiri (bukan ID keras 1): tes tidak boleh bergantung pada sisa data tes lain.
         $supplier = Supplier::factory()->create();
+        $cabang = Cabang::factory()->create();
+        $product = Product::factory()->create();
+        $currency = Currency::firstOrCreate(['code' => 'IDR'], ['name' => 'Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
+        $creator = \App\Models\User::factory()->create();
+
         $or = OrderRequest::create([
             'request_number' => 'OR-TEST-999',
             'request_date' => now(),
             'status' => 'approved',
             'supplier_id' => $supplier->id,
-            'cabang_id' => 1,
-            'created_by' => 1,
+            'cabang_id' => $cabang->id,
+            'created_by' => $creator->id,
         ]);
 
         $item = OrderRequestItem::create([
             'order_request_id' => $or->id,
-            'product_id' => 1,
+            'product_id' => $product->id,
             'quantity' => 10,
             'unit_price' => 50000,
-            'currency_id' => 1,
+            'currency_id' => $currency->id,
             'tipe_pajak' => 'none',
-            'cabang_id' => 1,
+            'cabang_id' => $cabang->id,
             'status' => 'approved',
         ]);
 
