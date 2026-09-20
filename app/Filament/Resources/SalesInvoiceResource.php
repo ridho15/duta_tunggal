@@ -154,6 +154,16 @@ class SalesInvoiceResource extends Resource
                                     })
                                     ->searchable()
                                     ->reactive()
+                                    ->helperText(function ($get) {
+                                        $hint = 'Hanya SO berstatus Selesai yang muncul di sini. Untuk pengiriman bertahap, invoice terbit OTOMATIS per Delivery Order saat DO selesai.';
+
+                                        $customerId = $get('selected_customer');
+                                        if ($customerId && ! SaleOrder::where('customer_id', $customerId)->where('status', 'completed')->exists()) {
+                                            return 'Belum ada SO Selesai untuk customer ini. ' . $hint;
+                                        }
+
+                                        return $hint;
+                                    })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_delivery_orders', []);
                                         $set('invoiceItem', []);
