@@ -519,7 +519,7 @@ class SaleOrderResource extends Resource
                             ->visible(function ($get) {
                                 return $get('options_form') == 2;
                             })
-                            ->options(Quotation::usable()->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
+                            ->options(Quotation::usable()->with('customer:id,name')->get()->mapWithKeys(fn ($quotation) => [$quotation->id => \App\Support\DocumentLabels::quotation($quotation)]))
                             ->required()
                             ->validationMessages([
                                 'required' => 'Quotation wajib dipilih'

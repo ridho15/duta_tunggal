@@ -96,7 +96,7 @@
         @if($deliveryOrder->additional_cost > 0)
         <tr>
             <td style="border: none;">Biaya Tambahan</td>
-            <td style="border: none;">: Rp {{ number_format($deliveryOrder->additional_cost, 0, ',', '.') }}</td>
+            <td style="border: none;">: Rp {{ number_format($deliveryOrder->additional_cost, 2, ',', '.') }}</td>
         </tr>
         @if($deliveryOrder->additional_cost_description)
         <tr>
@@ -132,62 +132,49 @@
         </thead>
         <tbody>
             @php
-                $total = 0;
-                $subtotal = 0;
+                // Nilai DO dari satu sumber (DeliveryOrderValuation/LineAmounts) — sama dengan invoice yang terbit dari DO ini.
+                $valuation = app(\App\Services\DeliveryOrderValuation::class)->forDeliveryOrder($deliveryOrder);
+                $subtotal = $valuation['goods_total'];
+                $total = $valuation['total'];
             @endphp
             @foreach ($deliveryOrder->deliveryOrderItem as $index => $item)
             @php
-                $price = 0;
-                $discountPct = 0;
-                $taxRate = 0;
-                $taxAmount = 0;
-                $lineSubtotal = 0;
-                if ($item->saleOrderItem) {
-                    $price = $item->saleOrderItem->unit_price;
-                    $discountPct = $item->saleOrderItem->discount;
-                    $taxRate = $item->saleOrderItem->tax;
-                    $base = $item->quantity * $price * (1 - $discountPct/100);
-                    $tr = \App\Services\TaxService::normalizeType($item->saleOrderItem->tipe_pajak ?? 'PPN Excluded');
-                    $taxResult = \App\Services\TaxService::compute($base, $taxRate, $tr);
-                    $taxAmount = $taxResult['ppn'];
-                    $lineSubtotal = $taxResult['total'];
-                    $subtotal += $lineSubtotal;
-                    $total += $lineSubtotal;
-                }
+                $line = $valuation['by_item'][$item->id] ?? [];
+                $price = (float) ($line['price'] ?? 0);
+                $discountPct = (float) ($line['discount'] ?? 0);
+                $taxRate = (float) ($line['tax_rate'] ?? 0);
+                $taxAmount = (float) ($line['tax_amount'] ?? 0);
+                $lineSubtotal = (float) ($line['total'] ?? 0);
             @endphp
             <tr>
                 <td>{{ $index + 1 }}</td>
                 <td>({{ $item->product->sku }}) {{ $item->product->name }}</td>
                 <td>{{ $item->quantity }}</td>
-                <td>Rp {{ number_format($price,0,',','.') }}</td>
+                <td>Rp {{ number_format($price,2,',','.') }}</td>
                 <td>{{ number_format($discountPct,2) }}%</td>
                 <td>{{ number_format($taxRate,2) }}%</td>
-                <td>Rp {{ number_format($taxAmount,0,',','.') }}</td>
-                <td>Rp {{ number_format($lineSubtotal,0,',','.') }}</td>
+                <td>Rp {{ number_format($taxAmount,2,',','.') }}</td>
+                <td>Rp {{ number_format($lineSubtotal,2,',','.') }}</td>
                 <td>{{ $item->reason }}</td>
             </tr>
             @endforeach
         </tbody>
     </table>
 
-    @php
-        $total = $total + $deliveryOrder->additional_cost;
-    @endphp
-
     <table style="border: none; margin-top: 20px; width: 50%; margin-left: auto;">
         <tr>
             <td style="border: none; text-align: right; font-weight: bold;">Subtotal:</td>
-            <td style="border: none; text-align: right;">Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
+            <td style="border: none; text-align: right;">Rp {{ number_format($subtotal, 2, ',', '.') }}</td>
         </tr>
         @if($deliveryOrder->additional_cost > 0)
         <tr>
             <td style="border: none; text-align: right; font-weight: bold;">Biaya Tambahan:</td>
-            <td style="border: none; text-align: right;">Rp {{ number_format($deliveryOrder->additional_cost, 0, ',', '.') }}</td>
+            <td style="border: none; text-align: right;">Rp {{ number_format($deliveryOrder->additional_cost, 2, ',', '.') }}</td>
         </tr>
         @endif
         <tr>
             <td style="border: none; text-align: right; font-weight: bold; border-top: 1px solid #333;">Total:</td>
-            <td style="border: none; text-align: right; border-top: 1px solid #333; font-weight: bold;">Rp {{ number_format($total, 0, ',', '.') }}</td>
+            <td style="border: none; text-align: right; border-top: 1px solid #333; font-weight: bold;">Rp {{ number_format($total, 2, ',', '.') }}</td>
         </tr>
     </table>
 

@@ -144,11 +144,12 @@ class SalesInvoiceResource extends Resource
                                         $customerId = $get('selected_customer');
                                         if (!$customerId) return [];
 
-                                        return SaleOrder::where('customer_id', $customerId)
+                                        return SaleOrder::with('customer:id,name')
+                                            ->where('customer_id', $customerId)
                                             ->where('status', 'completed')
                                             ->get()
                                             ->mapWithKeys(function ($so) {
-                                                return [$so->id => $so->so_number];
+                                                return [$so->id => \App\Support\DocumentLabels::saleOrder($so)];
                                             });
                                     })
                                     ->searchable()
@@ -256,18 +257,13 @@ class SalesInvoiceResource extends Resource
                                             ->unique()
                                             ->toArray();
 
+                                        // Nilai DO dari satu sumber (DeliveryOrderValuation) — sama dengan invoice yang akan terbit.
+                                        $selectable = $deliveryOrders->reject(fn ($do) => in_array($do->id, $invoicedDOIds))->values();
+                                        $values = app(\App\Services\DeliveryOrderValuation::class)->forDeliveryOrders($selectable);
+
                                         $options = [];
-                                        foreach ($deliveryOrders as $do) {
-                                            $isInvoiced = in_array($do->id, $invoicedDOIds);
-                                            $total = $do->total ?? 0;
-                                            $label = "{$do->do_number} - " . MoneyHelper::rupiah($total);
-
-                                            if ($isInvoiced) {
-                                                // Exclude already invoiced DO from selectable options
-                                                continue;
-                                            }
-
-                                            $options[$do->id] = $label;
+                                        foreach ($selectable as $do) {
+                                            $options[$do->id] = \App\Support\DocumentLabels::deliveryOrder($do, $values[$do->id]['total'] ?? 0.0, ! empty($values[$do->id]['unlinked_items']));
                                         }
 
                                         return $options;

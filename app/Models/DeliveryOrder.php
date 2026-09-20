@@ -139,20 +139,18 @@ class DeliveryOrder extends Model
     }
 
     /**
-     * Calculate total value of delivery order based on sale order items pricing
+     * Nilai DO = total invoice yang akan terbit dari DO ini (barang + PPN + biaya tambahan), via satu sumber:
+     * DeliveryOrderValuation (LineAmounts). Sebelumnya `harga − diskon + pajak` mencampur persen dengan rupiah.
      */
     public function getTotalAttribute()
     {
-        $total = 0;
-        
-        foreach ($this->deliveryOrderItem as $item) {
-            if ($item->saleOrderItem) {
-                $price = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-                $total += $price * $item->quantity;
-            }
-        }
-        
-        return $total;
+        return $this->valueBreakdown()['total'];
+    }
+
+    /** Rincian nilai DO: baris, DPP, PPN, total barang, biaya tambahan, total. */
+    public function valueBreakdown(): array
+    {
+        return app(\App\Services\DeliveryOrderValuation::class)->forDeliveryOrder($this);
     }
 
     protected static function booted()

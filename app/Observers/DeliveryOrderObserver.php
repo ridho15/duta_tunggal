@@ -326,43 +326,14 @@ class DeliveryOrderObserver
             return;
         }
 
-        $taxResolver = app(\App\Services\SalesInvoiceTaxResolver::class);
-        $invoiceTaxData = $taxResolver->resolveFromSaleOrder($primarySo);
-        $ppnRate = (float) ($invoiceTaxData['ppn_rate'] ?? 0);
-        $tipePajak = $invoiceTaxData['tipe_pajak'] ?? 'None';
-
-        $subtotal = 0;
-        $totalTax = 0;
-        $lineTotals = 0;
-        $invoiceItems = [];
-        $lineBuilder = app(\App\Services\SalesInvoiceLineBuilder::class);
-
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            $qty = (float) ($item->quantity ?? 0);
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $saleOrderItem = $item->saleOrderItem;
-            $unitPrice = $saleOrderItem ? (float) $saleOrderItem->unit_price : (float) ($item->product?->sell_price ?? 0);
-            $discountPct = $saleOrderItem ? max(0.0, min(100.0, (float) $saleOrderItem->discount)) : 0.0;
-
-            // Pajak per baris dari item SO-nya (Eksklusif / Inklusif / Non Pajak); tanpa pajak bila invoice bertipe None.
-            // Sebelumnya semua baris diperlakukan Eksklusif dengan tarif baris pertama sehingga SO Inklusif ditambah PPN dua kali.
-            $lineRate = $tipePajak === 'None' ? 0.0 : ($saleOrderItem ? (float) $saleOrderItem->tax : $ppnRate);
-            $lineType = $tipePajak === 'None' ? 'Non Pajak' : ($saleOrderItem?->tipe_pajak ?: $tipePajak);
-
-            // Satu-satunya perhitungan baris (LineAmounts); price disimpan GROSS + rincian diskon
-            $line = $lineBuilder->attributes(
-                $item->product_id, $qty, $unitPrice, $discountPct, $lineRate, $lineType, $item->product?->sales_coa_id
-            );
-
-            $subtotal += $line['subtotal'];
-            $totalTax += $line['tax_amount'];
-            $lineTotals += $line['total'];
-
-            $invoiceItems[] = $line;
-        }
+        // Satu-satunya perhitungan nilai DO (juga dipakai label pilihan DO & PDF DO): DeliveryOrderValuation.
+        $valuation = app(\App\Services\DeliveryOrderValuation::class)->forDeliveryOrder($deliveryOrder);
+        $ppnRate = $valuation['ppn_rate'];
+        $tipePajak = $valuation['tipe_pajak'];
+        $subtotal = $valuation['dpp'];
+        $totalTax = $valuation['tax'];
+        $lineTotals = $valuation['goods_total'];
+        $invoiceItems = $valuation['lines'];
 
         if (empty($invoiceItems) || $subtotal <= 0) {
             Log::warning('DeliveryOrderObserver: Skipping invoice creation, no valid items or subtotal is 0', [
