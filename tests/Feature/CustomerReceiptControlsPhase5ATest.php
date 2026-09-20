@@ -578,12 +578,37 @@ it('Isu 7: master:readiness — akun kas/bank "sebagian" sampai ada yang ditanda
 });
 
 it('Isu 7: coa:flag-cash-bank memberi pesan jelas (bukan galat SQL) bila migrasi is_cash_bank belum dijalankan', function () {
+    // DDL = implicit commit di MySQL dan bertahan lintas tes → kolom WAJIB dikembalikan di finally,
+    // dan tidak ada data yang dibuat sebelum DDL (agar tidak ikut ter-commit).
     \Illuminate\Support\Facades\Schema::table('chart_of_accounts', fn ($table) => $table->dropColumn('is_cash_bank'));
 
-    $exit = Artisan::call('coa:flag-cash-bank', ['--apply' => true]);
+    try {
+        $exit = Artisan::call('coa:flag-cash-bank', ['--apply' => true]);
 
-    expect($exit)->toBe(1)->and(Artisan::output())->toContain('php artisan migrate');
+        expect($exit)->toBe(1)->and(Artisan::output())->toContain('php artisan migrate');
 
-    // Pemilihan akun tetap aman tanpa kolom (dianggap belum ada penanda)
-    expect(ChartOfAccount::hasCashBankFlags())->toBeFalse();
+        // Pemilihan akun tetap aman tanpa kolom (dianggap belum ada penanda)
+        expect(ChartOfAccount::hasCashBankFlags())->toBeFalse();
+    } finally {
+        \Illuminate\Support\Facades\Schema::table('chart_of_accounts', function ($table) {
+            $table->boolean('is_cash_bank')->default(false)->after('is_active')->index();
+        });
+    }
+
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('chart_of_accounts', 'is_cash_bank'))->toBeTrue();
+});
+
+it('Isu 7: penanda "AR sudah diperbarui" milik ID lama tidak menular ke penerimaan baru ber-ID sama', function () {
+    $ctx = phase5Context();
+    $staleId = 987654;
+    \App\Observers\CustomerReceiptObserver::markArUpdatedInCreate($staleId);
+
+    CustomerReceipt::factory()->create([
+        'id' => $staleId, 'customer_id' => $ctx['customer']->id,
+        'total_payment' => 1000, 'payment_method' => 'cash', 'status' => 'Draft',
+    ]);
+
+    $flags = (new \ReflectionClass(\App\Observers\CustomerReceiptObserver::class))->getProperty('arUpdatedInCreate')->getValue();
+
+    expect($flags)->not->toHaveKey($staleId);
 });

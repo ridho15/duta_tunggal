@@ -289,6 +289,16 @@ it('Isu 4: quotations:expire — dry-run tidak mengubah, tanpa dry-run menandai 
         ->and($draftOverdue->fresh()->status)->toBe('draft');    // hanya Approved yang dikedaluwarsakan
 });
 
+it('Isu 4: quotations:expire tidak menyentuh quotation yang sudah dihapus (soft delete)', function () {
+    $ctx = phase3Context('approve', ['valid_until' => now()->subDays(2)->toDateString()]);
+    $ctx['quotation']->delete();
+
+    Artisan::call('quotations:expire');
+
+    $row = Quotation::withTrashed()->find($ctx['quotation']->id);
+    expect($row->status)->toBe('approve')->and($row->expired_at)->toBeNull();
+});
+
 it('Isu 4: job quotations:expire terdaftar di scheduler harian (routes/console.php)', function () {
     $events = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
         ->filter(fn ($e) => str_contains((string) $e->command, 'quotations:expire'));

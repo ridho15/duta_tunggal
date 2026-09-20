@@ -11,14 +11,34 @@ use App\Models\QuotationItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\User;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class SaleOrderApiTest extends TestCase
 {
-    public function test_dependencies_returns_complete_master_data_and_next_so_number()
+    /**
+     * Pengguna API: sejak Fase 3 endpoint tulis memeriksa izin (403 bila tidak punya),
+     * jadi tes memberi izin secara eksplisit — bukan bergantung pada pengguna sisa tes lain.
+     */
+    private function apiUser(): User
     {
         $user = User::first() ?? User::factory()->create();
+
+        foreach (["create sales order", "update sales order", "request sales order"] as $name) {
+            Permission::findOrCreate($name, 'web');
+        }
+        $user->givePermissionTo(["create sales order", "update sales order", "request sales order"]);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $this->actingAs($user);
+
+        return $user;
+    }
+
+    public function test_dependencies_returns_complete_master_data_and_next_so_number()
+    {
+        $user = $this->apiUser();
 
         $response = $this->getJson('/api/v1/sales-orders/dependencies');
 
@@ -47,8 +67,7 @@ class SaleOrderApiTest extends TestCase
 
     public function test_can_generate_new_so_number()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $response = $this->getJson('/api/v1/sales-orders/generate-number');
 
@@ -65,8 +84,7 @@ class SaleOrderApiTest extends TestCase
 
     public function test_create_sale_order_standalone_and_calculates_total_amount()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $customer = Customer::first() ?? Customer::create([
             'code' => 'CUST-TEST-SO-01',
@@ -96,7 +114,7 @@ class SaleOrderApiTest extends TestCase
             'to_rupiah' => 1,
         ]);
 
-        $product = Product::withoutGlobalScope('product_cabang')->first() ?? Product::create([
+        $product = Product::withoutGlobalScope('product_cabang')->first() ?? Product::factory()->create([
             'sku' => 'SKU-TEST-SO-01',
             'name' => 'Produk Test SO',
             'sell_price' => 200000,
@@ -154,8 +172,7 @@ class SaleOrderApiTest extends TestCase
 
     public function test_create_sale_order_from_approved_quotation()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $customer = Customer::first();
         $cabang = Cabang::first();
@@ -242,8 +259,7 @@ class SaleOrderApiTest extends TestCase
 
     public function test_show_and_update_sale_order()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $customer = Customer::first();
         $cabang = Cabang::first();

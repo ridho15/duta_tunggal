@@ -304,6 +304,26 @@ it('Isu 5: menggabung SO hanya untuk customer DAN alamat kirim yang sama', funct
     expect($validator->errors([$a->id]))->toBeEmpty();   // satu SO: alamat tidak diperiksa
 });
 
+it('Isu 5: SO yang sudah dihapus (soft delete) tidak dapat dipakai sebagai sumber DO', function () {
+    $ctx = phase2Context();
+    [$so] = phase2SaleOrder($ctx);
+    $so->delete();
+
+    expect(implode(' ', app(DeliveryOrderSourceValidator::class)->errors([$so->id])))->toContain('tidak ditemukan');
+});
+
+it('Isu 5: pengguna terbatas cabang tetap mendapat penjelasan status untuk SO cabang lain (bukan "tidak ditemukan")', function () {
+    $ctx = phase2Context();
+    [$so] = phase2SaleOrder($ctx, ['status' => 'completed']);
+    $otherCabang = Cabang::factory()->create(['kode' => 'P2-X' . strtoupper(substr(uniqid(), -4)), 'nama' => 'Cabang Lain', 'status' => 1]);
+    $restricted = User::factory()->create(['cabang_id' => $otherCabang->id, 'manage_type' => 'cabang']);
+    Auth::login($restricted);
+
+    $message = implode(' ', app(DeliveryOrderSourceValidator::class)->errors([$so->id]));
+
+    expect($message)->toContain('Selesai')->and($message)->not->toContain('tidak ditemukan');
+});
+
 it('Isu 5: assertValid melempar ValidationException pada field salesOrders', function () {
     $ctx = phase2Context();
     [$done] = phase2SaleOrder($ctx, ['status' => 'completed']);

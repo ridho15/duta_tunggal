@@ -10,14 +10,34 @@ use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class QuotationApiTest extends TestCase
 {
-    public function test_dependencies_returns_complete_master_data_and_next_quotation_number()
+    /**
+     * Pengguna API: sejak Fase 3 endpoint tulis memeriksa izin (403 bila tidak punya),
+     * jadi tes memberi izin secara eksplisit — bukan bergantung pada pengguna sisa tes lain.
+     */
+    private function apiUser(): User
     {
         $user = User::first() ?? User::factory()->create();
+
+        foreach (["create quotation", "update quotation"] as $name) {
+            Permission::findOrCreate($name, 'web');
+        }
+        $user->givePermissionTo(["create quotation", "update quotation"]);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $this->actingAs($user);
+
+        return $user;
+    }
+
+    public function test_dependencies_returns_complete_master_data_and_next_quotation_number()
+    {
+        $user = $this->apiUser();
 
         $response = $this->getJson('/api/v1/quotations/dependencies');
 
@@ -45,8 +65,7 @@ class QuotationApiTest extends TestCase
 
     public function test_can_generate_new_quotation_number()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $response = $this->getJson('/api/v1/quotations/generate-number');
 
@@ -63,8 +82,7 @@ class QuotationApiTest extends TestCase
 
     public function test_create_quotation_stores_record_and_calculates_total_amount()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $customer = Customer::first() ?? Customer::create([
             'code' => 'CUST-TEST-01',
@@ -94,7 +112,7 @@ class QuotationApiTest extends TestCase
             'to_rupiah' => 1,
         ]);
 
-        $product = Product::withoutGlobalScope('product_cabang')->first() ?? Product::create([
+        $product = Product::withoutGlobalScope('product_cabang')->first() ?? Product::factory()->create([
             'sku' => 'SKU-TEST-01',
             'name' => 'Produk Test Quotation',
             'sell_price' => 100000,
@@ -150,8 +168,7 @@ class QuotationApiTest extends TestCase
 
     public function test_show_and_update_quotation()
     {
-        $user = User::first() ?? User::factory()->create();
-        $this->actingAs($user);
+        $user = $this->apiUser();
 
         $customer = Customer::first();
         $cabang = Cabang::first();

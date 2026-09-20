@@ -457,6 +457,15 @@ it('Isu 9: halaman laporan — default Invoice, menampilkan HPP/margin/pembayara
         ->assertSee('Rekonsiliasi HPP dengan Jurnal');
 });
 
+it('Isu 9: satu instance SalesReportService per request — cache baris tidak dibuat ulang tiap sel', function () {
+    $ctx = p6Context();
+
+    $page = Livewire::actingAs($ctx['user'])->test(SalesReportPage::class)->instance();
+    $method = new ReflectionMethod($page, 'salesReportService');
+
+    expect($method->invoke($page))->toBe($method->invoke($page));
+});
+
 it('Isu 9: mengganti mode mereset filter status; opsi status berasal dari konstanta mode aktif', function () {
     $ctx = p6Context();
     p6SaleOrder($ctx, ['so_number' => 'SO-6-MODE', 'status' => 'approved']);

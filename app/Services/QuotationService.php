@@ -148,7 +148,8 @@ class QuotationService
      */
     public function expireOverdue(bool $dryRun = false): Collection
     {
-        $overdue = Quotation::withoutGlobalScopes()->overdueApproved()->orderBy('id')->get();
+        // Quotation tidak punya scope selain SoftDeletes — jangan dilepas agar yang sudah dihapus tidak ikut diubah.
+        $overdue = Quotation::overdueApproved()->orderBy('id')->get();
 
         if (! $dryRun) {
             foreach ($overdue as $quotation) {

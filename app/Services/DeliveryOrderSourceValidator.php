@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SaleOrder;
+use App\Models\Scopes\CabangScope;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -44,7 +45,7 @@ class DeliveryOrderSourceValidator
             return [];
         }
 
-        $orders = SaleOrder::withoutGlobalScopes()->with('customer')->whereIn('id', $ids)->get()->keyBy('id');
+        $orders = SaleOrder::withoutGlobalScope(CabangScope::class)->with('customer')->whereIn('id', $ids)->get()->keyBy('id');
         $linked = collect($alreadyLinkedIds)->map(fn ($v) => (int) $v)->all();
         $errors = [];
 
@@ -89,7 +90,7 @@ class DeliveryOrderSourceValidator
             return [];
         }
 
-        $orders = SaleOrder::withoutGlobalScopes()->whereIn('id', $ids)->get();
+        $orders = SaleOrder::withoutGlobalScope(CabangScope::class)->whereIn('id', $ids)->get();
         $errors = [];
 
         if ($orders->pluck('customer_id')->unique()->count() > 1) {

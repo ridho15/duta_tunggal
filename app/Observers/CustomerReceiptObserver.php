@@ -69,6 +69,10 @@ class CustomerReceiptObserver
 
     public function created(CustomerReceipt $receipt)
     {
+        // ID baru tidak boleh mewarisi penanda dari baris lama yang ber-ID sama
+        // (transaksi di-rollback / proses berumur panjang) — jika tidak, update AR terlewat.
+        unset(self::$arUpdatedInCreate[$receipt->id]);
+
         // Post journal for both partial and full receipts
         if (in_array(strtolower($receipt->status ?? ''), ['partial', 'paid'])) {
             // Avoid double posting journals: only post if none exist yet

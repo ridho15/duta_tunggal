@@ -897,3 +897,19 @@ Dikecualikan otomatis: `1110`, `1111`, `1112`, `1112.xx` (induk berkode), semua 
 1. `php artisan migrate` (migrasi `2026_09_20_190000_add_cogs_snapshot_to_invoice_items_table`; kode aman sebelum dijalankan — snapshot dilewati).
 2. `php artisan invoices:backfill-cogs` (dry-run) → tinjau **selisih terhadap jurnal HPP** → `--apply`.
 3. UAT: buka Laporan Penjualan (default Invoice) → periksa HPP, margin, status pembayaran dan baris "Rekonsiliasi HPP dengan Jurnal" → **cocokkan total HPP dan penjualan dengan Laba Rugi periode yang sama** (gerbang keluar Fase 6) → ekspor Excel/PDF.
+
+## Audit ulang Fase 1–6 pasca-revert `8eedb05`, 20 September 2026
+
+**Pertanyaan:** apakah `git revert 8eedb05` (yang mengembalikan mask uang di `AppServiceProvider`) membatalkan pekerjaan Fase 1–6? **Tidak.** Revert itu hanya menyentuh **satu baris** (`AppServiceProvider.php:156`); seluruh berkas Fase 1–6 identik dengan commit `4dde7aa`. Mask Indonesia `$money($input, ',', '.', 2)` justru **dibutuhkan** Fase 1 (state form berformat `8.687,00`); mask `('.', ',')` akan kembali memunculkan bug 100× (`8687.00` → `868.700`).
+
+**Yang dilakukan:** 200 tes fase + 1 tes end-to-end (`SalesFlowEndToEndFase1to6Test`, 77 assertion, mutasi terverifikasi) dan suite penuh dibandingkan per nama tes dengan baseline `c1c4c72` (DB uji terpisah, dijalankan per potongan 30 berkas — suite tunggal crash memori karena `IncreaseMemoryLimit`/API controller memaksa `memory_limit=512M`, juga terjadi pada baseline).
+
+**Temuan & perbaikan:**
+1. `CustomerReceiptObserver::$arUpdatedInCreate` (static, sudah ada sebelum Fase 5A) menyimpan ID penerimaan yang AR-nya sudah diperbarui dan tidak pernah dibersihkan → ID baru yang sama (rollback/proses panjang) melewati pembaruan AR. Kini dibersihkan pada `created()`.
+2. Tes Fase 5A men-*drop* kolom `is_cash_bank` (DDL = implicit commit, bertahan lintas tes) tanpa memulihkannya → kini dipulihkan di `finally`.
+3. `QuotationService::expireOverdue` memakai `withoutGlobalScopes()` (ikut melepas SoftDeletes → quotation terhapus bisa dikedaluwarsakan) → kini scope default dipakai.
+4. `DeliveryOrderSourceValidator` memakai `withoutGlobalScopes()` (SO terhapus lolos validasi) → kini hanya `CabangScope` yang dilepas.
+5. `SalesReportPage` membuat `SalesReportService` baru tiap sel sehingga cache baris tidak terpakai → di-memoize per request.
+6. `tests/Feature/Api/QuotationApiTest` & `SaleOrderApiTest` tidak memberi izin ke pengguna uji; sejak Fase 3 endpoint tulis memeriksa izin (403) → tes kini memberi izin eksplisit dan memakai factory produk.
+
+**Hasil pembanding suite penuh:** kegagalan di tree ini ⊆ kegagalan baseline, kecuali satu tes yang bergantung urutan/ID keras (`UATUIUXAuditVerificationTest::po item refer item label…`, memakai `cabang_id => 1`; gagal/lolos tergantung posisinya dalam proses, identik pada kedua tree bila dijalankan terisolasi). ~210 kegagalan lain sudah ada di baseline dan tidak terkait Fase 1–6.

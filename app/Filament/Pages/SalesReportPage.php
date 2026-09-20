@@ -411,8 +411,11 @@ class SalesReportPage extends Page implements HasTable
         ];
     }
 
+    private ?SalesReportService $salesReportServiceInstance = null;
+
     private function salesReportService(): SalesReportService
     {
-        return app(SalesReportService::class);
+        // Satu instance per request agar cache baris (invoiceRowCache, dst.) benar-benar terpakai.
+        return $this->salesReportServiceInstance ??= app(SalesReportService::class);
     }
 }
