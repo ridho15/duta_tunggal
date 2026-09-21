@@ -83,6 +83,12 @@ class DeliveryOrderItem extends Model
             // Sync journal entries, stock movements, and delivered quantities when quantity changes
             if ($deliveryOrderItem->isDirty('quantity')) {
                 $deliveryOrder = $deliveryOrderItem->deliveryOrder;
+
+                // T2.1 (flag stock.ledger): edit kuantitas (mis. checker) saat DO masih Siap Kirim → reservasi ikut turun/naik.
+                if ($deliveryOrder && $deliveryOrder->status === 'approved' && config('sales.stock.ledger', false)) {
+                    app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
+                }
+
                 if ($deliveryOrder && in_array($deliveryOrder->status, ['sent', 'received', 'completed'])) {
                     // Sync journal entries if they exist
                     self::syncJournalEntries($deliveryOrder);

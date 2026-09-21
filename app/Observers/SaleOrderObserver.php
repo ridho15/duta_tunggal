@@ -64,9 +64,13 @@ class SaleOrderObserver
             return;
         }
 
-        StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
-            $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available & decrements qty_reserved
-        });
+        if (config('sales.stock.ledger', false)) {
+            app(\App\Services\StockReservationLedger::class)->releaseForSaleOrder($saleOrder->id, "SO {$saleOrder->so_number} dibatalkan");
+        } else {
+            StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+                $reservation->delete(); // triggers StockReservationObserver::deleted → decrements qty_reserved
+            });
+        }
 
         Log::info('SaleOrderObserver: Released stock reservations for canceled SO', [
             'sale_order_id' => $saleOrder->id,

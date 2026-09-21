@@ -46,6 +46,11 @@ class DeliveryOrderObserver
             $this->handleQuantityUpdateAfterCompleted($deliveryOrder);
         }
 
+        // T2.1 (flag stock.ledger): DO ditutup/ditolak → reservasi DO dilepas lewat buku besar.
+        if ($deliveryOrder->wasChanged('status') && in_array($newStatus, ['closed', 'reject'], true) && $this->ledgerEnabled()) {
+            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} {$newStatus}");
+        }
+
         // Perubahan status lain (mis. delivery_failed, closed, reject, kembali ke draft) juga
         // dapat mengubah kuantitas terkirim/terikat -> sinkronkan progres SO.
         // sent & completed sudah disinkronkan di handler masing-masing.
@@ -60,6 +65,30 @@ class DeliveryOrderObserver
     public function restored(DeliveryOrder $deliveryOrder): void
     {
         $this->syncDeliveryProgress($deliveryOrder);
+    }
+
+    /** Buku besar reservasi & pengiriman idempoten (flag sales.stock.ledger, T2.1). */
+    protected function ledgerEnabled(): bool
+    {
+        return (bool) config('sales.stock.ledger', false);
+    }
+
+    /**
+     * Kuantitas item DO yang SUDAH keluar gudang (gerakan `sales`) dikurangi yang sudah dikembalikan (`adjustment_in`
+     * berasal dari item DO yang sama — pengembalian gagal-kirim, T2.3).
+     */
+    protected function netShipped($item, int $warehouseId, ?int $rakId): float
+    {
+        $base = \App\Models\StockMovement::query()
+            ->where('from_model_type', \App\Models\DeliveryOrderItem::class)
+            ->where('from_model_id', $item->id)
+            ->where('warehouse_id', $warehouseId)
+            ->when($rakId, fn ($q) => $q->where('rak_id', $rakId), fn ($q) => $q->whereNull('rak_id'));
+
+        $shipped = (float) (clone $base)->where('type', 'sales')->sum('quantity');
+        $returned = (float) (clone $base)->where('type', 'adjustment_in')->sum('quantity');
+
+        return max(0.0, $shipped - $returned);
     }
 
     /**
@@ -80,6 +109,13 @@ class DeliveryOrderObserver
             'delivery_order_id' => $deliveryOrder->id,
             'do_number' => $deliveryOrder->do_number,
         ]);
+
+        // T2.1 (flag stock.ledger): reservasi DO lewat buku besar (idempoten, tercatat, kuantitas ≤ item DO).
+        if ($this->ledgerEnabled()) {
+            app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "DO {$deliveryOrder->do_number} disetujui (Siap Kirim)");
+
+            return;
+        }
 
         $deliveryOrder->loadMissing('deliveryOrderItem.warehouseSources');
 
@@ -159,6 +195,16 @@ class DeliveryOrderObserver
         // =========================================================
         $this->createStockMovementsForShippingStart($deliveryOrder);
 
+        // T2.1 (flag stock.ledger): reservasi DO DIKONSUMSI saat barang berangkat — gerakan stok fisik sudah dibuat di atas.
+        // Tanpa ini reservasi tidak pernah dilepas dan stok bebas terus menyusut (reservasi yatim, temuan X1).
+        if ($this->ledgerEnabled()) {
+            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder(
+                $deliveryOrder->id,
+                "DO {$deliveryOrder->do_number} dikirim — reservasi dikonsumsi",
+                \App\Models\StockReservationEvent::CONSUMED
+            );
+        }
+
         // =========================================================
         // JANGAN hapus StockReservation - biarkan untuk tracking
         // qty_reserved tetap ada sampai delivery selesai
@@ -206,6 +252,15 @@ class DeliveryOrderObserver
                         continue;
                     }
 
+                    // T2.1 (flag stock.ledger): idempoten — jangan memotong stok dua kali untuk kuantitas yang sudah keluar
+                    // (mis. DO gagal kirim lalu dijadwalkan ulang).
+                    if ($this->ledgerEnabled()) {
+                        $sourceQty = max(0, $sourceQty - $this->netShipped($item, (int) $source->warehouse_id, $source->rak_id));
+                        if ($sourceQty <= 0) {
+                            continue;
+                        }
+                    }
+
                     $productService->createStockMovement(
                         product_id: $product->id,
                         warehouse_id: $source->warehouse_id,
@@ -229,6 +284,13 @@ class DeliveryOrderObserver
             // Single warehouse
             if (!$deliveryOrder->warehouse_id) {
                 continue;
+            }
+
+            if ($this->ledgerEnabled()) {
+                $qtyToShip = max(0, $qtyToShip - $this->netShipped($item, (int) $deliveryOrder->warehouse_id, $item->rak_id));
+                if ($qtyToShip <= 0) {
+                    continue;
+                }
             }
 
             $productService->createStockMovement(
@@ -430,9 +492,13 @@ class DeliveryOrderObserver
         }
 
         // Delete related stock reservations
-        $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        foreach ($reservations as $reservation) {
-            $reservation->delete();
+        if ($this->ledgerEnabled()) {
+            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} dihapus");
+        } else {
+            $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
+            foreach ($reservations as $reservation) {
+                $reservation->delete();
+            }
         }
 
         // DO dihapus: hitung ulang progres SO (kuantitas DO ini kembali ke SO).

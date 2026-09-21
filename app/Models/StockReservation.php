@@ -10,6 +10,7 @@ class StockReservation extends Model
     use HasFactory;
     protected $fillable = [
         'sale_order_id',
+        'sale_order_item_id',
         'material_issue_id',
         'product_id',
         'quantity',
@@ -21,6 +22,11 @@ class StockReservation extends Model
     public function saleOrder()
     {
         return $this->belongsTo(SaleOrder::class);
+    }
+
+    public function saleOrderItem()
+    {
+        return $this->belongsTo(SaleOrderItem::class);
     }
 
     public function materialIssue()
