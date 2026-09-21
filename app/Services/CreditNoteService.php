@@ -135,6 +135,41 @@ class CreditNoteService
         });
     }
 
+    /**
+     * Nota Kredit tipe retur dari item retur berkeputusan "Refund / Nota Kredit" (D38). Stok dan HPP sudah dijurnal
+     * CustomerReturnService (seperti Penggantian) — di sini hanya sisi uang; kuantitas ≤ sisa yang dapat dikreditkan.
+     *
+     * @throws ValidationException
+     */
+    public function draftFromReturn(\App\Models\CustomerReturn $customerReturn, ?User $actor = null): CreditNote
+    {
+        $this->assertEnabled();
+
+        if (! in_array($customerReturn->status, [\App\Models\CustomerReturn::STATUS_APPROVED, \App\Models\CustomerReturn::STATUS_COMPLETED], true)) {
+            throw ValidationException::withMessages(['customer_return' => "Retur {$customerReturn->return_number} belum disetujui/selesai; Nota Kredit dibuat setelah barang diterima dan diputuskan."]);
+        }
+        if (CreditNote::query()->where('customer_return_id', $customerReturn->id)->exists()) {
+            throw ValidationException::withMessages(['customer_return' => "Retur {$customerReturn->return_number} sudah memiliki Nota Kredit."]);
+        }
+
+        $quantities = [];
+        foreach ($customerReturn->customerReturnItems()->where('decision', \App\Models\CustomerReturnItem::DECISION_CREDIT)->whereNotNull('invoice_item_id')->get() as $line) {
+            $quantities[$line->invoice_item_id] = ($quantities[$line->invoice_item_id] ?? 0) + (float) $line->quantity;
+        }
+        if ($quantities === []) {
+            throw ValidationException::withMessages(['customer_return' => "Retur {$customerReturn->return_number} tidak memiliki item berkeputusan \"Refund / Nota Kredit\" yang terhubung ke baris invoice."]);
+        }
+
+        return $this->draft(
+            $customerReturn->invoice,
+            CreditNote::TYPE_RETURN,
+            $quantities,
+            "Retur {$customerReturn->return_number}: ".trim((string) $customerReturn->reason),
+            ['customer_return_id' => $customerReturn->id, 'credit_date' => ($customerReturn->completed_at ?? now())->toDateString()],
+            $actor
+        );
+    }
+
     /** Hapus draf (yang sudah terbit FINAL — D36). */
     public function deleteDraft(CreditNote $creditNote): void
     {

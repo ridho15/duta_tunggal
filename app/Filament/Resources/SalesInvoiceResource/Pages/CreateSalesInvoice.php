@@ -41,7 +41,7 @@ class CreateSalesInvoice extends CreateRecord
         $selectedDos = $data['selected_delivery_orders'] ?? $data['delivery_orders'] ?? [];
         if (!empty($selectedDos)) {
             $alreadyInvoicedDos = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
-                ->where('status', '!=', 'canceled')
+                ->whereNotIn('status', ['canceled', 'cancelled'])
                 ->where(function ($q) use ($selectedDos) {
                     foreach ((array) $selectedDos as $doId) {
                         $q->orWhereJsonContains('delivery_orders', (int) $doId);

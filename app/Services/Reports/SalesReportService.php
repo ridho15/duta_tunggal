@@ -49,10 +49,10 @@ class SalesReportService
     ];
 
     /**
-     * Invoice yang tidak dihitung sebagai penjualan. Enum invoices.status hanya draft/sent/paid/partially_paid/overdue/unpaid
-     * (invoice tidak punya status "batal"; pembatalan dilakukan lewat pembalikan jurnal).
+     * Invoice yang tidak dihitung sebagai penjualan: draf dan yang DIBATALKAN (T5: Nota Kredit penuh membalik seluruh nilainya,
+     * sehingga penjualan bersihnya nol). Penulisan `canceled` dipertahankan untuk data/kode lama.
      */
-    public const EXCLUDED_INVOICE_STATUSES = ['draft'];
+    public const EXCLUDED_INVOICE_STATUSES = ['draft', 'cancelled', 'canceled'];
 
     private const TOLERANCE = 0.005;
 
@@ -61,6 +61,9 @@ class SalesReportService
 
     /** @var array<int, array<string, mixed>> */
     private array $deliveryRowCache = [];
+
+    /** Ada Nota Kredit terbit di sistem? (satu kueri per instance; tanpa Nota Kredit laporan tidak menambah kueri apa pun.) */
+    private ?bool $hasIssuedCreditNotes = null;
 
     // ───────────────────────────── Mode, status, dan label ─────────────────────────────
 
@@ -231,6 +234,7 @@ class SalesReportService
 
         $invoice->loadMissing(['invoiceItem.product', 'accountReceivable', 'fromModel.customer', 'cabang']);
         $lines = $this->invoiceLines($invoice);
+        $creditTotal = $this->creditNoteTotal($invoice);   // T5: penjualan BERSIH setelah Nota Kredit terbit
 
         $dpp = $lines->isNotEmpty() ? (float) $lines->sum('dpp') : (float) ($invoice->subtotal ?? $invoice->dpp ?? 0);
         $ppn = $lines->isNotEmpty() ? (float) $lines->sum('ppn') : (float) $invoice->ppn_amount;
@@ -251,8 +255,9 @@ class SalesReportService
             'do_numbers' => $deliveryOrderNumbers,
             'dpp' => $dpp,
             'ppn' => $ppn,
-            'total' => (float) $invoice->total,
-            'other_fees' => round((float) $invoice->total - (float) $lines->sum('total'), 2),
+            'total' => round((float) $invoice->total - $creditTotal, 2),
+            'credit_note_total' => $creditTotal,
+            'other_fees' => round((float) $invoice->total - $creditTotal - (float) $lines->sum('total'), 2),
             'hpp' => $hpp,
             'hpp_estimated' => $lines->contains(fn ($line) => $line['hpp_source'] === InvoiceItem::COGS_SOURCE_ESTIMATE),
             'margin' => $margin,
@@ -276,9 +281,12 @@ class SalesReportService
     {
         $invoice->loadMissing('invoiceItem.product');
 
-        return $invoice->invoiceItem->map(function (InvoiceItem $item) use ($invoice) {
+        $adjustments = $this->creditAdjustments($invoice);
+
+        return $invoice->invoiceItem->map(function (InvoiceItem $item) use ($invoice, $adjustments) {
             $item->setRelation('invoice', $invoice);
             $b = $item->breakdown();
+            $credit = $adjustments[$item->id] ?? null;
 
             if ($item->cogs_amount !== null) {
                 $hpp = (float) $item->cogs_amount;
@@ -286,6 +294,17 @@ class SalesReportService
             } else {
                 $hpp = round((float) $item->quantity * (float) ($item->product?->cost_price ?? 0), 2);
                 $source = InvoiceItem::COGS_SOURCE_ESTIMATE;
+            }
+
+            // T5: Nota Kredit terbit mengurangi DPP/PPN/total baris; HPP hanya berkurang untuk retur FISIK (barang kembali ke stok)
+            if ($credit) {
+                $b['dpp'] = round($b['dpp'] - $credit['subtotal'], 2);
+                $b['ppn'] = round($b['ppn'] - $credit['tax'], 2);
+                $b['total'] = round($b['total'] - $credit['subtotal'] - $credit['tax'], 2);
+                if ($credit['returned_qty'] > 0 && (float) $b['quantity'] > 0) {
+                    $hpp = round($hpp * max(0.0, ((float) $b['quantity'] - $credit['returned_qty']) / (float) $b['quantity']), 2);
+                }
+                $b['quantity'] = round((float) $b['quantity'] - $credit['quantity'], 2);
             }
 
             return [
@@ -305,6 +324,48 @@ class SalesReportService
                 'margin_pct' => $b['dpp'] > 0 ? round(($b['dpp'] - $hpp) / $b['dpp'] * 100, 2) : 0.0,
             ];
         })->values();
+    }
+
+    /** Σ Nota Kredit TERBIT atas invoice ini (total termasuk biaya pengiriman). */
+    private function creditNoteTotal(Invoice $invoice): float
+    {
+        if (! $this->creditNotesExist()) {
+            return 0.0;
+        }
+
+        return round((float) \App\Models\CreditNote::query()->where('invoice_id', $invoice->id)->where('status', \App\Models\CreditNote::STATUS_ISSUED)->sum('total'), 2);
+    }
+
+    /**
+     * Nota Kredit terbit per baris invoice: DPP, PPN, kuantitas, dan kuantitas RETUR FISIK (tipe retur) untuk pengurang HPP.
+     *
+     * @return array<int, array{subtotal: float, tax: float, quantity: float, returned_qty: float}>
+     */
+    private function creditAdjustments(Invoice $invoice): array
+    {
+        if (! $this->creditNotesExist()) {
+            return [];
+        }
+
+        return \App\Models\CreditNoteItem::query()
+            ->join('credit_notes', 'credit_notes.id', '=', 'credit_note_items.credit_note_id')
+            ->whereNull('credit_notes.deleted_at')
+            ->where('credit_notes.invoice_id', $invoice->id)
+            ->where('credit_notes.status', \App\Models\CreditNote::STATUS_ISSUED)
+            ->whereNotNull('credit_note_items.invoice_item_id')
+            ->selectRaw("credit_note_items.invoice_item_id as item_id, SUM(credit_note_items.subtotal) as subtotal, SUM(credit_note_items.tax_amount) as tax, SUM(credit_note_items.quantity) as quantity, SUM(CASE WHEN credit_notes.type = 'retur' THEN credit_note_items.quantity ELSE 0 END) as returned_qty")
+            ->groupBy('credit_note_items.invoice_item_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->item_id => [
+                'subtotal' => (float) $row->subtotal, 'tax' => (float) $row->tax, 'quantity' => (float) $row->quantity, 'returned_qty' => (float) $row->returned_qty,
+            ]])
+            ->all();
+    }
+
+    private function creditNotesExist(): bool
+    {
+        return $this->hasIssuedCreditNotes ??= \Illuminate\Support\Facades\Schema::hasTable('credit_notes')
+            && \App\Models\CreditNote::query()->where('status', \App\Models\CreditNote::STATUS_ISSUED)->exists();
     }
 
     /** belum | sebagian | lunas | jatuh_tempo — dari Account Receivable (fallback: status invoice). */

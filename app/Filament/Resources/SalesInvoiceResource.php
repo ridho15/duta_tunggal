@@ -320,7 +320,7 @@ class SalesInvoiceResource extends Resource
                                         // Check which DOs are already invoiced (exclude canceled invoices and current invoice if editing)
                                         $invoicedDOIds = Invoice::where('from_model_type', 'App\Models\SaleOrder')
                                             ->whereNotNull('delivery_orders')
-                                            ->where('status', '!=', 'canceled')
+                                            ->whereNotIn('status', ['canceled', 'cancelled'])
                                             ->when($currentInvoiceId, function ($query) use ($currentInvoiceId) {
                                                 return $query->where('id', '!=', $currentInvoiceId);
                                             })

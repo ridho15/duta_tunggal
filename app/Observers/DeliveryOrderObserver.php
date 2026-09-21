@@ -372,7 +372,7 @@ class DeliveryOrderObserver
 
         // Cek apakah DO ini atau SO terkait sudah pernah dibuatkan invoice aktif
         $existingInvoice = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
-            ->where('status', '!=', 'canceled')
+            ->whereNotIn('status', ['canceled', 'cancelled'])
             ->where(function ($q) use ($deliveryOrder, $primarySo) {
                 $q->whereJsonContains('delivery_orders', $deliveryOrder->id)
                   ->orWhere(function ($sub) use ($primarySo) {

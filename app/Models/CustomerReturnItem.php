@@ -15,11 +15,14 @@ class CustomerReturnItem extends Model
     const DECISION_REPAIR  = 'repair';
     const DECISION_REPLACE = 'replace';
     const DECISION_REJECT  = 'reject';
+    /** T5 (D38): barang kembali ke stok (seperti Penggantian) dan sisi uang ditutup Nota Kredit tipe retur. */
+    const DECISION_CREDIT  = 'credit';
 
     const DECISION_LABELS = [
         self::DECISION_REPAIR  => 'Perbaikan',
         self::DECISION_REPLACE => 'Penggantian',
         self::DECISION_REJECT  => 'Klaim Ditolak',
+        self::DECISION_CREDIT  => 'Refund / Nota Kredit',
     ];
 
     const QC_RESULT_PASS = 'pass';
