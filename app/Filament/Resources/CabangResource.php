@@ -14,6 +14,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -176,7 +177,33 @@ class CabangResource extends Resource
                         Checkbox::make('status')
                             ->label('Status (Aktif / Tidak Aktif)')
                             ->default(false),
-                    ])
+                    ]),
+                Fieldset::make('Kop Dokumen (Invoice, Delivery Order, Kwitansi, Nota Kredit, Retur)')
+                    ->schema([
+                        TextInput::make('nama_legal')
+                            ->label('Nama Legal Perusahaan')
+                            ->helperText('Kosong = memakai pengaturan global (Pengaturan Aplikasi).')
+                            ->maxLength(150),
+                        TextInput::make('npwp')
+                            ->label('NPWP')
+                            ->maxLength(40),
+                        Textarea::make('alamat_pajak')
+                            ->label('Alamat Pajak')
+                            ->helperText('Dicetak pada dokumen berpajak; kosong = memakai Alamat cabang.')
+                            ->columnSpanFull(),
+                        Repeater::make('rekening')
+                            ->label('Rekening Bank untuk Pembayaran')
+                            ->schema([
+                                TextInput::make('bank')->label('Bank')->required()->maxLength(60),
+                                TextInput::make('number')->label('No. Rekening')->required()->maxLength(40),
+                                TextInput::make('holder')->label('Atas Nama')->maxLength(100),
+                                TextInput::make('branch')->label('Kantor Cabang Bank')->maxLength(100),
+                            ])
+                            ->columns(4)
+                            ->addActionLabel('+ Tambah Rekening')
+                            ->defaultItems(0)
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 

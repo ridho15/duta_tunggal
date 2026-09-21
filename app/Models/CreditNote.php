@@ -82,6 +82,11 @@ class CreditNote extends Model
         return $this->belongsTo(User::class, 'created_by')->withDefault();
     }
 
+    public function issuedBy()
+    {
+        return $this->belongsTo(User::class, 'issued_by');
+    }
+
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
