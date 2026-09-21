@@ -642,6 +642,20 @@ test('sales order can be confirmed by warehouse', function () {
         'keterangan' => 'Warehouse confirmation test',
     ]);
 
+    $product = Product::create([
+        'name' => 'Confirm Product',
+        'sku' => 'PRODCONF',
+        'cabang_id' => $this->cabang->id,
+        'product_category_id' => $this->productCategory->id,
+        'sell_price' => 100000,
+        'cost_price' => 80000,
+        'kode_merk' => 'CONFIRM',
+        'uom_id' => $this->uom->id,
+        'is_active' => true,
+        'is_manufacture' => false,
+        'is_raw_material' => false,
+    ]);
+
     $salesOrder = SaleOrder::create([
         'so_number' => 'SO-20251101-0006',
         'customer_id' => $customer->id,
@@ -652,9 +666,25 @@ test('sales order can be confirmed by warehouse', function () {
         'created_by' => 1,
     ]);
 
-    // Warehouse confirms the order
-    $result = $this->salesOrderService->confirm($salesOrder);
-    expect($result)->toBeTrue();
+    $item = SaleOrderItem::create([
+        'sale_order_id' => $salesOrder->id,
+        'product_id' => $product->id,
+        'quantity' => 2,
+        'unit_price' => 100000,
+        'discount' => 0,
+        'tax' => 11,
+        'warehouse_id' => $this->warehouse->id,
+        'rak_id' => null,
+    ]);
+
+    // Gudang mengonfirmasi seluruh item (jalur konfirmasi gudang SO; SalesOrderService::confirm() lama sudah dihapus di T2.6)
+    Auth::login(User::factory()->create(['cabang_id' => $this->cabang->id]));
+    $this->salesOrderService->confirmWarehouse($salesOrder, [
+        'status' => 'confirmed',
+        'items' => [[
+            'sale_order_item_id' => $item->id, 'confirmed_qty' => 2, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null, 'status' => 'confirmed',
+        ]],
+    ]);
 
     $salesOrder->refresh();
     expect($salesOrder->status)->toBe('confirmed');
@@ -812,11 +842,11 @@ test('sales order reserves stock', function () {
         'is_raw_material' => false,
     ]);
 
-    // Create inventory stock for the product
+    // Stok berada di RAK yang dipilih item (reservasi item ber-rak dihitung pada rak itu saja)
     InventoryStock::updateOrCreate([
         'product_id' => $product->id,
         'warehouse_id' => $this->warehouse->id,
-        'rak_id' => null,
+        'rak_id' => $this->rak->id,
     ], [
         'qty_available' => 10,
         'qty_reserved' => 0,
@@ -844,12 +874,10 @@ test('sales order reserves stock', function () {
         'rak_id' => $this->rak->id,
     ]);
 
-    // Confirm the sales order to trigger stock reservation
-    $result = $this->salesOrderService->confirm($salesOrder);
-    expect($result)->toBeTrue();
-
-    $salesOrder->refresh();
-    expect($salesOrder->status)->toBe('confirmed');
+    // Reservasi stok kini disusun SaleOrderReservationSynchronizer sejak SO Approved (flag reserve_on_so_approve, T2.4),
+    // bukan oleh SalesOrderService::confirm() yang lama.
+    config(['sales.stock.reserve_on_so_approve' => true]);
+    app(\App\Services\SaleOrderReservationSynchronizer::class)->sync($salesOrder);
 
     // Check stock reservation
     $reservation = StockReservation::where('sale_order_id', $salesOrder->id)->first();
