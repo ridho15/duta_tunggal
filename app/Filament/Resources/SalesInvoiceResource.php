@@ -971,6 +971,7 @@ class SalesInvoiceResource extends Resource
 
                 BadgeColumn::make('status')
                     ->label('Status')
+                    ->formatStateUsing(\App\Support\StatusLabels::formatter('invoice'))
                     ->colors([
                         'secondary' => 'draft',
                         'warning' => 'sent',

@@ -327,6 +327,7 @@ class WarehouseConfirmationResource extends Resource
 
                 TextColumn::make('status')
                     ->badge()
+                    ->formatStateUsing(\App\Support\StatusLabels::formatter('warehouse_confirmation'))
                     ->color(function ($state) {
                         return match (strtolower($state)) {
                             'confirmed' => 'success',

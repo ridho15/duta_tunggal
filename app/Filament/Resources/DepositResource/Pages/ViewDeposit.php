@@ -87,6 +87,7 @@ class ViewDeposit extends ViewRecord
                                     }),
                                 Infolists\Components\TextEntry::make('status')
                                     ->badge()
+                                    ->formatStateUsing(\App\Support\StatusLabels::formatter('deposit'))
                                     ->color(fn (string $state): string => match ($state) {
                                         'active' => 'success',
                                         'closed' => 'danger',

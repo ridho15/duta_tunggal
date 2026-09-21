@@ -60,6 +60,7 @@ class ViewSalesInvoice extends ViewRecord
                                 TextEntry::make('status')
                                     ->label('Status')
                                     ->badge()
+                                    ->formatStateUsing(\App\Support\StatusLabels::formatter('invoice'))
                                     ->color(fn (string $state): string => match ($state) {
                                         'draft' => 'gray',
                                         'unpaid' => 'gray',

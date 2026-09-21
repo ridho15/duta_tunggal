@@ -622,6 +622,7 @@ class CustomerReceiptResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
+                    ->formatStateUsing(\App\Support\StatusLabels::formatter('customer_receipt'))
                     ->colors([
                         'secondary' => 'Draft',
                         'warning' => 'Partial',
@@ -920,6 +921,7 @@ class CustomerReceiptResource extends Resource
                             }),
                         TextEntry::make('status')
                             ->badge()
+                            ->formatStateUsing(\App\Support\StatusLabels::formatter('customer_receipt'))
                             ->color(fn(string $state): string => match ($state) {
                                 'Draft' => 'gray',
                                 'Partial' => 'warning',

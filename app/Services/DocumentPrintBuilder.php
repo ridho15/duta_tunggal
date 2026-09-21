@@ -127,7 +127,7 @@ class DocumentPrintBuilder
             'title' => 'DELIVERY ORDER',
             'number' => (string) $deliveryOrder->do_number,
             'watermark' => $this->watermark($deliveryOrder->status),
-            'status_label' => ucfirst(str_replace('_', ' ', (string) $deliveryOrder->status)),
+            'status_label' => \App\Support\StatusLabels::label('delivery_order', $deliveryOrder->status),
             'meta' => $this->meta([
                 'No. Delivery Order' => $deliveryOrder->do_number,
                 'Tanggal' => $this->date($deliveryOrder->delivery_date),

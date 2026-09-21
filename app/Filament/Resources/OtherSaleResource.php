@@ -229,6 +229,7 @@ class OtherSaleResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
+                    ->formatStateUsing(\App\Support\StatusLabels::formatter('other_sale'))
                     ->color(fn(string $state): string => match ($state) {
                         'draft' => 'warning',
                         'posted' => 'success',

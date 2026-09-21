@@ -113,6 +113,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                         Infolists\Components\TextEntry::make('status')
                             ->badge()
+                            ->formatStateUsing(\App\Support\StatusLabels::formatter('warehouse_confirmation'))
                             ->color(function($state){
                                 return match (strtolower($state)) {
                                     'confirmed' => 'success',
@@ -279,6 +280,7 @@ class ViewWarehouseConfirmation extends ViewRecord
 
                                 Infolists\Components\TextEntry::make('status')
                                     ->badge()
+                                    ->formatStateUsing(\App\Support\StatusLabels::formatter('warehouse_confirmation'))
                                     ->color(fn(string $state): string => match (strtolower($state)) {
                                         'confirmed' => 'success',
                                         'partial_confirmed' => 'warning',

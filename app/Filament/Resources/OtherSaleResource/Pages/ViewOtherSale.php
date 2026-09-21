@@ -132,6 +132,7 @@ class ViewOtherSale extends Page implements HasTable
                                 Infolists\Components\TextEntry::make('status')
                                     ->label('Status')
                                     ->badge()
+                                    ->formatStateUsing(\App\Support\StatusLabels::formatter('other_sale'))
                                     ->color(fn (string $state): string => match ($state) {
                                         'draft' => 'gray',
                                         'posted' => 'success',
