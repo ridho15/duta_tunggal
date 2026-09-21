@@ -429,7 +429,7 @@ Pemilik menjawab **"lanjut"** atas rencana T0/T1 (`docs/PLAN-T0-T1-PENJUALAN.md`
 | **D1–D5** | Rekomendasi **disetujui** (21 September 2026: "setuju D1-D5") — reservasi saat SO Approved; blokir approve stok kurang kecuali backorder beralasan; stok lintas cabang ikut `lihat_stok_cabang_lain`; DO "Siap Kirim" + aksi Kirim/Diterima; jadwal wajib Mulai dulu | ✅ |
 | **D15** | Stok negatif saat Dikirim: **blokir** (pengecualian beralasan Owner/Super Admin) — disetujui 21 September 2026 ("setuju") | ✅ |
 | **D17–D23** | Keputusan turunan T2 (`docs/PLAN-T2-STOK-PENGIRIMAN.md` §2.2): seluruh rekomendasi **disetujui** 21 September 2026 ("setuju") | ✅ |
-| **D6–D14** | Rekomendasi belum dikonfirmasi; wajib dijawab sebelum T3/T4 | ⏳ menunggu |
+| **D6–D14** | Seluruh rekomendasi **disetujui** 21 September 2026 ("setuju D6-D14"): D6 ambang & peran dapat diatur (awal = perilaku sekarang, berlaku juga untuk Quotation); D7 Kredit=blokir, COD/Bebas=informasi, limit 0 pada Kredit=tidak diizinkan; D8 hanya jalur koreksi (tanpa buka kunci dokumen berjurnal); D9 11 kunci akun, Finance Manager + Super Admin, tercatat 🧾; D10 balik PPN di jurnal, sisa terbayar → Deposit, refund tunai lewat pengajuan berapproval 🧾; D11 `{PREFIX}-{KODECABANG}-{YYMM}-{SEQ4}` reset bulanan per cabang; D12 kop per Cabang fallback global 🧾; D13 2–3 aksi utama + menu "Lainnya"; D14 gabung customer dipilih bisnis dari CSV, di luar jam kerja dengan cadangan | ✅ |
 
 ---
 
