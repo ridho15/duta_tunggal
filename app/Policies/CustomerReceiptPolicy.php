@@ -37,6 +37,11 @@ class CustomerReceiptPolicy
      */
     public function update(User $user, CustomerReceipt $customerReceipt): bool
     {
+        // T3.3 (flag sales.controls.doc_lock): penerimaan berjurnal tidak diubah/dihapus langsung — gunakan Batalkan Penerimaan.
+        if (\App\Services\DocumentLock::blocks($customerReceipt, 'update')) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update customer receipt');
     }
 
@@ -45,6 +50,11 @@ class CustomerReceiptPolicy
      */
     public function delete(User $user, CustomerReceipt $customerReceipt): bool
     {
+        // T3.3 (flag sales.controls.doc_lock): penerimaan berjurnal tidak diubah/dihapus langsung — gunakan Batalkan Penerimaan.
+        if (\App\Services\DocumentLock::blocks($customerReceipt, 'delete')) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete customer receipt');
     }
 

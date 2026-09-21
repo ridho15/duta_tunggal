@@ -29,6 +29,7 @@ class ViewCustomerReceipt extends ViewRecord
     {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->color('warning'),
+            \App\Filament\Support\CustomerReceiptActions::cancel(Action::make('cancel_receipt')),
             Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-document-text')

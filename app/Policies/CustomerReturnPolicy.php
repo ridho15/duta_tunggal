@@ -24,6 +24,11 @@ class CustomerReturnPolicy
 
     public function update(User $user, CustomerReturn $customerReturn): bool
     {
+        // T3.3 (flag sales.controls.doc_lock): retur yang sudah diputuskan/selesai terkunci.
+        if (\App\Services\DocumentLock::blocks($customerReturn, 'update')) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update customer return');
     }
 
@@ -39,6 +44,11 @@ class CustomerReturnPolicy
 
     public function delete(User $user, CustomerReturn $customerReturn): bool
     {
+        // T3.3 (flag sales.controls.doc_lock): retur yang sudah diputuskan/selesai terkunci.
+        if (\App\Services\DocumentLock::blocks($customerReturn, 'delete')) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete customer return');
     }
 

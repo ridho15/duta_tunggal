@@ -24,6 +24,11 @@ class DeliverySchedulePolicy
 
     public function update(User $user, DeliverySchedule $deliverySchedule): bool
     {
+        // T3.3 (flag sales.controls.doc_lock): jadwal yang sudah berjalan/selesai terkunci.
+        if (\App\Services\DocumentLock::blocks($deliverySchedule, 'update')) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update delivery schedule');
     }
 
@@ -39,6 +44,11 @@ class DeliverySchedulePolicy
 
     public function delete(User $user, DeliverySchedule $deliverySchedule): bool
     {
+        // T3.3 (flag sales.controls.doc_lock): jadwal yang sudah berjalan/selesai terkunci.
+        if (\App\Services\DocumentLock::blocks($deliverySchedule, 'delete')) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete delivery schedule');
     }
 

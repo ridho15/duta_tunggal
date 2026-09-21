@@ -626,6 +626,7 @@ class CustomerReceiptResource extends Resource
                         'secondary' => 'Draft',
                         'warning' => 'Partial',
                         'success' => 'Paid',
+                        'danger' => 'Cancelled',
                     ]),
 
                 TextColumn::make('created_at')
@@ -659,6 +660,7 @@ class CustomerReceiptResource extends Resource
                         'Draft' => 'Draft',
                         'Partial' => 'Partial',
                         'Paid' => 'Paid',
+                        'Cancelled' => 'Dibatalkan',
                     ]),
             ])
             ->actions([
@@ -667,6 +669,7 @@ class CustomerReceiptResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
+                    \App\Filament\Support\CustomerReceiptActions::cancel(\Filament\Tables\Actions\Action::make('cancel_receipt')),
                     DeleteAction::make(),
                 ]),
             ], position: ActionsPosition::BeforeColumns)
