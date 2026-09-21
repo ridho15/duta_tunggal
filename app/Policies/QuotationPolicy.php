@@ -82,6 +82,11 @@ class QuotationPolicy
 
     public function approve(User $user, Quotation $quotation): bool
     {
+        // T3.1 (flag sales.controls.approval_rules): pemisahan tugas + ambang nominal juga berlaku untuk Quotation (D6/D26).
+        if (config('sales.controls.approval_rules', false)) {
+            return app(\App\Services\ApprovalControlService::class)->canApprove($user, $quotation)['allowed'];
+        }
+
         return $user->hasPermissionTo('approve quotation');
     }
 

@@ -113,6 +113,7 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-check-badge')
                     ->extraAttributes(['wire:loading.attr' => 'disabled'])
                     ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
+                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
                     ->visible(function ($record) {
                         if ($record->status !== 'request_approve') {
                             return false;
@@ -120,7 +121,7 @@ class ViewSaleOrder extends ViewRecord
                         $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
                         return $check['allowed'];
                     })
-                    ->action(function ($record) {
+                    ->action(function ($record, array $data = []) {
                         try {
                             $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
                             if (! $check['allowed']) {
@@ -129,7 +130,7 @@ class ViewSaleOrder extends ViewRecord
                             }
 
                             $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->approve($record);
+                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null]);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
                         } catch (ValidationException $e) {
                             $messages = collect($e->errors())->flatten()->implode(' ');

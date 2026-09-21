@@ -162,10 +162,14 @@ class SalesOrderService
     }
 
     /**
-     * @param  array{backorder?: bool, reason?: string|null}  $options  backorder=true: setujui walau stok kurang (D2, alasan wajib)
+     * @param  array{backorder?: bool, reason?: string|null, override_reason?: string|null}  $options  backorder=true: setujui walau stok kurang (D2, alasan wajib);
+     *                                                                                                  override_reason: alasan override pembuat=penyetuju (Owner/Super Admin, D24)
      */
     public function approve($saleOrder, array $options = [])
     {
+        // T3.1 (flag sales.controls.approval_rules): aturan persetujuan ditegakkan DI SERVICE, bukan hanya di policy/aksi.
+        app(ApprovalControlService::class)->enforce(Auth::user(), $saleOrder, $options);
+
         // Validate customer credit limit before approving
         $saleOrder->loadMissing('customer');
         if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
@@ -207,14 +211,14 @@ class SalesOrderService
      *
      * @throws ValidationException
      */
-    public function approveAsBackorder($saleOrder, ?string $reason)
+    public function approveAsBackorder($saleOrder, ?string $reason, ?string $overrideReason = null)
     {
         $allowed = app(ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $saleOrder);
         if (! $allowed['allowed']) {
             throw ValidationException::withMessages(['approval' => $allowed['reason'] ?? 'Akses persetujuan ditolak.']);
         }
 
-        return $this->approve($saleOrder, ['backorder' => true, 'reason' => $reason]);
+        return $this->approve($saleOrder, ['backorder' => true, 'reason' => $reason, 'override_reason' => $overrideReason]);
     }
 
     /** Perilaku lama (flag block_short_approval mati): hanya alokasi gudang yang diperiksa, item tanpa alokasi lolos. */

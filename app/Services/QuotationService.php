@@ -34,8 +34,14 @@ class QuotationService
         ]);
     }
 
-    public function approve($quotation)
+    /**
+     * @param  array{override_reason?: string|null}  $options  alasan override (pembuat = penyetuju, Owner/Super Admin — D24)
+     */
+    public function approve($quotation, array $options = [])
     {
+        // T3.1 (flag sales.controls.approval_rules): pemisahan tugas + ambang nominal ditegakkan di service (D6/D26).
+        app(ApprovalControlService::class)->enforce(Auth::user(), $quotation, $options);
+
         // Quotation yang sudah lewat masa berlakunya tidak boleh disetujui: penawaran harga
         // yang disetujui harus langsung dapat dipakai.
         if ($quotation->valid_until !== null && $quotation->valid_until->copy()->startOfDay()->lt(now()->startOfDay())) {

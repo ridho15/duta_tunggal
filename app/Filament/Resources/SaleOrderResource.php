@@ -1808,6 +1808,7 @@ class SaleOrderResource extends Resource
                     })
                     ->modalSubmitActionLabel('Ya, Setujui SO')
                     ->color('success')
+                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
                     ->visible(function ($record) {
                         if ($record->status !== 'request_approve') {
                             return false;
@@ -1815,7 +1816,7 @@ class SaleOrderResource extends Resource
                         $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
                         return $check['allowed'];
                     })
-                    ->action(function ($record) {
+                    ->action(function ($record, array $data = []) {
                         try {
                             $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
                             if (! $check['allowed']) {
@@ -1824,7 +1825,7 @@ class SaleOrderResource extends Resource
                             }
 
                             $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->approve($record);
+                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null]);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
                         } catch (ValidationException $e) {
                             $messages = collect($e->errors())->flatten()->implode(' ');

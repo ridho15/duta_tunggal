@@ -2,11 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\ApprovalOverride;
+use App\Models\ApprovalRule;
 use App\Models\OrderRequest;
 use App\Models\PaymentRequest;
+use App\Models\Quotation;
 use App\Models\SaleOrder;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class ApprovalControlService
 {
@@ -113,44 +118,129 @@ class ApprovalControlService
 
     /**
      * Determine whether the user can approve the given Sales Order.
+     * (Sejak T3.1 didelegasikan ke canApprove() yang membaca aturan dari tabel approval_rules; pesan & hasil identik dengan
+     * aturan awal, sehingga pemanggil lama tidak berubah.)
      */
     public function canApproveSaleOrder(?User $user, SaleOrder $saleOrder): array
     {
+        return $this->canApprove($user, $saleOrder);
+    }
+
+    /** Jenis dokumen yang memakai aturan persetujuan generik. */
+    public function documentType(Model $document): ?string
+    {
+        return match (true) {
+            $document instanceof SaleOrder => ApprovalRule::TYPE_SALE_ORDER,
+            $document instanceof Quotation => ApprovalRule::TYPE_QUOTATION,
+            default => null,
+        };
+    }
+
+    /**
+     * Apakah $user boleh menyetujui $document (Quotation / Sales Order)? Urutan: izin → pemisahan tugas → aturan nominal.
+     *
+     * @return array{allowed: bool, reason: string|null, self_override: bool, rule_id: int|null}
+     */
+    public function canApprove(?User $user, Model $document): array
+    {
+        $type = $this->documentType($document);
+        $deny = fn (string $reason) => ['allowed' => false, 'reason' => $reason, 'self_override' => false, 'rule_id' => null];
+
+        if ($type === null) {
+            return $deny('Jenis dokumen ini tidak memiliki aturan persetujuan.');
+        }
+
         if (! $user) {
-            return ['allowed' => false, 'reason' => 'Pengguna tidak terautentikasi.'];
+            return $deny('Pengguna tidak terautentikasi.');
         }
 
-        if (! $user->hasPermissionTo('response sales order')) {
-            return ['allowed' => false, 'reason' => 'Anda tidak memiliki hak akses persetujuan Sales Order.'];
+        $label = ApprovalRule::TYPES[$type];
+        $permission = $type === ApprovalRule::TYPE_QUOTATION ? 'approve quotation' : 'response sales order';
+
+        if (! $user->hasPermissionTo($permission)) {
+            return $deny("Anda tidak memiliki hak akses persetujuan {$label}.");
         }
 
-        // 1. Anti-Self-Approval
-        if ($this->isSelfApproval($user, $saleOrder) && ! $user->hasRole(['Super Admin', 'Owner'])) {
-            return [
-                'allowed' => false,
-                'reason' => 'Pemisahan tugas (Segregation of Duties): Pembuat Sales Order tidak boleh menyetujui dokumen miliknya sendiri.',
-            ];
-        }
-
-        // 2. Nominal Tier Check
-        $amount = (float) ($saleOrder->total_amount ?? 0);
-        if ($amount > self::TIER_1_MAX_AMOUNT) {
-            if (! $user->hasRole(self::TOP_TIER_ROLES)) {
-                return [
-                    'allowed' => false,
-                    'reason' => 'Persetujuan bertingkat: Nilai Sales Order di atas Rp 10.000.000 wajib disetujui oleh Direktur / Owner / Finance Manager.',
-                ];
+        // 1. Anti-Self-Approval (Super Admin/Owner: override darurat — wajib beralasan & tercatat bila aturan T3.1 hidup, D24)
+        $selfOverride = false;
+        if ($this->isSelfApproval($user, $document)) {
+            if (! $user->hasRole(['Super Admin', 'Owner'])) {
+                return $deny("Pemisahan tugas (Segregation of Duties): Pembuat {$label} tidak boleh menyetujui dokumen miliknya sendiri.");
             }
-        } else {
-            if (! $user->hasRole(self::SALES_TIER_1_ROLES)) {
-                return [
-                    'allowed' => false,
-                    'reason' => 'Persetujuan Sales Order membutuhkan wewenang Sales Manager / Direktur.',
-                ];
-            }
+            $selfOverride = true;
         }
 
-        return ['allowed' => true, 'reason' => null];
+        // 2. Nominal Tier Check — dari tabel approval_rules; bila belum ada tabel/aturan → konstanta lama (perilaku semula)
+        $amount = (float) ($document->total_amount ?? 0);
+        $rule = $this->ruleFor($type, $amount);
+        [$roles, $approverLabel, $above] = $rule
+            ? [$rule->roles ?? [], $rule->approver_label, $rule->above_amount !== null ? (float) $rule->above_amount : null]
+            : ($amount > self::TIER_1_MAX_AMOUNT
+                ? [self::TOP_TIER_ROLES, 'Direktur / Owner / Finance Manager', self::TIER_1_MAX_AMOUNT]
+                : [self::SALES_TIER_1_ROLES, 'Sales Manager / Direktur', null]);
+
+        if (! $user->hasRole($roles)) {
+            return $deny($above !== null
+                ? sprintf('Persetujuan bertingkat: Nilai %s di atas Rp %s wajib disetujui oleh %s.', $label, number_format($above, 0, ',', '.'), $approverLabel)
+                : "Persetujuan {$label} membutuhkan wewenang {$approverLabel}.");
+        }
+
+        return ['allowed' => true, 'reason' => null, 'self_override' => $selfOverride, 'rule_id' => $rule?->id];
+    }
+
+    private function ruleFor(string $type, float $amount): ?ApprovalRule
+    {
+        return Schema::hasTable('approval_rules') ? ApprovalRule::forDocument($type, $amount) : null;
+    }
+
+    /** Penyetuju yang lolos hanya karena override (menyetujui dokumen buatan sendiri) wajib memberi alasan bila flag `approval_rules` hidup. */
+    public function requiresOverrideReason(?User $user, Model $document): bool
+    {
+        if (! config('sales.controls.approval_rules', false)) {
+            return false;
+        }
+
+        $check = $this->canApprove($user, $document);
+
+        return $check['allowed'] && $check['self_override'];
+    }
+
+    /**
+     * Penegakan DI SERVICE (flag `sales.controls.approval_rules`): API/aksi lain tidak bisa menghindari aturan. Mencatat override.
+     *
+     * @param  array{override_reason?: string|null}  $options
+     *
+     * @throws ValidationException
+     */
+    public function enforce(?User $user, Model $document, array $options = []): void
+    {
+        if (! config('sales.controls.approval_rules', false)) {
+            return;
+        }
+
+        $check = $this->canApprove($user, $document);
+        if (! $check['allowed']) {
+            throw ValidationException::withMessages(['approval' => $check['reason']]);
+        }
+
+        if (! $check['self_override']) {
+            return;
+        }
+
+        $reason = trim((string) ($options['override_reason'] ?? ''));
+        if (mb_strlen($reason) < 10) {
+            throw ValidationException::withMessages(['override_reason' => 'Anda menyetujui dokumen buatan sendiri (override Owner/Super Admin). Alasan wajib diisi, minimal 10 karakter.']);
+        }
+
+        ApprovalOverride::create([
+            'document_type' => $this->documentType($document),
+            'document_id' => $document->getKey(),
+            'user_id' => $user->getKey(),
+            'approval_rule_id' => $check['rule_id'],
+            'amount' => (float) ($document->total_amount ?? 0),
+            'reason' => $reason,
+            'context' => ['kind' => 'self_approval', 'document_number' => $document->so_number ?? $document->quotation_number ?? null],
+        ]);
     }
 
     /**

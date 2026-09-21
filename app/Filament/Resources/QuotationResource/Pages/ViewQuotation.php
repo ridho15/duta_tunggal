@@ -61,13 +61,15 @@ class ViewQuotation extends ViewRecord
                     ->label('Setujui')
                     ->icon('heroicon-o-check-badge')
                     ->hidden(function ($record) {
-                        return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('approve quotation');
+                        return $record->status != 'request_approve' || !Auth::user()->hasPermissionTo('approve quotation')
+                            || !\App\Filament\Support\ApprovalActions::canApprove($record);
                     })
+                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
                     ->color('success')
                     ->requiresConfirmation()
-                    ->action(function ($record) {
+                    ->action(function ($record, array $data = []) {
                         try {
-                            app(QuotationService::class)->approve($record);
+                            app(QuotationService::class)->approve($record, ['override_reason' => $data['override_reason'] ?? null]);
                         } catch (\Illuminate\Validation\ValidationException $e) {
                             HelperController::sendNotification(isSuccess: false, title: "Tidak Dapat Disetujui", message: collect($e->errors())->flatten()->implode(' '));
 

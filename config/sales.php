@@ -45,4 +45,24 @@ return [
         'block_short_approval' => (bool) env('SALES_STOCK_BLOCK_SHORT_APPROVAL', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Kontrol internal & penomoran (T3/T4 — docs/PLAN-T3-T4-PENJUALAN.md)
+    |--------------------------------------------------------------------------
+    | SEMUA flag default false → perilaku lama utuh sampai dihidupkan bertahap (urutan di §7 rencana):
+    |   approval_rules       : penegakan aturan persetujuan (ambang & peran dari tabel approval_rules) DI SERVICE untuk Quotation & SO,
+    |                          pemisahan tugas Quotation, override Owner/Super Admin wajib alasan + tercatat.
+    |   credit_policy        : kebijakan kredit per tipe (D7/D28) dengan paparan = piutang + SO belum ditagih.
+    |   doc_lock             : DocumentLock sebagai sumber tunggal kunci dokumen (policy, aksi Filament, API).
+    |   accounting_settings  : akun jurnal alur penjualan dibaca dari Pengaturan Akuntansi (fallback config/coa.php).
+    |   central_numbering    : DocumentNumberService + document_sequences untuk semua dokumen penjualan.
+    */
+    'controls' => [
+        'approval_rules' => (bool) env('SALES_CONTROLS_APPROVAL_RULES', false),
+        'credit_policy' => (bool) env('SALES_CONTROLS_CREDIT_POLICY', false),
+        'doc_lock' => (bool) env('SALES_CONTROLS_DOC_LOCK', false),
+        'accounting_settings' => (bool) env('SALES_CONTROLS_ACCOUNTING_SETTINGS', false),
+        'central_numbering' => (bool) env('SALES_CONTROLS_CENTRAL_NUMBERING', false),
+    ],
+
 ];

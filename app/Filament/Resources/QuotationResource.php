@@ -1911,8 +1911,10 @@ class QuotationResource extends Resource
                         ->label('Approve')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('approve quotation') && ($record->status == 'request_approve');
+                            return Auth::user()->hasPermissionTo('approve quotation') && ($record->status == 'request_approve')
+                                && \App\Filament\Support\ApprovalActions::canApprove($record);
                         })
+                        ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
                         ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading('Setujui Quotation')
@@ -1929,9 +1931,9 @@ class QuotationResource extends Resource
                                 "<div class='text-sm space-y-1'><p>{$discountText}</p><p>{$tempoText}</p><p><strong>Total Penawaran:</strong> {$totalText}</p><p class='mt-2 text-success-600'>Dengan menyetujui, term discount dan tempo pembayaran ini akan resmi berlaku untuk Sales Order yang dibuat dari quotation ini.</p></div>"
                             );
                         })
-                        ->action(function ($record) {
+                        ->action(function ($record, array $data = []) {
                             try {
-                                app(QuotationService::class)->approve($record);
+                                app(QuotationService::class)->approve($record, ['override_reason' => $data['override_reason'] ?? null]);
                             } catch (\Illuminate\Validation\ValidationException $e) {
                                 HelperController::sendNotification(isSuccess: false, title: "Tidak Dapat Disetujui", message: collect($e->errors())->flatten()->implode(' '));
 
