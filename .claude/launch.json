@@ -10,6 +10,16 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "app",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--port=8009"
+      ],
+      "port": 8009
     }
   ]
 }
