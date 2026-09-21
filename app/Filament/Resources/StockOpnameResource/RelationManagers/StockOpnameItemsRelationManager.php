@@ -32,7 +32,7 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->searchable()
                     ->preload()
                     ->live()
-                    ->afterStateUpdated(function ($state, Forms\Set $set) {
+                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         if ($state) {
                             $product = Product::withoutGlobalScope('product_cabang')->find($state);
                             // Get current stock from inventory_stocks
@@ -50,8 +50,11 @@ class StockOpnameItemsRelationManager extends RelationManager
                             // Calculate average cost from purchase history
                             $opnameDate = $this->getOwnerRecord()->opname_date ?? now();
                             $averageCost = $this->calculateAverageCostForProduct($state, $opnameDate);
-                            $set('average_cost', $averageCost);
-                            $set('unit_cost', $averageCost); // Set unit cost to average cost by default
+                            $set('average_cost', $this->formatMoney($averageCost));
+                            $set('unit_cost', $this->formatMoney($averageCost)); // Set unit cost to average cost by default
+
+                            $set('difference_qty', (float) ($get('physical_qty') ?? 0) - (float) ($get('system_qty') ?? 0));
+                            $this->syncValues($set, $get, $averageCost);
                         }
                     }),
 
@@ -89,6 +92,7 @@ class StockOpnameItemsRelationManager extends RelationManager
                         $physicalQty = $state ?? 0;
                         $difference = $physicalQty - $systemQty;
                         $set('difference_qty', $difference);
+                        $this->syncValues($set, $get, $get('unit_cost'));
                     }),
 
                 TextInput::make('difference_qty')
@@ -102,39 +106,28 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->default(0)
                     ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
-                        $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
-                        $differenceValue = $differenceQty * $unitCost;
-                        $set('difference_value', $differenceValue);
-
-                        // Update total value
-                        $physicalQty = $get('physical_qty') ?? 0;
-                        $totalValue = $physicalQty * $unitCost;
-                        $set('total_value', $totalValue);
+                        $this->syncValues($set, $get, $state);
                     }),
 
                 TextInput::make('average_cost')
                     ->label('Average Cost')
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->default(0)
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : '')
                     ->helperText('Harga rata-rata berdasarkan riwayat pembelian'),
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->disabled()
-                    ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : ''),
+                    ->dehydrated(),
 
                 TextInput::make('total_value')
                     ->label('Total Nilai')
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : '')
                     ->helperText('Total nilai berdasarkan qty fisik × harga satuan'),
 
                 Textarea::make('notes')
@@ -225,6 +218,24 @@ class StockOpnameItemsRelationManager extends RelationManager
     /**
      * Calculate average cost for a product based on purchase history
      */
+    /**
+     * Harga satuan datang sebagai string bermask ("12.500,00"), jadi di-parse dengan MoneyHelper (bukan cast (float)).
+     * Nilai Selisih dan Total Nilai dihitung ulang setiap qty atau harga berubah dan disimpan ke state dalam format uang
+     * yang sama dengan input lain, supaya tampil konsisten dan tetap dibaca benar saat dehydrate (macro indonesianMoney).
+     */
+    private function syncValues(Forms\Set $set, Forms\Get $get, mixed $unitCost): void
+    {
+        $unit = MoneyHelper::safeParse($unitCost);
+
+        $set('difference_value', $this->formatMoney((float) ($get('difference_qty') ?? 0) * $unit));
+        $set('total_value', $this->formatMoney((float) ($get('physical_qty') ?? 0) * $unit));
+    }
+
+    private function formatMoney(mixed $value): string
+    {
+        return number_format(MoneyHelper::safeParse($value), 2, ',', '.');
+    }
+
     private function calculateAverageCostForProduct($productId, $opnameDate)
     {
         // Get all purchase receipts for this product before the opname date

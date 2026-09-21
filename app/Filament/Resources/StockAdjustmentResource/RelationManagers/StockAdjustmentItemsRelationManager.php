@@ -35,13 +35,15 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                     ->getSearchResultsUsing(fn (string $search) => StockAdjustmentResource::resolveProductOptions($search))
                     ->getOptionLabelUsing(fn ($value): ?string => StockAdjustmentResource::resolveProductLabel(is_numeric($value) ? (int) $value : null))
                     ->live()
-                    ->afterStateUpdated(function ($state, Forms\Set $set) {
+                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         if ($state) {
                             $product = Product::find($state);
                             if ($product) {
-                                $set('unit_cost', $product->cost_price ?? 0);
+                                $set('unit_cost', StockAdjustmentResource::formatMoney($product->cost_price ?? 0));
                             }
                         }
+
+                        StockAdjustmentResource::syncDifferenceValue($set, (float) ($get('difference_qty') ?? 0), $get('unit_cost'));
                     }),
 
                 Select::make('rak_id')
@@ -84,6 +86,7 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                         $adjustedQty = $state ?? 0;
                         $difference = $adjustedQty - $currentQty;
                         $set('difference_qty', $difference);
+                        StockAdjustmentResource::syncDifferenceValue($set, (float) $difference, $get('unit_cost'));
                     }),
 
                 TextInput::make('difference_qty')
@@ -97,18 +100,14 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                     ->default(0)
                     ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
-                        $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = \App\Helpers\MoneyHelper::safeParse($state ?? 0);
-                        $differenceValue = $differenceQty * $unitCost;
-                        $set('difference_value', $differenceValue);
+                        StockAdjustmentResource::syncDifferenceValue($set, (float) ($get('difference_qty') ?? 0), $state);
                     }),
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->prefix('Rp')
+                    ->indonesianMoney()
                     ->disabled()
-                    ->dehydrated()
-                    ->formatStateUsing(fn ($state) => $state !== null && $state !== '' ? number_format((float) MoneyHelper::safeParse($state), 2, ',', '.') : ''),
+                    ->dehydrated(),
 
                 Textarea::make('notes')
                     ->label('Catatan')

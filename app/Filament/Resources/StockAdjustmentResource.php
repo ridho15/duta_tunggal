@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockAdjustmentResource\Pages;
 use App\Filament\Resources\StockAdjustmentResource\RelationManagers;
+use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\InventoryStock;
 use App\Models\Product;
@@ -167,9 +168,11 @@ class StockAdjustmentResource extends Resource
                                         if (is_numeric($state)) {
                                             $product = Product::withoutGlobalScope('product_cabang')->find((int) $state);
                                             if ($product) {
-                                                $set('unit_cost', $product->cost_price ?? 0);
+                                                $set('unit_cost', self::formatMoney($product->cost_price ?? 0));
                                             }
                                         }
+
+                                        self::syncDifferenceValue($set, (float) ($get('difference_qty') ?? 0), $get('unit_cost'));
                                     }),
 
                                 Select::make('rak_id')
@@ -187,6 +190,7 @@ class StockAdjustmentResource extends Resource
                                     ->live()
                                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                                         self::syncAdjustmentItemStockState($set, $get, $get('../../warehouse_id'), $get('product_id'), $state);
+                                        self::syncDifferenceValue($set, (float) ($get('difference_qty') ?? 0), $get('unit_cost'));
                                     }),
 
                                 TextInput::make('current_qty')
@@ -214,19 +218,20 @@ class StockAdjustmentResource extends Resource
                                     ->disabled()
                                     ->dehydrated(),
 
+                                // Harga memicu hitung Nilai Selisih, jadi memakai debounce (bukan onBlur), sama dengan relation manager-nya.
                                 TextInput::make('unit_cost')
                                     ->label('Harga Satuan')
-                                    ->numeric()
+                                    ->indonesianMoney()
                                     ->required()
                                     ->default(0)
-                                    ->live()
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                                         self::syncDifferenceValue($set, (float) ($get('difference_qty') ?? 0), $state);
                                     }),
 
                                 TextInput::make('difference_value')
                                     ->label('Nilai Selisih')
-                                    ->numeric()
+                                    ->indonesianMoney()
                                     ->disabled()
                                     ->dehydrated(),
 
@@ -617,8 +622,17 @@ class StockAdjustmentResource extends Resource
         $set('difference_qty', $adjustedQty - $currentQty);
     }
 
-    protected static function syncDifferenceValue(Forms\Set $set, float $differenceQty, $unitCost): void
+    /**
+     * Harga satuan datang sebagai string bermask ("10.000,00"), sehingga wajib di-parse dengan MoneyHelper
+     * (bukan cast (float)), dan hasilnya disimpan ke state dalam format yang sama agar tampil konsisten.
+     */
+    public static function syncDifferenceValue(Forms\Set $set, float $differenceQty, $unitCost): void
     {
-        $set('difference_value', $differenceQty * (float) ($unitCost ?? 0));
+        $set('difference_value', self::formatMoney($differenceQty * MoneyHelper::safeParse($unitCost)));
+    }
+
+    public static function formatMoney(mixed $value): string
+    {
+        return number_format(MoneyHelper::safeParse($value), 2, ',', '.');
     }
 }

@@ -369,6 +369,9 @@ describe('Manual money inputs use debounced live updates when calculations must 
         'app/Filament/Resources/MaterialIssueResource.php' => [
             'cost_per_unit' => 1,
         ],
+        'app/Filament/Resources/StockAdjustmentResource.php' => [
+            'unit_cost' => 1,
+        ],
         'app/Filament/Resources/StockAdjustmentResource/RelationManagers/StockAdjustmentItemsRelationManager.php' => [
             'unit_cost' => 1,
         ],
