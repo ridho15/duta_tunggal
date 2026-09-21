@@ -43,7 +43,7 @@
 | **D4** | Kunci `approved` dipertahankan tetapi berlabel **"Siap Kirim"** (tanpa migrasi data) + aksi **Kirim** dan **Konfirmasi Diterima** |
 | **D5** | Jadwal: **harus "Mulai Pengiriman" dulu**; "Tandai Selesai" hanya dari *Dalam Perjalanan* |
 
-### 2.2 Perlu dijawab sebelum kode dimulai (default = rekomendasi bila tidak dijawab)
+### 2.2 Keputusan turunan — **DISETUJUI 21 September 2026 ("setuju": D15, D17–D23 sesuai rekomendasi)**
 Pemeriksaan lanjutan (§3) memunculkan keputusan turunan. Yang bertanda ⚠ **wajib** dijawab karena mengubah desain.
 
 | Kode | Pertanyaan | Rekomendasi (default) |

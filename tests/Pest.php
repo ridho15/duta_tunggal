@@ -49,3 +49,6 @@ function something()
 {
     // ..
 }
+
+// Fixture bersama tes stok & pengiriman (T2): stkContext(), stkSetStock(), stkSaleOrder(), stkDeliveryOrder(), ...
+require_once __DIR__ . '/Support/StockFixtures.php';

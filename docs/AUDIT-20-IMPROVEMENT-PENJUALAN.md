@@ -427,8 +427,8 @@ Pemilik menjawab **"lanjut"** atas rencana T0/T1 (`docs/PLAN-T0-T1-PENJUALAN.md`
 | K-E | `LOG_LEVEL` UAT = `warning` (produksi `error`) | ✅ |
 | K-F | Ambang limit kredit mencurigakan ≥ Rp1.000.000.000 | ✅ |
 | **D1–D5** | Rekomendasi **disetujui** (21 September 2026: "setuju D1-D5") — reservasi saat SO Approved; blokir approve stok kurang kecuali backorder beralasan; stok lintas cabang ikut `lihat_stok_cabang_lain`; DO "Siap Kirim" + aksi Kirim/Diterima; jadwal wajib Mulai dulu | ✅ |
-| **D15** | Stok negatif saat Dikirim — perlu konfirmasi eksplisit (bagian desain T2); rekomendasi: blokir | ⏳ menunggu |
-| **D17–D23** | Keputusan turunan T2 (lihat `docs/PLAN-T2-STOK-PENGIRIMAN.md` §2.2) | ⏳ menunggu (default = rekomendasi) |
+| **D15** | Stok negatif saat Dikirim: **blokir** (pengecualian beralasan Owner/Super Admin) — disetujui 21 September 2026 ("setuju") | ✅ |
+| **D17–D23** | Keputusan turunan T2 (`docs/PLAN-T2-STOK-PENGIRIMAN.md` §2.2): seluruh rekomendasi **disetujui** 21 September 2026 ("setuju") | ✅ |
 | **D6–D14** | Rekomendasi belum dikonfirmasi; wajib dijawab sebelum T3/T4 | ⏳ menunggu |
 
 ---
