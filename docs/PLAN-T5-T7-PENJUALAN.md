@@ -78,3 +78,28 @@
 - **T5:** retur 3 dari 12 pcs mengurangi piutang tepat 3/12 (DPP+PPN); retur > sisa ditolak; pembatalan penuh menyeimbangkan jurnal/AR/laporan; invoice terbayar → kelebihan ke Deposit, AR tidak negatif; dua kali terbit = satu efek; persetujuan (peran × nominal × pembuat); skenario "invoice salah → nota kredit → invoice pengganti"; mutation check.
 - **Rollout T5:** flag `SALES_CONTROLS_CREDIT_NOTES` dihidupkan **setelah** akuntan meninjau jurnal contoh 🧾 (disediakan di UAT).
 - **Risiko:** akuntansi & pajak (tertinggi) → flag + tinjauan akuntan; enum invoice dibagi dengan pekerjaan pihak lain → migrasi idempoten; deposit → bypass observer yang menulis ulang jurnal.
+
+## 9. Status pelaksanaan
+
+**Cabang:** `feat/penjualan-t5-koreksi` — satu commit per tugas: T5.1 `d18ae61`, T5.2 `7055622`, (baseline `e8a8292`), T5.3 `c28b450`.
+Flag `sales.controls.credit_notes` **default mati**: tanpa menyalakannya tidak ada menu/aksi Nota Kredit, opsi keputusan retur "Refund / Nota Kredit" tidak ditawarkan, dan laporan tidak menambah kueri per baris (angka identik dengan perilaku lama).
+
+| Tugas | Hasil | Tes baru |
+|---|---|---|
+| T5.1 | Migrasi `credit_notes`/`credit_note_items` (+ enum `invoices.status` `cancelled`, `customer_return_items.decision` `credit`, aturan persetujuan `credit_note`, izin — semuanya idempoten); `CreditNoteService` (draf berbatas sisa qty, terbit atomik & idempoten: jurnal cermin Dr Retur/PPN/Biaya Kirim, Cr Piutang/Deposit; AR tidak pernah negatif; pembatalan penuh → invoice `cancelled`); nomor `CN-…` terpusat | 11 |
+| T5.2 | Keputusan retur `credit` (stok & HPP tetap dari `CustomerReturnService`, tidak digandakan) + `draftFromReturn`; `SalesReportService` mengecualikan `cancelled` dan menghitung **bersih** Nota Kredit (DPP/PPN/total/qty; HPP turun hanya untuk retur fisik); Surat Jalan dari invoice `cancelled` dapat ditagih ulang | 8 |
+| T5.3 | `CreditNoteResource` (daftar + View), `CreditNotePolicy`, `CreditNoteActions` (Buat Nota Kredit, Batalkan Invoice, dari Retur, Terbitkan + No. Nota Retur Pajak + override beralasan, Hapus Draf), `CabangScope`, `DocumentLock`, kartu hub; label/filter `cancelled` di Invoice | 11 |
+
+Semua penjaga kritis diuji **mutasi** (dirusak → tes gagal → dipulihkan); 26 mutan T5.2/T5.3, semua mati setelah tes penutup ditambahkan.
+
+### Penyimpangan dari rencana & temuan baru
+- **Regresi T5.3 menangkap cacat T5.1**: izin `credit note` dibuat migrasi tetapi belum ada di `HelperController::listPermission()` (sumber seeder) → `PermissionsConsistencyTest` gagal; diperbaiki di T5.3. Pelajaran: tiap migrasi yang menambah izin harus menambah daftar itu.
+- **Suite penuh HEAD T4** (3315 tes): tidak ada kegagalan baru yang nyata. 44 "baru" adalah artefak snapshot (`public/build` Vite tidak ikut `git archive`; semuanya lolos di working tree). Baseline dikurangi 14 tes yang kini lolos (commit `e8a8292`).
+- **D35 (refund tunai)** tetap lewat aksi "Kembalikan Saldo" Deposit yang sudah ada; persetujuan bertingkat refund menyusul di aksi itu.
+- **`InvoicePolicy` tetap tidak disentuh** (WIP pihak lain): aksi Nota Kredit memakai izin `create credit note` + status invoice, bukan policy Invoice.
+- **Nota Kredit tidak dapat diedit** (D36): kesalahan pada draf → hapus dan buat ulang.
+
+### Yang perlu Anda lakukan
+1. `php artisan migrate` (migrasi baru `2026_09_23_100000_create_credit_notes_tables`) lalu `php artisan db:seed --class=PermissionSeeder` bila izin dikelola lewat seeder.
+2. **Tinjau jurnal contoh dengan akuntan 🧾** (Nota Kredit: Dr Retur Penjualan + PPN Keluaran, Cr Piutang/Deposit) sebelum menyalakan `SALES_CONTROLS_CREDIT_NOTES=true`.
+3. UAT: retur → keputusan "Refund / Nota Kredit" → Selesaikan → Buat Nota Kredit → Terbitkan (invoice belum dibayar, sebagian, lunas) dan "Batalkan Invoice".
