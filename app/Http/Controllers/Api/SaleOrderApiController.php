@@ -462,6 +462,7 @@ class SaleOrderApiController extends Controller
                     'so_number' => $saleOrder->so_number,
                     'redirect_url' => route('filament.admin.resources.sale-orders.index'),
                 ],
+                'warnings' => $this->stockWarnings($saleOrder),
             ]);
         } catch (\Exception $e) {
             Log::error('Error creating sales order: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -710,6 +711,7 @@ class SaleOrderApiController extends Controller
                     'so_number' => $saleOrder->so_number,
                     'redirect_url' => route('filament.admin.resources.sale-orders.index'),
                 ],
+                'warnings' => $this->stockWarnings($saleOrder->fresh()),
             ]);
         } catch (\Exception $e) {
             Log::error('Error updating sales order: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -717,6 +719,25 @@ class SaleOrderApiController extends Controller
                 'success' => false,
                 'message' => 'Gagal memperbarui Sales Order: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * T2.5: peringatan stok untuk SO yang baru disimpan (TIDAK memblokir simpan draf; pemblokiran ada di persetujuan).
+     *
+     * @return array<int, string>
+     */
+    private function stockWarnings(\App\Models\SaleOrder $saleOrder): array
+    {
+        try {
+            $availability = app(\App\Services\StockAvailability::class);
+            $check = $availability->check($saleOrder);
+
+            return $check['has_shortage'] ? $availability->describeShortages($check) : [];
+        } catch (\Throwable $e) {
+            Log::warning('SaleOrderApiController: pemeriksaan stok untuk peringatan gagal', ['error' => $e->getMessage()]);
+
+            return [];
         }
     }
 }

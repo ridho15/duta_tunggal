@@ -373,7 +373,7 @@ class SaleOrderResource extends Resource
      * Hasil pemeriksaan stok untuk daftar SO: dihitung SEKALI per halaman (jumlah query tetap, tanpa N+1) lewat StockAvailability::checkMany.
      * WeakMap terikat ke komponen Livewire → tidak pernah basi lintas request.
      */
-    protected static function stockCheckForList(object $livewire, SaleOrder $record): array
+    public static function stockCheckForList(object $livewire, SaleOrder $record): array
     {
         static $memo = null;
         $memo ??= new \WeakMap();
@@ -1650,6 +1650,13 @@ class SaleOrderResource extends Resource
                         }
                         return '✅ Semua item memiliki stok yang cukup';
                     }),
+                TextColumn::make('is_backorder')
+                    ->label('Backorder')
+                    ->badge()
+                    ->state(fn (SaleOrder $record): ?string => $record->is_backorder ? 'BACKORDER' : null)
+                    ->color('warning')
+                    ->tooltip(fn (SaleOrder $record): ?string => $record->is_backorder ? 'Alasan: '.($record->backorder_reason ?: '-') : null)
+                    ->toggleable(),
                 TextColumn::make('requestApproveBy.name')
                     ->label('Request Approve By')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -1820,6 +1827,8 @@ class SaleOrderResource extends Resource
                             HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
                         }
                     }),
+                \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
+                \App\Filament\Support\SaleOrderStockActions::retryReservation(Action::make('retry_reservation')),
                 ActionGroup::make([
                     DeleteAction::make()
                         ->label('Hapus')

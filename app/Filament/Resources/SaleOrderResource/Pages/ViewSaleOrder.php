@@ -146,6 +146,8 @@ class ViewSaleOrder extends ViewRecord
                             HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui SO", message: "Terjadi kesalahan: " . $e->getMessage());
                         }
                     }),
+                \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
+                \App\Filament\Support\SaleOrderStockActions::retryReservation(Action::make('retry_reservation')),
                 Action::make('closed')
                     ->label('Close')
                     ->requiresConfirmation()

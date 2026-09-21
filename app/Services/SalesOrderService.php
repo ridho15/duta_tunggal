@@ -253,7 +253,10 @@ class SalesOrderService
         ]);
     }
 
-    public function approve($saleOrder)
+    /**
+     * @param  array{backorder?: bool, reason?: string|null}  $options  backorder=true: setujui walau stok kurang (D2, alasan wajib)
+     */
+    public function approve($saleOrder, array $options = [])
     {
         // Validate customer credit limit before approving
         $saleOrder->loadMissing('customer');
@@ -274,6 +277,41 @@ class SalesOrderService
             }
         }
 
+        $backorder = null;
+
+        if (config('sales.stock.block_short_approval', false)) {
+            // T2.5 (D2): SEMUA item diperiksa (dengan/tanpa alokasi/gudang) terhadap stok bebas sadar-reservasi.
+            $backorder = $this->assertStockOrBackorder($saleOrder, $options);
+        } else {
+            $this->assertAllocationStock($saleOrder);
+        }
+
+        return $saleOrder->update([
+            'status' => 'approved',
+            'approve_by' => Auth::id() ?? auth()->id(),
+            'approve_at' => Carbon::now(),
+        ] + ($backorder ?? []));
+    }
+
+    /**
+     * Setujui SO sebagai BACKORDER (stok kurang): alasan wajib; hanya oleh yang berwenang menyetujui SO (peran Sales Manager ke atas,
+     * pemisahan tugas dengan pembuat SO tetap berlaku — sama seperti approve biasa). SO tanpa kekurangan disetujui biasa.
+     *
+     * @throws ValidationException
+     */
+    public function approveAsBackorder($saleOrder, ?string $reason)
+    {
+        $allowed = app(ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $saleOrder);
+        if (! $allowed['allowed']) {
+            throw ValidationException::withMessages(['approval' => $allowed['reason'] ?? 'Akses persetujuan ditolak.']);
+        }
+
+        return $this->approve($saleOrder, ['backorder' => true, 'reason' => $reason]);
+    }
+
+    /** Perilaku lama (flag block_short_approval mati): hanya alokasi gudang yang diperiksa, item tanpa alokasi lolos. */
+    private function assertAllocationStock($saleOrder): void
+    {
         // Validate warehouse free stock for all allocations
         $saleOrder->loadMissing(['saleOrderItem.warehouseAllocations.warehouse', 'saleOrderItem.product']);
         $insufficientItems = [];
@@ -291,7 +329,7 @@ class SalesOrderService
         }
 
         if (! empty($insufficientItems)) {
-            $msg = 'Stok gudang tidak mencukupi untuk item: ' . implode('; ', $insufficientItems);
+            $msg = 'Stok gudang tidak mencukupi untuk item: '.implode('; ', $insufficientItems);
             Notification::make()
                 ->title('Persetujuan Ditolak: Stok Kurang')
                 ->body($msg)
@@ -302,12 +340,42 @@ class SalesOrderService
                 'stock' => $msg,
             ]);
         }
+    }
 
-        return $saleOrder->update([
-            'status' => 'approved',
-            'approve_by' => Auth::id() ?? auth()->id(),
-            'approve_at' => Carbon::now()
-        ]);
+    /**
+     * T2.5: stok kurang → ditolak kecuali backorder beralasan. Mengembalikan atribut backorder untuk disimpan bersama persetujuan (atau null).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function assertStockOrBackorder($saleOrder, array $options): ?array
+    {
+        $availability = app(\App\Services\StockAvailability::class);
+        $check = $availability->check($saleOrder);
+
+        if (! $check['has_shortage']) {
+            return null;
+        }
+
+        $lines = $availability->describeShortages($check);
+
+        if (! ($options['backorder'] ?? false)) {
+            $msg = 'Stok tidak mencukupi — '.implode('; ', $lines).'. Kurangi qty, tunggu stok masuk, atau gunakan "Setujui sebagai Backorder" (alasan wajib) bila memang pre-order.';
+            Notification::make()->title('Persetujuan Ditolak: Stok Kurang')->body($msg)->danger()->send();
+
+            throw ValidationException::withMessages(['stock' => $msg]);
+        }
+
+        $reason = trim((string) ($options['reason'] ?? ''));
+        if ($reason === '') {
+            throw ValidationException::withMessages(['reason' => 'Alasan backorder wajib diisi (mis. barang dalam perjalanan, PO ke supplier sudah terbit).']);
+        }
+
+        return [
+            'is_backorder' => true,
+            'backorder_reason' => $reason,
+            'backorder_approved_by' => Auth::id(),
+            'backorder_approved_at' => Carbon::now(),
+        ];
     }
 
     public function close($saleOrder)

@@ -111,6 +111,8 @@ class SaleOrder extends Model
         'reject_at' => 'datetime',
         'warehouse_confirmed_at' => 'datetime',
         'exchange_rate' => 'decimal:8',
+        'is_backorder' => 'boolean',
+        'backorder_approved_at' => 'datetime',
     ];
     protected $fillable = [
         'customer_id',
@@ -141,6 +143,10 @@ class SaleOrder extends Model
         'warehouse_confirmed_at',
         'cabang_id',
         'notes',
+        'is_backorder',
+        'backorder_reason',
+        'backorder_approved_by',
+        'backorder_approved_at',
     ];
 
 

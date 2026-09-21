@@ -228,6 +228,16 @@ export const SaleOrderItemTable: React.FC<Props> = ({
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none"
                       placeholder="1"
                     />
+                    {/* T2.5: peringatan (tidak memblokir simpan draf) bila qty melebihi stok bebas cabang */}
+                    {(() => {
+                      const prod = (dependencies.products || []).find((p) => p.id === Number(item.product_id));
+                      if (!prod || !(item.quantity > 0) || item.quantity <= (prod.free_stock || 0)) return null;
+                      return (
+                        <p className="text-xs text-amber-600 mt-1">
+                          ⚠ Melebihi stok bebas ({prod.free_stock || 0}). Persetujuan hanya sebagai backorder.
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   {/* Satuan UOM (col-span-1 - Read-only text badge) */}

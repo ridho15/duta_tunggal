@@ -31,6 +31,9 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+  // T2.5: peringatan stok dari server setelah simpan (tidak memblokir); redirect ditunda sampai pengguna membacanya.
+  const [stockWarnings, setStockWarnings] = useState<string[]>([]);
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
   const [customerCreditSummary, setCustomerCreditSummary] = useState<CustomerCreditSummary | null>(null);
   const [isLoadingCredit, setIsLoadingCredit] = useState<boolean>(false);
 
@@ -327,6 +330,12 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
 
       if (res.data.success) {
         const redirectUrl = res.data.data?.redirect_url || '/admin/sale-orders';
+        const warnings: string[] = Array.isArray(res.data.warnings) ? res.data.warnings : [];
+        if (warnings.length > 0) {
+          setStockWarnings(warnings);
+          setPendingRedirect(redirectUrl);
+          return;
+        }
         window.location.href = redirectUrl;
       } else {
         setGeneralError(res.data.message || 'Gagal menyimpan Sales Order.');
@@ -375,6 +384,33 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12 font-sans antialiased text-gray-900">
+      {/* Peringatan stok (T2.5) — SO tersimpan; persetujuan akan menolak stok kurang kecuali sebagai backorder */}
+      {stockWarnings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-amber-900 text-sm">
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Sales Order tersimpan, tetapi stok belum mencukupi:</p>
+            <ul className="list-disc list-inside mt-2 text-xs space-y-1">
+              {stockWarnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs">Sales Order hanya dapat disetujui bila stok cukup, atau sebagai Backorder dengan alasan.</p>
+            {pendingRedirect && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = pendingRedirect;
+                }}
+                className="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+              >
+                Lanjut ke daftar Sales Order
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* General Alert */}
       {generalError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 text-red-800 text-sm">

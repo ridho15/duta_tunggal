@@ -134,6 +134,42 @@ class StockAvailability
     }
 
     /**
+     * Kalimat kekurangan untuk pengguna dari hasil check(): "Alat X: diminta 35, stok bebas 30 (kurang 5) di Gudang K01".
+     *
+     * @param  array{shortage_items: array<int, array<string, mixed>>}  $check
+     * @return array<int, string>  satu kalimat per item kurang
+     */
+    public function describeShortages(array $check): array
+    {
+        $names = DB::table('warehouses')->whereIn('id', collect($check['shortage_items'])->flatMap(fn ($r) => array_keys($r['warehouses']))->unique()->all() ?: [0])
+            ->pluck('name', 'id');
+
+        return array_map(function (array $row) use ($names): string {
+            $product = $row['item']->product?->name ?? 'Produk #'.$row['item']->product_id;
+
+            if ($row['allocation_mismatch']) {
+                return "{$product}: ".($row['note'] ?? 'alokasi gudang tidak sesuai qty item');
+            }
+
+            $where = collect($row['warehouses'])->keys()->map(fn ($id) => $names[$id] ?? "Gudang #{$id}")->implode(', ');
+
+            return sprintf(
+                '%s: diminta %s, stok bebas %s (kurang %s)%s',
+                $product,
+                $this->fmt($row['needed']),
+                $this->fmt($row['available']),
+                $this->fmt($row['shortage']),
+                $where !== '' ? " di {$where}" : ''
+            );
+        }, array_values($check['shortage_items']));
+    }
+
+    private function fmt(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, ',', '.'), '0'), ',') ?: '0';
+    }
+
+    /**
      * Pemeriksaan banyak SO sekaligus: jumlah query tetap (daftar SO tanpa N+1).
      *
      * @param  iterable<SaleOrder>  $saleOrders

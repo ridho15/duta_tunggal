@@ -24,6 +24,14 @@ Schedule::command('quotations:expire')
     ->withoutOverlapping()
     ->runInBackground();
 
+// T2.5 (D21): isi ulang reservasi SO backorder saat stok masuk (FIFO menurut waktu approve). Tidak berbuat apa-apa bila flag
+// sales.stock.reserve_on_so_approve mati; aman dijalankan berulang (idempoten).
+Schedule::command('sales:top-up-reservations')
+    ->everyThirtyMinutes()
+    ->name('sales-top-up-reservations')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Purchase return automation removed - now handled manually or through UI triggers
 // Schedule::command('purchase:automate-return')
 //     ->dailyAt('08:00')
