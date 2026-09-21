@@ -394,18 +394,18 @@ class InvoiceObserver
         $date = $invoice->invoice_date ?? Carbon::now()->toDateString();
 
         // Get COAs from invoice or fallback to defaults
-        $arCodes = $this->getConfiguredSalesCoaCodes('accounts_receivable', ['1120']);
-        $revenueCodes = $this->getConfiguredSalesCoaCodes('sales_revenue', ['4000', '4111']);
+        $arCodes = $this->getConfiguredSalesCoaCodes('accounts_receivable');
+        $revenueCodes = $this->getConfiguredSalesCoaCodes('sales_revenue');
 
         $arCoa = $invoice->arCoa?->exists ? $invoice->arCoa : $this->resolveCoaByCodes($arCodes);
         $revenueCoa = $invoice->revenueCoa?->exists ? $invoice->revenueCoa : $this->resolveCoaByCodes($revenueCodes, 'Revenue');
         $ppnKeluaranCoa = $invoice->ppnKeluaranCoa?->exists
             ? $invoice->ppnKeluaranCoa
-            : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_output_vat', ['2120.06']), 'Liability');
-        $discountCoa = $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_discount', ['4100.01']), 'Expense');
+            : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_output_vat'), 'Liability');
+        $discountCoa = $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_discount'), 'Expense');
         $biayaPengirimanCoa = $invoice->biayaPengirimanCoa?->exists
             ? $invoice->biayaPengirimanCoa
-            : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_shipping', ['6100.02']), 'Expense');
+            : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_shipping'), 'Expense');
 
         if (!$arCoa || !$revenueCoa) {
             Log::error('postSalesInvoice: essential COA mapping missing — cannot post invoice', [
@@ -580,12 +580,13 @@ class InvoiceObserver
         ];
     }
 
-    private function getConfiguredSalesCoaCodes(string $configKey, array $fallbacks = []): array
+    /**
+     * Kode akun berurutan untuk kunci Pengaturan Akuntansi (T3.4): [akun pengaturan bila flag hidup] → config/coa.php → kode bawaan.
+     * Tanpa pengaturan hasilnya sama dengan daftar lama (config + kode bawaan yang dulu ditulis di sini).
+     */
+    private function getConfiguredSalesCoaCodes(string $key): array
     {
-        return array_values(array_unique(array_filter([
-            config('coa.' . $configKey),
-            ...$fallbacks,
-        ])));
+        return app(\App\Services\AccountingSettings::class)->codes($key);
     }
 
     private function resolveCoaByCodes(array $codes, ?string $type = null): ?\App\Models\ChartOfAccount
@@ -634,10 +635,8 @@ class InvoiceObserver
 
         // Allow fallback sources (delivery orders) when invoice items are absent
 
-        $defaultGoodsDeliveryCoa = \App\Models\ChartOfAccount::where('code', '1140.20')->first()
-            ?? \App\Models\ChartOfAccount::where('code', '1180.10')->first();
-        $defaultCogsCoa = \App\Models\ChartOfAccount::where('code', '5100.10')->first()
-            ?? \App\Models\ChartOfAccount::where('code', '5000')->first();
+        $defaultGoodsDeliveryCoa = app(\App\Services\AccountingSettings::class)->first('goods_in_transit');
+        $defaultCogsCoa = app(\App\Services\AccountingSettings::class)->first('cogs');
 
         $debitTotals = [];
         $creditTotals = [];

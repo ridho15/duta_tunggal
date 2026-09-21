@@ -831,21 +831,11 @@ class SalesInvoiceResource extends Resource
 
                         // COA fields — hidden from UI, auto-populated from defaults
                         Hidden::make('ar_coa_id')
-                            ->default(fn () => static::resolveCoaIdByCodes([
-                                config('coa.accounts_receivable'),
-                                '1120',
-                            ])),
+                            ->default(fn () => static::resolveCoaIdByCodes(app(\App\Services\AccountingSettings::class)->codes('accounts_receivable'))),
                         Hidden::make('revenue_coa_id')
-                            ->default(fn () => static::resolveCoaIdByCodes([
-                                config('coa.sales_revenue'),
-                                '4000',
-                                '4111',
-                            ])),
+                            ->default(fn () => static::resolveCoaIdByCodes(app(\App\Services\AccountingSettings::class)->codes('sales_revenue'))),
                         Hidden::make('ppn_keluaran_coa_id')
-                            ->default(fn () => static::resolveCoaIdByCodes([
-                                config('coa.sales_output_vat'),
-                                '2120.06',
-                            ])),
+                            ->default(fn () => static::resolveCoaIdByCodes(app(\App\Services\AccountingSettings::class)->codes('sales_output_vat'))),
 
                         // Hidden fields
                         Hidden::make('id'),

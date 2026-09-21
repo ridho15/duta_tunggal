@@ -709,6 +709,11 @@ class LedgerPostingService
             return $deposit->coa;
         }
 
+        // T3.4: akun Deposit Customer dari Pengaturan Akuntansi (bila flag hidup) sebelum daftar bawaan
+        if ($explicit = app(AccountingSettings::class)->explicit('customer_deposit')) {
+            return $explicit;
+        }
+
         $preferredCodes = ['1150.01', '1150.02', '1150'];
         foreach ($preferredCodes as $code) {
             $coa = ChartOfAccount::where('code', $code)->first();
@@ -828,8 +833,10 @@ class LedgerPostingService
             $exchangeRate = $currencyContext['exchange_rate'];
 
             // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
-            $piutangCoa = ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
-            $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ChartOfAccount::where('code', config('coa.cash_and_bank'))->first();
+            // T3.4 (flag accounting_settings): akun Pengaturan Akuntansi didahulukan; tanpa pengaturan = perilaku lama.
+            $settings = app(AccountingSettings::class);
+            $piutangCoa = $settings->explicit('accounts_receivable') ?? ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
+            $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ($settings->explicit('cash_bank_default') ?? ChartOfAccount::where('code', config('coa.cash_and_bank'))->first());
 
             $entries = [];
 

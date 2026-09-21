@@ -51,6 +51,11 @@ class MasterDataReadiness
             $this->global('pajak_ppn', 'Tarif PPN aktif', self::CRITICAL, TaxSetting::query()->where('type', 'PPN')->where('status', true)->where('effective_date', '<=', now())->count(), 'Tambahkan tarif PPN aktif di Pengaturan Pajak.'),
         ];
 
+        // T3.4 (flag accounting_settings): "siap" hanya bila SEMUA kunci Pengaturan Akuntansi terisi eksplisit dan sah.
+        if (AccountingSettings::enabled()) {
+            $checks[] = $this->accountingSettingsCheck();
+        }
+
         return [
             'checks' => $checks,
             'ready' => collect($checks)->where('severity', self::CRITICAL)->every(fn ($c) => $c['ok']),
@@ -123,5 +128,26 @@ class MasterDataReadiness
         }
 
         return $check;
+    }
+
+    /** Pengaturan Akuntansi: kunci wajib terisi & sah (akun detail, aktif, tipe sesuai). Kunci kosong memakai akun bawaan (peringatan). */
+    protected function accountingSettingsCheck(): array
+    {
+        $rows = app(AccountingSettings::class)->status();
+        $missing = collect($rows)->filter(fn ($row) => ! $row['ready'])->map(fn ($row) => $row['label'])->values()->all();
+        $filled = count($rows) - count($missing);
+
+        return [
+            'key' => 'pengaturan_akuntansi',
+            'label' => 'Pengaturan Akuntansi (akun jurnal penjualan)',
+            'severity' => self::WARNING,
+            'count' => $filled,
+            'state' => $missing === [] ? 'siap' : ($filled === 0 ? 'kosong' : 'sebagian'),
+            'ok' => $missing === [],
+            'missing_cabang' => [],
+            'hint' => $missing === []
+                ? 'Semua kunci akun terisi.'
+                : 'Belum diisi (memakai akun bawaan): '.implode(', ', $missing).'. Atur di Pengaturan → Pengaturan Akuntansi.',
+        ];
     }
 }

@@ -392,8 +392,8 @@ class DeliveryOrderService
 
         $date = $deliveryOrder->delivery_date ?? now()->toDateString();
 
-        $defaultInventoryCoa = ChartOfAccount::whereIn('code', ['1140.10', '1140.01'])->first();
-        $defaultGoodsDeliveryCoa = ChartOfAccount::whereIn('code', ['1140.20', '1180.10'])->first();
+        $defaultInventoryCoa = app(AccountingSettings::class)->anyOf('inventory');
+        $defaultGoodsDeliveryCoa = app(AccountingSettings::class)->anyOf('goods_in_transit');
 
         $debitTotals = [];
         $creditTotals = [];

@@ -575,8 +575,8 @@ class DeliveryOrderObserver
         $date = $deliveryOrder->delivery_date ?? now()->toDateString();
 
         // Build journal entries for cost-of-goods-sold (goods delivery) and inventory credit
-        $defaultInventoryCoa = \App\Models\ChartOfAccount::whereIn('code', ['1140.10', '1140.01'])->first();
-        $defaultGoodsDeliveryCoa = \App\Models\ChartOfAccount::whereIn('code', ['1140.20', '1180.10'])->first();
+        $defaultInventoryCoa = app(\App\Services\AccountingSettings::class)->anyOf('inventory');
+        $defaultGoodsDeliveryCoa = app(\App\Services\AccountingSettings::class)->anyOf('goods_in_transit');
 
         $debitTotals = [];
         $creditTotals = [];
@@ -604,8 +604,8 @@ class DeliveryOrderObserver
             if (!$inventoryCoa || !$goodsDeliveryCoa) {
                 throw new \Exception(
                     'Akun COA untuk produk "' . ($product?->name ?? 'tidak diketahui') . '" tidak ditemukan. '
-                    . 'Diperlukan: Persediaan (' . ($inventoryCoa ? '\u2713' : '1140.10') . ') dan '
-                    . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? '\u2713' : '1140.20') . '). '
+                    . 'Diperlukan: Persediaan (' . ($inventoryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('inventory')[0] ?? '-')) . ') dan '
+                    . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('goods_in_transit')[0] ?? '-')) . '). '
                     . 'Silakan konfigurasi COA produk tersebut sebelum mengirim Delivery Order.'
                 );
             }

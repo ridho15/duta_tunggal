@@ -192,24 +192,12 @@ class CustomerReturnService
         }
 
         // COA: Inventory account (goods back in saleable stock)
-        $inventoryCoa = $this->firstExistingCoa([
-            '1101.01',
-            config('coa.inventory', '1140.01'),
-            '1140.10',
-            '1100',
-        ]);
+        $settings = app(AccountingSettings::class);
+        $inventoryCoa = $this->firstExistingCoa($settings->codes('return_inventory'));
         // COA: WIP / In-Repair holding account (goods held for repair)
-        $wipCoa = $this->firstExistingCoa([
-            '1101.02',
-            '1-201',
-            '1140.02',
-        ]) ?? $inventoryCoa;
+        $wipCoa = $this->firstExistingCoa($settings->codes('return_wip')) ?? $inventoryCoa;
         // COA: COGS reversal
-        $cogsCoa = $this->firstExistingCoa([
-            '5100.10',
-            '5000',
-            config('coa.sales_shipping', '6100.02'),
-        ]);
+        $cogsCoa = $this->firstExistingCoa([...$settings->codes('cogs'), ...$settings->codes('sales_shipping')]);
 
         if (! $inventoryCoa || ! $cogsCoa) {
             Log::warning('CustomerReturnService: COA account(s) not found — cannot create journal entries', [
