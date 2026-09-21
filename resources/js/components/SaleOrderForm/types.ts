@@ -20,6 +20,16 @@ export interface CustomerCreditSummary {
   usage_percentage: number;
   overdue_count: number;
   overdue_total: number;
+  // T3.2 — paparan untuk SEMUA tipe pembayaran (opsional agar kompatibel dengan respons lama)
+  payment_type?: string;
+  policy?: 'block' | 'cash' | 'info';
+  receivables?: number;
+  open_sales_orders_total?: number;
+  open_sales_orders_count?: number;
+  exposure?: number;
+  available_after_exposure?: number;
+  oldest_overdue_days?: number;
+  deposit_balance?: number;
 }
 
 export interface CustomerOption {

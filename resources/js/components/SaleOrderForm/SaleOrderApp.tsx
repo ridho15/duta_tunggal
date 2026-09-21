@@ -151,8 +151,9 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
       return;
     }
 
+    // T3.2: ringkasan piutang/SO terbuka dimuat untuk SEMUA tipe pembayaran (bukan hanya Kredit).
     const selectedCust = dependencies?.customers?.find((c) => c.id === header.customer_id);
-    if (!selectedCust || selectedCust.tipe_pembayaran !== 'Kredit') {
+    if (!selectedCust) {
       setCustomerCreditSummary(null);
       return;
     }

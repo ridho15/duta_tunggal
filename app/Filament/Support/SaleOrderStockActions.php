@@ -47,7 +47,7 @@ class SaleOrderStockActions
             ->form(fn (SaleOrder $record): array => array_merge([
                 Textarea::make('reason')->label('Alasan backorder')->required()->rows(3)
                     ->placeholder('Mis. barang dalam perjalanan dari supplier, PO sudah terbit...'),
-            ], ApprovalActions::overrideForm($record)))
+            ], ApprovalActions::saleOrderForm($record)))
             ->visible(function (SaleOrder $record, $livewire = null): bool {
                 if (! config('sales.stock.block_short_approval', false) || $record->status !== 'request_approve') {
                     return false;
@@ -61,7 +61,7 @@ class SaleOrderStockActions
             })
             ->action(function (SaleOrder $record, array $data): void {
                 try {
-                    app(SalesOrderService::class)->approveAsBackorder($record, $data['reason'] ?? null, $data['override_reason'] ?? null);
+                    app(SalesOrderService::class)->approveAsBackorder($record, $data['reason'] ?? null, $data['override_reason'] ?? null, $data['credit_override_reason'] ?? null);
                     Notification::make()->success()->title('Disetujui sebagai Backorder')
                         ->body("SO {$record->so_number} disetujui. Stok yang tersedia ditahan; sisanya diisi otomatis saat stok masuk.")->send();
                 } catch (ValidationException $e) {

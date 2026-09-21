@@ -50,3 +50,38 @@ function ctlInvoiceWithAr(array $ctx, \App\Models\SaleOrder $so, float $total, ?
 
     return $invoice;
 }
+
+/**
+ * Penerimaan customer Lunas ($amount) atas $invoice dalam keadaan SETELAH diposting (tanpa observer): baris AR terbayar penuh, status invoice `paid`,
+ * item penerimaan, dan jurnal Dr Bank / Cr Piutang. Mengembalikan [receipt, bankCoa, piutangCoa].
+ */
+function ctlPaidReceipt(array $ctx, \App\Models\Invoice $invoice, float $amount, string $method = 'Transfer'): array
+{
+    $bank = \App\Models\ChartOfAccount::firstOrCreate(['code' => '1112.01'], ['name' => 'Bank', 'type' => 'Asset', 'is_active' => true, 'opening_balance' => 0]);
+    $piutang = \App\Models\ChartOfAccount::firstOrCreate(['code' => '1120'], ['name' => 'Piutang Dagang', 'type' => 'Asset', 'is_active' => true, 'opening_balance' => 0]);
+
+    $receipt = \App\Models\CustomerReceipt::withoutEvents(fn () => \App\Models\CustomerReceipt::create([
+        'invoice_id' => $invoice->id, 'customer_id' => $ctx['customer']->id, 'selected_invoices' => [$invoice->id], 'payment_date' => now()->toDateString(),
+        'total_payment' => $amount, 'total_payment_idr' => $amount, 'payment_method' => $method, 'payment_reference' => 'TRX-CTL-'.strtoupper(substr(uniqid(), -6)),
+        'coa_id' => $bank->id, 'status' => 'Paid', 'created_by' => $ctx['user']->id, 'cabang_id' => $ctx['cabang']->id, 'exchange_rate' => 1,
+    ]));
+
+    \App\Models\CustomerReceiptItem::withoutEvents(fn () => \App\Models\CustomerReceiptItem::create([
+        'customer_receipt_id' => $receipt->id, 'invoice_id' => $invoice->id, 'method' => $method, 'amount' => $amount, 'amount_idr' => $amount,
+        'coa_id' => $bank->id, 'payment_date' => now()->toDateString(), 'selected_invoices' => [$invoice->id],
+    ]));
+
+    $ar = \App\Models\AccountReceivable::where('invoice_id', $invoice->id)->firstOrFail();
+    $ar->forceFill(['paid' => $amount, 'remaining' => max(0, (float) $ar->total - $amount), 'status' => $amount >= (float) $ar->total ? 'Lunas' : 'Belum Lunas'])->save();
+    $invoice->forceFill(['status' => $amount >= (float) $ar->total ? 'paid' : 'partially_paid'])->saveQuietly();
+
+    foreach ([[$bank->id, $amount, 0], [$piutang->id, 0, $amount]] as [$coaId, $debit, $credit]) {
+        \App\Models\JournalEntry::create([
+            'coa_id' => $coaId, 'date' => now()->toDateString(), 'reference' => 'REC-'.$receipt->id, 'description' => 'Customer receipt for receipt id '.$receipt->id,
+            'debit' => $debit, 'credit' => $credit, 'journal_type' => 'receipt', 'source_type' => \App\Models\CustomerReceipt::class, 'source_id' => $receipt->id,
+            'currency_id' => $ctx['idr']->id, 'exchange_rate' => 1, 'cabang_id' => $ctx['cabang']->id,
+        ]);
+    }
+
+    return [$receipt->fresh(), $bank, $piutang];
+}

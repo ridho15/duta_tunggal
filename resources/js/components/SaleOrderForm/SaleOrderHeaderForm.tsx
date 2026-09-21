@@ -323,6 +323,23 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
             </div>
           )}
 
+          {/* Piutang berjalan & SO terbuka — semua tipe pembayaran (T3.2) */}
+          {!isLoadingCredit && creditSummary && creditSummary.exposure !== undefined && (
+            <div className="px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 font-medium flex items-center gap-1 shadow-sm">
+              <span>Piutang: <b>{formatCurrency(creditSummary.receivables || 0, 'Rp')}</b></span>
+              <span className="text-gray-400">|</span>
+              <span>SO terbuka: <b>{formatCurrency(creditSummary.open_sales_orders_total || 0, 'Rp')}</b> ({creditSummary.open_sales_orders_count || 0})</span>
+              <span className="text-gray-400">|</span>
+              <span>Paparan: <b>{formatCurrency(creditSummary.exposure || 0, 'Rp')}</b></span>
+            </div>
+          )}
+          {!isLoadingCredit && creditSummary && selectedCustomer.tipe_pembayaran !== 'Kredit' && creditSummary.overdue_count > 0 && (
+            <div className="px-2.5 py-1 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 font-semibold flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+              <span>{creditSummary.overdue_count} tagihan jatuh tempo ({formatCurrency(creditSummary.overdue_total, 'Rp')}), tertua {creditSummary.oldest_overdue_days || 0} hari</span>
+            </div>
+          )}
+
           {/* Credit limit */}
           {selectedCustomer.tipe_pembayaran === 'Kredit' && (
             isLoadingCredit ? (

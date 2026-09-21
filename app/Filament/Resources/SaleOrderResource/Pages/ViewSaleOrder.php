@@ -113,7 +113,7 @@ class ViewSaleOrder extends ViewRecord
                     ->icon('heroicon-o-check-badge')
                     ->extraAttributes(['wire:loading.attr' => 'disabled'])
                     ->modalSubmitAction(fn ($action) => $action->extraAttributes(['wire:loading.attr' => 'disabled']))
-                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
+                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::saleOrderForm($record))
                     ->visible(function ($record) {
                         if ($record->status !== 'request_approve') {
                             return false;
@@ -130,7 +130,7 @@ class ViewSaleOrder extends ViewRecord
                             }
 
                             $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null]);
+                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null, 'credit_override_reason' => $data['credit_override_reason'] ?? null]);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
                         } catch (ValidationException $e) {
                             $messages = collect($e->errors())->flatten()->implode(' ');

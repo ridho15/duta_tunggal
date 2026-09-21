@@ -162,7 +162,7 @@ class SalesOrderService
     }
 
     /**
-     * @param  array{backorder?: bool, reason?: string|null, override_reason?: string|null}  $options  backorder=true: setujui walau stok kurang (D2, alasan wajib);
+     * @param  array{backorder?: bool, reason?: string|null, override_reason?: string|null, credit_override_reason?: string|null}  $options  backorder=true: setujui walau stok kurang (D2, alasan wajib);
      *                                                                                                  override_reason: alasan override pembuat=penyetuju (Owner/Super Admin, D24)
      */
     public function approve($saleOrder, array $options = [])
@@ -170,13 +170,31 @@ class SalesOrderService
         // T3.1 (flag sales.controls.approval_rules): aturan persetujuan ditegakkan DI SERVICE, bukan hanya di policy/aksi.
         app(ApprovalControlService::class)->enforce(Auth::user(), $saleOrder, $options);
 
+        // T3.2 (flag credit_policy): baris customer dikunci sampai persetujuan SO tersimpan, sehingga dua persetujuan bersamaan
+        // untuk customer yang sama tidak dapat sama-sama lolos memakai sisa limit yang sama.
+        if (config('sales.controls.credit_policy', false) && $saleOrder->customer_id) {
+            return DB::transaction(function () use ($saleOrder, $options) {
+                \App\Models\Customer::withoutGlobalScopes()->whereKey($saleOrder->customer_id)->lockForUpdate()->first();
+
+                return $this->approveLocked($saleOrder, $options);
+            });
+        }
+
+        return $this->approveLocked($saleOrder, $options);
+    }
+
+    private function approveLocked($saleOrder, array $options)
+    {
         // Validate customer credit limit before approving
         $saleOrder->loadMissing('customer');
         if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
             $creditService = app(CreditValidationService::class);
             $check = $creditService->canCustomerMakePurchase($saleOrder->customer, (float) $saleOrder->total_amount);
-            if (! $check['can_purchase']) {
+            if (! $check['can_purchase'] && ! $this->creditOverrideGranted($saleOrder, $options, $check['messages'])) {
                 $messages = implode('; ', $check['messages']);
+                if ($creditService->policyEnabled()) {
+                    $messages .= ' — Owner, Super Admin atau Finance Manager dapat mengecualikan dengan alasan tercatat.';
+                }
                 Notification::make()
                     ->title('Persetujuan Ditolak')
                     ->body($messages)
@@ -206,19 +224,48 @@ class SalesOrderService
     }
 
     /**
+     * T3.2 (D24): pengecualian limit kredit — hanya Owner/Super Admin/Finance Manager, alasan >= 10 karakter, tercatat di audit.
+     *
+     * @param  array<int, string>  $messages  alasan penolakan yang dikecualikan
+     */
+    private function creditOverrideGranted($saleOrder, array $options, array $messages): bool
+    {
+        if (! config('sales.controls.credit_policy', false)) {
+            return false;
+        }
+
+        $user = Auth::user();
+        $reason = trim((string) ($options['credit_override_reason'] ?? ''));
+        if (! $user || ! $user->hasRole(['Super Admin', 'Owner', 'Finance Manager']) || mb_strlen($reason) < 10) {
+            return false;
+        }
+
+        \App\Models\ApprovalOverride::create([
+            'document_type' => 'sale_order',
+            'document_id' => $saleOrder->getKey(),
+            'user_id' => $user->getKey(),
+            'amount' => (float) $saleOrder->total_amount,
+            'reason' => $reason,
+            'context' => ['kind' => 'credit_limit', 'document_number' => $saleOrder->so_number, 'blocked_by' => $messages],
+        ]);
+
+        return true;
+    }
+
+    /**
      * Setujui SO sebagai BACKORDER (stok kurang): alasan wajib; hanya oleh yang berwenang menyetujui SO (peran Sales Manager ke atas,
      * pemisahan tugas dengan pembuat SO tetap berlaku — sama seperti approve biasa). SO tanpa kekurangan disetujui biasa.
      *
      * @throws ValidationException
      */
-    public function approveAsBackorder($saleOrder, ?string $reason, ?string $overrideReason = null)
+    public function approveAsBackorder($saleOrder, ?string $reason, ?string $overrideReason = null, ?string $creditOverrideReason = null)
     {
         $allowed = app(ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $saleOrder);
         if (! $allowed['allowed']) {
             throw ValidationException::withMessages(['approval' => $allowed['reason'] ?? 'Akses persetujuan ditolak.']);
         }
 
-        return $this->approve($saleOrder, ['backorder' => true, 'reason' => $reason, 'override_reason' => $overrideReason]);
+        return $this->approve($saleOrder, ['backorder' => true, 'reason' => $reason, 'override_reason' => $overrideReason, 'credit_override_reason' => $creditOverrideReason]);
     }
 
     /** Perilaku lama (flag block_short_approval mati): hanya alokasi gudang yang diperiksa, item tanpa alokasi lolos. */

@@ -675,6 +675,16 @@ class SaleOrderResource extends Resource
                                     }
                                 }
 
+                                // T3.2 (flag credit_policy): piutang berjalan & SO terbuka untuk SEMUA tipe pembayaran (bukan hanya Kredit)
+                                if (config('sales.controls.credit_policy', false) && ($creditSummary['receivables'] ?? 0) + ($creditSummary['open_sales_orders_total'] ?? 0) > 0) {
+                                    $helper[] = "Piutang: Rp." . number_format($creditSummary['receivables'], 0, ',', '.')
+                                        . " · SO terbuka: Rp." . number_format($creditSummary['open_sales_orders_total'], 0, ',', '.')
+                                        . " · Paparan: Rp." . number_format($creditSummary['exposure'], 0, ',', '.');
+                                    if ($customer->tipe_pembayaran !== 'Kredit' && $creditSummary['overdue_count'] > 0) {
+                                        $helper[] = "⚠️ {$creditSummary['overdue_count']} tagihan jatuh tempo (tertua {$creditSummary['oldest_overdue_days']} hari)";
+                                    }
+                                }
+
                                 return implode(' | ', $helper);
                             })
                             ->afterStateUpdated(function ($set, $get, $state) {
@@ -1808,7 +1818,7 @@ class SaleOrderResource extends Resource
                     })
                     ->modalSubmitActionLabel('Ya, Setujui SO')
                     ->color('success')
-                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
+                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::saleOrderForm($record))
                     ->visible(function ($record) {
                         if ($record->status !== 'request_approve') {
                             return false;
@@ -1825,7 +1835,7 @@ class SaleOrderResource extends Resource
                             }
 
                             $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null]);
+                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null, 'credit_override_reason' => $data['credit_override_reason'] ?? null]);
                             HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
                         } catch (ValidationException $e) {
                             $messages = collect($e->errors())->flatten()->implode(' ');
