@@ -170,15 +170,12 @@
 
     <div class="header clearfix">
         <div class="company-info">
-            <h2>PT DUTA TUNGGAL</h2>
-            <p>Jl. Contoh No. 123<br>
-                Jakarta, Indonesia<br>
-                Telp: (021) 12345678<br>
-                Email: admin@dutatunggal.co.id</p>
-            @if($invoice->cabang)
+            @php $kop = app(\App\Services\DocumentPrintBuilder::class)->company($invoice->cabang, true); @endphp
+            <h2>{{ $kop['name'] }}</h2>
+            <p>@foreach ($kop['lines'] as $kopLine){{ $kopLine }}<br>@endforeach</p>
+            @if($kop['branch'])
             <p style="margin-top: 10px; font-size: 11px; color: #666;">
-                <strong>Cabang: {{ $invoice->cabang->nama }}</strong><br>
-                {{ $invoice->cabang->alamat ?? '' }}
+                <strong>Cabang: {{ $kop['branch'] }}</strong>
             </p>
             @endif
         </div>

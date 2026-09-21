@@ -226,12 +226,10 @@
     <table class="header-table">
         <tr>
             <td style="width: 70%;">
-                <div class="company-name">PT DUTA TUNGGAL</div>
+                @php $kop = app(\App\Services\DocumentPrintBuilder::class)->company($purchaseOrder->cabang, false); @endphp
+                <div class="company-name">{{ $kop['name'] }}</div>
                 <div class="company-info">
-                    Jl. Contoh No. 123<br>
-                    Jakarta, Indonesia<br>
-                    Telp: (021) 12345678<br>
-                    Email: admin@dutatunggal.co.id
+                    @foreach ($kop['lines'] as $kopLine){{ $kopLine }}<br>@endforeach
                 </div>
             </td>
             <td class="right">

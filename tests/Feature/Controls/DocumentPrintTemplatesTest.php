@@ -157,14 +157,56 @@ it('Sales Order dan Quotation: kop mengikuti data cabang (tanpa alamat contoh)',
     tpAssertNoPlaceholders($qHtml);
 });
 
-it('pemindai: template cetak penjualan tidak memuat alamat/telepon contoh atau nama perusahaan yang dikeraskan di kop', function () {
-    foreach (['sale-order-invoice', 'delivery-order', 'kwitansi', 'credit-note', 'customer-return', 'sales-order', 'quotation', 'surat-jalan'] as $name) {
-        $source = file_get_contents(resource_path("views/pdf/{$name}.blade.php"));
-        foreach (['Jl. Contoh', '12345678', '08xx', 'xxx-xxxx', 'Contoh Alamat', 'Jakarta, Indonesia'] as $fake) {
-            expect($source)->not->toContain($fake);
+it('pemindai: SEMUA template cetak (penjualan, pembelian, laporan) tidak memuat alamat/telepon contoh; template penjualan tanpa nama perusahaan dikeraskan di kop', function () {
+    $fakes = ['Jl. Contoh', '12345678', '08xx', 'xxx-xxxx', 'Contoh Alamat', 'Jakarta, Indonesia'];
+
+    foreach (glob(resource_path('views/pdf/*.blade.php')) as $path) {
+        $source = file_get_contents($path);
+        foreach ($fakes as $fake) {
+            expect($source)->not->toContain($fake, basename($path).": memuat \"{$fake}\"");
         }
     }
+
+    foreach (['sale-order-invoice', 'delivery-order', 'kwitansi', 'credit-note', 'customer-return', 'sales-order', 'quotation', 'surat-jalan', 'purchase-order', 'purchase-order-invoice-2', 'order-request'] as $name) {
+        expect(file_get_contents(resource_path("views/pdf/{$name}.blade.php")))->not->toContain('<div class="company-name">PT DUTA TUNGGAL</div>', "{$name}: nama perusahaan dikeraskan");
+    }
     expect(file_exists(resource_path('views/pdf/kwitansi-sales-order.blade.php')))->toBeFalse();   // templat yatim berdata contoh dihapus
+});
+
+it('Purchase Order, Invoice Pembelian, Order Request: kop dari Cabang/global (tanpa alamat contoh); render tetap sukses', function () {
+    $ctx = tpContext();
+    $supplier = \App\Models\Supplier::factory()->create();
+    $po = \App\Models\PurchaseOrder::create([
+        'supplier_id' => $supplier->id, 'cabang_id' => $ctx['cabang']->id, 'po_number' => 'PO-KOP-001', 'order_date' => now(), 'tempo_hutang' => 14, 'status' => 'approved', 'is_asset' => false,
+    ]);
+
+    // Purchase Order: alamat operasional cabang (bukan alamat pajak), NPWP tidak dicetak pada dokumen non-pajak
+    $poHtml = view('pdf.purchase-order', ['purchaseOrder' => $po->load(['supplier', 'cabang', 'purchaseOrderItem.currency', 'purchaseOrderCurrency.currency'])])->render();
+    expect($poHtml)->toContain('PT Duta Tunggal Sumatera')->toContain('Jl. Sudirman No. 10, Padang')->toContain('Telp: 0751-123456')->not->toContain('Jl. Pajak No. 1');
+    tpAssertNoPlaceholders($poHtml);
+
+    // Invoice Pembelian: dokumen berpajak → alamat pajak + NPWP; nama cabang tetap tampil
+    $invoice = \App\Models\Invoice::factory()->create([
+        'from_model_type' => \App\Models\PurchaseOrder::class, 'from_model_id' => $po->id, 'invoice_number' => 'PINV-KOP-001', 'cabang_id' => $ctx['cabang']->id,
+        'subtotal' => 1000000, 'dpp' => 1000000, 'tax' => 11, 'ppn_rate' => 11, 'total' => 1110000,
+    ]);
+    $invoice = \App\Models\Invoice::with(['fromModel.supplier', 'invoiceItem.product', 'cabang'])->findOrFail($invoice->id);
+    $invHtml = view('pdf.purchase-order-invoice-2', ['invoice' => $invoice])->render();
+    expect($invHtml)->toContain('PT Duta Tunggal Sumatera')->toContain('Jl. Pajak No. 1, Padang')->toContain('NPWP: 01.234.567.8-201.000')->toContain('Cabang: Cabang Padang');
+    tpAssertNoPlaceholders($invHtml);
+
+    // Order Request tidak punya cabang tingkat dokumen → kop global; tanpa data apa pun hanya nama bawaan
+    $orderRequest = \App\Models\OrderRequest::factory()->create(['currency_id' => $ctx['idr']->id]);
+    $emptyHtml = view('pdf.order-request', ['orderRequest' => $orderRequest->load('createdBy')])->render();
+    expect($emptyHtml)->toContain(\App\Services\DocumentPrintBuilder::DEFAULT_COMPANY_NAME)->not->toContain('Jl. Sudirman')->not->toContain('NPWP:');
+    tpAssertNoPlaceholders($emptyHtml);
+
+    \App\Models\AppSetting::set('company_legal_name', 'PT Global Legal');
+    \App\Models\AppSetting::set('company_address', 'Jl. Global No. 5');
+    \App\Models\AppSetting::set('company_phone', '021-999');
+    $globalHtml = view('pdf.order-request', ['orderRequest' => $orderRequest->fresh()->load('createdBy')])->render();
+    expect($globalHtml)->toContain('PT Global Legal')->toContain('Jl. Global No. 5')->toContain('Telp: 021-999');
+    tpAssertNoPlaceholders($globalHtml);
 });
 
 it('PDF benar-benar terbentuk (Dompdf) untuk Invoice, DO, Kwitansi, Nota Kredit, Retur — termasuk watermark diputar', function () {
