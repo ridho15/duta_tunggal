@@ -123,5 +123,16 @@ class SaleOrderItem extends Model
                 $item->tax = $itemTaxType === 'none' ? 0 : TaxSetting::activeRate('PPN');
             }
         });
+
+        // T2.4 (flag stock.reserve_on_so_approve): item SO aktif berubah/dihapus → reservasi disusun ulang.
+        static::saved(function (SaleOrderItem $item): void {
+            if ($item->wasRecentlyCreated || $item->wasChanged(['quantity', 'warehouse_id', 'rak_id', 'product_id'])) {
+                app(\App\Services\SaleOrderReservationSynchronizer::class)->syncIfActive((int) $item->sale_order_id, 'Item SO berubah');
+            }
+        });
+
+        static::deleted(function (SaleOrderItem $item): void {
+            app(\App\Services\SaleOrderReservationSynchronizer::class)->syncIfActive((int) $item->sale_order_id, 'Item SO dihapus');
+        });
     }
 }

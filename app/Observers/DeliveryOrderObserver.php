@@ -97,8 +97,7 @@ class DeliveryOrderObserver
     /** Buku besar reservasi & pengiriman idempoten (flag sales.stock.ledger, T2.1). */
     protected function ledgerEnabled(): bool
     {
-        // strict_dispatch mengandalkan buku besar (idempotensi pengiriman, pengembalian gagal-kirim) sehingga otomatis mengaktifkannya.
-        return (bool) config('sales.stock.ledger', false) || (bool) config('sales.stock.strict_dispatch', false);
+        return \App\Services\StockReservationLedger::enabled();
     }
 
     /**
@@ -107,6 +106,9 @@ class DeliveryOrderObserver
     protected function syncDeliveryProgress(DeliveryOrder $deliveryOrder): void
     {
         app(\App\Services\SaleOrderDeliveryProgress::class)->syncForDeliveryOrder($deliveryOrder);
+
+        // T2.4 (flag stock.reserve_on_so_approve): kebutuhan/penahanan SO berubah bersama DO → reservasi level-SO disusun ulang.
+        app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "DO {$deliveryOrder->do_number} → {$deliveryOrder->status}");
     }
 
     /**

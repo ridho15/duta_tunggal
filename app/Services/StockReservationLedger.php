@@ -21,6 +21,17 @@ use Illuminate\Support\Facades\Log;
 class StockReservationLedger
 {
     /**
+     * Buku besar aktif bila salah satu flag stok hidup: `ledger`, `strict_dispatch` (idempotensi pengiriman/pengembalian gagal-kirim)
+     * atau `reserve_on_so_approve` (reservasi SO dan DO harus terpetakan ke item SO agar tidak terhitung ganda).
+     */
+    public static function enabled(): bool
+    {
+        return (bool) (config('sales.stock.ledger', false)
+            || config('sales.stock.strict_dispatch', false)
+            || config('sales.stock.reserve_on_so_approve', false));
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes  product_id, warehouse_id, quantity, rak_id?, sale_order_id?, sale_order_item_id?, delivery_order_id?
      */
     public function reserve(array $attributes, string $reason): StockReservation

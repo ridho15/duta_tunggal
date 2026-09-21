@@ -85,8 +85,9 @@ class DeliveryOrderItem extends Model
                 $deliveryOrder = $deliveryOrderItem->deliveryOrder;
 
                 // T2.1 (flag stock.ledger): edit kuantitas (mis. checker) saat DO masih Siap Kirim → reservasi ikut turun/naik.
-                if ($deliveryOrder && $deliveryOrder->status === 'approved' && (config('sales.stock.ledger', false) || config('sales.stock.strict_dispatch', false))) {
+                if ($deliveryOrder && $deliveryOrder->status === 'approved' && \App\Services\StockReservationLedger::enabled()) {
                     app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
+                    app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
                 }
 
                 if ($deliveryOrder && in_array($deliveryOrder->status, ['sent', 'received', 'completed'])) {

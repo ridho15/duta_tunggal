@@ -93,6 +93,11 @@ class SaleOrderObserver
         if ($originalStatus !== 'canceled' && $newStatus === 'canceled') {
             $this->releaseStockReservations($saleOrder);
         }
+
+        // T2.4 (flag stock.reserve_on_so_approve): status SO berubah (approve, batal, tutup, tolak, selesai, ...) → reservasi level-SO disusun ulang.
+        if (\App\Services\SaleOrderReservationSynchronizer::enabled() && $saleOrder->wasChanged('status')) {
+            app(\App\Services\SaleOrderReservationSynchronizer::class)->sync($saleOrder->id, "SO {$saleOrder->so_number}: {$originalStatus} → {$newStatus}");
+        }
     }
 
     /**
@@ -105,7 +110,7 @@ class SaleOrderObserver
             return;
         }
 
-        if ((config('sales.stock.ledger', false) || config('sales.stock.strict_dispatch', false))) {
+        if (\App\Services\StockReservationLedger::enabled()) {
             app(\App\Services\StockReservationLedger::class)->releaseForSaleOrder($saleOrder->id, "SO {$saleOrder->so_number} dibatalkan");
         } else {
             StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
@@ -550,9 +555,14 @@ class SaleOrderObserver
 
         $reservationCount = StockReservation::where('sale_order_id', $saleOrder->id)->count();
         if ($reservationCount > 0) {
-            StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
-                $reservation->delete();
-            });
+            if (\App\Services\StockReservationLedger::enabled()) {
+                // Buku besar: reservasi DIKONSUMSI (barang sudah keluar lewat gerakan di atas), tercatat sebagai event.
+                app(\App\Services\StockReservationLedger::class)->releaseForSaleOrder($saleOrder->id, "SO {$saleOrder->so_number} Ambil Sendiri selesai — reservasi dikonsumsi", \App\Models\StockReservationEvent::CONSUMED);
+            } else {
+                StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {
+                    $reservation->delete();
+                });
+            }
 
             Log::info('SaleOrderObserver: Released self-pickup reservations after stock movement', [
                 'sale_order_id' => $saleOrder->id,
