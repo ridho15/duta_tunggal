@@ -669,3 +669,10 @@ Semua penjaga kritis diuji mutasi (dirusak → tes gagal → dipulihkan).
 
 **Cabang:** `feat/penjualan-t2-stok` (T2.0–T2.6, satu commit per tugas). Rincian tugas, penyimpangan, dan langkah Anda ada di **`docs/PLAN-T2-STOK-PENGIRIMAN.md` §11**.
 Ringkas: usulan **1 (reservasi sejak SO Approved)**, **2 (peringatan + blokir stok kurang, Backorder)**, **3 (status item DO & satu pintu status)** dan temuan **X1–X5** dikerjakan di belakang flag `sales.stock.*` (default mati); D1–D5, D15, D17–D23 seluruhnya diterapkan. X11/X12 dicatat, tidak diubah. D6–D14 (T3/T4) masih menunggu konfirmasi.
+
+---
+
+## Status pelaksanaan — T3 & T4 (22 September 2026)
+
+**Cabang:** `feat/penjualan-t3-kontrol` (T3.1–T3.4, T4.1–T4.3, satu commit per tugas). Rincian, penyimpangan, dan langkah Anda di **`docs/PLAN-T3-T4-PENJUALAN.md` §9**.
+Ringkas: usulan **6 (aturan persetujuan)**, **7 (kebijakan kredit)**, **8 (kunci dokumen + Batalkan Penerimaan)**, **9 (Pengaturan Akuntansi)**, **12 (penomoran terpusat)**, **20b–d (gabung customer, kode CUST, CustomerService tunggal)** dan temuan **X8, X10** dikerjakan di balik flag `sales.controls.*` (default mati); D6–D9, D11, D14 diterapkan. D10, D12, D13 (T5–T7) masih menunggu konfirmasi.

@@ -2,7 +2,8 @@
 
 > Dibuat 21 September 2026 · Turunan dari `docs/AUDIT-20-IMPROVEMENT-PENJUALAN.md` §7 (T3, T4) · Usulan **6, 7, 8, 9, 12, 20b–d** + temuan **X8, X10**.
 > Keputusan **D6–D14 sudah disetujui** ("setuju D6-D14", 21 September 2026). Keputusan turunan di §2.2 memakai **rekomendasi** dan tercatat; bila Anda tidak sependapat, cukup bilang — semuanya berada di balik flag sehingga mudah diubah.
-> Prasyarat: T2 selesai (cabang `feat/penjualan-t2-stok`). Cabang kerja: `feat/penjualan-t3-kontrol` (dari `feat/penjualan-t2-stok`).
+> **Status: DILAKSANAKAN (22 September 2026)** — T3.1–T3.4 dan T4.1–T4.3 selesai di cabang `feat/penjualan-t3-kontrol` (dari `feat/penjualan-t2-stok`); lihat **§9 Status pelaksanaan**.
+> Semua perilaku baru berada di balik flag `sales.controls.*` (default **mati**).
 
 ## Daftar Isi
 1. [Tujuan dan ruang lingkup](#1-tujuan-dan-ruang-lingkup)
@@ -13,6 +14,7 @@
 6. [Tes dan regresi](#6-tes-dan-regresi)
 7. [Rollout, flag, rollback](#7-rollout-flag-rollback)
 8. [Risiko & koordinasi](#8-risiko--koordinasi)
+9. [Status pelaksanaan](#9-status-pelaksanaan)
 
 ---
 
@@ -144,3 +146,42 @@ Semua flag di `config/sales.php` → `controls` (default **mati**): `approval_ru
 | Migrasi kode akun mengubah jurnal | Tiap titik dimigrasi dengan tes jurnal identik (fallback = kode sekarang) |
 | Penomoran menyentuh data hidup | Benih dari MAX; nomor lama tak diubah; dry-run + cadangan |
 | Bentrok dengan pekerjaan pembatalan invoice yang belum di-commit (G8) | T3 tidak menyentuh berkas itu; pemasangan kunci Invoice menyusul |
+
+---
+
+## 9. Status pelaksanaan
+
+**Cabang:** `feat/penjualan-t3-kontrol` — satu commit per tugas: T3.1 `4f47a06`, T3.2 `1340ea7`, T3.3 `71712d8`, T3.4 `2da384b`, T4.1 `a45f5e3`, T4.2/T4.3 di commit penutup (+ `5f1b77a` perbaikan tes akibat penghapusan `confirm()` T2.6).
+Semua flag `sales.controls.*` **default mati** → tanpa menyalakannya perilaku sama dengan sebelum T3/T4 (tiap tugas punya tes karakterisasi `[flag mati]`).
+
+| Tugas | Hasil | Tes baru |
+|---|---|---|
+| T3.1 | `approval_rules` (nilai awal identik konstanta lama) + `approval_overrides`; `canApprove` generik; penegakan **di service** untuk SO dan Quotation (pemisahan tugas Quotation, D26); override Owner/Super Admin wajib alasan ≥ 10 karakter + tercatat; halaman Aturan Persetujuan | 21 |
+| T3.2 | `CreditExposure` (piutang + SO belum ditagih); Kredit = blokir, COD/Bebas = informasi, limit 0 tidak diizinkan; **baris customer dikunci** selama persetujuan SO; pengecualian beralasan (Owner/Super Admin/Finance Manager); Info Customer untuk semua tipe (endpoint, React, Filament) | 11 |
+| T3.3 | `DocumentLock` (matriks dokumen × status × aksi, alasan + jalur koreksi) dipasang di policy DO/Jadwal/Penerimaan/Retur; **Batalkan Penerimaan** (jurnal balik, piutang & invoice kembali, migrasi aditif); peran fiktif "Super Sales" dihapus (X8) | 51 (42 baris matriks) |
+| T3.4 | `accounting_settings` + `AccountingSettings` (11 kunci; akun harus ada, aktif, detail, bertipe sesuai; fallback = perilaku lama); halaman Pengaturan Akuntansi; InvoiceObserver, DeliveryOrderObserver/Service, CustomerReturnService, form Invoice, jurnal Penerimaan membaca lewat pengaturan; pemindai tanpa kode akun literal; `master:readiness` diperluas | 16 |
+| T4.1 | `DocumentNumberService` + `document_sequences` (atomik, reset bulanan per cabang, `{PREFIX}-{KODECABANG}-{YYMM}-{SEQ4}`); generator SO/Quotation/DO/SJ/Jadwal/Retur/Invoice penjualan mendelegasikan; `documents:seed-sequences`, `documents:check-numbering` | 11 |
+| T4.2 | `CustomerService::create` tunggal (form Customer, SO, Quotation): dedup NIK/NPWP dan nama+telepon (flag `customer_dedup`), override beralasan, kode `CUST-00001` global (flag `central_numbering`), `legacy_code`, `customers:assign-codes` | 7 |
+| T4.3 | `CustomerMerger` + `customers:merge` (CSV disetujui bisnis, dry-run = transaksi dibatalkan, cadangan CSV, verifikasi Σ piutang/deposit/jumlah dokumen sebelum-sesudah, soft-delete + `merged_into`, deposit di kedua sisi ditolak) | 5 |
+
+Semua penjaga kritis diuji **mutasi** (dirusak → tes gagal → dipulihkan).
+
+### Penyimpangan dari rencana & temuan baru
+- **Suite penuh T2.6 menemukan 2 kegagalan baru** (tes yang memanggil `SalesOrderService::confirm()` yang saya hapus) — diperbaiki (`5f1b77a`). Pelajaran: gerbang terarah tidak cukup untuk penghapusan API; suite penuh dijalankan tiap penutup tahap.
+- **`kredit_limit ≤ 0` pada tipe Kredit sudah diblokir kode lama** (audit menyebutnya "tak terbatas"; yang benar: angka 999.999.999.999 di data master yang membuatnya tak berfungsi). D28 karenanya tidak mengubah perilaku; yang berubah adalah **paparan** (SO belum ditagih ikut dihitung).
+- **Nilai `tipe_pembayaran` COD adalah `"COD (Bayar Lunas)"`**, bukan "COD" — kebijakan dipetakan dengan awalan.
+- **Akun pada invoice (ar/revenue/PPN) yang sudah tersimpan tetap dipakai**; Pengaturan Akuntansi memengaruhi nilai bawaan dan invoice yang belum membawa akun (sesuai D30: tanpa perubahan mendadak).
+- **Batalkan Penerimaan** sengaja menolak penerimaan yang memakai/menghasilkan **deposit**, tanpa item, atau Draft (pembaliknya melibatkan saldo/alokasi yang tidak dapat ditebak) — koreksi lewat akuntansi/T5 🧾.
+- **Pilihan COA bebas** di form Deposit / Penjualan Lain belum dihapus (di luar alur inti); dicatat untuk T7.
+- **`InvoicePolicy` tidak disentuh**: berkas itu (dan `Invoice`, migrasi pembatalan invoice, `PaymentRequest*`, `Console/Kernel.php`) sedang diubah pihak lain di working tree; matriks Invoice sudah ada di `DocumentLock` dan diuji, pemasangan menyusul setelah perubahan itu di-commit.
+- **Penomoran invoice pembelian** memakai `InvoiceService::generateInvoiceNumber()` yang sama (kebiasaan lama); jalur pembelian sengaja dibiarkan format lama — hanya `generateSalesInvoiceNumber()` (penjualan) yang terpusat.
+- **Flaky**: `InvoiceArFeatureTest::creates correct journal entries for invoice` gagal sesekali karena factory `Cabang` memilih `kode` acak yang bisa kembar (lolos saat diulang); modul tidak tersentuh. Akun `5160` (factory produk) berparent_id acak dapat membuat akun uji tampak "induk" pada tes yang menggunakan id kecil — dinetralkan di tes.
+- **Uji balapan sungguhan** (dua proses paralel) tidak dapat dilakukan di dalam `RefreshDatabase`; keamanan balapan dibuktikan lewat tes yang memastikan kueri **`SELECT … FOR UPDATE`** (customer saat persetujuan, `document_sequences` saat penomoran) tetap ada (dimutasi → gagal).
+
+### Yang perlu Anda lakukan
+1. **`php artisan migrate`** — migrasi baru: `approval_rules`+`approval_overrides`, `customer_receipts` (cancelled_*), `accounting_settings`, `document_sequences`, `customers` (legacy_code, merged_into).
+2. **Nyalakan bertahap** (`.env`, lalu `php artisan config:clear`; uji tiap langkah): `SALES_CONTROLS_APPROVAL_RULES` → `SALES_CONTROLS_DOC_LOCK` → `SALES_CONTROLS_CREDIT_POLICY` (setelah `customers:audit-credit-limit` ditinjau) → `SALES_CONTROLS_ACCOUNTING_SETTINGS` (isi halaman Pengaturan Akuntansi dulu; `master:readiness`) → `SALES_CONTROLS_CENTRAL_NUMBERING` → `SALES_CONTROLS_CUSTOMER_DEDUP`.
+3. **Sebelum penomoran terpusat:** `php artisan documents:seed-sequences` (dry-run lalu `--apply`) dan `documents:check-numbering`.
+4. **Master customer (di luar jam kerja, dengan cadangan):** kirim CSV audit duplikat (`customers:audit-duplicates`) ke bisnis → CSV `survivor_id,merged_id` yang disetujui → `php artisan customers:merge <csv>` (dry-run) → `--apply`; lalu `customers:assign-codes` (dry-run → `--apply`).
+5. **Tinjau dengan akuntan** 🧾: daftar 11 kunci akun, perilaku Batalkan Penerimaan (jurnal balik), dan kebijakan paparan kredit.
+6. **Konfirmasi D10–D13** (Nota Kredit/refund, kop dokumen, standar aksi UI) sebelum T5–T7.

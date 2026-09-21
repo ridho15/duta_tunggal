@@ -584,7 +584,17 @@ class QuotationResource extends Resource
                                 ->getOptionLabelFromRecordUsing(function (Customer $customer) {
                                     return "({$customer->code}) {$customer->name}";
                                 })
-                                ->createOptionForm([
+                                ->createOptionUsing(function (array $data) {
+                                // T4.2 (X10): pembuatan customer dari form dokumen lewat CustomerService::create (dedup + kode terpusat)
+                                try {
+                                    return app(\App\Services\CustomerService::class)->create($data)->getKey();
+                                } catch (\Illuminate\Validation\ValidationException $e) {
+                                    \Filament\Notifications\Notification::make()->danger()->title('Customer tidak dapat dibuat')
+                                        ->body(collect($e->errors())->flatten()->implode(' '))->persistent()->send();
+                                    throw new \Filament\Support\Exceptions\Halt();   // batalkan simpan (aksi Filament menangkapnya)
+                                }
+                            })
+                            ->createOptionForm([
                                     Fieldset::make('Form Customer')
                                         ->schema([
                                             TextInput::make('code')

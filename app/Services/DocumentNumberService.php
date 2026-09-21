@@ -32,6 +32,8 @@ class DocumentNumberService
         'invoice_tax' => ['table' => 'invoices', 'column' => 'invoice_number', 'prefix' => 'INV-PJK', 'label' => 'Invoice Pajak'],
         'invoice_non_tax' => ['table' => 'invoices', 'column' => 'invoice_number', 'prefix' => 'INV-NPJK', 'label' => 'Invoice Non-Pajak'],
         'customer_return' => ['table' => 'customer_returns', 'column' => 'return_number', 'prefix' => 'CR', 'label' => 'Retur Customer'],
+        // Kode customer (D32): global, tanpa cabang/periode — CUST-00001
+        'customer' => ['table' => 'customers', 'column' => 'code', 'prefix' => 'CUST', 'label' => 'Kode Customer'],
     ];
 
     public static function enabled(): bool
@@ -45,10 +47,11 @@ class DocumentNumberService
     public function next(string $type, ?int $cabangId = null, ?CarbonInterface $date = null): string
     {
         $definition = self::TYPES[$type] ?? throw new \InvalidArgumentException("Jenis dokumen \"{$type}\" tidak dikenal.");
-        $cabangId ??= Auth::user()?->cabang_id ? (int) Auth::user()->cabang_id : null;
-        $period = ($date ?? now())->format('ym');
+        $global = $type === 'customer';   // kode customer: global (cabang 0), tanpa periode
+        $cabangId = $global ? null : ($cabangId ?? (Auth::user()?->cabang_id ? (int) Auth::user()->cabang_id : null));
+        $period = $global ? '0000' : ($date ?? now())->format('ym');
 
-        return DB::transaction(function () use ($type, $definition, $cabangId, $period) {
+        return DB::transaction(function () use ($type, $definition, $cabangId, $period, $global) {
             $key = ['type' => $type, 'cabang_id' => (int) $cabangId, 'period' => $period];
 
             $row = DB::table('document_sequences')->where($key)->lockForUpdate()->first();
@@ -69,7 +72,9 @@ class DocumentNumberService
             // Pengaman: lewati nomor yang ternyata sudah ada di tabel dokumen (mis. diinput manual) — urutan tetap monoton.
             do {
                 $next++;
-                $number = sprintf('%s-%s-%s-%s', $prefix, $cabangCode, $period, str_pad((string) $next, 4, '0', STR_PAD_LEFT));
+                $number = $global
+                    ? sprintf('%s-%s', $prefix, str_pad((string) $next, 5, '0', STR_PAD_LEFT))
+                    : sprintf('%s-%s-%s-%s', $prefix, $cabangCode, $period, str_pad((string) $next, 4, '0', STR_PAD_LEFT));
                 $exists = DB::table($definition['table'])->where($definition['column'], $number)->exists();
             } while ($exists);
 

@@ -55,7 +55,8 @@ return [
     |   credit_policy        : kebijakan kredit per tipe (D7/D28) dengan paparan = piutang + SO belum ditagih.
     |   doc_lock             : DocumentLock sebagai sumber tunggal kunci dokumen (policy, aksi Filament, API).
     |   accounting_settings  : akun jurnal alur penjualan dibaca dari Pengaturan Akuntansi (fallback config/coa.php).
-    |   central_numbering    : DocumentNumberService + document_sequences untuk semua dokumen penjualan.
+    |   central_numbering    : DocumentNumberService + document_sequences untuk semua dokumen penjualan (dan kode customer CUST-00001).
+    |   customer_dedup        : pembuatan customer menolak duplikat (NIK/NPWP sama, atau nama+telepon sama) kecuali override beralasan.
     */
     'controls' => [
         'approval_rules' => (bool) env('SALES_CONTROLS_APPROVAL_RULES', false),
@@ -63,6 +64,8 @@ return [
         'doc_lock' => (bool) env('SALES_CONTROLS_DOC_LOCK', false),
         'accounting_settings' => (bool) env('SALES_CONTROLS_ACCOUNTING_SETTINGS', false),
         'central_numbering' => (bool) env('SALES_CONTROLS_CENTRAL_NUMBERING', false),
+        // Dedup saat membuat customer (NIK/NPWP sama, atau nama+telepon sama) — semua form lewat CustomerService::create (T4.2, X10)
+        'customer_dedup' => (bool) env('SALES_CONTROLS_CUSTOMER_DEDUP', false),
     ],
 
 ];

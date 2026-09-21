@@ -30,6 +30,8 @@ class Customer extends Model
         'nik_npwp', // NIK / NPWP, -> string karena bisa mengandung karakter selain angka
         'keterangan',
         'cabang_id',
+        'legacy_code', // kode lama sebelum penomoran CUST-00001 (T4.2)
+        'merged_into', // id customer survivor bila customer ini sudah digabung (T4.3)
     ];
 
     protected static function booted()
