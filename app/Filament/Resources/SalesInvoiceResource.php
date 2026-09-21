@@ -977,6 +977,7 @@ class SalesInvoiceResource extends Resource
                         'success' => 'paid',
                         'primary' => 'partially_paid',
                         'danger' => 'overdue',
+                        'gray' => 'cancelled',
                     ]),
             ])
             ->filters([
@@ -988,6 +989,7 @@ class SalesInvoiceResource extends Resource
                         'paid' => 'Lunas',
                         'partially_paid' => 'Dibayar Sebagian',
                         'overdue' => 'Terlambat',
+                        'cancelled' => 'Dibatalkan',
                     ]),
                 SelectFilter::make('tax_invoice_state')
                     ->label('Faktur Pajak')
@@ -1064,6 +1066,8 @@ class SalesInvoiceResource extends Resource
                         ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
                         ->openUrlInNewTab(),
                     static::taxNumberTableAction(),
+                    \App\Filament\Support\CreditNoteActions::create(Tables\Actions\Action::make('create_credit_note')),
+                    \App\Filament\Support\CreditNoteActions::cancelInvoice(Tables\Actions\Action::make('cancel_invoice')),
                     Tables\Actions\Action::make('view_journal_entries')
                         ->label('Lihat Journal Entries')
                         ->icon('heroicon-o-book-open')

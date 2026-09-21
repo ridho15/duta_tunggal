@@ -106,6 +106,8 @@ class ViewCustomerReturn extends ViewRecord
                         ->send();
                 }),
 
+            \App\Filament\Support\CreditNoteActions::fromReturn(Actions\Action::make('create_credit_note')),
+
             Actions\Action::make('complete')
                 ->label('Selesaikan')
                 ->icon('heroicon-o-flag')

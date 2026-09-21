@@ -8,6 +8,7 @@
     $items = [
         ['label' => 'Piutang Usaha',      'url' => \App\Filament\Resources\AccountReceivableResource::getUrl(), 'icon' => 'banknotes',     'desc' => 'Kelola hak tagih dari pelanggan', 'class' => \App\Filament\Resources\AccountReceivableResource::class],
         ['label' => 'Invoice Penjualan',  'url' => \App\Filament\Resources\SalesInvoiceResource::getUrl(),     'icon' => 'document-text', 'desc' => 'Tagihan penjualan kepada pelanggan', 'class' => \App\Filament\Resources\SalesInvoiceResource::class],
+        ['label' => 'Nota Kredit',        'url' => \App\Filament\Resources\CreditNoteResource::getUrl(),   'icon' => 'receipt-refund', 'desc' => 'Koreksi resmi atas invoice: pembatalan, retur, koreksi', 'class' => \App\Filament\Resources\CreditNoteResource::class],
         ['label' => 'Penjualan Lainnya',  'url' => \App\Filament\Resources\OtherSaleResource::getUrl(),        'icon' => 'shopping-bag',  'desc' => 'Transaksi penjualan non-standar', 'class' => \App\Filament\Resources\OtherSaleResource::class],
     ];
 

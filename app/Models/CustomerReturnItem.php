@@ -25,6 +25,19 @@ class CustomerReturnItem extends Model
         self::DECISION_CREDIT  => 'Refund / Nota Kredit',
     ];
 
+    /**
+     * Opsi keputusan pada form retur: "Refund / Nota Kredit" hanya ditawarkan bila Nota Kredit diaktifkan
+     * (flag mati = pilihan lama persis); keputusan yang sudah tersimpan tetap tampil labelnya.
+     *
+     * @return array<string, string>
+     */
+    public static function decisionOptions(): array
+    {
+        return \App\Services\CreditNoteService::enabled()
+            ? self::DECISION_LABELS
+            : array_diff_key(self::DECISION_LABELS, [self::DECISION_CREDIT => true]);
+    }
+
     const QC_RESULT_PASS = 'pass';
     const QC_RESULT_FAIL = 'fail';
 

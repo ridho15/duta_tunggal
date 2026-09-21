@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -50,6 +51,11 @@ class CreditNote extends Model
         'applied_to_ar' => 'decimal:2',
         'applied_to_deposit' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new CabangScope);   // sama seperti Invoice/Retur: pengguna cabang hanya melihat cabangnya
+    }
 
     public function items()
     {

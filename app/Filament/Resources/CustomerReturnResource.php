@@ -267,7 +267,7 @@ class CustomerReturnResource extends Resource
 
                             Forms\Components\Select::make('decision')
                                 ->label('Keputusan')
-                                ->options(CustomerReturnItem::DECISION_LABELS)
+                                ->options(fn () => CustomerReturnItem::decisionOptions())
                                 ->columnSpan(2),
                         ])
                         ->columns(6)
@@ -467,6 +467,8 @@ class CustomerReturnResource extends Resource
                             );
                         }
                     }),
+
+                \App\Filament\Support\CreditNoteActions::fromReturn(Tables\Actions\Action::make('create_credit_note')),
 
                 Tables\Actions\DeleteAction::make(),
             ])

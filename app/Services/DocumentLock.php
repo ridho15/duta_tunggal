@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
  *   Jadwal         update: pending · delete: pending, cancelled, failed → koreksi: Batalkan jadwal
  *   Invoice        update/delete: draft                          → koreksi: Nota Kredit / pembatalan (T5)
  *   Penerimaan     update/delete: Draft (belum berjurnal)        → koreksi: Batalkan Penerimaan (jurnal balik)
+ *   Nota Kredit    update: tidak pernah (draf dibuat ulang) · delete: draft → koreksi: Nota Kredit baru
  *   Retur customer update: pending, received, qc_inspection · delete: pending → koreksi: proses ulang lewat alur retur
  */
 class DocumentLock
@@ -53,6 +54,10 @@ class DocumentLock
         Invoice::class => [
             'label' => 'Invoice', 'update' => ['draft'], 'delete' => ['draft'],
             'correction' => 'gunakan koreksi resmi (Nota Kredit / pembatalan invoice)',
+        ],
+        \App\Models\CreditNote::class => [
+            'label' => 'Nota Kredit', 'update' => [], 'delete' => ['draft'],
+            'correction' => 'Nota Kredit yang sudah terbit final; koreksi dengan Nota Kredit baru',
         ],
         CustomerReturn::class => [
             'label' => 'Retur Customer', 'update' => ['pending', 'received', 'qc_inspection'], 'delete' => ['pending'],

@@ -170,6 +170,26 @@ class CreditNoteService
         );
     }
 
+    /**
+     * Isi/ubah nomor Nota Retur Pajak (D37, format bebas) — hanya metadata; jurnal dan piutang tidak berubah.
+     *
+     * @throws ValidationException
+     */
+    public function setTaxDocumentNumber(CreditNote $creditNote, ?string $number, ?User $actor = null): CreditNote
+    {
+        $actor ??= Auth::user();
+        if (! $actor || ! $actor->hasPermissionTo('approve credit note')) {
+            throw ValidationException::withMessages(['approval' => 'Anda tidak memiliki hak akses mengisi nomor Nota Retur Pajak.']);
+        }
+        if (! $creditNote->isIssued()) {
+            throw ValidationException::withMessages(['credit_note' => 'Nomor Nota Retur Pajak diisi saat menerbitkan (draf) atau setelah terbit.']);
+        }
+
+        $creditNote->forceFill(['tax_document_number' => filled($number) ? mb_substr(trim((string) $number), 0, 100) : null])->save();
+
+        return $creditNote->refresh();
+    }
+
     /** Hapus draf (yang sudah terbit FINAL — D36). */
     public function deleteDraft(CreditNote $creditNote): void
     {

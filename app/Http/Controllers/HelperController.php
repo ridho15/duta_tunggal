@@ -663,6 +663,15 @@ class HelperController extends Controller
                 'restore',
                 'force-delete',
             ],
+            // T5 (Nota Kredit): draf dibuat, diterbitkan (approve) oleh peran berwenang; yang terbit final (update tidak dipakai)
+            'credit note' => [
+                'view any',
+                'view',
+                'create',
+                'update',
+                'delete',
+                'approve',
+            ],
             'purchase return' => [
                 'view any',
                 'view',

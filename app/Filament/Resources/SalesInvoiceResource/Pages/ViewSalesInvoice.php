@@ -67,6 +67,7 @@ class ViewSalesInvoice extends ViewRecord
                                         'paid' => 'success',
                                         'partially_paid' => 'primary',
                                         'overdue' => 'danger',
+                                        'cancelled' => 'gray',
                                         default => 'gray',
                                     }),
                             ]),
@@ -206,6 +207,8 @@ class ViewSalesInvoice extends ViewRecord
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil'),
             SalesInvoiceResource::taxNumberPageAction(),
+            \App\Filament\Support\CreditNoteActions::create(Actions\Action::make('create_credit_note')),
+            \App\Filament\Support\CreditNoteActions::cancelInvoice(Actions\Action::make('cancel_invoice')),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
