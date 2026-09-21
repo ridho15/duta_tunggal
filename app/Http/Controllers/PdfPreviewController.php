@@ -102,7 +102,6 @@ class PdfPreviewController extends Controller
                 'orientation' => 'portrait',
                 'filename'    => fn($r) => "Nota_Kredit_{$r->credit_note_number}.pdf",
                 'relations'   => ['invoice', 'customer', 'items.product', 'items.invoiceItem.product', 'createdBy', 'issuedBy'],
-                'authorize'   => true,
             ],
             'customer-receipt' => [
                 'model'       => CustomerReceipt::class,
@@ -112,7 +111,6 @@ class PdfPreviewController extends Controller
                 'orientation' => 'landscape',
                 'filename'    => fn($r) => 'Kwitansi_KW-'.str_pad((string) $r->id, 6, '0', STR_PAD_LEFT).'.pdf',
                 'relations'   => ['customer', 'customerReceiptItem.invoice', 'createdBy', 'cabang'],
-                'authorize'   => true,
             ],
             'surat-jalan' => [
                 'model'       => \App\Models\SuratJalan::class,
@@ -135,10 +133,8 @@ class PdfPreviewController extends Controller
         $config = $this->resolveConfig($type);
         $record = $this->resolveRecord($config, $id);
 
-        // Dokumen baru (T5/T6) diotorisasi lewat policy view; dokumen lama tetap seperti sebelumnya (hanya butuh login).
-        if (! empty($config['authorize'])) {
-            Gate::authorize('view', $record);
-        }
+        // Otorisasi per dokumen: policy `view` model terkait (izin `view <dokumen>`), bukan sekadar login.
+        Gate::authorize('view', $record);
 
         $viewData = [$config['bladeVar'] => $record];
 

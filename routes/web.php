@@ -148,6 +148,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
             'receivedBy', 'qcInspectedBy', 'approvedBy'
         ])->findOrFail($id);
 
+        \Illuminate\Support\Facades\Gate::authorize('view', $return);
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.customer-return', [
             'return' => $return,
             'doc' => app(\App\Services\DocumentPrintBuilder::class)->customerReturn($return),

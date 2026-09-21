@@ -55,10 +55,11 @@ class DeliveryScheduleTest extends TestCase
         $this->vehicle = Vehicle::factory()->create(['cabang_id' => $this->cabang->id]);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        foreach (['view any delivery schedule', 'create delivery schedule'] as $permission) {
+        // 'view delivery schedule' diperlukan rute PDF (diotorisasi per dokumen lewat policy view)
+        foreach (['view any delivery schedule', 'view delivery schedule', 'create delivery schedule'] as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
-        $this->user->givePermissionTo(['view any delivery schedule', 'create delivery schedule']);
+        $this->user->givePermissionTo(['view any delivery schedule', 'view delivery schedule', 'create delivery schedule']);
 
         $this->scheduleService = app(DeliveryScheduleService::class);
     }
@@ -699,6 +700,8 @@ class DeliveryScheduleTest extends TestCase
 
             return false;
         });
+
+        $this->actingAs($this->user);   // rute PDF diotorisasi per dokumen (policy view)
 
         try {
             $response = app(\App\Http\Controllers\PdfPreviewController::class)->stream('delivery-schedule', $schedule->id);

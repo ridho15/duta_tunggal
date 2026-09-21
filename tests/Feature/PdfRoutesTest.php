@@ -25,6 +25,11 @@ beforeEach(function () {
     $this->uom = \App\Models\UnitOfMeasure::factory()->create();
 
     $this->user = \App\Models\User::factory()->create();
+    // Rute PDF kini diotorisasi per dokumen (policy view): pengguna uji diberi izin lihat dokumen yang dicetak.
+    foreach (['view order request', 'view purchase order', 'view quotation', 'view sales order', 'view delivery order', 'view invoice', 'view delivery schedule', 'view surat jalan', 'view customer return'] as $permission) {
+        \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        $this->user->givePermissionTo($permission);
+    }
     $this->actingAs($this->user);
 
     Pdf::shouldReceive('loadView')->andReturnSelf();
