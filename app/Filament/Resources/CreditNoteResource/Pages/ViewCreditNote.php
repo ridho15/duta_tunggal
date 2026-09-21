@@ -34,6 +34,12 @@ class ViewCreditNote extends ViewRecord
                     'tableFilters[source_id][value]' => $this->record->id,
                 ]))
                 ->openUrlInNewTab(),
+            Action::make('print_credit_note')
+                ->label('Cetak Nota Kredit')
+                ->icon('heroicon-o-printer')
+                ->color('primary')
+                ->url(fn () => route('pdf-stream', ['type' => 'credit-note', 'id' => $this->record->id]))
+                ->openUrlInNewTab(),
             CreditNoteActions::deleteDraft(Action::make('delete_draft')),
         ];
     }

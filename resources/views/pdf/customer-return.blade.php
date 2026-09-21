@@ -133,36 +133,10 @@
 </head>
 <body>
 
-    {{-- ── Header ───────────────────────────────────────────────── --}}
-    <div class="header clearfix">
-        <div class="company-info">
-            <h2 style="margin:0 0 4px;">PT DUTA TUNGGAL</h2>
-            <p style="margin:0; line-height:1.6; color:#555;">
-                Distributor &amp; Manufacturer<br>
-                Telp: (021) xxx-xxxx
-            </p>
-        </div>
-        <div class="doc-title">
-            <h1>CUSTOMER RETURN</h1>
-            <div class="doc-number">{{ $return->return_number }}</div>
-            <div style="margin-top:6px;">
-                @php
-                    $statusClass = 'status-' . $return->status;
-                    $statusLabels = [
-                        'pending'       => 'Menunggu',
-                        'received'      => 'Diterima',
-                        'qc_inspection' => 'Inspeksi QC',
-                        'approved'      => 'Disetujui',
-                        'rejected'      => 'Ditolak',
-                        'completed'     => 'Selesai',
-                    ];
-                @endphp
-                <span class="status-badge {{ $statusClass }}">
-                    {{ $statusLabels[$return->status] ?? $return->status }}
-                </span>
-            </div>
-        </div>
-    </div>
+    @php $doc = $doc ?? app(\App\Services\DocumentPrintBuilder::class)->customerReturn($return); @endphp
+    @include('pdf.partials.watermark')
+    @include('pdf.partials.company-header')
+    <div style="margin: -6px 0 10px 0;"><strong>Status:</strong> {{ $doc['status_label'] }}</div>
 
     {{-- ── Return & Customer Info ───────────────────────────────── --}}
     <div class="meta-section clearfix">
@@ -240,11 +214,7 @@
         <tbody>
             @forelse($return->customerReturnItems as $index => $item)
             @php
-                $decisionLabels = [
-                    'repair'  => 'Perbaikan',
-                    'replace' => 'Penggantian',
-                    'reject'  => 'Ditolak',
-                ];
+                $decisionLabels = \App\Models\CustomerReturnItem::DECISION_LABELS;
                 $decisionClass = $item->decision ? 'decision-' . $item->decision : '';
                 $qcClass = $item->qc_result === 'pass' ? 'qc-pass' : ($item->qc_result === 'fail' ? 'qc-fail' : '');
                 $qcLabel = $item->qc_result === 'pass' ? 'Lolos' : ($item->qc_result === 'fail' ? 'Gagal' : '-');
@@ -305,21 +275,11 @@
     @endif
 
     {{-- ── Signatures ───────────────────────────────────────────── --}}
-    <div class="signature-section clearfix" style="margin-top:50px;">
-        <div class="sig-box">
-            <div class="sig-line">Dibuat Oleh</div>
-        </div>
-        <div class="sig-box">
-            <div class="sig-line">QC Inspector</div>
-        </div>
-        <div class="sig-box">
-            <div class="sig-line">Disetujui Oleh</div>
-        </div>
-    </div>
+    @include('pdf.partials.signature-block')
 
     <div class="footer">
-        <p>Dokumen ini dicetak secara otomatis oleh sistem ERP PT. Duta Tunggal &bull;
-           Dicetak pada: {{ now()->locale('id')->isoFormat('D MMMM Y, HH:mm') }}
+        <p>Dokumen ini dicetak secara otomatis oleh sistem ERP {{ $doc['company']['name'] }} &bull;
+           Dicetak pada: {{ $doc['printed_at'] }}
         </p>
     </div>
 

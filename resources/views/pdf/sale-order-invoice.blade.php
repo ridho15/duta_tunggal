@@ -161,73 +161,32 @@
         }
     @endphp
 
-    <div class="header clearfix">
-        <div class="company-info">
-            <h2>PT DUTA TUNGGAL</h2>
-            <p>Jl. Contoh No. 123<br>
-                Jakarta, Indonesia<br>
-                Telp: (021) 12345678<br>
-                Email: admin@dutatunggal.co.id</p>
-        </div>
-        <div class="invoice-title">
-            <h1>INVOICE</h1>
-            <div class="invoice-info">
-                <table>
-                    <tr>
-                        <td><strong>No. Invoice:</strong></td>
-                        <td>{{ $invoice->invoice_number }}</td>
-                    </tr>
-                    @if(filled($invoice->tax_invoice_number))
-                    <tr>
-                        <td><strong>No. Faktur Pajak:</strong></td>
-                        <td>{{ $invoice->tax_invoice_number }}</td>
-                    </tr>
-                    @endif
-                    <tr>
-                        <td><strong>Tanggal:</strong></td>
-                        <td>{{ \Carbon\Carbon::parse($invoice->invoice_date)->locale('id')->format('d M Y') }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Jatuh Tempo:</strong></td>
-                        <td>{{ \Carbon\Carbon::parse($invoice->due_date)->locale('id')->format('d M Y') }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Status:</strong></td>
-                        <td>{{ ucfirst($invoice->status) }}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-    </div>
+    @php $doc = $doc ?? app(\App\Services\DocumentPrintBuilder::class)->invoice($invoice); @endphp
+    @include('pdf.partials.watermark')
+    @include('pdf.partials.company-header')
 
-    <div class="invoice-details clearfix">
-        <div class="customer-info">
-            <h3>Pelanggan:</h3>
-            <p>
-                <strong>{{ $invoice->customer_name ?? optional($customer)->name ?? 'N/A' }}</strong><br>
-                {{ optional($customer)->perusahaan ?? '' }}<br>
-                {{ optional($customer)->address ?? '' }}<br>
-                @if(optional($customer)->phone)
-                Telp: {{ optional($customer)->phone }}<br>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+        <tr>
+            <td style="width: 52%; vertical-align: top; border: none; padding: 0;">
+                <h3 style="margin: 0 0 4px 0;">{{ $doc['party_title'] }}:</h3>
+                <strong>{{ $doc['party']['name'] }}</strong><br>
+                @if ($doc['party']['company']){{ $doc['party']['company'] }}<br>@endif
+                @if ($doc['party']['address']){{ $doc['party']['address'] }}<br>@endif
+                @if ($doc['party']['phone'])Telp: {{ $doc['party']['phone'] }}<br>@endif
+                @if ($doc['party']['email'])Email: {{ $doc['party']['email'] }}<br>@endif
+                @if ($doc['party']['npwp'])NPWP/NIK: {{ $doc['party']['npwp'] }}@endif
+            </td>
+            <td style="vertical-align: top; border: none; padding: 0;">
+                @include('pdf.partials.doc-meta')
+                @if ($doc['source'])
+                    <table style="width: 100%; border-collapse: collapse;"><tr>
+                        <td style="width: 32%; padding: 2px 6px 2px 0; border: none;"><strong>No. Sales Order</strong></td>
+                        <td style="padding: 2px 0; border: none;">: {{ $doc['source'] }}</td>
+                    </tr></table>
                 @endif
-                @if(optional($customer)->email)
-                Email: {{ optional($customer)->email }}
-                @endif
-            </p>
-        </div>
-        <div class="invoice-info">
-            <table>
-                <tr>
-                    <td><strong>Source:</strong></td>
-                    <td>{{ str_replace('App\\Models\\', '', $invoice->from_model_type ?? 'N/A') }}</td>
-                </tr>
-                <tr>
-                    <td><strong>Source No.:</strong></td>
-                    <td>{{ optional($invoice->fromModel)->so_number ?? 'N/A' }}</td>
-                </tr>
-            </table>
-        </div>
-    </div>
+            </td>
+        </tr>
+    </table>
 
     @php
         // Rincian baris baku (Fase 5B): Harga Satuan × Qty = Jumlah · Diskon (% dan Rp) · DPP · PPN (% dan Rp) · Total.
@@ -316,19 +275,38 @@
                 <td><strong>TOTAL:</strong></td>
                 <td class="text-right rupiah"><strong>{{ $money($invoice->total) }}</strong></td>
             </tr>
+            @foreach ($doc['credit_notes'] as $creditNote)
+            <tr>
+                <td>Nota Kredit {{ $creditNote['number'] }}:</td>
+                <td class="text-right rupiah">- {{ $money($creditNote['total']) }}</td>
+            </tr>
+            @endforeach
+            @if (!empty($doc['credit_notes']))
+            <tr class="total-row">
+                <td><strong>TOTAL SETELAH NOTA KREDIT:</strong></td>
+                <td class="text-right rupiah"><strong>{{ $money((float) $invoice->total - $doc['credit_total']) }}</strong></td>
+            </tr>
+            @endif
         </table>
     </div>
 
-    <div class="footer">
-        <p><strong>Syarat dan Ketentuan:</strong></p>
-        <p>1. Pembayaran paling lambat pada tanggal jatuh tempo<br>
-            2. Pembayaran dapat dilakukan melalui transfer bank<br>
-            3. Barang yang sudah dibeli tidak dapat dikembalikan<br>
-            4. Untuk pertanyaan hubungi -</p>
+    <div style="clear: both;"></div>
 
-        <p style="margin-top: 30px;">
-            <strong>Terima kasih atas kepercayaan Anda!</strong>
-        </p>
+    @include('pdf.partials.bank-accounts')
+
+    <div style="margin-top: 14px; font-size: 10px;">
+        <strong>Syarat dan Ketentuan:</strong>
+        <ol style="margin: 4px 0 0 16px; padding: 0;">
+            @foreach ($doc['terms'] as $term)
+                <li>{{ $term }}</li>
+            @endforeach
+        </ol>
+    </div>
+
+    @include('pdf.partials.signature-block')
+
+    <div class="footer" style="margin-top: 18px;">
+        Dicetak {{ $doc['printed_at'] }}@if ($doc['printed_by']) oleh {{ $doc['printed_by'] }}@endif
     </div>
 </body>
 

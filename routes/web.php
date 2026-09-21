@@ -139,7 +139,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     // Document PDF streaming (opens in new tab)
     Route::get('/pdf/{type}/{id}', [PdfPreviewController::class, 'stream'])
         ->name('pdf-stream')
-        ->where('type', 'order-request|purchase-order|purchase-invoice|quotation|sale-order|sales-invoice|delivery-order|delivery-schedule|surat-jalan');
+        ->where('type', 'order-request|purchase-order|purchase-invoice|quotation|sale-order|sales-invoice|delivery-order|delivery-schedule|surat-jalan|credit-note|customer-receipt');
 
     // Customer Return PDF streaming
     Route::get('/pdf/customer-return/{id}', function (int $id) {
@@ -148,7 +148,10 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
             'receivedBy', 'qcInspectedBy', 'approvedBy'
         ])->findOrFail($id);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.customer-return', ['return' => $return])->setPaper('a4', 'portrait');
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.customer-return', [
+            'return' => $return,
+            'doc' => app(\App\Services\DocumentPrintBuilder::class)->customerReturn($return),
+        ])->setPaper('a4', 'portrait');
         return $pdf->stream("CustomerReturn_{$return->return_number}.pdf");
     })->name('pdf-customer-return');
 });

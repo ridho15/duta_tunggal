@@ -30,6 +30,12 @@ class ViewCustomerReceipt extends ViewRecord
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->color('warning'),
             \App\Filament\Support\CustomerReceiptActions::cancel(Action::make('cancel_receipt')),
+            Action::make('print_receipt')
+                ->label('Cetak Kwitansi')
+                ->icon('heroicon-o-printer')
+                ->color('primary')
+                ->url(fn () => route('pdf-stream', ['type' => 'customer-receipt', 'id' => $this->record->id]))
+                ->openUrlInNewTab(),
             Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-document-text')

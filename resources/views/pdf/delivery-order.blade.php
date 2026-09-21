@@ -48,70 +48,10 @@
 
 <body>
 
-    <div class="header">
-        <img src="{{ public_path('logo_duta_tunggal.png') }}" class="logo" alt="Logo">
-        <h2>PT DUTA TUNGGAL</h2>
-        <p>Jl. Contoh No. 123, Jakarta, Indonesia<br>Telp: (021) 12345678 | Email: admin@dutatunggal.co.id</p>
-        <div class="title">DELIVERY ORDER</div>
-    </div>
-
-    <table style="border: none;">
-        <tr>
-            <td style="border: none;">No. Delivery Order</td>
-            <td style="border: none;">: {{ $deliveryOrder->do_number }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Tanggal</td>
-            <td style="border: none;">: {{ Carbon\Carbon::parse($deliveryOrder->delivery_date)->locale('id')->format('D,
-                d M Y') }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Customer</td>
-            <td style="border: none;">: @foreach ($deliveryOrder->salesOrders as $item)
-                {{ $item->customer->name }},
-                @endforeach</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Alamat Pengiriman</td>
-            <td style="border: none;">: @foreach ($deliveryOrder->salesOrders as $item)
-                {{ $item->shipped_to }}
-                @endforeach</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Driver</td>
-            <td style="border: none;">: {{ $deliveryOrder->driver->name }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Vehicle</td>
-            <td style="border: none;">: {{ $deliveryOrder->vehicle->plate }} - {{ $deliveryOrder->vehicle->type }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Warehouse</td>
-            <td style="border: none;">: {{ $deliveryOrder->warehouse->name ?? 'N/A' }}</td>
-        </tr>
-        <tr>
-            <td style="border: none;">Cabang</td>
-            <td style="border: none;">: {{ $deliveryOrder->cabang->nama ?? 'N/A' }}</td>
-        </tr>
-        @if($deliveryOrder->additional_cost > 0)
-        <tr>
-            <td style="border: none;">Biaya Tambahan</td>
-            <td style="border: none;">: Rp {{ number_format($deliveryOrder->additional_cost, 2, ',', '.') }}</td>
-        </tr>
-        @if($deliveryOrder->additional_cost_description)
-        <tr>
-            <td style="border: none;">Deskripsi Biaya Tambahan</td>
-            <td style="border: none;">: {{ $deliveryOrder->additional_cost_description }}</td>
-        </tr>
-        @endif
-        @endif
-        @if($deliveryOrder->notes)
-        <tr>
-            <td style="border: none;">Catatan</td>
-            <td style="border: none;">: {{ $deliveryOrder->notes }}</td>
-        </tr>
-        @endif
-    </table>
+    @php $doc = $doc ?? app(\App\Services\DocumentPrintBuilder::class)->deliveryOrder($deliveryOrder); @endphp
+    @include('pdf.partials.watermark')
+    @include('pdf.partials.company-header')
+    @include('pdf.partials.doc-meta')
 
     <br>
 
@@ -178,19 +118,11 @@
         </tr>
     </table>
 
-    <table style="border: none; margin-top: 50px; width: 100%;">
-        <tr>
-            <td style="border: none; text-align: center;">
-                Penerima, <br><br><br><br>
-                (____________________)
-            </td>
-            <td style="border: none; text-align: center;">
-                Hormat kami, <br><br><br><br>
-                <strong>PT DUTA TUNGGAL</strong><br>
-                (____________________)
-            </td>
-        </tr>
-    </table>
+    @include('pdf.partials.signature-block')
+
+    <div style="margin-top: 16px; font-size: 9px; color: #666; text-align: center;">
+        Dicetak {{ $doc['printed_at'] }}@if ($doc['printed_by']) oleh {{ $doc['printed_by'] }}@endif
+    </div>
 
 </body>
 

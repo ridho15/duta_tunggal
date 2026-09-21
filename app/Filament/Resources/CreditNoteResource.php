@@ -76,6 +76,11 @@ class CreditNoteResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make('print_credit_note')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->url(fn (CreditNote $record): string => route('pdf-stream', ['type' => 'credit-note', 'id' => $record->id]))
+                    ->openUrlInNewTab(),
                 CreditNoteActions::issue(Tables\Actions\Action::make('issue')),
             ])
             ->bulkActions([])

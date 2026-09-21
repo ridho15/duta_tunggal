@@ -89,13 +89,13 @@ class DocumentPrintBuilder
             'title' => 'INVOICE',
             'number' => (string) $invoice->invoice_number,
             'watermark' => $this->watermark($invoice->status),
-            'status_label' => Invoice::STATUS_LABELS[$invoice->status] ?? ucfirst((string) $invoice->status),
+            'status_label' => $this->invoiceStatus($invoice->status),
             'meta' => $this->meta([
                 'No. Invoice' => $invoice->invoice_number,
                 'No. Faktur Pajak' => $invoice->tax_invoice_number,
                 'Tanggal' => $this->date($invoice->invoice_date),
                 'Jatuh Tempo' => $this->date($invoice->due_date),
-                'Status' => Invoice::STATUS_LABELS[$invoice->status] ?? ucfirst((string) $invoice->status),
+                'Status' => $this->invoiceStatus($invoice->status),
             ]),
             'party_title' => 'Pelanggan',
             'party' => $this->party($customer, $invoice->customer_name),
@@ -136,6 +136,8 @@ class DocumentPrintBuilder
                 'Driver' => $deliveryOrder->driver?->name,
                 'Kendaraan' => $deliveryOrder->vehicle ? trim(($deliveryOrder->vehicle->plate ?? '').' '.($deliveryOrder->vehicle->type ?? '')) : null,
                 'Gudang' => $deliveryOrder->warehouse?->name,
+                'Biaya Tambahan' => (float) $deliveryOrder->additional_cost > 0 ? \App\Support\LineAmounts::money((float) $deliveryOrder->additional_cost) : null,
+                'Deskripsi Biaya Tambahan' => (float) $deliveryOrder->additional_cost > 0 ? $deliveryOrder->additional_cost_description : null,
                 'Catatan' => $deliveryOrder->notes,
             ]),
             'signatures' => [
@@ -160,7 +162,7 @@ class DocumentPrintBuilder
             'company' => $company = $this->company($receipt->cabang, true),
             'title' => 'KWITANSI',
             'number' => $number,
-            'watermark' => $cancelled ? self::WATERMARK_CANCELLED : $this->watermark($receipt->status),
+            'watermark' => $this->watermark($receipt->status),
             'status_label' => $cancelled ? 'Dibatalkan' : (string) $receipt->status,
             'meta' => $this->meta([
                 'No. Kwitansi' => $number,
@@ -273,6 +275,12 @@ class DocumentPrintBuilder
     }
 
     // ------------------------------------------------------------------ internal
+
+    /** Label status invoice; `unpaid` (belum ada di STATUS_LABELS) = Belum Dibayar. */
+    private function invoiceStatus(?string $status): string
+    {
+        return Invoice::STATUS_LABELS[$status] ?? (['unpaid' => 'Belum Dibayar', 'canceled' => 'Dibatalkan'][$status] ?? ucfirst(str_replace('_', ' ', (string) $status)));
+    }
 
     /** @return array<int, array{label: string, value: string}> baris meta; nilai kosong dilewati. */
     private function meta(array $rows): array

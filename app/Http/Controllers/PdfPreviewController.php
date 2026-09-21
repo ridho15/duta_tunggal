@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CreditNote;
+use App\Models\CustomerReceipt;
 use App\Models\DeliveryOrder;
 use App\Models\DeliverySchedule;
 use App\Models\Invoice;
@@ -9,7 +11,9 @@ use App\Models\OrderRequest;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
+use App\Services\DocumentPrintBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Gate;
 
 class PdfPreviewController extends Controller
 {
@@ -90,6 +94,26 @@ class PdfPreviewController extends Controller
                 'filename'    => fn($r) => "Jadwal_Pengiriman_{$r->schedule_number}.pdf",
                 'relations'   => ['driver', 'vehicle', 'suratJalan.deliveryOrder.deliveryOrderItem.product.uom', 'suratJalan.deliveryOrder.salesOrders.customer', 'cabang'],
             ],
+            'credit-note' => [
+                'model'       => CreditNote::class,
+                'blade'       => 'pdf.credit-note',
+                'bladeVar'    => 'creditNote',
+                'paper'       => 'a4',
+                'orientation' => 'portrait',
+                'filename'    => fn($r) => "Nota_Kredit_{$r->credit_note_number}.pdf",
+                'relations'   => ['invoice', 'customer', 'items.product', 'items.invoiceItem.product', 'createdBy', 'issuedBy'],
+                'authorize'   => true,
+            ],
+            'customer-receipt' => [
+                'model'       => CustomerReceipt::class,
+                'blade'       => 'pdf.kwitansi',
+                'bladeVar'    => 'receipt',
+                'paper'       => 'a5',
+                'orientation' => 'landscape',
+                'filename'    => fn($r) => 'Kwitansi_KW-'.str_pad((string) $r->id, 6, '0', STR_PAD_LEFT).'.pdf',
+                'relations'   => ['customer', 'customerReceiptItem.invoice', 'createdBy', 'cabang'],
+                'authorize'   => true,
+            ],
             'surat-jalan' => [
                 'model'       => \App\Models\SuratJalan::class,
                 'blade'       => 'pdf.surat-jalan',
@@ -111,7 +135,22 @@ class PdfPreviewController extends Controller
         $config = $this->resolveConfig($type);
         $record = $this->resolveRecord($config, $id);
 
+        // Dokumen baru (T5/T6) diotorisasi lewat policy view; dokumen lama tetap seperti sebelumnya (hanya butuh login).
+        if (! empty($config['authorize'])) {
+            Gate::authorize('view', $record);
+        }
+
         $viewData = [$config['bladeVar'] => $record];
+
+        // Bingkai cetak (kop, meta, tanda tangan, watermark) disusun satu tempat — Blade hanya menampilkan.
+        $builder = app(DocumentPrintBuilder::class);
+        match ($type) {
+            'sales-invoice' => $viewData['doc'] = $builder->invoice($record),
+            'delivery-order' => $viewData['doc'] = $builder->deliveryOrder($record),
+            'credit-note' => $viewData['doc'] = $builder->creditNote($record),
+            'customer-receipt' => $viewData['doc'] = $builder->receipt($record),
+            default => null,
+        };
 
         if ($type === 'delivery-schedule') {
             $viewData['deliveryOrders'] = $record->relatedDeliveryOrders();
