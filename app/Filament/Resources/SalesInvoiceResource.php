@@ -159,11 +159,7 @@ class SalesInvoiceResource extends Resource
                             ->schema([
                                 Select::make('selected_customer')
                                     ->label('Customer')
-                                    ->options(Customer::all()->mapWithKeys(function ($customer) {
-                                        return [$customer->id => "({$customer->code}) {$customer->name}"];
-                                    }))
-                                    ->searchable()
-                                    ->preload()
+                                    ->remoteSearch('customers')   // T7.2: pencarian sisi-server (tanpa memuat seluruh customer)
                                     ->reactive()
                                     ->required()
                                     ->validationMessages([
@@ -854,10 +850,7 @@ class SalesInvoiceResource extends Resource
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
-                                    ->options(function () {
-                                        return \App\Models\Product::query()->orderBy('name')->limit(50)->pluck('name', 'id');
-                                    })
-                                    ->searchable()
+                                    ->remoteSearch('products')   // T7.2: label produk terpilih tidak lagi bergantung pada 50 produk pertama
                                     ->disabled()
                                     ->dehydrated(true)
                                     ->required()

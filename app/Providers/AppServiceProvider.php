@@ -114,6 +114,22 @@ class AppServiceProvider extends ServiceProvider
         Table::$defaultNumberLocale = 'id';
 
         // ---------------------------------------------------------------
+        // Pencarian dropdown sisi-server (T7.2): Select::make('customer_id')->remoteSearch('customers')
+        // Menggantikan "muat semua + preload"/limit(50) statis; nilai terpilih selalu berlabel.
+        // ---------------------------------------------------------------
+        \Filament\Forms\Components\Select::macro('remoteSearch', function (string $type, array $filters = []) {
+            /** @var \Filament\Forms\Components\Select $this */
+            $service = fn () => app(\App\Services\RemoteSearch::class);
+
+            return $this->searchable()
+                ->options(fn () => $service()->options($type, null, $filters))
+                ->getSearchResultsUsing(fn (string $search): array => $service()->options($type, $search, $filters))
+                ->getOptionLabelUsing(fn ($value): ?string => $service()->label($type, $value))
+                ->searchPrompt(\App\Services\RemoteSearch::HINT)
+                ->noSearchResultsMessage('Tidak ada hasil. Coba nama, kode, atau nomor lain.');
+        });
+
+        // ---------------------------------------------------------------
         // Rupiah macro for TextColumn (Table columns)
         // Usage: TextColumn::make('price')->rupiah()
         // ---------------------------------------------------------------
