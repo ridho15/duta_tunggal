@@ -662,3 +662,10 @@ Semua penjaga kritis diuji mutasi (dirusak → tes gagal → dipulihkan).
 4. **Jalankan audit di UAT** dan kirim CSV/ringkasannya: `php artisan customers:audit-duplicates` dan `php artisan customers:audit-credit-limit` (read-only) → dasar keputusan D14.
 5. **Ukur performa:** `PERF_PROFILE=true` + `php artisan config:clear` di UAT beberapa hari → `php artisan perf:report --since=1d` → dasar T7.
 6. **Konfirmasi D1–D15** sebelum T2 dimulai.
+
+---
+
+## Status pelaksanaan — T2 (21 September 2026)
+
+**Cabang:** `feat/penjualan-t2-stok` (T2.0–T2.6, satu commit per tugas). Rincian tugas, penyimpangan, dan langkah Anda ada di **`docs/PLAN-T2-STOK-PENGIRIMAN.md` §11**.
+Ringkas: usulan **1 (reservasi sejak SO Approved)**, **2 (peringatan + blokir stok kurang, Backorder)**, **3 (status item DO & satu pintu status)** dan temuan **X1–X5** dikerjakan di belakang flag `sales.stock.*` (default mati); D1–D5, D15, D17–D23 seluruhnya diterapkan. X11/X12 dicatat, tidak diubah. D6–D14 (T3/T4) masih menunggu konfirmasi.

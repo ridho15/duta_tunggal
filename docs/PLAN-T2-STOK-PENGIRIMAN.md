@@ -1,8 +1,8 @@
 # Rencana Pelaksanaan T2 — Stok & Pengiriman
 
 > Dibuat 21 September 2026 · Turunan dari `docs/AUDIT-20-IMPROVEMENT-PENJUALAN.md` §7 (T2) · Usulan **1, 2, 3** + temuan **X1–X5**.
-> **Dokumen ini hanya rencana — belum ada kode yang diubah.** Pelaksanaan dimulai setelah Anda menjawab keputusan di §2.
-> Prasyarat: T0 & T1 selesai (cabang `feat/penjualan-t1-quick-wins`, baseline 201 gagal terkunci).
+> **Status: DILAKSANAKAN (21 September 2026)** — T2.0–T2.6 selesai di cabang `feat/penjualan-t2-stok`; lihat **§11 Status pelaksanaan**.
+> Semua perilaku baru berada di balik flag `sales.stock.*` (default **mati**). Prasyarat: T0 & T1 selesai (baseline 201 gagal terkunci).
 
 ## Daftar Isi
 1. [Tujuan dan ruang lingkup](#1-tujuan-dan-ruang-lingkup)
@@ -15,6 +15,7 @@
 8. [Skrip UAT manual T2](#8-skrip-uat-manual-t2)
 9. [Rollout, flag, rollback](#9-rollout-flag-rollback)
 10. [Risiko](#10-risiko)
+11. [Status pelaksanaan](#11-status-pelaksanaan)
 
 ---
 
@@ -273,3 +274,52 @@ Data: produk X stok fisik **30** di Gudang K01; dua SO: **A = 20**, **B = 15** (
 | Klik ganda/balapan pada transisi | Sedang | Sedang | `lockForUpdate` + baca ulang status; tes dua-panggilan = satu-efek |
 | Baris stok ganda per produk×gudang (rak) membuat baris-level `free_qty` negatif walau total benar | Sedang | Rendah | Pemilihan baris deterministik; jumlah per produk×gudang tetap sumber kebenaran; laporan C |
 | Estimasi 12 hari meleset karena banyak tes lama yang berubah | Sedang | Rendah | Daftar §7; tes diperbarui bersama tugasnya |
+
+---
+
+## 11. Status pelaksanaan
+
+**Cabang:** `feat/penjualan-t2-stok` — satu commit per tugas (T2.0 `fa4a5d5`, T2.1 `04fc29c`, T2.2 `11a325f`, T2.3 `60c7272`, T2.4 `6572123`, T2.5 `489ea04`, T2.6 di commit penutup).
+Semua flag `sales.stock.*` **default mati** → tanpa menyalakan flag, perilaku sama dengan sebelum T2 (dibuktikan tes karakterisasi `[flag mati]` di setiap tugas).
+
+| Tugas | Hasil | Tes baru |
+|---|---|---|
+| T2.0 | flag `stock.*`, fixture stok bersama (`tests/Support/StockFixtures.php`), probe audit sebagai regresi permanen | 5 |
+| T2.1 | buku besar reservasi tunggal (`StockReservationLedger`) + event append-only; reservasi DO dikonsumsi saat Dikirim (menutup reservasi yatim X1); pengiriman idempoten (`netShipped`); `stock:reconcile-reservations` | 22 |
+| T2.2 | `StockAvailability` (stok bebas sadar-reservasi, kebijakan cabang D3, batch tanpa N+1) dipakai form/validasi DO, approve, badge daftar SO | 15 |
+| T2.3 | `DeliveryOrderTransitions` (matriks, kunci baris, idempoten, atomik), label **Siap Kirim**, D5 (jadwal wajib Mulai), D15 (stok fisik kurang menolak Kirim + pengecualian Owner/Super Admin), D18/D20 (gagal kirim mengembalikan stok sekali), D19 (Batalkan DO), D23 (Diterima + Selesaikan), `delivery-orders:resync-item-status` | 53 |
+| T2.4 | `SaleOrderReservationSynchronizer` (keadaan-yang-diinginkan, idempoten; SO→DO tanpa selisih; D21 parsial; D22 penempatan otomatis), `sales:backfill-so-reservations` | 19 |
+| T2.5 | blokir approve stok kurang (D2) untuk SEMUA item, `approveAsBackorder` (alasan, SoD, Sales Manager+), badge Backorder, `sales:top-up-reservations` (FIFO, dijadwalkan 30 menit), `warnings[]` API + peringatan React/Filament | 15 |
+| T2.6 | penulisan ulang tes usang (lihat bawah), E2E T2, `SalesOrderService::confirm()` + `InsufficientStockException` dihapus, `cancel()` lewat buku besar, dokumen ini | 12 (spec 7 + E2E 2 + alur WC 3) + 12 tes lama ditulis ulang |
+
+Semua penjaga kritis diuji **mutasi** (dirusak → tes gagal → dipulihkan): matriks transisi, idempotensi, D15, pengembalian gagal-kirim, penjaga model, D5, pemeriksaan stok saat Mulai, penjaga Ambil Sendiri, pengurangan kebutuhan oleh DO, batas stok bebas, penempatan D22, blokir approve, alasan & SoD backorder, urutan FIFO, `warnings[]` API, visibilitas aksi.
+
+### Tes usang yang diganti / diaktifkan (T2.6)
+| Tes lama | Sebab gagal | Tindakan |
+|---|---|---|
+| `StockReservationServiceTest` TC-SR-001/002/006 (Material Issue) | baris stok ganda (`Product::created` membuat baris nol; `InventoryStock::create` menambah baris kedua) | fixture memakai `stkSetStock` → **lolos** |
+| TC-SR-003…005 dan seluruh `StockReservationFlowTest` | memakai `SalesOrderService::confirm()` dan semantik lama "`qty_available` berkurang saat reservasi" | diganti `Stock/StockReservationSpecTest` (semantik: `qty_available` = stok fisik, `qty_reserved` = tertahan) |
+| `SaleOrderMultiWarehouseTest` 3–6, 10b | memakai `confirm()` | ditulis ulang ke synchronizer (per alokasi, parsial, single-gudang, Ambil Sendiri tanpa double-deduct) |
+| `SalesOrderSelfPickupApprovedTest` | mengharapkan status `confirmed` (WC otomatis sudah dihapus) + baris stok ganda + akun HPP tidak ada | status `approved`, fixture stok & akun diperbaiki → **lolos** |
+| `InvoiceEditAndDeliveryOrderTest` (3 tes DO) | memanggil `createDeliveryOrderForConfirmedWarehouseConfirmation()` yang sudah dihapus | diganti `Stock/DeliveryOrderWarehouseConfirmationFlowTest` (alur DO-sentris) |
+
+### Penyimpangan dari rencana & temuan baru
+- **`reserve_on_so_approve` dan `strict_dispatch` otomatis menyalakan buku besar** (`StockReservationLedger::enabled()`): reservasi SO dan DO harus terpetakan ke item SO agar tidak terhitung ganda; menyalakan salah satu flag cukup.
+- **Efek status DO dijalankan observer, bukan hanya layanan:** status item, log, dan pengembalian stok gagal-kirim terjadi di *semua* pintu (termasuk kode lama yang memanggil `$do->update(['status' => …])`); model menolak transisi di luar matriks dan Kirim dengan stok fisik kurang.
+- **"Mulai Pengiriman" jadwal kini ditolak bila DO terkait belum Siap Kirim** (mis. masih menunggu konfirmasi gudang) atau stok fisik kurang — sebelumnya jadwal berjalan sementara DO diam-diam tetap di status lama. Perlu disampaikan ke tim logistik.
+- **Log DO** kini menyimpan komentar/alasan (sebelumnya `createLog` menerima tetapi membuang komentar). `confirmed_by = 0` berarti proses sistem (jadwal/konsol).
+- **Konfirmasi gudang terlambat** tidak lagi menarik DO yang sudah Dikirim/Selesai kembali ke Siap Kirim (perilaku lama menimpa status).
+- **Dry-run `sales:backfill-so-reservations` / `sales:top-up-reservations`** menjalankan logika yang sama di dalam transaksi yang dibatalkan, sehingga hasilnya identik dengan `--apply`.
+- **Penempatan otomatis D22** memecah reservasi ke gudang berikutnya bila gudang terbesar tidak cukup; data item SO tidak diubah.
+- **X11** (Retur Pembelian menaikkan `qty_reserved` tanpa baris) **hanya dilaporkan** (`stock:reconcile-reservations` bagian B), tidak diperbaiki — milik Pembelian. **X12** (`AppSetting::doApprovalRequired` tidak dipakai di mana pun) dicatat, tidak diubah.
+- **`composer test:chunked`** sebelumnya mati pada 300 detik (batas proses Composer) — kini `disableProcessTimeout`. Jangan menjalankan dua runner/`pest` pada database uji yang sama; gunakan `--db=` atau `DB_DATABASE=` berbeda (berakhiran `_test`).
+- `AssetPurchaseWorkflowTest::asset purchase flow with pre set signature` sempat gagal satu kali saat mesin sangat terbebani (baris `inventory_stocks` produk aset) tetapi lolos bila dijalankan sendiri — modul aset, tidak tersentuh T2; **dipantau**.
+
+### Yang perlu Anda lakukan
+1. **`php artisan migrate`** — tiga migrasi aditif: `…100000_add_item_mapping_and_events_to_stock_reservations`, `…110000_add_received_fields_to_delivery_orders_table`, `…120000_add_backorder_fields_to_sale_orders_table`.
+2. **Deploy dengan semua flag mati**, lalu jalankan urutan §9: `php artisan stock:reconcile-reservations` (tinjau CSV yatim/tak-terjelaskan) → `--apply` untuk yatim → `sales:backfill-so-reservations` (dry-run, tinjau) → `--apply`.
+3. **Nyalakan flag bertahap di `.env`** (setiap langkah uji dengan skrip UAT §8): `SALES_STOCK_LEDGER=true` → `SALES_STOCK_STRICT_DISPATCH=true` → `SALES_STOCK_RESERVE_ON_SO_APPROVE=true` → `SALES_STOCK_BLOCK_SHORT_APPROVAL=true` (terakhir, setelah tim sales dilatih soal Backorder). Lalu `php artisan config:clear`.
+4. **Pastikan scheduler berjalan** (`php artisan schedule:work` di dev / cron `schedule:run` di server) agar `sales:top-up-reservations` berjalan tiap 30 menit.
+5. **Jalankan `php artisan delivery-orders:resync-item-status`** (dry-run, lalu `--apply`) untuk merapikan status item DO lama.
+6. **UAT manual T2** — skrip §8 (14 langkah); kirim temuan.
+7. **Konfirmasi D6–D14** sebelum T3/T4 dimulai.

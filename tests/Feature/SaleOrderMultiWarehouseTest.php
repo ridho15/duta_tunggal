@@ -6,9 +6,10 @@
  * Menguji seluruh alur multi-gudang pada Sales Order:
  *  1. Alokasi multi-gudang tersimpan dengan benar di DB saat SO dibuat
  *  2. Alokasi multi-gudang dapat di-update (tambah/hapus) pada saat SO di-edit
- *  3. SalesOrderService::confirm() memvalidasi stok per alokasi (multi-gudang)
- *  4. SalesOrderService::confirm() membuat StockReservation per alokasi
- *  5. SalesOrderService::confirm() tetap bekerja untuk mode single-gudang
+ *  3. Reservasi SO (SaleOrderReservationSynchronizer, T2.4) menghitung stok per alokasi (multi-gudang)
+ *  4. Reservasi SO dibuat per alokasi
+ *  5. Stok alokasi kurang → reservasi PARSIAL (D21) dan approve diblokir (D2)
+ *  6. Reservasi SO untuk mode single-gudang
  *  6. handleStockReductionForSelfPickup() mengurangi stok per alokasi untuk Ambil Sendiri
  *  7. handleStockReductionForSelfPickup() bekerja untuk single-gudang
  *  8. createWarehouseConfirmationForApprovedSaleOrder() membuat WC items per alokasi
@@ -203,26 +204,30 @@ test('2. Alokasi multi-gudang dapat diambil via relasi dari SaleOrderItem', func
     expect($item->warehouse_id)->toBeNull(); // multi-warehouse mode
 });
 
-test('3. SalesOrderService::confirm() memvalidasi stok per alokasi (multi-gudang)', function () {
+/** Reservasi SO sejak Approved (T2.4): SO diset Approved sehingga observer menyusun reservasinya. */
+function mwApprove(SaleOrder $so): SaleOrder
+{
+    config(['sales.stock.reserve_on_so_approve' => true]);
+    $so->update(['status' => 'approved']);
+
+    return $so->fresh();
+}
+
+test('3. Reservasi SO menghitung stok per alokasi (multi-gudang) tanpa kekurangan', function () {
     $f = mwFixtures();
     $data = makeSoWithAllocations($f);
+    $so = mwApprove(SaleOrder::find($data['so']->id));
 
-    $service = new SalesOrderService();
-    $so = SaleOrder::find($data['so']->id);
+    // wh1 punya 10, alokasi 5 → cukup; wh2 punya 8, alokasi 4 → cukup
+    $summary = app(\App\Services\SaleOrderReservationSynchronizer::class)->sync($so);
 
-    // wh1 has qty=10, alloc requests 5 → should pass
-    // wh2 has qty=8, alloc requests 4 → should pass
-    $result = $service->confirm($so);
-    expect($result)->toBeTrue();
+    expect($summary[$data['item']->id])->toMatchArray(['target' => 9.0, 'held' => 9.0, 'shortage' => 0.0]);
 });
 
-test('4. SalesOrderService::confirm() membuat StockReservation per alokasi (multi-gudang)', function () {
+test('4. Reservasi SO dibuat per alokasi (multi-gudang); stok fisik tidak berubah', function () {
     $f = mwFixtures();
     $data = makeSoWithAllocations($f);
-
-    $service = new SalesOrderService();
-    $so = SaleOrder::find($data['so']->id);
-    $service->confirm($so);
+    $so = mwApprove(SaleOrder::find($data['so']->id));
 
     // Should create 2 reservations (one per allocation)
     $reservations = StockReservation::where('sale_order_id', $so->id)->get();
@@ -239,24 +244,36 @@ test('4. SalesOrderService::confirm() membuat StockReservation per alokasi (mult
     // Verify warehouse_id is never NULL in reservations
     $nullWh = $reservations->whereNull('warehouse_id');
     expect($nullWh)->toHaveCount(0);
+
+    // qty_available = stok FISIK (tetap); tertahan tercatat di qty_reserved
+    $stock1 = InventoryStock::where('product_id', $f['product']->id)->where('warehouse_id', $f['warehouse1']->id)->first();
+    expect((float) $stock1->qty_available)->toBe(10.0);
+    expect((float) $stock1->qty_reserved)->toBe(5.0);
 });
 
-test('5. SalesOrderService::confirm() lempar exception jika stok alokasi tidak cukup', function () {
+test('5. Stok alokasi kurang: reservasi PARSIAL (D21) dan approve diblokir tanpa backorder (D2)', function () {
     $f = mwFixtures();
     $data = makeSoWithAllocations($f);
 
-    // Reduce wh2 stock below allocation requirement
-    InventoryStock::where('warehouse_id', $f['warehouse2']->id)->update(['qty_available' => 2]); // alloc needs 4
+    // Kurangi stok wh2 di bawah kebutuhan alokasi (butuh 4)
+    InventoryStock::where('warehouse_id', $f['warehouse2']->id)->update(['qty_available' => 2]);
 
-    $service = new SalesOrderService();
+    // D2: approve ditolak (flag blokir hidup) dan tidak ada reservasi yang terbentuk
+    config(['sales.stock.block_short_approval' => true, 'sales.stock.reserve_on_so_approve' => true]);
     $so = SaleOrder::find($data['so']->id);
-
-    expect(fn () => $service->confirm($so))->toThrow(\App\Exceptions\InsufficientStockException::class);
-    // No reservations should be created
+    expect(fn () => (new SalesOrderService())->approve($so))->toThrow(\Illuminate\Validation\ValidationException::class);
     expect(StockReservation::where('sale_order_id', $so->id)->count())->toBe(0);
+
+    // Tanpa flag blokir SO tetap dapat berstatus Approved: menahan yang tersedia saja (wh1 5, wh2 2), kekurangan 2
+    config(['sales.stock.block_short_approval' => false]);
+    $so = mwApprove(SaleOrder::find($data['so']->id));
+    $summary = app(\App\Services\SaleOrderReservationSynchronizer::class)->sync($so);
+
+    expect((float) StockReservation::where('sale_order_id', $so->id)->where('warehouse_id', $f['warehouse2']->id)->sum('quantity'))->toBe(2.0);
+    expect($summary[$data['item']->id]['shortage'])->toBe(2.0);
 });
 
-test('6. SalesOrderService::confirm() bekerja untuk mode single-gudang', function () {
+test('6. Reservasi SO bekerja untuk mode single-gudang', function () {
     $f = mwFixtures();
 
     $so = SaleOrder::create([
@@ -282,9 +299,7 @@ test('6. SalesOrderService::confirm() bekerja untuk mode single-gudang', functio
         'rak_id' => null,
     ]);
 
-    $service = new SalesOrderService();
-    $result = $service->confirm($so);
-    expect($result)->toBeTrue();
+    $so = mwApprove($so);
 
     $reservations = StockReservation::where('sale_order_id', $so->id)->get();
     expect($reservations)->toHaveCount(1);
@@ -411,24 +426,19 @@ test('10. handleStockReductionForSelfPickup mengurangi stok per alokasi untuk Am
     expect((float) $stock2->qty_available)->toBe(4.0);
 });
 
-test('10b. handleStockReductionForSelfPickup melepas reservation tanpa double-deduct stok', function () {
+test('10b. handleStockReductionForSelfPickup mengonsumsi reservasi tanpa double-deduct stok', function () {
     $f = mwFixtures();
     $data = makeSoWithAllocations($f, 'Ambil Sendiri');
 
-    $service = new SalesOrderService();
-    $so = SaleOrder::find($data['so']->id);
-    $service->confirm($so);
+    $so = mwApprove(SaleOrder::find($data['so']->id));
 
-    $stock1AfterReservation = InventoryStock::where('product_id', $f['product']->id)
-        ->where('warehouse_id', $f['warehouse1']->id)
-        ->first();
-    $stock2AfterReservation = InventoryStock::where('product_id', $f['product']->id)
-        ->where('warehouse_id', $f['warehouse2']->id)
-        ->first();
+    // Setelah Approved: stok fisik TETAP, sebagian tertahan (semantik qty_available = fisik)
+    $stock1AfterReservation = InventoryStock::where('product_id', $f['product']->id)->where('warehouse_id', $f['warehouse1']->id)->first();
+    $stock2AfterReservation = InventoryStock::where('product_id', $f['product']->id)->where('warehouse_id', $f['warehouse2']->id)->first();
 
-    expect((float) $stock1AfterReservation->qty_available)->toBe(5.0);
+    expect((float) $stock1AfterReservation->qty_available)->toBe(10.0);
     expect((float) $stock1AfterReservation->qty_reserved)->toBe(5.0);
-    expect((float) $stock2AfterReservation->qty_available)->toBe(4.0);
+    expect((float) $stock2AfterReservation->qty_available)->toBe(8.0);
     expect((float) $stock2AfterReservation->qty_reserved)->toBe(4.0);
 
     $observer = new SaleOrderObserver();
@@ -436,13 +446,10 @@ test('10b. handleStockReductionForSelfPickup melepas reservation tanpa double-de
     $method->setAccessible(true);
     $method->invoke($observer, SaleOrder::find($so->id));
 
-    $stock1 = InventoryStock::where('product_id', $f['product']->id)
-        ->where('warehouse_id', $f['warehouse1']->id)
-        ->first();
-    $stock2 = InventoryStock::where('product_id', $f['product']->id)
-        ->where('warehouse_id', $f['warehouse2']->id)
-        ->first();
+    $stock1 = InventoryStock::where('product_id', $f['product']->id)->where('warehouse_id', $f['warehouse1']->id)->first();
+    $stock2 = InventoryStock::where('product_id', $f['product']->id)->where('warehouse_id', $f['warehouse2']->id)->first();
 
+    // Stok fisik keluar SEKALI (10-5, 8-4) dan reservasi terkonsumsi
     expect((float) $stock1->qty_available)->toBe(5.0);
     expect((float) $stock1->qty_reserved)->toBe(0.0);
     expect((float) $stock2->qty_available)->toBe(4.0);

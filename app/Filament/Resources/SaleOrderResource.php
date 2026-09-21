@@ -1201,7 +1201,12 @@ class SaleOrderResource extends Resource
                                         $totalStock = (float) InventoryStock::freeQtyFor($productId);
 
                                         if ($allocations->isEmpty()) {
-                                            return "📦 Total stok bebas: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
+                                            // T2.5: peringatan (tidak memblokir simpan draf); persetujuan menolak stok kurang kecuali sebagai backorder.
+                                            $warning = $quantity > $totalStock + 0.00001
+                                                ? '⚠️ Qty melebihi stok bebas — persetujuan hanya sebagai Backorder (alasan wajib). '
+                                                : '';
+
+                                            return $warning . "📦 Total stok bebas: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
                                         }
 
                                         $allocationQty = (float) $allocations->sum(fn($r) => (float) ($r['quantity'] ?? 0));

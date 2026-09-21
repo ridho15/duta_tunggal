@@ -2,11 +2,9 @@
 
 namespace App\Services;
 
-use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\HelperController;
 use App\Models\Currency;
 use App\Models\Customer;
-use App\Models\InventoryStock;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
 use App\Models\StockReservation;
@@ -128,106 +126,16 @@ class SalesOrderService
         ]);
     }
 
-    public function confirm($salesOrder)
-    {
-        try {
-            DB::transaction(function () use ($salesOrder) {
-                // Load relationships needed for multi-warehouse support
-                $salesOrder->load('saleOrderItem.warehouseAllocations', 'saleOrderItem.product');
-
-                // Validate stock availability with pessimistic locking
-                foreach ($salesOrder->saleOrderItem as $item) {
-                    $allocations = $item->warehouseAllocations;
-
-                    if ($allocations->isNotEmpty()) {
-                        // Multi-warehouse mode: validate each allocation separately
-                        foreach ($allocations as $allocation) {
-                            $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                                ->where('warehouse_id', $allocation->warehouse_id)
-                                ->lockForUpdate()
-                                ->first();
-
-                            if (!$inventoryStock) {
-                                throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$allocation->warehouse_id}");
-                            }
-
-                            $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
-                            if ($availableForReservation < (float) $allocation->quantity) {
-                                $productName = $item->product?->name ?? $item->product_id;
-                                throw new InsufficientStockException("Stok tidak cukup untuk produk {$productName} di gudang {$allocation->warehouse_id}. Tersedia: {$availableForReservation}, Diminta: {$allocation->quantity}");
-                            }
-                        }
-                    } else {
-                        // Single warehouse mode
-                        $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                            ->where('warehouse_id', $item->warehouse_id)
-                            ->lockForUpdate()
-                            ->first();
-
-                        if (!$inventoryStock) {
-                            throw new InsufficientStockException("No inventory stock found for product {$item->product_id} in warehouse {$item->warehouse_id}");
-                        }
-
-                        $availableForReservation = $inventoryStock->qty_available - $inventoryStock->qty_reserved;
-                        if ($availableForReservation < $item->quantity) {
-                            $productName = $item->product?->name ?? $item->product_id;
-                            throw new InsufficientStockException("Stok tidak cukup untuk produk {$productName}. Tersedia: {$availableForReservation}, Diminta: {$item->quantity}");
-                        }
-                    }
-                }
-
-                // Reserve stock for each item
-                foreach ($salesOrder->saleOrderItem as $item) {
-                    $allocations = $item->warehouseAllocations;
-
-                    if ($allocations->isNotEmpty()) {
-                        // Multi-warehouse mode: create reservation per allocation
-                        foreach ($allocations as $allocation) {
-                            StockReservation::create([
-                                'sale_order_id' => $salesOrder->id,
-                                'product_id' => $item->product_id,
-                                'quantity' => $allocation->quantity,
-                                'warehouse_id' => $allocation->warehouse_id,
-                                'rak_id' => null,
-                            ]);
-                        }
-                    } else {
-                        // Single warehouse mode
-                        StockReservation::create([
-                            'sale_order_id' => $salesOrder->id,
-                            'product_id' => $item->product_id,
-                            'quantity' => $item->quantity,
-                            'warehouse_id' => $item->warehouse_id,
-                            'rak_id' => $item->rak_id,
-                        ]);
-                    }
-                }
-
-                $salesOrder->update(['status' => 'confirmed']);
-            });
-
-            return true;
-        } catch (InsufficientStockException $e) {
-            Notification::make()
-                ->title('Stok Tidak Cukup')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
-
-            throw $e;
-        }
-    }
-
-    /**
-     * Cancel a sale order and release any stock reservations.
-     */
     public function cancel($salesOrder)
     {
         DB::transaction(function () use ($salesOrder) {
-            // Release all stock reservations for this SO
-            StockReservation::where('sale_order_id', $salesOrder->id)->each(function ($reservation) {
-                $reservation->delete(); // triggers StockReservationObserver::deleted → restores qty_available
-            });
+            // Buku besar aktif: SaleOrderObserver melepas SEMUA reservasi SO/DO-nya lewat StockReservationLedger (tercatat sebagai event).
+            // Alur lama (semua flag mati): reservasi dihapus di sini agar qty_reserved turun.
+            if (! StockReservationLedger::enabled()) {
+                StockReservation::where('sale_order_id', $salesOrder->id)->each(function ($reservation) {
+                    $reservation->delete(); // StockReservationObserver::deleted → menurunkan qty_reserved
+                });
+            }
 
             $salesOrder->update(['status' => 'canceled']);
         });

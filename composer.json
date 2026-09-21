@@ -79,6 +79,7 @@
             "@php artisan test"
         ],
         "test:chunked": [
+            "Composer\\Config::disableProcessTimeout",
             "@php scripts/run-tests-chunked.php"
         ],
         "test:compare": [

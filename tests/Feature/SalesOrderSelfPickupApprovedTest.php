@@ -117,12 +117,14 @@ test('sales order self pickup approved does not create stock reservation', funct
     ]);
 
     // Create inventory stock
-    InventoryStock::create([
-        'product_id' => $product->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
-        'qty_available' => 50,
-        'qty_reserved' => 0,
+    // Product::created sudah membuat baris stok nol (tanpa rak): atur SATU baris saja lalu pasang raknya (bukan baris ganda).
+    stkSetStock($product, $warehouse, 50)->forceFill(['rak_id' => $rak->id])->save();
+
+    // Invoice otomatis saat SO selesai butuh akun HPP/persediaan/penjualan: pinjam akun & pemetaan dari fixture stok bersama.
+    $accounts = stkContext()['product'];
+    $product->update([
+        'sales_coa_id' => $accounts->sales_coa_id, 'cogs_coa_id' => $accounts->cogs_coa_id,
+        'goods_delivery_coa_id' => $accounts->goods_delivery_coa_id, 'inventory_coa_id' => $accounts->inventory_coa_id,
     ]);
 
     $salesOrderService = app(SalesOrderService::class);
@@ -158,10 +160,11 @@ test('sales order self pickup approved does not create stock reservation', funct
     $salesOrderService->approve($saleOrder);
 
     $saleOrder->refresh();
-    // With sufficient stock, WC is auto-confirmed → SO status promoted to 'confirmed'
-    expect($saleOrder->status)->toBe('confirmed');
+    // WC/DO tidak lagi dibuat otomatis saat SO disetujui (alur DO-sentris): SO tetap 'approved'.
+    expect($saleOrder->status)->toBe('approved');
 
-    // Check that no stock reservation is created for self pickup
+    // Flag reserve_on_so_approve mati (perilaku lama): tidak ada reservasi untuk Ambil Sendiri.
+    // (Dengan flag hidup reservasi SO ditahan dan dikonsumsi saat selesai — lihat Stock/SaleOrderReservationTest.)
     $stockReservations = StockReservation::where('sale_order_id', $saleOrder->id)->get();
     expect($stockReservations)->toHaveCount(0);
 

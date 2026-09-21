@@ -2,42 +2,32 @@
 
 namespace Tests\Feature;
 
-use App\Exceptions\InsufficientStockException;
-use App\Models\InventoryStock;
 use App\Models\MaterialIssue;
 use App\Models\MaterialIssueItem;
 use App\Models\Product;
 use App\Models\Rak;
-use App\Models\SaleOrder;
-use App\Models\SaleOrderItem;
-use App\Models\StockReservation;
 use App\Models\UnitOfMeasure;
 use App\Models\Warehouse;
 use App\Services\ManufacturingService;
-use App\Services\SalesOrderService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * TC-SR-001..006 — Stock Reservation Service Feature Tests
- *
- * Covers: reserve/release via MaterialIssue, InsufficientStockException,
- * concurrent lock guard, SO-cancel release, and consumption flow.
+ * TC-SR-001, 002, 006 — Stock Reservation Service (Material Issue): reserve, release, consume.
+ * Reservasi Sales Order (dulu TC-SR-003..005) kini di tests/Feature/Stock/StockReservationSpecTest.php.
  */
 class StockReservationServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     private StockReservationService $stockService;
-    private SalesOrderService $soService;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->stockService = new StockReservationService();
-        $this->soService    = new SalesOrderService();
     }
 
     // -------------------------------------------------------------------------
@@ -51,14 +41,9 @@ class StockReservationServiceTest extends TestCase
         $rak       = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
         $uom       = UnitOfMeasure::factory()->create();
 
-        $inventoryStock = InventoryStock::create([
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'rak_id'        => $rak->id,
-            'qty_available' => $initialAvailable,
-            'qty_reserved'  => $initialReserved,
-            'qty_min'       => 0,
-        ]);
+        // Product::created membuat baris stok nol (tanpa rak) untuk setiap gudang: atur SATU baris saja (bukan baris ganda) lalu pasang raknya.
+        $inventoryStock = stkSetStock($product, $warehouse, $initialAvailable, $initialReserved);
+        $inventoryStock->forceFill(['rak_id' => $rak->id])->save();
 
         $materialIssue = MaterialIssue::factory()->create([
             'status'       => MaterialIssue::STATUS_APPROVED,
@@ -134,139 +119,9 @@ class StockReservationServiceTest extends TestCase
         ]);
     }
 
-    // -------------------------------------------------------------------------
-    // TC-SR-003: Confirming a SaleOrder with insufficient stock throws
-    //            InsufficientStockException (guard in SalesOrderService::confirm).
-    // -------------------------------------------------------------------------
-
-    #[Test]
-    public function tc_sr_003_over_reservation_throws_insufficient_stock_exception(): void
-    {
-        $warehouse = Warehouse::factory()->create();
-        $product   = Product::factory()->create();
-
-        // Only 5 units available
-        InventoryStock::create([
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'qty_available' => 5,
-            'qty_reserved'  => 0,
-            'qty_min'       => 0,
-        ]);
-
-        $saleOrder = SaleOrder::factory()->create(['status' => 'draft']);
-        SaleOrderItem::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'quantity'      => 20, // requesting more than available
-        ]);
-        $saleOrder->load('saleOrderItem');
-
-        $this->expectException(InsufficientStockException::class);
-
-        $this->soService->confirm($saleOrder);
-    }
-
-    // -------------------------------------------------------------------------
-    // TC-SR-004: SalesOrderService::confirm() uses lockForUpdate() so that
-    //            concurrent reservations cannot produce negative qty.
-    //            Verified: a second confirmation attempt on exhausted stock
-    //            still throws InsufficientStockException (no negative stock).
-    // -------------------------------------------------------------------------
-
-    #[Test]
-    public function tc_sr_004_concurrent_reservation_never_produces_negative_available(): void
-    {
-        $warehouse = Warehouse::factory()->create();
-        $product   = Product::factory()->create();
-
-        $stock = InventoryStock::create([
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'qty_available' => 10,
-            'qty_reserved'  => 0,
-            'qty_min'       => 0,
-        ]);
-
-        // First SO — reserves exactly 10
-        $so1 = SaleOrder::factory()->create(['status' => 'draft']);
-        SaleOrderItem::factory()->create([
-            'sale_order_id' => $so1->id,
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'quantity'      => 10,
-        ]);
-        $so1->load('saleOrderItem');
-        $this->soService->confirm($so1);
-
-        $stock->refresh();
-        $this->assertEquals(0, $stock->qty_available, 'All stock should be reserved after first confirm');
-
-        // Second SO — tries to reserve 5 more → should throw
-        $so2 = SaleOrder::factory()->create(['status' => 'draft']);
-        SaleOrderItem::factory()->create([
-            'sale_order_id' => $so2->id,
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'quantity'      => 5,
-        ]);
-        $so2->load('saleOrderItem');
-
-        $this->expectException(InsufficientStockException::class);
-        $this->soService->confirm($so2);
-
-        // Stock must NOT go negative
-        $stock->refresh();
-        $this->assertGreaterThanOrEqual(0, $stock->qty_available);
-    }
-
-    // -------------------------------------------------------------------------
-    // TC-SR-005: Cancelling an SO releases its stock reservations and restores
-    //            qty_available (SalesOrderService::cancel).
-    // -------------------------------------------------------------------------
-
-    #[Test]
-    public function tc_sr_005_cancel_sale_order_releases_stock_reservations(): void
-    {
-        $warehouse = Warehouse::factory()->create();
-        $product   = Product::factory()->create();
-
-        $stock = InventoryStock::create([
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'qty_available' => 50,
-            'qty_reserved'  => 0,
-            'qty_min'       => 0,
-        ]);
-
-        $saleOrder = SaleOrder::factory()->create(['status' => 'draft']);
-        SaleOrderItem::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'product_id'    => $product->id,
-            'warehouse_id'  => $warehouse->id,
-            'quantity'      => 15,
-        ]);
-        $saleOrder->load('saleOrderItem');
-
-        // Confirm → reserve 15 units
-        $this->soService->confirm($saleOrder);
-        $stock->refresh();
-        $this->assertEquals(15, $stock->qty_reserved);
-        $this->assertEquals(35, $stock->qty_available);
-
-        // Cancel → release reservations
-        $saleOrder->refresh();
-        $this->soService->cancel($saleOrder);
-
-        $stock->refresh();
-        $this->assertEquals(0, $stock->qty_reserved,  'qty_reserved should be 0 after SO cancel');
-        $this->assertEquals(50, $stock->qty_available, 'qty_available should be restored after SO cancel');
-
-        $this->assertDatabaseMissing('stock_reservations', [
-            'sale_order_id' => $saleOrder->id,
-        ]);
-    }
+    // TC-SR-003..005 (reservasi Sales Order lewat SalesOrderService::confirm) DIGANTI oleh
+    // tests/Feature/Stock/StockReservationSpecTest.php — konfirmasi lama sudah dihapus (T2.6); reservasi SO kini disusun
+    // SaleOrderReservationSynchronizer dengan semantik stok fisik + qty_reserved.
 
     // -------------------------------------------------------------------------
     // TC-SR-006: consumeReservedStockForMaterialIssue() permanently consumes

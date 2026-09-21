@@ -4,19 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Cabang;
 use App\Models\Customer;
-use App\Models\DeliveryOrder;
-use App\Models\DeliveryOrderItem;
-use App\Models\Driver;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\SaleOrder;
-use App\Models\SaleOrderItem;
 use App\Models\User;
-use App\Models\Vehicle;
-use App\Models\Warehouse;
-use App\Models\WarehouseConfirmation;
-use App\Models\WarehouseConfirmationItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -159,198 +151,10 @@ class InvoiceEditAndDeliveryOrderTest extends TestCase
 
     // ──────────────────────────────────────────────────────────────────────────
     // Bug #3 – Delivery Order auto-generation
+    //
+    // Tiga tes lama di sini memanggil createDeliveryOrderForConfirmedWarehouseConfirmation() — alur "WC → DO otomatis" sudah
+    // dihapus (alur sekarang DO-sentris: DO dibuat, WC per item dibuat DARI DO, DO otomatis Siap Kirim bila semua WC
+    // dikonfirmasi). Spesifikasinya (DO tanpa driver/kendaraan, Ambil Sendiri) kini ada di
+    // tests/Feature/Stock/DeliveryOrderWarehouseConfirmationFlowTest.php.
     // ──────────────────────────────────────────────────────────────────────────
-
-    public function test_delivery_order_is_created_when_driver_and_vehicle_exist(): void
-    {
-        $cabang = Cabang::factory()->create();
-        // No cabang_id → CabangScope is skipped globally for this user
-        $user   = User::factory()->create(['cabang_id' => null]);
-        $this->actingAs($user);
-
-        $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
-        $customer  = Customer::factory()->create(['cabang_id' => $cabang->id]);
-        $product   = Product::factory()->create();
-
-        // Create driver and vehicle so FK constraints are satisfied
-        $driver  = Driver::factory()->create();
-        $vehicle = Vehicle::factory()->create();
-
-        $saleOrder = SaleOrder::factory()->create([
-            'customer_id'      => $customer->id,
-            'cabang_id'        => $cabang->id,
-            'status'           => 'approved',
-            'tipe_pengiriman'  => 'Kirim Langsung',
-            'approve_by'       => $user->id,
-        ]);
-
-        $soItem = SaleOrderItem::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'product_id'    => $product->id,
-            'quantity'      => 3,
-            'warehouse_id'  => $warehouse->id,
-        ]);
-
-        // Build a WarehouseConfirmation — create as 'request' first so the observer
-        // does not fire DO creation before WC items are added (race condition)
-        $wc = WarehouseConfirmation::create([
-            'confirmable_type'  => \App\Models\SaleOrder::class,
-            'confirmable_id'    => $saleOrder->id,
-            'confirmation_type' => 'sales_order',
-            'status'            => 'request',
-            'confirmed_by'      => $user->id,
-            'confirmed_at'      => now(),
-        ]);
-
-        WarehouseConfirmationItem::create([
-            'warehouse_confirmation_id' => $wc->id,
-            'sale_order_item_id'        => $soItem->id,
-            'product_name'              => $product->name,
-            'requested_qty'             => 3,
-            'confirmed_qty'             => 3,
-            'warehouse_id'              => $warehouse->id,
-            'status'                    => 'confirmed',
-        ]);
-
-        // Reload WC with items before calling the creation helper
-        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'confirmable');
-
-        // Directly invoke the protected method via a test-accessible call
-        $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
-
-        $saleOrder->refresh();
-        $deliveryOrder = $saleOrder->deliveryOrder()->first();
-
-        $this->assertNotNull($deliveryOrder, 'Delivery Order was NOT created');
-        $this->assertEquals('draft', $deliveryOrder->status);
-        $this->assertEquals($driver->id,  $deliveryOrder->driver_id);
-        $this->assertEquals($vehicle->id, $deliveryOrder->vehicle_id);
-
-        $items = $deliveryOrder->deliveryOrderItem()->get();
-        $this->assertCount(1, $items);
-        $this->assertEquals(3, (int) $items->first()->quantity);
-    }
-
-    public function test_delivery_order_is_created_without_driver_or_vehicle(): void
-    {
-        $cabang   = Cabang::factory()->create();
-        $user     = User::factory()->create(['cabang_id' => $cabang->id]);
-        $this->actingAs($user);
-
-        $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
-        $customer  = Customer::factory()->create(['cabang_id' => $cabang->id]);
-        $product   = Product::factory()->create();
-
-        // Deliberately do NOT create any Driver or Vehicle
-        // New behavior: DO IS created with null driver_id/vehicle_id (nullable since Task 15)
-
-        $saleOrder = SaleOrder::factory()->create([
-            'customer_id'     => $customer->id,
-            'cabang_id'       => $cabang->id,
-            'status'          => 'approved',
-            'tipe_pengiriman' => 'Kirim Langsung',
-        ]);
-
-        $soItem = SaleOrderItem::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'product_id'    => $product->id,
-            'quantity'      => 2,
-            'warehouse_id'  => $warehouse->id,
-        ]);
-
-        $wc = WarehouseConfirmation::create([
-            'confirmable_type'  => \App\Models\SaleOrder::class,
-            'confirmable_id'    => $saleOrder->id,
-            'confirmation_type' => 'sales_order',
-            'status'            => 'confirmed',
-            'confirmed_by'      => $user->id,
-            'confirmed_at'      => now(),
-        ]);
-
-        WarehouseConfirmationItem::create([
-            'warehouse_confirmation_id' => $wc->id,
-            'sale_order_item_id'        => $soItem->id,
-            'product_name'              => $product->name,
-            'requested_qty'             => 2,
-            'confirmed_qty'             => 2,
-            'warehouse_id'              => $warehouse->id,
-            'status'                    => 'confirmed',
-        ]);
-
-        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'confirmable');
-        $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
-
-        // DO IS now created even without driver/vehicle (nullable driver_id/vehicle_id)
-        $deliveryOrder = $saleOrder->deliveryOrder()->first();
-        $this->assertNotNull($deliveryOrder, 'DO should be created even without driver/vehicle');
-        $this->assertNull($deliveryOrder->driver_id, 'driver_id should be null when no driver exists');
-        $this->assertNull($deliveryOrder->vehicle_id, 'vehicle_id should be null when no vehicle exists');
-    }
-
-    public function test_delivery_order_is_created_for_self_pickup_sales_order(): void
-    {
-        // Task 15: Barang yang diambil sendiri oleh customer tetap perlu DO sebagai bukti keluar gudang
-        $cabang  = Cabang::factory()->create();
-        $user    = User::factory()->create(['cabang_id' => $cabang->id]);
-        $this->actingAs($user);
-
-        Driver::factory()->create();
-        Vehicle::factory()->create();
-
-        $product  = Product::factory()->create();
-        $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
-        $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
-
-        $saleOrder = SaleOrder::factory()->create([
-            'cabang_id'       => $cabang->id,
-            'customer_id'     => $customer->id,
-            'tipe_pengiriman' => 'Ambil Sendiri',
-            'status'          => 'approved',
-        ]);
-
-        $soItem = SaleOrderItem::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'product_id'    => $product->id,
-            'quantity'      => 5,
-            'warehouse_id'  => $warehouse->id,
-        ]);
-
-        $wc = WarehouseConfirmation::create([
-            'confirmable_type'  => \App\Models\SaleOrder::class,
-            'confirmable_id'    => $saleOrder->id,
-            'confirmation_type' => 'sales_order',
-            'status'            => 'confirmed',
-            'confirmed_by'      => $user->id,
-            'confirmed_at'      => now(),
-        ]);
-
-        WarehouseConfirmationItem::create([
-            'warehouse_confirmation_id' => $wc->id,
-            'sale_order_item_id'        => $soItem->id,
-            'product_name'              => $product->name,
-            'requested_qty'             => 5,
-            'confirmed_qty'             => 5,
-            'warehouse_id'              => $warehouse->id,
-            'status'                    => 'confirmed',
-        ]);
-
-        $wc->load('warehouseConfirmationItems.saleOrderItem.product', 'confirmable');
-        $this->callProtectedMethod($wc, 'createDeliveryOrderForConfirmedWarehouseConfirmation', [$wc]);
-
-        // Task 15: DO IS now created for Ambil Sendiri as proof of goods leaving warehouse
-        $deliveryOrder = DeliveryOrder::where('cabang_id', $cabang->id)->first();
-        $this->assertNotNull($deliveryOrder, 'DO should be created for Ambil Sendiri (Task 15)');
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Helper
-    // ──────────────────────────────────────────────────────────────────────────
-
-    private function callProtectedMethod(object $object, string $method, array $args = []): mixed
-    {
-        $reflection = new \ReflectionClass($object);
-        $m = $reflection->getMethod($method);
-        $m->setAccessible(true);
-        return $m->invokeArgs($object, $args);
-    }
 }
