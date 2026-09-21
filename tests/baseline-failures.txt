@@ -16,9 +16,6 @@ Tests\Feature\InventoryReportPreviewTest :: Inventory preview view renders servi
 Tests\Feature\InventoryReportTest :: It calculates aging categories correctly
 Tests\Feature\InventoryReportTest :: It filters stock report by warehouse
 Tests\Feature\InventoryReportTest :: It shows correct stock levels
-Tests\Feature\InvoiceEditAndDeliveryOrderTest :: Delivery order is created for self pickup sales order
-Tests\Feature\InvoiceEditAndDeliveryOrderTest :: Delivery order is created when driver and vehicle exist
-Tests\Feature\InvoiceEditAndDeliveryOrderTest :: Delivery order is created without driver or vehicle
 Tests\Feature\JournalEntryTest :: journal entries can be filtered by date range
 Tests\Feature\JournalEntryTest :: journal entries can be filtered by journal type
 Tests\Feature\LargePurchaseFlowDemoSeederTest :: large purchase item UX keeps repeaters safe and relation manager review paginated
@@ -167,18 +164,7 @@ Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` �
 Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it returns empty array when no COA is selected
 Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it sends success notification when toggling confirmation
 Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it toggles showConfirmed state correctly
-Tests\Feature\SaleOrderMultiWarehouseTest :: 10b. handleStockReductionForSelfPickup melepas reservation tanpa double-deduct stok
-Tests\Feature\SalesOrderSelfPickupApprovedTest :: sales order self pickup approved does not create stock reservation
 Tests\Feature\StatusRowClassesTest :: sale order index renders status row classes and legend
-Tests\Feature\StockReservationFlowTest :: It creates stock reservations when sale order is confirmed
-Tests\Feature\StockReservationFlowTest :: It handles partial delivery correctly
-Tests\Feature\StockReservationFlowTest :: It prevents double reservation of same stock
-Tests\Feature\StockReservationFlowTest :: It releases stock reservations when delivery order is completed
-Tests\Feature\StockReservationServiceTest :: Tc sr 001 reserve stock increases reserved and decreases available
-Tests\Feature\StockReservationServiceTest :: Tc sr 002 release reservation decreases reserved and restores available
-Tests\Feature\StockReservationServiceTest :: Tc sr 004 concurrent reservation never produces negative available
-Tests\Feature\StockReservationServiceTest :: Tc sr 005 cancel sale order releases stock reservations
-Tests\Feature\StockReservationServiceTest :: Tc sr 006 consume reservation decreases reserved and leaves available low
 Tests\Feature\UATUIUXAuditVerificationTest :: Quality control preselects by specific item query param
 Tests\Feature\UATUIUXAuditVerificationTest :: Quality control preselects first eligible item when po has multiple items
 Tests\Feature\VendorPaymentFlowAdjustmentTest :: Manual mode creates details and updates ap with adjustment
