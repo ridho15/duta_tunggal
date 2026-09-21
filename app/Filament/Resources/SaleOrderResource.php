@@ -369,6 +369,41 @@ class SaleOrderResource extends Resource
         return $memo[$livewire][$record->id]['remaining'] ?? null;
     }
 
+    /**
+     * Hasil pemeriksaan stok untuk daftar SO: dihitung SEKALI per halaman (jumlah query tetap, tanpa N+1) lewat StockAvailability::checkMany.
+     * WeakMap terikat ke komponen Livewire → tidak pernah basi lintas request.
+     */
+    protected static function stockCheckForList(object $livewire, SaleOrder $record): array
+    {
+        static $memo = null;
+        $memo ??= new \WeakMap();
+
+        if (! isset($memo[$livewire])) {
+            $records = method_exists($livewire, 'getTableRecords') ? $livewire->getTableRecords() : [];
+            $orders = $records instanceof \Illuminate\Contracts\Pagination\Paginator ? $records->items() : (is_iterable($records) ? $records : []);
+            $memo[$livewire] = app(\App\Services\StockAvailability::class)->checkMany($orders);
+        }
+
+        return $memo[$livewire][$record->getKey()] ?? app(\App\Services\StockAvailability::class)->check($record);
+    }
+
+    /**
+     * Kondisi SQL "qty item > stok yang dapat dipenuhi" untuk filter Status Stok: stok bebas produk×gudang (rak bila dipilih; semua gudang bila item
+     * belum memilih gudang) DITAMBAH reservasi milik SO itu sendiri. Perbandingan rak memakai IS NULL (sebelumnya `rak_id = rak_id` selalu salah untuk rak kosong).
+     */
+    protected static function stockShortageSql(): string
+    {
+        return 'sale_order_items.quantity > ('
+            . '  COALESCE((SELECT SUM(s.qty_available - s.qty_reserved) FROM inventory_stocks s'
+            . '     WHERE s.deleted_at IS NULL AND s.product_id = sale_order_items.product_id'
+            . '     AND (sale_order_items.warehouse_id IS NULL OR s.warehouse_id = sale_order_items.warehouse_id)'
+            . '     AND (sale_order_items.rak_id IS NULL OR s.rak_id = sale_order_items.rak_id)), 0)'
+            . ' + COALESCE((SELECT SUM(r.quantity) FROM stock_reservations r WHERE r.material_issue_id IS NULL'
+            . '     AND r.sale_order_id = sale_order_items.sale_order_id AND r.product_id = sale_order_items.product_id'
+            . '     AND (sale_order_items.warehouse_id IS NULL OR r.warehouse_id = sale_order_items.warehouse_id)), 0)'
+            . ')';
+    }
+
     protected static function formatQty(float|int|string|null $value): string
     {
         return number_format((float) $value, 0, ',', '.');
@@ -1584,32 +1619,32 @@ class SaleOrderResource extends Resource
                 TextColumn::make('stock_status')
                     ->label('Status Stok')
                     ->badge()
-                    ->state(function (SaleOrder $record): string {
+                    ->state(function (SaleOrder $record, $livewire): string {
                         if ($record->status === 'completed') {
                             return 'SELESAI';
                         }
 
-                        return $record->hasInsufficientStock() ? 'STOK KURANG' : 'STOK READY';
+                        return static::stockCheckForList($livewire, $record)['has_shortage'] ? 'STOK KURANG' : 'STOK READY';
                     })
-                    ->color(function (SaleOrder $record): string {
+                    ->color(function (SaleOrder $record, $livewire): string {
                         if ($record->status === 'completed') {
                             return 'gray';
                         }
 
-                        return $record->hasInsufficientStock() ? 'warning' : 'success';
+                        return static::stockCheckForList($livewire, $record)['has_shortage'] ? 'warning' : 'success';
                     })
                     ->size('sm')
                     ->weight('bold')
-                    ->tooltip(function (SaleOrder $record): ?string {
+                    ->tooltip(function (SaleOrder $record, $livewire): ?string {
                         if ($record->status === 'completed') {
                             return '✅ Sales order sudah selesai';
                         }
 
-                        if ($record->hasInsufficientStock()) {
-                            $insufficientItems = $record->getInsufficientStockItems();
+                        $check = static::stockCheckForList($livewire, $record);
+                        if ($check['has_shortage']) {
                             $tooltip = "⚠️ Item dengan stok kurang:\n";
-                            foreach ($insufficientItems as $item) {
-                                $tooltip .= "• {$item['item']->product->name}: Tersedia {$item['available']}, Dibutuhkan {$item['needed']}\n";
+                            foreach ($check['shortage_items'] as $row) {
+                                $tooltip .= "• {$row['item']->product->name}: Tersedia " . static::formatQty($row['available']) . ', Dibutuhkan ' . static::formatQty($row['needed']) . "\n";
                             }
                             return trim($tooltip);
                         }
@@ -1686,25 +1721,13 @@ class SaleOrderResource extends Resource
                     ->query(function (Builder $query, array $data): Builder {
                         if ($data['value'] === 'insufficient') {
                             return $query->whereHas('saleOrderItem', function (Builder $q) {
-                                $q->whereRaw('quantity > (
-                                    SELECT COALESCE(SUM(qty_available - qty_reserved), 0) 
-                                    FROM inventory_stocks 
-                                    WHERE inventory_stocks.product_id = sale_order_items.product_id 
-                                    AND inventory_stocks.warehouse_id = sale_order_items.warehouse_id 
-                                    AND inventory_stocks.rak_id = sale_order_items.rak_id
-                                )');
+                                $q->whereRaw(static::stockShortageSql());
                             });
                         }
 
                         if ($data['value'] === 'sufficient') {
                             return $query->whereDoesntHave('saleOrderItem', function (Builder $q) {
-                                $q->whereRaw('quantity > (
-                                    SELECT COALESCE(SUM(qty_available - qty_reserved), 0) 
-                                    FROM inventory_stocks 
-                                    WHERE inventory_stocks.product_id = sale_order_items.product_id 
-                                    AND inventory_stocks.warehouse_id = sale_order_items.warehouse_id 
-                                    AND inventory_stocks.rak_id = sale_order_items.rak_id
-                                )');
+                                $q->whereRaw(static::stockShortageSql());
                             });
                         }
 
@@ -1713,12 +1736,12 @@ class SaleOrderResource extends Resource
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 // Additional eager loading for table display
-                return $query->with(['customer', 'saleOrderItem.product']);
+                return $query->with(['customer', 'saleOrderItem.product', 'saleOrderItem.warehouseAllocations']);
             })
-            ->recordClasses(function (SaleOrder $record): string {
+            ->recordClasses(function (SaleOrder $record, $livewire): string {
                 $classes = [static::statusRowClass($record->status)];
 
-                if ($record->status !== 'completed' && $record->hasInsufficientStock()) {
+                if ($record->status !== 'completed' && static::stockCheckForList($livewire, $record)['has_shortage']) {
                     $classes[] = 'insufficient-stock-row';
                 }
 

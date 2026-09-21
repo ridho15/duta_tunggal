@@ -174,7 +174,7 @@ class EditDeliveryOrder extends EditRecord
                             throw new ValidationException($validator);
                         }
 
-                        $availableStock = InventoryStock::freeQtyFor($item['product_id'] ?? null, $sourceWarehouseId);
+                        $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, !empty($item['sale_order_item_id']) ? (int) $item['sale_order_item_id'] : null);   // stok bebas + reservasi milik SO ini
 
                         if ((float) $availableStock < $sourceQtyItem) {
                             $validator = Validator::make([], []);

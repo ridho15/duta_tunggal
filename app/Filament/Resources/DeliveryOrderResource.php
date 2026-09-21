@@ -369,7 +369,7 @@ class DeliveryOrderResource extends Resource
                                                                 }
 
                                                                 $productId = $deliveryItem['product_id'] ?? null;
-                                                                $availableStock = InventoryStock::freeQtyFor($productId, $sourceWarehouseId);
+                                                                $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $sourceWarehouseId, !empty($deliveryItem['sale_order_item_id']) ? (int) $deliveryItem['sale_order_item_id'] : null);
 
                                                                 if ((float) $availableStock < $sourceQtyItem) {
                                                                     $fail('Stock tidak mencukupi pada salah satu sumber gudang item delivery order.');
@@ -635,7 +635,7 @@ class DeliveryOrderResource extends Resource
                                                             $stockQuery->where('rak_id', $rakId);
                                                         }
 
-                                                        $available = InventoryStock::freeQtyFor($productId, $warehouseId, $rakId);
+                                                        $available = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $warehouseId, ($soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id')) ? (int) $soItemId : null, $rakId ? (int) $rakId : null);
                                                         if ($available <= 0) {
                                                             return '🚨 HABIS';
                                                         }
@@ -662,7 +662,7 @@ class DeliveryOrderResource extends Resource
                                                             $stockQuery->where('rak_id', $rakId);
                                                         }
 
-                                                        $available = InventoryStock::freeQtyFor($productId, $warehouseId, $rakId);
+                                                        $available = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $warehouseId, ($soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id')) ? (int) $soItemId : null, $rakId ? (int) $rakId : null);
                                                         if ($qty > 0 && $qty > $available) {
                                                             return 'Qty melebihi stok bebas: ' . number_format($available, 0, ',', '.');
                                                         }

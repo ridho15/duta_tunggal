@@ -250,83 +250,24 @@ class SaleOrder extends Model
     }
 
     /**
-     * Check if any items in this sale order have insufficient stock
+     * Ada item dengan stok kurang? Memakai StockAvailability (sadar reservasi milik SO ini dan kebijakan cabang, D3).
      */
     public function hasInsufficientStock()
     {
-        foreach ($this->saleOrderItem as $item) {
-            $allocations = $item->warehouseAllocations;
-
-            if ($allocations->isNotEmpty()) {
-                $allocatedTotal = (float) $allocations->sum('quantity');
-                if (abs($allocatedTotal - (float) $item->quantity) > 0.0001) {
-                    return true;
-                }
-
-                foreach ($allocations as $allocation) {
-                    $availableStock = InventoryStock::freeQtyFor($item->product_id, $allocation->warehouse_id);
-
-                    if ((float) $availableStock < (float) $allocation->quantity) {
-                        return true;
-                    }
-                }
-            } else {
-                $availableStock = InventoryStock::freeQtyFor($item->product_id, $item->warehouse_id, $item->rak_id);
-
-                if ($availableStock < $item->quantity) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return app(\App\Services\StockAvailability::class)->check($this)['has_shortage'];
     }
 
     /**
-     * Get items with insufficient stock
+     * Item dengan stok kurang: [['item', 'available', 'needed', 'shortage'], …]
      */
     public function getInsufficientStockItems()
     {
-        $insufficientItems = [];
-        foreach ($this->saleOrderItem as $item) {
-            $allocations = $item->warehouseAllocations;
-
-            if ($allocations->isNotEmpty()) {
-                $allocatedTotal = (float) $allocations->sum('quantity');
-                if (abs($allocatedTotal - (float) $item->quantity) > 0.0001) {
-                    $insufficientItems[] = [
-                        'item' => $item,
-                        'available' => $allocatedTotal,
-                        'needed' => $item->quantity,
-                        'shortage' => $item->quantity - $allocatedTotal
-                    ];
-                    continue;
-                }
-
-                foreach ($allocations as $allocation) {
-                    $availableStock = InventoryStock::freeQtyFor($item->product_id, $allocation->warehouse_id);
-
-                    if ((float) $availableStock < (float) $allocation->quantity) {
-                        $insufficientItems[] = [
-                            'item' => $item,
-                            'available' => $availableStock,
-                            'needed' => $allocation->quantity,
-                            'shortage' => (float) $allocation->quantity - (float) $availableStock
-                        ];
-                    }
-                }
-            } else {
-                $availableStock = InventoryStock::freeQtyFor($item->product_id, $item->warehouse_id, $item->rak_id);
-                if ($availableStock < $item->quantity) {
-                    $insufficientItems[] = [
-                        'item' => $item,
-                        'available' => $availableStock,
-                        'needed' => $item->quantity,
-                        'shortage' => $item->quantity - $availableStock
-                    ];
-                }
-            }
-        }
-        return $insufficientItems;
+        return array_map(fn (array $row) => [
+            'item' => $row['item'],
+            'available' => $row['available'],
+            'needed' => $row['needed'],
+            'shortage' => $row['shortage'],
+        ], app(\App\Services\StockAvailability::class)->check($this)['shortage_items']);
     }
 
     protected static function booted()

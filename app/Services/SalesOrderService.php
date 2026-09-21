@@ -281,7 +281,7 @@ class SalesOrderService
             foreach ($item->warehouseAllocations as $allocation) {
                 $whId = $allocation->warehouse_id;
                 $whQty = (float) $allocation->quantity;
-                $freeStock = (float) \App\Models\InventoryStock::freeQtyFor($item->product_id, $whId);
+                $freeStock = app(\App\Services\StockAvailability::class)->freeForSaleOrders((int) $item->product_id, (int) $whId, [(int) $saleOrder->id]);
                 if ($whQty > $freeStock) {
                     $whName = $allocation->warehouse?->name ?? "Gudang #{$whId}";
                     $prodName = $item->product?->name ?? "Produk #{$item->product_id}";
