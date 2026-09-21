@@ -41,6 +41,7 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
@@ -78,6 +79,68 @@ class QualityControlPurchaseResource extends Resource
     public static function formatQcPurchaseOriginalMoney(mixed $amount, ?int $currencyId): string
     {
         return CurrencyConversionResolver::formatAmount($currencyId, (float) $amount, 2);
+    }
+
+    /**
+     * PO asal sebuah QC. Ada tiga bentuk data: QC lama per item (fromModel = PurchaseOrderItem),
+     * QC "1 QC banyak item" (fromModel = PurchaseOrder dan purchase_order_id terisi), dan QC dari
+     * baris penerimaan (fromModel = PurchaseReceiptItem).
+     */
+    public static function resolveQcPurchaseOrder(?QualityControl $qualityControl): ?PurchaseOrder
+    {
+        if (! $qualityControl) {
+            return null;
+        }
+
+        $direct = $qualityControl->purchaseOrder;
+        if ($direct?->exists) {
+            return $direct;
+        }
+
+        $source = $qualityControl->fromModel;
+        $purchaseOrder = match (true) {
+            $source instanceof PurchaseOrder => $source,
+            $source instanceof PurchaseOrderItem => $source->purchaseOrder,
+            default => $source?->purchaseReceipt?->purchaseOrder,
+        };
+
+        return $purchaseOrder?->exists ? $purchaseOrder : null;
+    }
+
+    /**
+     * Total qty yang dipesan untuk QC ini: qty baris PO (QC per item) atau jumlah baris PO yang diperiksa (QC multi-item).
+     */
+    public static function qcPurchaseOrderedQuantity(?QualityControl $qualityControl): ?float
+    {
+        if (! $qualityControl) {
+            return null;
+        }
+
+        if ($qualityControl->fromModel instanceof PurchaseOrderItem) {
+            return (float) $qualityControl->fromModel->quantity;
+        }
+
+        if ($qualityControl->items->isNotEmpty()) {
+            return (float) $qualityControl->items->sum(fn ($item) => (float) ($item->purchaseOrderItem?->quantity ?? 0));
+        }
+
+        return null;
+    }
+
+    /**
+     * Batasi query QC ke PO yang memenuhi $constraint, untuk ketiga bentuk data di resolveQcPurchaseOrder().
+     */
+    protected static function wherePurchaseOrder(Builder $query, \Closure $constraint): Builder
+    {
+        return $query->where(function (Builder $group) use ($constraint) {
+            $group->whereHas('purchaseOrder', $constraint)
+                ->orWhereHasMorph('fromModel', [PurchaseOrder::class], $constraint)
+                ->orWhereHasMorph(
+                    'fromModel',
+                    [PurchaseOrderItem::class],
+                    fn (Builder $item) => $item->whereHas('purchaseOrder', $constraint)
+                );
+        });
     }
 
     public static function qcPurchaseMoneySummary(?QualityControl $qualityControl): array
@@ -939,34 +1002,42 @@ class QualityControlPurchaseResource extends Resource
                 TextColumn::make('supplier_name')
                     ->label('Supplier')
                     ->getStateUsing(function ($record) {
-                        $supplier = $record->fromModel?->purchaseOrder?->supplier;
-                        if ($supplier) {
+                        $supplier = static::resolveQcPurchaseOrder($record)?->supplier;
+                        if ($supplier?->exists) {
                             return "({$supplier->code}) " . ($supplier->perusahaan ?? 'N/A');
                         }
                         return 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('fromModel.purchaseOrder.supplier', function ($query) use ($search) {
-                            return $query->where('perusahaan', 'LIKE', '%' . $search . '%')
-                                ->orWhere('code', 'LIKE', '%' . $search . '%');
+                        return static::wherePurchaseOrder($query, function ($purchaseOrder) use ($search) {
+                            return $purchaseOrder->whereHas('supplier', function ($supplier) use ($search) {
+                                return $supplier->where(function ($match) use ($search) {
+                                    return $match->where('perusahaan', 'LIKE', '%' . $search . '%')
+                                        ->orWhere('code', 'LIKE', '%' . $search . '%');
+                                });
+                            });
                         });
                     }),
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->getStateUsing(function ($record) {
-                        return $record->fromModel?->purchaseOrder?->po_number
-                            ?? $record->fromModel?->purchaseReceipt?->purchaseOrder?->po_number
-                            ?? 'N/A';
+                        return static::resolveQcPurchaseOrder($record)?->po_number ?? 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
-                        return $query->whereHas('fromModel.purchaseOrder', function ($query) use ($search) {
-                            return $query->where('po_number', 'LIKE', '%' . $search . '%');
+                        return static::wherePurchaseOrder($query, function ($purchaseOrder) use ($search) {
+                            return $purchaseOrder->where('po_number', 'LIKE', '%' . $search . '%');
                         });
                     }),
                 TextColumn::make('product.name')
                     ->label('Product')
                     ->getStateUsing(function ($record) {
-                        return $record->product?->name ?? 'N/A';
+                        if ($record->product?->name) {
+                            return $record->product->name;
+                        }
+
+                        return $record->items->isNotEmpty()
+                            ? "Multi-item ({$record->items->count()} produk)"
+                            : 'N/A';
                     })
                     ->searchable(query: function (Builder $query, $search) {
                         return $query->whereHas('product', function ($query) use ($search) {
@@ -1297,7 +1368,8 @@ class QualityControlPurchaseResource extends Resource
                         Select::make('supplier_id')
                             ->label('Supplier')
                             ->options(function () {
-                                return \App\Models\Supplier::where('status', 1)
+                                return \App\Models\Supplier::query()
+                                    ->orderBy('perusahaan')
                                     ->get()
                                     ->mapWithKeys(fn($supplier) => [$supplier->id => "({$supplier->code}) {$supplier->perusahaan}"]);
                             })
@@ -1307,10 +1379,10 @@ class QualityControlPurchaseResource extends Resource
                         return $query->when(
                             $data['supplier_id'],
                             function ($query, $supplierId) {
-                                return $query->where(function ($sub) use ($supplierId) {
-                                    $sub->whereHas('fromModel.purchaseOrder', fn($q) => $q->where('supplier_id', $supplierId))
-                                        ->orWhereHas('purchaseOrder', fn($q) => $q->where('supplier_id', $supplierId));
-                                });
+                                return static::wherePurchaseOrder(
+                                    $query,
+                                    fn ($purchaseOrder) => $purchaseOrder->where('supplier_id', $supplierId)
+                                );
                             }
                         );
                     }),
@@ -1423,8 +1495,8 @@ class QualityControlPurchaseResource extends Resource
                     ->schema([
                         TextEntry::make('qc_number')->label('QC Number'),
                         TextEntry::make('created_at')->date()->label('QC Date'),
-                        TextEntry::make('product.name')->label('Product'),
-                        TextEntry::make('product.sku')->label('SKU'),
+                        TextEntry::make('product.name')->label('Product')->placeholder('Multi-item (lihat tabel item di bawah)'),
+                        TextEntry::make('product.sku')->label('SKU')->placeholder('-'),
                         TextEntry::make('warehouse.name')->label('Warehouse'),
                         TextEntry::make('warehouse.cabang.nama')->label('Cabang'),
                         TextEntry::make('rak.name')->label('Rack'),
@@ -1448,32 +1520,53 @@ class QualityControlPurchaseResource extends Resource
                     ])->columns(2),
                 InfolistSection::make('Purchase Information')
                     ->schema([
-                        // QC Purchase is created from a PurchaseOrderItem, not a receipt item.
-                        TextEntry::make('fromModel.purchaseOrder.po_number')->label('PO Number'),
-                        TextEntry::make('fromModel.purchaseOrder.supplier.perusahaan')->label('Supplier'),
-                        TextEntry::make('fromModel.quantity')->label('Ordered Quantity'),
+                        // QC per item berasal dari PurchaseOrderItem, QC multi-item dari PurchaseOrder (lihat resolveQcPurchaseOrder()).
+                        TextEntry::make('qc_purchase_po_number')
+                            ->label('PO Number')
+                            ->getStateUsing(fn(QualityControl $record) => static::resolveQcPurchaseOrder($record)?->po_number)
+                            ->placeholder('-'),
+                        TextEntry::make('qc_purchase_supplier')
+                            ->label('Supplier')
+                            ->getStateUsing(fn(QualityControl $record) => static::resolveQcPurchaseOrder($record)?->supplier?->perusahaan)
+                            ->placeholder('-'),
+                        TextEntry::make('qc_purchase_ordered_quantity')
+                            ->label('Ordered Quantity')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseOrderedQuantity($record))
+                            ->numeric()
+                            ->placeholder('-'),
+                        // Harga per baris berbeda-beda pada QC multi-item, jadi ringkasan harga hanya untuk QC per item.
                         TextEntry::make('qc_purchase_unit_price')
                             ->label('Unit Price')
-                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['unit_price']),
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['unit_price'])
+                            ->visible(fn(QualityControl $record) => $record->fromModel instanceof PurchaseOrderItem),
                         TextEntry::make('qc_purchase_currency')
                             ->label('Currency')
-                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['currency']),
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['currency'])
+                            ->visible(fn(QualityControl $record) => $record->fromModel instanceof PurchaseOrderItem),
                         TextEntry::make('qc_purchase_exchange_rate')
                             ->label('Exchange Rate')
-                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['exchange_rate']),
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['exchange_rate'])
+                            ->visible(fn(QualityControl $record) => $record->fromModel instanceof PurchaseOrderItem),
                         TextEntry::make('qc_purchase_unit_price_idr')
                             ->label('Unit Price (IDR)')
-                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['unit_price_idr']),
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['unit_price_idr'])
+                            ->visible(fn(QualityControl $record) => $record->fromModel instanceof PurchaseOrderItem),
                         TextEntry::make('qc_purchase_accepted_value')
                             ->label('QC Accepted Value')
-                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['accepted_value']),
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['accepted_value'])
+                            ->visible(fn(QualityControl $record) => $record->fromModel instanceof PurchaseOrderItem),
                         TextEntry::make('qc_purchase_accepted_value_idr')
                             ->label('QC Accepted Value (IDR)')
-                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['accepted_value_idr']),
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseMoneySummary($record)['accepted_value_idr'])
+                            ->visible(fn(QualityControl $record) => $record->fromModel instanceof PurchaseOrderItem),
                     ])->columns(2),
                 InfolistSection::make('Quality Control Results')
                     ->schema([
-                        TextEntry::make('fromModel.quantity')->label('Qty Order'),
+                        TextEntry::make('qc_purchase_results_ordered_quantity')
+                            ->label('Qty Order')
+                            ->getStateUsing(fn(QualityControl $record) => static::qcPurchaseOrderedQuantity($record))
+                            ->numeric()
+                            ->placeholder('-'),
                         TextEntry::make('quantity_received')->label('Qty Received'),
                         TextEntry::make('passed_quantity')->label('Qty Accepted')->color('success'),
                         TextEntry::make('rejected_quantity')->label('Qty Rejected')->color('danger'),
@@ -1568,9 +1661,14 @@ class QualityControlPurchaseResource extends Resource
             })
             ->with([
                 'product.uom',
-                'fromModel.purchaseOrder.supplier',
+                // fromModel bisa PurchaseOrderItem (QC per item) atau PurchaseOrder (QC multi-item), jadi muat per tipe.
+                'fromModel' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                    PurchaseOrderItem::class => ['purchaseOrder.supplier'],
+                    PurchaseOrder::class => ['supplier'],
+                ]),
                 'purchaseOrder.supplier',
                 'items.product',
+                'items.purchaseOrderItem',
                 'inspectedBy',
                 'warehouse.cabang',
                 'rak'

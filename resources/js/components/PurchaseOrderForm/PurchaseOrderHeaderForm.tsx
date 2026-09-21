@@ -66,6 +66,16 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [dependencies.cabangs]);
 
+  const warehouseOptions: SelectOption[] = useMemo(() => {
+    return (dependencies.warehouses || [])
+      .map((w) => ({
+        value: w.id,
+        label: `(${w.kode}) ${w.name}`,
+        sublabel: w.cabang_nama ? `Cabang: ${w.cabang_nama}` : undefined,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [dependencies.warehouses]);
+
   const orderRequestOptions: SelectOption[] = useMemo(() => {
     return (dependencies.available_order_requests || []).map((or) => ({
       value: or.id,
@@ -276,6 +286,29 @@ export const PurchaseOrderHeaderForm: React.FC<Props> = ({
             disabled={!!selectedOr}
             onChange={(val) => onChange({ ...header, cabang_id: val ? Number(val) : null })}
           />
+        </div>
+      </div>
+
+      {/* Row 2b: Gudang Tujuan - 1 PO = 1 gudang penerimaan; QC hanya bisa ke gudang ini */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
+        <div className="md:col-span-8">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Gudang Tujuan <span className="text-red-500">*</span>
+          </label>
+          <SearchableSelect
+            options={warehouseOptions}
+            value={header.warehouse_id}
+            placeholder="-- Pilih Gudang Tujuan --"
+            hasError={!!errors['header.warehouse_id']}
+            onChange={(val) => onChange({ ...header, warehouse_id: val ? Number(val) : null })}
+          />
+          {errors['header.warehouse_id'] ? (
+            <p className="text-xs text-red-500 mt-1">{errors['header.warehouse_id'][0]}</p>
+          ) : (
+            <p className="text-xs text-gray-500 mt-1">
+              Satu PO untuk satu gudang. Penerimaan barang (QC) hanya bisa masuk ke gudang ini; pindah gudang lewat Stock Transfer.
+            </p>
+          )}
         </div>
       </div>
 

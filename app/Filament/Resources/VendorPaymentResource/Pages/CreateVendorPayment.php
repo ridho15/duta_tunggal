@@ -33,7 +33,7 @@ class CreateVendorPayment extends CreateRecord
                 $prInvoiceIds = $pr->selected_invoices ?? [];
                 $eligibleInvoices = empty($prInvoiceIds)
                     ? collect()
-                    : Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get()
+                    : Invoice::whereIn('id', $prInvoiceIds)->where('status', '!=', Invoice::STATUS_CANCELLED)->with('accountPayable')->get()
                         ->filter(fn ($invoice) => ((float)($invoice->accountPayable->remaining ?? $invoice->total)) > 0);
 
                 $selectedInvoices = $eligibleInvoices->pluck('id')->values()->toArray();
@@ -50,16 +50,22 @@ class CreateVendorPayment extends CreateRecord
                     }
                 }
 
+                $paymentDetails = VendorPaymentResource::buildPaymentDetails($eligibleInvoices);
+
                 $this->form->fill([
                     'payment_request_id' => $pr->id,
                     'supplier_id' => $pr->supplier_id,
                     'cabang_id' => $pr->cabang_id ?? null,
                     'selected_invoices' => $selectedInvoices,
                     'total_payment' => VendorPaymentResource::formatMoneyState($total),
-                    'payment_details' => VendorPaymentResource::buildPaymentDetails($eligibleInvoices),
+                    'payment_details' => $paymentDetails,
                     'target_bank_account' => $targetAccount,
                     'payment_date' => now()->toDateString(),
                 ]);
+
+                // Repeater payment_details baru tampil bila state-nya tidak kosong, sehingga fill() di atas
+                // menghilangkannya saat hidrasi. Isi ulang seperti yang dilakukan $set() pada pemilihan PR/invoice manual.
+                $this->data['payment_details'] = $paymentDetails;
             }
         }
     }

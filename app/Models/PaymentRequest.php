@@ -283,6 +283,10 @@ class PaymentRequest extends Model
      */
     public static function getInvoiceRemainingPayable(Invoice $invoice, ?int $excludePrId = null): float
     {
+        if ($invoice->isCancelled()) {
+            return 0.0;
+        }
+
         $invoice->load('accountPayable');
         $ap = $invoice->accountPayable;
         $remainingAp = ($ap && $ap->exists)

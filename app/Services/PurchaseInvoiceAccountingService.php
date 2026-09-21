@@ -277,6 +277,7 @@ class PurchaseInvoiceAccountingService
 
         $alreadyInvoicedReceiptIds = Invoice::withoutGlobalScopes()
             ->whereNull('deleted_at')
+            ->where('status', '!=', Invoice::STATUS_CANCELLED)
             ->where('from_model_type', PurchaseOrder::class)
             ->whereNotNull('purchase_receipts')
             ->get(['purchase_receipts'])
@@ -294,6 +295,7 @@ class PurchaseInvoiceAccountingService
         if (!empty($supplierInvoiceNumber) && $supplierId) {
             $existing = Invoice::withoutGlobalScopes()
                 ->whereNull('deleted_at')
+                ->where('status', '!=', Invoice::STATUS_CANCELLED)
                 ->where('from_model_type', PurchaseOrder::class)
                 ->where('supplier_invoice_number', $supplierInvoiceNumber)
                 ->where('supplier_id', $supplierId);
@@ -311,6 +313,7 @@ class PurchaseInvoiceAccountingService
         if (!empty($taxInvoiceNumber)) {
             $existingTax = Invoice::withoutGlobalScopes()
                 ->whereNull('deleted_at')
+                ->where('status', '!=', Invoice::STATUS_CANCELLED)
                 ->where('tax_invoice_number', $taxInvoiceNumber);
             if (!empty($data['id'])) {
                 $existingTax->where('id', '!=', $data['id']);

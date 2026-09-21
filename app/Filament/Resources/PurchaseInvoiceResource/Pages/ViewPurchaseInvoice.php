@@ -3,11 +3,16 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Services\PurchaseInvoiceCancellationService;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
+use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class ViewPurchaseInvoice extends ViewRecord
@@ -76,6 +81,68 @@ class ViewPurchaseInvoice extends ViewRecord
                             'Gagal Memposting Invoice',
                             $exception,
                             'Invoice pembelian belum berhasil diposting. Silakan coba lagi.'
+                        );
+                    }
+                }),
+            Actions\Action::make('cancel_invoice')
+                ->label('Batalkan Invoice')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->visible(fn ($record) => auth()->user()?->can('cancel', $record) ?? false)
+                ->modalHeading('Batalkan Invoice Pembelian')
+                ->modalDescription('Jurnal invoice akan dibalik (bukan dihapus), hutang usaha dikeluarkan, dan invoice ditandai Dibatalkan. Penerimaan barang (GRN) dapat ditagihkan kembali lewat invoice baru. Invoice yang sudah dibayar atau masih tercakup Permintaan Pembayaran aktif tidak dapat dibatalkan.')
+                ->modalSubmitActionLabel('Ya, Batalkan Invoice')
+                ->form([
+                    Forms\Components\DatePicker::make('reversal_date')
+                        ->label('Tanggal Pembatalan (Jurnal Balik)')
+                        ->default(now())
+                        ->maxDate(now())
+                        ->required(),
+                    Forms\Components\Textarea::make('reason')
+                        ->label('Alasan Pembatalan')
+                        ->required()
+                        ->minLength(5)
+                        ->maxLength(500),
+                ])
+                ->action(function ($record, array $data) {
+                    try {
+                        app(PurchaseInvoiceCancellationService::class)->cancel(
+                            $record,
+                            (string) $data['reason'],
+                            $data['reversal_date'] ?? null,
+                            Auth::id()
+                        );
+
+                        $this->record->refresh();
+
+                        Notification::make()
+                            ->title('Invoice Dibatalkan')
+                            ->body('Jurnal telah dibalik dan hutang usaha dikeluarkan. Penerimaan barang dapat ditagihkan kembali.')
+                            ->success()
+                            ->send();
+                    } catch (\DomainException $exception) {
+                        Notification::make()
+                            ->title('Invoice Belum Dapat Dibatalkan')
+                            ->body($exception->getMessage())
+                            ->danger()
+                            ->persistent()
+                            ->send();
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Data Pembatalan Tidak Valid')
+                            ->body(collect($exception->errors())->flatten()->implode(' '))
+                            ->danger()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Log::error('ViewPurchaseInvoice cancel_invoice failed', [
+                            'invoice_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Membatalkan Invoice',
+                            $exception,
+                            'Invoice pembelian belum berhasil dibatalkan. Tidak ada perubahan yang disimpan; silakan coba lagi.'
                         );
                     }
                 }),

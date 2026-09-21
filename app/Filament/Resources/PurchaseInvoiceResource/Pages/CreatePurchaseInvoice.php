@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Services\PurchaseInvoiceAccountingService;
 use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -22,7 +23,12 @@ class CreatePurchaseInvoice extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $service = app(PurchaseInvoiceAccountingService::class);
-        $data = $service->validateReceiptBackedCreateData($data);
+
+        try {
+            $data = $service->validateReceiptBackedCreateData($data);
+        } catch (ValidationException $exception) {
+            throw $this->toFormValidationException($exception);
+        }
 
         if (!empty($data['purchase_order_ids'])) {
             $poCurrencyContext = $service->currencyContextFromPurchaseOrderIds($data['purchase_order_ids']);
@@ -84,7 +90,7 @@ class CreatePurchaseInvoice extends CreateRecord
                 return $service->finaliseInvoice($record);
             });
         } catch (ValidationException $exception) {
-            throw $exception;
+            throw $this->toFormValidationException($exception);
         } catch (Throwable $exception) {
             Log::error('CreatePurchaseInvoice handleRecordCreation failed', [
                 'user_id' => Auth::id(),
@@ -100,5 +106,30 @@ class CreatePurchaseInvoice extends CreateRecord
 
             throw $exception;
         }
+    }
+
+    /**
+     * Service melempar error dengan kunci state form polos (mis. "supplier_invoice_number"), sedangkan Filament
+     * hanya menempelkan error ke field lewat kunci "data.*". Tanpa awalan itu penolakan (nomor invoice ganda,
+     * receipt sudah ditagih, dan lain-lain) tidak terlihat sama sekali. Notifikasi ikut dikirim karena
+     * sebagian kunci (mis. invoiceItem) tidak punya field sendiri.
+     */
+    private function toFormValidationException(ValidationException $exception): ValidationException
+    {
+        $errors = $exception->errors();
+
+        Notification::make()
+            ->danger()
+            ->title('Invoice pembelian belum dapat disimpan')
+            ->body(collect($errors)->flatten()->implode(' '))
+            ->send();
+
+        return ValidationException::withMessages(
+            collect($errors)
+                ->mapWithKeys(fn (array $messages, string $key) => [
+                    str_starts_with($key, 'data.') ? $key : 'data.' . $key => $messages,
+                ])
+                ->all()
+        );
     }
 }

@@ -24,6 +24,16 @@ Schedule::command('quotations:expire')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Tandai invoice (pembelian maupun penjualan) yang melewati jatuh tempo dan masih punya sisa sebagai Terlambat, serta
+// memulihkannya bila tempo diperpanjang. Sebelumnya hanya didaftarkan di app/Console/Kernel.php yang tidak dipakai
+// Laravel 12 (lihat catatan quotations:expire), sehingga status "Terlambat" tidak pernah berubah otomatis.
+// Invoice draft, lunas, dan dibatalkan dikecualikan oleh perintahnya sendiri.
+Schedule::command('invoices:check-overdue')
+    ->dailyAt('00:05')
+    ->name('invoices-check-overdue')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // T2.5 (D21): isi ulang reservasi SO backorder saat stok masuk (FIFO menurut waktu approve). Tidak berbuat apa-apa bila flag
 // sales.stock.reserve_on_so_approve mati; aman dijalankan berulang (idempoten).
 Schedule::command('sales:top-up-reservations')

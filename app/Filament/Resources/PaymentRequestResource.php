@@ -116,7 +116,7 @@ class PaymentRequestResource extends Resource
                                         return Invoice::with('accountPayable')
                                             ->where('from_model_type', \App\Models\PurchaseOrder::class)
                                             ->whereIn('from_model_id', $poIds)
-                                            ->whereNotIn('status', ['draft', Invoice::STATUS_PAID])
+                                            ->whereNotIn('status', ['draft', Invoice::STATUS_PAID, Invoice::STATUS_CANCELLED])
                                             ->get()
                                             ->filter(function ($invoice) use ($currentPrId) {
                                                 // Exclude invoices that are fully paid or have no remaining debt

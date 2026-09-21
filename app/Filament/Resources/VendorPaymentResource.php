@@ -94,7 +94,7 @@ class VendorPaymentResource extends Resource
                                             $prInvoiceIds = $pr->selected_invoices ?? [];
                                             $eligibleInvoices = empty($prInvoiceIds)
                                                 ? collect()
-                                                : Invoice::whereIn('id', $prInvoiceIds)->with('accountPayable')->get()
+                                                : Invoice::whereIn('id', $prInvoiceIds)->where('status', '!=', Invoice::STATUS_CANCELLED)->with('accountPayable')->get()
                                                     ->filter(fn ($invoice) => ((float)($invoice->accountPayable->remaining ?? $invoice->total)) > 0);
 
                                             $set('selected_invoices', $eligibleInvoices->pluck('id')->values()->toArray());
@@ -210,7 +210,7 @@ class VendorPaymentResource extends Resource
                                                 return [];
                                             }
 
-                                            $invoices = Invoice::whereIn('id', $prInvoiceIds)
+                                            $invoices = Invoice::whereIn('id', $prInvoiceIds)->where('status', '!=', Invoice::STATUS_CANCELLED)
                                                 ->with(['accountPayable'])
                                                 ->get();
 
@@ -255,7 +255,7 @@ class VendorPaymentResource extends Resource
                                             return false;
                                         }
 
-                                        $invoice = Invoice::whereIn('id', $prInvoiceIds)
+                                        $invoice = Invoice::whereIn('id', $prInvoiceIds)->where('status', '!=', Invoice::STATUS_CANCELLED)
                                             ->with('accountPayable')
                                             ->find((int)$value);
 
@@ -306,7 +306,7 @@ class VendorPaymentResource extends Resource
                                         }
 
                                         try {
-                                            $invoices = Invoice::whereIn('id', $invoiceIds)
+                                            $invoices = Invoice::whereIn('id', $invoiceIds)->where('status', '!=', Invoice::STATUS_CANCELLED)
                                                 ->with('accountPayable')
                                                 ->get();
 
@@ -748,7 +748,7 @@ class VendorPaymentResource extends Resource
         return parent::getEloquentQuery()->with(['supplier', 'vendorPaymentDetail.invoice']);
     }
 
-    private static function formatMoneyState($value): string
+    public static function formatMoneyState($value): string
     {
         return number_format((float) MoneyHelper::safeParse($value ?? 0), 2, ',', '.');
     }
@@ -781,6 +781,11 @@ class VendorPaymentResource extends Resource
 
     public static function resolveInvoiceRemainingAmount(Invoice $invoice): float
     {
+        // Invoice batal sudah dijurnal balik dan hutangnya dikeluarkan; jangan jatuh ke fallback total invoice.
+        if ($invoice->isCancelled()) {
+            return 0.0;
+        }
+
         $accountPayable = $invoice->accountPayable;
 
         if ($invoice->relationLoaded('accountPayable') && $accountPayable?->getKey()) {
@@ -829,7 +834,7 @@ class VendorPaymentResource extends Resource
         });
     }
 
-    private static function buildPaymentDetails($invoices): array
+    public static function buildPaymentDetails($invoices): array
     {
         return self::buildInvoicePaymentSnapshot($invoices)->map(function ($snapshot) {
             /** @var Invoice $invoice */

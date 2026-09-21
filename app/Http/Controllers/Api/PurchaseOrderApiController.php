@@ -15,6 +15,7 @@ use App\Models\PurchaseOrderCurrency;
 use App\Models\PurchaseOrderItem;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Services\PurchaseOrderService;
 use App\Support\CurrencyConversionResolver;
 use App\Support\OrderRequestQuantityLock;
@@ -48,6 +49,21 @@ class PurchaseOrderApiController extends Controller
                 $cabangsQuery->where('id', $user->cabang_id);
             }
             $cabangs = $cabangsQuery->get(['id', 'kode', 'nama', 'alamat']);
+
+            // 1b. Fetch Gudang tujuan penerimaan (aktif; mengikuti CabangScope milik model Warehouse)
+            $warehouses = Warehouse::query()
+                ->where('status', 1)
+                ->with('cabang:id,nama')
+                ->orderBy('name')
+                ->get(['id', 'kode', 'name', 'cabang_id'])
+                ->map(fn (Warehouse $warehouse) => [
+                    'id' => $warehouse->id,
+                    'kode' => $warehouse->kode,
+                    'name' => $warehouse->name,
+                    'cabang_id' => $warehouse->cabang_id,
+                    'cabang_nama' => $warehouse->cabang?->nama,
+                ])
+                ->values();
 
             // 2. Fetch Currencies
             $currencies = Currency::query()
@@ -209,6 +225,7 @@ class PurchaseOrderApiController extends Controller
                     'default_currency_id' => $defaultCurrencyId,
                     'default_cabang_id' => $user?->cabang_id,
                     'cabangs' => $cabangs,
+                    'warehouses' => $warehouses,
                     'currencies' => $currencies,
                     'suppliers' => $suppliers,
                     'products' => $products,
@@ -413,6 +430,7 @@ class PurchaseOrderApiController extends Controller
             'header.po_number' => 'required|string|max:255|unique:purchase_orders,po_number',
             'header.supplier_id' => 'required|integer|exists:suppliers,id',
             'header.cabang_id' => 'nullable|integer|exists:cabangs,id',
+            'header.warehouse_id' => $this->warehouseRules(),
             'header.order_date' => 'required|date',
             'header.expected_date' => 'nullable|date',
             'header.top_type' => 'nullable|string',
@@ -434,6 +452,7 @@ class PurchaseOrderApiController extends Controller
             'header.po_number.required' => 'Nomor PO tidak boleh kosong',
             'header.po_number.unique' => 'Nomor PO sudah digunakan',
             'header.supplier_id.required' => 'Supplier wajib dipilih',
+            'header.warehouse_id.required' => 'Gudang tujuan wajib dipilih',
             'header.order_date.required' => 'Tanggal PO wajib diisi',
             'items.required' => 'Minimal harus menambahkan 1 item barang',
             'items.min' => 'Minimal harus menambahkan 1 item barang',
@@ -494,6 +513,7 @@ class PurchaseOrderApiController extends Controller
                 'po_number' => $headerData['po_number'],
                 'supplier_id' => (int) $headerData['supplier_id'],
                 'cabang_id' => ! empty($headerData['cabang_id']) ? (int) $headerData['cabang_id'] : Auth::user()?->cabang_id,
+                'warehouse_id' => (int) $headerData['warehouse_id'],
                 'order_date' => $headerData['order_date'],
                 'expected_date' => $headerData['expected_date'] ?? null,
                 'status' => $status,
@@ -592,6 +612,7 @@ class PurchaseOrderApiController extends Controller
                     'po_number' => $po->po_number,
                     'supplier_id' => $po->supplier_id,
                     'cabang_id' => $po->cabang_id,
+                    'warehouse_id' => $po->warehouse_id ? (int) $po->warehouse_id : null,
                     'order_date' => $po->order_date ? $po->order_date->format('Y-m-d') : '',
                     'expected_date' => $po->expected_date ? $po->expected_date->format('Y-m-d') : '',
                     'status' => $po->status,
@@ -647,6 +668,7 @@ class PurchaseOrderApiController extends Controller
             'header.po_number' => "required|string|max:255|unique:purchase_orders,po_number,{$id}",
             'header.supplier_id' => 'required|integer|exists:suppliers,id',
             'header.cabang_id' => 'nullable|integer|exists:cabangs,id',
+            'header.warehouse_id' => $this->warehouseRules(),
             'header.order_date' => 'required|date',
             'header.expected_date' => 'nullable|date',
             'header.top_type' => 'nullable|string',
@@ -662,6 +684,8 @@ class PurchaseOrderApiController extends Controller
             'items.*.tax' => 'nullable|numeric|min:0|max:100',
             'items.*.tipe_pajak' => 'required|string|in:none,eklusif,inklusif',
             'items.*.currency_id' => 'nullable|integer|exists:currencies,id',
+        ], [
+            'header.warehouse_id.required' => 'Gudang tujuan wajib dipilih',
         ]);
 
         if ($validator->fails()) {
@@ -701,6 +725,7 @@ class PurchaseOrderApiController extends Controller
                 'po_number' => $headerData['po_number'],
                 'supplier_id' => (int) $headerData['supplier_id'],
                 'cabang_id' => ! empty($headerData['cabang_id']) ? (int) $headerData['cabang_id'] : $po->cabang_id,
+                'warehouse_id' => (int) $headerData['warehouse_id'],
                 'order_date' => $headerData['order_date'],
                 'expected_date' => $headerData['expected_date'] ?? null,
                 'top_type' => $headerData['top_type'] ?? $po->top_type,
@@ -784,5 +809,26 @@ class PurchaseOrderApiController extends Controller
                 'message' => 'Gagal memperbarui Purchase Order: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Gudang tujuan wajib diisi dan harus gudang aktif yang terlihat oleh user
+     * (query lewat model Warehouse sehingga soft delete dan CabangScope ikut berlaku).
+     *
+     * @return array<int, mixed>
+     */
+    private function warehouseRules(): array
+    {
+        return [
+            'required',
+            'integer',
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                $exists = Warehouse::query()->where('status', 1)->whereKey($value)->exists();
+
+                if (! $exists) {
+                    $fail('Gudang tujuan tidak valid atau tidak aktif.');
+                }
+            },
+        ];
     }
 }

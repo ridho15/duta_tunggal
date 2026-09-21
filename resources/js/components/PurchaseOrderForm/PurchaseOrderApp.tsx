@@ -34,6 +34,7 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
     default_currency_id: 1,
     default_cabang_id: null,
     cabangs: [],
+    warehouses: [],
     currencies: [],
     suppliers: [],
     products: [],
@@ -47,6 +48,7 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
     po_number: '',
     supplier_id: null,
     cabang_id: null,
+    warehouse_id: null,
     order_date: new Date().toISOString().split('T')[0],
     expected_date: null,
     top_type: 'cod',
@@ -105,6 +107,7 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
                 po_number: poData.po_number,
                 supplier_id: poData.supplier_id,
                 cabang_id: poData.cabang_id,
+                warehouse_id: poData.warehouse_id ?? null,
                 order_date: poData.order_date,
                 expected_date: poData.expected_date || null,
                 status: poData.status,
@@ -325,6 +328,10 @@ export const PurchaseOrderApp: React.FC<Props> = ({ initialData, editId }) => {
     }
     if (!header.supplier_id) {
       setErrors({ 'header.supplier_id': ['Supplier wajib dipilih'] });
+      return;
+    }
+    if (!header.warehouse_id) {
+      setErrors({ 'header.warehouse_id': ['Gudang tujuan wajib dipilih'] });
       return;
     }
     if (items.length === 0) {

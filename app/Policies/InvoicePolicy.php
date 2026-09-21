@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\PurchaseInvoiceCancellationService;
 use Illuminate\Auth\Access\Response;
 
 class InvoicePolicy
@@ -58,6 +59,16 @@ class InvoicePolicy
     {
         return $user->hasPermissionTo('delete invoice')
             && strtolower((string) $invoice->status) === Invoice::STATUS_DRAFT;
+    }
+
+    /**
+     * Membatalkan invoice yang sudah diposting (jurnal balik, bukan hapus). Memakai izin `delete invoice`
+     * (izin khusus menyusul); invoice draft cukup dihapus lewat delete().
+     */
+    public function cancel(User $user, Invoice $invoice): bool
+    {
+        return $user->hasPermissionTo('delete invoice')
+            && in_array(strtolower((string) $invoice->status), PurchaseInvoiceCancellationService::POSTED_STATUSES, true);
     }
 
     /**

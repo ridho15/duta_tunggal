@@ -20,6 +20,7 @@ class Invoice extends Model
     const STATUS_PAID = 'paid';
     const STATUS_PARTIALLY_PAID = 'partially_paid';
     const STATUS_OVERDUE = 'overdue';
+    const STATUS_CANCELLED = 'cancelled';
 
     // Status labels
     const STATUS_LABELS = [
@@ -28,6 +29,7 @@ class Invoice extends Model
         self::STATUS_PAID => 'Lunas',
         self::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
         self::STATUS_OVERDUE => 'Terlambat',
+        self::STATUS_CANCELLED => 'Dibatalkan',
     ];
 
     protected $table = 'invoices';
@@ -48,7 +50,7 @@ class Invoice extends Model
         'total',
         'price_variance_amount',
         'due_date',
-        'status', // draft, sent, paid, partially_paid, overdue
+        'status', // draft, sent, paid, partially_paid, overdue, cancelled
         'ppn_rate',
         'tipe_pajak',
         'dpp', //Dasar penggunaan pajak,
@@ -68,11 +70,15 @@ class Invoice extends Model
         'ar_coa_id',
         'ppn_keluaran_coa_id',
         'biaya_pengiriman_coa_id',
-        'cabang_id'
+        'cabang_id',
+        'cancelled_at',
+        'cancelled_by',
+        'cancel_reason',
     ];
 
     protected $casts = [
         'delivery_orders' => 'array',
+        'cancelled_at' => 'datetime',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
         'currency_id' => 'integer',
@@ -93,6 +99,7 @@ class Invoice extends Model
             self::STATUS_PAID => self::STATUS_PAID,
             self::STATUS_PARTIALLY_PAID => self::STATUS_PARTIALLY_PAID,
             self::STATUS_OVERDUE => self::STATUS_OVERDUE,
+            self::STATUS_CANCELLED, 'canceled' => self::STATUS_CANCELLED,
             default => $value,
         };
     }
@@ -111,9 +118,21 @@ class Invoice extends Model
             self::STATUS_SENT,
             self::STATUS_PAID,
             self::STATUS_PARTIALLY_PAID,
-            self::STATUS_OVERDUE => $normalized,
+            self::STATUS_OVERDUE,
+            self::STATUS_CANCELLED => $normalized,
+            'canceled' => self::STATUS_CANCELLED,
             default => $value,
         };
+    }
+
+    public function cancelledBy()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by')->withDefault();
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
     }
 
     public function getInvoiceDateAttribute($value): ?\Illuminate\Support\Carbon

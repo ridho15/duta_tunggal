@@ -19,6 +19,8 @@ use App\Support\CurrencyConversionResolver;
 use Filament\Notifications\Notification;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -523,6 +525,7 @@ class PurchaseInvoiceResource extends Resource
 
                                         $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
                                             ->whereNotNull('purchase_receipts')
+                                            ->where('status', '!=', Invoice::STATUS_CANCELLED)
                                             ->get()
                                             ->pluck('purchase_receipts')
                                             ->flatten()
@@ -733,6 +736,7 @@ class PurchaseInvoiceResource extends Resource
                                         // Check which receipts are already invoiced
                                         $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
                                             ->whereNotNull('purchase_receipts')
+                                            ->where('status', '!=', Invoice::STATUS_CANCELLED)
                                             ->get()->pluck('purchase_receipts')->flatten()->unique()->toArray();
 
                                         $options = [];
@@ -764,6 +768,7 @@ class PurchaseInvoiceResource extends Resource
                                     ->disableOptionWhen(function ($value) {
                                         $invoicedReceiptIds = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
                                             ->whereNotNull('purchase_receipts')
+                                            ->where('status', '!=', Invoice::STATUS_CANCELLED)
                                             ->get()
                                             ->pluck('purchase_receipts')
                                             ->flatten()
@@ -1326,7 +1331,28 @@ class PurchaseInvoiceResource extends Resource
                             ->formatStateUsing(fn ($state, Invoice $record) => self::formatInvoiceCurrencyPair($record, $state)),
                         Infolists\Components\TextEntry::make('status')
                             ->label('Status')
-                            ->badge(),
+                            ->badge()
+                            ->formatStateUsing(fn ($state) => Invoice::STATUS_LABELS[$state] ?? $state)
+                            ->color(fn ($state) => match ($state) {
+                                Invoice::STATUS_DRAFT => 'gray',
+                                Invoice::STATUS_SENT => 'warning',
+                                Invoice::STATUS_PAID => 'success',
+                                Invoice::STATUS_PARTIALLY_PAID => 'primary',
+                                Invoice::STATUS_OVERDUE, Invoice::STATUS_CANCELLED => 'danger',
+                                default => 'gray',
+                            }),
+                        Infolists\Components\TextEntry::make('cancelled_at')
+                            ->label('Dibatalkan Pada')
+                            ->dateTime('d/m/Y H:i')
+                            ->visible(fn (Invoice $record) => $record->isCancelled()),
+                        Infolists\Components\TextEntry::make('cancelledBy.name')
+                            ->label('Dibatalkan Oleh')
+                            ->placeholder('-')
+                            ->visible(fn (Invoice $record) => $record->isCancelled()),
+                        Infolists\Components\TextEntry::make('cancel_reason')
+                            ->label('Alasan Pembatalan')
+                            ->columnSpanFull()
+                            ->visible(fn (Invoice $record) => $record->isCancelled()),
                     ])
                     ->columns(2),
 
@@ -1451,6 +1477,7 @@ class PurchaseInvoiceResource extends Resource
                             Invoice::STATUS_PAID => 'Lunas',
                             Invoice::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
                             Invoice::STATUS_OVERDUE => 'Terlambat',
+                            Invoice::STATUS_CANCELLED => 'Dibatalkan',
                             default => $state,
                         };
                     })
@@ -1460,6 +1487,7 @@ class PurchaseInvoiceResource extends Resource
                         'success' => Invoice::STATUS_PAID,
                         'primary' => Invoice::STATUS_PARTIALLY_PAID,
                         'danger' => Invoice::STATUS_OVERDUE,
+                        'gray' => Invoice::STATUS_CANCELLED,
                     ]),
             ])
             ->filters([
@@ -1929,6 +1957,7 @@ class PurchaseInvoiceResource extends Resource
 
                 $invoicedReceiptIds = Invoice::where('from_model_type', 'App\\Models\\PurchaseOrder')
                     ->whereNotNull('purchase_receipts')
+                    ->where('status', '!=', Invoice::STATUS_CANCELLED)
                     ->get()->pluck('purchase_receipts')->flatten()
                     ->intersect($allReceiptIds)->unique()->toArray();
 

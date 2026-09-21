@@ -33,6 +33,14 @@ export interface CabangOption {
   alamat?: string;
 }
 
+export interface WarehouseOption {
+  id: number;
+  kode: string;
+  name: string;
+  cabang_id?: number | null;
+  cabang_nama?: string | null;
+}
+
 export interface SupplierOption {
   id: number;
   code: string;
@@ -83,6 +91,7 @@ export interface PurchaseOrderHeader {
   po_number: string;
   supplier_id: number | null;
   cabang_id: number | null;
+  warehouse_id: number | null;
   order_date: string;
   expected_date: string | null;
   status?: string;
@@ -126,6 +135,7 @@ export interface PurchaseOrderDependencies {
   default_currency_id: number;
   default_cabang_id: number | null;
   cabangs: CabangOption[];
+  warehouses: WarehouseOption[];
   currencies: CurrencyOption[];
   suppliers: SupplierOption[];
   products: ProductOption[];

@@ -10,10 +10,16 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\Warehouse;
 use Tests\TestCase;
 
 class PurchaseOrderApiTest extends TestCase
 {
+    private function activeWarehouse(array $overrides = []): Warehouse
+    {
+        return Warehouse::factory()->create(array_merge(['status' => 1], $overrides));
+    }
+
     public function test_can_fetch_purchase_order_dependencies()
     {
         $response = $this->getJson('/api/v1/purchase-orders/dependencies');
@@ -27,6 +33,7 @@ class PurchaseOrderApiTest extends TestCase
                     'default_expected_date',
                     'default_currency_id',
                     'cabangs',
+                    'warehouses',
                     'currencies',
                     'suppliers',
                     'products',
@@ -63,6 +70,7 @@ class PurchaseOrderApiTest extends TestCase
         ]);
         $supplier = Supplier::first() ?? Supplier::create(['code' => 'SUP-01', 'perusahaan' => 'Supplier Test']);
 
+        $warehouse = $this->activeWarehouse();
         $poNumber = 'PO-TEST-' . time();
 
         $payload = [
@@ -70,6 +78,7 @@ class PurchaseOrderApiTest extends TestCase
                 'po_number' => $poNumber,
                 'supplier_id' => $supplier->id,
                 'cabang_id' => $cabang->id,
+                'warehouse_id' => $warehouse->id,
                 'order_date' => now()->format('Y-m-d'),
                 'expected_date' => now()->addDays(7)->format('Y-m-d'),
                 'top_type' => 'credit_days',
@@ -108,6 +117,7 @@ class PurchaseOrderApiTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', [
             'po_number' => $poNumber,
             'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
             'status' => 'draft',
         ]);
     }
@@ -127,6 +137,7 @@ class PurchaseOrderApiTest extends TestCase
             'tempo_hutang' => 0,
             'total_amount' => 100000,
         ]);
+        $warehouse = $this->activeWarehouse();
 
         $item = $po->purchaseOrderItem()->create([
             'product_id' => $product->id,
@@ -141,7 +152,8 @@ class PurchaseOrderApiTest extends TestCase
         // 1. Show API
         $showRes = $this->getJson("/api/v1/purchase-orders/{$po->id}");
         $showRes->assertStatus(200)
-            ->assertJsonPath('data.po_number', $po->po_number);
+            ->assertJsonPath('data.po_number', $po->po_number)
+            ->assertJsonPath('data.warehouse_id', null);
 
         // 2. Update API
         $updatePayload = [
@@ -149,6 +161,7 @@ class PurchaseOrderApiTest extends TestCase
                 'po_number' => $po->po_number,
                 'supplier_id' => $supplier->id,
                 'cabang_id' => $po->cabang_id,
+                'warehouse_id' => $warehouse->id,
                 'order_date' => now()->format('Y-m-d'),
                 'expected_date' => now()->addDays(5)->format('Y-m-d'),
                 'top_type' => 'credit_days',
@@ -178,8 +191,12 @@ class PurchaseOrderApiTest extends TestCase
         $this->assertDatabaseHas('purchase_orders', [
             'id' => $po->id,
             'tempo_hutang' => 14,
+            'warehouse_id' => $warehouse->id,
             'note' => 'Updated via Test',
         ]);
+
+        $this->getJson("/api/v1/purchase-orders/{$po->id}")
+            ->assertJsonPath('data.warehouse_id', $warehouse->id);
     }
 
     public function test_order_request_reference_flow_mirrors_legacy_filament()
@@ -273,6 +290,7 @@ class PurchaseOrderApiTest extends TestCase
                 'po_number' => $poNumber,
                 'supplier_id' => $supplierA->id,
                 'cabang_id' => $cabang->id,
+                'warehouse_id' => $this->activeWarehouse()->id,
                 'order_date' => now()->format('Y-m-d'),
                 'refer_model_type' => 'OrderRequest',
                 'refer_model_id' => $approvedOr->id,
@@ -301,5 +319,56 @@ class PurchaseOrderApiTest extends TestCase
             'supplier_id' => $supplierA->id,
             'status' => 'approved',
         ]);
+    }
+
+    public function test_dependencies_lists_only_active_warehouses(): void
+    {
+        $active = $this->activeWarehouse(['name' => 'Gudang Aktif Uji']);
+        $inactive = $this->activeWarehouse(['name' => 'Gudang Nonaktif Uji', 'status' => 0]);
+
+        $response = $this->getJson('/api/v1/purchase-orders/dependencies')->assertStatus(200);
+
+        $ids = collect($response->json('data.warehouses'))->pluck('id');
+        $this->assertTrue($ids->contains($active->id));
+        $this->assertFalse($ids->contains($inactive->id));
+        $this->assertSame(
+            ['id', 'kode', 'name', 'cabang_id', 'cabang_nama'],
+            array_keys($response->json('data.warehouses.0'))
+        );
+    }
+
+    public function test_store_requires_warehouse_in_po_header(): void
+    {
+        $supplier = Supplier::first() ?? Supplier::create(['code' => 'SUP-01', 'perusahaan' => 'Supplier Test']);
+        $product = Product::withoutGlobalScope('product_cabang')->first() ?? Product::factory()->create();
+        $currency = Currency::first() ?? Currency::create(['name' => 'Rupiah', 'code' => 'IDR', 'symbol' => 'Rp', 'to_rupiah' => 1]);
+
+        $payload = [
+            'header' => [
+                'po_number' => 'PO-NOWH-' . time(),
+                'supplier_id' => $supplier->id,
+                'order_date' => now()->format('Y-m-d'),
+            ],
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'unit_price' => 1000,
+                'tipe_pajak' => 'none',
+                'currency_id' => $currency->id,
+            ]],
+        ];
+
+        $this->postJson('/api/v1/purchase-orders', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['header.warehouse_id' => 'Gudang tujuan wajib dipilih']);
+
+        $inactive = $this->activeWarehouse(['status' => 0]);
+        $payload['header']['warehouse_id'] = $inactive->id;
+
+        $this->postJson('/api/v1/purchase-orders', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['header.warehouse_id']);
+
+        $this->assertDatabaseMissing('purchase_orders', ['po_number' => $payload['header']['po_number']]);
     }
 }
