@@ -81,7 +81,7 @@
 
 ## 9. Status pelaksanaan
 
-**Cabang:** `feat/penjualan-t5-koreksi` — satu commit per tugas: T5.1 `d18ae61`, T5.2 `7055622`, (baseline `e8a8292`), T5.3 `c28b450`.
+**Cabang:** `feat/penjualan-t5-koreksi` — satu commit per tugas: T5.1 `d18ae61`, T5.2 `7055622`, (baseline `e8a8292`), T5.3 `c28b450`, T6.1 `9fc3fb6`, T6.2 `5ddf4f6`, T7.1 `f15b11c`, T7.2 `d341b1b`, T7.3 (commit penutup).
 Flag `sales.controls.credit_notes` **default mati**: tanpa menyalakannya tidak ada menu/aksi Nota Kredit, opsi keputusan retur "Refund / Nota Kredit" tidak ditawarkan, dan laporan tidak menambah kueri per baris (angka identik dengan perilaku lama).
 
 | Tugas | Hasil | Tes baru |
@@ -90,7 +90,13 @@ Flag `sales.controls.credit_notes` **default mati**: tanpa menyalakannya tidak a
 | T5.2 | Keputusan retur `credit` (stok & HPP tetap dari `CustomerReturnService`, tidak digandakan) + `draftFromReturn`; `SalesReportService` mengecualikan `cancelled` dan menghitung **bersih** Nota Kredit (DPP/PPN/total/qty; HPP turun hanya untuk retur fisik); Surat Jalan dari invoice `cancelled` dapat ditagih ulang | 8 |
 | T5.3 | `CreditNoteResource` (daftar + View), `CreditNotePolicy`, `CreditNoteActions` (Buat Nota Kredit, Batalkan Invoice, dari Retur, Terbitkan + No. Nota Retur Pajak + override beralasan, Hapus Draf), `CabangScope`, `DocumentLock`, kartu hub; label/filter `cancelled` di Invoice | 11 |
 
-Semua penjaga kritis diuji **mutasi** (dirusak → tes gagal → dipulihkan); 26 mutan T5.2/T5.3, semua mati setelah tes penutup ditambahkan.
+| T6.1 | Migrasi kop Cabang (`nama_legal`, `npwp`, `alamat_pajak`, `rekening` JSON); form Cabang + kop **global** di Pengaturan Aplikasi; `DocumentPrintBuilder` (Cabang → global → bawaan; kolom kosong dilewati, **tidak pernah alamat/telepon contoh**; rekening; watermark; terbilang; bingkai Invoice/DO/Kwitansi/Nota Kredit/Retur) + 5 partial Blade | 8 |
+| T6.2 | Template Invoice (kop legal+NPWP+alamat pajak, pelanggan lengkap, rekening, syarat, tanda tangan, DRAFT/DIBATALKAN, baris Nota Kredit), DO, Retur, **Kwitansi** (dari Penerimaan; templat lama yatim), **Nota Kredit** (baru), Sales Order & Quotation (kop dari cabang); rute `/pdf/credit-note`, `/pdf/customer-receipt` (diotorisasi policy); aksi Cetak; templat yatim `kwitansi-sales-order` (data contoh) dihapus | 10 |
+| T7.1 | `StatusLabels` terpusat; 11 kolom/entri status mentah diperbaiki (Invoice "unpaid"→"Belum Dibayar", Penerimaan, Konfirmasi Gudang, Penjualan Lainnya, Deposit); **pemindai** (ratchet) kolom status Filament & Blade cetak | 4 |
+| T7.2 | `RemoteSearch` + makro `Select::remoteSearch()` + `/api/v1/search/{type}` (customer, produk, SO, Quotation, Invoice, DO; ≤ 50 hasil + petunjuk; label pilihan pulih; NIK dicari tetapi tidak tampil); form Invoice tak lagi `Customer::all()+preload` / `limit(50)` produk; pemindai pola | 8 |
+| T7.3 | `ImpactPreview` (**preview = eksekusi**: `CreditNoteService::impact()/journalPlan()`, `CustomerReceiptCancellation::restoreTargets()/reversibleJournals()` dipakai bersama eksekutor) pada modal Terbitkan Nota Kredit & Batalkan Penerimaan; `DocumentActions` (D13: aksi utama + menu "Lainnya") pada View Invoice/Nota Kredit/Penerimaan/Retur; penjaga klik ganda; **N+1 daftar SO dihapus** (60 → 25 kueri; datar terhadap jumlah baris); anggaran query aksi kunci | 13 |
+
+Semua penjaga kritis diuji **mutasi** (dirusak → tes gagal → dipulihkan); 26 mutan T5.2/T5.3, 23 mutan T6, 14 mutan T7.1/T7.2, 17 mutan T7.3 — semua mati setelah tes penutup ditambahkan.
 
 ### Penyimpangan dari rencana & temuan baru
 - **Regresi T5.3 menangkap cacat T5.1**: izin `credit note` dibuat migrasi tetapi belum ada di `HelperController::listPermission()` (sumber seeder) → `PermissionsConsistencyTest` gagal; diperbaiki di T5.3. Pelajaran: tiap migrasi yang menambah izin harus menambah daftar itu.
@@ -98,8 +104,15 @@ Semua penjaga kritis diuji **mutasi** (dirusak → tes gagal → dipulihkan); 26
 - **D35 (refund tunai)** tetap lewat aksi "Kembalikan Saldo" Deposit yang sudah ada; persetujuan bertingkat refund menyusul di aksi itu.
 - **`InvoicePolicy` tetap tidak disentuh** (WIP pihak lain): aksi Nota Kredit memakai izin `create credit note` + status invoice, bukan policy Invoice.
 - **Nota Kredit tidak dapat diedit** (D36): kesalahan pada draf → hapus dan buat ulang.
+- **Data contoh pada dokumen resmi (T6)**: template Invoice/DO/Retur/SO/Quotation/Kwitansi mencetak "Jl. Contoh No. 123", "(021) 12345678", "08xx-xxxx-xxxx" — kini diganti data Cabang/global; tanpa data → baris dilewati. **Template pembelian** (`purchase-order`, `purchase-order-invoice-2`, `order-request`) masih memuat data contoh → ditandai sebagai tugas terpisah.
+- **Rute `/pdf/{type}/{id}` untuk dokumen LAMA hanya butuh login** (tanpa policy per dokumen); jenis baru (Nota Kredit, Kwitansi) sudah diotorisasi. Menyeragamkan otorisasi ditandai sebagai tugas terpisah (bisa memutus alur bila policy `view` terlalu ketat).
+- **"Tes isi teks PDF"**: yang diuji adalah HTML hasil render (sumber PDF) + bukti bahwa Dompdf membentuk PDF (`%PDF-`); pengekstrak teks PDF tidak tersedia di `vendor`. Pemeriksaan visual A4 tetap langkah Anda.
+- **Belum dikerjakan di T7**: `SearchableSelect` React remote dan API `dependencies` yang masih memuat semua customer/produk (form SO React) — mengubahnya tanpa remote-select akan **memburuk** (customer ke-N tak ditemukan); Jadwal "Selesai" masih **100 kueri** (target audit ≤ 60; anggaran menjaga agar tidak naik); `ImpactPreview` baru untuk Nota Kredit & Batalkan Penerimaan (SO Approve, DO Kirim/Selesai, Jadwal, Terbitkan Invoice menyusul); `DocumentActions` baru dipasang pada 4 View (SO/Quotation/DO sudah memakai `ActionGroup` sendiri); pemindai status menyisakan utang modul non-penjualan (Aset, QC, Bank, Pembelian, dll.).
+- Tes lama `CustomerReceiptViewPageTest` diperbarui (badge kini "Lunas", bukan "Paid") — perubahan yang dimaksudkan T7.1.
 
 ### Yang perlu Anda lakukan
 1. `php artisan migrate` (migrasi baru `2026_09_23_100000_create_credit_notes_tables`) lalu `php artisan db:seed --class=PermissionSeeder` bila izin dikelola lewat seeder.
 2. **Tinjau jurnal contoh dengan akuntan 🧾** (Nota Kredit: Dr Retur Penjualan + PPN Keluaran, Cr Piutang/Deposit) sebelum menyalakan `SALES_CONTROLS_CREDIT_NOTES=true`.
-3. UAT: retur → keputusan "Refund / Nota Kredit" → Selesaikan → Buat Nota Kredit → Terbitkan (invoice belum dibayar, sebagian, lunas) dan "Batalkan Invoice".
+3. UAT: retur → keputusan "Refund / Nota Kredit" → Selesaikan → Buat Nota Kredit → Terbitkan (invoice belum dibayar, sebagian, lunas) dan "Batalkan Invoice"; periksa pratinjau dampak pada modal Terbitkan/Batalkan Penerimaan.
+4. `php artisan migrate` (tambahan: `2026_09_24_100000_add_letterhead_columns_to_cabangs_table`); isi **Kop Dokumen** tiap Cabang (nama legal, NPWP, alamat pajak, rekening) atau kop global di Pengaturan Aplikasi, lalu **periksa visual A4** Invoice, DO, Kwitansi, Nota Kredit, Retur (termasuk watermark DRAFT/DIBATALKAN) 🧾.
+5. Ukur di UAT: waktu Jadwal "Selesai" dan pencarian customer/produk ke-500 (data UAT tidak ada di DB dev).

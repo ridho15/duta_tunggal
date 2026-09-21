@@ -40,7 +40,7 @@ class CreditNoteActions
     /** "Buat Nota Kredit" dari Invoice: pilih jenis (koreksi/retur/pembatalan), kuantitas per baris, biaya kirim, alasan. */
     public static function create($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label('Buat Nota Kredit')
             ->icon('heroicon-o-receipt-refund')
             ->color('warning')
@@ -104,7 +104,7 @@ class CreditNoteActions
     /** "Batalkan Invoice" — pintasan: Nota Kredit pembatalan PENUH (D39); invoice menjadi Dibatalkan saat Nota Kredit diterbitkan. */
     public static function cancelInvoice($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label('Batalkan Invoice')
             ->icon('heroicon-o-no-symbol')
             ->color('danger')
@@ -134,7 +134,7 @@ class CreditNoteActions
     /** "Buat Nota Kredit dari Retur" (D38): item berkeputusan "Refund / Nota Kredit". */
     public static function fromReturn($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label('Buat Nota Kredit')
             ->icon('heroicon-o-receipt-refund')
             ->color('warning')
@@ -164,12 +164,12 @@ class CreditNoteActions
     /** "Terbitkan": jurnal cermin + piutang/Deposit; nomor Nota Retur Pajak opsional; override beralasan bila menyetujui buatan sendiri. */
     public static function issue($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label('Terbitkan')
             ->icon('heroicon-o-check-badge')
             ->color('success')
             ->modalHeading('Terbitkan Nota Kredit')
-            ->modalDescription('Jurnal cermin diposting, piutang dikurangi (kelebihan yang sudah dibayar menjadi Deposit Customer). Setelah terbit Nota Kredit FINAL; koreksi dengan Nota Kredit baru.')
+            ->modalDescription(fn (CreditNote $record) => app(\App\Services\ImpactPreview::class)->html(app(\App\Services\ImpactPreview::class)->creditNoteIssue($record)))
             ->modalSubmitActionLabel('Ya, Terbitkan')
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
             ->form(fn (CreditNote $record): array => array_merge([
@@ -198,7 +198,7 @@ class CreditNoteActions
     /** "Isi No. Nota Retur Pajak" pada Nota Kredit yang sudah terbit (metadata saja). */
     public static function taxDocumentNumber($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label(fn (CreditNote $record): string => filled($record->tax_document_number) ? 'Ubah No. Nota Retur Pajak' : 'Isi No. Nota Retur Pajak')
             ->icon('heroicon-o-document-text')
             ->color('gray')
@@ -220,7 +220,7 @@ class CreditNoteActions
     /** "Hapus Draf" — hanya draf; yang terbit final (D36). */
     public static function deleteDraft($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label('Hapus Draf')
             ->icon('heroicon-o-trash')
             ->color('danger')

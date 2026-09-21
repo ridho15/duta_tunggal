@@ -27,6 +27,12 @@ class ViewCustomerReceipt extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        return \App\Filament\Support\DocumentActions::layout($this->headerActionList(), ['edit', 'view_journal_entries', 'cancel_receipt']);
+    }
+
+    /** Daftar lengkap aksi header; pengelompokan utama/"Lainnya" oleh DocumentActions (D13). */
+    private function headerActionList(): array
+    {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil')->color('warning'),
             \App\Filament\Support\CustomerReceiptActions::cancel(Action::make('cancel_receipt')),

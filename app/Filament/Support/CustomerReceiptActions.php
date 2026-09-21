@@ -15,13 +15,13 @@ class CustomerReceiptActions
 {
     public static function cancel($action)
     {
-        return $action
+        return \App\Filament\Support\DocumentActions::guard($action)
             ->label('Batalkan Penerimaan')
             ->icon('heroicon-o-no-symbol')
             ->color('danger')
             ->requiresConfirmation()
             ->modalHeading('Batalkan Penerimaan')
-            ->modalDescription('Jurnal penerimaan dibalik (entri cermin, dokumen asli tetap tersimpan), piutang dan status invoice dikembalikan. Tidak dapat dibatalkan dua kali.')
+            ->modalDescription(fn (CustomerReceipt $record) => app(\App\Services\ImpactPreview::class)->html(app(\App\Services\ImpactPreview::class)->receiptCancellation($record)))
             ->modalSubmitActionLabel('Ya, Batalkan Penerimaan')
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
             ->form([

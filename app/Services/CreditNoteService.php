@@ -241,9 +241,10 @@ class CreditNoteService
                 }
             }
 
-            $total = round((float) $locked->total, 2);
-            $applyToAr = round(min($total, max(0.0, (float) $ar->remaining)), 2);
-            $toDeposit = round($total - $applyToAr, 2);
+            $impact = $this->impact($locked, $invoice, $ar);
+            $total = $impact['total'];
+            $applyToAr = $impact['apply_to_ar'];
+            $toDeposit = $impact['to_deposit'];
 
             $this->postJournal($locked, $invoice, $applyToAr, $toDeposit, $actor);
             $this->applyToReceivable($ar, $invoice, $total, $applyToAr, $toDeposit);
@@ -261,6 +262,45 @@ class CreditNoteService
 
             return $locked->refresh();
         });
+    }
+
+    /**
+     * Dampak PENERBITAN (fungsi murni): dipakai `issue()` DAN pratinjau modal (ImpactPreview) sehingga pesan tidak pernah berbeda dari hasil nyata.
+     * Bagian piutang = min(total, sisa piutang); kelebihan → Deposit Customer; status invoice sesudahnya.
+     *
+     * @return array{total: float, apply_to_ar: float, to_deposit: float, ar_after: array{total: float, paid: float, remaining: float}, invoice_status_after: ?string, fully_credited: bool}
+     */
+    public function impact(CreditNote $creditNote, Invoice $invoice, AccountReceivable $ar): array
+    {
+        $total = round((float) $creditNote->total, 2);
+        $applyToAr = round(min($total, max(0.0, (float) $ar->remaining)), 2);
+        $toDeposit = round($total - $applyToAr, 2);
+
+        $after = [
+            'total' => max(0.0, (float) $ar->total - $total),
+            'paid' => max(0.0, (float) $ar->paid - $toDeposit),
+            'remaining' => max(0.0, (float) $ar->remaining - $applyToAr),
+        ];
+        $creditedAfter = (float) CreditNote::query()->where('invoice_id', $invoice->id)->where('status', CreditNote::STATUS_ISSUED)->where('id', '!=', $creditNote->id)->sum('total') + $total;
+        $status = $this->statusAfter($invoice, $creditedAfter, $after['remaining'], $after['paid']);
+
+        return [
+            'total' => $total, 'apply_to_ar' => $applyToAr, 'to_deposit' => $toDeposit, 'ar_after' => $after,
+            'invoice_status_after' => $status, 'fully_credited' => $status === 'cancelled',
+        ];
+    }
+
+    /** Status invoice sesudah Nota Kredit: penuh dikreditkan → cancelled; piutang habis → paid; masih ada pembayaran → partially_paid; selain itu null (tidak berubah). */
+    private function statusAfter(Invoice $invoice, float $creditedTotal, float $remaining, float $paid): ?string
+    {
+        if ($creditedTotal >= (float) $invoice->total - self::EPS) {
+            return 'cancelled';
+        }
+        if ($remaining <= self::EPS) {
+            return 'paid';
+        }
+
+        return $paid > 0 ? 'partially_paid' : null;
     }
 
     // ------------------------------------------------------------------ internal
@@ -320,7 +360,14 @@ class CreditNoteService
         return max(0.0, round((float) $invoice->other_fee_total - $creditedFee, 2));
     }
 
-    private function postJournal(CreditNote $creditNote, Invoice $invoice, float $applyToAr, float $toDeposit, User $actor): void
+    /**
+     * Rencana jurnal penerbitan (murni; tanpa menulis): dipakai `postJournal()` DAN pratinjau modal.
+     *
+     * @return array<int, array{coa_id: int, description: string, debit: float, credit: float}>
+     *
+     * @throws \RuntimeException akun belum diatur / jurnal tidak seimbang
+     */
+    public function journalPlan(CreditNote $creditNote, Invoice $invoice, float $applyToAr, float $toDeposit): array
     {
         $settings = app(AccountingSettings::class);
         $arCoa = ($invoice->arCoa?->exists ? $invoice->arCoa : null) ?? $settings->first('accounts_receivable');
@@ -331,10 +378,6 @@ class CreditNoteService
         if (! $arCoa) {
             throw new \RuntimeException('Akun Piutang Dagang tidak ditemukan; atur di Pengaturan Akuntansi.');
         }
-
-        $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
-        $rate = (float) ($invoice->exchange_rate ?: 1);
-        $rate = $rate > 0 ? $rate : 1.0;
 
         $entries = [];
         $push = function (?ChartOfAccount $coa, string $description, float $debit, float $credit, string $missing) use (&$entries) {
@@ -372,6 +415,16 @@ class CreditNoteService
         if (abs($debit - $credit) > self::EPS) {
             throw new \RuntimeException("Jurnal Nota Kredit {$creditNote->credit_note_number} tidak seimbang (debit {$debit} ≠ kredit {$credit}); dibatalkan.");
         }
+
+        return $entries;
+    }
+
+    private function postJournal(CreditNote $creditNote, Invoice $invoice, float $applyToAr, float $toDeposit, User $actor): void
+    {
+        $entries = $this->journalPlan($creditNote, $invoice, $applyToAr, $toDeposit);
+        $currencyId = is_numeric($invoice->currency_id ?? null) ? (int) $invoice->currency_id : CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
+        $rate = (float) ($invoice->exchange_rate ?: 1);
+        $rate = $rate > 0 ? $rate : 1.0;
 
         foreach ($entries as $entry) {
             JournalEntry::create($entry + [
@@ -436,20 +489,14 @@ class CreditNoteService
     private function finalizeInvoice(Invoice $invoice, AccountReceivable $ar, CreditNote $creditNote): void
     {
         $creditedTotal = (float) CreditNote::query()->where('invoice_id', $invoice->id)->where('status', CreditNote::STATUS_ISSUED)->sum('total');
-        $fully = $creditedTotal >= (float) $invoice->total - self::EPS;
+        $status = $this->statusAfter($invoice, $creditedTotal, (float) $ar->remaining, (float) $ar->paid);
 
-        if ($fully) {
+        if ($status === 'cancelled') {
             $invoice->forceFill([
                 'status' => 'cancelled', 'cancelled_at' => now(), 'cancelled_by' => $creditNote->issued_by, 'cancel_reason' => $creditNote->reason,
             ])->saveQuietly();
-
-            return;
-        }
-
-        if ($ar->remaining <= self::EPS) {
-            $invoice->forceFill(['status' => 'paid'])->saveQuietly();
-        } elseif ((float) $ar->paid > 0) {
-            $invoice->forceFill(['status' => 'partially_paid'])->saveQuietly();
+        } elseif ($status !== null) {
+            $invoice->forceFill(['status' => $status])->saveQuietly();
         }
     }
 

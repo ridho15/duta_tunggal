@@ -121,8 +121,14 @@ class SaleOrderResource extends Resource
 
     protected static function resolveDefaultCurrencyId(): ?int
     {
-        return CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
-            ?? Currency::query()->orderBy('id')->value('id');
+        // T7.3: dicari sekali per permintaan (disimpan di container; daftar SO memanggilnya per baris → N+1 mata uang)
+        if (! app()->bound('sales.default_currency_id')) {
+            app()->instance('sales.default_currency_id', [
+                CurrencyConversionResolver::resolveCurrencyIdByCode('IDR') ?? Currency::query()->orderBy('id')->value('id'),
+            ]);
+        }
+
+        return app('sales.default_currency_id')[0];
     }
 
     protected static function resolveCurrencySymbol(?int $currencyId): string
@@ -1768,7 +1774,7 @@ class SaleOrderResource extends Resource
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 // Additional eager loading for table display
-                return $query->with(['customer', 'saleOrderItem.product', 'saleOrderItem.warehouseAllocations']);
+                return $query->with(['customer', 'saleOrderItem.product', 'saleOrderItem.warehouseAllocations', 'saleOrderItem.purchaseOrderItem', 'deliveryOrder:delivery_orders.id,delivery_orders.status']);
             })
             ->recordClasses(function (SaleOrder $record, $livewire): string {
                 $classes = [static::statusRowClass($record->status)];
@@ -1943,6 +1949,11 @@ class SaleOrderResource extends Resource
                             }
 
                             // Untuk Kirim Langsung: perlu Delivery Order completed
+                            // T7.3: memakai relasi yang sudah dimuat di daftar (tanpa satu kueri per baris)
+                            if ($record->relationLoaded('deliveryOrder')) {
+                                return $record->deliveryOrder->contains(fn ($deliveryOrder) => $deliveryOrder->status === 'completed');
+                            }
+
                             return $record->deliveryOrder()->where('status', 'completed')->exists();
                         })
                         ->color('success')
@@ -2010,6 +2021,11 @@ class SaleOrderResource extends Resource
                         ->visible(function ($record) {
                             if (!Auth::user()->hasPermissionTo('create purchase order')) {
                                 return false;
+                            }
+
+                            // T7.3: memakai relasi yang sudah dimuat di daftar (tanpa satu kueri per baris)
+                            if ($record->relationLoaded('saleOrderItem') && $record->saleOrderItem->every(fn ($item) => $item->relationLoaded('purchaseOrderItem'))) {
+                                return $record->saleOrderItem->contains(fn ($item) => $item->purchaseOrderItem->isEmpty());
                             }
 
                             return $record->saleOrderItem()

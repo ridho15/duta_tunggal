@@ -82,15 +82,43 @@ class CustomerReceiptCancellation
         return $receipt->refresh();
     }
 
-    /** Entri cermin (debit↔kredit) untuk semua jurnal penerimaan yang belum dibalik; yang asli ditandai sudah dibalik. */
-    private function reverseJournals(CustomerReceipt $receipt): void
+    /** Jurnal penerimaan yang akan dibalik (dipakai eksekusi DAN pratinjau dampak). */
+    public function reversibleJournals(CustomerReceipt $receipt): \Illuminate\Support\Collection
     {
-        $originals = JournalEntry::withoutGlobalScopes()
+        return JournalEntry::withoutGlobalScopes()
             ->where('source_type', CustomerReceipt::class)
             ->where('source_id', $receipt->id)
             ->where('is_reversal', false)
             ->whereNull('reversal_of_transaction_id')
             ->get();
+    }
+
+    /**
+     * Piutang yang dikembalikan saat pembatalan: [invoice_id, jumlah IDR] per rincian penerimaan (dipakai eksekusi DAN pratinjau dampak).
+     *
+     * @return array<int, array{invoice_id: int, amount: float}>
+     */
+    public function restoreTargets(CustomerReceipt $receipt): array
+    {
+        $targets = [];
+        foreach ($receipt->customerReceiptItem()->get() as $item) {
+            $selected = $item->selected_invoices;
+            $invoiceIds = ! empty($selected)
+                ? array_values(array_unique(array_filter(array_map('intval', is_array($selected) ? $selected : (json_decode($selected, true) ?? [])))))
+                : array_filter([(int) ($item->invoice_id ?? $receipt->invoice_id)]);
+
+            foreach ($invoiceIds as $invoiceId) {
+                $targets[] = ['invoice_id' => (int) $invoiceId, 'amount' => (float) ($item->amount_idr ?: $item->amount), 'exchange_rate' => (float) ($item->exchange_rate ?? 1)];
+            }
+        }
+
+        return $targets;
+    }
+
+    /** Entri cermin (debit↔kredit) untuk semua jurnal penerimaan yang belum dibalik; yang asli ditandai sudah dibalik. */
+    private function reverseJournals(CustomerReceipt $receipt): void
+    {
+        $originals = $this->reversibleJournals($receipt);
 
         if ($originals->isEmpty()) {
             return;
@@ -132,41 +160,34 @@ class CustomerReceiptCancellation
 
     private function restoreAccountReceivables(CustomerReceipt $receipt): void
     {
-        foreach ($receipt->customerReceiptItem()->get() as $item) {
-            $selected = $item->selected_invoices;
-            $invoiceIds = ! empty($selected)
-                ? array_values(array_unique(array_filter(array_map('intval', is_array($selected) ? $selected : (json_decode($selected, true) ?? [])))))
-                : array_filter([(int) ($item->invoice_id ?? $receipt->invoice_id)]);
+        foreach ($this->restoreTargets($receipt) as $target) {
+            $ar = AccountReceivable::where('invoice_id', $target['invoice_id'])->lockForUpdate()->first();
+            if (! $ar) {
+                continue;
+            }
 
-            foreach ($invoiceIds as $invoiceId) {
-                $ar = AccountReceivable::where('invoice_id', $invoiceId)->lockForUpdate()->first();
-                if (! $ar) {
-                    continue;
-                }
+            $amountIdr = $target['amount'];
+            $rate = (float) ($ar->exchange_rate ?? $target['exchange_rate'] ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
 
-                $amountIdr = (float) ($item->amount_idr ?: $item->amount);
-                $rate = (float) ($ar->exchange_rate ?? $item->exchange_rate ?? 1);
-                $rate = $rate > 0 ? $rate : 1.0;
+            $ar->paid = max(0.0, (float) $ar->paid - $amountIdr);
+            $ar->remaining = (float) $ar->remaining + $amountIdr;
+            $ar->paid_original = round((float) $ar->paid / $rate, 4);
+            $ar->remaining_original = round(max(0, (float) $ar->remaining) / $rate, 4);
+            $ar->status = $ar->remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
+            $ar->save();
 
-                $ar->paid = max(0.0, (float) $ar->paid - $amountIdr);
-                $ar->remaining = (float) $ar->remaining + $amountIdr;
-                $ar->paid_original = round((float) $ar->paid / $rate, 4);
-                $ar->remaining_original = round(max(0, (float) $ar->remaining) / $rate, 4);
-                $ar->status = $ar->remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
-                $ar->save();
+            $invoice = $ar->invoice;
+            if ($invoice) {
+                $invoice->update(['status' => $ar->paid > 0 ? 'partially_paid' : 'unpaid']);
 
-                $invoice = $ar->invoice;
-                if ($invoice) {
-                    $invoice->update(['status' => $ar->paid > 0 ? 'partially_paid' : 'unpaid']);
-
-                    if ($ar->remaining > 0 && ! $ar->ageingSchedule()->exists()) {
-                        $days = ($invoice->invoice_date && $invoice->due_date)
-                            ? Carbon::parse($invoice->invoice_date)->diffInDays(Carbon::parse($invoice->due_date))
-                            : 0;
-                        $ar->ageingSchedule()->create([
-                            'invoice_date' => $invoice->invoice_date, 'due_date' => $invoice->due_date, 'days_outstanding' => $days, 'bucket' => 'Current',
-                        ]);
-                    }
+                if ($ar->remaining > 0 && ! $ar->ageingSchedule()->exists()) {
+                    $days = ($invoice->invoice_date && $invoice->due_date)
+                        ? Carbon::parse($invoice->invoice_date)->diffInDays(Carbon::parse($invoice->due_date))
+                        : 0;
+                    $ar->ageingSchedule()->create([
+                        'invoice_date' => $invoice->invoice_date, 'due_date' => $invoice->due_date, 'days_outstanding' => $days, 'bucket' => 'Current',
+                    ]);
                 }
             }
         }

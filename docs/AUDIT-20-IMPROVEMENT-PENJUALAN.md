@@ -517,6 +517,8 @@ Partial kop/TTD/rekening/meta, `DocumentPrintBuilder`, template Invoice, DO, Kwi
 
 Setiap butir usulan dipecah menjadi deliverable yang dapat dicentang. **Tidak ada usulan yang dianggap selesai sebelum semua deliverable-nya tercentang beserta tesnya.**
 
+**Status per 22 September 2026:** baris T0–T4 tercatat di `docs/PLAN-T2-STOK-PENGIRIMAN.md` §11 dan `docs/PLAN-T3-T4-PENJUALAN.md` §9; T5–T7 di `docs/PLAN-T5-T7-PENJUALAN.md` §9. Tanda: ☑ selesai · ◐ sebagian (catatan di baris) · ☐ belum.
+
 | # | Deliverable | Tahap | ☐ |
 |---|---|---|---|
 | 1 | X1: konsumsi/lepas reservasi + `stock:reconcile-reservations` | T2 | ☐ |
@@ -532,13 +534,13 @@ Setiap butir usulan dipecah menjadi deliverable yang dapat dicentang. **Tidak ad
 | 3 | Jadwal mengikuti (Mulai dulu; selesai hanya dari on_the_way) | T2 | ☐ |
 | 3 | `delivery-orders:resync-item-status` | T2 | ☐ |
 | 3 | Larangan stok negatif saat `sent` | T2 | ☐ |
-| 4 | Keputusan retur "Refund / Nota Kredit" + batas qty | T5 | ☐ |
-| 4 | Jurnal retur Dr Retur+PPN / Cr Piutang (tanpa gandakan HPP/stok) | T5 | ☐ |
-| 4 | Refund tunai lewat pengajuan berapproval | T5 | ☐ |
-| 5 | Tabel/model/nomor Nota Kredit; status `canceled` | T5 | ☐ |
-| 5 | Pembatalan penuh + koreksi sebagian + jurnal balik | T5 | ☐ |
-| 5 | Invoice terbayar → deposit/refund; AR tak negatif | T5 | ☐ |
-| 5 | Laporan & filter mengenali `canceled`/nota kredit | T5 | ☐ |
+| 4 | Keputusan retur "Refund / Nota Kredit" + batas qty | T5 | ☑ |
+| 4 | Jurnal retur Dr Retur+PPN / Cr Piutang (tanpa gandakan HPP/stok) | T5 | ☑ |
+| 4 | Refund tunai lewat pengajuan berapproval | T5 | ◐ *(lewat "Kembalikan Saldo" Deposit; approval bertingkat refund menyusul)* |
+| 5 | Tabel/model/nomor Nota Kredit; status `canceled` | T5 | ☑ |
+| 5 | Pembatalan penuh + koreksi sebagian + jurnal balik | T5 | ☑ |
+| 5 | Invoice terbayar → deposit/refund; AR tak negatif | T5 | ☑ |
+| 5 | Laporan & filter mengenali `canceled`/nota kredit | T5 | ☑ |
 | 6 | `approval_rules` + `canApprove()` generik untuk Quotation & SO | T3 | ☐ |
 | 6 | Penegakan di service + override beralasan tercatat | T3 | ☐ |
 | 7 | Kebijakan kredit per tipe + limit 0 ≠ tak terbatas | T3 | ☐ |
@@ -553,24 +555,24 @@ Setiap butir usulan dipecah menjadi deliverable yang dapat dicentang. **Tidak ad
 | 9 | Hapus COA bebas (Deposit, Penyesuaian, Penjualan Lain, item SO/invoice) | T3 | ☐ |
 | 9 | `master:readiness` diperluas | T3 | ☐ |
 | 10 | Referensi + bukti + bank + peringatan duplikat | T1 | ☑ |
-| 11 | Partial kop/TTD/rekening + `DocumentPrintBuilder` | T6 | ☐ |
-| 11 | Templat Invoice, DO, Kwitansi, Nota Kredit, Retur | T6 | ☐ |
-| 11 | Watermark DRAFT/DIBATALKAN + tes isi PDF | T6 | ☐ |
+| 11 | Partial kop/TTD/rekening + `DocumentPrintBuilder` | T6 | ☑ |
+| 11 | Templat Invoice, DO, Kwitansi, Nota Kredit, Retur | T6 | ☑ |
+| 11 | Watermark DRAFT/DIBATALKAN + tes isi PDF | T6 | ☑ *(tes pada HTML sumber PDF + PDF terbentuk; cek visual A4 = Anda)* |
 | 12 | `DocumentNumberService` + `document_sequences` (atomik) | T4 | ☐ |
 | 12 | Migrasi semua generator + kode invoice pajak/non-pajak Cabang | T4 | ☐ |
 | 12 | `documents:check-numbering` | T4 | ☐ |
 | 13 | Faktur pajak: form/View/daftar/PDF/filter/ekspor | T1 | ☑ *(ekspor ditunda — K-D)* |
-| 14 | `DocumentActions` + penerapan View & tabel | T7 | ☐ |
+| 14 | `DocumentActions` + penerapan View & tabel | T7 | ◐ *(4 View: Invoice, Nota Kredit, Penerimaan, Retur; SO/Quotation/DO/tabel menyusul)* |
 | 15 | `lang/id/*` (validation dkk.) | T1 | ☑ |
-| 15 | `StatusLabels` terpusat + 25 kolom + pemindai bahasa | T7 | ☐ |
-| 16 | `ImpactPreview` (preview = eksekusi) + modal berdampak | T7 | ☐ |
-| 16 | Konfirmasi untuk Invoice/Penerimaan/Nota Kredit/Retur | T7 | ☐ |
-| 17 | Endpoint pencarian sisi-server + macro Filament + React remote | T7 | ☐ |
-| 17 | Hapus `Customer::all()+preload`, "muat semua" API, `limit(50)` quotation | T7 | ☐ |
+| 15 | `StatusLabels` terpusat + 25 kolom + pemindai bahasa | T7 | ☑ *(penjualan/keuangan penjualan; utang modul non-penjualan tercatat di pemindai)* |
+| 16 | `ImpactPreview` (preview = eksekusi) + modal berdampak | T7 | ◐ *(Nota Kredit & Batalkan Penerimaan; SO Approve, DO, Jadwal, Terbitkan Invoice menyusul)* |
+| 16 | Konfirmasi untuk Invoice/Penerimaan/Nota Kredit/Retur | T7 | ◐ *(Nota Kredit & Penerimaan)* |
+| 17 | Endpoint pencarian sisi-server + macro Filament + React remote | T7 | ◐ *(endpoint + makro selesai; React remote menyusul)* |
+| 17 | Hapus `Customer::all()+preload`, "muat semua" API, `limit(50)` quotation | T7 | ◐ *(form Invoice + pemindai; API `dependencies` menyusul)* |
 | 18 | Label SO/DO/Quotation informatif; nilai DO via `LineAmounts`; kolom Sisa Qty | T1 | ☑ |
 | 18 | Info stok/limit/sisa di tempat relevan | T7 | ☐ |
 | 19 | Profiler request + `perf:report` + panduan env/opcache | T1 | ☑ |
-| 19 | Anggaran query, hapus N+1, antrean, penjaga klik ganda | T7 | ☐ |
+| 19 | Anggaran query, hapus N+1, antrean, penjaga klik ganda | T7 | ◐ *(anggaran query + N+1 daftar SO + penjaga klik ganda; Jadwal Selesai 100 → target ≤ 60 dan antrean menyusul)* |
 | 20 | `customers:audit-duplicates` (read-only) | T1 | ☑ |
 | 20 | `customers:merge` + cadangan + uji sebelum/sesudah | T4 | ☐ |
 | 20 | Kode `CUST-…`, `legacy_code`, NIK keluar dari kode | T4 | ☐ |

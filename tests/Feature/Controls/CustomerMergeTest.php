@@ -83,10 +83,12 @@ it('verifikasi sebelum/sesudah membatalkan penggabungan bila ada tabel yang tida
     [$ctx, $a, $b] = mrgScenario();
     // Simulasikan dokumen yang "tidak terpindah": tambahkan tabel ke daftar via pemantau yang mengembalikan customer_id ke B di tengah jalan
     $fired = false;
-    \Illuminate\Support\Facades\DB::listen(function ($query) use ($b, &$fired) {
+    $stragglerId = (int) \Illuminate\Support\Facades\DB::table('sale_orders')->where('customer_id', $b->id)->value('id');   // SO milik B pada skenario ini (bukan baris sisa tes lain)
+    expect($stragglerId)->toBeGreaterThan(0);
+    \Illuminate\Support\Facades\DB::listen(function ($query) use ($b, $stragglerId, &$fired) {
         if (! $fired && str_contains($query->sql, 'update `sale_orders` set `customer_id`')) {
             $fired = true;   // hanya sekali (pemantau memicu kueri lagi)
-            \Illuminate\Support\Facades\DB::table('sale_orders')->limit(1)->update(['customer_id' => $b->id]);   // satu SO "tercecer" kembali ke B
+            \Illuminate\Support\Facades\DB::table('sale_orders')->where('id', $stragglerId)->update(['customer_id' => $b->id]);   // satu SO "tercecer" kembali ke B
         }
     });
 

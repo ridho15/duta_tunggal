@@ -21,6 +21,12 @@ class ViewCreditNote extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        return \App\Filament\Support\DocumentActions::layout($this->headerActionList(), ['print_credit_note', 'view_journal_entries', 'delete_draft']);
+    }
+
+    /** Daftar lengkap aksi header; pengelompokan utama/"Lainnya" oleh DocumentActions (D13). */
+    private function headerActionList(): array
+    {
         return [
             CreditNoteActions::issue(Action::make('issue')),
             CreditNoteActions::taxDocumentNumber(Action::make('tax_document_number')),
