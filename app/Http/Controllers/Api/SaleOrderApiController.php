@@ -194,9 +194,10 @@ class SaleOrderApiController extends Controller
     /**
      * Generate fresh SO Number.
      */
-    public function generateNumber(): JsonResponse
+    public function generateNumber(Request $request): JsonResponse
     {
-        $soNumber = $this->salesOrderService->generateSoNumber();
+        // T4.1: kode cabang pada nomor mengikuti cabang SO yang dipilih (bila dikirim), selain itu cabang pengguna.
+        $soNumber = $this->salesOrderService->generateSoNumber($request->integer('cabang_id') ?: null);
         return response()->json([
             'success' => true,
             'data' => [

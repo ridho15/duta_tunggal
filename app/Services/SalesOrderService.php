@@ -419,8 +419,13 @@ class SalesOrderService
         return $saleOrder;
     }
 
-    public function generateSoNumber()
+    public function generateSoNumber(?int $cabangId = null)
     {
+        // T4.1 (flag central_numbering): penomoran terpusat SO-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
+        if (DocumentNumberService::enabled()) {
+            return app(DocumentNumberService::class)->next('sale_order', $cabangId);
+        }
+
         $prefix = 'SO-';
 
         // Find the highest existing sequence number globally (ignoring branch scopes)

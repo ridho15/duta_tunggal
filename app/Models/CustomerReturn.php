@@ -143,8 +143,13 @@ class CustomerReturn extends Model
      * Generate a unique sequential return number.
      * Format: CR-YYYY-NNNN (e.g. CR-2026-0001)
      */
-    public static function generateReturnNumber(): string
+    public static function generateReturnNumber(?int $cabangId = null): string
     {
+        // T4.1 (flag central_numbering): penomoran terpusat CR-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
+        if (\App\Services\DocumentNumberService::enabled()) {
+            return app(\App\Services\DocumentNumberService::class)->next('customer_return', $cabangId);
+        }
+
         $year   = now()->format('Y');
         $prefix = "CR-{$year}-";
 

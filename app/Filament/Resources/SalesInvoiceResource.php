@@ -248,7 +248,7 @@ class SalesInvoiceResource extends Resource
                                             ->tooltip('Generate Invoice Number')
                                             ->action(function ($set, $get) {
                                                 $invoiceService = app(InvoiceService::class);
-                                                $set('invoice_number', $invoiceService->generateInvoiceNumber());
+                                                $set('invoice_number', $invoiceService->generateSalesInvoiceNumber());
                                             })
                                     )
                                     ->maxLength(255),

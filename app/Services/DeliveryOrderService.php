@@ -167,8 +167,13 @@ class DeliveryOrderService
     /**
      * Static version so models / observers can call it without injecting the service.
      */
-    public static function generateStaticDoNumber(): string
+    public static function generateStaticDoNumber(?int $cabangId = null): string
     {
+        // T4.1 (flag central_numbering): penomoran terpusat DO-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
+        if (DocumentNumberService::enabled()) {
+            return app(DocumentNumberService::class)->next('delivery_order', $cabangId);
+        }
+
         $date   = now()->format('Ymd');
         $prefix = 'DO-' . $date . '-';
 

@@ -18,8 +18,13 @@ class DeliveryScheduleService
         return static::generateStaticScheduleNumber();
     }
 
-    public static function generateStaticScheduleNumber(): string
+    public static function generateStaticScheduleNumber(?int $cabangId = null): string
     {
+        // T4.1 (flag central_numbering): penomoran terpusat SCH-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
+        if (DocumentNumberService::enabled()) {
+            return app(DocumentNumberService::class)->next('delivery_schedule', $cabangId);
+        }
+
         $date   = now()->format('Ymd');
         $prefix = 'SCH-' . $date . '-';
 

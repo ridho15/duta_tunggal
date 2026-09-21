@@ -265,7 +265,7 @@ class SaleOrderObserver
         ]);
 
         // FIX #4: Use InvoiceService for proper sequential invoice number generation.
-        $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateSalesInvoiceNumber($saleOrder->cabang_id ? (int) $saleOrder->cabang_id : null);
 
         $invoiceData = [
             'invoice_number' => $invoiceNumber,

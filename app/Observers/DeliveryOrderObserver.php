@@ -429,7 +429,7 @@ class DeliveryOrderObserver
         }
 
         $grandTotal = round($lineTotals + $additionalCosts, 2);
-        $invoiceNumber = (new \App\Services\InvoiceService())->generateInvoiceNumber();
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateSalesInvoiceNumber($deliveryOrder->cabang_id ? (int) $deliveryOrder->cabang_id : null, ($tipePajak ?? 'none') !== 'none');
 
         $invoiceData = [
             'invoice_number' => $invoiceNumber,

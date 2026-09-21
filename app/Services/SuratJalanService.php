@@ -18,8 +18,13 @@ class SuratJalanService
     public const MIN_CANCEL_REASON_LENGTH = 5;
 
     /** SJ-YYYYMMDD-0001, berurutan per hari (dihitung dari nomor terbesar, bukan acak). */
-    public function generateCode(): string
+    public function generateCode(?int $cabangId = null): string
     {
+        // T4.1 (flag central_numbering): penomoran terpusat SJ-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
+        if (DocumentNumberService::enabled()) {
+            return app(DocumentNumberService::class)->next('surat_jalan', $cabangId);
+        }
+
         return SequentialNumberGenerator::generate('surat_jalans', 'sj_number', 'SJ-', 4, 'Ymd');
     }
 

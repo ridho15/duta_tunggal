@@ -169,8 +169,13 @@ class QuotationService
         return $overdue;
     }
 
-    public function generateCode()
+    public function generateCode(?int $cabangId = null)
     {
+        // T4.1 (flag central_numbering): penomoran terpusat QO-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
+        if (DocumentNumberService::enabled()) {
+            return app(DocumentNumberService::class)->next('quotation', $cabangId);
+        }
+
         $date = now()->format('Ymd');
         $prefix = 'QO-' . $date . '-';
 

@@ -12,6 +12,23 @@ class InvoiceService
      * if the candidate already exists in the DB, the counter is incremented until
      * a genuinely free slot is found.
      */
+    /**
+     * Nomor invoice PENJUALAN (T4.1): flag `central_numbering` hidup → INV-{KODECABANG}-{YYMM}-{SEQ4} (invoice pajak/non-pajak memakai kode
+     * Cabang bila $taxable diketahui); flag mati → nomor lama. `generateInvoiceNumber()` tetap format lama (juga dipakai jalur pembelian).
+     */
+    public function generateSalesInvoiceNumber(?int $cabangId = null, ?bool $taxable = null): string
+    {
+        if (DocumentNumberService::enabled()) {
+            return app(DocumentNumberService::class)->next(match ($taxable) {
+                true => 'invoice_tax',
+                false => 'invoice_non_tax',
+                default => 'invoice',
+            }, $cabangId);
+        }
+
+        return $this->generateInvoiceNumber();
+    }
+
     public function generateInvoiceNumber(): string
     {
         $date = now()->format('Ymd');
