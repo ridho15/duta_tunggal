@@ -15,6 +15,7 @@ class EditDeliverySchedule extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         app(DeliveryScheduleService::class)->validateSender($data, 'data.');
+        app(DeliveryScheduleService::class)->validateStatusChange($this->record, (string) ($data['status'] ?? $this->record->status), 'data.');
 
         return $data;
     }

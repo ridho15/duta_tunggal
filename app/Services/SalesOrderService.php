@@ -330,10 +330,17 @@ class SalesOrderService
 
     public function completed($saleOrder)
     {
-        return $saleOrder->update([
-            'status' => 'completed',
-            'completed_at' => Carbon::now()
-        ]);
+        try {
+            return $saleOrder->update([
+                'status' => 'completed',
+                'completed_at' => Carbon::now()
+            ]);
+        } catch (\App\Exceptions\DeliveryOrderTransitionException $e) {
+            // T2.3 (D15): stok fisik "Ambil Sendiri" tidak cukup
+            Notification::make()->title('Penyelesaian Ditolak: Stok Kurang')->body($e->getMessage())->danger()->send();
+
+            throw ValidationException::withMessages(['stock' => $e->getMessage()]);
+        }
     }
 
     public function createPurchaseOrder($saleOrder, $data)

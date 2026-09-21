@@ -61,6 +61,9 @@ class DeliverySchedule extends Model
         'scheduled_date' => 'datetime',
     ];
 
+    /** Alasan pengiriman gagal (tidak disimpan) — diteruskan ke DO terkait saat jadwal ditandai Gagal (T2.3, D20). */
+    public ?string $transitionReason = null;
+
     public function driver()
     {
         return $this->belongsTo(Driver::class, 'driver_id')->withDefault();
@@ -203,5 +206,12 @@ class DeliverySchedule extends Model
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);
+
+        // T2.3 (flag stock.strict_dispatch): jadwal wajib Mulai dulu (D5); "Mulai" ditolak bila DO terkait tidak siap/stok fisik kurang.
+        static::updating(function (DeliverySchedule $schedule) {
+            if ($schedule->isDirty('status')) {
+                app(\App\Services\DeliveryScheduleService::class)->guardStatusChange($schedule, (string) $schedule->getOriginal('status'), (string) $schedule->status);
+            }
+        });
     }
 }

@@ -274,6 +274,20 @@ class DeliveryScheduleResource extends Resource
     }
 
     /**
+     * Ubah status jadwal lewat aksi cepat. Alur ketat (T2.3): penolakan (jadwal belum dimulai, DO belum siap, stok fisik kurang) tampil
+     * sebagai notifikasi jelas — bukan halaman galat — dan status jadwal tidak berubah.
+     */
+    public static function changeScheduleStatus(DeliverySchedule $record, string $status, ?string $reason = null): void
+    {
+        try {
+            $record->transitionReason = $reason;
+            $record->update(['status' => $status]);
+        } catch (\App\Exceptions\DeliveryOrderTransitionException $e) {
+            \Filament\Notifications\Notification::make()->danger()->title('Status jadwal tidak dapat diubah')->body($e->getMessage())->persistent()->send();
+        }
+    }
+
+    /**
      * Empty-state: master driver/kendaraan belum diisi. Tanpa ini form hanya menampilkan dropdown kosong dan
      * pesan "wajib dipilih". Tautan tambah hanya ditampilkan bila pengguna berizin.
      */
@@ -767,9 +781,12 @@ class DeliveryScheduleResource extends Resource
                         ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Mulai Pengiriman')
-                        ->modalDescription('Ubah status jadwal ini menjadi "Sedang Berjalan"?')
+                        ->modalDescription(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                            ? 'Mulai pengiriman? Barang keluar dari gudang: stok fisik DO terkait berkurang dan DO berstatus Dikirim.'
+                            : 'Ubah status jadwal ini menjadi "Sedang Berjalan"?')
+                        ->extraAttributes(['wire:loading.attr' => 'disabled'])
                         ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['pending']))
-                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'on_the_way'])),
+                        ->action(fn(DeliverySchedule $record) => static::changeScheduleStatus($record, 'on_the_way')),
                     Action::make('set_delivered')
                         ->label('Tandai Selesai')
                         ->icon('heroicon-o-check-circle')
@@ -777,24 +794,33 @@ class DeliveryScheduleResource extends Resource
                         ->requiresConfirmation()
                         ->modalHeading('Tandai Selesai')
                         ->modalDescription('Tandai jadwal pengiriman ini sebagai selesai/terkirim?')
-                        ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['on_the_way', 'pending']))
-                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'delivered'])),
+                        ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                        // Alur ketat (D5): selesai hanya dari Dalam Perjalanan — "Mulai Pengiriman" dulu.
+                        ->visible(fn(DeliverySchedule $record) => in_array($record->status, \App\Services\DeliveryOrderTransitions::enabled() ? ['on_the_way', 'partial_delivered'] : ['on_the_way', 'pending']))
+                        ->action(fn(DeliverySchedule $record) => static::changeScheduleStatus($record, 'delivered')),
                     Action::make('set_failed')
                         ->label('Tandai Gagal')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
                         ->modalHeading('Tandai Pengiriman Gagal')
-                        ->modalDescription('Tandai jadwal pengiriman ini sebagai gagal?')
+                        ->modalDescription(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                            ? 'Tandai jadwal ini gagal? DO yang sudah Dikirim menjadi "Pengiriman Gagal" dan stoknya dikembalikan ke gudang.'
+                            : 'Tandai jadwal pengiriman ini sebagai gagal?')
+                        ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                        ->form(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                            ? [Textarea::make('reason')->label('Alasan gagal')->required()->rows(3)]
+                            : [])
                         ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['on_the_way', 'pending']))
-                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'failed'])),
+                        ->action(fn(DeliverySchedule $record, array $data) => static::changeScheduleStatus($record, 'failed', $data['reason'] ?? null)),
                     Action::make('set_cancelled')
                         ->label('Batalkan')
                         ->icon('heroicon-o-no-symbol')
                         ->color('gray')
                         ->requiresConfirmation()
+                        ->extraAttributes(['wire:loading.attr' => 'disabled'])
                         ->visible(fn(DeliverySchedule $record) => in_array($record->status, ['pending']))
-                        ->action(fn(DeliverySchedule $record) => $record->update(['status' => 'cancelled'])),
+                        ->action(fn(DeliverySchedule $record) => static::changeScheduleStatus($record, 'cancelled')),
                     DeleteAction::make(),
                 ]),
             ], position: ActionsPosition::BeforeColumns)

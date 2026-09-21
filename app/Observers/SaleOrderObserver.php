@@ -28,6 +28,47 @@ class SaleOrderObserver
     }
 
     /**
+     * T2.3 (flag stock.strict_dispatch, D15/F9): penyelesaian SO "Ambil Sendiri" memotong stok fisik seketika — ditolak bila stok fisik
+     * di gudang item/alokasi tidak cukup (sebelum status tersimpan).
+     *
+     * @throws \App\Exceptions\DeliveryOrderTransitionException
+     */
+    public function updating(SaleOrder $saleOrder): void
+    {
+        if (! \App\Services\DeliveryOrderTransitions::enabled()
+            || ! $saleOrder->isDirty('status')
+            || $saleOrder->status !== 'completed'
+            || $saleOrder->getOriginal('status') === 'completed'
+            || $saleOrder->tipe_pengiriman !== 'Ambil Sendiri') {
+            return;
+        }
+
+        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
+
+        $needs = [];
+        foreach ($saleOrder->saleOrderItem as $item) {
+            if ($item->warehouseAllocations->isNotEmpty()) {
+                foreach ($item->warehouseAllocations as $allocation) {
+                    if ($allocation->warehouse_id && (float) $allocation->quantity > 0) {
+                        $needs[] = ['product_id' => (int) $item->product_id, 'warehouse_id' => (int) $allocation->warehouse_id, 'needed' => (float) $allocation->quantity, 'product' => $item->product?->name];
+                    }
+                }
+            } elseif ($item->warehouse_id && (float) $item->quantity > 0) {
+                $needs[] = ['product_id' => (int) $item->product_id, 'warehouse_id' => (int) $item->warehouse_id, 'needed' => (float) $item->quantity, 'product' => $item->product?->name];
+            }
+        }
+
+        $shortages = app(\App\Services\DeliveryShipments::class)->shortagesForNeeds($needs);
+        if ($shortages !== []) {
+            throw new \App\Exceptions\DeliveryOrderTransitionException(
+                "SO {$saleOrder->so_number} (Ambil Sendiri) belum dapat diselesaikan — stok fisik tidak cukup ("
+                . \App\Services\DeliveryShipments::describeShortages($shortages) . '). Tambah stok atau ubah kuantitas SO.',
+                $shortages
+            );
+        }
+    }
+
+    /**
      * Handle the SaleOrder "updated" event.
      */
     public function updated(SaleOrder $saleOrder): void
@@ -64,7 +105,7 @@ class SaleOrderObserver
             return;
         }
 
-        if (config('sales.stock.ledger', false)) {
+        if ((config('sales.stock.ledger', false) || config('sales.stock.strict_dispatch', false))) {
             app(\App\Services\StockReservationLedger::class)->releaseForSaleOrder($saleOrder->id, "SO {$saleOrder->so_number} dibatalkan");
         } else {
             StockReservation::where('sale_order_id', $saleOrder->id)->each(function ($reservation) {

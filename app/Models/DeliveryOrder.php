@@ -59,8 +59,19 @@ class DeliveryOrder extends Model
         'delivery_failed' => 'danger',
     ];
 
+    /** Label "Siap Kirim" (D4) untuk `approved` saat alur ketat aktif: DO sudah disetujui gudang tetapi barang belum berangkat. */
+    public const STRICT_STATUS_LABELS = [
+        'approved' => 'Siap Kirim',
+        'confirmed' => 'Siap Kirim',
+        'sent' => 'Dikirim',
+    ];
+
     public static function statusLabel(?string $status): string
     {
+        if (config('sales.stock.strict_dispatch', false) && isset(self::STRICT_STATUS_LABELS[$status ?? ''])) {
+            return self::STRICT_STATUS_LABELS[$status];
+        }
+
         return self::STATUS_LABELS[$status ?? ''] ?? ($status ? ucfirst(str_replace('_', ' ', $status)) : '-');
     }
 
@@ -70,6 +81,11 @@ class DeliveryOrder extends Model
     }
 
     protected $table = 'delivery_orders';
+
+    protected $casts = [
+        'received_at' => 'datetime',
+    ];
+
     protected $fillable = [
         'do_number',
         'delivery_date',
@@ -81,7 +97,9 @@ class DeliveryOrder extends Model
         'additional_cost',
         'additional_cost_description',
         'created_by',
-        'cabang_id'
+        'cabang_id',
+        'received_at',
+        'received_by_name',
     ];
 
     public function driver()
@@ -168,6 +186,12 @@ class DeliveryOrder extends Model
         static::restoring(function ($deliveryOrder) {
             $deliveryOrder->deliveryOrderItem()->withTrashed()->restore();
         });
+
+        // T2.3 (flag stock.strict_dispatch): perubahan status di luar matriks / stok fisik kurang ditolak di model,
+        // apa pun pintunya (aksi UI, jadwal, kode lama yang memanggil ->update(['status' => ...])).
+        static::updating(function ($deliveryOrder) {
+            \App\Services\DeliveryOrderTransitions::guardModelChange($deliveryOrder);
+        });
     }
 
     public function stockReservations()
@@ -207,7 +231,7 @@ class DeliveryOrder extends Model
         $wcs = $this->warehouseConfirmations()->get();
         if ($wcs->isEmpty()) {
             if ($this->status !== 'request_stock') {
-                $this->update(['status' => 'request_stock']);
+                $this->moveStatusFromWarehouseConfirmations('request_stock');
             }
 
             return;
@@ -219,10 +243,29 @@ class DeliveryOrder extends Model
         $anyRejected  = $statuses->contains('rejected');
 
         if ($allConfirmed) {
-            $this->update(['status' => 'approved']);
+            $this->moveStatusFromWarehouseConfirmations('approved');
         } elseif ($anyRejected) {
-            $this->update(['status' => 'reject']);
+            $this->moveStatusFromWarehouseConfirmations('reject');
         }
         // else: one or more WCs still pending → stay at request_stock
+    }
+
+    /**
+     * Alur ketat (T2.3): konfirmasi gudang hanya menggerakkan DO bila transisinya sah menurut matriks. DO yang sudah Dikirim/Selesai
+     * tidak boleh "mundur" ke Siap Kirim hanya karena WC dikonfirmasi belakangan. Alur lama: langsung ubah (perilaku semula).
+     */
+    private function moveStatusFromWarehouseConfirmations(string $target): void
+    {
+        if (! \App\Services\DeliveryOrderTransitions::enabled()) {
+            $this->update(['status' => $target]);
+
+            return;
+        }
+
+        if ($this->status === $target || ! \App\Services\DeliveryOrderTransitions::allows($this->status, $target)) {
+            return;
+        }
+
+        app(\App\Services\DeliveryOrderTransitions::class)->to($this, $target, ['source' => 'warehouse_confirmation']);
     }
 }

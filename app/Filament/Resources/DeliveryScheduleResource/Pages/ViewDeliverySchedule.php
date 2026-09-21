@@ -36,9 +36,12 @@ class ViewDeliverySchedule extends ViewRecord
                     ->color('info')
                     ->requiresConfirmation()
                     ->modalHeading('Mulai Pengiriman')
-                    ->modalDescription('Ubah status jadwal ini menjadi "Sedang Berjalan"?')
+                    ->modalDescription(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                        ? 'Mulai pengiriman? Barang keluar dari gudang: stok fisik DO terkait berkurang dan DO berstatus Dikirim.'
+                        : 'Ubah status jadwal ini menjadi "Sedang Berjalan"?')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
                     ->visible(fn() => in_array($this->record->status, ['pending']))
-                    ->action(fn() => $this->record->update(['status' => 'on_the_way'])),
+                    ->action(fn() => DeliveryScheduleResource::changeScheduleStatus($this->record, 'on_the_way')),
                 Action::make('set_delivered')
                     ->label('Tandai Selesai')
                     ->icon('heroicon-o-check-circle')
@@ -46,24 +49,32 @@ class ViewDeliverySchedule extends ViewRecord
                     ->requiresConfirmation()
                     ->modalHeading('Tandai Selesai')
                     ->modalDescription('Tandai jadwal pengiriman ini sebagai selesai/terkirim?')
-                    ->visible(fn() => in_array($this->record->status, ['on_the_way', 'pending']))
-                    ->action(fn() => $this->record->update(['status' => 'delivered'])),
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->visible(fn() => in_array($this->record->status, \App\Services\DeliveryOrderTransitions::enabled() ? ['on_the_way', 'partial_delivered'] : ['on_the_way', 'pending']))
+                    ->action(fn() => DeliveryScheduleResource::changeScheduleStatus($this->record, 'delivered')),
                 Action::make('set_failed')
                     ->label('Tandai Gagal')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalHeading('Tandai Pengiriman Gagal')
-                    ->modalDescription('Tandai jadwal pengiriman ini sebagai gagal?')
+                    ->modalDescription(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                        ? 'Tandai jadwal ini gagal? DO yang sudah Dikirim menjadi "Pengiriman Gagal" dan stoknya dikembalikan ke gudang.'
+                        : 'Tandai jadwal pengiriman ini sebagai gagal?')
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
+                    ->form(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                        ? [\Filament\Forms\Components\Textarea::make('reason')->label('Alasan gagal')->required()->rows(3)]
+                        : [])
                     ->visible(fn() => in_array($this->record->status, ['on_the_way', 'pending']))
-                    ->action(fn() => $this->record->update(['status' => 'failed'])),
+                    ->action(fn(array $data) => DeliveryScheduleResource::changeScheduleStatus($this->record, 'failed', $data['reason'] ?? null)),
                 Action::make('set_cancelled')
                     ->label('Batalkan')
                     ->icon('heroicon-o-no-symbol')
                     ->color('gray')
                     ->requiresConfirmation()
+                    ->extraAttributes(['wire:loading.attr' => 'disabled'])
                     ->visible(fn() => in_array($this->record->status, ['pending']))
-                    ->action(fn() => $this->record->update(['status' => 'cancelled'])),
+                    ->action(fn() => DeliveryScheduleResource::changeScheduleStatus($this->record, 'cancelled')),
                 EditAction::make()->icon('heroicon-o-pencil')->label('Edit Jadwal'),
                 DeleteAction::make()->icon('heroicon-o-trash')->label('Hapus Jadwal'),
             ])->button()->label('Aksi'),

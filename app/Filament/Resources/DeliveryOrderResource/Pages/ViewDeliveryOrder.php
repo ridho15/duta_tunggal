@@ -123,6 +123,24 @@ class ViewDeliveryOrder extends ViewRecord
                     \App\Http\Controllers\HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order telah ditutup. Proses selanjutnya: Tim Finance perlu memastikan Invoice telah diterbitkan dan diselesaikan untuk Delivery Order ini.");
                 }),
 
+            // T2.3 (flag stock.strict_dispatch): aksi status DO alur ketat — semua lewat DeliveryOrderTransitions.
+            \App\Filament\Support\DeliveryOrderActions::dispatch(Actions\Action::make('dispatch')),
+            \App\Filament\Support\DeliveryOrderActions::receive(Actions\Action::make('receive')),
+            \App\Filament\Support\DeliveryOrderActions::complete(Actions\Action::make('complete_delivery')),
+            \App\Filament\Support\DeliveryOrderActions::cancel(Actions\Action::make('cancel_delivery_order')),
+            \App\Filament\Support\DeliveryOrderActions::failed(
+                Actions\Action::make('mark_delivery_failed')
+                    ->label('Pengiriman Gagal')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Tandai Pengiriman Gagal')
+                    ->modalSubmitActionLabel('Ya, Tandai Gagal')
+                    ->visible(fn () => \App\Services\DeliveryOrderTransitions::enabled()
+                        && Auth::user()->hasPermissionTo('response delivery order')
+                        && in_array($this->record->status, ['sent', 'approved']))
+            ),
+
             // Actions\Action::make('completed')
             //     ->label('Complete')
             //     ->icon('heroicon-o-check-badge')

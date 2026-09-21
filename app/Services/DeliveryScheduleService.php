@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\DeliveryOrderTransitionException;
 use App\Models\DeliveryOrder;
 use App\Models\DeliverySchedule;
 use App\Models\Driver;
 use App\Models\Vehicle;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
@@ -108,6 +110,10 @@ class DeliveryScheduleService
      */
     public function startRelatedDeliveryOrders(DeliverySchedule $schedule): int
     {
+        if (DeliveryOrderTransitions::enabled()) {
+            return $this->startStrict($schedule);
+        }
+
         $deliveryOrders = $schedule->relatedDeliveryOrders();
 
         $startedCount = 0;
@@ -146,6 +152,10 @@ class DeliveryScheduleService
      */
     public function completeRelatedDeliveryOrders(DeliverySchedule $schedule): int
     {
+        if (DeliveryOrderTransitions::enabled()) {
+            return $this->completeStrict($schedule);
+        }
+
         $deliveryOrders = $schedule->relatedDeliveryOrders();
 
         $completedCount = 0;
@@ -180,5 +190,167 @@ class DeliveryScheduleService
         }
 
         return $completedCount;
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // T2.3 — alur ketat (flag stock.strict_dispatch): semua lewat DeliveryOrderTransitions, galat TIDAK ditelan.
+    // ------------------------------------------------------------------------------------------------
+
+    /** Status jadwal yang berarti barang sudah/sedang di jalan. */
+    private const STARTED_STATUSES = ['on_the_way', 'partial_delivered', 'delivered'];
+
+    /** Status DO yang tidak memblokir "Mulai": sudah berangkat atau sudah final. */
+    private const NOT_BLOCKING_AT_START = ['sent', 'received', 'completed', 'closed'];
+
+    /** Status DO yang siap dikirim (D4 "Siap Kirim"), termasuk yang dijadwalkan ulang setelah gagal. */
+    private const SHIPPABLE = ['approved', 'confirmed', 'partial', 'delivery_failed'];
+
+    /**
+     * Penjaga perubahan status jadwal (dipanggil model, sehingga tombol maupun form status sama-sama tercakup).
+     *
+     * @throws DeliveryOrderTransitionException
+     */
+    public function guardStatusChange(DeliverySchedule $schedule, string $from, string $to): void
+    {
+        if (! DeliveryOrderTransitions::enabled() || $from === $to) {
+            return;
+        }
+
+        // D5: "Tandai Selesai" hanya dari Dalam Perjalanan; Mulai Pengiriman dulu.
+        if ($to === 'delivered' && ! in_array($from, ['on_the_way', 'partial_delivered'], true)) {
+            throw new DeliveryOrderTransitionException('Jadwal ' . $schedule->schedule_number . ' belum dimulai. Klik "Mulai Pengiriman" lebih dulu (stok baru keluar gudang saat itu), lalu "Tandai Selesai" setelah barang sampai.');
+        }
+
+        if (! in_array($from, self::STARTED_STATUSES, true) && in_array($to, ['on_the_way', 'partial_delivered'], true)) {
+            $this->assertCanStart($schedule);
+        }
+    }
+
+    /** Bentuk validasi form: galat penjaga status → ValidationException pada kolom status (Filament menampilkannya di bawah kolom). */
+    public function validateStatusChange(DeliverySchedule $schedule, string $to, string $prefix = ''): void
+    {
+        try {
+            $this->guardStatusChange($schedule, (string) $schedule->status, $to);
+        } catch (DeliveryOrderTransitionException $e) {
+            throw ValidationException::withMessages([$prefix . 'status' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * "Mulai Pengiriman" hanya bila setiap DO terkait sudah Siap Kirim dan stok fisiknya cukup (D15) — dicek sebelum status jadwal berubah.
+     *
+     * @throws DeliveryOrderTransitionException
+     */
+    public function assertCanStart(DeliverySchedule $schedule): void
+    {
+        $shipments = app(DeliveryShipments::class);
+
+        foreach ($schedule->relatedDeliveryOrders() as $deliveryOrder) {
+            $deliveryOrder->refresh();
+
+            if (in_array($deliveryOrder->status, self::NOT_BLOCKING_AT_START, true)) {
+                continue;
+            }
+
+            if (! in_array($deliveryOrder->status, self::SHIPPABLE, true)) {
+                throw new DeliveryOrderTransitionException(sprintf(
+                    'Pengiriman belum dapat dimulai: Delivery Order %s masih berstatus "%s". Selesaikan konfirmasi/persetujuan gudang sampai "Siap Kirim", atau keluarkan DO dari jadwal ini.',
+                    $deliveryOrder->do_number,
+                    DeliveryOrder::statusLabel($deliveryOrder->status)
+                ));
+            }
+
+            $shortages = $shipments->physicalShortages($deliveryOrder);
+            if ($shortages !== []) {
+                throw new DeliveryOrderTransitionException(sprintf(
+                    'Pengiriman belum dapat dimulai: Delivery Order %s — stok fisik tidak cukup (%s). Tambah stok atau kurangi kuantitas DO; Owner/Super Admin dapat mengecualikan lewat aksi "Kirim" pada DO.',
+                    $deliveryOrder->do_number,
+                    DeliveryShipments::describeShortages($shortages)
+                ), $shortages);
+            }
+        }
+    }
+
+    private function startStrict(DeliverySchedule $schedule): int
+    {
+        $transitions = app(DeliveryOrderTransitions::class);
+        $started = 0;
+
+        DB::transaction(function () use ($schedule, $transitions, &$started) {
+            foreach ($schedule->relatedDeliveryOrders() as $deliveryOrder) {
+                $deliveryOrder->refresh();
+
+                if (in_array($deliveryOrder->status, self::NOT_BLOCKING_AT_START, true)) {
+                    continue;
+                }
+
+                $transitions->to($deliveryOrder, 'sent', ['comments' => "Jadwal {$schedule->schedule_number} dimulai", 'source' => 'delivery_schedule']);
+                $started++;
+            }
+        });
+
+        return $started;
+    }
+
+    /**
+     * Jadwal Selesai: DO yang sudah Dikirim otomatis melewati "Diterima" (tercatat, D23) lalu "Selesai" (jurnal + invoice).
+     */
+    private function completeStrict(DeliverySchedule $schedule): int
+    {
+        $transitions = app(DeliveryOrderTransitions::class);
+        $completed = 0;
+
+        DB::transaction(function () use ($schedule, $transitions, &$completed) {
+            foreach ($schedule->relatedDeliveryOrders() as $deliveryOrder) {
+                $deliveryOrder->refresh();
+
+                if (in_array($deliveryOrder->status, ['completed', 'closed', 'reject'], true)) {
+                    continue;
+                }
+
+                $options = ['source' => 'delivery_schedule'];
+
+                if (in_array($deliveryOrder->status, self::SHIPPABLE, true)) {
+                    $transitions->to($deliveryOrder, 'sent', $options + ['comments' => "Jadwal {$schedule->schedule_number} selesai"]);
+                }
+
+                $transitions->complete($deliveryOrder, $options + ['comments' => "Jadwal {$schedule->schedule_number} ditandai selesai"]);
+                $completed++;
+            }
+        });
+
+        return $completed;
+    }
+
+    /**
+     * D20: jadwal ditandai Gagal setelah barang berangkat → DO yang sudah Dikirim menjadi "Pengiriman Gagal" dan stoknya kembali (D18).
+     * DO yang belum berangkat tidak berubah.
+     */
+    public function failRelatedDeliveryOrders(DeliverySchedule $schedule): int
+    {
+        if (! DeliveryOrderTransitions::enabled()) {
+            return 0;
+        }
+
+        $reason = trim((string) ($schedule->transitionReason ?? ''));
+        $reason = "Jadwal {$schedule->schedule_number} ditandai gagal" . ($reason !== '' ? ": {$reason}" : '');
+
+        $transitions = app(DeliveryOrderTransitions::class);
+        $failed = 0;
+
+        DB::transaction(function () use ($schedule, $transitions, $reason, &$failed) {
+            foreach ($schedule->relatedDeliveryOrders() as $deliveryOrder) {
+                $deliveryOrder->refresh();
+
+                if ($deliveryOrder->status !== 'sent') {
+                    continue;
+                }
+
+                $transitions->to($deliveryOrder, 'delivery_failed', ['reason' => $reason, 'source' => 'delivery_schedule']);
+                $failed++;
+            }
+        });
+
+        return $failed;
     }
 }

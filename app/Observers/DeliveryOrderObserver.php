@@ -26,6 +26,11 @@ class DeliveryOrderObserver
         $originalStatus = $deliveryOrder->getOriginal('status');
         $newStatus = $deliveryOrder->status;
 
+        // T2.3 (flag stock.strict_dispatch): status item + log + pengembalian stok gagal-kirim seragam untuk SEMUA pintu.
+        if ($deliveryOrder->wasChanged('status') && \App\Services\DeliveryOrderTransitions::enabled()) {
+            $this->handleStrictStatusEffects($deliveryOrder, (string) $originalStatus, (string) $newStatus);
+        }
+
         // Jika status berubah ke 'approved', buat stock reservations
         if ($originalStatus !== 'approved' && $newStatus === 'approved') {
             $this->handleApprovedStatus($deliveryOrder);
@@ -60,6 +65,28 @@ class DeliveryOrderObserver
     }
 
     /**
+     * T2.3: efek yang harus sama di semua pintu status — status item mengikuti status DO, log berjejak (alasan/penerima/pengecualian),
+     * dan pengiriman gagal SETELAH barang berangkat mengembalikan stok fisik (D18) serta membuat ulang reservasi DO untuk dijadwalkan ulang.
+     */
+    protected function handleStrictStatusEffects(DeliveryOrder $deliveryOrder, string $from, string $to): void
+    {
+        $itemStatus = \App\Services\DeliveryOrderTransitions::itemStatusFor($to);
+        if ($itemStatus !== null) {
+            $deliveryOrder->deliveryOrderItem()->update(['status' => $itemStatus]);
+        }
+
+        if ($to === 'delivery_failed' && in_array($from, ['sent', 'received'], true)) {
+            $context = \App\Services\DeliveryOrderTransitions::context();
+            $reason = (string) ($context['reason'] ?? 'pengiriman gagal');
+
+            app(\App\Services\DeliveryShipments::class)->reverse($deliveryOrder, $reason);
+            app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "DO {$deliveryOrder->do_number} gagal kirim — reservasi dibuat ulang untuk penjadwalan ulang");
+        }
+
+        \App\Services\DeliveryOrderTransitions::writeLog($deliveryOrder, $from, $to);
+    }
+
+    /**
      * DO dipulihkan dari soft-delete: kuantitasnya kembali terikat ke SO.
      */
     public function restored(DeliveryOrder $deliveryOrder): void
@@ -70,25 +97,8 @@ class DeliveryOrderObserver
     /** Buku besar reservasi & pengiriman idempoten (flag sales.stock.ledger, T2.1). */
     protected function ledgerEnabled(): bool
     {
-        return (bool) config('sales.stock.ledger', false);
-    }
-
-    /**
-     * Kuantitas item DO yang SUDAH keluar gudang (gerakan `sales`) dikurangi yang sudah dikembalikan (`adjustment_in`
-     * berasal dari item DO yang sama — pengembalian gagal-kirim, T2.3).
-     */
-    protected function netShipped($item, int $warehouseId, ?int $rakId): float
-    {
-        $base = \App\Models\StockMovement::query()
-            ->where('from_model_type', \App\Models\DeliveryOrderItem::class)
-            ->where('from_model_id', $item->id)
-            ->where('warehouse_id', $warehouseId)
-            ->when($rakId, fn ($q) => $q->where('rak_id', $rakId), fn ($q) => $q->whereNull('rak_id'));
-
-        $shipped = (float) (clone $base)->where('type', 'sales')->sum('quantity');
-        $returned = (float) (clone $base)->where('type', 'adjustment_in')->sum('quantity');
-
-        return max(0.0, $shipped - $returned);
+        // strict_dispatch mengandalkan buku besar (idempotensi pengiriman, pengembalian gagal-kirim) sehingga otomatis mengaktifkannya.
+        return (bool) config('sales.stock.ledger', false) || (bool) config('sales.stock.strict_dispatch', false);
     }
 
     /**
@@ -255,7 +265,7 @@ class DeliveryOrderObserver
                     // T2.1 (flag stock.ledger): idempoten — jangan memotong stok dua kali untuk kuantitas yang sudah keluar
                     // (mis. DO gagal kirim lalu dijadwalkan ulang).
                     if ($this->ledgerEnabled()) {
-                        $sourceQty = max(0, $sourceQty - $this->netShipped($item, (int) $source->warehouse_id, $source->rak_id));
+                        $sourceQty = max(0, $sourceQty - \App\Services\DeliveryShipments::netShipped($item, (int) $source->warehouse_id, $source->rak_id));
                         if ($sourceQty <= 0) {
                             continue;
                         }
@@ -287,7 +297,7 @@ class DeliveryOrderObserver
             }
 
             if ($this->ledgerEnabled()) {
-                $qtyToShip = max(0, $qtyToShip - $this->netShipped($item, (int) $deliveryOrder->warehouse_id, $item->rak_id));
+                $qtyToShip = max(0, $qtyToShip - \App\Services\DeliveryShipments::netShipped($item, (int) $deliveryOrder->warehouse_id, $item->rak_id));
                 if ($qtyToShip <= 0) {
                     continue;
                 }

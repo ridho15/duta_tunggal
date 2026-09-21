@@ -1296,22 +1296,24 @@ class DeliveryOrderResource extends Resource
                                 message: "Quantity delivery order telah diperbarui oleh checker"
                             );
                         }),
-                    Action::make('mark_delivery_failed')
-                        ->label('Pengiriman Gagal')
-                        ->icon('heroicon-o-x-circle')
-                        ->color('danger')
-                        ->requiresConfirmation()
-                        ->modalHeading('Tandai Pengiriman Gagal')
-                        ->modalDescription('Apakah Anda yakin pengiriman ini gagal? DO akan ditandai sebagai Pengiriman Gagal dan dapat diprioritaskan untuk pengiriman berikutnya.')
-                        ->modalSubmitActionLabel('Ya, Tandai Gagal')
-                        ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response delivery order') &&
-                                in_array($record->status, ['sent', 'approved']);
-                        })
-                        ->action(function ($record) {
-                            $record->update(['status' => 'delivery_failed']);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Delivery Order ditandai sebagai Pengiriman Gagal. Proses selanjutnya: Segera koordinasikan dengan Tim Sales dan jadwalkan ulang pengiriman ke customer.");
-                        }),
+                    \App\Filament\Support\DeliveryOrderActions::dispatch(Action::make('dispatch')),
+                    \App\Filament\Support\DeliveryOrderActions::receive(Action::make('receive')),
+                    \App\Filament\Support\DeliveryOrderActions::complete(Action::make('complete_delivery')),
+                    \App\Filament\Support\DeliveryOrderActions::cancel(Action::make('cancel_delivery_order')),
+                    \App\Filament\Support\DeliveryOrderActions::failed(
+                        Action::make('mark_delivery_failed')
+                            ->label('Pengiriman Gagal')
+                            ->icon('heroicon-o-x-circle')
+                            ->color('danger')
+                            ->requiresConfirmation()
+                            ->modalHeading('Tandai Pengiriman Gagal')
+                            ->modalDescription('Apakah Anda yakin pengiriman ini gagal? DO akan ditandai sebagai Pengiriman Gagal dan dapat diprioritaskan untuk pengiriman berikutnya.')
+                            ->modalSubmitActionLabel('Ya, Tandai Gagal')
+                            ->visible(function ($record) {
+                                return Auth::user()->hasPermissionTo('response delivery order') &&
+                                    in_array($record->status, ['sent', 'approved']);
+                            })
+                    ),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
