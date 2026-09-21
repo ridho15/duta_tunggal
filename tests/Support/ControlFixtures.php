@@ -85,3 +85,39 @@ function ctlPaidReceipt(array $ctx, \App\Models\Invoice $invoice, float $amount,
 
     return [$receipt->fresh(), $bank, $piutang];
 }
+
+/**
+ * Invoice PENJUALAN terbit bernilai: $qty pcs × Rp $price (bersih diskon) + PPN $taxRate% (+ biaya pengiriman $shipping) lengkap dengan baris piutang (AR)
+ * dan akun yang dibutuhkan Nota Kredit (Retur Penjualan, Deposit). Mengembalikan [invoice, invoiceItem, customerSaleOrder].
+ */
+function ctlCreditInvoice(array $ctx, float $qty = 12, float $price = 100000, float $taxRate = 11, float $shipping = 0, string $status = 'unpaid', ?float $paid = null): array
+{
+    foreach ([['4120.10', 'Retur Penjualan', 'Expense'], ['2160.04', 'Deposit Pelanggan', 'Liability'], ['2120.06', 'PPN Keluaran', 'Liability'], ['1120', 'Piutang Dagang', 'Asset'], ['6100.02', 'Biaya Pengiriman', 'Expense']] as [$code, $name, $type]) {
+        \App\Models\ChartOfAccount::firstOrCreate(['code' => $code], ['name' => $name, 'type' => $type, 'is_active' => true, 'opening_balance' => 0]);
+    }
+
+    [$so] = stkSaleOrder($ctx, 1, ['status' => 'completed', 'total_amount' => 1]);
+    $subtotal = round($qty * $price, 2);
+    $tax = round($subtotal * $taxRate / 100, 2);
+    $total = round($subtotal + $tax + $shipping, 2);
+
+    $invoice = \App\Models\Invoice::withoutEvents(fn () => \App\Models\Invoice::factory()->create([
+        'from_model_type' => \App\Models\SaleOrder::class, 'from_model_id' => $so->id, 'customer_name' => $ctx['customer']->name, 'cabang_id' => $ctx['cabang']->id,
+        'subtotal' => $subtotal, 'dpp' => $subtotal, 'tax' => $taxRate, 'ppn_rate' => $taxRate, 'total' => $total, 'status' => $status, 'invoice_date' => now()->toDateString(),
+        'due_date' => now()->addDays(30)->toDateString(), 'ar_coa_id' => null, 'revenue_coa_id' => null, 'ppn_keluaran_coa_id' => null, 'biaya_pengiriman_coa_id' => null,
+        'other_fee' => $shipping > 0 ? [['amount' => $shipping, 'description' => 'Ongkir', 'type' => 'delivery_cost']] : null,
+    ]));
+
+    $item = \App\Models\InvoiceItem::factory()->create([
+        'invoice_id' => $invoice->id, 'product_id' => $ctx['product']->id, 'quantity' => $qty, 'price' => $price, 'discount' => 0, 'tax_rate' => $taxRate,
+        'tax_amount' => $tax, 'subtotal' => $subtotal, 'total' => round($subtotal + $tax, 2),
+    ]);
+
+    $paid ??= $status === 'paid' ? $total : 0;
+    \App\Models\AccountReceivable::create([
+        'invoice_id' => $invoice->id, 'customer_id' => $ctx['customer']->id, 'total' => $total, 'paid' => $paid, 'remaining' => $total - $paid,
+        'status' => $total - $paid > 0 ? 'Belum Lunas' : 'Lunas', 'cabang_id' => $ctx['cabang']->id, 'exchange_rate' => 1,
+    ]);
+
+    return [$invoice->fresh(), $item, $so];
+}

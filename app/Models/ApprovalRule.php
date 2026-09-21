@@ -17,9 +17,12 @@ class ApprovalRule extends Model
 
     public const TYPE_SALE_ORDER = 'sale_order';
 
+    public const TYPE_CREDIT_NOTE = 'credit_note';
+
     public const TYPES = [
         self::TYPE_QUOTATION => 'Quotation',
         self::TYPE_SALE_ORDER => 'Sales Order',
+        self::TYPE_CREDIT_NOTE => 'Nota Kredit',
     ];
 
     protected $fillable = ['document_type', 'label', 'above_amount', 'up_to_amount', 'roles', 'approver_label', 'is_active', 'notes', 'created_by', 'updated_by'];

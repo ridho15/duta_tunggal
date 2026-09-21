@@ -132,6 +132,7 @@ class ApprovalControlService
         return match (true) {
             $document instanceof SaleOrder => ApprovalRule::TYPE_SALE_ORDER,
             $document instanceof Quotation => ApprovalRule::TYPE_QUOTATION,
+            $document instanceof \App\Models\CreditNote => ApprovalRule::TYPE_CREDIT_NOTE,
             default => null,
         };
     }
@@ -155,7 +156,11 @@ class ApprovalControlService
         }
 
         $label = ApprovalRule::TYPES[$type];
-        $permission = $type === ApprovalRule::TYPE_QUOTATION ? 'approve quotation' : 'response sales order';
+        $permission = match ($type) {
+            ApprovalRule::TYPE_QUOTATION => 'approve quotation',
+            ApprovalRule::TYPE_CREDIT_NOTE => 'approve credit note',
+            default => 'response sales order',
+        };
 
         if (! $user->hasPermissionTo($permission)) {
             return $deny("Anda tidak memiliki hak akses persetujuan {$label}.");
@@ -171,7 +176,7 @@ class ApprovalControlService
         }
 
         // 2. Nominal Tier Check — dari tabel approval_rules; bila belum ada tabel/aturan → konstanta lama (perilaku semula)
-        $amount = (float) ($document->total_amount ?? 0);
+        $amount = (float) ($document->total_amount ?? $document->total ?? 0);
         $rule = $this->ruleFor($type, $amount);
         [$roles, $approverLabel, $above] = $rule
             ? [$rule->roles ?? [], $rule->approver_label, $rule->above_amount !== null ? (float) $rule->above_amount : null]
@@ -237,9 +242,9 @@ class ApprovalControlService
             'document_id' => $document->getKey(),
             'user_id' => $user->getKey(),
             'approval_rule_id' => $check['rule_id'],
-            'amount' => (float) ($document->total_amount ?? 0),
+            'amount' => (float) ($document->total_amount ?? $document->total ?? 0),
             'reason' => $reason,
-            'context' => ['kind' => 'self_approval', 'document_number' => $document->so_number ?? $document->quotation_number ?? null],
+            'context' => ['kind' => 'self_approval', 'document_number' => $document->so_number ?? $document->quotation_number ?? $document->credit_note_number ?? null],
         ]);
     }
 

@@ -27,11 +27,11 @@ beforeEach(function () {
     config(['sales.controls.approval_rules' => true]);
 });
 
-it('nilai awal tabel = konstanta lama (dua aturan per dokumen)', function () {
+it('nilai awal tabel = konstanta lama (dua aturan per dokumen; Nota Kredit ditambahkan T5)', function () {
     $rules = ApprovalRule::orderBy('document_type')->orderBy('above_amount')->get();
 
-    expect($rules)->toHaveCount(4)
-        ->and($rules->pluck('document_type')->unique()->sort()->values()->all())->toBe(['quotation', 'sale_order'])
+    expect($rules)->toHaveCount(6)
+        ->and($rules->pluck('document_type')->unique()->sort()->values()->all())->toBe(['credit_note', 'quotation', 'sale_order'])
         ->and(ApprovalRule::forDocument('sale_order', 10000000)->approver_label)->toBe('Sales Manager / Direktur')      // batas atas inklusif
         ->and(ApprovalRule::forDocument('sale_order', 10000000.01)->approver_label)->toBe('Direktur / Owner / Finance Manager');
 });

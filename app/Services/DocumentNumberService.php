@@ -32,6 +32,7 @@ class DocumentNumberService
         'invoice_tax' => ['table' => 'invoices', 'column' => 'invoice_number', 'prefix' => 'INV-PJK', 'label' => 'Invoice Pajak'],
         'invoice_non_tax' => ['table' => 'invoices', 'column' => 'invoice_number', 'prefix' => 'INV-NPJK', 'label' => 'Invoice Non-Pajak'],
         'customer_return' => ['table' => 'customer_returns', 'column' => 'return_number', 'prefix' => 'CR', 'label' => 'Retur Customer'],
+        'credit_note' => ['table' => 'credit_notes', 'column' => 'credit_note_number', 'prefix' => 'CN', 'label' => 'Nota Kredit'],
         // Kode customer (D32): global, tanpa cabang/periode — CUST-00001
         'customer' => ['table' => 'customers', 'column' => 'code', 'prefix' => 'CUST', 'label' => 'Kode Customer'],
     ];

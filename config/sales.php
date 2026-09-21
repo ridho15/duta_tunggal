@@ -64,6 +64,8 @@ return [
         'doc_lock' => (bool) env('SALES_CONTROLS_DOC_LOCK', false),
         'accounting_settings' => (bool) env('SALES_CONTROLS_ACCOUNTING_SETTINGS', false),
         'central_numbering' => (bool) env('SALES_CONTROLS_CENTRAL_NUMBERING', false),
+        // Nota Kredit (T5): pembatalan invoice, koreksi sebagian, retur dengan jalur uang — jurnal balik penjualan/PPN, piutang, Deposit
+        'credit_notes' => (bool) env('SALES_CONTROLS_CREDIT_NOTES', false),
         // Dedup saat membuat customer (NIK/NPWP sama, atau nama+telepon sama) — semua form lewat CustomerService::create (T4.2, X10)
         'customer_dedup' => (bool) env('SALES_CONTROLS_CUSTOMER_DEDUP', false),
     ],
