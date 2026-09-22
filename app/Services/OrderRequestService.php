@@ -299,7 +299,7 @@ class OrderRequestService
                 }
             }
 
-            $supplier = Supplier::findOrFail($data['supplier_id']);
+            $supplier = $this->resolvePurchaseOrderSupplier($orderRequest, $data);
 
             $defaultCurrency = Currency::query()->first();
 
@@ -314,6 +314,7 @@ class OrderRequestService
             }
 
             $cabangId = $this->resolvePurchaseOrderCabangId($orderRequest, $data, $resolvedItems);
+            $warehouseId = $this->resolvePurchaseOrderWarehouseId($data);
 
             $purchaseOrder = $orderRequest->purchaseOrders()->create([
                 'po_number'    => $data['po_number'],
@@ -325,7 +326,7 @@ class OrderRequestService
                 'tempo_hutang' => $supplier->tempo_hutang ?? 0,
                 'created_by'   => Auth::id() ?? $orderRequest->created_by,
                 'cabang_id'    => $cabangId,
-                'warehouse_id' => $data['warehouse_id'] ?? null,
+                'warehouse_id' => $warehouseId,
             ]);
 
             $itemsForPivotSync = [];
@@ -438,7 +439,7 @@ class OrderRequestService
     public function createPurchaseOrder($orderRequest, $data)
     {
 
-        $supplier = Supplier::findOrFail($data['supplier_id']);
+        $supplier = $this->resolvePurchaseOrderSupplier($orderRequest, $data);
         $defaultCurrency = Currency::query()->first();
 
         if (! $defaultCurrency) {
@@ -452,6 +453,7 @@ class OrderRequestService
         }
 
         $cabangId = $this->resolvePurchaseOrderCabangId($orderRequest, $data, $resolvedItems);
+        $warehouseId = $this->resolvePurchaseOrderWarehouseId($data);
 
         $purchaseOrder = $orderRequest->purchaseOrders()->create([
             'po_number'    => $data['po_number'],
@@ -463,7 +465,7 @@ class OrderRequestService
             'tempo_hutang' => $supplier->tempo_hutang ?? 0,
             'created_by'   => Auth::id() ?? $orderRequest->created_by,
             'cabang_id'    => $cabangId,
-            'warehouse_id' => $data['warehouse_id'] ?? null,
+            'warehouse_id' => $warehouseId,
         ]);
 
         $hasPriceDeviation = false;
@@ -571,5 +573,35 @@ class OrderRequestService
     public function submitForApproval($orderRequest)
     {
         $orderRequest->update(['status' => 'request_approve']);
+    }
+
+    private function resolvePurchaseOrderSupplier($orderRequest, array $data): Supplier
+    {
+        $supplierId = $data['supplier_id'] ?? null;
+        if (! $supplierId && ! empty($data['selected_items'])) {
+            $firstItem = collect($data['selected_items'])->first(fn ($i) => ! empty($i['include']) && ! empty($i['item_supplier_id']));
+            $supplierId = $firstItem['item_supplier_id'] ?? null;
+        }
+        if (! $supplierId) {
+            $orderRequest->loadMissing('orderRequestItem');
+            $supplierId = $orderRequest->orderRequestItem->firstWhere('supplier_id', '!=', null)?->supplier_id;
+        }
+        if (! $supplierId) {
+            $exception = new \Illuminate\Database\Eloquent\ModelNotFoundException('Supplier tidak ditemukan untuk membuat Purchase Order. Pastikan item Order Request memiliki supplier.');
+            $exception->setModel(Supplier::class);
+            throw $exception;
+        }
+
+        return Supplier::findOrFail($supplierId);
+    }
+
+    private function resolvePurchaseOrderWarehouseId(array $data): ?int
+    {
+        $warehouseId = $data['warehouse_id'] ?? null;
+        if (! $warehouseId) {
+            $warehouseId = \App\Models\Warehouse::withoutGlobalScopes()->where('status', 1)->value('id');
+        }
+
+        return $warehouseId ? (int) $warehouseId : null;
     }
 }

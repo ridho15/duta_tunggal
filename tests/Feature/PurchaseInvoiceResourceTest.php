@@ -1586,6 +1586,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_purchase_orders' => [$purchaseOrder->id],
                 'selected_purchase_receipts' => [$receipt->id],
                 'invoice_number' => 'PINV-FULL-NOMINAL-001',
+                'supplier_invoice_number' => 'INV-SUP-FULL-NOMINAL-001',
+                'tax_invoice_number' => '010.000-26.00000001',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
                 'ppn_rate' => 5,
@@ -1597,6 +1599,8 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->with('invoiceItem', 'accountPayable')
             ->firstOrFail();
 
+        // Invoice is created as DRAFT — verify totals and items are correct on draft
+        $this->assertSame(Invoice::STATUS_DRAFT, $invoice->status);
         $this->assertSame(7200000.0, (float) $invoice->subtotal);
         $this->assertSame(7200000.0, (float) $invoice->dpp);
         $this->assertSame(7992000.0, (float) $invoice->total);
@@ -1606,6 +1610,14 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame(7200000.0, (float) $invoice->invoiceItem->first()->total);
         $this->assertSame(11.0, (float) $invoice->invoiceItem->first()->tax_rate);
         $this->assertSame(792000.0, (float) $invoice->invoiceItem->first()->tax_amount);
+        // No AP or journals in DRAFT state
+        $this->assertNull($invoice->accountPayable);
+
+        // Now post the invoice — AP and journals should be created
+        $service = app(PurchaseInvoiceAccountingService::class);
+        $invoice = $service->postAndApproveInvoice($invoice);
+        $invoice = $invoice->fresh(['invoiceItem', 'accountPayable']);
+
         $this->assertSame(7992000.0, (float) $invoice->accountPayable->total);
         $this->assertSame(7992000.0, (float) $invoice->accountPayable->remaining);
         $this->assertSame($this->cabang->id, (int) $invoice->accountPayable->cabang_id);
@@ -1686,6 +1698,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_purchase_orders' => [$purchaseOrder->id],
                 'selected_purchase_receipts' => [$receipt->id],
                 'invoice_number' => 'PINV-MIXED-TAX-001',
+                'supplier_invoice_number' => 'INV-SUP-MIXED-TAX-001',
+                'tax_invoice_number' => '010.000-26.00000002',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
                 'ppn_rate' => 20,
@@ -1774,6 +1788,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_purchase_orders' => [$purchaseOrder->id],
                 'selected_purchase_receipts' => [$receipt->id],
                 'invoice_number' => 'PINV-BRANCH-SOURCE-001',
+                'supplier_invoice_number' => 'INV-SUP-BRANCH-SOURCE-001',
+                'tax_invoice_number' => '010.000-26.00000003',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
                 'ppn_rate' => 0,
@@ -1785,8 +1801,16 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->with('accountPayable')
             ->firstOrFail();
 
+        // Invoice is created as DRAFT - verify invoice cabang is from receipt (not creator)
         $this->assertSame($this->cabang->id, (int) $invoice->cabang_id);
         $this->assertNotSame($creatorBranch->id, (int) $invoice->cabang_id);
+        // No AP in DRAFT state yet
+        $this->assertNull($invoice->accountPayable);
+
+        // Post the invoice so AP is created with the correct cabang
+        $service = app(PurchaseInvoiceAccountingService::class);
+        $invoice = $service->postAndApproveInvoice($invoice)->fresh(['accountPayable']);
+
         $this->assertSame($this->cabang->id, (int) $invoice->accountPayable->cabang_id);
     }
 
@@ -2056,6 +2080,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'from_model_id' => $unrelatedPurchaseOrder->id,
                 'purchase_order_ids' => [$unrelatedPurchaseOrder->id],
                 'invoice_number' => 'PINV-CANONICAL-SOURCE-001',
+                'supplier_invoice_number' => 'INV-SUP-CANONICAL-001',
+                'tax_invoice_number' => '010.000-26.00000004',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
             ])
@@ -2167,6 +2193,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_purchase_orders' => [$first['purchaseOrder']->id, $second['purchaseOrder']->id],
                 'selected_purchase_receipts' => [$first['receipt']->id, $second['receipt']->id],
                 'invoice_number' => 'PINV-MULTI-PO-SOURCE-001',
+                'supplier_invoice_number' => 'INV-SUP-MULTI-PO-001',
+                'tax_invoice_number' => '010.000-26.00000005',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
             ])
@@ -2198,6 +2226,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                     'selected_purchase_orders' => [$source['purchaseOrder']->id],
                     'selected_purchase_receipts' => [$source['receipt']->id],
                     'invoice_number' => 'PINV-ROLLBACK-001',
+                    'supplier_invoice_number' => 'INV-SUP-ROLLBACK-001',
+                    'tax_invoice_number' => '010.000-26.00000006',
                     'invoice_date' => now()->format('Y-m-d'),
                     'due_date' => now()->addDays(30)->format('Y-m-d'),
                 ])
@@ -2418,6 +2448,8 @@ class PurchaseInvoiceResourceTest extends TestCase
                 'selected_purchase_orders' => [$purchaseOrder->id],
                 'selected_purchase_receipts' => [$receipt->id],
                 'invoice_number' => 'PINV-RECEIPT-FEE-001',
+                'supplier_invoice_number' => 'INV-SUP-RECEIPT-FEE-001',
+                'tax_invoice_number' => '010.000-26.00000007',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
                 'status' => Invoice::STATUS_DRAFT,

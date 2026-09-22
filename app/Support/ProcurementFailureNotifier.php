@@ -73,7 +73,7 @@ class ProcurementFailureNotifier
         }
 
         if (Str::contains($normalized, ['sqlstate', 'integrity constraint', 'syntax error', 'badmethodcall', 'undefined'])) {
-            return $fallback;
+            return $fallback . ' (Detail: ' . Str::limit($message, 150) . ')';
         }
 
         if (Str::contains($normalized, ['coa', 'akun coa'])) {
@@ -89,6 +89,14 @@ class ProcurementFailureNotifier
 
     public static function danger(string $title, Throwable|string|null $error, string $fallback): void
     {
+        if ($error instanceof Throwable) {
+            \Illuminate\Support\Facades\Log::error($title . ': ' . $error->getMessage(), [
+                'exception' => get_class($error),
+                'file' => $error->getFile() . ':' . $error->getLine(),
+                'trace' => Str::limit($error->getTraceAsString(), 1500),
+            ]);
+        }
+
         Notification::make()
             ->title($title)
             ->body(self::message($error, $fallback))

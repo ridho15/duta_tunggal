@@ -789,7 +789,12 @@ class QualityControlPurchaseResource extends Resource
                             ->afterStateUpdated(function ($set, $state) {
                                 $po = $state ? PurchaseOrder::with(['purchaseOrderItem.product.uom', 'warehouse'])->find($state) : null;
                                 if ($po) {
-                                    $set('warehouse_id', $po->warehouse_id);
+                                    if ($po->warehouse_id) {
+                                        $set('warehouse_id', $po->warehouse_id);
+                                    } else {
+                                        $defaultWarehouseId = \App\Models\Warehouse::withoutGlobalScopes()->where('status', 1)->value('id');
+                                        $set('warehouse_id', $defaultWarehouseId);
+                                    }
                                     $set('cabang_id', $po->cabang_id ?? 1);
                                     $items = [];
                                     foreach ($po->purchaseOrderItem as $poItem) {
@@ -826,17 +831,51 @@ class QualityControlPurchaseResource extends Resource
                                 return HelperController::generateUniqueCode('quality_controls', 'qc_number', 'QC-' . date('Ymd') . '-', 4);
                             })
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Nomor QC wajib diisi.',
+                            ])
                             ->disabled(fn($context) => $context === 'edit')
                             ->dehydrated(true)
                             ->columnSpan(1),
 
                         Select::make('warehouse_id')
-                            ->label('Gudang Penerimaan (Terkunci ke PO)')
-                            ->options(\App\Models\Warehouse::pluck('name', 'id'))
-                            ->disabled()
+                            ->label(function (\Filament\Forms\Get $get) {
+                                $poId = $get('purchase_order_id');
+                                $po = $poId ? PurchaseOrder::find($poId) : null;
+                                return ($po && $po->warehouse_id)
+                                    ? 'Gudang Penerimaan (Terkunci ke PO)'
+                                    : 'Gudang Penerimaan';
+                            })
+                            ->options(function () {
+                                return \App\Models\Warehouse::withoutGlobalScopes()
+                                    ->where('status', 1)
+                                    ->orderBy('name')
+                                    ->get()
+                                    ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"])
+                                    ->all();
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->disabled(function (\Filament\Forms\Get $get) {
+                                $poId = $get('purchase_order_id');
+                                if (! $poId) {
+                                    return false;
+                                }
+                                $po = PurchaseOrder::find($poId);
+                                return (bool) ($po && $po->warehouse_id);
+                            })
                             ->dehydrated(true)
                             ->required()
-                            ->helperText('Gudang penerimaan barang terkunci mengikuti PO tujuan.')
+                            ->validationMessages([
+                                'required' => 'Gudang penerimaan wajib dipilih.',
+                            ])
+                            ->helperText(function (\Filament\Forms\Get $get) {
+                                $poId = $get('purchase_order_id');
+                                $po = $poId ? PurchaseOrder::find($poId) : null;
+                                return ($po && $po->warehouse_id)
+                                    ? 'Gudang penerimaan barang terkunci mengikuti PO tujuan.'
+                                    : 'PO belum memiliki gudang tujuan. Silakan pilih gudang penerimaan barang.';
+                            })
                             ->columnSpan(1),
 
                         Select::make('cabang_id')
@@ -851,11 +890,15 @@ class QualityControlPurchaseResource extends Resource
                         Select::make('inspected_by')
                             ->label('Petugas QC (Inspected By)')
                             ->options(\App\Models\User::pluck('name', 'id'))
-                            ->default(fn(?QualityControl $record) => $record?->inspected_by ?? Auth::id())
-                            ->disabled()
+                            ->default(fn(?QualityControl $record) => $record?->inspected_by ?? Auth::id() ?? auth()->guard('web')->id() ?? \App\Models\User::first()?->id)
+                            ->searchable()
+                            ->preload()
                             ->dehydrated(true)
-                            ->helperText('Terisi otomatis dengan akun login.')
+                            ->helperText('Terisi otomatis dengan akun login, dapat dipilih jika berbeda.')
                             ->required()
+                            ->validationMessages([
+                                'required' => 'Petugas QC wajib diisi.',
+                            ])
                             ->columnSpan(1),
 
                         DatePicker::make('date_send_stock')
@@ -910,6 +953,10 @@ class QualityControlPurchaseResource extends Resource
                                     ->label('Diterima')
                                     ->numeric()
                                     ->required(fn(\Filament\Forms\Get $get) => filled($get('../../purchase_order_id')))
+                                    ->validationMessages([
+                                        'required' => 'Jumlah diterima wajib diisi.',
+                                        'numeric'  => 'Jumlah diterima harus berupa angka.',
+                                    ])
                                     ->reactive()
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function ($set, $get, $state) {
@@ -924,6 +971,10 @@ class QualityControlPurchaseResource extends Resource
                                     ->label('Lolos')
                                     ->numeric()
                                     ->required(fn(\Filament\Forms\Get $get) => filled($get('../../purchase_order_id')))
+                                    ->validationMessages([
+                                        'required' => 'Jumlah lolos wajib diisi.',
+                                        'numeric'  => 'Jumlah lolos harus berupa angka.',
+                                    ])
                                     ->reactive()
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function ($set, $get, $state) {

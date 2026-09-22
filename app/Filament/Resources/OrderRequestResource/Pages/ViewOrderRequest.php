@@ -200,6 +200,7 @@ class ViewOrderRequest extends ViewRecord
 
                     return [
                         'supplier_id'           => $isMultiSupplier ? null : $firstSupplierId,
+                        'warehouse_id'          => \App\Models\Warehouse::withoutGlobalScopes()->where('status', 1)->value('id'),
                         'order_date'            => now()->format('Y-m-d'),
                         'create_purchase_order' => true,
                         'multi_supplier'        => $isMultiSupplier,
@@ -216,6 +217,7 @@ class ViewOrderRequest extends ViewRecord
                                 ->default(true)
                                 ->live()
                                 ->columnSpanFull(),
+                            Hidden::make('supplier_id'),
                             Hidden::make('multi_supplier'),
                             Placeholder::make('multi_supplier_notice')
                                 ->label('')
@@ -373,10 +375,15 @@ class ViewOrderRequest extends ViewRecord
                     } catch (ValidationException $exception) {
                         throw $exception;
                     } catch (Throwable $exception) {
+                        \Illuminate\Support\Facades\Log::error('Order Request approve action failure', [
+                            'order_request_id' => $record->id,
+                            'message' => $exception->getMessage(),
+                            'file' => $exception->getFile() . ':' . $exception->getLine(),
+                        ]);
                         ProcurementFailureNotifier::danger(
                             'Gagal Memproses Order Request',
                             $exception,
-                            'Order request belum dapat diproses. Periksa data yang dipilih lalu coba lagi.'
+                            'Order request belum dapat diproses: ' . $exception->getMessage()
                         );
                     }
                 }),
@@ -463,6 +470,7 @@ class ViewOrderRequest extends ViewRecord
                     return [
                         'supplier_id'    => $isMultiSupplier ? null : $firstSupplierId,
                         'cabang_id'      => $isMultiSupplier ? null : ($items[0]['item_cabang_id'] ?? null),
+                        'warehouse_id'   => \App\Models\Warehouse::withoutGlobalScopes()->where('status', 1)->value('id'),
                         'multi_supplier' => $isMultiSupplier,
                         'selected_items' => $items,
                     ];
@@ -485,6 +493,24 @@ class ViewOrderRequest extends ViewRecord
                                 ->nullable()
                                 ->native(false)
                                 ->displayFormat('d M Y'),
+                            Select::make('warehouse_id')
+                                ->label('Gudang Tujuan Penerimaan')
+                                ->options(function () {
+                                    return \App\Models\Warehouse::withoutGlobalScopes()
+                                        ->where('status', 1)
+                                        ->orderBy('name')
+                                        ->get()
+                                        ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"])
+                                        ->all();
+                                })
+                                ->searchable()
+                                ->preload()
+                                ->required()
+                                ->validationMessages([
+                                    'required' => 'Gudang tujuan penerimaan wajib dipilih.',
+                                ])
+                                ->helperText('Gudang tujuan penerimaan fisik barang untuk PO yang akan dibuat.')
+                                ->columnSpanFull(),
                             Textarea::make('note')
                                 ->label('Catatan')
                                 ->nullable()
@@ -506,60 +532,77 @@ class ViewOrderRequest extends ViewRecord
                     return OrderRequestResource::hasApprovedItemsAvailableForPurchaseOrder($record);
                 })
                 ->action(function (array $data, $record) {
-                    $orderRequestService = app(OrderRequestService::class);
-                    $includedItems = OrderRequestResource::selectedPurchaseOrderApprovedItems($data['selected_items'] ?? []);
-                    if ($includedItems->isEmpty()) {
-                        HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.');
-                        return;
-                    }
-
-                    $groups = $includedItems->groupBy(function ($item) {
-                        return implode('|', [
-                            (string) ($item['item_supplier_id'] ?? ''),
-                            (string) ($item['item_cabang_id'] ?? ''),
-                        ]);
-                    });
-
-                    if (!empty($data['multi_supplier']) || $groups->count() > 1) {
-                        $created = 0;
-                        foreach ($groups as $groupItems) {
-                            $firstItem = $groupItems->first();
-                            $supplierId = $firstItem['item_supplier_id'] ?? null;
-                            $cabangId = $firstItem['item_cabang_id'] ?? null;
-                            if (empty($supplierId) || empty($cabangId)) {
-                                continue;
-                            }
-
-                            $poData = array_merge($data, [
-                                'supplier_id'    => $supplierId,
-                                'cabang_id'      => $cabangId,
-                                'po_number'      => self::generateUniquePoNumber(),
-                                'selected_items' => $groupItems->values()->toArray(),
-                                'multi_supplier' => false,
-                            ]);
-
-                            $orderRequestService->createPurchaseOrder($record, $poData);
-                            $created++;
+                    try {
+                        $orderRequestService = app(OrderRequestService::class);
+                        $includedItems = OrderRequestResource::selectedPurchaseOrderApprovedItems($data['selected_items'] ?? []);
+                        if ($includedItems->isEmpty()) {
+                            HelperController::sendNotification(isSuccess: false, title: 'Perhatian', message: 'Tidak ada item Approved dengan sisa qty yang bisa dibuatkan Purchase Order.');
+                            return;
                         }
 
-                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: "{$created} Purchase Order berhasil dibuat per supplier.");
+                        $groups = $includedItems->groupBy(function ($item) {
+                            return implode('|', [
+                                (string) ($item['item_supplier_id'] ?? ''),
+                                (string) ($item['item_cabang_id'] ?? ''),
+                            ]);
+                        });
+
+                        if (!empty($data['multi_supplier']) || $groups->count() > 1) {
+                            $created = 0;
+                            foreach ($groups as $groupItems) {
+                                $firstItem = $groupItems->first();
+                                $supplierId = $firstItem['item_supplier_id'] ?? null;
+                                $pusatCabangId = \App\Models\Cabang::where('kode', 'CBG-001')->orWhere('nama', 'like', '%pusat%')->value('id') ?? 1;
+                                $cabangId = $firstItem['item_cabang_id'] ?? $pusatCabangId;
+                                if (empty($supplierId)) {
+                                    continue;
+                                }
+
+                                $poData = array_merge($data, [
+                                    'supplier_id'    => $supplierId,
+                                    'cabang_id'      => $cabangId,
+                                    'warehouse_id'   => $data['warehouse_id'] ?? null,
+                                    'po_number'      => self::generateUniquePoNumber(),
+                                    'selected_items' => $groupItems->values()->toArray(),
+                                    'multi_supplier' => false,
+                                ]);
+
+                                $orderRequestService->createPurchaseOrder($record, $poData);
+                                $created++;
+                            }
+
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "{$created} Purchase Order berhasil dibuat per supplier.");
+                            $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
+                            return;
+                        }
+
+                        $data['po_number'] = $data['po_number'] ?? self::generateUniquePoNumber();
+                        $data['supplier_id'] = $data['supplier_id'] ?? self::resolveFirstIncludedSupplierId($includedItems);
+                        $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? null);
+
+                        $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
+                        if ($purchaseOrder) {
+                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
+                            return;
+                        }
+
+                        $orderRequestService->createPurchaseOrder($record, $data);
+                        HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
                         $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
-                        return;
+                    } catch (ValidationException $exception) {
+                        throw $exception;
+                    } catch (Throwable $exception) {
+                        \Illuminate\Support\Facades\Log::error('ViewOrderRequest create_purchase_order failure', [
+                            'order_request_id' => $record->id,
+                            'message' => $exception->getMessage(),
+                            'file' => $exception->getFile() . ':' . $exception->getLine(),
+                        ]);
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Membuat Purchase Order',
+                            $exception,
+                            'Purchase Order belum dapat dibuat: ' . $exception->getMessage()
+                        );
                     }
-
-                    $data['po_number'] = $data['po_number'] ?? self::generateUniquePoNumber();
-                    $data['supplier_id'] = $data['supplier_id'] ?? self::resolveFirstIncludedSupplierId($includedItems);
-                    $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? null);
-
-                    $purchaseOrder = PurchaseOrder::where('po_number', $data['po_number'])->first();
-                    if ($purchaseOrder) {
-                        HelperController::sendNotification(isSuccess: false, title: "Information", message: "PO Number sudah digunakan !");
-                        return;
-                    }
-
-                    $orderRequestService->createPurchaseOrder($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Purchase Order berhasil dibuat dan otomatis disetujui.");
-                    $this->redirect(OrderRequestResource::getUrl('view', ['record' => $record]));
                 })
         ];
     }

@@ -2816,6 +2816,7 @@ class OrderRequestResource extends Resource
                             return [
                                 'supplier_id'           => $isMultiSupplier ? null : ($items[0]['item_supplier_id'] ?? null),
                                 'cabang_id'             => $isMultiSupplier ? null : $firstCabangId,
+                                'warehouse_id'          => \App\Models\Warehouse::withoutGlobalScopes()->where('status', 1)->value('id'),
                                 'order_date'            => now()->format('Y-m-d'),
                                 'create_purchase_order' => true,
                                 'multi_supplier'        => $isMultiSupplier,
@@ -2857,6 +2858,24 @@ class OrderRequestResource extends Resource
                                         ->nullable()
                                         ->native(false)
                                         ->displayFormat('d M Y'),
+                                    Select::make('warehouse_id')
+                                        ->label('Gudang Tujuan Penerimaan')
+                                        ->options(function () {
+                                            return \App\Models\Warehouse::withoutGlobalScopes()
+                                                ->where('status', 1)
+                                                ->orderBy('name')
+                                                ->get()
+                                                ->mapWithKeys(fn ($w) => [$w->id => "({$w->kode}) {$w->name}"])
+                                                ->all();
+                                        })
+                                        ->searchable()
+                                        ->preload()
+                                        ->required(fn(Get $get) => (bool) $get('create_purchase_order'))
+                                        ->validationMessages([
+                                            'required' => 'Gudang tujuan penerimaan wajib dipilih.',
+                                        ])
+                                        ->helperText('Gudang tujuan penerimaan fisik barang untuk PO yang akan dibuat.')
+                                        ->columnSpanFull(),
                                     Textarea::make('note')
                                         ->label('Catatan')
                                         ->nullable()
@@ -2942,6 +2961,7 @@ class OrderRequestResource extends Resource
                                             $poData = array_merge($data, [
                                                 'supplier_id'    => $supplierId,
                                                 'cabang_id'      => $cabangId,
+                                                'warehouse_id'   => $data['warehouse_id'] ?? null,
                                                 'po_number'      => $poNumber,
                                                 'selected_items' => $groupItems->values()->toArray(),
                                                 'multi_supplier' => false,
@@ -2983,10 +3003,15 @@ class OrderRequestResource extends Resource
                             } catch (ValidationException $exception) {
                                 throw $exception;
                             } catch (Throwable $exception) {
+                                \Illuminate\Support\Facades\Log::error('OrderRequestResource table action approve failure', [
+                                    'order_request_id' => $record->id,
+                                    'message' => $exception->getMessage(),
+                                    'file' => $exception->getFile() . ':' . $exception->getLine(),
+                                ]);
                                 ProcurementFailureNotifier::danger(
                                     'Gagal Memproses Order Request',
                                     $exception,
-                                    'Order request belum dapat diproses. Periksa data yang dipilih lalu coba lagi.'
+                                    'Order request belum dapat diproses: ' . $exception->getMessage()
                                 );
                             }
                         }),

@@ -112,8 +112,19 @@ class CreateQualityControlPurchase extends CreateRecord
 
             // Lock destination warehouse and accounting branch to Pusat
             $defaultCabangId = \App\Models\Cabang::where('kode', 'CBG-001')->value('id') ?? \App\Models\Cabang::first()?->id;
-            $data['warehouse_id'] = $po->warehouse_id;
+            $targetWarehouseId = $po->warehouse_id ?: ($data['warehouse_id'] ?? null);
+            if (! $targetWarehouseId) {
+                $targetWarehouseId = \App\Models\Warehouse::withoutGlobalScopes()->where('status', 1)->value('id')
+                    ?? \App\Models\Warehouse::withoutGlobalScopes()->value('id');
+            }
+            if ($targetWarehouseId && ! $po->warehouse_id) {
+                $po->update(['warehouse_id' => $targetWarehouseId]);
+            }
+            $data['warehouse_id'] = $targetWarehouseId;
             $data['cabang_id'] = $po->cabang_id ?? $defaultCabangId;
+            if (empty($data['inspected_by'])) {
+                $data['inspected_by'] = Auth::id() ?? auth()->guard('web')->id() ?? \App\Models\User::first()?->id;
+            }
 
             if (isset($data['items']) && is_array($data['items'])) {
                 if (empty($data['items'])) {

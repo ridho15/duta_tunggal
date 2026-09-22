@@ -625,7 +625,23 @@ class PurchaseInvoiceAccountingService
                 ])->save();
             });
 
-            return $this->finaliseInvoice($invoice->fresh(['invoiceItem', 'accountPayable']), replaceExistingJournals: false);
+            $fresh = $invoice->fresh(['invoiceItem', 'accountPayable']);
+
+            // For repair, always sync AP regardless of draft status — we are correcting
+            // potentially corrupted legacy data that may already have an AP record.
+            $repairedFull = $this->finaliseInvoice($fresh, replaceExistingJournals: false);
+
+            // If the invoice is still in DRAFT after finaliseInvoice (which skips AP for
+            // draft), explicitly sync the AP so the repair always corrects the balance.
+            if (strtolower((string) $repairedFull->status) === Invoice::STATUS_DRAFT) {
+                $this->syncAccountPayable(
+                    $repairedFull->fresh(),
+                    (float) $repairedFull->total,
+                    $repairedFull->cabang_id
+                );
+            }
+
+            return $repairedFull->fresh(['invoiceItem', 'accountPayable']);
         });
     }
 
