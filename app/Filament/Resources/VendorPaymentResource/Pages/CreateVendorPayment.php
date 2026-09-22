@@ -61,6 +61,18 @@ class CreateVendorPayment extends CreateRecord
                     'payment_details' => $paymentDetails,
                     'target_bank_account' => $targetAccount,
                     'payment_date' => now()->toDateString(),
+                    // fill() kedua ini menimpa seluruh state form, termasuk field yang tidak disebut di sini —
+                    // default komponen (mis. Toggle/TextInput::default()) tidak dipakai ulang pada fill() kedua.
+                    // Tanpa baris ini, ppn_import_amount/pph22_amount/bea_masuk_amount jadi '' lalu di-dehydrate
+                    // ke null oleh macro indonesianMoney(), padahal kolomnya NOT NULL -> insert gagal (SQLSTATE 23000).
+                    'is_import_payment' => false,
+                    'ppn_import_amount' => VendorPaymentResource::formatMoneyState(0),
+                    'pph22_amount' => VendorPaymentResource::formatMoneyState(0),
+                    'bea_masuk_amount' => VendorPaymentResource::formatMoneyState(0),
+                    // Hidden::make(...)->default(0); sama seperti di atas, default komponen tidak terpakai lagi
+                    // pada fill() kedua ini sehingga jadi null, padahal kolomnya NOT NULL.
+                    'payment_adjustment' => 0,
+                    'diskon' => 0,
                 ]);
 
                 // Repeater payment_details baru tampil bila state-nya tidak kosong, sehingga fill() di atas

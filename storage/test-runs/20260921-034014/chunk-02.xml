@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="218" assertions="695" errors="20" failures="1" skipped="0" time="213.583737">
+    <testsuite name="Tests\Feature\AutoBankReconciliationTest" file="tests/Feature/AutoBankReconciliationTest.php" tests="1" assertions="7" errors="0" failures="0" skipped="0" time="5.145106">
+      <testcase name="it auto creates bank reconciliation when transfer is posted" file="tests/Feature/AutoBankReconciliationTest.php::it auto creates bank reconciliation when transfer is posted" class="Tests\Feature\AutoBankReconciliationTest" classname="Tests.Feature.AutoBankReconciliationTest" assertions="7" time="5.145106"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetClassicLayoutTest" file="tests/Feature/BalanceSheetClassicLayoutTest.php" tests="22" assertions="52" errors="0" failures="0" skipped="0" time="11.690119">
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it returns at least 2 asset groups" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it returns at least 2 asset groups" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="2" time="0.487204"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it each group has required keys" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it each group has required keys" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="10" time="0.474385"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it KAS DAN BANK group total = 25_000_000" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it KAS DAN BANK group total = 25_000_000" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.478946"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it children include code/name/balance" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it children include code/name/balance" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="7" time="0.544760"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it children include 100.01 and 100.02" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it children include 100.01 and 100.02" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="2" time="0.566414"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it groups sorted by parent_code ascending" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it groups sorted by parent_code ascending" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.538883"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it zero-balance child excluded when include_zero_balances=false" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it zero-balance child excluded when include_zero_balances=false" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.523072"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it zero-balance child included when include_zero_balances=true" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it zero-balance child included when include_zero_balances=true" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.490720"/>
+      <testcase name="`Classic Balance Sheet Layout` → `buildClassicGroups()` → it total_label = &quot;TOTAL &quot; + uppercase parent name" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `buildClassicGroups()` → it total_label = &quot;TOTAL &quot; + uppercase parent name" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.483745"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it returns all required top-level keys" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it returns all required top-level keys" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="11" time="0.473729"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it total_assets = 75_000_000" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it total_assets = 75_000_000" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.486508"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it BANK group total = 50_000_000" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it BANK group total = 50_000_000" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.541240"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it HUTANG DAGANG total = 30_000_000" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it HUTANG DAGANG total = 30_000_000" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="2" time="0.556843"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it MODAL equity total = 45_000_000" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it MODAL equity total = 45_000_000" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.715246"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it is_balanced is bool" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it is_balanced is bool" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.711682"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it liability total negative when debit &gt; credit" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it liability total negative when debit &gt; credit" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.641860"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it total_liabilities_and_equity = total_liabilities + total_equity" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it total_liabilities_and_equity = total_liabilities + total_equity" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.504972"/>
+      <testcase name="`Classic Balance Sheet Layout` → `getClassicReportData()` → it sum of asset group totals = total_assets when showZero=true" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `getClassicReportData()` → it sum of asset group totals = total_assets when showZero=true" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.525327"/>
+      <testcase name="`Classic Balance Sheet Layout` → `classic_view property` → it defaults to false" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `classic_view property` → it defaults to false" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.528787"/>
+      <testcase name="`Classic Balance Sheet Layout` → `classic_view property` → it can be set to true" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `classic_view property` → it can be set to true" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.473477"/>
+      <testcase name="`Classic Balance Sheet Layout` → `classic_view property` → it asset_groups is an array" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `classic_view property` → it asset_groups is an array" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="1" time="0.465805"/>
+      <testcase name="`Classic Balance Sheet Layout` → `classic_view property` → it all child balances are float" file="tests/Feature/BalanceSheetClassicLayoutTest.php::`Classic Balance Sheet Layout` → `classic_view property` → it all child balances are float" class="Tests\Feature\BalanceSheetClassicLayoutTest" classname="Tests.Feature.BalanceSheetClassicLayoutTest" assertions="3" time="0.476515"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetComparisonTest" file="tests/Feature/BalanceSheetComparisonTest.php" tests="10" assertions="42" errors="0" failures="0" skipped="0" time="5.168142">
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it enables comparison mode correctly" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it enables comparison mode correctly" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="2" time="0.525460"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it disables comparison mode correctly" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it disables comparison mode correctly" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="2" time="0.485668"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it returns null comparison data when comparison is disabled" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it returns null comparison data when comparison is disabled" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="1" time="0.468397"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it returns null comparison data when comparison date is not set" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it returns null comparison data when comparison date is not set" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="1" time="0.488864"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it calculates comparison data correctly for same period" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it calculates comparison data correctly for same period" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="5" time="0.603722"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it calculates comparison data correctly for different periods" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it calculates comparison data correctly for different periods" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="5" time="0.514933"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it handles comparison with zero previous values" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it handles comparison with zero previous values" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="5" time="0.516124"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it applies branch filter to comparison data" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it applies branch filter to comparison data" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="3" time="0.554519"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it calculates percentage changes correctly" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it calculates percentage changes correctly" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="5" time="0.497146"/>
+      <testcase name="`Balance Sheet Comparison Functionality Tests` → it includes all balance sheet sections in comparison" file="tests/Feature/BalanceSheetComparisonTest.php::`Balance Sheet Comparison Functionality Tests` → it includes all balance sheet sections in comparison" class="Tests\Feature\BalanceSheetComparisonTest" classname="Tests.Feature.BalanceSheetComparisonTest" assertions="13" time="0.513306"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetConsistencyTest" file="tests/Feature/BalanceSheetConsistencyTest.php" tests="3" assertions="32" errors="0" failures="0" skipped="0" time="2.967245">
+      <testcase name="balance sheet remains balanced after purchase transaction with payment" file="tests/Feature/BalanceSheetConsistencyTest.php::balance sheet remains balanced after purchase transaction with payment" class="Tests\Feature\BalanceSheetConsistencyTest" classname="Tests.Feature.BalanceSheetConsistencyTest" assertions="10" time="0.756787"/>
+      <testcase name="balance sheet remains balanced after sales transaction with payment" file="tests/Feature/BalanceSheetConsistencyTest.php::balance sheet remains balanced after sales transaction with payment" class="Tests\Feature\BalanceSheetConsistencyTest" classname="Tests.Feature.BalanceSheetConsistencyTest" assertions="9" time="1.358508"/>
+      <testcase name="balance sheet remains balanced after multiple purchase and sales transactions" file="tests/Feature/BalanceSheetConsistencyTest.php::balance sheet remains balanced after multiple purchase and sales transactions" class="Tests\Feature\BalanceSheetConsistencyTest" classname="Tests.Feature.BalanceSheetConsistencyTest" assertions="13" time="0.851950"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetExportTest" file="tests/Feature/BalanceSheetExportTest.php" tests="4" assertions="6" errors="0" failures="0" skipped="0" time="2.239633">
+      <testcase name="`BalanceSheetPage Export Tests` → it can export PDF with filters applied" file="tests/Feature/BalanceSheetExportTest.php::`BalanceSheetPage Export Tests` → it can export PDF with filters applied" class="Tests\Feature\BalanceSheetExportTest" classname="Tests.Feature.BalanceSheetExportTest" assertions="1" time="0.686433"/>
+      <testcase name="`BalanceSheetPage Export Tests` → it can export Excel with filters applied" file="tests/Feature/BalanceSheetExportTest.php::`BalanceSheetPage Export Tests` → it can export Excel with filters applied" class="Tests\Feature\BalanceSheetExportTest" classname="Tests.Feature.BalanceSheetExportTest" assertions="1" time="0.574319"/>
+      <testcase name="`BalanceSheetPage Export Tests` → it exports include filtered data correctly" file="tests/Feature/BalanceSheetExportTest.php::`BalanceSheetPage Export Tests` → it exports include filtered data correctly" class="Tests\Feature\BalanceSheetExportTest" classname="Tests.Feature.BalanceSheetExportTest" assertions="2" time="0.494084"/>
+      <testcase name="`BalanceSheetPage Export Tests` → it exports work with all branches filter" file="tests/Feature/BalanceSheetExportTest.php::`BalanceSheetPage Export Tests` → it exports work with all branches filter" class="Tests\Feature\BalanceSheetExportTest" classname="Tests.Feature.BalanceSheetExportTest" assertions="2" time="0.484797"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetPageFrontendTest" file="tests/Feature/BalanceSheetPageFrontendTest.php" tests="20" assertions="63" errors="0" failures="0" skipped="0" time="14.748534">
+      <testcase name="`BalanceSheetPage Frontend Tests` → it renders the balance sheet page correctly" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it renders the balance sheet page correctly" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="5" time="0.483094"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays summary cards with correct data" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays summary cards with correct data" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="6" time="0.491913"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays account rows with proper formatting" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays account rows with proper formatting" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="6" time="0.515806"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it shows balanced status when assets equal liabilities plus equity" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it shows balanced status when assets equal liabilities plus equity" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="2" time="0.497116"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays filter section with proper inputs" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays filter section with proper inputs" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="4" time="0.563054"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it can toggle comparison mode and show comparison inputs" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it can toggle comparison mode and show comparison inputs" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="2" time="0.523050"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays export buttons" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays export buttons" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="0.475667"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it shows drill down modal when account is clicked" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it shows drill down modal when account is clicked" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="2" time="0.483902"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays drill down modal content correctly" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays drill down modal content correctly" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="7" time="0.495018"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it closes drill down modal correctly" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it closes drill down modal correctly" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="0.511288"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays cabang options in filter dropdown" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays cabang options in filter dropdown" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="1" time="0.493050"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it shows proper section headers with icons" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it shows proper section headers with icons" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="0.476857"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays subsection headers correctly" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays subsection headers correctly" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="0.537527"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it shows total rows with proper styling" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it shows total rows with proper styling" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="0.823828"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays account codes in monospace font" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays account codes in monospace font" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="0.520183"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it shows retained earnings section" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it shows retained earnings section" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="2" time="0.605444"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays current ratio in summary cards" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays current ratio in summary cards" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="2" time="1.401706"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it renders comparison section when enabled" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it renders comparison section when enabled" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="1" time="1.613120"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it shows proper balance check message" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it shows proper balance check message" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="2" time="1.787523"/>
+      <testcase name="`BalanceSheetPage Frontend Tests` → it displays account balances with proper formatting" file="tests/Feature/BalanceSheetPageFrontendTest.php::`BalanceSheetPage Frontend Tests` → it displays account balances with proper formatting" class="Tests\Feature\BalanceSheetPageFrontendTest" classname="Tests.Feature.BalanceSheetPageFrontendTest" assertions="3" time="1.449391"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetPageTest" file="tests/Feature/BalanceSheetPageTest.php" tests="11" assertions="35" errors="0" failures="0" skipped="0" time="35.801447">
+      <testcase name="`BalanceSheetPage Backend Tests` → it can mount the page with default values" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can mount the page with default values" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="3" time="2.053436"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can generate balance sheet data" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can generate balance sheet data" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="4" time="3.459708"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can get cabang options" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can get cabang options" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="3" time="2.043565"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can toggle comparison mode" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can toggle comparison mode" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="2" time="2.659760"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can get comparison data when comparison is enabled" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can get comparison data when comparison is enabled" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="5" time="5.163424"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can show account details" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can show account details" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="2" time="4.066779"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can close drill down modal" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can close drill down modal" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="2" time="3.305491"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can get drill down data for account" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can get drill down data for account" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="9" time="2.970673"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it validates date before generating report" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it validates date before generating report" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="1" time="3.929231"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it can filter by cabang" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it can filter by cabang" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="1" time="2.352513"/>
+      <testcase name="`BalanceSheetPage Backend Tests` → it builds balance alert data when sheet is unbalanced" file="tests/Feature/BalanceSheetPageTest.php::`BalanceSheetPage Backend Tests` → it builds balance alert data when sheet is unbalanced" class="Tests\Feature\BalanceSheetPageTest" classname="Tests.Feature.BalanceSheetPageTest" assertions="3" time="3.796870"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BalanceSheetServiceTest" file="tests/Feature/BalanceSheetServiceTest.php" tests="22" assertions="76" errors="0" failures="0" skipped="0" time="44.205751">
+      <testcase name="`Balance Sheet Structure` → it generates complete balance sheet structure" file="tests/Feature/BalanceSheetServiceTest.php::`Balance Sheet Structure` → it generates complete balance sheet structure" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="28" time="3.647647"/>
+      <testcase name="`Balance Sheet Structure` → it correctly calculates asset balances (debit - credit)" file="tests/Feature/BalanceSheetServiceTest.php::`Balance Sheet Structure` → it correctly calculates asset balances (debit - credit)" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="3.217188"/>
+      <testcase name="`Balance Sheet Structure` → it correctly calculates liability balances (credit - debit)" file="tests/Feature/BalanceSheetServiceTest.php::`Balance Sheet Structure` → it correctly calculates liability balances (credit - debit)" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="0.706148"/>
+      <testcase name="`Current vs Non-Current Classification` → it separates current and non-current assets correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Current vs Non-Current Classification` → it separates current and non-current assets correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="4" time="1.166235"/>
+      <testcase name="`Current vs Non-Current Classification` → it separates current and long-term liabilities correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Current vs Non-Current Classification` → it separates current and long-term liabilities correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="4" time="1.992981"/>
+      <testcase name="`Retained Earnings Calculation` → it calculates retained earnings from revenue and expenses" file="tests/Feature/BalanceSheetServiceTest.php::`Retained Earnings Calculation` → it calculates retained earnings from revenue and expenses" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="3" time="3.038482"/>
+      <testcase name="`Retained Earnings Calculation` → it handles negative retained earnings (accumulated loss)" file="tests/Feature/BalanceSheetServiceTest.php::`Retained Earnings Calculation` → it handles negative retained earnings (accumulated loss)" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="3" time="3.060892"/>
+      <testcase name="`Date-based Balance Calculation` → it includes only transactions up to the specified date" file="tests/Feature/BalanceSheetServiceTest.php::`Date-based Balance Calculation` → it includes only transactions up to the specified date" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="4.368417"/>
+      <testcase name="`Date-based Balance Calculation` → it calculates cumulative balance correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Date-based Balance Calculation` → it calculates cumulative balance correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="3.387789"/>
+      <testcase name="`Cabang Filtering` → it filters by specific cabang when provided" file="tests/Feature/BalanceSheetServiceTest.php::`Cabang Filtering` → it filters by specific cabang when provided" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="3.547715"/>
+      <testcase name="`Cabang Filtering` → it includes all cabang when cabang_id is null" file="tests/Feature/BalanceSheetServiceTest.php::`Cabang Filtering` → it includes all cabang when cabang_id is null" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="3.111190"/>
+      <testcase name="`Period Comparison` → it compares two balance sheet dates correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Period Comparison` → it compares two balance sheet dates correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="4" time="1.997101"/>
+      <testcase name="`Drill-down Functionality` → it retrieves journal entries for specific account" file="tests/Feature/BalanceSheetServiceTest.php::`Drill-down Functionality` → it retrieves journal entries for specific account" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="5" time="0.759034"/>
+      <testcase name="`Drill-down Functionality` → it filters drill-down by cabang" file="tests/Feature/BalanceSheetServiceTest.php::`Drill-down Functionality` → it filters drill-down by cabang" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="2" time="0.997475"/>
+      <testcase name="`Financial Ratios and Summary` → it calculates current ratio correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Financial Ratios and Summary` → it calculates current ratio correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="1.534399"/>
+      <testcase name="`Financial Ratios and Summary` → it calculates debt-to-equity ratio correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Financial Ratios and Summary` → it calculates debt-to-equity ratio correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="1.170756"/>
+      <testcase name="`Financial Ratios and Summary` → it calculates working capital correctly" file="tests/Feature/BalanceSheetServiceTest.php::`Financial Ratios and Summary` → it calculates working capital correctly" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="1" time="0.640493"/>
+      <testcase name="`Balance Verification` → it detects balanced sheet" file="tests/Feature/BalanceSheetServiceTest.php::`Balance Verification` → it detects balanced sheet" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="2" time="1.113455"/>
+      <testcase name="`Balance Verification` → it detects unbalanced sheet" file="tests/Feature/BalanceSheetServiceTest.php::`Balance Verification` → it detects unbalanced sheet" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="4" time="2.330150"/>
+      <testcase name="`Edge Cases` → it handles zero balance accounts (excludes from list)" file="tests/Feature/BalanceSheetServiceTest.php::`Edge Cases` → it handles zero balance accounts (excludes from list)" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="2" time="0.857729"/>
+      <testcase name="`Edge Cases` → it handles empty balance sheet (no transactions)" file="tests/Feature/BalanceSheetServiceTest.php::`Edge Cases` → it handles empty balance sheet (no transactions)" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="4" time="0.585337"/>
+      <testcase name="`Edge Cases` → it handles division by zero in ratios" file="tests/Feature/BalanceSheetServiceTest.php::`Edge Cases` → it handles division by zero in ratios" class="Tests\Feature\BalanceSheetServiceTest" classname="Tests.Feature.BalanceSheetServiceTest" assertions="2" time="0.975138"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BillOfMaterialResourceReactivePriceTest" file="tests/Feature/BillOfMaterialResourceReactivePriceTest.php" tests="3" assertions="19" errors="0" failures="1" skipped="0" time="2.582116">
+      <testcase name="bom item price refreshes when material changes" file="tests/Feature/BillOfMaterialResourceReactivePriceTest.php::bom item price refreshes when material changes" class="Tests\Feature\BillOfMaterialResourceReactivePriceTest" classname="Tests.Feature.BillOfMaterialResourceReactivePriceTest" assertions="5" time="1.166133">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">bom item price refreshes when material changesFailed asserting that two strings are equal.
+at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+at tests/Feature/BillOfMaterialResourceReactivePriceTest.php:113</failure>
+      </testcase>
+      <testcase name="bom conversion rows load from selected product" file="tests/Feature/BillOfMaterialResourceReactivePriceTest.php::bom conversion rows load from selected product" class="Tests\Feature\BillOfMaterialResourceReactivePriceTest" classname="Tests.Feature.BillOfMaterialResourceReactivePriceTest" assertions="6" time="0.685510"/>
+      <testcase name="bom conversion rows preload on edit and view" file="tests/Feature/BillOfMaterialResourceReactivePriceTest.php::bom conversion rows preload on edit and view" class="Tests\Feature\BillOfMaterialResourceReactivePriceTest" classname="Tests.Feature.BillOfMaterialResourceReactivePriceTest" assertions="8" time="0.730473"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BillOfMaterialTest" file="Bill Of Material (Tests\Feature\BillOfMaterial)" tests="10" assertions="37" errors="0" failures="0" skipped="0" time="11.607368">
+      <testcase name="Bom creation with components" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom creation with components" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="4" time="0.616082"/>
+      <testcase name="Multi level bom support" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Multi level bom support" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="4" time="0.849471"/>
+      <testcase name="Bom cost calculation" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom cost calculation" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="2" time="0.824134"/>
+      <testcase name="Bom version update" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom version update" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="3" time="0.779697"/>
+      <testcase name="Bom code generation" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom code generation" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="5" time="0.565208"/>
+      <testcase name="Bom relationships" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom relationships" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="9" time="1.856642"/>
+      <testcase name="Bom soft delete cascade" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom soft delete cascade" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="3" time="0.759165"/>
+      <testcase name="Bom active status filtering" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom active status filtering" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="2" time="3.315815"/>
+      <testcase name="Bom item subtotal calculation" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom item subtotal calculation" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="4" time="1.444600"/>
+      <testcase name="Bom with zero costs" file="Bill Of Material (Tests\Feature\BillOfMaterial)::Bom with zero costs" class="Tests\Feature\BillOfMaterialTest" classname="Tests.Feature.BillOfMaterialTest" assertions="1" time="0.596555"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BranchInheritanceFlowTest" file="tests/Feature/BranchInheritanceFlowTest.php" tests="12" assertions="13" errors="1" failures="0" skipped="0" time="8.064486">
+      <testcase name="sale order inherits cabang from quotation source" file="tests/Feature/BranchInheritanceFlowTest.php::sale order inherits cabang from quotation source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.557866"/>
+      <testcase name="sales invoice inherits cabang from sale order source" file="tests/Feature/BranchInheritanceFlowTest.php::sales invoice inherits cabang from sale order source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.546027"/>
+      <testcase name="sales invoice inherits tax fields from sale order source" file="tests/Feature/BranchInheritanceFlowTest.php::sales invoice inherits tax fields from sale order source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="3" time="0.526963"/>
+      <testcase name="purchase invoice inherits cabang from selected purchase order source" file="tests/Feature/BranchInheritanceFlowTest.php::purchase invoice inherits cabang from selected purchase order source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="0" time="0.609618">
+        <error type="Illuminate\Validation\ValidationException">purchase invoice inherits cabang from selected purchase order sourceIlluminate\Validation\ValidationException: Minimal satu Purchase Receipt harus dipilih.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Services/PurchaseInvoiceAccountingService.php:172
+at app/Filament/Resources/PurchaseInvoiceResource/Pages/CreatePurchaseInvoice.php:25
+at tests/Feature/BranchInheritanceFlowTest.php:39
+at tests/Feature/BranchInheritanceFlowTest.php:135</error>
+      </testcase>
+      <testcase name="manufacturing order inherits cabang from production plan sale order source" file="tests/Feature/BranchInheritanceFlowTest.php::manufacturing order inherits cabang from production plan sale order source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="1.565656"/>
+      <testcase name="manufacturing order create page does not auto-create warehouse confirmation" file="tests/Feature/BranchInheritanceFlowTest.php::manufacturing order create page does not auto-create warehouse confirmation" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.511040"/>
+      <testcase name="production plan inherits cabang from selected BOM source" file="tests/Feature/BranchInheritanceFlowTest.php::production plan inherits cabang from selected BOM source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.545134"/>
+      <testcase name="asset transfer inherits source cabang from selected asset" file="tests/Feature/BranchInheritanceFlowTest.php::asset transfer inherits source cabang from selected asset" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.870170"/>
+      <testcase name="delivery order inherits cabang from selected sales order source" file="tests/Feature/BranchInheritanceFlowTest.php::delivery order inherits cabang from selected sales order source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.621081"/>
+      <testcase name="surat jalan inherits cabang from selected delivery order source" file="tests/Feature/BranchInheritanceFlowTest.php::surat jalan inherits cabang from selected delivery order source" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.530410"/>
+      <testcase name="delivery order rejects mixed-branch sales orders" file="tests/Feature/BranchInheritanceFlowTest.php::delivery order rejects mixed-branch sales orders" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.641542"/>
+      <testcase name="surat jalan rejects mixed-branch delivery orders" file="tests/Feature/BranchInheritanceFlowTest.php::surat jalan rejects mixed-branch delivery orders" class="Tests\Feature\BranchInheritanceFlowTest" classname="Tests.Feature.BranchInheritanceFlowTest" assertions="1" time="0.538979"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BukuBesarLivewireTest" file="Buku Besar Livewire (Tests\Feature\BukuBesarLivewire)" tests="1" assertions="2" errors="0" failures="0" skipped="0" time="0.643707">
+      <testcase name="Livewire renders entries when coa selected" file="Buku Besar Livewire (Tests\Feature\BukuBesarLivewire)::Livewire renders entries when coa selected" class="Tests\Feature\BukuBesarLivewireTest" classname="Tests.Feature.BukuBesarLivewireTest" assertions="2" time="0.643707"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BukuBesarPageFrontendTest" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)" tests="11" assertions="29" errors="0" failures="0" skipped="0" time="13.751880">
+      <testcase name="It shows dynamic buttons when no coa selected" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::It shows dynamic buttons when no coa selected" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="2" time="5.345450"/>
+      <testcase name="Show all button clears coa selection" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Show all button clears coa selection" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="3" time="0.800274"/>
+      <testcase name="Show by journal entry button clears coa selection" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Show by journal entry button clears coa selection" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="3" time="0.809679"/>
+      <testcase name="Selecting coa displays ledger" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Selecting coa displays ledger" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="5" time="0.796227"/>
+      <testcase name="Changing start date updates component" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Changing start date updates component" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="1" time="0.755519"/>
+      <testcase name="Changing end date updates component" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Changing end date updates component" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="1" time="0.756852"/>
+      <testcase name="Refresh button reloads component" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Refresh button reloads component" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="1" time="0.782153"/>
+      <testcase name="Coa options are sorted by code" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Coa options are sorted by code" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="1" time="0.773241"/>
+      <testcase name="Ledger displays journal entries within date range" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Ledger displays journal entries within date range" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="2" time="1.037189"/>
+      <testcase name="Multiple coa selections work correctly" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Multiple coa selections work correctly" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="4" time="0.798053"/>
+      <testcase name="Computed properties work correctly" file="Buku Besar Page Frontend (Tests\Feature\BukuBesarPageFrontend)::Computed properties work correctly" class="Tests\Feature\BukuBesarPageFrontendTest" classname="Tests.Feature.BukuBesarPageFrontendTest" assertions="6" time="1.097243"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\BukuBesarPageTest" file="Buku Besar Page (Tests\Feature\BukuBesarPage)" tests="10" assertions="29" errors="0" failures="0" skipped="0" time="7.583763">
+      <testcase name="It can render buku besar page" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It can render buku besar page" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="3" time="0.756885"/>
+      <testcase name="It displays coa options in dropdown" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It displays coa options in dropdown" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="4" time="0.704452"/>
+      <testcase name="It can select a coa and display ledger" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It can select a coa and display ledger" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="4" time="0.721877"/>
+      <testcase name="It filters journal entries by date range" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It filters journal entries by date range" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="3" time="0.753039"/>
+      <testcase name="It handles no coa selected gracefully" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It handles no coa selected gracefully" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="2" time="0.745661"/>
+      <testcase name="It handles coa with no transactions" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It handles coa with no transactions" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="2" time="0.751475"/>
+      <testcase name="It calculates running balance correctly" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It calculates running balance correctly" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="3" time="0.915330"/>
+      <testcase name="It provides correct coa options" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It provides correct coa options" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="4" time="0.760797"/>
+      <testcase name="It defaults to current month date range" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It defaults to current month date range" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="2" time="0.751650"/>
+      <testcase name="It can update date range" file="Buku Besar Page (Tests\Feature\BukuBesarPage)::It can update date range" class="Tests\Feature\BukuBesarPageTest" classname="Tests.Feature.BukuBesarPageTest" assertions="2" time="0.722598"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashBankServiceIntegrationTest" file="tests/Feature/CashBankServiceIntegrationTest.php" tests="8" assertions="27" errors="0" failures="0" skipped="0" time="3.908026">
+      <testcase name="postTransfer creates correct journal entries without admin fee" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer creates correct journal entries without admin fee" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="7" time="0.467687"/>
+      <testcase name="postTransfer creates correct journal entries with admin fee and coa" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer creates correct journal entries with admin fee and coa" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="7" time="0.537566"/>
+      <testcase name="postTransfer with admin fee but no coa only creates two entries" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer with admin fee but no coa only creates two entries" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="3" time="0.466302"/>
+      <testcase name="postTransfer maintains double entry balance with admin fee" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer maintains double entry balance with admin fee" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="2" time="0.460137"/>
+      <testcase name="postTransfer updates transfer status to posted" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer updates transfer status to posted" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="2" time="0.446492"/>
+      <testcase name="postTransfer handles zero admin fee correctly" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer handles zero admin fee correctly" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="1" time="0.451433"/>
+      <testcase name="postTransfer uses correct descriptions in journal entries" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer uses correct descriptions in journal entries" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="3" time="0.621776"/>
+      <testcase name="postTransfer records correct transaction date" file="tests/Feature/CashBankServiceIntegrationTest.php::postTransfer records correct transaction date" class="Tests\Feature\CashBankServiceIntegrationTest" classname="Tests.Feature.CashBankServiceIntegrationTest" assertions="2" time="0.456632"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashBankServiceTest" file="tests/Feature/CashBankServiceTest.php" tests="8" assertions="27" errors="0" failures="0" skipped="0" time="7.644206">
+      <testcase name="postTransfer creates correct journal entries without admin fee" file="tests/Feature/CashBankServiceTest.php::postTransfer creates correct journal entries without admin fee" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="7" time="0.455105"/>
+      <testcase name="postTransfer creates correct journal entries with admin fee and coa" file="tests/Feature/CashBankServiceTest.php::postTransfer creates correct journal entries with admin fee and coa" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="7" time="0.450168"/>
+      <testcase name="postTransfer with admin fee but no coa only creates two entries" file="tests/Feature/CashBankServiceTest.php::postTransfer with admin fee but no coa only creates two entries" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="3" time="0.533700"/>
+      <testcase name="postTransfer maintains double entry balance with admin fee" file="tests/Feature/CashBankServiceTest.php::postTransfer maintains double entry balance with admin fee" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="2" time="1.094414"/>
+      <testcase name="postTransfer updates transfer status to posted" file="tests/Feature/CashBankServiceTest.php::postTransfer updates transfer status to posted" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="2" time="1.532444"/>
+      <testcase name="postTransfer handles zero admin fee correctly" file="tests/Feature/CashBankServiceTest.php::postTransfer handles zero admin fee correctly" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="1" time="1.700480"/>
+      <testcase name="postTransfer uses correct descriptions in journal entries" file="tests/Feature/CashBankServiceTest.php::postTransfer uses correct descriptions in journal entries" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="3" time="1.310223"/>
+      <testcase name="postTransfer records correct transaction date" file="tests/Feature/CashBankServiceTest.php::postTransfer records correct transaction date" class="Tests\Feature\CashBankServiceTest" classname="Tests.Feature.CashBankServiceTest" assertions="2" time="0.567671"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashBankTransactionDetailsUITest" file="Cash Bank Transaction Details UI (Tests\Feature\CashBankTransactionDetailsUI)" tests="5" assertions="19" errors="0" failures="0" skipped="0" time="2.407839">
+      <testcase name="Transaction details form validation" file="Cash Bank Transaction Details UI (Tests\Feature\CashBankTransactionDetailsUI)::Transaction details form validation" class="Tests\Feature\CashBankTransactionDetailsUITest" classname="Tests.Feature.CashBankTransactionDetailsUITest" assertions="1" time="0.535060"/>
+      <testcase name="Amount auto calculation from details" file="Cash Bank Transaction Details UI (Tests\Feature\CashBankTransactionDetailsUI)::Amount auto calculation from details" class="Tests\Feature\CashBankTransactionDetailsUITest" classname="Tests.Feature.CashBankTransactionDetailsUITest" assertions="4" time="0.471490"/>
+      <testcase name="Transaction details with zero total fails" file="Cash Bank Transaction Details UI (Tests\Feature\CashBankTransactionDetailsUI)::Transaction details with zero total fails" class="Tests\Feature\CashBankTransactionDetailsUITest" classname="Tests.Feature.CashBankTransactionDetailsUITest" assertions="2" time="0.454518"/>
+      <testcase name="All transaction types support details" file="Cash Bank Transaction Details UI (Tests\Feature\CashBankTransactionDetailsUI)::All transaction types support details" class="Tests\Feature\CashBankTransactionDetailsUITest" classname="Tests.Feature.CashBankTransactionDetailsUITest" assertions="4" time="0.486629"/>
+      <testcase name="Transaction details display in table" file="Cash Bank Transaction Details UI (Tests\Feature\CashBankTransactionDetailsUI)::Transaction details display in table" class="Tests\Feature\CashBankTransactionDetailsUITest" classname="Tests.Feature.CashBankTransactionDetailsUITest" assertions="8" time="0.460141"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashBankTransactionPostingTest" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)" tests="6" assertions="21" errors="0" failures="0" skipped="0" time="2.821307">
+      <testcase name="Multiple coa posting action" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)::Multiple coa posting action" class="Tests\Feature\CashBankTransactionPostingTest" classname="Tests.Feature.CashBankTransactionPostingTest" assertions="4" time="0.455476"/>
+      <testcase name="Posting validation fails with wrong total" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)::Posting validation fails with wrong total" class="Tests\Feature\CashBankTransactionPostingTest" classname="Tests.Feature.CashBankTransactionPostingTest" assertions="2" time="0.446724"/>
+      <testcase name="Cash in transaction with income breakdown" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)::Cash in transaction with income breakdown" class="Tests\Feature\CashBankTransactionPostingTest" classname="Tests.Feature.CashBankTransactionPostingTest" assertions="4" time="0.497551"/>
+      <testcase name="Transaction with negative amounts for tax reductions" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)::Transaction with negative amounts for tax reductions" class="Tests\Feature\CashBankTransactionPostingTest" classname="Tests.Feature.CashBankTransactionPostingTest" assertions="4" time="0.469305"/>
+      <testcase name="Bank transaction with details available for all types" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)::Bank transaction with details available for all types" class="Tests\Feature\CashBankTransactionPostingTest" classname="Tests.Feature.CashBankTransactionPostingTest" assertions="4" time="0.496735"/>
+      <testcase name="Transaction details with ntpn for tax transactions" file="Cash Bank Transaction Posting (Tests\Feature\CashBankTransactionPosting)::Transaction details with ntpn for tax transactions" class="Tests\Feature\CashBankTransactionPostingTest" classname="Tests.Feature.CashBankTransactionPostingTest" assertions="3" time="0.455516"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashBankTransferResourceTest" file="Cash Bank Transfer Resource (Tests\Feature\CashBankTransferResource)" tests="3" assertions="5" errors="0" failures="0" skipped="0" time="1.411785">
+      <testcase name="View page can be rendered" file="Cash Bank Transfer Resource (Tests\Feature\CashBankTransferResource)::View page can be rendered" class="Tests\Feature\CashBankTransferResourceTest" classname="Tests.Feature.CashBankTransferResourceTest" assertions="2" time="0.447391"/>
+      <testcase name="Infolist displays transfer information" file="Cash Bank Transfer Resource (Tests\Feature\CashBankTransferResource)::Infolist displays transfer information" class="Tests\Feature\CashBankTransferResourceTest" classname="Tests.Feature.CashBankTransferResourceTest" assertions="2" time="0.477482"/>
+      <testcase name="View action is available in table" file="Cash Bank Transfer Resource (Tests\Feature\CashBankTransferResource)::View action is available in table" class="Tests\Feature\CashBankTransferResourceTest" classname="Tests.Feature.CashBankTransferResourceTest" assertions="1" time="0.486912"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashBankTransferTest" file="tests/Feature/CashBankTransferTest.php" tests="7" assertions="37" errors="0" failures="0" skipped="0" time="3.481448">
+      <testcase name="bank transfer without admin fee creates two journal entries" file="tests/Feature/CashBankTransferTest.php::bank transfer without admin fee creates two journal entries" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="10" time="0.497936"/>
+      <testcase name="bank transfer with admin fee creates three journal entries" file="tests/Feature/CashBankTransferTest.php::bank transfer with admin fee creates three journal entries" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="12" time="0.617861"/>
+      <testcase name="bank transfer with admin fee but no coa creates two journal entries" file="tests/Feature/CashBankTransferTest.php::bank transfer with admin fee but no coa creates two journal entries" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="3" time="0.463052"/>
+      <testcase name="bank transfer factory with admin fee state creates proper data" file="tests/Feature/CashBankTransferTest.php::bank transfer factory with admin fee state creates proper data" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="5" time="0.466903"/>
+      <testcase name="bank transfer posted event is dispatched" file="tests/Feature/CashBankTransferTest.php::bank transfer posted event is dispatched" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="1" time="0.454410"/>
+      <testcase name="bank transfer cannot be posted twice" file="tests/Feature/CashBankTransferTest.php::bank transfer cannot be posted twice" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="2" time="0.502470"/>
+      <testcase name="bank transfer with large admin fee calculates correctly" file="tests/Feature/CashBankTransferTest.php::bank transfer with large admin fee calculates correctly" class="Tests\Feature\CashBankTransferTest" classname="Tests.Feature.CashBankTransferTest" assertions="4" time="0.478817"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashFlowPageTest" file="tests/Feature/CashFlowPageTest.php" tests="14" assertions="44" errors="0" failures="0" skipped="0" time="9.051465">
+      <testcase name="`Cash Flow Report Page Tests` → it generates report data structure correctly" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it generates report data structure correctly" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="6" time="0.542518"/>
+      <testcase name="`Cash Flow Report Page Tests` → it includes period information in report data" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it includes period information in report data" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="2" time="0.510960"/>
+      <testcase name="`Cash Flow Report Page Tests` → it calculates opening balance correctly" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it calculates opening balance correctly" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="1" time="0.518902"/>
+      <testcase name="`Cash Flow Report Page Tests` → it calculates net change and closing balance correctly" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it calculates net change and closing balance correctly" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="3" time="0.525640"/>
+      <testcase name="`Cash Flow Report Page Tests` → it filters data by branch correctly" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it filters data by branch correctly" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="2" time="0.507376"/>
+      <testcase name="`Cash Flow Report Page Tests` → it returns selected branch names correctly" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it returns selected branch names correctly" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="2" time="0.470706"/>
+      <testcase name="`Cash Flow Report Page Tests` → it returns empty array when no branches selected" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it returns empty array when no branches selected" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="2" time="0.486158"/>
+      <testcase name="`Cash Flow Report Page Tests` → it handles empty report data gracefully" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it handles empty report data gracefully" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="5" time="0.500587"/>
+      <testcase name="`Cash Flow Report Page Tests` → it can export to excel without errors" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it can export to excel without errors" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="3" time="0.523535"/>
+      <testcase name="`Cash Flow Report Page Tests` → it can export to pdf without errors" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it can export to pdf without errors" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="3" time="0.506790"/>
+      <testcase name="`Cash Flow Report Page Tests` → it includes sections in report data" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it includes sections in report data" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="2" time="0.941151"/>
+      <testcase name="`Cash Flow Report Page Tests` → it includes items in sections with correct structure" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it includes items in sections with correct structure" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="8" time="1.218543"/>
+      <testcase name="`Cash Flow Report Page Tests` → it handles invalid date ranges gracefully" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it handles invalid date ranges gracefully" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="3" time="1.272554"/>
+      <testcase name="`Cash Flow Report Page Tests` → it defaults to current month when no dates provided" file="tests/Feature/CashFlowPageTest.php::`Cash Flow Report Page Tests` → it defaults to current month when no dates provided" class="Tests\Feature\CashFlowPageTest" classname="Tests.Feature.CashFlowPageTest" assertions="2" time="0.526046"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CashFlowReportServiceTest" file="tests/Feature/CashFlowReportServiceTest.php" tests="17" assertions="62" errors="0" failures="0" skipped="0" time="13.653109">
+      <testcase name="service can generate direct method cash flow report" file="tests/Feature/CashFlowReportServiceTest.php::service can generate direct method cash flow report" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="9" time="0.606655"/>
+      <testcase name="service includes vendor payment journals in direct cash flow" file="tests/Feature/CashFlowReportServiceTest.php::service includes vendor payment journals in direct cash flow" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="3" time="0.560913"/>
+      <testcase name="service counts customer deposits once and excludes deposit-funded receipts from sales receipts" file="tests/Feature/CashFlowReportServiceTest.php::service counts customer deposits once and excludes deposit-funded receipts from sales receipts" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="3" time="0.538092"/>
+      <testcase name="service includes supplier deposit journals in direct cash flow" file="tests/Feature/CashFlowReportServiceTest.php::service includes supplier deposit journals in direct cash flow" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="3" time="0.515044"/>
+      <testcase name="service can generate indirect method cash flow report" file="tests/Feature/CashFlowReportServiceTest.php::service can generate indirect method cash flow report" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="8" time="0.477651"/>
+      <testcase name="service validates net change calculation" file="tests/Feature/CashFlowReportServiceTest.php::service validates net change calculation" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="2" time="0.549802"/>
+      <testcase name="service filters by date range correctly" file="tests/Feature/CashFlowReportServiceTest.php::service filters by date range correctly" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="1" time="0.752084"/>
+      <testcase name="service filters by branch correctly" file="tests/Feature/CashFlowReportServiceTest.php::service filters by branch correctly" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="2" time="0.579877"/>
+      <testcase name="service handles empty data gracefully" file="tests/Feature/CashFlowReportServiceTest.php::service handles empty data gracefully" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="5" time="0.514579"/>
+      <testcase name="service defaults to direct method when no method specified" file="tests/Feature/CashFlowReportServiceTest.php::service defaults to direct method when no method specified" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="1" time="0.504251"/>
+      <testcase name="service calculates opening balance correctly" file="tests/Feature/CashFlowReportServiceTest.php::service calculates opening balance correctly" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="3" time="0.502384"/>
+      <testcase name="service handles multiple cash accounts correctly" file="tests/Feature/CashFlowReportServiceTest.php::service handles multiple cash accounts correctly" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="1" time="0.971299"/>
+      <testcase name="indirect method includes net income from income statement" file="tests/Feature/CashFlowReportServiceTest.php::indirect method includes net income from income statement" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="4" time="0.501802"/>
+      <testcase name="service handles invalid method parameter gracefully" file="tests/Feature/CashFlowReportServiceTest.php::service handles invalid method parameter gracefully" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="1" time="1.866073"/>
+      <testcase name="service returns correct period information" file="tests/Feature/CashFlowReportServiceTest.php::service returns correct period information" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="2" time="2.013533"/>
+      <testcase name="service handles null dates correctly" file="tests/Feature/CashFlowReportServiceTest.php::service handles null dates correctly" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="2" time="0.999544"/>
+      <testcase name="branch filter limits cash bank outflows" file="tests/Feature/CashFlowReportServiceTest.php::branch filter limits cash bank outflows" class="Tests\Feature\CashFlowReportServiceTest" classname="Tests.Feature.CashFlowReportServiceTest" assertions="12" time="1.199525"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\ChartOfAccountLedgerTest" file="tests/Feature/ChartOfAccountLedgerTest.php" tests="6" assertions="11" errors="3" failures="0" skipped="0" time="3.005255">
+      <testcase name="chart of account ledger displays correct data for specific account" file="tests/Feature/ChartOfAccountLedgerTest.php::chart of account ledger displays correct data for specific account" class="Tests\Feature\ChartOfAccountLedgerTest" classname="Tests.Feature.ChartOfAccountLedgerTest" assertions="4" time="0.905947"/>
+      <testcase name="chart of account ledger filters journal entries by date range correctly" file="tests/Feature/ChartOfAccountLedgerTest.php::chart of account ledger filters journal entries by date range correctly" class="Tests\Feature\ChartOfAccountLedgerTest" classname="Tests.Feature.ChartOfAccountLedgerTest" assertions="4" time="1.357029"/>
+      <testcase name="chart of account ledger calculates opening balance correctly" file="tests/Feature/ChartOfAccountLedgerTest.php::chart of account ledger calculates opening balance correctly" class="Tests\Feature\ChartOfAccountLedgerTest" classname="Tests.Feature.ChartOfAccountLedgerTest" assertions="3" time="0.742279"/>
+      <testcase name="chart of account ledger calculates running balance correctly for asset account" file="tests/Feature/ChartOfAccountLedgerTest.php::chart of account ledger calculates running balance correctly for asset account" class="Tests\Feature\ChartOfAccountLedgerTest" classname="Tests.Feature.ChartOfAccountLedgerTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">chart of account ledger calculates running balance correctly for asset accountIlluminate\Database\QueryException: SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction (Connection: mysql, SQL: select * from `accounting_periods` where `cabang_id` is null and date(`period_start`) &lt;= 2025-11-22 and date(`period_end`) &gt;= 2025-11-22 limit 1)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at app/Models/AccountingPeriod.php:55
+at app/Models/JournalEntry.php:162
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:488
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:255
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1384
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1219
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1218
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at tests/Feature/ChartOfAccountLedgerTest.php:17
+Caused by
+PDOException: SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at app/Models/AccountingPeriod.php:55
+at app/Models/JournalEntry.php:162
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:488
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:255
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1384
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1219
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1218
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at tests/Feature/ChartOfAccountLedgerTest.php:17</error>
+      </testcase>
+      <testcase name="chart of account ledger handles different date ranges correctly" file="tests/Feature/ChartOfAccountLedgerTest.php::chart of account ledger handles different date ranges correctly" class="Tests\Feature\ChartOfAccountLedgerTest" classname="Tests.Feature.ChartOfAccountLedgerTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">chart of account ledger handles different date ranges correctlyIlluminate\Database\QueryException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.cabangs' doesn't exist (Connection: mysql, SQL: select exists(select * from `cabangs` where `cabangs`.`deleted_at` is null) as `exists`)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3561
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at tests/TestCase.php:44
+Caused by
+PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.cabangs' doesn't exist
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3561
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at tests/TestCase.php:44</error>
+      </testcase>
+      <testcase name="chart of account ledger handles liability account balance calculation correctly" file="tests/Feature/ChartOfAccountLedgerTest.php::chart of account ledger handles liability account balance calculation correctly" class="Tests\Feature\ChartOfAccountLedgerTest" classname="Tests.Feature.ChartOfAccountLedgerTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">chart of account ledger handles liability account balance calculation correctlyIlluminate\Database\QueryException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at tests/Feature/ChartOfAccountLedgerTest.php:12
+Caused by
+PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at tests/Feature/ChartOfAccountLedgerTest.php:12</error>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\ChartOfAccountTest" file="tests/Feature/ChartOfAccountTest.php" tests="4" assertions="0" errors="4" failures="0" skipped="0" time="0.000000">
+      <testcase name="can create chart of account" file="tests/Feature/ChartOfAccountTest.php::can create chart of account" class="Tests\Feature\ChartOfAccountTest" classname="Tests.Feature.ChartOfAccountTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">can create chart of accountIlluminate\Database\QueryException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10
+Caused by
+PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10</error>
+      </testcase>
+      <testcase name="can update chart of account" file="tests/Feature/ChartOfAccountTest.php::can update chart of account" class="Tests\Feature\ChartOfAccountTest" classname="Tests.Feature.ChartOfAccountTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">can update chart of accountIlluminate\Database\QueryException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10
+Caused by
+PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10</error>
+      </testcase>
+      <testcase name="can soft delete chart of account" file="tests/Feature/ChartOfAccountTest.php::can soft delete chart of account" class="Tests\Feature\ChartOfAccountTest" classname="Tests.Feature.ChartOfAccountTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">can soft delete chart of accountIlluminate\Database\QueryException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10
+Caused by
+PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10</error>
+      </testcase>
+      <testcase name="validates coa code uniqueness" file="tests/Feature/ChartOfAccountTest.php::validates coa code uniqueness" class="Tests\Feature\ChartOfAccountTest" classname="Tests.Feature.ChartOfAccountTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\QueryException">validates coa code uniquenessIlluminate\Database\QueryException: SQLSTATE[HY000]: General error: 1412 Table definition has changed, please retry transaction (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10
+Caused by
+PDOException: SQLSTATE[HY000]: General error: 1412 Table definition has changed, please retry transaction
+
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:397
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3188
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3173
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3763
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3172
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:902
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:884
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/BuildsQueries.php:366
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:708
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:740
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at database/seeders/ChartOfAccountSeeder.php:340
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:184
+at vendor/laravel/framework/src/Illuminate/Database/Seeder.php:193
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:71
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/GuardsAttributes.php:157
+at vendor/laravel/framework/src/Illuminate/Database/Console/Seeds/SeedCommand.php:70
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:36
+at vendor/laravel/framework/src/Illuminate/Container/Util.php:43
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:96
+at vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php:35
+at vendor/laravel/framework/src/Illuminate/Container/Container.php:836
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:211
+at vendor/symfony/console/Command/Command.php:335
+at vendor/laravel/framework/src/Illuminate/Console/Command.php:180
+at vendor/symfony/console/Application.php:1080
+at vendor/symfony/console/Application.php:356
+at vendor/symfony/console/Application.php:195
+at vendor/laravel/framework/src/Illuminate/Console/Application.php:165
+at vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php:426
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:451
+at vendor/laravel/framework/src/Illuminate/Testing/PendingCommand.php:675
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithConsole.php:87
+at vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/InteractsWithDatabase.php:362
+at tests/Feature/ChartOfAccountTest.php:10</error>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\CogmPreviewControllerTest" file="Cogm Preview Controller (Tests\Feature\CogmPreviewController)" tests="0" assertions="0" errors="2" failures="0" skipped="0" time="0.000000"/>
+    <testsuite name="Tests\Feature\CompleteDeliveryOrderFlowTest" file="Complete Delivery Order Flow (Tests\Feature\CompleteDeliveryOrderFlow)" tests="0" assertions="0" errors="1" failures="0" skipped="0" time="0.000000"/>
+    <testsuite name="Tests\Feature\CompleteProcurementAccountingFlowTest" file="Complete Procurement Accounting Flow (Tests\Feature\CompleteProcurementAccountingFlow)" tests="0" assertions="0" errors="1" failures="0" skipped="0" time="0.000000"/>
+    <testsuite name="Tests\Feature\CompleteSalesFlowFilamentTest" file="Complete Sales Flow Filament (Tests\Feature\CompleteSalesFlowFilament)" tests="0" assertions="0" errors="1" failures="0" skipped="0" time="0.000000"/>
+    <testsuite name="Tests\Feature\CrossCabangProductAutofillTest" file="tests/Feature/CrossCabangProductAutofillTest.php" tests="0" assertions="0" errors="6" failures="0" skipped="0" time="0.000000"/>
+    <testsuite name="Tests\Feature\CurrencyAmountInputValidationTest" file="Currency Amount Input Validation (Tests\Feature\CurrencyAmountInputValidation)" tests="0" assertions="0" errors="1" failures="0" skipped="0" time="0.000000"/>
+  </testsuite>
+</testsuites>

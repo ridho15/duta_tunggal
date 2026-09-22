@@ -147,32 +147,34 @@ class DocumentCodeGenerationTest extends TestCase
             'SO number generator must avoid collision across branches');
     }
 
-    // ─── Purchase Receipt Code (RN-) ─────────────────────────────────────────
+    // ─── Purchase Receipt Code (GRN-) ─────────────────────────────────────────
+    // Isu 9: dulu 'RN-' di sini vs 'GRN-' pada jalur QC auto-receipt untuk dokumen yang SAMA (purchase_receipts.
+    // receipt_number) — disatukan ke 'GRN-' (lihat PurchaseReceiptService::generateReceiptNumber()).
 
     #[Test]
-    public function rn_number_generator_produces_rn_prefix(): void
+    public function grn_number_generator_produces_grn_prefix(): void
     {
-        $service  = app(PurchaseReceiptService::class);
-        $rnNumber = $service->generateReceiptNumber();
+        $service   = app(PurchaseReceiptService::class);
+        $grnNumber = $service->generateReceiptNumber();
 
-        $this->assertStringStartsWith('RN-', $rnNumber,
-            'Purchase Receipt number must start with RN- prefix');
+        $this->assertStringStartsWith('GRN-', $grnNumber,
+            'Purchase Receipt number must start with GRN- prefix (sama dengan jalur QC auto-receipt)');
     }
 
     #[Test]
-    public function rn_number_contains_date_in_format_yyyymmdd(): void
+    public function grn_number_contains_date_in_format_yyyymmdd(): void
     {
-        $service  = app(PurchaseReceiptService::class);
-        $rnNumber = $service->generateReceiptNumber();
-        $today    = now()->format('Ymd');
+        $service   = app(PurchaseReceiptService::class);
+        $grnNumber = $service->generateReceiptNumber();
+        $today     = now()->format('Ymd');
 
-        // Format: RN-YYYYMMDD-XXXX
-        $this->assertStringContainsString($today, $rnNumber,
+        // Format: GRN-YYYYMMDD-XXXX
+        $this->assertStringContainsString($today, $grnNumber,
             "Receipt number must contain today's date ({$today})");
     }
 
     #[Test]
-    public function rn_number_generator_produces_unique_codes(): void
+    public function grn_number_generator_produces_unique_codes(): void
     {
         $service = app(PurchaseReceiptService::class);
         $po = PurchaseOrder::factory()->create([
@@ -184,7 +186,7 @@ class DocumentCodeGenerationTest extends TestCase
         $numbers = [];
         for ($i = 0; $i < 5; $i++) {
             $num = $service->generateReceiptNumber();
-            $this->assertNotContains($num, $numbers, "Duplicate RN number generated: {$num}");
+            $this->assertNotContains($num, $numbers, "Duplicate GRN number generated: {$num}");
             $numbers[] = $num;
 
             // Register so next call sees it as taken
@@ -199,21 +201,21 @@ class DocumentCodeGenerationTest extends TestCase
             ]);
         }
 
-        $this->assertCount(5, array_unique($numbers), 'All 5 RN numbers must be unique');
+        $this->assertCount(5, array_unique($numbers), 'All 5 GRN numbers must be unique');
     }
 
     #[Test]
-    public function rn_number_format_is_rn_date_fourdigit(): void
+    public function grn_number_format_is_grn_date_fourdigit(): void
     {
-        $service  = app(PurchaseReceiptService::class);
-        $rnNumber = $service->generateReceiptNumber();
-        $today    = now()->format('Ymd');
+        $service   = app(PurchaseReceiptService::class);
+        $grnNumber = $service->generateReceiptNumber();
+        $today     = now()->format('Ymd');
 
-        // Assert format: RN-YYYYMMDD-XXXX (where XXXX is 4-digit zero-padded)
+        // Assert format: GRN-YYYYMMDD-XXXX (where XXXX is 4-digit zero-padded)
         $this->assertMatchesRegularExpression(
-            '/^RN-\d{8}-\d{4}$/',
-            $rnNumber,
-            "RN number must match format RN-YYYYMMDD-XXXX, got: {$rnNumber}"
+            '/^GRN-\d{8}-\d{4}$/',
+            $grnNumber,
+            "GRN number must match format GRN-YYYYMMDD-XXXX, got: {$grnNumber}"
         );
     }
 

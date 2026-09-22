@@ -1055,7 +1055,7 @@ class VendorPaymentResource extends Resource
                         ->color('info')
                         ->url(fn($record) => route('filament.admin.resources.journal-entries.index', [
                             'tableFilters[source_type][value]' => 'App\Models\VendorPayment',
-                            'tableFilters[source_id][value]' => $record->id
+                            'tableFilters[source_id][source_id]' => $record->id
                         ]))
                         ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make()

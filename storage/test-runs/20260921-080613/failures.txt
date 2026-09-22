@@ -1,0 +1,3 @@
+Tests\Feature\PaymentLedgerPostingTest :: Import purchase invoice does not post ppn masukan
+Tests\Feature\VendorPaymentFlowAdjustmentTest :: Manual mode creates details and updates ap with adjustment
+Tests\Feature\VendorPaymentFlowAdjustmentTest :: Vendor payment observer keeps adjustment amount in account payable remaining

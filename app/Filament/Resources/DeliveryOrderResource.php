@@ -586,9 +586,18 @@ class DeliveryOrderResource extends Resource
                                                     ->label('Gudang Sumber')
                                                     ->reactive()
                                                     ->options(function ($get) {
+                                                        // cabang_id ada di root form DO, diisi otomatis dari SO yang dipilih.
+                                                        // Path relatif: warehouseSources_item → deliveryOrderItem_item
+                                                        //               → deliveryOrderItem_repeater → form_root.
+                                                        $cabangId = $get('../../../../cabang_id')
+                                                            ?? $get('../../../cabang_id')
+                                                            ?? null;
+
                                                         return WarehouseStockOptions::forProduct(
                                                             $get('../../product_id') ?? $get('../product_id'),
                                                             $get('warehouse_id'),
+                                                            true,
+                                                            $cabangId ? (int) $cabangId : null,
                                                         );
                                                     })
                                                     ->searchable()
@@ -771,7 +780,7 @@ class DeliveryOrderResource extends Resource
                                 $sourceType = urlencode(\App\Models\DeliveryOrder::class);
                                 $sourceId = $record->id;
 
-                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}";
                             })
                             ->openUrlInNewTab()
                             ->visible(function ($record) {

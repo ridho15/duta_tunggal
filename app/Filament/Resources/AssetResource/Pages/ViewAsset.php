@@ -147,7 +147,7 @@ class ViewAsset extends ViewRecord
                 ->color('gray')
                 ->label('Lihat Jurnal')
                 ->icon('heroicon-o-eye')
-                ->url(fn() => '/admin/journal-entries?tableFilters[source_type][value]=App%5CModels%5CAsset&tableFilters[source_id][value]=' . $this->record->id)
+                ->url(fn() => '/admin/journal-entries?tableFilters[source_type][value]=App%5CModels%5CAsset&tableFilters[source_id][source_id]=' . $this->record->id)
                 ->openUrlInNewTab(),
         ];
     }

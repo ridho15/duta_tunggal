@@ -42,7 +42,7 @@ class ViewVendorPayment extends ViewRecord
                 ->color('info')
                 ->url(fn () => route('filament.admin.resources.journal-entries.index', [
                     'tableFilters[source_type][value]' => 'App\Models\VendorPayment',
-                    'tableFilters[source_id][value]' => $this->record->id
+                    'tableFilters[source_id][source_id]' => $this->record->id
                 ]))
                 ->openUrlInNewTab(),
         ];
@@ -120,7 +120,7 @@ class ViewVendorPayment extends ViewRecord
                                 $sourceType = urlencode(\App\Models\VendorPayment::class);
                                 $sourceId = $this->record->id;
 
-                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}";
                             })
                             ->openUrlInNewTab()
                             ->visible(function () {

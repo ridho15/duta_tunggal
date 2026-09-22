@@ -1,0 +1,44 @@
+
+   PASS  Tests\Feature\PurchaseReceiptInvoiceTaxTest
+  ✓ automatic invoice calculates dpp and ppn per item type (non, inklus… 3.98s  
+
+   PASS  Tests\Feature\SalesInvoiceFormHintsTest
+  ✓ it pilihan SO menjelaskan bahwa hanya SO Selesai yang muncul dan in… 0.63s  
+  ✓ it bila customer belum punya SO Selesai, teks bantu menyatakannya s… 0.74s  
+
+   PASS  Tests\Feature\SalesInvoiceJournalTest
+  ✓ it creates sales invoice journal entries automatically when sale or… 0.51s  
+  ✓ it uses default COAs when product has no specific COAs               0.51s  
+
+   PASS  Tests\Feature\SalesInvoiceResourceTest
+  ✓ creating invoice via resource uses default coa values                0.60s  
+  ✓ the form schema contains hidden coa fields                           0.58s  
+  ✓ ppn rate auto fills from tax setting when tipe pajak changes         0.92s  
+  ✓ legacy sales invoice tax values are normalized for display           0.47s  
+  ✓ sales invoice edit save normalizes formatted money values before pe… 0.48s  
+  ✓ creating invoice via resource uses configured non legacy coa values  0.61s  
+  ✓ sales invoice list defaults to newest first                          0.54s  
+
+   PASS  Tests\Feature\SalesInvoiceShippingCostJournalTest
+  ✓ it creates sales invoice journal entries with shipping costs when d… 0.52s  
+  ✓ it does not create shipping cost journal entry when delivery order…  0.52s  
+
+   PASS  Tests\Feature\SalesInvoiceTaxNumberTest
+  ✓ it format: 16 digit dengan atau tanpa pemisah lolos dan dinormalkan… 0.48s  
+  ✓ it duplikat ditolak terhadap invoice penjualan lain maupun invoice…  0.57s  
+  ✓ it invoice otomatis (unpaid) dapat diberi nomor lewat aksi tabel; j… 0.93s  
+  ✓ it aksi menolak format tidak sah dan nomor ganda dengan galat pada…  1.16s  
+  ✓ it aksi dapat mengubah dan menghapus nomor yang sudah terisi         1.01s  
+  ✓ it aksi tidak tampil untuk invoice draft (dan batal), dan tidak unt… 0.71s  
+  ✓ it halaman Lihat: badge "Belum diisi" untuk invoice ber-PPN tanpa n… 0.84s  
+  ✓ it filter "Faktur pajak": Belum ada hanya invoice ber-PPN yang suda… 0.80s  
+  ✓ it kolom daftar menampilkan nomor, "Belum diisi" (merah) untuk yang… 0.72s  
+  ✓ it form Edit invoice draft: nomor tidak sah ditolak, nomor sah dino… 1.40s  
+  ✓ it PDF invoice memuat No. Faktur Pajak bila terisi dan tidak menamp… 0.63s  
+
+   PASS  Tests\Feature\SalesOrderSelfPickupToInvoiceTest
+  ✓ complete flow from sales order self pickup to invoice                0.56s  
+
+  Tests:    26 passed (235 assertions)
+  Duration: 21.51s
+

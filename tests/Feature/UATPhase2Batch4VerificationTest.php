@@ -221,18 +221,20 @@ class UATPhase2Batch4VerificationTest extends TestCase
 
     /**
      * @test
-     * Memverifikasi PurchaseReceiptService menghasilkan nomor RN- berurutan
+     * Isu 9: PurchaseReceiptService dan QualityControlService (test di atas) menulis ke tabel/kolom yang SAMA
+     * (purchase_receipts.receipt_number) — dulu dengan prefix BERBEDA ('RN-' vs 'GRN-'), kini disatukan ke 'GRN-'
+     * sehingga berbagi satu urutan tanpa memandang jalur pembuatannya.
      */
-    public function test_issue_9_purchase_receipt_service_generates_sequential_rn_number(): void
+    public function test_issue_9_purchase_receipt_service_generates_sequential_grn_number(): void
     {
         $service = app(PurchaseReceiptService::class);
         $today = now()->format('Ymd');
 
-        $rn1 = $service->generateReceiptNumber();
-        $this->assertStringStartsWith("RN-{$today}-", $rn1);
+        $grn1 = $service->generateReceiptNumber();
+        $this->assertStringStartsWith("GRN-{$today}-", $grn1, 'PurchaseReceiptService harus memakai prefix GRN- yang sama dengan jalur QC, bukan RN-');
 
         PurchaseReceipt::withoutGlobalScopes()->create([
-            'receipt_number' => $rn1,
+            'receipt_number' => $grn1,
             'purchase_order_id' => 1,
             'receipt_date' => now()->toDateString(),
             'received_by' => $this->user->id,
@@ -241,10 +243,36 @@ class UATPhase2Batch4VerificationTest extends TestCase
             'currency_id' => $this->currency->id,
         ]);
 
-        $rn2 = $service->generateReceiptNumber();
-        $seq1 = (int) substr($rn1, -4);
-        $seq2 = (int) substr($rn2, -4);
-        $this->assertEquals($seq1 + 1, $seq2, 'Nomor RN- dari PurchaseReceiptService harus berurutan');
+        $grn2 = $service->generateReceiptNumber();
+        $seq1 = (int) substr($grn1, -4);
+        $seq2 = (int) substr($grn2, -4);
+        $this->assertEquals($seq1 + 1, $seq2, 'Nomor GRN- dari PurchaseReceiptService harus berurutan');
+    }
+
+    /**
+     * @test
+     * Isu 9: jalur QC auto-receipt dan jalur manual (PurchaseReceiptService) berbagi SATU urutan pada prefix GRN- yang
+     * sama — tidak ada lagi dua prefix (RN-/GRN-) untuk satu dokumen yang sama.
+     */
+    public function test_issue_9_qc_and_manual_receipt_share_one_grn_sequence(): void
+    {
+        $qcService = app(QualityControlService::class);
+        $reflection = new \ReflectionClass($qcService);
+        $method = $reflection->getMethod('generateReceiptNumber');
+        $method->setAccessible(true);
+
+        $fromQc = $method->invoke($qcService);
+        PurchaseReceipt::withoutGlobalScopes()->create([
+            'receipt_number' => $fromQc, 'purchase_order_id' => 1, 'receipt_date' => now()->toDateString(),
+            'received_by' => $this->user->id, 'status' => 'completed', 'cabang_id' => $this->cabang->id, 'currency_id' => $this->currency->id,
+        ]);
+
+        $fromManual = app(PurchaseReceiptService::class)->generateReceiptNumber();
+
+        $this->assertStringStartsWith('GRN-', $fromQc);
+        $this->assertStringStartsWith('GRN-', $fromManual);
+        $this->assertEquals((int) substr($fromQc, -4) + 1, (int) substr($fromManual, -4),
+            'Nomor dari jalur manual harus melanjutkan urutan yang dibuat jalur QC (satu urutan bersama)');
     }
 
     /**

@@ -299,7 +299,8 @@ class PurchaseReturnService
                     return;
                 }
 
-                $reference = 'PR-' . $purchaseReturn->nota_retur;
+                // Isu 9: nota_retur sudah unik (prefix NR-…); "PR-" + nota_retur dulu membuat referensi ganda "PR-NR-…" yang membingungkan.
+                $reference = $purchaseReturn->nota_retur;
                 $description = 'Purchase Return: ' . $purchaseReturn->nota_retur;
                 $date = $purchaseReturn->return_date ?? now();
 

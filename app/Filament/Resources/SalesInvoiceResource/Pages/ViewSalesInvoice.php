@@ -234,7 +234,7 @@ class ViewSalesInvoice extends ViewRecord
                         // Jika multiple entries, gunakan filter
                         $sourceType = urlencode(\App\Models\Invoice::class);
                         $sourceId = $record->id;
-                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}");
                     }
                 }),
             Actions\Action::make('print_invoice')

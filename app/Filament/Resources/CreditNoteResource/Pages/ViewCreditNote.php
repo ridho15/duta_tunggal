@@ -37,7 +37,7 @@ class ViewCreditNote extends ViewRecord
                 ->visible(fn (): bool => $this->record instanceof CreditNote && $this->record->isIssued())
                 ->url(fn () => route('filament.admin.resources.journal-entries.index', [
                     'tableFilters[source_type][value]' => CreditNote::class,
-                    'tableFilters[source_id][value]' => $this->record->id,
+                    'tableFilters[source_id][source_id]' => $this->record->id,
                 ]))
                 ->openUrlInNewTab(),
             Action::make('print_credit_note')

@@ -1,0 +1,1110 @@
+
+   PASS  Tests\Feature\AutoBankReconciliationTest
+  ✓ it auto creates bank reconciliation when transfer is posted          5.15s  
+
+   PASS  Tests\Feature\BalanceSheetClassicLayoutTest
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it returns at… 0.49s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it each group… 0.47s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it KAS DAN BA… 0.48s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it children i… 0.54s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it children i… 0.57s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it groups sor… 0.54s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it zero-balan… 0.52s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it zero-balan… 0.49s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it total_labe… 0.48s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it returns…  0.47s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it total_as… 0.49s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it BANK gro… 0.54s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it HUTANG D… 0.56s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it MODAL eq… 0.72s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it is_balan… 0.71s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it liabilit… 0.64s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it total_li… 0.50s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it sum of a… 0.53s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it defaults…  0.53s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it can be se… 0.47s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it asset_gro… 0.47s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it all child… 0.48s  
+
+   PASS  Tests\Feature\BalanceSheetComparisonTest
+  ✓ Balance Sheet Comparison Functionality Tests → it enables compariso… 0.53s  
+  ✓ Balance Sheet Comparison Functionality Tests → it disables comparis… 0.49s  
+  ✓ Balance Sheet Comparison Functionality Tests → it returns null comp… 0.47s  
+  ✓ Balance Sheet Comparison Functionality Tests → it returns null comp… 0.49s  
+  ✓ Balance Sheet Comparison Functionality Tests → it calculates compar… 0.60s  
+  ✓ Balance Sheet Comparison Functionality Tests → it calculates compar… 0.51s  
+  ✓ Balance Sheet Comparison Functionality Tests → it handles compariso… 0.52s  
+  ✓ Balance Sheet Comparison Functionality Tests → it applies branch fi… 0.55s  
+  ✓ Balance Sheet Comparison Functionality Tests → it calculates percen… 0.50s  
+  ✓ Balance Sheet Comparison Functionality Tests → it includes all bala… 0.51s  
+
+   PASS  Tests\Feature\BalanceSheetConsistencyTest
+  ✓ balance sheet remains balanced after purchase transaction with paym… 0.76s  
+  ✓ balance sheet remains balanced after sales transaction with payment  1.36s  
+  ✓ balance sheet remains balanced after multiple purchase and sales tr… 0.85s  
+
+   PASS  Tests\Feature\BalanceSheetExportTest
+  ✓ BalanceSheetPage Export Tests → it can export PDF with filters appl… 0.69s  
+  ✓ BalanceSheetPage Export Tests → it can export Excel with filters ap… 0.57s  
+  ✓ BalanceSheetPage Export Tests → it exports include filtered data co… 0.49s  
+  ✓ BalanceSheetPage Export Tests → it exports work with all branches f… 0.48s  
+
+   PASS  Tests\Feature\BalanceSheetPageFrontendTest
+  ✓ BalanceSheetPage Frontend Tests → it renders the balance sheet page… 0.48s  
+  ✓ BalanceSheetPage Frontend Tests → it displays summary cards with co… 0.49s  
+  ✓ BalanceSheetPage Frontend Tests → it displays account rows with pro… 0.52s  
+  ✓ BalanceSheetPage Frontend Tests → it shows balanced status when ass… 0.50s  
+  ✓ BalanceSheetPage Frontend Tests → it displays filter section with p… 0.56s  
+  ✓ BalanceSheetPage Frontend Tests → it can toggle comparison mode and… 0.52s  
+  ✓ BalanceSheetPage Frontend Tests → it displays export buttons         0.48s  
+  ✓ BalanceSheetPage Frontend Tests → it shows drill down modal when ac… 0.48s  
+  ✓ BalanceSheetPage Frontend Tests → it displays drill down modal cont… 0.50s  
+  ✓ BalanceSheetPage Frontend Tests → it closes drill down modal correc… 0.51s  
+  ✓ BalanceSheetPage Frontend Tests → it displays cabang options in fil… 0.49s  
+  ✓ BalanceSheetPage Frontend Tests → it shows proper section headers w… 0.48s  
+  ✓ BalanceSheetPage Frontend Tests → it displays subsection headers co… 0.54s  
+  ✓ BalanceSheetPage Frontend Tests → it shows total rows with proper s… 0.82s  
+  ✓ BalanceSheetPage Frontend Tests → it displays account codes in mono… 0.52s  
+  ✓ BalanceSheetPage Frontend Tests → it shows retained earnings sectio… 0.61s  
+  ✓ BalanceSheetPage Frontend Tests → it displays current ratio in summ… 1.40s  
+  ✓ BalanceSheetPage Frontend Tests → it renders comparison section whe… 1.61s  
+  ✓ BalanceSheetPage Frontend Tests → it shows proper balance check mes… 1.79s  
+  ✓ BalanceSheetPage Frontend Tests → it displays account balances with… 1.45s  
+array:6 [
+  "account" => App\Models\ChartOfAccount {#8900
+    #connection: "mysql"
+    #table: "chart_of_accounts"
+    #primaryKey: "id"
+    #keyType: "int"
+    +incrementing: true
+    #with: []
+    #withCount: []
+    +preventsLazyLoading: false
+    #perPage: 15
+    +exists: true
+    +wasRecentlyCreated: false
+    #escapeWhenCastingToString: false
+    #attributes: array:18 [
+      "id" => 1132
+      "code" => "1-1001"
+      "name" => "Kas"
+      "type" => "Asset"
+      "parent_id" => null
+      "is_active" => 1
+      "is_cash_bank" => 0
+      "is_current" => 1
+      "description" => null
+      "opening_balance" => "0.00"
+      "debit" => "0.00"
+      "credit" => "0.00"
+      "ending_balance" => "0.00"
+      "created_at" => "2026-09-21 10:43:22"
+      "updated_at" => "2026-09-21 10:43:22"
+      "deleted_at" => null
+      "kode" => "1-1001"
+      "nama" => "Kas"
+    ]
+    #original: array:16 [
+      "id" => 1132
+      "code" => "1-1001"
+      "name" => "Kas"
+      "type" => "Asset"
+      "parent_id" => null
+      "is_active" => 1
+      "is_cash_bank" => 0
+      "is_current" => 1
+      "description" => null
+      "opening_balance" => "0.00"
+      "debit" => "0.00"
+      "credit" => "0.00"
+      "ending_balance" => "0.00"
+      "created_at" => "2026-09-21 10:43:22"
+      "updated_at" => "2026-09-21 10:43:22"
+      "deleted_at" => null
+    ]
+    #changes: []
+    #previous: []
+    #casts: array:3 [
+      "is_active" => "boolean"
+      "is_cash_bank" => "boolean"
+      "deleted_at" => "datetime"
+    ]
+    #classCastCache: []
+    #attributeCastCache: []
+    #dateFormat: null
+    #appends: []
+    #dispatchesEvents: []
+    #observables: []
+    #relations: []
+    #touches: []
+    #relationAutoloadCallback: null
+    #relationAutoloadContext: null
+    +timestamps: true
+    +usesUniqueIds: false
+    #hidden: []
+    #visible: []
+    #fillable: array:12 [
+      0 => "code"
+      1 => "name"
+      2 => "type"
+      3 => "parent_id"
+      4 => "is_active"
+      5 => "is_cash_bank"
+      6 => "is_current"
+      7 => "description"
+      8 => "opening_balance"
+      9 => "debit"
+      10 => "credit"
+      11 => "ending_balance"
+    ]
+    #guarded: array:1 [
+      0 => "*"
+    ]
+    #forceDeleting: false
+  }
+  "entries" => Illuminate\Database\Eloquent\Collection {#12846
+    #items: array:1 [
+      0 => App\Models\JournalEntry {#13201
+        #connection: "mysql"
+        #table: "journal_entries"
+        #primaryKey: "id"
+        #keyType: "int"
+        +incrementing: true
+        #with: []
+        #withCount: []
+        +preventsLazyLoading: false
+        #perPage: 15
+        +exists: true
+        +wasRecentlyCreated: false
+        #escapeWhenCastingToString: false
+        #attributes: array:27 [
+          "id" => 218
+          "coa_id" => 1132
+          "date" => "2026-09-20"
+          "reference" => "DRILL-001"
+          "description" => "Test transaction"
+          "debit" => "1000000.00"
+          "credit" => "0.00"
+          "journal_type" => null
+          "cabang_id" => 145
+          "created_by" => null
+          "updated_by" => null
+          "department_id" => null
+          "project_id" => null
+          "currency_id" => null
+          "exchange_rate" => "1.00000000"
+          "amount_original_currency" => null
+          "source_type" => "manual"
+          "source_id" => 1
+          "transaction_id" => null
+          "bank_recon_id" => null
+          "bank_recon_status" => null
+          "bank_recon_date" => null
+          "is_reversal" => 0
+          "reversal_of_transaction_id" => null
+          "created_at" => "2026-09-21 10:43:22"
+          "updated_at" => "2026-09-21 10:43:22"
+          "deleted_at" => null
+        ]
+        #original: array:27 [
+          "id" => 218
+          "coa_id" => 1132
+          "date" => "2026-09-20"
+          "reference" => "DRILL-001"
+          "description" => "Test transaction"
+          "debit" => "1000000.00"
+          "credit" => "0.00"
+          "journal_type" => null
+          "cabang_id" => 145
+          "created_by" => null
+          "updated_by" => null
+          "department_id" => null
+          "project_id" => null
+          "currency_id" => null
+          "exchange_rate" => "1.00000000"
+          "amount_original_currency" => null
+          "source_type" => "manual"
+          "source_id" => 1
+          "transaction_id" => null
+          "bank_recon_id" => null
+          "bank_recon_status" => null
+          "bank_recon_date" => null
+          "is_reversal" => 0
+          "reversal_of_transaction_id" => null
+          "created_at" => "2026-09-21 10:43:22"
+          "updated_at" => "2026-09-21 10:43:22"
+          "deleted_at" => null
+        ]
+        #changes: []
+        #previous: []
+        #casts: array:7 [
+          "date" => "date"
+          "debit" => "decimal:2"
+          "credit" => "decimal:2"
+          "exchange_rate" => "decimal:8"
+          "amount_original_currency" => "decimal:4"
+          "is_reversal" => "boolean"
+          "deleted_at" => "datetime"
+        ]
+        #classCastCache: []
+        #attributeCastCache: []
+        #dateFormat: null
+        #appends: []
+        #dispatchesEvents: []
+        #observables: []
+        #relations: array:2 [
+          "cabang" => App\Models\Cabang {#11964
+            #connection: "mysql"
+            #table: "cabangs"
+            #primaryKey: "id"
+            #keyType: "int"
+            +incrementing: true
+            #with: []
+            #withCount: []
+            +preventsLazyLoading: false
+            #perPage: 15
+            +exists: true
+            +wasRecentlyCreated: false
+            #escapeWhenCastingToString: false
+            #attributes: array:20 [
+              "id" => 145
+              "kode" => "TEST"
+              "nama" => "Test Branch"
+              "alamat" => "Test Address"
+              "telepon" => "0123456789"
+              "kenaikan_harga" => "0.00"
+              "status" => 1
+              "warna_background" => null
+              "tipe_penjualan" => "Semua"
+              "kode_invoice_pajak" => null
+              "kode_invoice_non_pajak" => null
+              "kode_invoice_pajak_walkin" => null
+              "nama_kwitansi" => null
+              "label_invoice_pajak" => null
+              "label_invoice_non_pajak" => null
+              "logo_invoice_non_pajak" => null
+              "lihat_stok_cabang_lain" => 0
+              "created_at" => "2026-09-21 10:43:22"
+              "updated_at" => "2026-09-21 10:43:22"
+              "deleted_at" => null
+            ]
+            #original: array:20 [
+              "id" => 145
+              "kode" => "TEST"
+              "nama" => "Test Branch"
+              "alamat" => "Test Address"
+              "telepon" => "0123456789"
+              "kenaikan_harga" => "0.00"
+              "status" => 1
+              "warna_background" => null
+              "tipe_penjualan" => "Semua"
+              "kode_invoice_pajak" => null
+              "kode_invoice_non_pajak" => null
+              "kode_invoice_pajak_walkin" => null
+              "nama_kwitansi" => null
+              "label_invoice_pajak" => null
+              "label_invoice_non_pajak" => null
+              "logo_invoice_non_pajak" => null
+              "lihat_stok_cabang_lain" => 0
+              "created_at" => "2026-09-21 10:43:22"
+              "updated_at" => "2026-09-21 10:43:22"
+              "deleted_at" => null
+            ]
+            #changes: []
+            #previous: []
+            #casts: array:1 [
+              "deleted_at" => "datetime"
+            ]
+            #classCastCache: []
+            #attributeCastCache: []
+            #dateFormat: null
+            #appends: []
+            #dispatchesEvents: []
+            #observables: []
+            #relations: []
+            #touches: []
+            #relationAutoloadCallback: null
+            #relationAutoloadContext: null
+            +timestamps: true
+            +usesUniqueIds: false
+            #hidden: []
+            #visible: []
+            #fillable: array:16 [
+              0 => "kode"
+              1 => "nama"
+              2 => "alamat"
+              3 => "telepon"
+              4 => "kenaikan_harga"
+              5 => "status"
+              6 => "warna_background"
+              7 => "tipe_penjualan"
+              8 => "kode_invoice_pajak"
+              9 => "kode_invoice_non_pajak"
+              10 => "kode_invoice_pajak_walkin"
+              11 => "nama_kwitansi"
+              12 => "label_invoice_pajak"
+              13 => "label_invoice_non_pajak"
+              14 => "logo_invoice_non_pajak"
+              15 => "lihat_stok_cabang_lain"
+            ]
+            #guarded: array:1 [
+              0 => "*"
+            ]
+            #forceDeleting: false
+          }
+          "coa" => App\Models\ChartOfAccount {#12762
+            #connection: "mysql"
+            #table: "chart_of_accounts"
+            #primaryKey: "id"
+            #keyType: "int"
+            +incrementing: true
+            #with: []
+            #withCount: []
+            +preventsLazyLoading: false
+            #perPage: 15
+            +exists: true
+            +wasRecentlyCreated: false
+            #escapeWhenCastingToString: false
+            #attributes: array:16 [
+              "id" => 1132
+              "code" => "1-1001"
+              "name" => "Kas"
+              "type" => "Asset"
+              "parent_id" => null
+              "is_active" => 1
+              "is_cash_bank" => 0
+              "is_current" => 1
+              "description" => null
+              "opening_balance" => "0.00"
+              "debit" => "0.00"
+              "credit" => "0.00"
+              "ending_balance" => "0.00"
+              "created_at" => "2026-09-21 10:43:22"
+              "updated_at" => "2026-09-21 10:43:22"
+              "deleted_at" => null
+            ]
+            #original: array:16 [
+              "id" => 1132
+              "code" => "1-1001"
+              "name" => "Kas"
+              "type" => "Asset"
+              "parent_id" => null
+              "is_active" => 1
+              "is_cash_bank" => 0
+              "is_current" => 1
+              "description" => null
+              "opening_balance" => "0.00"
+              "debit" => "0.00"
+              "credit" => "0.00"
+              "ending_balance" => "0.00"
+              "created_at" => "2026-09-21 10:43:22"
+              "updated_at" => "2026-09-21 10:43:22"
+              "deleted_at" => null
+            ]
+            #changes: []
+            #previous: []
+            #casts: array:3 [
+              "is_active" => "boolean"
+              "is_cash_bank" => "boolean"
+              "deleted_at" => "datetime"
+            ]
+            #classCastCache: []
+            #attributeCastCache: []
+            #dateFormat: null
+            #appends: []
+            #dispatchesEvents: []
+            #observables: []
+            #relations: []
+            #touches: []
+            #relationAutoloadCallback: null
+            #relationAutoloadContext: null
+            +timestamps: true
+            +usesUniqueIds: false
+            #hidden: []
+            #visible: []
+            #fillable: array:12 [
+              0 => "code"
+              1 => "name"
+              2 => "type"
+              3 => "parent_id"
+              4 => "is_active"
+              5 => "is_cash_bank"
+              6 => "is_current"
+              7 => "description"
+              8 => "opening_balance"
+              9 => "debit"
+              10 => "credit"
+              11 => "ending_balance"
+            ]
+            #guarded: array:1 [
+              0 => "*"
+            ]
+            #forceDeleting: false
+          }
+        ]
+        #touches: []
+        #relationAutoloadCallback: null
+        #relationAutoloadContext: null
+        +timestamps: true
+        +usesUniqueIds: false
+        #hidden: []
+        #visible: []
+        #fillable: array:23 [
+          0 => "coa_id"
+          1 => "date"
+          2 => "reference"
+          3 => "description"
+          4 => "debit"
+          5 => "credit"
+          6 => "journal_type"
+          7 => "cabang_id"
+          8 => "department_id"
+          9 => "project_id"
+          10 => "currency_id"
+          11 => "exchange_rate"
+          12 => "amount_original_currency"
+          13 => "source_type"
+          14 => "source_id"
+          15 => "transaction_id"
+          16 => "bank_recon_id"
+          17 => "bank_recon_status"
+          18 => "bank_recon_date"
+          19 => "is_reversal"
+          20 => "reversal_of_transaction_id"
+          21 => "created_by"
+          22 => "updated_by"
+        ]
+        #guarded: array:1 [
+          0 => "*"
+        ]
+        #forceDeleting: false
+      }
+    ]
+    #escapeWhenCastingToString: false
+  }
+  "total_debit" => 1000000.0
+  "total_credit" => 0.0
+  "balance" => 1000000.0
+  "as_of_date" => "2026-09-20"
+] // tests/Feature/BalanceSheetPageTest.php:208
+
+   PASS  Tests\Feature\BalanceSheetPageTest
+  ✓ BalanceSheetPage Backend Tests → it can mount the page with default… 2.05s  
+  ✓ BalanceSheetPage Backend Tests → it can generate balance sheet data  3.46s  
+  ✓ BalanceSheetPage Backend Tests → it can get cabang options           2.04s  
+  ✓ BalanceSheetPage Backend Tests → it can toggle comparison mode       2.66s  
+  ✓ BalanceSheetPage Backend Tests → it can get comparison data when co… 5.16s  
+  ✓ BalanceSheetPage Backend Tests → it can show account details         4.07s  
+  ✓ BalanceSheetPage Backend Tests → it can close drill down modal       3.31s  
+  ✓ BalanceSheetPage Backend Tests → it can get drill down data for acc… 2.97s  
+  ✓ BalanceSheetPage Backend Tests → it validates date before generatin… 3.93s  
+  ✓ BalanceSheetPage Backend Tests → it can filter by cabang             2.35s  
+  ✓ BalanceSheetPage Backend Tests → it builds balance alert data when…  3.80s  
+
+   PASS  Tests\Feature\BalanceSheetServiceTest
+  ✓ Balance Sheet Structure → it generates complete balance sheet struc… 3.65s  
+  ✓ Balance Sheet Structure → it correctly calculates asset balances (d… 3.22s  
+  ✓ Balance Sheet Structure → it correctly calculates liability balance… 0.71s  
+  ✓ Current vs Non-Current Classification → it separates current and no… 1.17s  
+  ✓ Current vs Non-Current Classification → it separates current and lo… 1.99s  
+  ✓ Retained Earnings Calculation → it calculates retained earnings fro… 3.04s  
+  ✓ Retained Earnings Calculation → it handles negative retained earnin… 3.06s  
+  ✓ Date-based Balance Calculation → it includes only transactions up t… 4.37s  
+  ✓ Date-based Balance Calculation → it calculates cumulative balance c… 3.39s  
+  ✓ Cabang Filtering → it filters by specific cabang when provided       3.55s  
+  ✓ Cabang Filtering → it includes all cabang when cabang_id is null     3.11s  
+  ✓ Period Comparison → it compares two balance sheet dates correctly    2.00s  
+  ✓ Drill-down Functionality → it retrieves journal entries for specifi… 0.76s  
+  ✓ Drill-down Functionality → it filters drill-down by cabang           1.00s  
+  ✓ Financial Ratios and Summary → it calculates current ratio correctl… 1.53s  
+  ✓ Financial Ratios and Summary → it calculates debt-to-equity ratio c… 1.17s  
+  ✓ Financial Ratios and Summary → it calculates working capital correc… 0.64s  
+  ✓ Balance Verification → it detects balanced sheet                     1.11s  
+  ✓ Balance Verification → it detects unbalanced sheet                   2.33s  
+  ✓ Edge Cases → it handles zero balance accounts (excludes from list)   0.86s  
+  ✓ Edge Cases → it handles empty balance sheet (no transactions)        0.59s  
+  ✓ Edge Cases → it handles division by zero in ratios                   0.98s  
+
+   FAIL  Tests\Feature\BillOfMaterialResourceReactivePriceTest
+  ⨯ bom item price refreshes when material changes                       1.17s  
+  ✓ bom conversion rows load from selected product                       0.69s  
+  ✓ bom conversion rows preload on edit and view                         0.73s  
+
+   PASS  Tests\Feature\BillOfMaterialTest
+  ✓ bom creation with components                                         0.62s  
+  ✓ multi level bom support                                              0.85s  
+  ✓ bom cost calculation                                                 0.82s  
+  ✓ bom version update                                                   0.78s  
+  ✓ bom code generation                                                  0.57s  
+  ✓ bom relationships                                                    1.86s  
+  ✓ bom soft delete cascade                                              0.76s  
+  ✓ bom active status filtering                                          3.32s  
+  ✓ bom item subtotal calculation                                        1.44s  
+  ✓ bom with zero costs                                                  0.60s  
+
+   FAIL  Tests\Feature\BranchInheritanceFlowTest
+  ✓ sale order inherits cabang from quotation source                     0.56s  
+  ✓ sales invoice inherits cabang from sale order source                 0.55s  
+  ✓ sales invoice inherits tax fields from sale order source             0.53s  
+  ⨯ purchase invoice inherits cabang from selected purchase order sourc… 0.61s  
+  ✓ manufacturing order inherits cabang from production plan sale order… 1.57s  
+  ✓ manufacturing order create page does not auto-create warehouse conf… 0.51s  
+  ✓ production plan inherits cabang from selected BOM source             0.55s  
+  ✓ asset transfer inherits source cabang from selected asset            0.87s  
+  ✓ delivery order inherits cabang from selected sales order source      0.62s  
+  ✓ surat jalan inherits cabang from selected delivery order source      0.53s  
+  ✓ delivery order rejects mixed-branch sales orders                     0.64s  
+  ✓ surat jalan rejects mixed-branch delivery orders                     0.54s  
+
+   PASS  Tests\Feature\BukuBesarLivewireTest
+  ✓ livewire renders entries when coa selected                           0.64s  
+
+   PASS  Tests\Feature\BukuBesarPageFrontendTest
+  ✓ it shows dynamic buttons when no coa selected                        5.35s  
+  ✓ show all button clears coa selection                                 0.80s  
+  ✓ show by journal entry button clears coa selection                    0.81s  
+  ✓ selecting coa displays ledger                                        0.80s  
+  ✓ changing start date updates component                                0.76s  
+  ✓ changing end date updates component                                  0.76s  
+  ✓ refresh button reloads component                                     0.78s  
+  ✓ coa options are sorted by code                                       0.77s  
+  ✓ ledger displays journal entries within date range                    1.04s  
+  ✓ multiple coa selections work correctly                               0.80s  
+  ✓ computed properties work correctly                                   1.10s  
+
+   PASS  Tests\Feature\BukuBesarPageTest
+  ✓ it can render buku besar page                                        0.76s  
+  ✓ it displays coa options in dropdown                                  0.70s  
+  ✓ it can select a coa and display ledger                               0.72s  
+  ✓ it filters journal entries by date range                             0.75s  
+  ✓ it handles no coa selected gracefully                                0.75s  
+  ✓ it handles coa with no transactions                                  0.75s  
+  ✓ it calculates running balance correctly                              0.92s  
+  ✓ it provides correct coa options                                      0.76s  
+  ✓ it defaults to current month date range                              0.75s  
+  ✓ it can update date range                                             0.72s  
+
+   PASS  Tests\Feature\CashBankServiceIntegrationTest
+  ✓ postTransfer creates correct journal entries without admin fee       0.47s  
+  ✓ postTransfer creates correct journal entries with admin fee and coa  0.54s  
+  ✓ postTransfer with admin fee but no coa only creates two entries      0.47s  
+  ✓ postTransfer maintains double entry balance with admin fee           0.46s  
+  ✓ postTransfer updates transfer status to posted                       0.45s  
+  ✓ postTransfer handles zero admin fee correctly                        0.45s  
+  ✓ postTransfer uses correct descriptions in journal entries            0.62s  
+  ✓ postTransfer records correct transaction date                        0.46s  
+
+   PASS  Tests\Feature\CashBankServiceTest
+  ✓ postTransfer creates correct journal entries without admin fee       0.46s  
+  ✓ postTransfer creates correct journal entries with admin fee and coa  0.45s  
+  ✓ postTransfer with admin fee but no coa only creates two entries      0.53s  
+  ✓ postTransfer maintains double entry balance with admin fee           1.09s  
+  ✓ postTransfer updates transfer status to posted                       1.53s  
+  ✓ postTransfer handles zero admin fee correctly                        1.70s  
+  ✓ postTransfer uses correct descriptions in journal entries            1.31s  
+  ✓ postTransfer records correct transaction date                        0.57s  
+
+   PASS  Tests\Feature\CashBankTransactionDetailsUITest
+  ✓ transaction details form validation                                  0.54s  
+  ✓ amount auto calculation from details                                 0.47s  
+  ✓ transaction details with zero total fails                            0.45s  
+  ✓ all transaction types support details                                0.49s  
+  ✓ transaction details display in table                                 0.46s  
+
+   PASS  Tests\Feature\CashBankTransactionPostingTest
+  ✓ multiple coa posting action                                          0.46s  
+  ✓ posting validation fails with wrong total                            0.45s  
+  ✓ cash in transaction with income breakdown                            0.50s  
+  ✓ transaction with negative amounts for tax reductions                 0.47s  
+  ✓ bank transaction with details available for all types                0.50s  
+  ✓ transaction details with ntpn for tax transactions                   0.46s  
+
+   PASS  Tests\Feature\CashBankTransferResourceTest
+  ✓ view page can be rendered                                            0.45s  
+  ✓ infolist displays transfer information                               0.48s  
+  ✓ view action is available in table                                    0.49s  
+
+   PASS  Tests\Feature\CashBankTransferTest
+  ✓ bank transfer without admin fee creates two journal entries          0.50s  
+  ✓ bank transfer with admin fee creates three journal entries           0.62s  
+  ✓ bank transfer with admin fee but no coa creates two journal entries  0.46s  
+  ✓ bank transfer factory with admin fee state creates proper data       0.47s  
+  ✓ bank transfer posted event is dispatched                             0.45s  
+  ✓ bank transfer cannot be posted twice                                 0.50s  
+  ✓ bank transfer with large admin fee calculates correctly              0.48s  
+
+   PASS  Tests\Feature\CashFlowPageTest
+  ✓ Cash Flow Report Page Tests → it generates report data structure co… 0.54s  
+  ✓ Cash Flow Report Page Tests → it includes period information in rep… 0.51s  
+  ✓ Cash Flow Report Page Tests → it calculates opening balance correct… 0.52s  
+  ✓ Cash Flow Report Page Tests → it calculates net change and closing…  0.53s  
+  ✓ Cash Flow Report Page Tests → it filters data by branch correctly    0.51s  
+  ✓ Cash Flow Report Page Tests → it returns selected branch names corr… 0.47s  
+  ✓ Cash Flow Report Page Tests → it returns empty array when no branch… 0.49s  
+  ✓ Cash Flow Report Page Tests → it handles empty report data graceful… 0.50s  
+  ✓ Cash Flow Report Page Tests → it can export to excel without errors  0.52s  
+  ✓ Cash Flow Report Page Tests → it can export to pdf without errors    0.51s  
+  ✓ Cash Flow Report Page Tests → it includes sections in report data    0.94s  
+  ✓ Cash Flow Report Page Tests → it includes items in sections with co… 1.22s  
+  ✓ Cash Flow Report Page Tests → it handles invalid date ranges gracef… 1.27s  
+  ✓ Cash Flow Report Page Tests → it defaults to current month when no…  0.53s  
+
+   PASS  Tests\Feature\CashFlowReportServiceTest
+  ✓ service can generate direct method cash flow report                  0.61s  
+  ✓ service includes vendor payment journals in direct cash flow         0.56s  
+  ✓ service counts customer deposits once and excludes deposit-funded r… 0.54s  
+  ✓ service includes supplier deposit journals in direct cash flow       0.52s  
+  ✓ service can generate indirect method cash flow report                0.48s  
+  ✓ service validates net change calculation                             0.55s  
+  ✓ service filters by date range correctly                              0.75s  
+  ✓ service filters by branch correctly                                  0.58s  
+  ✓ service handles empty data gracefully                                0.51s  
+  ✓ service defaults to direct method when no method specified           0.50s  
+  ✓ service calculates opening balance correctly                         0.50s  
+  ✓ service handles multiple cash accounts correctly                     0.97s  
+  ✓ indirect method includes net income from income statement            0.50s  
+  ✓ service handles invalid method parameter gracefully                  1.87s  
+  ✓ service returns correct period information                           2.01s  
+  ✓ service handles null dates correctly                                 1.00s  
+  ✓ branch filter limits cash bank outflows                              1.20s  
+
+   FAIL  Tests\Feature\ChartOfAccountLedgerTest
+  ✓ chart of account ledger displays correct data for specific account   0.91s  
+  ✓ chart of account ledger filters journal entries by date range corre… 1.36s  
+  ✓ chart of account ledger calculates opening balance correctly         0.74s  
+  ⨯ chart of account ledger calculates running balance correctly for asset account
+  ⨯ chart of account ledger handles different date ranges correctly
+  ⨯ chart of account ledger handles liability account balance calculation correctly
+
+   FAIL  Tests\Feature\ChartOfAccountTest
+  ⨯ can create chart of account
+  ⨯ can update chart of account
+  ⨯ can soft delete chart of account
+  ⨯ validates coa code uniqueness
+  ✓ validates account type hierarchy                                     0.31s  
+
+   FAIL  Tests\Feature\CogmPreviewControllerTest
+  ⨯ preview report matches hpp service values
+  ⨯ preview report filters cogm values by product
+
+   FAIL  Tests\Feature\CompleteDeliveryOrderFlowTest
+  ⨯ complete delivery order flow with journal entries and stock movements
+
+   FAIL  Tests\Feature\CompleteProcurementAccountingFlowTest
+  ⨯ complete procurement flow with full accounting
+
+   FAIL  Tests\Feature\CompleteSalesFlowFilamentTest
+  ⨯ complete sales flow from quotation to customer payment with form simulation
+
+   FAIL  Tests\Feature\CrossCabangProductAutofillTest
+  ⨯ it product lookup with global scope only finds products in user cabang
+  ⨯ it product lookup without global scope finds product across cabangs
+  ⨯ it product all query with global scope filters by user cabang
+  ⨯ it product all query without global scope returns products from all cabangs
+  ⨯ it p1 patch: purchase order can reference cross-cabang product       0.49s  
+  ⨯ it p2 patch: sale order can reference cross-cabang product           0.63s  
+
+   FAIL  Tests\Feature\CurrencyAmountInputValidationTest
+  ✓ idr entry stored correctly                                           0.47s  
+  ⨯ usd entry not converted to idr                                       0.54s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\BillOfMaterialResourceReactivePriceTest > bom item…    
+  Failed asserting that two strings are equal.
+  -'82.500'
+  +'83'
+  
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/BillOfMaterialResourceReactivePriceTest.php:113
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\BranchInheritanceFlowTest > pu…  ValidationException   
+  Minimal satu Purchase Receipt harus dipilih.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Services/PurchaseInvoiceAccountingService.php:172
+  3   app/Filament/Resources/PurchaseInvoiceResource/Pages/CreatePurchaseInvoice.php:25
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountLedgerTest > chart of…  QueryException   
+  SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction (Connection: mysql, SQL: select * from `accounting_periods` where `cabang_id` is null and date(`period_start`) <= 2025-11-22 and date(`period_end`) >= 2025-11-22 limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+    402▕             // For select statements, we'll simply execute the query and return an array
+    403▕             // of the database result set. Each element in the array will be a single
+    404▕             // row from the database table, and will either be an array or objects.
+    405▕             $statement = $this->prepared(
+  ➜ 406▕                 $this->getPdoForSelect($useReadPdo)->prepare($query)
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕
+
+      [2m+11 vendor frames [22m
+  12  app/Models/AccountingPeriod.php:55
+  13  app/Models/JournalEntry.php:162
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountLedgerTest > chart of…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.cabangs' doesn't exist (Connection: mysql, SQL: select exists(select * from `cabangs` where `cabangs`.`deleted_at` is null) as `exists`)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+    402▕             // For select statements, we'll simply execute the query and return an array
+    403▕             // of the database result set. Each element in the array will be a single
+    404▕             // row from the database table, and will either be an array or objects.
+    405▕             $statement = $this->prepared(
+  ➜ 406▕                 $this->getPdoForSelect($useReadPdo)->prepare($query)
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕
+
+      [2m+9 vendor frames [22m
+  10  tests/TestCase.php:44
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountLedgerTest > chart of…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+    402▕             // For select statements, we'll simply execute the query and return an array
+    403▕             // of the database result set. Each element in the array will be a single
+    404▕             // row from the database table, and will either be an array or objects.
+    405▕             $statement = $this->prepared(
+  ➜ 406▕                 $this->getPdoForSelect($useReadPdo)->prepare($query)
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕
+
+      [2m+16 vendor frames [22m
+  17  database/seeders/ChartOfAccountSeeder.php:340
+      [2m+24 vendor frames [22m
+  42  tests/Feature/ChartOfAccountLedgerTest.php:12
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountTest > can create cha…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+    402▕             // For select statements, we'll simply execute the query and return an array
+    403▕             // of the database result set. Each element in the array will be a single
+    404▕             // row from the database table, and will either be an array or objects.
+    405▕             $statement = $this->prepared(
+  ➜ 406▕                 $this->getPdoForSelect($useReadPdo)->prepare($query)
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕
+
+      [2m+16 vendor frames [22m
+  17  database/seeders/ChartOfAccountSeeder.php:340
+      [2m+23 vendor frames [22m
+  41  tests/Feature/ChartOfAccountTest.php:10
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountTest > can update cha…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+    402▕             // For select statements, we'll simply execute the query and return an array
+    403▕             // of the database result set. Each element in the array will be a single
+    404▕             // row from the database table, and will either be an array or objects.
+    405▕             $statement = $this->prepared(
+  ➜ 406▕                 $this->getPdoForSelect($useReadPdo)->prepare($query)
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕
+
+      [2m+16 vendor frames [22m
+  17  database/seeders/ChartOfAccountSeeder.php:340
+      [2m+23 vendor frames [22m
+  41  tests/Feature/ChartOfAccountTest.php:10
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountTest > can soft delet…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.chart_of_accounts' doesn't exist (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:406
+    402▕             // For select statements, we'll simply execute the query and return an array
+    403▕             // of the database result set. Each element in the array will be a single
+    404▕             // row from the database table, and will either be an array or objects.
+    405▕             $statement = $this->prepared(
+  ➜ 406▕                 $this->getPdoForSelect($useReadPdo)->prepare($query)
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕
+
+      [2m+16 vendor frames [22m
+  17  database/seeders/ChartOfAccountSeeder.php:340
+      [2m+23 vendor frames [22m
+  41  tests/Feature/ChartOfAccountTest.php:10
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ChartOfAccountTest > validates coa…   QueryException   
+  SQLSTATE[HY000]: General error: 1412 Table definition has changed, please retry transaction (Connection: mysql, SQL: select * from `chart_of_accounts` where (`code` = 1000) and `chart_of_accounts`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕ 
+  ➜ 411▕             $statement->execute();
+    412▕ 
+    413▕             return $statement->fetchAll();
+    414▕         });
+    415▕     }
+
+      [2m+16 vendor frames [22m
+  17  database/seeders/ChartOfAccountSeeder.php:340
+      [2m+23 vendor frames [22m
+  41  tests/Feature/ChartOfAccountTest.php:10
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CogmPreviewControllerTest > preview…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.report_hpp_prefixes' doesn't exist (Connection: mysql, SQL: insert into `report_hpp_prefixes` (`category`, `prefix`, `sort_order`, `updated_at`, `created_at`) values (raw_material_inventory, 1140.001, 1, 2026-09-21 10:45:52, 2026-09-21 10:45:52))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+16 vendor frames [22m
+  17  tests/Feature/CogmPreviewControllerTest.php:125
+  18  tests/Feature/CogmPreviewControllerTest.php:33
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CogmPreviewControllerTest > preview…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.report_hpp_prefixes' doesn't exist (Connection: mysql, SQL: insert into `report_hpp_prefixes` (`category`, `prefix`, `sort_order`, `updated_at`, `created_at`) values (raw_material_inventory, 1140.001, 1, 2026-09-21 10:45:52, 2026-09-21 10:45:52))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+16 vendor frames [22m
+  17  tests/Feature/CogmPreviewControllerTest.php:125
+  18  tests/Feature/CogmPreviewControllerTest.php:33
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CompleteDeliveryOrderFlowTest > com…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.users' doesn't exist (Connection: mysql, SQL: insert into `users` (`name`, `email`, `username`, `password`, `first_name`, `kode_user`, `updated_at`, `created_at`) values (Test User, test@example.com, testuser, $2y$04$01UNF.10y2akwR7js2UDBetC9aWGMEF8o8kRLKxa40Rq4Mk4aR6AO, Test, TU001, 2026-09-21 10:45:52, 2026-09-21 10:45:52))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+16 vendor frames [22m
+  17  tests/Feature/CompleteDeliveryOrderFlowTest.php:48
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CompleteProcurementAccountingFlowTe…  QueryException   
+  SQLSTATE[42S02]: Base table or view not found: 1146 Table 'duta_tunggal_t2_test.users' doesn't exist (Connection: mysql, SQL: insert into `users` (`name`, `first_name`, `last_name`, `username`, `kode_user`, `email`, `email_verified_at`, `password`, `remember_token`, `updated_at`, `created_at`) values (TestUser44 LastName44, TestUser44, LastName44, testuser44, TESTUSER, testuser44@example.com, 2026-09-21 10:45:52, $2y$04$jrBnnd9HJHQqY1yjqYQsfu3PGjop8bUXjRYhiBWP54JRIdIOzmMhW, 50a709bc29, 2026-09-21 10:45:52, 2026-09-21 10:45:52))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+14 vendor frames [22m
+  15  tests/Feature/CompleteProcurementAccountingFlowTest.php:56
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CompleteSalesFlowFilamentTest > com…  QueryException   
+  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'manufacturing_labor_coa_id' in 'field list' (Connection: mysql, SQL: insert into `products` (`sku`, `name`, `supplier_id`, `product_category_id`, `uom_id`, `cost_price`, `sell_price`, `biaya`, `harga_batas`, `item_value`, `tipe_pajak`, `pajak`, `jumlah_kelipatan_gudang_besar`, `jumlah_jual_kategori_banyak`, `kode_merk`, `inventory_coa_id`, `sales_coa_id`, `sales_return_coa_id`, `sales_discount_coa_id`, `goods_delivery_coa_id`, `cogs_coa_id`, `purchase_return_coa_id`, `unbilled_purchase_coa_id`, `temporary_procurement_coa_id`, `manufacturing_labor_coa_id`, `manufacturing_overhead_coa_id`, `is_active`, `updated_at`, `created_at`) values (SKU-250, Produk fugiat, 1, 1, 1, 10000, 15000, 1737.8, 19.74, 49520.78, Eksklusif, 1.73, 36, 98, MRK-653, 640, 707, 709, 708, 641, 710, 711, 676, 670, 590, 592, 1, 2026-09-21 10:45:55, 2026-09-21 10:45:55))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/CompleteSalesFlowFilamentTest.php:65
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CrossCabangProductAutofillTest > it…  QueryException   
+  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'manufacturing_labor_coa_id' in 'field list' (Connection: mysql, SQL: insert into `products` (`sku`, `name`, `supplier_id`, `product_category_id`, `uom_id`, `cost_price`, `sell_price`, `biaya`, `harga_batas`, `item_value`, `tipe_pajak`, `pajak`, `jumlah_kelipatan_gudang_besar`, `jumlah_jual_kategori_banyak`, `kode_merk`, `inventory_coa_id`, `sales_coa_id`, `sales_return_coa_id`, `sales_discount_coa_id`, `goods_delivery_coa_id`, `cogs_coa_id`, `purchase_return_coa_id`, `unbilled_purchase_coa_id`, `temporary_procurement_coa_id`, `manufacturing_labor_coa_id`, `manufacturing_overhead_coa_id`, `cabang_id`, `updated_at`, `created_at`) values (CROSS-001, Produk pariatur, 2, 2, 2, 35000, 50000, 1373.49, 4.22, 47999.61, inklusif, 10, 44, 29, MRK-438, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 4, 2026-09-21 10:45:55, 2026-09-21 10:45:55))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/CrossCabangProductAutofillTest.php:24
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CrossCabangProductAutofillTest > it…  QueryException   
+  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'manufacturing_labor_coa_id' in 'field list' (Connection: mysql, SQL: insert into `products` (`sku`, `name`, `supplier_id`, `product_category_id`, `uom_id`, `cost_price`, `sell_price`, `biaya`, `harga_batas`, `item_value`, `tipe_pajak`, `pajak`, `jumlah_kelipatan_gudang_besar`, `jumlah_jual_kategori_banyak`, `kode_merk`, `inventory_coa_id`, `sales_coa_id`, `sales_return_coa_id`, `sales_discount_coa_id`, `goods_delivery_coa_id`, `cogs_coa_id`, `purchase_return_coa_id`, `unbilled_purchase_coa_id`, `temporary_procurement_coa_id`, `manufacturing_labor_coa_id`, `manufacturing_overhead_coa_id`, `cabang_id`, `updated_at`, `created_at`) values (CROSS-001, Produk unde, 3, 3, 3, 35000, 50000, 1935.57, 12.55, 9295.18, inklusif, 10, 22, 95, MRK-721, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 7, 2026-09-21 10:45:56, 2026-09-21 10:45:56))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/CrossCabangProductAutofillTest.php:24
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CrossCabangProductAutofillTest > it…  QueryException   
+  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'manufacturing_labor_coa_id' in 'field list' (Connection: mysql, SQL: insert into `products` (`sku`, `name`, `supplier_id`, `product_category_id`, `uom_id`, `cost_price`, `sell_price`, `biaya`, `harga_batas`, `item_value`, `tipe_pajak`, `pajak`, `jumlah_kelipatan_gudang_besar`, `jumlah_jual_kategori_banyak`, `kode_merk`, `inventory_coa_id`, `sales_coa_id`, `sales_return_coa_id`, `sales_discount_coa_id`, `goods_delivery_coa_id`, `cogs_coa_id`, `purchase_return_coa_id`, `unbilled_purchase_coa_id`, `temporary_procurement_coa_id`, `manufacturing_labor_coa_id`, `manufacturing_overhead_coa_id`, `cabang_id`, `updated_at`, `created_at`) values (CROSS-001, Produk recusandae, 4, 4, 4, 35000, 50000, 4505.02, 6.14, 21849.1, inklusif, 10, 45, 95, MRK-783, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 10, 2026-09-21 10:45:56, 2026-09-21 10:45:56))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/CrossCabangProductAutofillTest.php:24
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CrossCabangProductAutofillTest > it…  QueryException   
+  SQLSTATE[42S22]: Column not found: 1054 Unknown column 'manufacturing_labor_coa_id' in 'field list' (Connection: mysql, SQL: insert into `products` (`sku`, `name`, `supplier_id`, `product_category_id`, `uom_id`, `cost_price`, `sell_price`, `biaya`, `harga_batas`, `item_value`, `tipe_pajak`, `pajak`, `jumlah_kelipatan_gudang_besar`, `jumlah_jual_kategori_banyak`, `kode_merk`, `inventory_coa_id`, `sales_coa_id`, `sales_return_coa_id`, `sales_discount_coa_id`, `goods_delivery_coa_id`, `cogs_coa_id`, `purchase_return_coa_id`, `unbilled_purchase_coa_id`, `temporary_procurement_coa_id`, `manufacturing_labor_coa_id`, `manufacturing_overhead_coa_id`, `cabang_id`, `updated_at`, `created_at`) values (CROSS-001, Produk molestiae, 5, 5, 5, 35000, 50000, 4072.01, 17.25, 7486.06, inklusif, 10, 18, 21, MRK-631, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 13, 2026-09-21 10:45:57, 2026-09-21 10:45:57))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:47
+     43▕             if ($this->pretending()) {
+     44▕                 return true;
+     45▕             }
+     46▕ 
+  ➜  47▕             $statement = $this->getPdo()->prepare($query);
+     48▕ 
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/CrossCabangProductAutofillTest.php:24
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CrossCabangProductAutofillTest > it…  QueryException   
+  SQLSTATE[HY000]: General error: 1412 Table definition has changed, please retry transaction (Connection: mysql, SQL: select * from `products` where `products`.`id` = 1 and `products`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕ 
+  ➜ 411▕             $statement->execute();
+    412▕ 
+    413▕             return $statement->fetchAll();
+    414▕         });
+    415▕     }
+
+      [2m+12 vendor frames [22m
+  13  tests/Feature/CrossCabangProductAutofillTest.php:86
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CrossCabangProductAutofillTest > it…  QueryException   
+  SQLSTATE[HY000]: General error: 1412 Table definition has changed, please retry transaction (Connection: mysql, SQL: select * from `products` where `products`.`id` = 3 and `products`.`deleted_at` is null limit 1)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕ 
+  ➜ 411▕             $statement->execute();
+    412▕ 
+    413▕             return $statement->fetchAll();
+    414▕         });
+    415▕     }
+
+      [2m+12 vendor frames [22m
+  13  tests/Feature/CrossCabangProductAutofillTest.php:97
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CurrencyAmountInputValidationTest >…  QueryException   
+  SQLSTATE[HY000]: General error: 1412 Table definition has changed, please retry transaction (Connection: mysql, SQL: select * from `order_requests` where `order_requests`.`id` in (2) and `order_requests`.`deleted_at` is null)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:411
+    407▕             );
+    408▕ 
+    409▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    410▕ 
+  ➜ 411▕             $statement->execute();
+    412▕ 
+    413▕             return $statement->fetchAll();
+    414▕         });
+    415▕     }
+
+      [2m+18 vendor frames [22m
+  19  app/Models/OrderRequestItem.php:96
+      [2m+12 vendor frames [22m
+  32  tests/Feature/CurrencyAmountInputValidationTest.php:70
+
+
+  Tests:    21 failed, 211 passed (699 assertions)
+  Duration: 223.72s
+

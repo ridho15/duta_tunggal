@@ -1,0 +1,144 @@
+
+=== JOURNAL ENTRIES CREATED ===
+COA: 1120 - PIUTANG DAGANG
+Description: Customer receipt for receipt id 1
+Debit: 0.00, Credit: 1000000.00
+Reference: REC-1
+---
+COA: 977720 - Test Account 88261
+Description: Bank/Cash for receipt id 1 via cash
+Debit: 1000000.00, Credit: 0.00
+Reference: REC-1
+---
+=== ACCOUNT RECEIVABLE STATUS ===
+Total: 1000000.00
+Paid: 1000000.00
+Remaining: 0.00
+Status: Lunas
+=== INVOICE STATUS ===
+Status: paid
+   PASS  Tests\Feature\CustomerReceiptCashPaymentTest
+  ✓ cash payment creates correct journal entries and updates ar          3.76s  
+
+=== Customer Receipt vs Vendor Payment Mechanism Comparison ===
+
+✅ Model structures are similar
+✅ Both have header-detail relationship
+✅ Both support multiple payment methods
+✅ Both track payment amounts and dates
+✅ Both integrate with Chart of Accounts
+✅ Both have status tracking (Draft/Partial/Paid)
+✅ Both support invoice allocation
+
+Key Similarities:
+- Same attribute names and types
+- Same relationship patterns
+- Same payment processing logic
+- Same journal entry integration
+
+Conclusion: Customer Receipt mechanism is implemented similarly to Vendor Payment mechanism.
+
+   PASS  Tests\Feature\CustomerReceiptVsVendorPaymentTest
+  ✓ customer receipt and vendor payment mechanisms comparison            0.55s  
+
+   PASS  Tests\Feature\InvoicePaymentFlowConsistencyTest
+  ✓ converted invoice total drives receivable and partial receipt balan… 0.69s  
+
+   PASS  Tests\Feature\PaymentCurrencyAuditTest
+  ✓ payment recorded in idr or has amount idr                            0.68s  
+
+   FAIL  Tests\Feature\PaymentLedgerPostingTest
+  ✓ post vendor payment creates debit ap and credit bank                 0.59s  
+  ✓ post vendor payment is idempotent for same payment                   0.68s  
+  ✓ post vendor payment using deposit credits deposit coa                0.49s  
+  ✓ post vendor payment with deposit throws when deposit coa is missing  0.48s  
+  ✓ vendor payment detail creation fails early when supplier deposit is… 0.47s  
+  ✓ vendor payment status update fails early when deposit is unavailabl… 0.46s  
+  ✓ post deposit creates journal entries                                 0.49s  
+  ⨯ import purchase invoice does not post ppn masukan                    0.51s  
+  ✓ import payment posts ppn masukan and other import taxes              0.52s  
+
+   PASS  Tests\Feature\PaymentRequestVendorPaymentFlowTest
+  ✓ it can create a payment request in draft status                      0.46s  
+  ✓ payment request total amount is formatted as rupiah in the create f… 0.71s  
+  ✓ payment request generates unique request number                      0.50s  
+  ✓ it can submit payment request for approval                           0.47s  
+  ✓ submit action is only visible from draft status                      0.47s  
+  ✓ it can approve a pending payment request                             0.46s  
+  ✓ approve action is only visible when pending approval                 0.47s  
+  ✓ it can reject a pending payment request                              0.47s  
+  ✓ reject action requires approval notes                                0.47s  
+  ✓ it can create vendor payment linked to approved payment request      0.48s  
+  ✓ after creating vendor payment payment request status becomes paid    0.49s  
+  ✓ creating vendor payment without payment request id does not affect…  0.49s  
+  ✓ vendor payment select only shows approved prs without vendor paymen… 0.48s  
+  ✓ paid payment request is excluded from vendor payment select          0.48s  
+  ✓ payment request belongs to vendor payment                            0.49s  
+  ✓ vendor payment belongs to payment request                            0.48s  
+  ✓ payment request status constants are correctly defined               0.46s  
+  ✓ payment request status labels cover all statuses                     0.47s  
+  ✓ payment request status is normalized to canonical lowercase value    0.47s  
+
+   FAIL  Tests\Feature\VendorPaymentFlowAdjustmentTest
+  ⨯ vendor payment observer keeps adjustment amount in account payable…  0.49s  
+  ⨯ manual mode creates details and updates ap with adjustment           0.50s  
+
+   PASS  Tests\Feature\VendorPaymentFromPaymentRequestTest
+  ✓ create page prefills from payment request query with remaining amou… 0.69s  
+  ✓ helpers used by the create page are publicly callable                0.46s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PaymentLedgerPostingTest > import purchase invoice…    
+  Invoice posting should be posted or skipped
+Failed asserting that false is true.
+
+  at tests/Feature/PaymentLedgerPostingTest.php:518
+    514▕         // Post invoice to ledger
+    515▕         $service = app(LedgerPostingService::class);
+    516▕         $result = $service->postInvoice($invoice);
+    517▕ 
+  ➜ 518▕         $this->assertTrue(in_array($result['status'], ['posted', 'skipped']), 'Invoice posting should be posted or skipped');
+    519▕ 
+    520▕         // Check journal entries - should NOT have PPN Masukan debit for import purchases
+    521▕         $journals = JournalEntry::where('source_type', \App\Models\Invoice::class)->where('source_id', $invoice->id)->get();
+    522▕         $ppnMasukanEntry = $journals->firstWhere('coa_id', $ppnMasukanCoa->id);
+
+  1   tests/Feature/PaymentLedgerPostingTest.php:518
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentFlowAdjustmentTest > vendor payment ob…   
+  Failed asserting that 75349.0 matches expected 75000.0.
+
+  at tests/Feature/VendorPaymentFlowAdjustmentTest.php:83
+     79▕ 
+     80▕         $ap->refresh();
+     81▕ 
+     82▕         $this->assertEquals(120000.00, $ap->paid);
+  ➜  83▕         $this->assertEquals(75000.00, $ap->remaining);
+     84▕         $this->assertEquals('Belum Lunas', $ap->status);
+     85▕     }
+     86▕ 
+     87▕     #[Test]
+
+  1   tests/Feature/VendorPaymentFlowAdjustmentTest.php:83
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentFlowAdjustmentTest > manual mode creat…   
+  Failed asserting that 809473.0 matches expected 75000.0.
+
+  at tests/Feature/VendorPaymentFlowAdjustmentTest.php:230
+    226▕ 
+    227▕         $ap1->refresh();
+    228▕         $ap2->refresh();
+    229▕         $this->assertEquals(120000.00, $ap1->paid);
+  ➜ 230▕         $this->assertEquals(75000.00, $ap1->remaining);
+    231▕         $this->assertEquals('Belum Lunas', $ap1->status);
+    232▕ 
+    233▕         $this->assertEquals(150000.00, $ap2->paid);
+    234▕         $this->assertEquals(0.00, $ap2->remaining);
+
+  1   tests/Feature/VendorPaymentFlowAdjustmentTest.php:230
+
+
+  Tests:    3 failed, 33 passed (159 assertions)
+  Duration: 21.85s
+

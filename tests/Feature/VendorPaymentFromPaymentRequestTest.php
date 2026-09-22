@@ -6,10 +6,12 @@ use App\Filament\Resources\VendorPaymentResource;
 use App\Filament\Resources\VendorPaymentResource\Pages\CreateVendorPayment;
 use App\Http\Controllers\HelperController;
 use App\Models\AccountPayable;
+use App\Models\ChartOfAccount;
 use App\Models\Invoice;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\VendorPayment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -109,5 +111,45 @@ class VendorPaymentFromPaymentRequestTest extends TestCase
         $this->assertSame('1.234,50', VendorPaymentResource::formatMoneyState('1234.5'));
         $this->assertSame('0,00', VendorPaymentResource::formatMoneyState(null));
         $this->assertSame([], VendorPaymentResource::buildPaymentDetails(collect()));
+    }
+
+    /**
+     * Ditemukan saat UAT (22/09/2026): membuat Vendor Payment dari halaman "Buat Vendor Payment" pada Payment
+     * Request (?payment_request_id=...) gagal dengan error 500 (SQLSTATE 23000, kolom NOT NULL diisi null).
+     * `mount()` memanggil $this->form->fill() KEDUA KALINYA dengan array parsial; fill() kedua ini tidak lagi
+     * memakai default komponen (Toggle/TextInput/Hidden ->default(...)) untuk field yang tidak disebutkan, sehingga
+     * ppn_import_amount, pph22_amount, bea_masuk_amount, payment_adjustment, dan diskon jadi null padahal kolomnya
+     * NOT NULL. Form yang dibuka tanpa payment_request_id tidak kena bug ini karena hanya melalui satu kali fill().
+     */
+    public function test_create_from_payment_request_saves_without_the_not_null_column_crash(): void
+    {
+        $user = $this->paymentUser();
+        $fixture = $this->approvedPaymentRequest($user, 71928, 0);
+
+        $bankCoa = ChartOfAccount::factory()->create([
+            'code' => '1100',
+            'name' => 'Bank Utama',
+            'type' => 'asset',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['payment_request_id' => $fixture['paymentRequest']->id])
+            ->test(CreateVendorPayment::class)
+            ->set('data.payment_method', 'Bank Transfer')
+            ->set('data.coa_id', $bankCoa->id)
+            ->set('data.target_bank_account', 'BCA 1234567890 a.n. UAT Supplier')
+            ->set('data.transfer_reference_number', 'TRF-UAT-TEST-001')
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $payment = VendorPayment::where('payment_request_id', $fixture['paymentRequest']->id)->firstOrFail();
+
+        $this->assertSame(0.0, (float) $payment->ppn_import_amount);
+        $this->assertSame(0.0, (float) $payment->pph22_amount);
+        $this->assertSame(0.0, (float) $payment->bea_masuk_amount);
+        $this->assertSame(0.0, (float) $payment->payment_adjustment);
+        $this->assertSame(0, (int) $payment->diskon);
+        $this->assertFalse((bool) $payment->is_import_payment);
+        $this->assertEqualsWithDelta(71928.0, (float) $payment->total_payment, 0.01);
     }
 }

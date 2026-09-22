@@ -1,0 +1,81 @@
+
+   PASS  Tests\Feature\ERP\InvoiceTest
+  ✓ invoice number generation produces correct format                    4.30s  
+  ✓ invoice number is sequential and unique                              0.79s  
+  ✓ invoice number has four digit sequence padding                       0.55s  
+  ✓ invoice number generation never returns duplicate                    0.50s  
+  ✓ invoice number generator skips existing numbers                      0.55s  
+  ✓ invoice can be updated without unique constraint violation           0.46s  
+  ✓ invoice service never produces a duplicate number even with concurr… 0.47s  
+
+   PASS  Tests\Feature\InvoiceArFeatureTest
+  ✓ can generate invoice from confirmed delivery order                   0.50s  
+  ✓ posts invoice to accounts receivable                                 0.49s  
+  ✓ creates correct journal entries for invoice                          0.49s  
+  ✓ tracks aging for accounts receivable                                 0.49s  
+  ✓ handles customer payment and updates ar remaining                    0.48s  
+  ✓ generates ageing schedule report                                     0.53s  
+  ✓ calculates total totals correctly with tax                           0.49s  
+  ✓ handles multiple invoices per customer                               0.50s  
+  ✓ updates invoice status on full payment                               0.49s  
+  ✓ generates unique invoice numbers                                     0.50s  
+
+   PASS  Tests\Feature\InvoiceCurrencyAuditTest
+  ✓ invoice amount converted or has amount idr                           0.53s  
+
+   PASS  Tests\Feature\InvoiceDppCalculationTest
+  ✓ invoice dpp no discount no tax                                       0.57s  
+  ✓ invoice dpp with discount percentage                                 0.24s  
+  ✓ invoice dpp is pre tax not including ppn                             0.25s  
+  ✓ invoice dpp fixed formula differs from buggy formula                 0.24s  
+  ✓ invoice dpp zero discount still works                                0.25s  
+  ✓ invoice dpp multiple items sum                                       0.26s  
+  ✓ purchase invoice dpp no discount                                     0.28s  
+  ✓ purchase invoice dpp with discount                                   0.26s  
+  ✓ purchase invoice dpp is pre tax                                      0.25s  
+  ✓ purchase invoice dpp fixed differs from buggy                        0.25s  
+  ✓ purchase invoice dpp multiple items sum                              0.25s  
+  ✓ taxservice eksklusif dpp matches invoice dpp formula                 0.24s  
+  ✓ taxservice inklusif dpp calculated from gross                        0.25s  
+  ✓ taxservice non pajak dpp equals gross                                0.24s  
+
+   PASS  Tests\Feature\InvoiceEditAndDeliveryOrderTest
+  ✓ invoice item creation includes all required fields                   0.26s  
+  ✓ invoice item update preserves existing coa when provided             0.26s  
+
+   PASS  Tests\Feature\InvoiceLineBreakdownPhase5BTest
+  ✓ it Isu 10: contoh UAT — 20 × 8.687, diskon 5%, PPN 11% eksklusif =…  0.25s  
+  ✓ it Isu 10: inklusif — total = nilai setelah diskon, DPP diekstrak,…  0.25s  
+  ✓ it Isu 10: kebijakan pembulatan dapat dikembalikan ke rupiah bulat…  0.24s  
+  ✓ it Isu 10: SO, quotation, dan invoice memakai perhitungan yang sama… 0.25s  
+  ✓ it Isu 10: format uang baku selalu 2 desimal sehingga sen tidak ter… 0.24s  
+  ✓ it Isu 10: invoice dari jalur Sales Order — price GROSS + rincian;…  0.37s  
+  ✓ it Isu 10: invoice dari jalur Delivery Order — price GROSS (dulu NE… 0.43s  
+  ✓ it Isu 10: invoice per DO untuk pengiriman sebagian — baris memakai… 0.39s  
+  ✓ it Isu 10: SO inklusif pada jalur Delivery Order tidak lagi ditamba… 0.39s  
+  ✓ it Isu 10: SalesInvoiceLineBuilder — baris form dicocokkan ke item…  0.33s  
+  ✓ it Isu 10: breakdown() — invoice lama dengan price GROSS dan price…  0.35s  
+  ✓ it Isu 10: net_unit_price (dipakai retur) tidak bergantung pada apa… 0.34s  
+  ✓ it Isu 10: data lama tanpa subtotal (DPP) diturunkan dari total − P… 0.33s  
+  ✓ it Isu 10: invoices:backfill-line-breakdown — dry-run tidak menguba… 0.36s  
+  ✓ it Isu 10: PDF invoice memuat Harga × Qty = Jumlah, Diskon (% dan R… 0.40s  
+  ✓ it Isu 10: PDF Sales Order dan Quotation menampilkan 183.208,83 (bu… 0.34s  
+  ✓ it Isu 10: halaman Lihat invoice menampilkan rincian baris dan tota… 0.46s  
+  ✓ it Isu 10: invoice PDF tampil untuk invoice lama (rincian dihitung…  0.34s  
+  ✓ it Isu 10: endpoint PDF invoice berhasil (landscape, 12 kolom)       0.45s  
+  ✓ it Isu 10: retur customer memakai harga bersih (setelah diskon), bu… 0.25s  
+  ✓ it Isu 10: halaman Ubah invoice menampilkan rincian baris dan menyi… 0.53s  
+
+   PASS  Tests\Feature\InvoiceNumberGeneratorTest
+  ✓ generates first number when no invoices exist                        0.25s  
+  ✓ generates sequential numbers                                         0.27s  
+  ✓ considers invoices from other branches                               0.25s  
+  ✓ resets counter for new date                                          0.25s  
+  ✓ does not loop infinitely when all slots taken                        0.25s  
+
+   PASS  Tests\Feature\InvoicePaymentFlowConsistencyTest
+  ✓ converted invoice total drives receivable and partial receipt balan… 0.34s  
+
+  Tests:    61 passed (287 assertions)
+  Duration: 26.45s
+

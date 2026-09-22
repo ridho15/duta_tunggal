@@ -46,9 +46,15 @@ class PurchaseReceiptService
         return JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item);
     }
 
+    /**
+     * Isu 9: sebelumnya jalur ini memakai prefix 'RN-' sedangkan jalur QC auto-receipt (QualityControlService::
+     * generateReceiptNumber()) memakai 'GRN-' — DUA prefix untuk dokumen yang SAMA (tabel/kolom purchase_receipts.
+     * receipt_number). Disatukan ke 'GRN-'; SequentialNumberGenerator sudah menghitung dari tabel yang sama sehingga
+     * kedua jalur otomatis berbagi satu urutan tanpa perubahan lain.
+     */
     public function generateReceiptNumber()
     {
-        return \App\Services\SequentialNumberGenerator::generate('purchase_receipts', 'receipt_number', 'RN-', 4, 'Ymd');
+        return \App\Services\SequentialNumberGenerator::generate('purchase_receipts', 'receipt_number', 'GRN-', 4, 'Ymd');
     }
 
     /**
@@ -674,7 +680,8 @@ class PurchaseReceiptService
             'project_id' => $projectId,
             'source_type' => PurchaseReceipt::class,
             'source_id' => $receipt->id,
-            'reference' => 'PR-' . $receipt->id,
+            // Isu 9: nomor dokumen asli (GRN-…/RN-…), bukan sintetis "PR-{id}" yang tidak bisa ditelusuri balik ke dokumennya.
+            'reference' => $receipt->receipt_number,
         ];
 
         // 2. Debit the unbilled purchase account (reverse the original credit)
@@ -695,7 +702,7 @@ class PurchaseReceiptService
             'project_id' => $projectId,
             'source_type' => PurchaseReceipt::class,
             'source_id' => $receipt->id,
-            'reference' => 'PR-' . $receipt->id,
+            'reference' => $receipt->receipt_number,
         ];
 
         if (! $this->validateJournalBalance($entries)) {

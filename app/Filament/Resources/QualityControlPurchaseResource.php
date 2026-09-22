@@ -1606,7 +1606,7 @@ class QualityControlPurchaseResource extends Resource
                                 $sourceType = urlencode(\App\Models\QualityControl::class);
                                 $sourceId = $record->id;
 
-                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}";
                             })
                             ->openUrlInNewTab()
                             ->visible(function ($record) {

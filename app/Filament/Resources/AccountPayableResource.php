@@ -235,8 +235,10 @@ class AccountPayableResource extends Resource
                     
                 TextColumn::make('total')
                     ->label('Total Amount (Rp / Source)')
-                    ->sortable()
-                    ->searchable()
+                    // Query dasar (AccountPayableQuery::base()) meng-leftJoin invoices, dan kedua tabel punya kolom
+                    // `total`, jadi sort/search bawaan Filament pada 'total' ambigu (SQLSTATE 1052). Kualifikasi manual.
+                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy('account_payables.total', $direction))
+                    ->searchable(query: fn (Builder $query, string $search) => $query->where('account_payables.total', 'like', "%{$search}%"))
                     ->formatStateUsing(fn ($state, AccountPayable $record) => MoneyHelper::rupiah($state) . ' / ' . PurchaseInvoiceResource::formatInvoiceCurrencyPair($record->invoice, $record->total_original ?? $record->invoice?->total ?? $state)),
                     
                 TextColumn::make('paid')
@@ -282,7 +284,18 @@ class AccountPayableResource extends Resource
                     
                 TextColumn::make('invoice.fromModel.po_number')
                     ->label('PO Number')
-                    ->searchable()
+                    // fromModel() adalah morphTo; whereHas langsung padanya membuat Eloquent meng-OR-kan EXISTS untuk
+                    // SEMUA tipe morph yang pernah dipakai (termasuk SaleOrder, yang tidak punya kolom po_number ->
+                    // SQLSTATE 42S22). Invoice di Utang Usaha selalu berasal dari PurchaseOrder, jadi query langsung
+                    // ke tabel itu lewat subquery whereIn (tanpa lewat relasi morphTo) agar tidak ambigu/pecah.
+                    ->searchable(query: fn (Builder $query, string $search) => $query->whereHas(
+                        'invoice',
+                        fn (Builder $q) => $q->where('from_model_type', \App\Models\PurchaseOrder::class)
+                            // whereIn(col, Closure) menerima Query\Builder biasa (bukan Eloquent\Builder) untuk subquery-nya.
+                            ->whereIn('from_model_id', fn ($sub) => $sub->select('id')
+                                ->from('purchase_orders')
+                                ->where('po_number', 'like', "%{$search}%"))
+                    ))
                     ->sortable()
                     ->copyable()
                     ->default('-')

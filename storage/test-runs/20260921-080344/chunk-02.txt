@@ -1,0 +1,487 @@
+
+   PASS  Tests\Feature\InvoiceResourceCurrencyConversionTest
+  ✓ invoice create form shows converted sale order values and stores th… 3.85s  
+  ✓ invoice edit keeps decimal item values when saved                    0.54s  
+  ✓ invoice list page shows converted rupiah values                      0.76s  
+
+   PASS  Tests\Feature\InvoiceServiceFeatureTest
+  ✓ tc inv 001 generates invoice number in correct format                0.49s  
+  ✓ tc inv 002 purchase invoice uses pinv prefix different from inv      0.44s  
+  ✓ tc inv 003 auto creates ar when sales invoice is created             0.46s  
+  ✓ tc inv 004 ar remaining equals total and paid is zero on creation    0.46s  
+  ✓ tc inv 005 other fee json array summed correctly                     0.45s  
+  ✓ tc inv 005b empty other fee returns zero                             0.45s  
+  ✓ tc inv 006 ppn dpp plus ppn equals total                             0.45s  
+  ✓ tc inv 007 invoice status becomes paid when ar remaining reaches ze… 0.64s  
+
+   PASS  Tests\Feature\PurchaseInvoiceCancellationTest
+  ✓ cancel reverses journals removes payable and records who when and w… 0.70s  
+  ✓ invoices that cannot be cancelled are rejected without any change    0.87s  
+  ✓ reason is required and reversal date cannot precede the invoice dat… 0.65s  
+  ✓ cancelled invoice is never payable                                   0.66s  
+  ✓ view page action cancels a posted invoice                            0.87s  
+  ✓ view page action reports why an invoice cannot be cancelled          0.83s  
+  ✓ view page action is hidden for drafts cancelled invoices and users…  0.84s  
+  ✓ overdue check is scheduled daily                                     0.62s  
+  ✓ overdue check marks restores and skips the right invoices            0.76s  
+
+   PASS  Tests\Feature\PurchaseInvoiceCreateErrorsTest
+  ✓ duplicate supplier invoice number is reported on the field and in a… 1.06s  
+  ✓ service errors get the data prefix so livewire can attach them to f… 0.71s  
+  ✓ cancelled invoice frees its receipt and supplier and tax numbers     0.72s  
+
+   FAIL  Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest
+  ✓ it dry-runs receipt backed purchase invoice repair without changing… 0.57s  
+  ⨯ it applies receipt backed purchase invoice repair and reposts journ… 0.55s  
+  ⨯ it keeps account payable ageing amounts in idr while retaining sour… 0.54s  
+  ⨯ it normalizes malformed receipt backed invoice item prices from pur… 0.62s  
+  ✓ it rejects receipt backed purchase invoice with mixed currencies     0.58s  
+
+   FAIL  Tests\Feature\PurchaseInvoiceResourceTest
+  ✓ purchase invoice resource can render list page                       0.71s  
+  ✓ purchase invoice resource can render create page                     0.79s  
+  ✓ purchase invoice create data forces draft status                     0.74s  
+  ✓ purchase invoice create data persists source currency context        0.69s  
+  ✓ purchase invoice formats foreign source amount with idr equivalent   0.74s  
+  ✓ purchase invoice form currency formatter is compact and rounds high… 0.65s  
+  ⨯ purchase invoice form does not render duplicate source amount field… 0.77s  
+  ⨯ purchase invoice live preview uses service totals without money mas… 0.97s  
+  ✓ purchase invoice edit data clears import charge state for non impor… 0.67s  
+  ✓ purchase invoice view uses stored currency display                   0.67s  
+  ✓ purchase invoice create preserves idr currency for idr po            0.68s  
+  ⨯ mark as sent action shows friendly notification when update fails    0.84s  
+  ✓ purchase invoice pdf renders supplier and ppn correctly              0.69s  
+  ✓ import purchase invoice pdf shows import breakdown                   0.74s  
+  ✓ purchase invoice form has required fields                            0.75s  
+  ✓ purchase invoice source fields put cabang after order request as re… 0.71s  
+  ⨯ purchase invoice manual money fields update on blur to keep mask st… 0.69s  
+  ✓ purchase invoice money parser keeps indonesian thousands as full am… 0.73s  
+  ⨯ purchase invoice total recalculation uses full formatted money valu… 0.68s  
+  ✓ supplier options prioritize five unique recent receipt suppliers     0.74s  
+  ✓ supplier options fall back to alphabetical order and limit fifty     0.76s  
+  ✓ supplier selection filters purchase orders                           0.96s  
+  ✓ order request and purchase order options follow cabang scope         0.74s  
+  ✓ order request selection leaves cabang empty until purchase order is… 1.60s  
+  ✓ purchase invoice locks cabang from first purchase order and reopens… 1.74s  
+  ✓ order request cabang context falls back to item then receipt         0.71s  
+  ✓ partial purchase receipt can be selected for purchase invoice        1.26s  
+  ✓ purchase order selection loads receipts                              0.97s  
+  ⨯ purchase receipt checkbox labels use rupiah format                   0.98s  
+  ✓ receipt selection calculates invoice items                           0.95s  
+  ✓ tax and other fees calculations                                      0.97s  
+  ⨯ purchase invoice create normalizes tax to percentage                 1.08s  
+  ⨯ purchase invoice from receipt persists full nominal branch ap and j… 1.11s  
+  ⨯ purchase invoice ignores manual ppn for mixed tax receipts           1.11s  
+  ✓ purchase receipt resource is not manually creatable or editable      0.67s  
+  ⨯ purchase invoice uses receipt branch when order request creator has… 1.17s  
+  ⨯ purchase invoice audit command dry runs and repairs with reversal    0.74s  
+  ✓ purchase invoice pdf renders ppn once without legacy tax row         0.68s  
+  ✓ invoice creation with valid data                                     0.93s  
+  ✓ invoice number generation action                                     0.96s  
+  ⨯ purchase orders require order request before submit                  0.96s  
+  ✓ purchase invoice requires purchase order and receipt before submit   0.96s  
+  ✓ purchase invoice requires receipt after purchase order is selected   1.07s  
+  ⨯ purchase invoice derives source from receipt and ignores hidden sou… 1.08s  
+  ✓ purchase invoice source state is cleared when purchase order is rem… 1.02s  
+  ✓ purchase invoice rejects invalid receipt source relationships        0.71s  
+  ✓ purchase invoice rejects receipt already used by another invoice     0.74s  
+  ⨯ purchase invoice multi po source is derived from selected receipts   1.11s  
+  ⨯ purchase invoice creation rolls back when finalisation fails         1.04s  
+  ✓ form validation requires invoice date                                0.97s  
+  ✓ form validation requires due date                                    0.97s  
+  ✓ purchase invoice resource can render edit page                       0.73s  
+  ✓ purchase invoice creation with other fees                            0.72s  
+  ⨯ purchase invoice create page persists receipt biaya items            1.07s  
+  ⨯ purchase invoice ignores zero value other fee items                  1.08s  
+  ✓ purchase invoice receipt biaya deletion                              0.66s  
+  ✓ create deposit with journal posting                                  0.69s  
+  ✓ create deposit supplier oogne with specific data                     0.67s  
+
+   PASS  Tests\Feature\PurchaseInvoiceTest
+  ✓ purchase invoice creation with proper relationships                  0.53s  
+  ✓ invoice observer creates account payable and ageing schedule         0.50s  
+  ✓ purchase invoice creation posts balanced automatic journal entries   0.52s  
+  ✓ three way matching validation                                        0.50s  
+  ✓ invoice number generation                                            0.49s  
+  ✓ invoice status tracking                                              0.52s  
+  ✓ invoice with tax and other fees calculation                          0.49s  
+  ✓ invoice soft delete cascades to invoice items                        0.50s  
+  ✓ invoice customer accessor for purchase orders                        0.49s  
+
+   PASS  Tests\Feature\PurchaseReceiptInvoiceIdrNormalizationTest
+  ✓ it normalizes purchase receipt invoice amounts to idr when po item…  0.68s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest > it applies…   
+  Expected status code 0 but received 1.
+Failed asserting that 1 matches expected 0.
+
+  at tests/Feature/PurchaseInvoiceReceiptBackedRepairTest.php:214
+    210▕         '--invoice' => $invoice->id,
+    211▕         '--apply' => true,
+    212▕     ])
+    213▕         ->expectsOutputToContain('repaired successfully')
+  ➜ 214▕         ->assertExitCode(0);
+    215▕ 
+    216▕     $invoice = $invoice->fresh('invoiceItem', 'accountPayable');
+    217▕ 
+    218▕     expect((float) $invoice->subtotal)->toBe(533.3)
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest > it keeps a…   
+  Failed asserting that 29894.13 is identical to 591.96.
+
+  at tests/Feature/PurchaseInvoiceReceiptBackedRepairTest.php:263
+    259▕     $report = app(\App\Services\Reports\AgeingReportService::class)->generate([
+    260▕         'report_type' => 'payables',
+    261▕     ]);
+    262▕ 
+  ➜ 263▕     expect((float) $invoice->accountPayable->remaining_original)->toBe(591.96)
+    264▕         ->and((float) $invoice->accountPayable->remaining)->toBe(8879400.0)
+    265▕         ->and((float) array_sum($report['apSummary']))->toBe(8879400.0);
+    266▕ });
+    267▕
+
+  1   tests/Feature/PurchaseInvoiceReceiptBackedRepairTest.php:263
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest > it normali…   
+  Failed asserting that 5333.0 is identical to 53.33.
+
+  at tests/Feature/PurchaseInvoiceReceiptBackedRepairTest.php:291
+    287▕         'ppn_rate' => 11,
+    288▕     ]);
+    289▕ 
+    290▕     expect($data['invoiceItem'])->toHaveCount(2)
+  ➜ 291▕         ->and((float) $data['invoiceItem'][0]['price'])->toBe(53.33)
+    292▕         ->and((float) $data['invoiceItem'][1]['price'])->toBe(53.33)
+    293▕         ->and((float) $data['subtotal'])->toBe(533.3)
+    294▕         ->and((float) $data['total'])->toBe(591.96);
+    295▕ });
+
+  1   tests/Feature/PurchaseInvoiceReceiptBackedRepairTest.php:291
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice form…   
+  Expected: <?php\n
+  \n
+  namespace App\Filament\Resources;\n
+  ... (1965 more lines)
+
+  To contain: Placeholder::make('unit_price_preview')
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:405
+    401▕         $this->assertStringNotContainsString("->label('Harga (Rp / Source)')", $source);
+    402▕         $this->assertStringNotContainsString("->label('Total Source')", $source);
+    403▕         $this->assertStringNotContainsString("->label('Total (Rp / Source)')", $source);
+    404▕         $this->assertStringNotContainsString("->label('Grand Total Source')", $source);
+  ➜ 405▕         $this->assertStringContainsString("Placeholder::make('unit_price_preview')", $source);
+    406▕         $this->assertStringContainsString("Placeholder::make('grand_total_preview')", $source);
+    407▕     }
+    408▕ 
+    409▕     public function test_purchase_invoice_live_preview_uses_service_totals_without_money_mask_distortion(): void
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:405
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice live…   
+  Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:108
+    104▕     {
+    105▕         $actual = $this->get($name);
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+  ➜ 108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+    110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseInvoiceResourceTest.php:465
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > mark as sent action s…   
+  Failed asserting that an action with name [mark_as_sent] exists on the [App\Filament\Resources\PurchaseInvoiceResource\Pages\ViewPurchaseInvoice] page.
+Failed asserting that null is an instance of class Filament\Actions\Action.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:151
+    147▕ 
+    148▕             $livewireClass = $this->instance()::class;
+    149▕             $prettyName = implode(' > ', $name);
+    150▕ 
+  ➜ 151▕             Assert::assertInstanceOf(
+    152▕                 Action::class,
+    153▕                 $action,
+    154▕                 message: "Failed asserting that an action with name [{$prettyName}] exists on the [{$livewireClass}] page.",
+    155▕             );
+
+      [2m+9 vendor frames [22m
+  10  tests/Feature/PurchaseInvoiceResourceTest.php:672
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice manu…   
+  TextInput::make('total') was not found after Repeater::make('receiptBiayaItems').
+Failed asserting that false is not false.
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:851
+    847▕             $sectionPosition = strpos($resourceSource, $sectionNeedle);
+    848▕             $this->assertNotFalse($sectionPosition, "{$sectionNeedle} was not found.");
+    849▕ 
+    850▕             $fieldPosition = strpos($resourceSource, $fieldNeedle, $sectionPosition);
+  ➜ 851▕             $this->assertNotFalse($fieldPosition, "{$fieldNeedle} was not found after {$sectionNeedle}.");
+    852▕ 
+    853▕             $fieldBlock = substr($resourceSource, $fieldPosition, 800);
+    854▕             $this->assertStringContainsString('->indonesianMoney()', $fieldBlock);
+    855▕             $this->assertStringContainsString('->live(onBlur: true)', $fieldBlock);
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:851
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice tota…   
+  Failed asserting that 110000.0 is identical to '110.000,00'.
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:898
+    894▕ 
+    895▕         $resource::recalculateForTest($state);
+    896▕ 
+    897▕         $this->assertSame(200000.0, $state['other_fee']);
+  ➜ 898▕         $this->assertSame('110.000,00', $state['ppn_amount']);
+    899▕         $this->assertSame('1.510.000,00', $state['total']);
+    900▕     }
+    901▕ 
+    902▕     public function test_supplier_options_prioritize_five_unique_recent_receipt_suppliers(): void
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:898
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase receipt chec…   
+  Expected: <div wire:id="18ug1KQ0S2AXMxqVwfC1"\n
+      class="fi-page fi-resource-create-record-page fi-resource-purchase-invoices"\n
+  >\n
+  ... (3296 more lines)
+
+  To contain: [PO-W3IX8Y] RN-HX4F4Z - Rp 1.500,00
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:38
+     34▕ 
+     35▕     function assertSeeHtml($values)
+     36▕     {
+     37▕         foreach (Arr::wrap($values) as $value) {
+  ➜  38▕             PHPUnit::assertStringContainsString(
+     39▕                 $value,
+     40▕                 $this->html()
+     41▕             );
+     42▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseInvoiceResourceTest.php:1430
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest…  ModelNotFoundException   
+  No query results for model [App\Models\Invoice].
+
+  at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:780
+    776▕         if (! is_null($model = $this->first($columns))) {
+    777▕             return $model;
+    778▕         }
+    779▕ 
+  ➜ 780▕         throw (new ModelNotFoundException)->setModel(get_class($this->model));
+    781▕     }
+    782▕ 
+    783▕     /**
+    784▕      * Execute the query and get the first result or call a callback.
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseInvoiceResourceTest.php:1530
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice from…   
+  Component has errors: "data.supplier_invoice_number", "data.tax_invoice_number"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseInvoiceResourceTest.php:1594
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice igno…   
+  Component has errors: "data.supplier_invoice_number", "data.tax_invoice_number"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseInvoiceResourceTest.php:1694
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice uses…   
+  Component has errors: "data.supplier_invoice_number", "data.tax_invoice_number"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseInvoiceResourceTest.php:1782
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice audi…   
+  Failed asserting that 7992.0 is identical to 7992000.0.
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:1890
+    1886▕ 
+    1887▕         $invoice = $invoice->fresh(['accountPayable']);
+    1888▕         $this->assertSame(7200000.0, (float) $invoice->subtotal);
+    1889▕         $this->assertSame(7992000.0, (float) $invoice->total);
+  ➜ 1890▕         $this->assertSame(7992000.0, (float) $invoice->accountPayable->total);
+    1891▕ 
+    1892▕         $this->assertGreaterThan(0, JournalEntry::withoutGlobalScopes()
+    1893▕             ->where('source_type', Invoice::class)
+    1894▕             ->where('source_id', $invoice->id)
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:1890
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase orders requi…   
+  Component has no matching failed rule or error message [required] for [data.selected_order_request] attribute.
+Failed asserting that an array contains 'required'.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:100
+     96▕             return;
+     97▕         }
+     98▕ 
+     99▕         // If the provided rule/message isn't a failed rule, let's check to see if it's a message...
+  ➜ 100▕         PHPUnit::assertContains($ruleOrMessage, $messages, "Component has no matching failed rule or error message [{$ruleOrMessage}] for [{$key}] attribute.");
+    101▕     }
+    102▕ 
+    103▕ 
+    104▕     public function assertHasNoErrors($keys = [])
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/PurchaseInvoiceResourceTest.php:1998
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice deri…   
+  Component has errors: "data.supplier_invoice_number", "data.tax_invoice_number"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseInvoiceResourceTest.php:2063
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice mult…   
+  Component has errors: "data.supplier_invoice_number", "data.tax_invoice_number"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseInvoiceResourceTest.php:2174
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice crea…   
+  Failed asserting that two strings are identical.
+  -'Forced finalisation failure'
+  +'Expected finalisation failure was not thrown.'
+  
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:2207
+    2203▕                 ])
+    2204▕                 ->call('create');
+    2205▕             $this->fail('Expected finalisation failure was not thrown.');
+    2206▕         } catch (RuntimeException $exception) {
+  ➜ 2207▕             $this->assertSame('Forced finalisation failure', $exception->getMessage());
+    2208▕         }
+    2209▕ 
+    2210▕         $this->assertDatabaseMissing('invoices', ['invoice_number' => 'PINV-ROLLBACK-001']);
+    2211▕     }
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:2207
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice crea…   
+  Failed asserting that null is not null.
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:2441
+    2437▕             ->call('create');
+    2438▕ 
+    2439▕         $savedInvoice = Invoice::where('invoice_number', 'PINV-RECEIPT-FEE-001')->first();
+    2440▕ 
+  ➜ 2441▕         $this->assertNotNull($savedInvoice);
+    2442▕         $this->assertIsArray($savedInvoice->other_fee);
+    2443▕         $this->assertCount(1, $savedInvoice->other_fee);
+    2444▕         $this->assertEquals('Biaya Transport', $savedInvoice->other_fee[0]['name']);
+    2445▕         $this->assertEquals(7500, $savedInvoice->other_fee[0]['amount']);
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:2441
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest…  ModelNotFoundException   
+  No query results for model [App\Models\Invoice].
+
+  at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:780
+    776▕         if (! is_null($model = $this->first($columns))) {
+    777▕             return $model;
+    778▕         }
+    779▕ 
+  ➜ 780▕         throw (new ModelNotFoundException)->setModel(get_class($this->model));
+    781▕     }
+    782▕ 
+    783▕     /**
+    784▕      * Execute the query and get the first result or call a callback.
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseInvoiceResourceTest.php:2521
+
+
+  Tests:    20 failed, 76 passed (482 assertions)
+  Duration: 77.48s
+

@@ -1517,7 +1517,9 @@ class PurchaseInvoiceResource extends Resource
                                 // Jika multiple entries, gunakan filter dengan format yang sesuai dengan filter options
                                 $sourceType = 'App\\Models\\Invoice'; // Format yang sama dengan filter options
                                 $sourceId = $record->id;
-                                return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                                // Filter 'source_id' adalah Filter::make() dengan field form 'source_id' (bukan SelectFilter),
+                                // jadi kuncinya harus 'source_id', bukan 'value' (yang hanya berlaku untuk SelectFilter).
+                                return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}");
                             }
                         }),
                     \Filament\Tables\Actions\Action::make('post_invoice')
