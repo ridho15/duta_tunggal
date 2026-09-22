@@ -259,46 +259,46 @@
                 <tr>
                     <td class="summary-item">
                         <span class="icon">📋</span>
-                        <span class="value">{{ $data->count() }}</span>
+                        <span class="value">{{ $summary['total_orders'] }}</span>
                         <span class="label">Total Transaksi</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">💰</span>
-                        <span class="value">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</span>
+                        <span class="value">Rp {{ number_format($summary['total_amount'], 0, ',', '.') }}</span>
                         <span class="label">Total Nilai</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">📊</span>
-                        <span class="value">Rp {{ $data->count() > 0 ? number_format($data->sum('total_amount') / $data->count(), 0, ',', '.') : '0' }}</span>
+                        <span class="value">Rp {{ number_format($summary['average_amount'], 0, ',', '.') }}</span>
                         <span class="label">Rata-rata per Transaksi</span>
                     </td>
                 </tr>
                 <tr>
                     <td class="summary-item">
                         <span class="icon">📝</span>
-                        <span class="value">{{ $data->where('status', 'draft')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['draft'] }}</span>
                         <span class="label">Draft</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">✅</span>
-                        <span class="value">{{ $data->where('status', 'approved')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['approved'] }}</span>
                         <span class="label">Approved</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">📦</span>
-                        <span class="value">{{ $data->where('status', 'partially_received')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['partially_received'] }}</span>
                         <span class="label">Partially Received</span>
                     </td>
                 </tr>
                 <tr>
                     <td class="summary-item">
                         <span class="icon">🎯</span>
-                        <span class="value">{{ $data->where('status', 'completed')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['completed'] }}</span>
                         <span class="label">Completed</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">🔒</span>
-                        <span class="value">{{ $data->where('status', 'closed')->count() }}</span>
+                        <span class="value">{{ $summary['status_counts']['closed'] }}</span>
                         <span class="label">Closed</span>
                     </td>
                 </tr>
@@ -321,19 +321,19 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($data as $index => $order)
+            @foreach($rows as $index => $order)
             <tr>
                 <td class="text-center">{{ $index + 1 }}</td>
-                <td>{{ $order->po_number }}</td>
-                <td>{{ $order->order_date->format('d/m/Y') }}</td>
-                <td>{{ $order->supplier->code ?? '-' }}</td>
-                <td>{{ $order->supplier->perusahaan ?? '-' }}</td>
-                <td>{{ $order->supplier->address ?? '-' }}</td>
-                <td>{{ $order->supplier->phone ?? '-' }}</td>
-                <td class="text-right">Rp {{ number_format($order->total_amount ?? 0, 0, ',', '.') }}</td>
+                <td>{{ $order['po_number'] }}</td>
+                <td>{{ $order['order_date']->format('d/m/Y') }}</td>
+                <td>{{ $order['supplier_code'] }}</td>
+                <td>{{ $order['supplier_name'] }}</td>
+                <td>{{ $order['supplier_address'] }}</td>
+                <td>{{ $order['supplier_phone'] }}</td>
+                <td class="text-right">Rp {{ number_format($order['total_amount'], 0, ',', '.') }}</td>
                 <td class="text-center">
-                    <span class="status-badge status-{{ $order->status }}">
-                        {{ $order->status }}
+                    <span class="status-badge status-{{ $order['status'] }}">
+                        {{ $order['status'] }}
                     </span>
                 </td>
             </tr>
@@ -342,7 +342,7 @@
         <tfoot>
             <tr style="background-color: #e9ecef; font-weight: bold;">
                 <td colspan="7" class="text-right">TOTAL:</td>
-                <td class="text-right">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</td>
+                <td class="text-right">Rp {{ number_format($summary['total_amount'], 0, ',', '.') }}</td>
                 <td></td>
             </tr>
         </tfoot>

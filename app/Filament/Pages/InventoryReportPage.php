@@ -2,25 +2,25 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
-use Filament\Tables\Table;
-use Filament\Tables\Concerns\InteractsWithTable;
-use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\Action;
-use Filament\Forms\Form;
+use App\Exports\InventoryReportExport;
+use App\Models\InventoryStock;
+use App\Models\Product;
+use App\Models\StockMovement;
+use App\Models\Warehouse;
+use App\Services\Reports\InventoryReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use App\Models\InventoryStock;
-use App\Models\StockMovement;
-use App\Models\Product;
-use App\Models\Warehouse;
-use App\Exports\InventoryReportExport;
+use Filament\Forms\Form;
+use Filament\Pages\Page;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Database\Eloquent\Builder;
-use Carbon\Carbon;
+use Throwable;
 
 class InventoryReportPage extends Page implements HasTable
 {
@@ -35,6 +35,11 @@ class InventoryReportPage extends Page implements HasTable
     protected static ?string $navigationLabel = 'Laporan Inventori';
 
     protected static ?int $navigationSort = 3;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public ?string $start_date = null;
     public ?string $end_date = null;
@@ -52,95 +57,74 @@ class InventoryReportPage extends Page implements HasTable
     public function exportExcel()
     {
         $type = $this->show_movement_history ? 'movement' : ($this->show_aging_stock ? 'aging' : 'stock');
-        return Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, $type, $this->start_date, $this->end_date), 'inventory_report.xlsx');
+
+        return Excel::download(
+            new InventoryReportExport($this->warehouse_id, $this->product_id, $type, $this->start_date, $this->end_date),
+            'inventory_report.xlsx'
+        );
     }
 
     public function exportPdf()
     {
-        $type = $this->show_movement_history ? 'movement' : ($this->show_aging_stock ? 'aging' : 'stock');
-        return Pdf::loadView('reports.inventory_report', [
-            'data' => $this->getCurrentTableQuery()->get(),
-            'type' => $type,
-            'start_date' => $this->start_date,
-            'end_date' => $this->end_date,
-            'warehouse' => $this->warehouse_id ? Warehouse::find($this->warehouse_id) : null,
-            'product' => $this->product_id ? Product::find($this->product_id) : null,
-        ])->download('inventory_report.pdf');
+        return Pdf::loadView('reports.inventory_report', $this->inventoryReportService()->pdfPayload($this->reportFilters()))
+            ->download('inventory_report.pdf');
     }
 
     private function getCurrentTableQuery()
     {
-        if ($this->show_movement_history) {
-            return StockMovement::query()
-                ->when($this->start_date, fn($q) => $q->whereDate('date', '>=', $this->start_date))
-                ->when($this->end_date, fn($q) => $q->whereDate('date', '<=', $this->end_date))
-                ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))
-                ->when($this->product_id, fn($q) => $q->where('product_id', $this->product_id))
-                ->with(['product', 'warehouse', 'rak'])
-                ->orderBy('date', 'desc')
-                ->orderBy('created_at', 'desc');
-        } elseif ($this->show_aging_stock) {
-            return InventoryStock::query()
-                ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))
-                ->when($this->product_id, fn($q) => $q->where('product_id', $this->product_id))
-                ->with(['product', 'warehouse', 'rak'])
-                ->orderBy('warehouse_id')
-                ->orderBy('product_id');
-        } else {
-            return InventoryStock::query()
-                ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))
-                ->when($this->product_id, fn($q) => $q->where('product_id', $this->product_id))
-                ->with(['product', 'warehouse', 'rak'])
-                ->orderBy('warehouse_id')
-                ->orderBy('product_id');
-        }
+        return match ($this->currentReportType()) {
+            'movement' => $this->inventoryReportService()->movementQuery($this->reportFilters()),
+            'aging' => $this->inventoryReportService()->agingQuery($this->reportFilters()),
+            default => $this->inventoryReportService()->stockQuery($this->reportFilters()),
+        };
     }
 
     public function table(Table $table): Table
     {
         if ($this->show_movement_history) {
             return $this->getMovementHistoryTable($table);
-        } elseif ($this->show_aging_stock) {
-            return $this->getAgingStockTable($table);
-        } else {
-            return $this->getStockByWarehouseTable($table);
         }
+
+        if ($this->show_aging_stock) {
+            return $this->getAgingStockTable($table);
+        }
+
+        return $this->getStockByWarehouseTable($table);
     }
 
     private function getStockByWarehouseTable(Table $table): Table
     {
+        try {
+            $query = InventoryStock::query()
+                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+                ->with(['product', 'warehouse', 'rak'])
+                ->orderBy('warehouse_id')
+                ->orderBy('product_id');
+        } catch (Throwable) {
+            $query = InventoryStock::query()->whereRaw('1 = 0');
+        }
+
         return $table
             ->defaultSort('created_at', 'desc')
-            ->query(
-                InventoryStock::query()
-                    ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))
-                    ->when($this->product_id, fn($q) => $q->where('product_id', $this->product_id))
-                    ->with(['product', 'warehouse', 'rak'])
-                    ->orderBy('warehouse_id')
-                    ->orderBy('product_id')
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
                 TextColumn::make('product.name')->label('Produk')->sortable(),
                 TextColumn::make('product.code')->label('Kode Produk')->sortable(),
                 TextColumn::make('rak.name')->label('Rak')->sortable(),
-                TextColumn::make('qty_available')->label('Qty Tersedia')->sortable(),
-                TextColumn::make('qty_reserved')->label('Qty Dipesan')->sortable(),
+                TextColumn::make('qty_available')->label('Qty Fisik')->sortable(),
+                TextColumn::make('qty_reserved')->label('Qty Reserved')->sortable(),
                 TextColumn::make('qty_min')->label('Qty Minimum')->sortable(),
                 TextColumn::make('qty_on_hand')
-                    ->label('Qty On Hand')
-                    ->getStateUsing(fn($record) => $record->qty_available - $record->qty_reserved)
+                    ->label('Qty Tersedia Bebas')
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->qtyOnHand($record))
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status')
-                    ->getStateUsing(function ($record) {
-                        $onHand = $record->qty_available - $record->qty_reserved;
-                        if ($onHand <= 0) return 'Habis';
-                        if ($onHand <= $record->qty_min) return 'Minimum';
-                        return 'Normal';
-                    })
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->stockStatusForRecord($record))
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'Habis' => 'danger',
                         'Minimum' => 'warning',
                         'Normal' => 'success',
@@ -150,38 +134,37 @@ class InventoryReportPage extends Page implements HasTable
                 Action::make('view_movements')
                     ->label('Lihat Movement')
                     ->icon('heroicon-o-eye')
-                    ->url(fn($record) => route('filament.admin.resources.inventory-stocks.view', $record)),
+                    ->url(fn ($record) => \App\Filament\Resources\InventoryStockResource::getUrl('view', ['record' => $record])),
             ])
             ->headerActions([
                 Action::make('export_excel')
                     ->label('Export Excel')
                     ->icon('heroicon-o-document')
-                    ->action(fn() => Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, 'stock'), 'inventory_stock_report.xlsx')),
+                    ->action(fn () => Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, 'stock'), 'inventory_stock_report.xlsx')),
                 Action::make('export_pdf')
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
-                    ->action(fn() => Pdf::loadView('reports.inventory_report', [
-                        'data' => $this->getTableQuery()->get(),
-                        'type' => 'stock',
-                        'warehouse' => $this->warehouse_id ? Warehouse::find($this->warehouse_id) : null,
-                        'product' => $this->product_id ? Product::find($this->product_id) : null,
-                    ])->download('inventory_stock_report.pdf')),
+                    ->action(fn () => Pdf::loadView('reports.inventory_report', $this->inventoryReportService()->pdfPayload($this->reportFilters('stock')))->download('inventory_stock_report.pdf')),
             ]);
     }
 
     private function getMovementHistoryTable(Table $table): Table
     {
+        try {
+            $query = StockMovement::query()
+                ->when($this->start_date, fn ($query) => $query->whereDate('date', '>=', $this->start_date))
+                ->when($this->end_date, fn ($query) => $query->whereDate('date', '<=', $this->end_date))
+                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+                ->with(['product', 'warehouse', 'rak'])
+                ->orderBy('date', 'desc')
+                ->orderBy('created_at', 'desc');
+        } catch (Throwable) {
+            $query = StockMovement::query()->whereRaw('1 = 0');
+        }
+
         return $table
-            ->query(
-                StockMovement::query()
-                    ->when($this->start_date, fn($q) => $q->whereDate('date', '>=', $this->start_date))
-                    ->when($this->end_date, fn($q) => $q->whereDate('date', '<=', $this->end_date))
-                    ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))
-                    ->when($this->product_id, fn($q) => $q->where('product_id', $this->product_id))
-                    ->with(['product', 'warehouse', 'rak'])
-                    ->orderBy('date', 'desc')
-                    ->orderBy('created_at', 'desc')
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('date')->label('Tanggal')->date()->sortable(),
                 TextColumn::make('product.name')->label('Produk')->sortable(),
@@ -189,7 +172,7 @@ class InventoryReportPage extends Page implements HasTable
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
                 TextColumn::make('rak.name')->label('Rak')->sortable(),
                 TextColumn::make('type')->label('Tipe Movement')->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'in' => 'success',
                         'out' => 'danger',
                         'transfer' => 'warning',
@@ -199,11 +182,7 @@ class InventoryReportPage extends Page implements HasTable
                 TextColumn::make('quantity')->label('Quantity')->sortable(),
                 TextColumn::make('value')->label('Nilai')->rupiah()->sortable(),
                 TextColumn::make('from_model_type')->label('Referensi')->getStateUsing(function ($record) {
-                    if ($record->from_model_type && $record->from_model_id) {
-                        $modelName = class_basename($record->from_model_type);
-                        return $modelName . ' #' . $record->from_model_id;
-                    }
-                    return '-';
+                    return $this->inventoryReportService()->movementReference($record);
                 }),
                 TextColumn::make('notes')->label('Catatan')->limit(50),
             ])
@@ -211,85 +190,54 @@ class InventoryReportPage extends Page implements HasTable
                 Action::make('export_excel')
                     ->label('Export Excel')
                     ->icon('heroicon-o-document')
-                    ->action(fn() => Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, 'movement', $this->start_date, $this->end_date), 'inventory_movement_report.xlsx')),
+                    ->action(fn () => Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, 'movement', $this->start_date, $this->end_date), 'inventory_movement_report.xlsx')),
                 Action::make('export_pdf')
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
-                    ->action(fn() => Pdf::loadView('reports.inventory_report', [
-                        'data' => $this->getTableQuery()->get(),
-                        'type' => 'movement',
-                        'start_date' => $this->start_date,
-                        'end_date' => $this->end_date,
-                        'warehouse' => $this->warehouse_id ? Warehouse::find($this->warehouse_id) : null,
-                        'product' => $this->product_id ? Product::find($this->product_id) : null,
-                    ])->download('inventory_movement_report.pdf')),
+                    ->action(fn () => Pdf::loadView('reports.inventory_report', $this->inventoryReportService()->pdfPayload($this->reportFilters('movement')))->download('inventory_movement_report.pdf')),
             ]);
     }
 
     private function getAgingStockTable(Table $table): Table
     {
+        try {
+            $query = InventoryStock::query()
+                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+                ->with(['product', 'warehouse', 'rak'])
+                ->orderBy('warehouse_id')
+                ->orderBy('product_id');
+        } catch (Throwable) {
+            $query = InventoryStock::query()->whereRaw('1 = 0');
+        }
+
         return $table
-            ->query(
-                InventoryStock::query()
-                    ->when($this->warehouse_id, fn($q) => $q->where('warehouse_id', $this->warehouse_id))
-                    ->when($this->product_id, fn($q) => $q->where('product_id', $this->product_id))
-                    ->with(['product', 'warehouse', 'rak'])
-                    ->orderBy('warehouse_id')
-                    ->orderBy('product_id')
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
                 TextColumn::make('product.name')->label('Produk')->sortable(),
                 TextColumn::make('product.code')->label('Kode Produk')->sortable(),
                 TextColumn::make('rak.name')->label('Rak')->sortable(),
-                TextColumn::make('qty_available')->label('Qty Tersedia')->sortable(),
-                TextColumn::make('qty_reserved')->label('Qty Dipesan')->sortable(),
+                TextColumn::make('qty_available')->label('Qty Fisik')->sortable(),
+                TextColumn::make('qty_reserved')->label('Qty Reserved')->sortable(),
                 TextColumn::make('qty_on_hand')
-                    ->label('Qty On Hand')
-                    ->getStateUsing(fn($record) => $record->qty_available - $record->qty_reserved)
+                    ->label('Qty Tersedia Bebas')
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->qtyOnHand($record))
                     ->sortable(),
                 TextColumn::make('last_movement_date')
                     ->label('Terakhir Movement')
-                    ->getStateUsing(function ($record) {
-                        $lastMovement = StockMovement::where('product_id', $record->product_id)
-                            ->where('warehouse_id', $record->warehouse_id)
-                            ->orderBy('date', 'desc')
-                            ->first();
-                        return $lastMovement ? $lastMovement->date : null;
-                    })
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->lastMovementDateForRecord($record))
                     ->date()
                     ->sortable(),
                 TextColumn::make('aging_days')
                     ->label('Hari Aging')
-                    ->getStateUsing(function ($record) {
-                        $lastMovement = StockMovement::where('product_id', $record->product_id)
-                            ->where('warehouse_id', $record->warehouse_id)
-                            ->orderBy('date', 'desc')
-                            ->first();
-                        if (!$lastMovement) {
-                            return 999; // Very old if no movement
-                        }
-                        return Carbon::parse($lastMovement->date)->diffInDays(now());
-                    })
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->agingDaysForRecord($record) ?? 999)
                     ->sortable(),
                 TextColumn::make('aging_category')
                     ->label('Kategori Aging')
-                    ->getStateUsing(function ($record) {
-                        $lastMovement = StockMovement::where('product_id', $record->product_id)
-                            ->where('warehouse_id', $record->warehouse_id)
-                            ->orderBy('date', 'desc')
-                            ->first();
-                        if (!$lastMovement) {
-                            return 'Tidak Ada Movement';
-                        }
-                        $days = Carbon::parse($lastMovement->date)->diffInDays(now());
-                        if ($days <= 30) return 'Aktif';
-                        if ($days <= 90) return 'Slow Moving';
-                        if ($days <= 180) return 'Stagnan';
-                        return 'Dead Stock';
-                    })
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->agingCategoryForRecord($record))
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'Aktif' => 'success',
                         'Slow Moving' => 'warning',
                         'Stagnan' => 'danger',
@@ -301,16 +249,11 @@ class InventoryReportPage extends Page implements HasTable
                 Action::make('export_excel')
                     ->label('Export Excel')
                     ->icon('heroicon-o-document')
-                    ->action(fn() => Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, 'aging'), 'inventory_aging_report.xlsx')),
+                    ->action(fn () => Excel::download(new InventoryReportExport($this->warehouse_id, $this->product_id, 'aging'), 'inventory_aging_report.xlsx')),
                 Action::make('export_pdf')
                     ->label('Export PDF')
                     ->icon('heroicon-o-document')
-                    ->action(fn() => Pdf::loadView('reports.inventory_report', [
-                        'data' => $this->getCurrentTableQuery()->get(),
-                        'type' => 'aging',
-                        'warehouse' => $this->warehouse_id ? Warehouse::find($this->warehouse_id) : null,
-                        'product' => $this->product_id ? Product::find($this->product_id) : null,
-                    ])->download('inventory_aging_report.pdf')),
+                    ->action(fn () => Pdf::loadView('reports.inventory_report', $this->inventoryReportService()->pdfPayload($this->reportFilters('aging')))->download('inventory_aging_report.pdf')),
             ]);
     }
 
@@ -332,5 +275,52 @@ class InventoryReportPage extends Page implements HasTable
                 // Toggle::make('show_movement_history')->label('Tampilkan History Movement'),
                 // Toggle::make('show_aging_stock')->label('Tampilkan Aging Stock'),
             ]);
+    }
+
+    private function currentReportType(): string
+    {
+        if ($this->show_movement_history) {
+            return 'movement';
+        }
+
+        if ($this->show_aging_stock) {
+            return 'aging';
+        }
+
+        return 'stock';
+    }
+
+    private function reportFilters(?string $type = null): array
+    {
+        return [
+            'warehouse_id' => $this->warehouse_id,
+            'product_id' => $this->product_id,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'type' => $type ?? $this->currentReportType(),
+        ];
+    }
+
+    private function inventoryReportService(): InventoryReportService
+    {
+        return app(InventoryReportService::class);
+    }
+
+    public function warehouseOptions()
+    {
+        try {
+            return Warehouse::query()->orderBy('name')->pluck('name', 'id');
+        } catch (Throwable) {
+            return collect();
+        }
+    }
+
+    public function productOptions()
+    {
+        try {
+            return Product::query()->orderBy('name')->pluck('name', 'id');
+        } catch (Throwable) {
+            return collect();
+        }
     }
 }

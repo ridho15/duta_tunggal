@@ -191,46 +191,47 @@ class IncomeStatementService
             ->orderBy('code')
             ->get();
 
-        return $accounts->map(function ($account) use ($startDate, $endDate, $cabangId, $type, $totalRevenue) {
-            // Get journal entries for this account in the period
-            $query = JournalEntry::where('coa_id', $account->id)
+        // Pre-load all balances in a single bulk aggregate query to avoid N+1.
+        $accountIds = $accounts->pluck('id');
+        $balanceMap = $accountIds->isEmpty()
+            ? collect()
+            : JournalEntry::whereIn('coa_id', $accountIds)
                 ->where('date', '>=', $startDate)
-                ->where('date', '<=', $endDate);
+                ->where('date', '<=', $endDate)
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->groupBy('coa_id')
+                ->selectRaw('coa_id, SUM(debit) as total_debit, SUM(credit) as total_credit, COUNT(*) as entries_count')
+                ->get()
+                ->keyBy('coa_id');
 
-            if ($cabangId) {
-                $query->where('cabang_id', $cabangId);
-            }
+        return $accounts->map(function ($account) use ($balanceMap, $type, $totalRevenue) {
+            $row = $balanceMap->get($account->id);
+            $totalDebit  = (float) ($row->total_debit  ?? 0);
+            $totalCredit = (float) ($row->total_credit ?? 0);
 
-            $entries = $query->get();
-
-            $totalDebit = $entries->sum('debit');
-            $totalCredit = $entries->sum('credit');
-
-            // Calculate balance based on account type
             // Revenue: Credit increases, Debit decreases
             // Expense: Debit increases, Credit decreases
             $balance = match ($type) {
                 'Revenue' => $totalCredit - $totalDebit,
                 'Expense' => $totalDebit - $totalCredit,
-                default => 0,
+                default   => 0,
             };
 
-            // Calculate percentage of revenue
             $percentageOfRevenue = $totalRevenue > 0 ? ($balance / $totalRevenue) * 100 : 0;
 
             return [
-                'id' => $account->id,
-                'code' => $account->code,
-                'name' => $account->name,
-                'type' => $account->type,
-                'parent_id' => $account->parent_id,
-                'total_debit' => $totalDebit,
-                'total_credit' => $totalCredit,
-                'balance' => $balance,
-                'entries_count' => $entries->count(),
+                'id'                   => $account->id,
+                'code'                 => $account->code,
+                'name'                 => $account->name,
+                'type'                 => $account->type,
+                'parent_id'            => $account->parent_id,
+                'total_debit'          => $totalDebit,
+                'total_credit'         => $totalCredit,
+                'balance'              => $balance,
+                'entries_count'        => (int) ($row->entries_count ?? 0),
                 'percentage_of_revenue' => $percentageOfRevenue,
             ];
-        })->filter(fn($acc) => $acc['balance'] != 0); // Only show accounts with activity
+        })->filter(fn ($acc) => $acc['balance'] != 0);
     }
 
     /**
@@ -281,42 +282,42 @@ class IncomeStatementService
             ->orderBy('code')
             ->get();
 
-        return $accounts->map(function ($account) use ($startDate, $endDate, $cabangId, $type) {
-            // Get journal entries for this account in the period
-            $query = JournalEntry::where('coa_id', $account->id)
+        // Pre-load all balances in a single bulk aggregate query to avoid N+1.
+        $accountIds = $accounts->pluck('id');
+        $balanceMap = $accountIds->isEmpty()
+            ? collect()
+            : JournalEntry::whereIn('coa_id', $accountIds)
                 ->where('date', '>=', $startDate)
-                ->where('date', '<=', $endDate);
+                ->where('date', '<=', $endDate)
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->groupBy('coa_id')
+                ->selectRaw('coa_id, SUM(debit) as total_debit, SUM(credit) as total_credit, COUNT(*) as entries_count')
+                ->get()
+                ->keyBy('coa_id');
 
-            if ($cabangId) {
-                $query->where('cabang_id', $cabangId);
-            }
+        return $accounts->map(function ($account) use ($balanceMap, $type) {
+            $row = $balanceMap->get($account->id);
+            $totalDebit  = (float) ($row->total_debit  ?? 0);
+            $totalCredit = (float) ($row->total_credit ?? 0);
 
-            $entries = $query->get();
-
-            $totalDebit = $entries->sum('debit');
-            $totalCredit = $entries->sum('credit');
-
-            // Calculate balance based on account type
-            // Revenue: Credit increases, Debit decreases
-            // Expense: Debit increases, Credit decreases
             $balance = match ($type) {
                 'Revenue' => $totalCredit - $totalDebit,
                 'Expense' => $totalDebit - $totalCredit,
-                default => 0,
+                default   => 0,
             };
 
             return [
-                'id' => $account->id,
-                'code' => $account->code,
-                'name' => $account->name,
-                'type' => $account->type,
-                'parent_id' => $account->parent_id,
-                'total_debit' => $totalDebit,
-                'total_credit' => $totalCredit,
-                'balance' => $balance,
-                'entries_count' => $entries->count(),
+                'id'            => $account->id,
+                'code'          => $account->code,
+                'name'          => $account->name,
+                'type'          => $account->type,
+                'parent_id'     => $account->parent_id,
+                'total_debit'   => $totalDebit,
+                'total_credit'  => $totalCredit,
+                'balance'       => $balance,
+                'entries_count' => (int) ($row->entries_count ?? 0),
             ];
-        })->filter(fn($acc) => $acc['balance'] != 0); // Only show accounts with activity
+        })->filter(fn ($acc) => $acc['balance'] != 0);
     }
 
     /**

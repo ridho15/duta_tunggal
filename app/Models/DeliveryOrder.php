@@ -4,14 +4,88 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryOrder extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory,LogsGlobalActivity, CascadesJournalEntries;
+
+    /**
+     * Status DO yang kuantitasnya dihitung SUDAH TERKIRIM ke SO (barang sudah keluar gudang).
+     */
+    public const DELIVERED_STATUSES = ['sent', 'received', 'completed'];
+
+    /**
+     * Status DO yang kuantitasnya DILEPAS kembali ke SO (DO ditutup sebelum dikirim).
+     * Semua status lain (draft s/d approved, partial, reject, delivery_failed, dst.)
+     * masih "terikat" ke SO karena DO dapat diperbaiki / dijadwalkan ulang.
+     */
+    public const RELEASED_STATUSES = ['closed'];
+
+    public const STATUS_LABELS = [
+        'draft' => 'Draf',
+        'request_stock' => 'Menunggu Konfirmasi Stok',
+        'request_approve' => 'Menunggu Persetujuan',
+        'approved' => 'Disetujui',
+        'confirmed' => 'Dikonfirmasi',
+        'partial' => 'Sebagian',
+        'sent' => 'Sedang Dikirim',
+        'received' => 'Diterima',
+        'completed' => 'Selesai',
+        'supplier' => 'Dari Supplier',
+        'request_close' => 'Minta Ditutup',
+        'closed' => 'Ditutup',
+        'reject' => 'Ditolak',
+        'delivery_failed' => 'Pengiriman Gagal',
+    ];
+
+    public const STATUS_COLORS = [
+        'draft' => 'gray',
+        'request_stock' => 'warning',
+        'request_approve' => 'gray',
+        'approved' => 'info',
+        'confirmed' => 'info',
+        'partial' => 'warning',
+        'sent' => 'primary',
+        'received' => 'info',
+        'completed' => 'success',
+        'supplier' => 'warning',
+        'request_close' => 'warning',
+        'closed' => 'danger',
+        'reject' => 'danger',
+        'delivery_failed' => 'danger',
+    ];
+
+    /** Label "Siap Kirim" (D4) untuk `approved` saat alur ketat aktif: DO sudah disetujui gudang tetapi barang belum berangkat. */
+    public const STRICT_STATUS_LABELS = [
+        'approved' => 'Siap Kirim',
+        'confirmed' => 'Siap Kirim',
+        'sent' => 'Dikirim',
+    ];
+
+    public static function statusLabel(?string $status): string
+    {
+        if (config('sales.stock.strict_dispatch', false) && isset(self::STRICT_STATUS_LABELS[$status ?? ''])) {
+            return self::STRICT_STATUS_LABELS[$status];
+        }
+
+        return self::STATUS_LABELS[$status ?? ''] ?? ($status ? ucfirst(str_replace('_', ' ', $status)) : '-');
+    }
+
+    public static function statusColor(?string $status): string
+    {
+        return self::STATUS_COLORS[$status ?? ''] ?? 'gray';
+    }
+
     protected $table = 'delivery_orders';
+
+    protected $casts = [
+        'received_at' => 'datetime',
+    ];
+
     protected $fillable = [
         'do_number',
         'delivery_date',
@@ -23,7 +97,9 @@ class DeliveryOrder extends Model
         'additional_cost',
         'additional_cost_description',
         'created_by',
-        'cabang_id'
+        'cabang_id',
+        'received_at',
+        'received_by_name',
     ];
 
     public function driver()
@@ -51,6 +127,11 @@ class DeliveryOrder extends Model
         return $this->belongsToMany(SuratJalan::class, 'surat_jalan_delivery_orders', 'delivery_order_id', 'surat_jalan_id')->withTimestamps();
     }
 
+    public function deliverySchedules()
+    {
+        return $this->belongsToMany(DeliverySchedule::class, 'delivery_schedule_delivery_orders', 'delivery_order_id', 'delivery_schedule_id')->withTimestamps();
+    }
+
     public function deliverySalesOrder()
     {
         return $this->hasMany(DeliverySalesOrder::class, 'delivery_order_id');
@@ -76,20 +157,18 @@ class DeliveryOrder extends Model
     }
 
     /**
-     * Calculate total value of delivery order based on sale order items pricing
+     * Nilai DO = total invoice yang akan terbit dari DO ini (barang + PPN + biaya tambahan), via satu sumber:
+     * DeliveryOrderValuation (LineAmounts). Sebelumnya `harga − diskon + pajak` mencampur persen dengan rupiah.
      */
     public function getTotalAttribute()
     {
-        $total = 0;
-        
-        foreach ($this->deliveryOrderItem as $item) {
-            if ($item->saleOrderItem) {
-                $price = $item->saleOrderItem->unit_price - $item->saleOrderItem->discount + $item->saleOrderItem->tax;
-                $total += $price * $item->quantity;
-            }
-        }
-        
-        return $total;
+        return $this->valueBreakdown()['total'];
+    }
+
+    /** Rincian nilai DO: baris, DPP, PPN, total barang, biaya tambahan, total. */
+    public function valueBreakdown(): array
+    {
+        return app(\App\Services\DeliveryOrderValuation::class)->forDeliveryOrder($this);
     }
 
     protected static function booted()
@@ -106,6 +185,12 @@ class DeliveryOrder extends Model
 
         static::restoring(function ($deliveryOrder) {
             $deliveryOrder->deliveryOrderItem()->withTrashed()->restore();
+        });
+
+        // T2.3 (flag stock.strict_dispatch): perubahan status di luar matriks / stok fisik kurang ditolak di model,
+        // apa pun pintunya (aksi UI, jadwal, kode lama yang memanggil ->update(['status' => ...])).
+        static::updating(function ($deliveryOrder) {
+            \App\Services\DeliveryOrderTransitions::guardModelChange($deliveryOrder);
         });
     }
 
@@ -127,5 +212,60 @@ class DeliveryOrder extends Model
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    // WC records linked to this DO via polymorphic relationship (DO-centric flow)
+    public function warehouseConfirmations()
+    {
+        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
+    }
+
+    /**
+     * Update DO status based on all linked WC outcomes.
+     * - ALL confirmed  → approved (auto)
+     * - ANY rejected   → reject (auto)
+     * - still pending  → stays request_stock
+     */
+    public function updateStatusFromWarehouseConfirmations(): void
+    {
+        $wcs = $this->warehouseConfirmations()->get();
+        if ($wcs->isEmpty()) {
+            if ($this->status !== 'request_stock') {
+                $this->moveStatusFromWarehouseConfirmations('request_stock');
+            }
+
+            return;
+        }
+
+        $statuses = $wcs->map(fn ($wc) => strtolower((string) $wc->status))->values();
+
+        $allConfirmed = $statuses->every(fn ($status) => $status === 'confirmed');
+        $anyRejected  = $statuses->contains('rejected');
+
+        if ($allConfirmed) {
+            $this->moveStatusFromWarehouseConfirmations('approved');
+        } elseif ($anyRejected) {
+            $this->moveStatusFromWarehouseConfirmations('reject');
+        }
+        // else: one or more WCs still pending → stay at request_stock
+    }
+
+    /**
+     * Alur ketat (T2.3): konfirmasi gudang hanya menggerakkan DO bila transisinya sah menurut matriks. DO yang sudah Dikirim/Selesai
+     * tidak boleh "mundur" ke Siap Kirim hanya karena WC dikonfirmasi belakangan. Alur lama: langsung ubah (perilaku semula).
+     */
+    private function moveStatusFromWarehouseConfirmations(string $target): void
+    {
+        if (! \App\Services\DeliveryOrderTransitions::enabled()) {
+            $this->update(['status' => $target]);
+
+            return;
+        }
+
+        if ($this->status === $target || ! \App\Services\DeliveryOrderTransitions::allows($this->status, $target)) {
+            return;
+        }
+
+        app(\App\Services\DeliveryOrderTransitions::class)->to($this, $target, ['source' => 'warehouse_confirmation']);
     }
 }

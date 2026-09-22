@@ -5,13 +5,14 @@ namespace Tests\Unit;
 use App\Models\ProductionPlan;
 use App\Services\ProductionPlanService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ProductionPlanServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function generated_plan_number_is_unique_and_matches_pattern()
     {
         $service = new ProductionPlanService();

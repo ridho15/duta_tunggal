@@ -17,7 +17,7 @@ class StockReservationService
     public function reserveStockForMaterialIssue(MaterialIssue $materialIssue): void
     {
         if (!$materialIssue->isApproved() && !$materialIssue->isPendingApproval()) {
-            throw new \Exception('Material issue must be approved or pending approval to reserve stock');
+            throw new \Exception('Material issue harus berstatus approved atau pending approval untuk reservasi stok.');
         }
 
         Log::info('Starting reserveStockForMaterialIssue', [
@@ -27,6 +27,8 @@ class StockReservationService
         ]);
 
         DB::transaction(function () use ($materialIssue) {
+            MaterialIssue::where('id', $materialIssue->id)->lockForUpdate()->first();
+
             // Check if reservations already exist for this material issue
             $existingCount = StockReservation::where('material_issue_id', $materialIssue->id)->count();
             if ($existingCount > 0) {
@@ -47,6 +49,21 @@ class StockReservationService
                 ]);
                 $warehouseId = $item->warehouse_id ?? $materialIssue->warehouse_id;
 
+                $inventoryStock = InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$inventoryStock) {
+                    throw new \Exception("Stok untuk produk {$item->product_id} di warehouse {$warehouseId} tidak ditemukan.");
+                }
+
+                $freeQty = (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved;
+
+                if ($freeQty < (float) $item->quantity) {
+                    throw new \Exception("Stok tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$freeQty}, dibutuhkan: {$item->quantity}.");
+                }
+
                 StockReservation::create([
                     'material_issue_id' => $materialIssue->id,
                     'product_id' => $item->product_id,
@@ -55,17 +72,13 @@ class StockReservationService
                     'rak_id' => $item->rak_id,
                 ]);
 
-                // Update inventory stock qty_reserved
-                $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                    ->where('warehouse_id', $warehouseId)
-                    ->first();
-
                 if ($inventoryStock) {
                     Log::info('Before increment check', [
                         'material_issue_id' => $materialIssue->id,
                         'product_id' => $item->product_id,
                         'warehouse_id' => $warehouseId,
                         'current_qty_reserved' => $inventoryStock->qty_reserved,
+                        'current_qty_available' => $inventoryStock->qty_available,
                     ]);
 
                     // NOTE: qty_reserved is automatically incremented by StockReservationObserver when StockReservation is created
@@ -95,6 +108,8 @@ class StockReservationService
     public function releaseStockReservationsForMaterialIssue(MaterialIssue $materialIssue): void
     {
         DB::transaction(function () use ($materialIssue) {
+            MaterialIssue::where('id', $materialIssue->id)->lockForUpdate()->first();
+
             $reservations = StockReservation::where('material_issue_id', $materialIssue->id)->get();
 
             foreach ($reservations as $reservation) {
@@ -109,8 +124,16 @@ class StockReservationService
                 ]);
             }
 
-            // Delete reservations (this will trigger StockReservationObserver deleted method)
-            StockReservation::where('material_issue_id', $materialIssue->id)->delete();
+            // Delete each reservation individually so Eloquent fires the 'deleted'
+            // model event and StockReservationObserver restores qty_available /
+            // decrements qty_reserved. A mass-delete query bypasses observers.
+            foreach ($reservations as $reservation) {
+                InventoryStock::where('product_id', $reservation->product_id)
+                    ->where('warehouse_id', $reservation->warehouse_id)
+                    ->lockForUpdate()
+                    ->first();
+                $reservation->delete();
+            }
         });
     }
 
@@ -120,7 +143,7 @@ class StockReservationService
     public function consumeReservedStockForMaterialIssue(MaterialIssue $materialIssue): void
     {
         if (!$materialIssue->isCompleted()) {
-            throw new \Exception('Material issue must be completed to consume reserved stock');
+            throw new \Exception('Material issue harus berstatus completed untuk mengonsumsi stok reservasi.');
         }
 
         Log::info('Starting consumeReservedStockForMaterialIssue', [
@@ -129,16 +152,19 @@ class StockReservationService
         ]);
 
         DB::transaction(function () use ($materialIssue) {
+            MaterialIssue::where('id', $materialIssue->id)->lockForUpdate()->first();
+
             $reservations = StockReservation::where('material_issue_id', $materialIssue->id)->get();
 
             foreach ($reservations as $reservation) {
                 // Manually update inventory stock since observer may not fire inside transaction
                 $inventoryStock = InventoryStock::where('product_id', $reservation->product_id)
                     ->where('warehouse_id', $reservation->warehouse_id)
+                    ->lockForUpdate()
                     ->first();
 
                 if ($inventoryStock) {
-                    // Only decrement reserved stock (stock is consumed, not returned to available)
+                    $inventoryStock->decrement('qty_available', $reservation->quantity);
                     $inventoryStock->decrement('qty_reserved', $reservation->quantity);
 
                     Log::info('Manually updated stock for consumed reservation', [
@@ -185,8 +211,7 @@ class StockReservationService
             return 0;
         }
 
-        // Since qty_available is now decremented when reserved, available stock = qty_available
-        return $inventoryStock->qty_available;
+        return max(0, (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved);
     }
 
     /**

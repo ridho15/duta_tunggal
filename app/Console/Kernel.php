@@ -20,6 +20,8 @@ class Kernel extends ConsoleKernel
         \App\Console\Commands\ShowJournalEntriesForPayment::class,
         \App\Console\Commands\ListRecommendedCoa::class,
         \App\Console\Commands\GenerateMonthlyDepreciation::class,
+        \App\Console\Commands\CheckOverdueInvoicesCommand::class,
+        \App\Console\Commands\SyncProductInventoryCoaCommand::class,
     ];
 
     /**
@@ -27,7 +29,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // No scheduled depreciation - manual calculation only
+        // Tidak dipakai: bootstrap/app.php Laravel 12 hanya memuat jadwal dari routes/console.php.
+        // Daftarkan jadwal baru di sana (invoices:check-overdue sudah dipindahkan ke routes/console.php).
     }
 
     /**

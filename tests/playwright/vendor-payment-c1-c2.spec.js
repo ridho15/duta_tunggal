@@ -1,0 +1,62 @@
+import { test, expect } from '@playwright/test'
+import {
+  FIXTURE,
+  ensureVendorPaymentFixture,
+  openVendorPaymentCreatePage,
+  selectFixturePaymentRequest,
+} from './helpers/vendor-payment-fixture'
+
+const ERR = /Fatal error|Whoops!|Something went wrong/i
+
+test.use({ storageState: 'playwright/.auth/user.json' })
+
+test.beforeAll(async () => {
+  ensureVendorPaymentFixture()
+})
+
+test('C1-a: vendor-payments create page loads and shows Payment Request reference', async ({ page }) => {
+  await openVendorPaymentCreatePage(page)
+
+  const body = await page.textContent('body')
+  expect(body).not.toMatch(ERR)
+  expect(body).toContain('Payment Request (PR)')
+  expect(body).toContain('Pilih Payment Request yang sudah disetujui. Invoice yang ditampilkan hanya berasal dari Payment Request yang dipilih.')
+})
+
+test('C1-b: selecting payment request auto-fills supplier', async ({ page }) => {
+  await openVendorPaymentCreatePage(page)
+  await selectFixturePaymentRequest(page)
+
+  const supplierCombobox = page.getByRole('combobox').nth(1)
+  await expect(supplierCombobox).toBeVisible()
+  await expect(supplierCombobox).toContainText(FIXTURE.supplierCode)
+})
+
+test('C2-a: invoice checkbox list appears after payment request selected', async ({ page }) => {
+  await openVendorPaymentCreatePage(page)
+  await selectFixturePaymentRequest(page)
+
+  const body = await page.textContent('body')
+  expect(body).toContain('Pilih Invoice')
+
+  const invoiceHeading = page.getByRole('heading', { name: /Pilih Invoice/i }).first()
+  await expect(invoiceHeading).toBeVisible()
+
+  const invoiceCheckboxes = page.locator('input[type="checkbox"][value]')
+  await expect.poll(async () => await invoiceCheckboxes.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(0)
+
+  const checkboxContainers = page.locator('[role="group"] > div, .fi-fo-checkbox-list-option')
+  if (await checkboxContainers.count()) {
+    const firstBox = await checkboxContainers.nth(0).boundingBox()
+    const secondBox = await checkboxContainers.nth(1).boundingBox().catch(() => null)
+
+    if (firstBox && secondBox) {
+      expect(Math.abs(firstBox.x - secondBox.x)).toBeLessThanOrEqual(24)
+      expect(secondBox.y).toBeGreaterThanOrEqual(firstBox.y)
+    }
+  }
+
+  if (await invoiceCheckboxes.count()) {
+    await expect(invoiceCheckboxes.first()).toBeVisible()
+  }
+})

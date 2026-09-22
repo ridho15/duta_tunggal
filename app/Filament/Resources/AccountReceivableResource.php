@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\AccountReceivableResource\Pages;
 use App\Models\Cabang;
 use App\Models\AccountReceivable;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Support\AccountReceivableQuery;
+use App\Support\OverdueStatusPresenter;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
@@ -32,9 +35,17 @@ class AccountReceivableResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Finance - Penjualan';
+    protected static ?string $navigationGroup = 'Keuangan Penjualan';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Piutang Usaha';
+
+    protected static ?string $modelLabel = 'Piutang Usaha';
+
+    protected static ?string $pluralModelLabel = 'Piutang Usaha';
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -44,7 +55,7 @@ class AccountReceivableResource extends Resource
                     ->schema([
                         Select::make('cabang_id')
                             ->label('Cabang')
-                            ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                            ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                 return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                             }))
                             ->default(function () {
@@ -85,17 +96,14 @@ class AccountReceivableResource extends Resource
                             ->relationship('customer', 'name'),
                         TextInput::make('total')
                             ->required()
-                            ->indonesianMoney()
-                            ->numeric(),
+                            ->indonesianMoney(),
                         TextInput::make('paid')
                             ->required()
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0.00),
                         TextInput::make('remaining')
                             ->required()
-                            ->indonesianMoney()
-                            ->numeric(),
+                            ->indonesianMoney(),
                         Checkbox::make('status')
                             ->label('Lunas / Belum Lunas')
                     ])
@@ -106,7 +114,9 @@ class AccountReceivableResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->with(['invoice.fromModel']);
+                return AccountReceivableQuery::withOverdueGrouping(
+                    AccountReceivableQuery::base()->with(['invoice.fromModel'])
+                );
             })
             ->columns([
                 TextColumn::make('invoice.invoice_number')
@@ -138,12 +148,7 @@ class AccountReceivableResource extends Resource
                     ->label('Due Date')
                     ->date('M j, Y')
                     ->sortable()
-                    ->color(function ($record) {
-                        if ($record->invoice->due_date < now() && $record->status === 'Belum Lunas') {
-                            return 'danger';
-                        }
-                        return 'gray';
-                    }),
+                    ->color(fn ($record) => self::overdueStatusPresenter()->dueDateColor($record)),
                     
                 TextColumn::make('total')
                     ->label('Total Amount')
@@ -181,17 +186,8 @@ class AccountReceivableResource extends Resource
                     
                 TextColumn::make('days_overdue')
                     ->label('Days Overdue')
-                    ->getStateUsing(function ($record) {
-                        if ($record->status === 'Belum Lunas' && $record->invoice->due_date < now()) {
-                            return now()->diffInDays($record->invoice->due_date);
-                        }
-                        return 0;
-                    })
-                    ->color(function ($state) {
-                        if ($state > 30) return 'danger';
-                        if ($state > 0) return 'warning';
-                        return 'success';
-                    })
+                    ->getStateUsing(fn ($record) => self::overdueStatusPresenter()->daysOverdue($record))
+                    ->color(fn ($state) => self::overdueStatusPresenter()->daysOverdueColor($state))
                     ->badge()
                     ->sortable(),
                     
@@ -240,25 +236,14 @@ class AccountReceivableResource extends Resource
                     ->label('Payment Status')
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(function ($record) {
-                        return $record->status === 'Lunas' ? '✅ PAID' : '⏳ OUTSTANDING';
+                        return $record->status === PaymentStatus::PAID->value ? '✅ PAID' : '⏳ OUTSTANDING';
                     })
                     ->collapsible(),
                     
                 Tables\Grouping\Group::make('overdue_group')
                     ->label('Overdue Status')
                     ->titlePrefixedWithLabel(false)
-                    ->getTitleFromRecordUsing(function ($record) {
-                        if ($record->status === 'Lunas') return '✅ PAID';
-                        
-                        $daysOverdue = $record->invoice->due_date < now() 
-                            ? now()->diffInDays($record->invoice->due_date) 
-                            : 0;
-                            
-                        if ($daysOverdue > 60) return '🚨 OVERDUE 60+ Days';
-                        if ($daysOverdue > 30) return '⚠️ OVERDUE 30+ Days';
-                        if ($daysOverdue > 0) return '⏰ OVERDUE';
-                        return '💚 CURRENT';
-                    })
+                    ->getTitleFromRecordUsing(fn ($record) => self::overdueStatusPresenter()->overdueGroupLabel($record))
                     ->collapsible(),
             ])
             ->filters([
@@ -275,8 +260,8 @@ class AccountReceivableResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Payment Status')
                     ->options([
-                        'Belum Lunas' => 'Outstanding',
-                        'Lunas' => 'Paid',
+                        PaymentStatus::UNPAID->value => 'Outstanding',
+                        PaymentStatus::PAID->value => 'Paid',
                     ])
                     ->multiple(),
                     
@@ -286,11 +271,9 @@ class AccountReceivableResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('amount_from')
                                     ->label('Amount From')
-                                    ->numeric()
                                     ->indonesianMoney(),
                                 Forms\Components\TextInput::make('amount_to')
                                     ->label('Amount To')
-                                    ->numeric()
                                     ->indonesianMoney(),
                             ])
                     ])
@@ -319,12 +302,23 @@ class AccountReceivableResource extends Resource
                     
                 Tables\Filters\Filter::make('overdue')
                     ->label('Overdue Invoices')
-                    ->query(function (Builder $query): Builder {
-                        return $query->whereHas('invoice', function (Builder $query) {
-                            $query->where('due_date', '<', now());
-                        })->where('status', 'Belum Lunas');
-                    })
+                    ->query(fn (Builder $query): Builder => AccountReceivableQuery::applyOverdueFilter($query))
                     ->toggle(),
+
+                Tables\Filters\SelectFilter::make('overdue_days')
+                    ->label('Overdue Period')
+                    ->options([
+                        '1-30' => '1-30 Days',
+                        '31-60' => '31-60 Days',
+                        '60+' => '60+ Days',
+                    ])
+                    ->query(function (Builder $query, $data) {
+                        if (!$data['value']) {
+                            return $query;
+                        }
+
+                        return AccountReceivableQuery::applyOverdueDaysFilter($query, $data['value']);
+                    }),
                     
                 Tables\Filters\Filter::make('date_range')
                     ->form([
@@ -455,5 +449,10 @@ class AccountReceivableResource extends Resource
             'create' => Pages\CreateAccountReceivable::route('/create'),
             'edit' => Pages\EditAccountReceivable::route('/{record}/edit'),
         ];
+    }
+
+    public static function overdueStatusPresenter(): OverdueStatusPresenter
+    {
+        return app(OverdueStatusPresenter::class);
     }
 }

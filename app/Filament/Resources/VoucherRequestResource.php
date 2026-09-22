@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VoucherRequestResource\Pages;
 use App\Filament\Resources\VoucherRequestResource\RelationManagers;
+use App\Models\CashBankTransaction;
 use App\Models\VoucherRequest;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Services\VoucherRequestService;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Filament\Forms;
@@ -21,20 +23,23 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class VoucherRequestResource extends Resource
 {
     protected static ?string $model = VoucherRequest::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
     
-    protected static ?string $navigationGroup = 'Finance - Akuntansi';
+    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
     
     protected static ?string $navigationLabel = 'Pengajuan Voucher';
     
     protected static ?string $modelLabel = 'Pengajuan Voucher';
     
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -73,17 +78,9 @@ class VoucherRequestResource extends Resource
                                 Forms\Components\TextInput::make('amount')
                                     ->label('Nominal')
                                     ->required()
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->minValue(0)
-                                    ->step(0.01)
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(function ($state, Forms\Set $set) {
-                                        // Format saat blur
-                                        if ($state) {
-                                            $set('amount', number_format((float) $state, 2, '.', ''));
-                                        }
-                                    }),
+                                    ->dehydrateStateUsing(fn ($state) => \App\Helpers\MoneyHelper::safeParse($state)),
 
                                 Forms\Components\TextInput::make('related_party')
                                     ->label('Pihak Terkait')
@@ -94,7 +91,7 @@ class VoucherRequestResource extends Resource
 
                                 Select::make('cabang_id')
                                     ->label('Cabang')
-                                    ->options(Cabang::all()->mapWithKeys(function ($cabang) {
+                                    ->options(Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     }))
                                     ->searchable()
@@ -223,8 +220,8 @@ class VoucherRequestResource extends Resource
                 Tables\Columns\TextColumn::make('total_amount_used')
                     ->label('Sudah Digunakan')
                     ->rupiah()
-                    ->getStateUsing(fn ($record) => $record->getTotalAmountUsed())
-                    ->sortable()
+                    ->getStateUsing(fn ($record) => (float) ($record->total_amount_used ?? 0))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('total_amount_used', $direction))
                     ->toggleable()
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
@@ -235,10 +232,10 @@ class VoucherRequestResource extends Resource
                 Tables\Columns\TextColumn::make('remaining_amount')
                     ->label('Sisa')
                     ->rupiah()
-                    ->getStateUsing(fn ($record) => $record->getRemainingAmount())
-                    ->sortable()
+                    ->getStateUsing(fn ($record) => (float) ($record->remaining_amount ?? (($record->amount ?? 0) - (float) ($record->total_amount_used ?? 0))))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('remaining_amount', $direction))
                     ->toggleable()
-                    ->color(fn ($record) => $record->getRemainingAmount() > 0 ? 'success' : 'gray')
+                    ->color(fn ($record) => (float) ($record->remaining_amount ?? (($record->amount ?? 0) - (float) ($record->total_amount_used ?? 0))) > 0 ? 'success' : 'gray')
                     ->summarize([
                         Tables\Columns\Summarizers\Sum::make()
                             ->rupiah()
@@ -371,7 +368,7 @@ class VoucherRequestResource extends Resource
                                 });
                         }
                         
-                        return \App\Models\Cabang::all()->mapWithKeys(function ($cabang) {
+                        return \App\Models\Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(function ($cabang) {
                             return [$cabang->id => "{$cabang->kode} - {$cabang->nama}"];
                         });
                     })
@@ -402,12 +399,12 @@ class VoucherRequestResource extends Resource
                                 ->title('Berhasil')
                                 ->body('Voucher berhasil diajukan untuk persetujuan' . ($notifyOwner ? ' dan notifikasi dikirim ke Owner' : ''))
                                 ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Gagal')
-                                ->body($e->getMessage())
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Mengajukan Voucher',
+                                $exception,
+                                'Voucher request belum dapat diajukan. Silakan periksa data voucher lalu coba lagi.'
+                            );
                         }
                     }),
 
@@ -495,12 +492,12 @@ class VoucherRequestResource extends Resource
                                 ->title('Berhasil')
                                 ->body('Voucher berhasil disetujui')
                                 ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Gagal')
-                                ->body($e->getMessage())
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Menyetujui Voucher',
+                                $exception,
+                                'Voucher request belum dapat disetujui. Silakan periksa data voucher lalu coba lagi.'
+                            );
                         }
                     }),
 
@@ -525,12 +522,12 @@ class VoucherRequestResource extends Resource
                                 ->title('Berhasil')
                                 ->body('Voucher berhasil ditolak')
                                 ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->danger()
-                                ->title('Gagal')
-                                ->body($e->getMessage())
-                                ->send();
+                        } catch (Throwable $exception) {
+                            ProcurementFailureNotifier::danger(
+                                'Gagal Menolak Voucher',
+                                $exception,
+                                'Voucher request belum dapat ditolak. Silakan periksa data voucher lalu coba lagi.'
+                            );
                         }
                     }),
 
@@ -598,6 +595,18 @@ class VoucherRequestResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $usedAmountSubquery = CashBankTransaction::query()
+            ->selectRaw('COALESCE(SUM(voucher_amount_used), 0)')
+            ->whereColumn('voucher_request_id', 'voucher_requests.id');
+
+        $query
+            ->select('voucher_requests.*')
+            ->selectSub($usedAmountSubquery, 'total_amount_used')
+            ->selectRaw(
+                '(voucher_requests.amount - COALESCE((' . $usedAmountSubquery->toSql() . '), 0)) as remaining_amount',
+                $usedAmountSubquery->getBindings(),
+            );
 
         $user = Auth::user();
         if ($user && !in_array('all', $user->manage_type ?? [])) {

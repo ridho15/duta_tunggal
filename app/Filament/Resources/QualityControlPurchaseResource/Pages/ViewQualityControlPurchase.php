@@ -4,18 +4,19 @@ namespace App\Filament\Resources\QualityControlPurchaseResource\Pages;
 
 use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Http\Controllers\HelperController;
+use App\Models\PurchaseReturn;
 use App\Models\Rak;
 use App\Models\Warehouse;
+use App\Services\PurchaseReturnService;
 use App\Services\QualityControlService;
-use App\Services\ReturnProductService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Actions\Action as ActionsAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Radio;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ViewQualityControlPurchase extends ViewRecord
 {
@@ -30,69 +31,99 @@ class ViewQualityControlPurchase extends ViewRecord
                 ->icon('heroicon-o-trash'),
             Action::make('Complete')
                 ->color('success')
-                ->label('Complete')
-                ->requiresConfirmation(function ($record) {
-                    return [
-                        'title' => 'Konfirmasi Complete QC',
-                        'description' => "Passed: {$record->passed_quantity}, Rejected: {$record->rejected_quantity}. Apakah Anda yakin ingin menyelesaikan QC ini?",
-                        'submitLabel' => 'Ya, Selesaikan QC',
-                    ];
-                })
-                ->hidden(function ($record) {
-                    // Sembunyikan action jika status sudah complete atau passed_quantity = 0
-                    return $record->status == 1 || $record->passed_quantity == 0;
-                })
+                ->label('Complete QC')
                 ->icon('heroicon-o-check-badge')
-                ->form(function ($record) {
-                    if ($record->rejected_quantity > 0) {
-                        return [
-                            Select::make('warehouse_id')
-                                ->label('Gudang Return')
-                                ->preload()
-                                ->reactive()
-                                ->searchable(['kode', 'name'])
-                                ->relationship('warehouse', 'name')
-                                ->getOptionLabelFromRecordUsing(fn (Warehouse $record) => "{$record->kode} - {$record->name}")
-                                ->required(),
-                            Select::make('rak_id')
-                                ->label('Rak Return')
-                                ->preload()
-                                ->reactive()
-                                ->searchable()
-                                ->options(function ($get) {
-                                    return Rak::where('warehouse_id', $get('warehouse_id'))->select(['id', 'name'])->get()->pluck('name', 'id');
-                                })
-                                ->getOptionLabelFromRecordUsing(fn (Rak $record) => "{$record->code} - {$record->name}")
-                                ->nullable(),
-                            Select::make('item_condition')
-                                ->label('Kondisi Item')
-                                ->options([
-                                    'damage' => 'Rusak',
-                                    'expired' => 'Kadaluarsa',
-                                    'wrong_item' => 'Barang Salah',
-                                    'poor_quality' => 'Kualitas Buruk',
-                                    'other' => 'Lainnya'
-                                ])
-                                ->default('damage')
-                                ->required(),
-                            Textarea::make('reason')
-                                ->label('Alasan Return')
-                                ->nullable()
-                                ->string()
-                                ->default($record->reason_reject)
-                        ];
+                ->hidden(function ($record) {
+                    return $record->status == 1 || ((float)($record->passed_quantity ?? 0) <= 0 && (float)($record->rejected_quantity ?? 0) <= 0);
+                })
+                ->modalHeading('Selesaikan Quality Control')
+                ->modalDescription(function ($record) {
+                    if ($record->items()->exists()) {
+                        $itemCount = $record->items()->count();
+                        $passed = number_format((float) ($record->passed_quantity ?? 0), 0, ',', '.');
+                        $rejected = number_format((float) ($record->rejected_quantity ?? 0), 0, ',', '.');
+                        return "Multi-Item QC ({$itemCount} item) | Total Lulus: {$passed} | Total Ditolak: {$rejected}.";
                     }
 
-                    return null;
+                    $passed = number_format((float) ($record->passed_quantity ?? 0), 0, ',', '.');
+                    $rejected = number_format((float) ($record->rejected_quantity ?? 0), 0, ',', '.');
+                    $prodName = optional($record->product)->name ?? 'Produk';
+                    return "Item: {$prodName} | Qty Lulus: {$passed} | Qty Ditolak: {$rejected}.";
                 })
-                ->action(function (array $data, $record) {
-                    $qualityControlService = app(QualityControlService::class);
-                    $qualityControlService->completeQualityControl($record, $data);
-                    HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Purchase Completed");
-                    
-                    // Only check PO completion for QC from PurchaseReceiptItem, not PurchaseOrderItem
-                    if ($record->from_model_type === 'App\Models\PurchaseReceiptItem') {
-                        $qualityControlService->checkPenerimaanBarang($record);
+                ->form(function ($record) {
+                    if ($record->items()->exists()) {
+                        return [];
+                    }
+
+                    if ((float) ($record->rejected_quantity ?? 0) <= 0) {
+                        return [];
+                    }
+
+                    return [
+                        Radio::make('failed_qc_action')
+                            ->label('Tindak Lanjut Barang Ditolak (Rejected)')
+                            ->options([
+                                PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY => 'Tunggu Pengganti (PO tetap terbuka untuk pengiriman ulang supplier)',
+                                PurchaseReturn::QC_ACTION_RETURN_SUPPLIER    => 'Retur ke Supplier (Buat dokumen nota retur ke supplier)',
+                                PurchaseReturn::QC_ACTION_REDUCE_STOCK       => 'Batalkan Sisa PO (Kurangi kuantitas PO & tutup sesuai jumlah yang diterima)',
+                            ])
+                            ->default(PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY)
+                            ->required()
+                            ->helperText('Tentukan tindakan untuk barang yang tidak lolos QC agar PO tidak menggantung selamanya.'),
+                    ];
+                })
+                ->modalSubmitActionLabel('Selesaikan QC')
+                ->action(function ($record, array $data) {
+                    try {
+                        $qualityControlService = app(QualityControlService::class);
+
+                        if ($record->items()->exists()) {
+                            $qualityControlService->completeQualityControl($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "QC Selesai", message: "Multi-Item Quality Control Selesai dan Penerimaan Barang (GRN) telah diterbitkan.");
+                            return;
+                        }
+
+                        $purchaseReturnService = app(PurchaseReturnService::class);
+
+                        if ((float) ($record->rejected_quantity ?? 0) > 0 && ! empty($data['failed_qc_action'])) {
+                            $action = $data['failed_qc_action'];
+
+                            $purchaseReturn = $purchaseReturnService->createFromQualityControl($record, $action);
+
+                            if ($action === PurchaseReturn::QC_ACTION_REDUCE_STOCK) {
+                                $purchaseReturnService->executeQcResolution($purchaseReturn);
+                            }
+                        }
+
+                        $qualityControlService->completeQualityControl($record, $data);
+
+                        if ($record->from_model_type === 'App\Models\PurchaseReceiptItem') {
+                            $qualityControlService->checkPenerimaanBarang($record);
+                        }
+
+                        $msg = "Quality Control Purchase Completed.";
+                        if ((float) ($record->rejected_quantity ?? 0) > 0) {
+                            $labels = [
+                                PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY => 'PO tetap terbuka menunggu pengganti supplier.',
+                                PurchaseReturn::QC_ACTION_RETURN_SUPPLIER    => 'Dokumen retur telah dibuat untuk pengembalian ke supplier.',
+                                PurchaseReturn::QC_ACTION_REDUCE_STOCK       => 'Kuantitas PO telah disesuaikan dengan jumlah diterima.',
+                            ];
+                            $actionLabel = $labels[$data['failed_qc_action'] ?? ''] ?? '';
+                            $msg .= " Tindak lanjut reject: {$actionLabel}";
+                        }
+
+                        HelperController::sendNotification(isSuccess: true, title: "QC Selesai", message: $msg);
+                    } catch (Throwable $exception) {
+                        Log::error('ViewQualityControlPurchase complete action failed', [
+                            'quality_control_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Menyelesaikan QC Pembelian',
+                            $exception,
+                            'QC pembelian belum berhasil diselesaikan. Periksa hasil QC, gudang return, dan data item yang diproses lalu coba lagi.'
+                        );
                     }
                 })
         ];
@@ -101,10 +132,10 @@ class ViewQualityControlPurchase extends ViewRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         // Populate product information fields
-        $data['product_name'] = $this->record->product->name ?? '';
-        $data['sku'] = $this->record->product->sku ?? '';
-        $data['quantity_received'] = $this->record->fromModel->qty_accepted ?? 0;
-        $data['uom'] = $this->record->product->uom->name ?? '';
+        $data['product_name'] = $this->record->product?->name ?? ($this->record->items()->exists() ? 'Multi-Item Purchase Order' : '');
+        $data['sku'] = $this->record->product?->sku ?? ($this->record->items()->exists() ? '-' : '');
+        $data['quantity_received'] = $this->record->quantity_received ?? 0;
+        $data['uom'] = $this->record->product?->uom?->name ?? ($this->record->items()->exists() ? 'item(s)' : '');
         return $data;
     }
 }

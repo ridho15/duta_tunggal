@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
+use App\Models\Cabang;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\User;
-use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -43,7 +43,6 @@ test('supplier product filtering logic', function () {
 
 test('order request creation with supplier and products', function () {
     $user = User::factory()->create();
-    $warehouse = Warehouse::factory()->create();
     $supplier = Supplier::factory()->create();
     $product1 = Product::factory()->create(['supplier_id' => $supplier->id]);
     $product2 = Product::factory()->create(['supplier_id' => $supplier->id]);
@@ -53,37 +52,36 @@ test('order request creation with supplier and products', function () {
     // Create order request with supplier
     $orderRequest = OrderRequest::create([
         'request_number' => 'OR-TEST-001',
-        'warehouse_id' => $warehouse->id,
-        'supplier_id' => $supplier->id,
         'request_date' => now()->toDateString(),
         'status' => 'draft',
         'note' => 'Test order request',
         'created_by' => $user->id,
     ]);
 
-    expect($orderRequest->supplier_id)->toBe($supplier->id);
-    expect($orderRequest->warehouse_id)->toBe($warehouse->id);
     expect($orderRequest->status)->toBe('draft');
 
     // Add items with products from the same supplier
     $item1 = OrderRequestItem::create([
         'order_request_id' => $orderRequest->id,
+        'supplier_id' => $supplier->id,
         'product_id' => $product1->id,
         'quantity' => 10,
     ]);
 
     $item2 = OrderRequestItem::create([
         'order_request_id' => $orderRequest->id,
+        'supplier_id' => $supplier->id,
         'product_id' => $product2->id,
         'quantity' => 5,
     ]);
 
     expect($orderRequest->fresh()->orderRequestItem)->toHaveCount(2);
+    expect($item1->supplier_id)->toBe($supplier->id);
+    expect($item2->supplier_id)->toBe($supplier->id);
 });
 
 test('supplier change clears invalid items', function () {
     $user = User::factory()->create();
-    $warehouse = Warehouse::factory()->create();
     $supplier1 = Supplier::factory()->create();
     $supplier2 = Supplier::factory()->create();
 
@@ -95,8 +93,6 @@ test('supplier change clears invalid items', function () {
     // Create order request with supplier1
     $orderRequest = OrderRequest::create([
         'request_number' => 'OR-TEST-002',
-        'warehouse_id' => $warehouse->id,
-        'supplier_id' => $supplier1->id,
         'request_date' => now()->toDateString(),
         'status' => 'draft',
         'created_by' => $user->id,
@@ -105,20 +101,18 @@ test('supplier change clears invalid items', function () {
     // Add item from supplier1
     $item = OrderRequestItem::create([
         'order_request_id' => $orderRequest->id,
+        'supplier_id' => $supplier1->id,
         'product_id' => $productFromSupplier1->id,
         'quantity' => 10,
     ]);
 
     expect($orderRequest->fresh()->orderRequestItem)->toHaveCount(1);
 
-    // Simulate frontend logic: when supplier changes to supplier2, invalid items should be cleared
-    $orderRequest->update(['supplier_id' => $supplier2->id]);
+    // Simulate frontend logic: when item supplier context changes to supplier2, invalid items should be cleared
 
     // Items from old supplier should be considered invalid
     $invalidItems = OrderRequestItem::where('order_request_id', $orderRequest->id)
-        ->whereHas('product', function ($query) use ($supplier2) {
-            $query->where('supplier_id', '!=', $supplier2->id);
-        })
+        ->where('supplier_id', '!=', $supplier2->id)
         ->get();
 
     // In frontend logic, these would be deleted
@@ -132,13 +126,8 @@ test('supplier change clears invalid items', function () {
 
 test('order request fillable attributes', function () {
     $user = User::factory()->create();
-    $warehouse = Warehouse::factory()->create();
-    $supplier = Supplier::factory()->create();
-
     $data = [
         'request_number' => 'OR-FILLABLE-TEST',
-        'warehouse_id' => $warehouse->id,
-        'supplier_id' => $supplier->id,
         'request_date' => '2025-11-13',
         'status' => 'draft',
         'note' => 'Testing fillable attributes',
@@ -148,53 +137,59 @@ test('order request fillable attributes', function () {
     $orderRequest = OrderRequest::create($data);
 
     expect($orderRequest->request_number)->toBe($data['request_number']);
-    expect($orderRequest->warehouse_id)->toBe($data['warehouse_id']);
-    expect($orderRequest->supplier_id)->toBe($data['supplier_id']);
     expect($orderRequest->request_date)->toBe($data['request_date']);
     expect($orderRequest->status)->toBe($data['status']);
     expect($orderRequest->note)->toBe($data['note']);
     expect($orderRequest->created_by)->toBe($data['created_by']);
 });
 
-test('order request supplier relationship', function () {
+test('order request item supplier relationship', function () {
     $user = User::factory()->create();
-    $warehouse = Warehouse::factory()->create();
     $supplier = Supplier::factory()->create(['perusahaan' => 'Test Supplier', 'code' => 'SUP001']);
 
     test()->actingAs($user);
 
     $orderRequest = OrderRequest::create([
         'request_number' => 'OR-SUPPLIER-TEST',
-        'warehouse_id' => $warehouse->id,
-        'supplier_id' => $supplier->id,
         'request_date' => now()->toDateString(),
         'status' => 'draft',
         'created_by' => $user->id,
     ]);
 
-    // Test relationship
-    expect($orderRequest->supplier)->not->toBeNull();
-    expect($orderRequest->supplier->perusahaan)->toBe('Test Supplier');
-    expect($orderRequest->supplier->code)->toBe('SUP001');
+    $item = OrderRequestItem::create([
+        'order_request_id' => $orderRequest->id,
+        'supplier_id' => $supplier->id,
+        'product_id' => Product::factory()->create(['supplier_id' => $supplier->id])->id,
+        'quantity' => 2,
+    ]);
+
+    expect($item->supplier)->not->toBeNull();
+    expect($item->supplier->perusahaan)->toBe('Test Supplier');
+    expect($item->supplier->code)->toBe('SUP001');
 
     // Test that supplier can be null
     $orderRequestWithoutSupplier = OrderRequest::create([
         'request_number' => 'OR-NO-SUPPLIER-TEST',
-        'warehouse_id' => $warehouse->id,
-        'supplier_id' => null,
         'request_date' => now()->toDateString(),
         'status' => 'draft',
         'created_by' => $user->id,
     ]);
 
-    expect($orderRequestWithoutSupplier->supplier)->not->toBeNull(); // withDefault() returns default model
-    expect($orderRequestWithoutSupplier->supplier->perusahaan)->toBeNull(); // default model has null name
+    $itemWithoutSupplier = OrderRequestItem::create([
+        'order_request_id' => $orderRequestWithoutSupplier->id,
+        'supplier_id' => null,
+        'product_id' => Product::factory()->create()->id,
+        'quantity' => 1,
+    ]);
+
+    expect($itemWithoutSupplier->supplier)->not->toBeNull();
+    expect($itemWithoutSupplier->supplier->perusahaan)->toBeNull();
 });
 
 test('order request filters work correctly', function () {
     $user = User::factory()->create();
-    $warehouse1 = Warehouse::factory()->create(['name' => 'Warehouse A']);
-    $warehouse2 = Warehouse::factory()->create(['name' => 'Warehouse B']);
+    $cabang1 = Cabang::factory()->create(['kode' => 'CBG-A', 'nama' => 'Cabang A']);
+    $cabang2 = Cabang::factory()->create(['kode' => 'CBG-B', 'nama' => 'Cabang B']);
     $supplier1 = Supplier::factory()->create(['perusahaan' => 'Supplier A']);
     $supplier2 = Supplier::factory()->create(['perusahaan' => 'Supplier B']);
 
@@ -203,8 +198,6 @@ test('order request filters work correctly', function () {
     // Create order requests with different statuses, suppliers, and warehouses
     $draftRequest = OrderRequest::create([
         'request_number' => 'OR-DRAFT-001',
-        'warehouse_id' => $warehouse1->id,
-        'supplier_id' => $supplier1->id,
         'request_date' => '2025-11-10',
         'status' => 'draft',
         'created_by' => $user->id,
@@ -212,8 +205,6 @@ test('order request filters work correctly', function () {
 
     $approvedRequest = OrderRequest::create([
         'request_number' => 'OR-APPROVED-001',
-        'warehouse_id' => $warehouse2->id,
-        'supplier_id' => $supplier2->id,
         'request_date' => '2025-11-12',
         'status' => 'approved',
         'created_by' => $user->id,
@@ -221,11 +212,31 @@ test('order request filters work correctly', function () {
 
     $rejectedRequest = OrderRequest::create([
         'request_number' => 'OR-REJECTED-001',
-        'warehouse_id' => $warehouse1->id,
-        'supplier_id' => $supplier1->id,
         'request_date' => '2025-11-14',
         'status' => 'rejected',
         'created_by' => $user->id,
+    ]);
+
+    OrderRequestItem::create([
+        'order_request_id' => $draftRequest->id,
+        'supplier_id' => $supplier1->id,
+        'cabang_id' => $cabang1->id,
+        'product_id' => Product::factory()->create(['supplier_id' => $supplier1->id])->id,
+        'quantity' => 1,
+    ]);
+    OrderRequestItem::create([
+        'order_request_id' => $approvedRequest->id,
+        'supplier_id' => $supplier2->id,
+        'cabang_id' => $cabang2->id,
+        'product_id' => Product::factory()->create(['supplier_id' => $supplier2->id])->id,
+        'quantity' => 1,
+    ]);
+    OrderRequestItem::create([
+        'order_request_id' => $rejectedRequest->id,
+        'supplier_id' => $supplier1->id,
+        'cabang_id' => $cabang1->id,
+        'product_id' => Product::factory()->create(['supplier_id' => $supplier1->id])->id,
+        'quantity' => 1,
     ]);
 
     // Test status filter
@@ -237,19 +248,27 @@ test('order request filters work correctly', function () {
     expect($approvedOrders)->toHaveCount(1);
     expect($approvedOrders->first()->id)->toBe($approvedRequest->id);
 
-    // Test supplier filter
-    $supplier1Orders = OrderRequest::where('supplier_id', $supplier1->id)->get();
+    // Test supplier filter (item-level supplier)
+    $supplier1Orders = OrderRequest::whereHas('orderRequestItem', function ($query) use ($supplier1) {
+        $query->where('supplier_id', $supplier1->id);
+    })->get();
     expect($supplier1Orders)->toHaveCount(2); // draft and rejected
 
-    $supplier2Orders = OrderRequest::where('supplier_id', $supplier2->id)->get();
+    $supplier2Orders = OrderRequest::whereHas('orderRequestItem', function ($query) use ($supplier2) {
+        $query->where('supplier_id', $supplier2->id);
+    })->get();
     expect($supplier2Orders)->toHaveCount(1); // approved
 
-    // Test warehouse filter
-    $warehouse1Orders = OrderRequest::where('warehouse_id', $warehouse1->id)->get();
-    expect($warehouse1Orders)->toHaveCount(2); // draft and rejected
+    // Test cabang filter at item level
+    $cabang1Orders = OrderRequest::whereHas('orderRequestItem', function ($query) use ($cabang1) {
+        $query->where('cabang_id', $cabang1->id);
+    })->get();
+    expect($cabang1Orders)->toHaveCount(2); // draft and rejected
 
-    $warehouse2Orders = OrderRequest::where('warehouse_id', $warehouse2->id)->get();
-    expect($warehouse2Orders)->toHaveCount(1); // approved
+    $cabang2Orders = OrderRequest::whereHas('orderRequestItem', function ($query) use ($cabang2) {
+        $query->where('cabang_id', $cabang2->id);
+    })->get();
+    expect($cabang2Orders)->toHaveCount(1); // approved
 
     // Test date range filter
     $dateRangeOrders = OrderRequest::whereDate('request_date', '>=', '2025-11-11')
@@ -261,7 +280,6 @@ test('order request filters work correctly', function () {
 
 test('approve form supplier auto-selected from order request', function () {
     $user = User::factory()->create();
-    $warehouse = Warehouse::factory()->create();
     $supplier = Supplier::factory()->create(['perusahaan' => 'Auto Select Supplier', 'code' => 'AUTO001']);
     $product = Product::factory()->create(['supplier_id' => $supplier->id]);
 
@@ -270,8 +288,6 @@ test('approve form supplier auto-selected from order request', function () {
     // Create order request with supplier
     $orderRequest = OrderRequest::create([
         'request_number' => 'OR-AUTO-SELECT-001',
-        'warehouse_id' => $warehouse->id,
-        'supplier_id' => $supplier->id,
         'request_date' => now()->toDateString(),
         'status' => 'draft',
         'created_by' => $user->id,
@@ -280,16 +296,17 @@ test('approve form supplier auto-selected from order request', function () {
     // Add item
     OrderRequestItem::create([
         'order_request_id' => $orderRequest->id,
+        'supplier_id' => $supplier->id,
         'product_id' => $product->id,
         'quantity' => 5,
     ]);
 
-    // Verify that the order request has the supplier
-    expect($orderRequest->supplier_id)->toBe($supplier->id);
-    expect($orderRequest->supplier->perusahaan)->toBe('Auto Select Supplier');
+    // Verify that supplier is persisted at item level
+    $firstItem = $orderRequest->fresh()->orderRequestItem()->first();
+    expect($firstItem)->not->toBeNull();
+    expect($firstItem->supplier_id)->toBe($supplier->id);
+    expect($firstItem->supplier->perusahaan)->toBe('Auto Select Supplier');
 
-    // In a real scenario, when opening the approve form, supplier_id should be pre-filled
-    // This would be tested in a browser test with Dusk, but here we verify the data integrity
-    $freshOrderRequest = $orderRequest->fresh();
-    expect($freshOrderRequest->supplier_id)->toBe($supplier->id);
+    // In approve form, selected item supplier should be pre-filled from OR item
+    expect($orderRequest->fresh()->orderRequestItem()->count())->toBeGreaterThan(0);
 });

@@ -11,14 +11,45 @@ use Illuminate\Support\Facades\Log;
 class DeliveryOrderItem extends Model
 {
     use SoftDeletes, HasFactory,LogsGlobalActivity;
+
+    /** Status level item DO (lihat DeliveryOrderService::updateStatus & WarehouseConfirmationItem). */
+    public const STATUS_LABELS = [
+        'pending' => 'Menunggu',
+        'requested' => 'Menunggu Konfirmasi Gudang',
+        'confirmed' => 'Terkonfirmasi',
+        'partial' => 'Sebagian',
+        'rejected' => 'Ditolak',
+        'sent' => 'Sedang Dikirim',
+        'received' => 'Diterima',
+    ];
+
+    public const STATUS_COLORS = [
+        'pending' => 'gray',
+        'requested' => 'warning',
+        'confirmed' => 'success',
+        'partial' => 'info',
+        'rejected' => 'danger',
+        'sent' => 'primary',
+        'received' => 'success',
+    ];
+
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUS_LABELS[$status ?? ''] ?? ($status ? ucfirst(str_replace('_', ' ', $status)) : '-');
+    }
+
+    public static function statusColor(?string $status): string
+    {
+        return self::STATUS_COLORS[$status ?? ''] ?? 'gray';
+    }
     protected $table = 'delivery_order_items';
     protected $fillable = [
         'delivery_order_id',
-        'purchase_receipt_item_id',
         'sale_order_item_id',
         'product_id',
         'quantity',
-        'reason'
+        'reason',
+        'status',  // G-09: tracks item-level warehouse/delivery state
     ];
 
     public function deliveryOrder()
@@ -31,11 +62,6 @@ class DeliveryOrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id')->withDefault();
     }
 
-    public function purchaseReceiptItem()
-    {
-        return $this->belongsTo(PurchaseReceiptItem::class, 'purchase_receipt_item_id')->withDefault();
-    }
-
     public function saleOrderItem()
     {
         return $this->belongsTo(SaleOrderItem::class, 'sale_order_item_id')->withDefault();
@@ -46,12 +72,24 @@ class DeliveryOrderItem extends Model
         return $this->morphOne(StockMovement::class, 'from_model')->withDefault();
     }
 
+    public function warehouseSources()
+    {
+        return $this->hasMany(DeliveryOrderItemWarehouseSource::class, 'delivery_order_item_id');
+    }
+
     protected static function booted()
     {
         static::updated(function ($deliveryOrderItem) {
             // Sync journal entries, stock movements, and delivered quantities when quantity changes
             if ($deliveryOrderItem->isDirty('quantity')) {
                 $deliveryOrder = $deliveryOrderItem->deliveryOrder;
+
+                // T2.1 (flag stock.ledger): edit kuantitas (mis. checker) saat DO masih Siap Kirim → reservasi ikut turun/naik.
+                if ($deliveryOrder && $deliveryOrder->status === 'approved' && \App\Services\StockReservationLedger::enabled()) {
+                    app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
+                    app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
+                }
+
                 if ($deliveryOrder && in_array($deliveryOrder->status, ['sent', 'received', 'completed'])) {
                     // Sync journal entries if they exist
                     self::syncJournalEntries($deliveryOrder);
@@ -66,43 +104,62 @@ class DeliveryOrderItem extends Model
         });
 
         static::created(function ($deliveryOrderItem) {
-            // Update delivered_quantity when delivery order item is created
+            // Cache delivered_quantity & status SO hanya berubah bila DO sudah berstatus terkirim.
             if ($deliveryOrderItem->sale_order_item_id) {
-                $saleOrderItem = $deliveryOrderItem->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Only update if delivery order is in final status
-                    $deliveryOrder = $deliveryOrderItem->deliveryOrder;
-                    if ($deliveryOrder && in_array($deliveryOrder->status, ['sent', 'received', 'completed'])) {
-                        $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                            ->whereHas('deliveryOrder', function ($query) {
-                                $query->whereIn('status', ['sent', 'received', 'completed']);
-                            })
-                            ->sum('quantity');
-
-                        $saleOrderItem->update([
-                            'delivered_quantity' => $totalDelivered
-                        ]);
-                    }
+                $deliveryOrder = $deliveryOrderItem->deliveryOrder;
+                if ($deliveryOrder && in_array($deliveryOrder->status, DeliveryOrder::DELIVERED_STATUSES, true)) {
+                    app(\App\Services\SaleOrderDeliveryProgress::class)
+                        ->syncForSaleOrderItems([$deliveryOrderItem->sale_order_item_id]);
                 }
             }
         });
 
-        static::saving(function ($deliveryOrderItem) {
-            // Validate quantity doesn't exceed remaining quantity from sales order
+        static::deleted(function ($deliveryOrderItem) {
+            // Item dilepas dari DO (mis. dihapus di halaman edit) -> hitung ulang progres SO.
             if ($deliveryOrderItem->sale_order_item_id) {
-                $saleOrderItem = $deliveryOrderItem->saleOrderItem;
-                $currentDeliveredQty = $saleOrderItem->deliveryOrderItems()
-                    ->where('id', '!=', $deliveryOrderItem->id) // Exclude current item if updating
-                    ->whereHas('deliveryOrder', function ($query) {
-                        $query->whereIn('status', ['sent', 'received', 'completed']); // Only count actually delivered orders
-                    })
-                    ->sum('quantity');
+                app(\App\Services\SaleOrderDeliveryProgress::class)
+                    ->syncForSaleOrderItems([$deliveryOrderItem->sale_order_item_id]);
+            }
+        });
 
-                $remainingQty = $saleOrderItem->quantity - $currentDeliveredQty;
+        static::deleting(function ($deliveryOrderItem) {
+            if ($deliveryOrderItem->isForceDeleting()) {
+                $deliveryOrderItem->warehouseSources()->forceDelete();
+            } else {
+                $deliveryOrderItem->warehouseSources()->delete();
+            }
+        });
 
-                if ($deliveryOrderItem->quantity > $remainingQty) {
-                    throw new \Exception("Quantity ({$deliveryOrderItem->quantity}) melebihi sisa quantity yang tersedia ({$remainingQty}) untuk sales order item ini.");
-                }
+        static::restoring(function ($deliveryOrderItem) {
+            $deliveryOrderItem->warehouseSources()->withTrashed()->restore();
+        });
+
+        static::saving(function ($deliveryOrderItem) {
+            // Guard: kuantitas item DO tidak boleh melebihi sisa SO yang BELUM terikat DO lain
+            // (terkirim ATAU masih diproses). Baris ini sendiri dikecualikan agar edit tidak menghitung dua kali.
+            if (! $deliveryOrderItem->sale_order_item_id) {
+                return;
+            }
+
+            $saleOrderItem = $deliveryOrderItem->saleOrderItem;
+            if (! $saleOrderItem || ! $saleOrderItem->exists) {
+                return;
+            }
+
+            $progress = app(\App\Services\SaleOrderDeliveryProgress::class)->forItems(
+                [$saleOrderItem->id],
+                null,
+                $deliveryOrderItem->exists ? $deliveryOrderItem->id : null
+            )[$saleOrderItem->id] ?? null;
+
+            if (! $progress) {
+                return;
+            }
+
+            $remainingQty = max(0.0, $progress['ordered'] - $progress['delivered'] - $progress['in_process']);
+
+            if ((float) $deliveryOrderItem->quantity > $remainingQty + 0.0001) {
+                throw new \Exception("Quantity ({$deliveryOrderItem->quantity}) melebihi sisa quantity yang tersedia ({$remainingQty}) untuk sales order item ini.");
             }
         });
     }
@@ -138,8 +195,8 @@ class DeliveryOrderItem extends Model
             $lineAmount = round($qtyDelivered * $costPerUnit, 2);
             if ($lineAmount <= 0) continue;
             
-            $inventoryCoa = $product?->inventoryCoa ?: $defaultInventoryCoa;
-            $goodsDeliveryCoa = $product?->goodsDeliveryCoa ?: $defaultGoodsDeliveryCoa;
+            $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?: $defaultInventoryCoa;
+            $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?: $defaultGoodsDeliveryCoa;
             
             if (!$inventoryCoa || !$goodsDeliveryCoa) continue;
             
@@ -199,8 +256,34 @@ class DeliveryOrderItem extends Model
             if ($quantity <= 0) continue;
             
             $product = $item->product;
-            if (!$product || !$deliveryOrder->warehouse_id) continue;
-            
+            if (!$product) continue;
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $source->warehouse_id,
+                        quantity: $sourceQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Sales delivery for DO {$deliveryOrder->do_number}",
+                        rak_id: $source->rak_id,
+                        fromModel: $item,
+                        value: $product->cost_price * $sourceQty
+                    );
+                }
+
+                continue;
+            }
+
+            if (!$deliveryOrder->warehouse_id) continue;
+
             $productService->createStockMovement(
                 product_id: $product->id,
                 warehouse_id: $deliveryOrder->warehouse_id,
@@ -216,25 +299,11 @@ class DeliveryOrderItem extends Model
     }
 
     /**
-     * Sync delivered quantities for sale order items
+     * Sync delivered quantities & status SO — didelegasikan ke SaleOrderDeliveryProgress
+     * (satu-satunya penulis cache delivered_quantity).
      */
     protected static function syncDeliveredQuantities(DeliveryOrder $deliveryOrder): void
     {
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
-                    
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
-            }
-        }
+        app(\App\Services\SaleOrderDeliveryProgress::class)->syncForDeliveryOrder($deliveryOrder);
     }
 }

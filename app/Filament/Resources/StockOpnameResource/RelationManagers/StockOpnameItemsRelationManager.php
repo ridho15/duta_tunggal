@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockOpnameResource\RelationManagers;
 
+use App\Helpers\MoneyHelper;
 use App\Models\Product;
 use App\Models\Rak;
 use Filament\Forms;
@@ -31,9 +32,9 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->searchable()
                     ->preload()
                     ->live()
-                    ->afterStateUpdated(function ($state, Forms\Set $set) {
+                    ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
                         if ($state) {
-                            $product = Product::find($state);
+                            $product = Product::withoutGlobalScope('product_cabang')->find($state);
                             // Get current stock from inventory_stocks
                             $warehouseId = $this->getOwnerRecord()->warehouse_id;
                             $inventoryStock = \App\Models\InventoryStock::where('product_id', $state)
@@ -49,14 +50,27 @@ class StockOpnameItemsRelationManager extends RelationManager
                             // Calculate average cost from purchase history
                             $opnameDate = $this->getOwnerRecord()->opname_date ?? now();
                             $averageCost = $this->calculateAverageCostForProduct($state, $opnameDate);
-                            $set('average_cost', $averageCost);
-                            $set('unit_cost', $averageCost); // Set unit cost to average cost by default
+                            $set('average_cost', $this->formatMoney($averageCost));
+                            $set('unit_cost', $this->formatMoney($averageCost)); // Set unit cost to average cost by default
+
+                            $set('difference_qty', (float) ($get('physical_qty') ?? 0) - (float) ($get('system_qty') ?? 0));
+                            $this->syncValues($set, $get, $averageCost);
                         }
                     }),
 
                 Select::make('rak_id')
                     ->label('Rak')
-                    ->options(Rak::pluck('name', 'id'))
+                    ->options(function () {
+                        $warehouseId = $this->getOwnerRecord()->warehouse_id ?? null;
+
+                        if (!$warehouseId) {
+                            return [];
+                        }
+
+                        return Rak::where('warehouse_id', $warehouseId)
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
                     ->searchable()
                     ->preload(),
 
@@ -78,34 +92,26 @@ class StockOpnameItemsRelationManager extends RelationManager
                         $physicalQty = $state ?? 0;
                         $difference = $physicalQty - $systemQty;
                         $set('difference_qty', $difference);
+                        $this->syncValues($set, $get, $get('unit_cost'));
                     }),
 
                 TextInput::make('difference_qty')
                     ->label('Selisih Qty')
-                    ->numeric()
                     ->disabled()
                     ->dehydrated(),
 
                 TextInput::make('unit_cost')
                     ->label('Harga Satuan')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->default(0)
-                    ->live()
+                    ->live(debounce: 500)
                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {
-                        $differenceQty = $get('difference_qty') ?? 0;
-                        $unitCost = $state ?? 0;
-                        $differenceValue = $differenceQty * $unitCost;
-                        $set('difference_value', $differenceValue);
-
-                        // Update total value
-                        $physicalQty = $get('physical_qty') ?? 0;
-                        $totalValue = $physicalQty * $unitCost;
-                        $set('total_value', $totalValue);
+                        $this->syncValues($set, $get, $state);
                     }),
 
                 TextInput::make('average_cost')
                     ->label('Average Cost')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->default(0)
                     ->disabled()
                     ->dehydrated()
@@ -113,13 +119,13 @@ class StockOpnameItemsRelationManager extends RelationManager
 
                 TextInput::make('difference_value')
                     ->label('Nilai Selisih')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->disabled()
                     ->dehydrated(),
 
                 TextInput::make('total_value')
                     ->label('Total Nilai')
-                    ->numeric()
+                    ->indonesianMoney()
                     ->disabled()
                     ->dehydrated()
                     ->helperText('Total nilai berdasarkan qty fisik × harga satuan'),
@@ -192,15 +198,19 @@ class StockOpnameItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
                 ]),
             ]);
     }
@@ -208,6 +218,24 @@ class StockOpnameItemsRelationManager extends RelationManager
     /**
      * Calculate average cost for a product based on purchase history
      */
+    /**
+     * Harga satuan datang sebagai string bermask ("12.500,00"), jadi di-parse dengan MoneyHelper (bukan cast (float)).
+     * Nilai Selisih dan Total Nilai dihitung ulang setiap qty atau harga berubah dan disimpan ke state dalam format uang
+     * yang sama dengan input lain, supaya tampil konsisten dan tetap dibaca benar saat dehydrate (macro indonesianMoney).
+     */
+    private function syncValues(Forms\Set $set, Forms\Get $get, mixed $unitCost): void
+    {
+        $unit = MoneyHelper::safeParse($unitCost);
+
+        $set('difference_value', $this->formatMoney((float) ($get('difference_qty') ?? 0) * $unit));
+        $set('total_value', $this->formatMoney((float) ($get('physical_qty') ?? 0) * $unit));
+    }
+
+    private function formatMoney(mixed $value): string
+    {
+        return number_format(MoneyHelper::safeParse($value), 2, ',', '.');
+    }
+
     private function calculateAverageCostForProduct($productId, $opnameDate)
     {
         // Get all purchase receipts for this product before the opname date

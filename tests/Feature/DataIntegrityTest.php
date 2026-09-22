@@ -17,6 +17,7 @@ use App\Models\Cabang;
 use App\Models\Warehouse;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Support\Facades\DB;
 
@@ -33,7 +34,7 @@ class DataIntegrityTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function test_database_transaction_rollback_on_failure()
     {
         // Test that database transactions properly rollback on failure
@@ -58,7 +59,7 @@ class DataIntegrityTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function test_foreign_key_constraints_prevent_orphaned_records()
     {
         // Test that foreign key constraints work properly
@@ -100,7 +101,7 @@ class DataIntegrityTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function test_cross_module_data_consistency_sale_to_invoice()
     {
         // Test data consistency from Sale Order -> Invoice
@@ -164,7 +165,7 @@ class DataIntegrityTest extends TestCase
         $this->assertEquals($saleOrderTotal, $invoiceItems->first()->total);
     }
 
-    /** @test */
+    #[Test]
     public function test_financial_transaction_integrity_deposit_to_payment()
     {
         // Test financial data integrity: Deposit -> Payment -> Journal Entry
@@ -218,7 +219,7 @@ class DataIntegrityTest extends TestCase
         $this->assertEquals($depositAmount + $paymentAmount, $totalLogged); // create + use
     }
 
-    /** @test */
+    #[Test]
     public function test_data_validation_rules_enforced()
     {
         // Test that model validation rules are properly enforced
@@ -258,7 +259,7 @@ class DataIntegrityTest extends TestCase
         $this->assertInstanceOf(User::class, $deposit->createdBy);
     }
 
-    /** @test */
+    #[Test]
     public function test_cascade_operations_and_soft_deletes()
     {
         // Test soft delete behavior and cascade operations
@@ -302,7 +303,7 @@ class DataIntegrityTest extends TestCase
         $this->assertDatabaseHas('deposits', ['id' => $deposit->id]);
     }
 
-    /** @test */
+    #[Test]
     public function test_concurrent_transaction_isolation()
     {
         // Test transaction isolation to prevent race conditions
@@ -354,7 +355,7 @@ class DataIntegrityTest extends TestCase
         $this->assertEquals($initialAmount, $deposit->amount); // Original unchanged
     }
 
-    /** @test */
+    #[Test]
     public function test_data_integrity_across_module_boundaries()
     {
         // Test data integrity when data flows between different modules
@@ -440,7 +441,7 @@ class DataIntegrityTest extends TestCase
         $this->assertEquals(100000, $deposit->remaining_amount); // 600000 - 500000
     }
 
-    /** @test */
+    #[Test]
     public function test_unique_constraints_and_indexes()
     {
         // Test unique constraints prevent duplicate data
@@ -492,7 +493,7 @@ class DataIntegrityTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function test_data_consistency_on_bulk_operations()
     {
         // Test data consistency during bulk operations

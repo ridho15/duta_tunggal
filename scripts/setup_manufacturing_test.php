@@ -106,7 +106,7 @@ abort_if(!$cabang, 1, "No cabang found\n");
 
 // COA for finished goods and WIP
 $fgCoa  = ChartOfAccount::where('code', '1140.02')->first();
-$wipCoa = ChartOfAccount::where('code', '1140.02')->first();
+$wipCoa = ChartOfAccount::where('code', '1-201')->first();
 
 $bom = BillOfMaterial::withoutGlobalScopes()->withTrashed()
     ->where('product_id', $fgProduct->id)
@@ -132,7 +132,6 @@ if (!$bom) {
             'labor_cost'             => 0,
             'overhead_cost'          => 0,
             'total_cost'             => 1000,
-            'finished_goods_coa_id'  => $fgCoa?->id,
             'work_in_progress_coa_id' => $wipCoa?->id,
         ]);
 

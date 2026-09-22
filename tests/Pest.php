@@ -4,10 +4,6 @@ pest()->extend(Tests\DuskTestCase::class)
 //  ->use(Illuminate\Foundation\Testing\DatabaseMigrations::class)
     ->in('Browser');
 
-pest()->extend(Tests\DuskTestCase::class)
-//  ->use(Illuminate\Foundation\Testing\DatabaseMigrations::class)
-    ->in('Browser');
-
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -53,3 +49,7 @@ function something()
 {
     // ..
 }
+
+// Fixture bersama tes stok & pengiriman (T2): stkContext(), stkSetStock(), stkSaleOrder(), stkDeliveryOrder(), ...
+require_once __DIR__ . '/Support/StockFixtures.php';
+require_once __DIR__ . '/Support/ControlFixtures.php';   // ctlUser(), ctlQuotation(), ...

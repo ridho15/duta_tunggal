@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('vendor_payments') || Schema::hasColumn('vendor_payments', 'payment_request_id')) {
+            return;
+        }
+
         Schema::table('vendor_payments', function (Blueprint $table) {
             $table->unsignedBigInteger('payment_request_id')->nullable()->after('id')
                   ->comment('Linked PaymentRequest (Task 15c)');
@@ -22,8 +26,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('vendor_payments')) {
+            return;
+        }
+
         Schema::table('vendor_payments', function (Blueprint $table) {
-            $table->dropColumn('payment_request_id');
+            if (Schema::hasColumn('vendor_payments', 'payment_request_id')) {
+                $table->dropColumn('payment_request_id');
+            }
         });
     }
 };

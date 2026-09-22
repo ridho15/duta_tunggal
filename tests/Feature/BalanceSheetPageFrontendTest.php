@@ -81,6 +81,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('renders the balance sheet page correctly', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertOk()
             ->assertSee('Neraca')
             ->assertSee('ASET (ASSETS)')
@@ -90,6 +91,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays summary cards with correct data', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Total Aset')
             ->assertSee('Rp 15.000.000') // Cash balance
             ->assertSee('Total Kewajiban')
@@ -100,6 +102,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays account rows with proper formatting', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('1-1001') // Account code
             ->assertSee('Kas') // Account name
             ->assertSee('2-1001') // Liability account code
@@ -110,12 +113,14 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('shows balanced status when assets equal liabilities plus equity', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Neraca Seimbang')
             ->assertSee('Aset = Kewajiban + Ekuitas');
     });
 
     it('displays filter section with proper inputs', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Tanggal Neraca')
             ->assertSee('Cabang')
             ->assertSee('Semua Cabang')
@@ -124,6 +129,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('can toggle comparison mode and show comparison inputs', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->set('show_comparison', true)
             ->assertSee('🔄 Bandingkan Periode')
             ->assertSee('comparison_date');
@@ -131,6 +137,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays export buttons', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Export PDF')
             ->assertSee('Export Excel')
             ->assertSee('Print');
@@ -138,6 +145,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('shows drill down modal when account is clicked', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->call('showAccountDetails', $this->cashAccount->id)
             ->assertSet('show_drill_down', true)
             ->assertSet('selected_account_id', $this->cashAccount->id);
@@ -145,6 +153,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays drill down modal content correctly', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->call('showAccountDetails', $this->cashAccount->id)
             ->assertSee('Kas') // Account name in modal
             ->assertSee('Total Debit')
@@ -157,6 +166,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('closes drill down modal correctly', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->call('showAccountDetails', $this->cashAccount->id)
             ->assertSet('show_drill_down', true)
             ->call('closeDrillDown')
@@ -166,11 +176,13 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays cabang options in filter dropdown', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('TEST - Test Branch');
     });
 
     it('shows proper section headers with icons', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('🏦 ASET (ASSETS)')
             ->assertSee('📋 KEWAJIBAN (LIABILITIES)')
             ->assertSee('🏛️ EKUITAS (EQUITY)');
@@ -178,6 +190,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays subsection headers correctly', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('💵 Aset Lancar (Current Assets)')
             ->assertSee('💳 Kewajiban Lancar (Current Liabilities)')
             ->assertSee('💼 Total Ekuitas');
@@ -185,6 +198,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('shows total rows with proper styling', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('🏦 TOTAL ASET')
             ->assertSee('📊 TOTAL KEWAJIBAN')
             ->assertSee('⚖️ TOTAL KEWAJIBAN & EKUITAS', false);
@@ -192,6 +206,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('displays account codes in monospace font', function () {
         $response = Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('1-1001')
             ->assertSee('2-1001')
             ->assertSee('3-1001');
@@ -199,6 +214,7 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('shows retained earnings section', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Laba Ditahan (Retained Earnings)')
             ->assertSee('RE'); // Retained earnings code
     });
@@ -206,12 +222,14 @@ describe('BalanceSheetPage Frontend Tests', function () {
     it('displays current ratio in summary cards', function () {
         // Current assets: 15M, Current liabilities: 5M, Ratio should be 3.00
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Rasio Lancar')
             ->assertSee('3.00');
     });
 
     it('renders comparison section when enabled', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->set('show_comparison', true)
             ->set('comparison_date', now()->subMonth()->format('Y-m-d'))
             ->assertSee('📊 Perbandingan dengan');
@@ -219,12 +237,14 @@ describe('BalanceSheetPage Frontend Tests', function () {
 
     it('shows proper balance check message', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('✅')
             ->assertDontSee('⚠️');
     });
 
     it('displays account balances with proper formatting', function () {
         Livewire::test(BalanceSheetPage::class)
+            ->set('showPreview', true)
             ->assertSee('Rp 15.000.000') // Cash
             ->assertSee('Rp 5.000.000') // Payable
             ->assertSee('Rp 10.000.000'); // Capital

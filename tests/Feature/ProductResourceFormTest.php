@@ -4,20 +4,21 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\ProductResource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ProductResourceFormTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function product_resource_form_method_exists_and_is_callable()
     {
         $this->assertTrue(method_exists(ProductResource::class, 'form'));
         $this->assertTrue(is_callable([ProductResource::class, 'form']));
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_does_not_have_syntax_errors()
     {
         // This test will fail if there are PHP syntax errors in the form method
@@ -28,7 +29,7 @@ class ProductResourceFormTest extends TestCase
         $this->assertTrue($formMethod->isPublic());
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_has_correct_method_signature()
     {
         $reflection = new \ReflectionClass(ProductResource::class);
@@ -40,7 +41,7 @@ class ProductResourceFormTest extends TestCase
             'form method parameter should be of type Filament\Forms\Form');
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_has_schema_method()
     {
         // Test that the form method contains schema() call by checking the method body
@@ -62,7 +63,7 @@ class ProductResourceFormTest extends TestCase
             'form method should contain schema() call');
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_contains_expected_components()
     {
         // Check that the form method contains expected Filament components
@@ -92,7 +93,7 @@ class ProductResourceFormTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_structure_is_valid()
     {
         // Test that the form method has proper PHP structure
@@ -127,7 +128,7 @@ class ProductResourceFormTest extends TestCase
             'form method should have balanced parentheses');
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_validation_rules_are_present()
     {
         // Check that validation rules are present in the form
@@ -163,7 +164,7 @@ class ProductResourceFormTest extends TestCase
             'form method should contain validation rules');
     }
 
-    /** @test */
+    #[Test]
     public function product_resource_form_labels_are_present()
     {
         // Check that labels are present in the form

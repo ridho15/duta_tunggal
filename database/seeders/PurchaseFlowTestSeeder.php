@@ -55,190 +55,258 @@ class PurchaseFlowTestSeeder extends Seeder
             return;
         }
 
-        DB::transaction(function () use ($warehouse, $supplier, $product, $user, $currency) {
-            // Reset stock for this product/warehouse combination
-            InventoryStock::where('product_id', $product->id)
-                ->where('warehouse_id', $warehouse->id)
-                ->update(['qty_available' => 0, 'qty_reserved' => 0]);
+        DB::transaction(function () use ($supplier, $product, $user, $currency) {
+            // Reset stock for this product in ALL warehouses
+            InventoryStock::where('product_id', $product->id)->update(['qty_available' => 0, 'qty_reserved' => 0]);
 
             // Reset related data
             StockMovement::where('product_id', $product->id)->delete();
             JournalEntry::where('source_type', \App\Models\PurchaseReceiptItem::class)->delete();
             QualityControl::where('product_id', $product->id)->delete();
             PurchaseReceiptItem::where('product_id', $product->id)->delete();
-            PurchaseReceipt::where('purchase_order_id', '>', 0)->delete(); // Will be recreated
-            PurchaseOrder::where('supplier_id', $supplier->id)->delete(); // Will be recreated
-            OrderRequest::where('supplier_id', $supplier->id)->delete(); // Will be recreated
-            // 1. Create Order Request
-            $this->command->info('Step 1: Creating Order Request...');
-            $orderRequest = OrderRequest::create([
-                'request_number' => 'OR-' . now()->format('Ymd') . '-0001',
-                'warehouse_id' => $warehouse->id,
-                'supplier_id' => $supplier->id,
-                'request_date' => now(),
-                'status' => 'draft',
-                'note' => 'Test Order Request for Purchase Flow',
-                'created_by' => $user->id
-            ]);
+            
+            // Force delete to clear soft-deleted records and prevent unique constraint violations
+            PurchaseReceipt::where('purchase_order_id', '>', 0)->forceDelete();
+            PurchaseOrder::where('supplier_id', $supplier->id)->forceDelete();
+            OrderRequest::whereIn('id', function ($q) use ($supplier) {
+                $q->select('order_request_id')->from('order_request_items')->where('supplier_id', $supplier->id);
+            })->forceDelete();
 
-            // Create Order Request Item
-            OrderRequestItem::create([
-                'order_request_id' => $orderRequest->id,
-                'product_id' => $product->id,
-                'quantity' => 10,
-                'note' => 'Test item'
-            ]);
+            $seedPrefix = rand(1000, 9999);
 
-            // 2. Approve Order Request (creates Purchase Order)
-            $this->command->info('Step 2: Approving Order Request...');
-            $orderRequestService = app(OrderRequestService::class);
-            $orderRequest = $orderRequestService->approve($orderRequest, [
-                'supplier_id' => $supplier->id,
-                'po_number' => 'PO-' . now()->format('Ymd') . '-0001',
-                'order_date' => now(),
-                'expected_date' => now()->addDays(7),
-                'note' => 'Test PO from Order Request'
-            ]);
+            // Run 3 iterations with random Cabangs!
+            for ($i = 1; $i <= 3; $i++) {
+                $this->command->info("--- RUNNING PURCHASE FLOW ITERATION {$i} ---");
 
-            $purchaseOrder = $orderRequest->purchaseOrder;
+                // Get a random Cabang
+                $cabang = \App\Models\Cabang::inRandomOrder()->first();
+                if (!$cabang) {
+                    $cabang = \App\Models\Cabang::first();
+                }
 
-            // 3. Approve Purchase Order
-            $this->command->info('Step 3: Approving Purchase Order...');
-            $purchaseOrder->update([
-                'status' => 'approved',
-                'date_approved' => now(),
-                'approved_by' => $user->id
-            ]);
+                // Get/create a warehouse for this Cabang
+                $warehouse = \App\Models\Warehouse::where('cabang_id', $cabang->id)->first();
+                if (!$warehouse) {
+                    $warehouse = \App\Models\Warehouse::factory()->create([
+                        'cabang_id' => $cabang->id,
+                        'status' => 1
+                    ]);
+                }
 
-            // 4. Create Purchase Receipt
-            $this->command->info('Step 4: Creating Purchase Receipt...');
-            $purchaseReceiptService = app(PurchaseReceiptService::class);
-            $receipt = PurchaseReceipt::create([
-                'receipt_number' => $purchaseReceiptService->generateReceiptNumber(),
-                'purchase_order_id' => $purchaseOrder->id,
-                'receipt_date' => now(),
-                'received_by' => $user->id,
-                'notes' => 'Test Purchase Receipt',
-                'currency_id' => $currency->id,
-                'status' => 'draft'
-            ]);
-
-            // Create Purchase Receipt Item
-            $receiptItem = PurchaseReceiptItem::create([
-                'purchase_receipt_id' => $receipt->id,
-                'purchase_order_item_id' => $purchaseOrder->purchaseOrderItem->first()->id,
-                'product_id' => $product->id,
-                'qty_received' => 10,
-                'qty_accepted' => 10,
-                'qty_rejected' => 0,
-                'warehouse_id' => $warehouse->id,
-                'is_sent' => false
-            ]);
-
-            // 5. Send item to Quality Control
-            $this->command->info('Step 5: Sending item to Quality Control...');
-            $purchaseReceiptService = app(PurchaseReceiptService::class);
-            $result = $purchaseReceiptService->createTemporaryProcurementEntriesForReceiptItem($receiptItem);
-            if (!isset($result['status']) || $result['status'] !== 'posted') {
-                throw new \Exception('Failed to send item to QC: ' . ($result['message'] ?? 'Unknown error'));
-            }
-            $receipt->updateStatusBasedOnQCItems();
-
-            // QC is automatically created via model observer
-
-            // 6. Complete Quality Control
-            $this->command->info('Step 6: Completing Quality Control...');
-            $qualityControl = $receiptItem->qualityControl;
-            $qualityControlService = app(QualityControlService::class);
-            $qualityControlService->completeQualityControl($qualityControl, [
-                'notes' => 'Test QC completed',
-                'item_condition' => 'good'
-            ]);
-
-            // Post inventory after QC completion
-            $purchaseReceiptService->postItemInventoryAfterQC($receiptItem);
-
-            // 7. Check Purchase Receipt and Items
-            $this->command->info('Step 7: Checking Purchase Receipt and Items...');
-            $this->assertPurchaseReceiptData($receipt, $receiptItem, $qualityControl);
-
-            // 8. Check Stock
-            $this->command->info('Step 8: Checking Stock...');
-            $this->assertStockData($product->id, $warehouse->id, 10);
-
-            // 9. Check Journal Entries
-            $this->command->info('Step 9: Checking Journal Entries...');
-            $this->assertJournalEntries($receiptItem);
-
-            // 10. Create Invoice from Purchase Order
-            $this->command->info('Step 10: Creating Invoice from Purchase Order...');
-            $invoiceService = app(\App\Services\InvoiceService::class);
-            $invoice = Invoice::create([
-                'invoice_number' => $invoiceService->generateInvoiceNumber(),
-                'from_model_type' => \App\Models\PurchaseOrder::class,
-                'from_model_id' => $purchaseOrder->id,
-                'invoice_date' => now(),
-                'due_date' => now()->addDays(30),
-                'subtotal' => $purchaseOrder->total_amount,
-                'tax' => 0,
-                'other_fee' => 0,
-                'total' => $purchaseOrder->total_amount,
-                'status' => 'sent',
-                'supplier_name' => $supplier->name,
-                'supplier_phone' => $supplier->phone,
-            ]);
-
-            // Create invoice items
-            foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
-                $invoice->invoiceItem()->create([
-                    'product_id' => $poItem->product_id,
-                    'quantity' => $poItem->quantity,
-                    'price' => $poItem->unit_price,
-                    'total' => $poItem->quantity * $poItem->unit_price,
+                // 1. Create Order Request
+                $this->command->info("Step 1 [Iter {$i}]: Creating Order Request for Cabang: ({$cabang->kode}) {$cabang->nama}...");
+                $orderRequest = OrderRequest::create([
+                    'request_number' => 'OR-' . now()->format('Ymd') . '-' . $seedPrefix . '-' . sprintf('%04d', $i),
+                    'request_date' => now(),
+                    'status' => 'draft',
+                    'note' => "Test Order Request for Purchase Flow Iteration {$i}",
+                    'created_by' => $user->id,
+                    'currency_id' => $currency->id,
+                    'cabang_id' => $cabang->id, // Set the random cabang!
                 ]);
-            }
 
-            // 11. Create Vendor Payment
-            $this->command->info('Step 11: Creating Vendor Payment...');
-            $cashBankAccount = \App\Models\CashBankAccount::first();
-            if (!$cashBankAccount) {
-                // Create a default cash account if not exists
-                $cashCoa = \App\Models\ChartOfAccount::where('code', '1111.01')->first();
-                $cashBankAccount = \App\Models\CashBankAccount::create([
-                    'name' => 'Kas Kecil',
-                    'account_number' => '1111.01',
-                    'coa_id' => $cashCoa?->id,
+                // Create Order Request Item
+                $orderRequestItem = OrderRequestItem::create([
+                    'order_request_id' => $orderRequest->id,
+                    'product_id' => $product->id,
+                    'quantity' => 10,
+                    'note' => 'Test item',
+                    'cabang_id' => $cabang->id, // Same random cabang!
+                    'supplier_id' => $supplier->id,
+                    'currency_id' => $currency->id,
                 ]);
+
+                // 2. Approve Order Request (creates Purchase Order)
+                $this->command->info("Step 2 [Iter {$i}]: Approving Order Request...");
+                $orderRequestService = app(OrderRequestService::class);
+                $orderRequest = $orderRequestService->approve($orderRequest, [
+                    'supplier_id' => $supplier->id,
+                    'po_number' => 'PO-' . now()->format('Ymd') . '-' . $seedPrefix . '-' . sprintf('%04d', $i),
+                    'order_date' => now(),
+                    'expected_date' => now()->addDays(7),
+                    'note' => 'Test PO from Order Request'
+                ]);
+
+                $purchaseOrder = $orderRequest->purchaseOrder;
+                
+                // Assert that the PurchaseOrder's cabang_id matches the OrderRequestItem's cabang_id!
+                if ($purchaseOrder->cabang_id !== $cabang->id) {
+                    throw new \Exception("PurchaseOrder cabang_id ({$purchaseOrder->cabang_id}) does not match OrderRequestItem cabang_id ({$cabang->id})");
+                }
+
+                // 3. Approve Purchase Order
+                $this->command->info("Step 3 [Iter {$i}]: Approving Purchase Order...");
+                $purchaseOrder->update([
+                    'status' => 'approved',
+                    'date_approved' => now(),
+                    'approved_by' => $user->id
+                ]);
+
+                // 4. Create Purchase Receipt
+                $this->command->info("Step 4 [Iter {$i}]: Creating Purchase Receipt...");
+                $purchaseReceiptService = app(PurchaseReceiptService::class);
+                $receipt = PurchaseReceipt::create([
+                    'receipt_number' => $purchaseReceiptService->generateReceiptNumber() . '-' . $i,
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'receipt_date' => now(),
+                    'received_by' => $user->id,
+                    'notes' => 'Test Purchase Receipt ' . $i,
+                    'currency_id' => $currency->id,
+                    'status' => 'draft',
+                    'cabang_id' => $cabang->id, // Same random cabang!
+                ]);
+
+                // Create Purchase Receipt Item
+                $receiptItem = PurchaseReceiptItem::create([
+                    'purchase_receipt_id' => $receipt->id,
+                    'purchase_order_item_id' => $purchaseOrder->purchaseOrderItem->first()->id,
+                    'product_id' => $product->id,
+                    'qty_received' => 10,
+                    'qty_accepted' => 10,
+                    'qty_rejected' => 0,
+                    'warehouse_id' => $warehouse->id,
+                    'status' => 'pending'
+                ]);
+
+                // 5. Send item to Quality Control
+                $this->command->info("Step 5 [Iter {$i}]: Sending item to Quality Control...");
+                
+                // Create Quality Control record for this receipt item
+                $qualityControl = QualityControl::create([
+                    'qc_number'         => app(QualityControlService::class)->generateQcNumber(),
+                    'passed_quantity'   => 10,
+                    'rejected_quantity' => 0,
+                    'quantity_received' => 10,
+                    'notes'             => 'Test QC from Seeder ' . $i,
+                    'status'            => 0,
+                    'inspected_by'      => $user->id,
+                    'warehouse_id'      => $warehouse->id,
+                    'product_id'        => $product->id,
+                    'from_model_type'   => \App\Models\PurchaseReceiptItem::class,
+                    'from_model_id'     => $receiptItem->id,
+                    'cabang_id'         => $cabang->id, // Same random cabang!
+                ]);
+
+                $result = $purchaseReceiptService->createTemporaryProcurementEntriesForReceiptItem($receiptItem);
+                if (!isset($result['status']) || $result['status'] !== 'posted') {
+                    throw new \Exception('Failed to send item to QC: ' . ($result['message'] ?? 'Unknown error'));
+                }
+                $receipt->checkAndUpdateStatus();
+
+                // Load and verify it has the correct cabang_id!
+                $qualityControl = $receiptItem->fresh()->qualityControl;
+                if (!$qualityControl || !$qualityControl->exists) {
+                    throw new \Exception("QualityControl record not found in database for receipt item");
+                }
+                if ($qualityControl->cabang_id !== $cabang->id) {
+                    throw new \Exception("QualityControl cabang_id ({$qualityControl->cabang_id}) does not match expected ({$cabang->id})");
+                }
+
+                // 6. Complete Quality Control
+                $this->command->info("Step 6 [Iter {$i}]: Completing Quality Control...");
+                $qualityControlService = app(QualityControlService::class);
+                $qualityControlService->completeQualityControl($qualityControl, [
+                    'notes' => 'Test QC completed ' . $i,
+                    'item_condition' => 'good'
+                ]);
+
+                // Post inventory after QC completion
+                $purchaseReceiptService->postItemInventoryAfterQC($receiptItem);
+
+                // Let's assert that the PurchaseReceipt's cabang_id is consistent!
+                if ($receipt->fresh()->cabang_id !== $cabang->id) {
+                    throw new \Exception("PurchaseReceipt cabang_id does not match expected");
+                }
+
+                // 7. Check Purchase Receipt and Items
+                $this->command->info("Step 7 [Iter {$i}]: Checking Purchase Receipt and Items...");
+                $this->assertPurchaseReceiptData($receipt, $receiptItem, $qualityControl);
+
+                // 8. Check Stock
+                $this->command->info("Step 8 [Iter {$i}]: Checking Stock in warehouse {$warehouse->id}...");
+                $this->assertStockData($product->id, $warehouse->id, 10);
+
+                // 9. Check Journal Entries
+                $this->command->info("Step 9 [Iter {$i}]: Checking Journal Entries...");
+                $this->assertJournalEntries($receiptItem);
+                // Assert that the journal entries created have the correct cabang_id!
+                $receiptJournals = JournalEntry::where('source_type', PurchaseReceiptItem::class)->where('source_id', $receiptItem->id)->get();
+                foreach ($receiptJournals as $je) {
+                    if ($je->cabang_id !== $cabang->id) {
+                        throw new \Exception("JournalEntry cabang_id ({$je->cabang_id}) does not match expected ({$cabang->id})");
+                    }
+                }
+
+                // 10. Create Invoice from Purchase Order
+                $this->command->info("Step 10 [Iter {$i}]: Creating Invoice from Purchase Order...");
+                $invoiceService = app(\App\Services\InvoiceService::class);
+                $invoice = Invoice::create([
+                    'invoice_number' => $invoiceService->generateInvoiceNumber() . '-' . $i,
+                    'from_model_type' => \App\Models\PurchaseOrder::class,
+                    'from_model_id' => $purchaseOrder->id,
+                    'invoice_date' => now(),
+                    'due_date' => now()->addDays(30),
+                    'subtotal' => $purchaseOrder->total_amount,
+                    'tax' => 0,
+                    'other_fee' => 0,
+                    'total' => $purchaseOrder->total_amount,
+                    'status' => 'sent',
+                    'supplier_name' => $supplier->perusahaan ?? null,
+                    'supplier_phone' => $supplier->phone,
+                    'cabang_id' => $cabang->id, // Consistently set!
+                ]);
+
+                // Create invoice items
+                foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
+                    $invoice->invoiceItem()->create([
+                        'product_id' => $poItem->product_id,
+                        'quantity' => $poItem->quantity,
+                        'price' => $poItem->unit_price,
+                        'total' => $poItem->quantity * $poItem->unit_price,
+                    ]);
+                }
+
+                // 11. Create Vendor Payment
+                $this->command->info("Step 11 [Iter {$i}]: Creating Vendor Payment...");
+                $cashBankAccount = \App\Models\CashBankAccount::first();
+                if (!$cashBankAccount) {
+                    $cashCoa = \App\Models\ChartOfAccount::where('code', '1111.01')->first();
+                    $cashBankAccount = \App\Models\CashBankAccount::create([
+                        'name' => 'Kas Kecil',
+                        'account_number' => '1111.01',
+                        'coa_id' => $cashCoa?->id,
+                    ]);
+                }
+
+                $vendorPayment = \App\Models\VendorPayment::create([
+                    'supplier_id' => $supplier->id,
+                    'selected_invoices' => [$invoice->id],
+                    'payment_date' => now(),
+                    'total_payment' => $invoice->total,
+                    'coa_id' => $cashBankAccount->coa_id,
+                    'payment_method' => 'Cash',
+                    'status' => 'Draft',
+                    'notes' => 'Test payment for purchase invoice ' . $i,
+                ]);
+
+                // Create vendor payment detail
+                $vendorPayment->vendorPaymentDetail()->create([
+                    'invoice_id' => $invoice->id,
+                    'amount' => $invoice->total,
+                    'method' => 'Cash',
+                    'coa_id' => $cashBankAccount->coa_id,
+                    'payment_date' => now(),
+                    'notes' => 'Full payment for invoice ' . $i,
+                ]);
+
+                // 12. Complete Payment (set status to Paid)
+                $this->command->info("Step 12 [Iter {$i}]: Completing Payment...");
+                $vendorPayment->update(['status' => 'Paid']);
+
+                // 13. Check Invoice and Payment Status
+                $this->command->info("Step 13 [Iter {$i}]: Checking Invoice and Payment Status...");
+                $this->assertInvoiceAndPaymentStatus($invoice, $vendorPayment);
             }
-
-            $vendorPayment = \App\Models\VendorPayment::create([
-                'supplier_id' => $supplier->id,
-                'selected_invoices' => [$invoice->id],
-                'payment_date' => now(),
-                'total_payment' => $invoice->total,
-                'coa_id' => $cashBankAccount->coa_id,
-                'payment_method' => 'Cash',
-                'status' => 'Draft',
-                'notes' => 'Test payment for purchase invoice',
-            ]);
-
-            // Create vendor payment detail
-            $vendorPayment->vendorPaymentDetail()->create([
-                'invoice_id' => $invoice->id,
-                'amount' => $invoice->total,
-                'method' => 'Cash',
-                'coa_id' => $cashBankAccount->coa_id,
-                'payment_date' => now(),
-                'notes' => 'Full payment for invoice',
-            ]);
-
-            // 12. Complete Payment (set status to Paid)
-            $this->command->info('Step 12: Completing Payment...');
-            $vendorPayment->update(['status' => 'Paid']);
-
-            // 13. Check Invoice and Payment Status
-            $this->command->info('Step 13: Checking Invoice and Payment Status...');
-            $this->assertInvoiceAndPaymentStatus($invoice, $vendorPayment);
 
             // 14. Check Balance Sheet after Payment
             $this->command->info('Step 14: Checking Balance Sheet after Payment...');

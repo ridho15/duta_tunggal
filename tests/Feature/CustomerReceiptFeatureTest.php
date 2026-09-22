@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
+use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Models\CustomerReceipt;
 use App\Models\DeliveryOrder;
@@ -24,6 +25,21 @@ class CustomerReceiptFeatureTest extends TestCase
     {
         parent::setUp();
         $this->seed(\Database\Seeders\CabangSeeder::class);
+
+        foreach ([
+            ['code' => '1120', 'name' => 'Piutang Dagang', 'type' => 'Asset'],
+            ['code' => '4000', 'name' => 'Penjualan', 'type' => 'Revenue'],
+            ['code' => '2120.06', 'name' => 'PPN Keluaran', 'type' => 'Liability'],
+            ['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset'],
+            ['code' => '5100.10', 'name' => 'HPP Barang', 'type' => 'Expense'],
+            ['code' => '6100.02', 'name' => 'Biaya Pengiriman', 'type' => 'Expense'],
+            ['code' => '4100.01', 'name' => 'Diskon Penjualan', 'type' => 'Expense'],
+        ] as $coa) {
+            ChartOfAccount::firstOrCreate(
+                ['code' => $coa['code']],
+                ['name' => $coa['name'], 'type' => $coa['type'], 'is_active' => true]
+            );
+        }
     }
 
     public function test_can_create_customer_receipt_with_cash_payment()
@@ -90,6 +106,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'selected_invoices' => [$invoice->id],
             'total_payment' => 1000000,
             'payment_method' => 'cash',
+            'status' => 'Draft',
         ]);
 
         $receipt->customerReceiptItem()->create([
@@ -154,6 +171,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'selected_invoices' => [$invoice->id],
             'total_payment' => 500000,
             'payment_method' => 'bank_transfer',
+            'status' => 'Draft',
         ]);
 
         $receipt->customerReceiptItem()->create([
@@ -210,15 +228,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
-        // Manually create AR for invoice1
-        AccountReceivable::create([
-            'invoice_id' => $invoice1->id,
-            'customer_id' => $customer->id,
-            'total' => 500000,
-            'paid' => 0,
-            'remaining' => 500000,
-            'status' => 'Belum Lunas'
-        ]);
+        $ar1 = AccountReceivable::where('invoice_id', $invoice1->id)->firstOrFail();
 
         // Second invoice
         $saleOrder2 = SaleOrder::factory()->create([
@@ -246,15 +256,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
-        // Manually create AR for invoice2
-        AccountReceivable::create([
-            'invoice_id' => $invoice2->id,
-            'customer_id' => $customer->id,
-            'total' => 300000,
-            'paid' => 0,
-            'remaining' => 300000,
-            'status' => 'Belum Lunas'
-        ]);
+        $ar2 = AccountReceivable::where('invoice_id', $invoice2->id)->firstOrFail();
 
         // Payment for both
         $receipt = CustomerReceipt::factory()->create([
@@ -262,6 +264,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'selected_invoices' => [$invoice1->id, $invoice2->id],
             'total_payment' => 800000,
             'payment_method' => 'cheque',
+            'status' => 'Draft',
         ]);
 
         $receipt->customerReceiptItem()->create([
@@ -290,6 +293,8 @@ class CustomerReceiptFeatureTest extends TestCase
         // Check both invoices paid
         $this->assertEquals('paid', $invoice1->fresh()->status);
         $this->assertEquals('paid', $invoice2->fresh()->status);
+        $this->assertEquals(0, $ar1->fresh()->remaining);
+        $this->assertEquals(0, $ar2->fresh()->remaining);
     }
 
     public function test_can_handle_overpayment_and_create_deposit()
@@ -326,15 +331,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'status' => 'unpaid',
         ]);
 
-        // Manually create AR since factory doesn't trigger observer
-        AccountReceivable::create([
-            'invoice_id' => $invoice->id,
-            'customer_id' => $customer->id,
-            'total' => 1000000,
-            'paid' => 0,
-            'remaining' => 1000000,
-            'status' => 'Belum Lunas'
-        ]);
+        $ar = AccountReceivable::where('invoice_id', $invoice->id)->firstOrFail();
 
         // Overpayment
         $receipt = CustomerReceipt::factory()->create([
@@ -342,6 +339,7 @@ class CustomerReceiptFeatureTest extends TestCase
             'selected_invoices' => [$invoice->id],
             'total_payment' => 1200000, // Over by 200,000
             'payment_method' => 'credit_card',
+            'status' => 'Draft',
         ]);
 
         $receipt->customerReceiptItem()->create([
@@ -360,6 +358,7 @@ class CustomerReceiptFeatureTest extends TestCase
         // Check invoice paid and deposit created
         $this->assertEquals('paid', $invoice->fresh()->status);
         // Note: Deposit creation would be handled by observer
+        $this->assertEquals(0, $ar->fresh()->remaining);
     }
 
     public function test_can_use_deposit_for_payment()

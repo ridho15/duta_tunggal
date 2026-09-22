@@ -16,6 +16,7 @@ use App\Models\StockMovement;
 use App\Models\JournalEntry;
 use App\Services\QualityControlService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Database\Seeders\CabangSeeder;
 use Database\Seeders\ChartOfAccountSeeder;
@@ -63,7 +64,7 @@ class QCTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function test_qc_purchase_complete_creates_data()
     {
         // Seed required data
@@ -93,11 +94,10 @@ class QCTest extends TestCase
             'purchase_receipt_id' => $purchaseReceipt->id,
             'purchase_order_item_id' => $poItem->id,
             'product_id' => $this->product->id,
-            'qty_received' => 5,
-            'qty_accepted' => 5,
+            'qty_received' => 0,
+            'qty_accepted' => 0,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
-            'is_sent' => true,
         ]);
 
         // Create and complete QC

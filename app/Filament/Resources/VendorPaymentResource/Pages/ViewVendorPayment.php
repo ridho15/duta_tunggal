@@ -29,15 +29,20 @@ class ViewVendorPayment extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make()->icon('heroicon-o-pencil')->color('warning'),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\EditAction::make()
+                ->visible(fn ($record) => strtolower((string) $record->status) === 'draft')
+                ->icon('heroicon-o-pencil')
+                ->color('warning'),
+            Actions\DeleteAction::make()
+                ->visible(fn ($record) => strtolower((string) $record->status) === 'draft')
+                ->icon('heroicon-o-trash'),
             Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-document-text')
                 ->color('info')
                 ->url(fn () => route('filament.admin.resources.journal-entries.index', [
                     'tableFilters[source_type][value]' => 'App\Models\VendorPayment',
-                    'tableFilters[source_id][value]' => $this->record->id
+                    'tableFilters[source_id][source_id]' => $this->record->id
                 ]))
                 ->openUrlInNewTab(),
         ];
@@ -51,7 +56,7 @@ class ViewVendorPayment extends ViewRecord
                     ->schema([
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('supplier.name')
+                                Infolists\Components\TextEntry::make('supplier.perusahaan')
                                     ->label('Supplier'),
                                 Infolists\Components\TextEntry::make('payment_date')
                                     ->label('Tanggal Pembayaran')
@@ -67,10 +72,41 @@ class ViewVendorPayment extends ViewRecord
                                     ->label('Metode Pembayaran'),
                                 Infolists\Components\TextEntry::make('status')
                                     ->label('Status'),
+                                Infolists\Components\TextEntry::make('target_bank_account')
+                                    ->label('Rekening Bank Tujuan')
+                                    ->placeholder('-'),
+                                Infolists\Components\TextEntry::make('transfer_reference_number')
+                                    ->label('No. Referensi Transfer')
+                                    ->placeholder('-'),
+                                Infolists\Components\ImageEntry::make('proof_file')
+                                    ->label('Bukti Transfer')
+                                    ->disk('public')
+                                    ->visible(fn ($record) => filled($record->proof_file) && preg_match('/\.(jpg|jpeg|png|webp|gif)$/i', (string) $record->proof_file)),
+                                Infolists\Components\TextEntry::make('proof_file_link')
+                                    ->label('Berkas Bukti Transfer')
+                                    ->state(fn ($record) => filled($record->proof_file) ? 'Unduh Berkas' : '-')
+                                    ->url(fn ($record) => filled($record->proof_file) ? asset('storage/' . $record->proof_file) : null)
+                                    ->openUrlInNewTab()
+                                    ->visible(fn ($record) => filled($record->proof_file) && ! preg_match('/\.(jpg|jpeg|png|webp|gif)$/i', (string) $record->proof_file)),
                             ]),
                         Infolists\Components\TextEntry::make('notes')
                             ->label('Catatan')
                             ->columnSpanFull(),
+                    ]),
+                Infolists\Components\Section::make('Detail Pelunasan')
+                    ->schema([
+                        RepeatableEntry::make('vendorPaymentDetail')
+                            ->label('')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('invoice.invoice_number')->label('Invoice'),
+                                Infolists\Components\TextEntry::make('invoice.invoice_date')->label('Tanggal Invoice')->date(),
+                                Infolists\Components\TextEntry::make('invoice.due_date')->label('Due Date')->date(),
+                                Infolists\Components\TextEntry::make('invoice.total')->label('Total Invoice')->rupiah(),
+                                Infolists\Components\TextEntry::make('amount')->label('Jumlah Bayar')->rupiah(),
+                                Infolists\Components\TextEntry::make('method')->label('Metode'),
+                                Infolists\Components\TextEntry::make('coa.name')->label('COA'),
+                                Infolists\Components\TextEntry::make('notes')->label('Catatan'),
+                            ])->columns(4),
                     ]),
 
                 Infolists\Components\Section::make('Journal Entries')
@@ -84,7 +120,7 @@ class ViewVendorPayment extends ViewRecord
                                 $sourceType = urlencode(\App\Models\VendorPayment::class);
                                 $sourceId = $this->record->id;
 
-                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}";
+                                return "/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}";
                             })
                             ->openUrlInNewTab()
                             ->visible(function () {

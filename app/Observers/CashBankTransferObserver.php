@@ -176,18 +176,17 @@ class CashBankTransferObserver
     private function reverseJournalEntries(CashBankTransfer $transfer, array $original): void
     {
         try {
-            // Find and delete existing journal entries for this transfer
-            $journalEntries = JournalEntry::where('source_type', 'App\\Models\\CashBankTransfer')
-                                        ->where('source_id', $transfer->id)
-                                        ->get();
+            // Bulk delete without firing JournalEntryObserver per row (sync path = internal correction)
+            $deleted = JournalEntry::withoutEvents(function () use ($transfer) {
+                return JournalEntry::where('source_type', 'App\\Models\\CashBankTransfer')
+                    ->where('source_id', $transfer->id)
+                    ->delete();
+            });
 
-            foreach ($journalEntries as $entry) {
-                $entry->delete();
-                Log::info('Reversed journal entry', [
-                    'journal_entry_id' => $entry->id,
-                    'transfer_id' => $transfer->id,
-                ]);
-            }
+            Log::info('Reversed journal entries (bulk)', [
+                'transfer_id' => $transfer->id,
+                'deleted_count' => $deleted,
+            ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to reverse journal entries', [
@@ -201,8 +200,11 @@ class CashBankTransferObserver
     private function createJournalEntries(CashBankTransfer $transfer): void
     {
         try {
-            $cashBankService = app(CashBankService::class);
-            $cashBankService->postTransfer($transfer);
+            // Suppress JournalEntryObserver during sync re-creation (internal accounting correction)
+            JournalEntry::withoutEvents(function () use ($transfer) {
+                $cashBankService = app(CashBankService::class);
+                $cashBankService->postTransfer($transfer);
+            });
 
             Log::info('Created new journal entries for updated transfer', [
                 'transfer_id' => $transfer->id,

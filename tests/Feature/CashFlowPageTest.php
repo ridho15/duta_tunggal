@@ -5,6 +5,7 @@ use App\Models\CashBankTransaction;
 use App\Models\ChartOfAccount;
 use App\Models\Reports\CashFlowCashAccount;
 use App\Services\Reports\CashFlowReportService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -12,6 +13,8 @@ uses(RefreshDatabase::class);
 describe('Cash Flow Report Page Tests', function () {
 
     beforeEach(function () {
+        Carbon::setTestNow('2026-03-15 00:00:00');
+
         // Run the finance report config seeder to set up cash flow configuration
         $this->seed(\Database\Seeders\Finance\FinanceReportConfigSeeder::class);
 
@@ -60,6 +63,10 @@ describe('Cash Flow Report Page Tests', function () {
             'type' => 'Expense',
             'is_active' => true,
         ]);
+    });
+
+    afterEach(function () {
+        Carbon::setTestNow();
     });
 
     it('generates report data structure correctly', function () {

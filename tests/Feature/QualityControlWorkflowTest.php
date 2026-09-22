@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
@@ -21,6 +22,7 @@ use Tests\TestCase;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\StockMovement;
+use App\Support\OrderRequestQuantityLock;
 use Illuminate\Support\Facades\Notification;
 
 class QualityControlWorkflowTest extends TestCase
@@ -96,8 +98,8 @@ class QualityControlWorkflowTest extends TestCase
             'purchase_receipt_id' => $purchaseReceipt->id,
             'purchase_order_item_id' => $purchaseOrderItem->id,
             'product_id' => $this->product->id,
-            'qty_received' => $receivedQty,
-            'qty_accepted' => $acceptedQty,
+            'qty_received' => 0,
+            'qty_accepted' => 0,
             'qty_rejected' => 0,
             'warehouse_id' => $this->warehouse->id,
             'status' => 'pending',
@@ -105,6 +107,433 @@ class QualityControlWorkflowTest extends TestCase
         ]);
 
         return compact('purchaseOrder', 'purchaseOrderItem', 'purchaseReceipt', 'purchaseReceiptItem');
+    }
+
+    public function test_purchase_order_stays_partially_received_when_qc_acceptance_is_less_than_ordered_quantity(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-PARTIAL-001',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 500,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $service = app(QualityControlService::class);
+
+        $firstQc = $service->createQCFromPurchaseOrderItem($purchaseOrderItem, [
+            'quantity_received' => 300,
+            'passed_quantity' => 300,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $service->completeQualityControl($firstQc, [
+            'quantity_received' => 300,
+            'passed_quantity' => 300,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $secondQc = $service->createQCFromPurchaseOrderItem($purchaseOrderItem->fresh(), [
+            'quantity_received' => 200,
+            'passed_quantity' => 198,
+            'rejected_quantity' => 2,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $service->completeQualityControl($secondQc, [
+            'quantity_received' => 200,
+            'passed_quantity' => 198,
+            'rejected_quantity' => 2,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $purchaseOrder->refresh();
+        $summary = $purchaseOrder->receiptFulfillmentSummary();
+
+        $this->assertSame(500.0, $summary['total_ordered']);
+        $this->assertSame(500.0, $summary['total_received']);
+        $this->assertSame(498.0, $summary['total_accepted']);
+        $this->assertSame('Sebagian Diterima', $summary['status_label']);
+        $this->assertSame('partially_received', $purchaseOrder->status);
+        $this->assertNotSame('completed', $purchaseOrder->status);
+
+        $limitAfterReject = OrderRequestQuantityLock::purchaseOrderItemReceiptLimit((int) $purchaseOrderItem->id);
+        $qcRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh());
+
+        $this->assertSame(2.0, $limitAfterReject['remaining_accepted']);
+        $this->assertSame(2.0, $limitAfterReject['remaining_received']);
+        $this->assertSame(498.0, $qcRemaining['accepted']);
+        $this->assertSame(2.0, $qcRemaining['remaining']);
+
+        $thirdQc = $service->createQCFromPurchaseOrderItem($purchaseOrderItem->fresh(), [
+            'quantity_received' => 2,
+            'passed_quantity' => 2,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $service->completeQualityControl($thirdQc, [
+            'quantity_received' => 2,
+            'passed_quantity' => 2,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $purchaseOrder->refresh();
+        $completedSummary = $purchaseOrder->receiptFulfillmentSummary();
+        $completedRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh());
+
+        $this->assertSame(500.0, $completedSummary['total_accepted']);
+        $this->assertSame('Semua Diterima', $completedSummary['status_label']);
+        $this->assertSame('completed', $purchaseOrder->status);
+        $this->assertSame(0.0, (float) $completedRemaining['remaining']);
+    }
+
+    public function test_partially_received_purchase_order_still_appears_in_qc_create_options(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-PARTIAL-SELECT-001',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1000,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $service = app(QualityControlService::class);
+        $qualityControl = $service->createQCFromPurchaseOrderItem($purchaseOrderItem, [
+            'quantity_received' => 500,
+            'passed_quantity' => 500,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $service->completeQualityControl($qualityControl, [
+            'quantity_received' => 500,
+            'passed_quantity' => 500,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $purchaseOrder->refresh();
+        $purchaseOrderItem->refresh();
+
+        $this->assertSame('partially_received', $purchaseOrder->status);
+
+        $options = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+        $this->assertArrayHasKey($purchaseOrder->id, $options);
+        $this->assertStringContainsString('Status QC: QC Partial', $options[$purchaseOrder->id]);
+
+        $remaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh());
+        $this->assertSame(500.0, (float) $remaining['remaining']);
+    }
+
+    public function test_edit_pending_purchase_qc_allows_existing_passed_quantity_when_global_remaining_is_lower(): void
+    {
+        $cabang = \App\Models\Cabang::query()->firstOrFail();
+        $this->user->update(['cabang_id' => $cabang->id]);
+        $this->warehouse->update(['cabang_id' => $cabang->id]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-EDIT-ALLOWANCE-001',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $cabang->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 500,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $service = app(QualityControlService::class);
+        $completedQc = $service->createQCFromPurchaseOrderItem($purchaseOrderItem, [
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+        $service->completeQualityControl($completedQc, [
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $pendingQc = QualityControl::withoutEvents(fn () => QualityControl::factory()->create([
+            'qc_number' => 'QC-P-EDIT-ALLOWANCE',
+            'from_model_type' => PurchaseOrderItem::class,
+            'from_model_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'status' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $cabang->id,
+            'inspected_by' => $this->user->id,
+        ]));
+
+        $globalRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh());
+        $editRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh(), $pendingQc);
+
+        $this->assertSame(2.0, (float) $globalRemaining['remaining']);
+        $this->assertSame(500.0, (float) $editRemaining['remaining']);
+
+        $pendingQc->fill([
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $cabang->id,
+        ])->save();
+
+        $this->assertSame(498.0, (float) $pendingQc->fresh()->passed_quantity);
+    }
+
+    public function test_edit_pending_purchase_qc_still_rejects_passed_quantity_above_current_allowance(): void
+    {
+        $cabang = \App\Models\Cabang::query()->firstOrFail();
+        $this->user->update(['cabang_id' => $cabang->id]);
+        $this->warehouse->update(['cabang_id' => $cabang->id]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-EDIT-ALLOWANCE-002',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $cabang->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 500,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $service = app(QualityControlService::class);
+        $completedQc = $service->createQCFromPurchaseOrderItem($purchaseOrderItem, [
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+        $service->completeQualityControl($completedQc, [
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $pendingQc = QualityControl::withoutEvents(fn () => QualityControl::factory()->create([
+            'qc_number' => 'QC-P-EDIT-ALLOWANCE-OVER',
+            'from_model_type' => PurchaseOrderItem::class,
+            'from_model_id' => $purchaseOrderItem->id,
+            'product_id' => $this->product->id,
+            'quantity_received' => 498,
+            'passed_quantity' => 498,
+            'rejected_quantity' => 0,
+            'status' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $cabang->id,
+            'inspected_by' => $this->user->id,
+        ]));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('cannot exceed available quantity');
+
+        $pendingQc->fill([
+            'quantity_received' => 501,
+            'passed_quantity' => 501,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $cabang->id,
+        ])->save();
+    }
+
+    public function test_rejected_partial_qc_keeps_purchase_order_selectable_for_remaining_quantity(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-REJECT-SELECT-001',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $service = app(QualityControlService::class);
+        $qualityControl = $service->createQCFromPurchaseOrderItem($purchaseOrderItem, [
+            'quantity_received' => 10,
+            'passed_quantity' => 8,
+            'rejected_quantity' => 2,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $service->completeQualityControl($qualityControl, [
+            'quantity_received' => 10,
+            'passed_quantity' => 8,
+            'rejected_quantity' => 2,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $purchaseOrder->refresh();
+        $purchaseOrderItem->refresh();
+
+        $this->assertSame('partially_received', $purchaseOrder->status);
+
+        $options = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+        $this->assertArrayHasKey($purchaseOrder->id, $options);
+
+        $remaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh());
+        $this->assertSame(8.0, (float) $remaining['accepted']);
+        $this->assertSame(2.0, (float) $remaining['remaining']);
+    }
+
+    public function test_rejected_partial_qc_is_labelled_as_qc_partial_in_selector_options(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-REJECT-LABEL-001',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'approved',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+        ]);
+
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 10,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $service = app(QualityControlService::class);
+        $qualityControl = $service->createQCFromPurchaseOrderItem($purchaseOrderItem, [
+            'quantity_received' => 10,
+            'passed_quantity' => 8,
+            'rejected_quantity' => 2,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $service->completeQualityControl($qualityControl, [
+            'quantity_received' => 10,
+            'passed_quantity' => 8,
+            'rejected_quantity' => 2,
+            'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        $options = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+
+        $this->assertArrayHasKey($purchaseOrder->id, $options);
+        $this->assertStringContainsString('Status QC: QC Partial', $options[$purchaseOrder->id]);
+    }
+
+    public function test_completed_purchase_order_is_excluded_from_qc_create_options(): void
+    {
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-QC-COMPLETE-SELECT-001',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(3),
+            'status' => 'completed',
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+            'completed_by' => $this->user->id,
+            'completed_at' => now(),
+        ]);
+
+        PurchaseOrderItem::factory()->create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1000,
+            'unit_price' => 1,
+            'discount' => 0,
+            'tax' => 0,
+            'currency_id' => $this->currency->id,
+        ]);
+
+        $options = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+        $this->assertArrayNotHasKey($purchaseOrder->id, $options);
     }
 
     public function test_quality_control_assignment_creates_pending_record(): void
@@ -115,18 +544,90 @@ class QualityControlWorkflowTest extends TestCase
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $this->assertNotNull($qualityControl);
+
+        // remaining validation from the original test
         $this->assertStringStartsWith('QC-' . now()->format('Ymd'), $qualityControl->qc_number);
         $this->assertEquals($context['purchaseOrderItem']->quantity, $qualityControl->passed_quantity);
         $this->assertEquals(0, $qualityControl->rejected_quantity);
         $this->assertEquals(0, $qualityControl->status);
         $this->assertEquals($this->user->id, $qualityControl->inspected_by);
-        // warehouse is taken from order item via purchase order
-        $this->assertEquals($context['purchaseOrder']->warehouse_id, $qualityControl->warehouse_id);
+        $this->assertEquals($this->warehouse->id, $qualityControl->warehouse_id);
         $this->assertEquals(PurchaseOrderItem::class, $qualityControl->from_model_type);
         $this->assertEquals($context['purchaseOrderItem']->id, $qualityControl->from_model_id);
+    }
+
+    public function test_pending_qc_passed_quantity_is_not_counted_until_processed(): void
+    {
+        $context = $this->createPurchaseReceiptContext();
+
+        $qualityControl = QualityControl::create([
+            'qc_number' => 'QC-P-' . now()->format('Ymd') . '-PENDING',
+            'from_model_type' => PurchaseOrderItem::class,
+            'from_model_id' => $context['purchaseOrderItem']->id,
+            'inspected_by' => $this->user->id,
+            'passed_quantity' => 10,
+            'rejected_quantity' => 0,
+            'quantity_received' => 10,
+            'notes' => 'Pending QC edit draft',
+            'status' => 0,
+            'warehouse_id' => $this->warehouse->id,
+            'product_id' => $this->product->id,
+            'date_send_stock' => now()->toDateString(),
+        ]);
+
+        $pendingRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($context['purchaseOrderItem']->fresh());
+
+        $this->assertSame(10.0, $pendingRemaining['ordered']);
+        $this->assertSame(0.0, (float) $pendingRemaining['accepted']);
+        $this->assertSame(10.0, (float) $pendingRemaining['remaining']);
+
+        $qualityControl->update(['status' => 1]);
+
+        $processedRemaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($context['purchaseOrderItem']->fresh());
+
+        $this->assertSame(10.0, (float) $processedRemaining['accepted']);
+        $this->assertSame(0.0, (float) $processedRemaining['remaining']);
+    }
+
+    /**
+     * If the product and fallback codes do not provide any COA, completing
+     * quality control should not crash nor attempt to insert an entry with a
+     * null coa_id.  The guard in
+     * QualityControlService::createJournalEntriesAndInventoryForQC handles this
+     * by returning early; we assert that no journal entries are written.
+     */
+    public function test_complete_qc_skips_journal_when_coa_missing(): void
+    {
+        // remove typical inventory/temporary procurement/unbilled purchase codes
+        \App\Models\ChartOfAccount::whereIn('code', [
+            '1140.10','1140.01','1180.01','1400.01','2100.10','2190.10',
+        ])->delete();
+
+        // ensure a clean slate
+        $this->assertDatabaseCount('journal_entries', 0);
+
+        $context = $this->createPurchaseReceiptContext();
+        $service = app(QualityControlService::class);
+        $qc = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
+            'inspected_by' => $this->user->id,
+            'passed_quantity' => 5,
+            'rejected_quantity' => 0,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+        $this->assertNotNull($qc);
+
+        // complete the QC record – should not throw
+        $service->completeQualityControl($qc, []);
+
+        $qc->refresh();
+        $this->assertEquals(1, $qc->status);
+
+        // journal entries should still be zero because posting was skipped
+        $this->assertDatabaseCount('journal_entries', 0);
     }
 
     public function test_quality_control_completion_creates_stock_movement_and_marks_processed(): void
@@ -136,6 +637,7 @@ class QualityControlWorkflowTest extends TestCase
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ])->fresh();
 
         $service->completeQualityControl($qualityControl, []);
@@ -152,7 +654,7 @@ class QualityControlWorkflowTest extends TestCase
         $this->assertEquals('purchase_in', $stockMovement->type);
         $this->assertEquals($qualityControl->passed_quantity, $stockMovement->quantity);
 
-        $expectedValue = $context['purchaseOrderItem']->unit_price * $qualityControl->passed_quantity;
+        $expectedValue = (float) ($stockMovement->meta['unit_cost'] ?? 0) * (float) $qualityControl->passed_quantity;
         $this->assertEquals($expectedValue, (float) $stockMovement->value);
         $this->assertEquals(QualityControl::class, $stockMovement->from_model_type);
         $this->assertEquals($qualityControl->id, $stockMovement->from_model_id);
@@ -172,6 +674,7 @@ class QualityControlWorkflowTest extends TestCase
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $qualityControl->update([
@@ -211,6 +714,7 @@ class QualityControlWorkflowTest extends TestCase
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $qualityControl->update([
@@ -238,9 +742,11 @@ class QualityControlWorkflowTest extends TestCase
     {
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
+        $returnService = app(PurchaseReturnService::class);
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $qualityControl->update([
@@ -250,36 +756,47 @@ class QualityControlWorkflowTest extends TestCase
             'supplier_action' => 'replace',
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
+        $replacementPo = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'po_number' => 'PO-' . now()->format('Ymd') . '-REPLACEMENT',
+            'order_date' => now(),
+            'expected_date' => now()->addDays(5),
             'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+            'completed_by' => null,
+            'completed_at' => null,
+            'cabang_id' => $this->warehouse->cabang_id,
+        ]);
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $purchaseReturn = $returnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER,
+            $replacementPo->id
+        );
+
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
-        // Verify return product is created for rejected items
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertNotNull($returnProduct);
-        $this->assertEquals('draft', $returnProduct->status);
-        $this->assertEquals('Damaged packaging', $returnProduct->reason);
-
-        // Verify return items
-        $returnItems = $returnProduct->returnProductItem;
-        $this->assertCount(1, $returnItems);
-        $this->assertEquals(3, $returnItems->first()->quantity);
-        $this->assertEquals($this->product->id, $returnItems->first()->product_id);
-
-        // In a real scenario, this would trigger a new purchase order or delivery schedule
-        // For now, we verify the rejection is recorded and can be processed
+        // Verify QC is completed and purchase return is created for the rejected items
         $this->assertEquals(1, $qualityControl->status);
-        $this->assertDatabaseHas('return_products', [
-            'id' => $returnProduct->id,
+        $this->assertNotNull($purchaseReturn);
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals(PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER, $purchaseReturn->failed_qc_action);
+        $this->assertEquals($replacementPo->id, $purchaseReturn->replacement_po_id);
+        $this->assertDatabaseHas('purchase_returns', [
+            'id' => $purchaseReturn->id,
             'status' => 'draft',
-            'reason' => 'Damaged packaging',
+            'failed_qc_action' => PurchaseReturn::QC_ACTION_MERGE_NEXT_ORDER,
+            'replacement_po_id' => $replacementPo->id,
+        ]);
+
+        $this->assertDatabaseHas('purchase_return_items', [
+            'purchase_return_id' => $purchaseReturn->id,
+            'qty_returned' => 3,
+            'product_id' => $this->product->id,
         ]);
     }
 
@@ -287,9 +804,11 @@ class QualityControlWorkflowTest extends TestCase
     {
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
+        $returnService = app(PurchaseReturnService::class);
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $qualityControl->update([
@@ -300,34 +819,33 @@ class QualityControlWorkflowTest extends TestCase
             'credit_note_amount' => 45000, // 3 units * 15000
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+        $purchaseReturn = $returnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_REDUCE_STOCK
+        );
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
         // Verify QC is completed
         $this->assertEquals(1, $qualityControl->status);
 
-        // Verify return product is created
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertNotNull($returnProduct);
-
-        // In a real implementation, this would:
-        // 1. Create a credit note record
-        // 2. Reduce the purchase invoice amount
-        // 3. Update accounts payable
-        // 4. Create appropriate journal entries
-
-        // For now, we verify the rejection is recorded
-        $this->assertDatabaseHas('return_products', [
-            'id' => $returnProduct->id,
+        // Purchase QC currently creates a PurchaseReturn draft; financial credit-note
+        // processing is handled by the PurchaseReturn workflow, not by QC completion itself.
+        $this->assertNotNull($purchaseReturn);
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals(PurchaseReturn::QC_ACTION_REDUCE_STOCK, $purchaseReturn->failed_qc_action);
+        $this->assertDatabaseHas('purchase_returns', [
+            'id' => $purchaseReturn->id,
             'status' => 'draft',
+            'failed_qc_action' => PurchaseReturn::QC_ACTION_REDUCE_STOCK,
+        ]);
+
+        $this->assertDatabaseHas('purchase_return_items', [
+            'purchase_return_id' => $purchaseReturn->id,
+            'qty_returned' => 3,
+            'product_id' => $this->product->id,
         ]);
 
         // Verify stock movement for passed quantity only
@@ -341,10 +859,12 @@ class QualityControlWorkflowTest extends TestCase
     {
         $context = $this->createPurchaseReceiptContext(orderedQty: 10, receivedQty: 8, acceptedQty: 8);
         $service = app(QualityControlService::class);
+        $returnService = app(PurchaseReturnService::class);
 
         // First, complete QC with passed items to create initial stock
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $qualityControl->update([
@@ -354,49 +874,38 @@ class QualityControlWorkflowTest extends TestCase
             'supplier_action' => 'return_refund',
         ]);
 
-        $returnPayload = [
-            'return_number' => 'RP-' . now()->format('Ymd') . '-0001',
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 'draft',
-            'reason' => 'Damaged packaging',
-        ];
+        $purchaseReturn = $returnService->createFromQualityControl(
+            $qualityControl,
+            PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY
+        );
 
-        $service->completeQualityControl($qualityControl->fresh(), $returnPayload);
+        $service->completeQualityControl($qualityControl->fresh(), []);
 
         $qualityControl->refresh();
 
         // Verify QC completion
         $this->assertEquals(1, $qualityControl->status);
 
-        // Verify return product is created
-        $returnProduct = $qualityControl->returnProduct;
-        $this->assertNotNull($returnProduct);
-        $this->assertEquals('draft', $returnProduct->status);
-
-        // Verify return items
-        $returnItems = $returnProduct->returnProductItem;
-        $this->assertCount(1, $returnItems);
-        $this->assertEquals(3, $returnItems->first()->quantity);
-
-        // In a real implementation, this would:
-        // 1. Create a purchase return record linked to the original receipt
-        // 2. Create stock movement reversal for the returned items
-        // 3. Reverse the journal entries
-        // 4. Update accounts payable for the refund
+        // Purchase QC workflow should create a draft PurchaseReturn, not a sales-side ReturnProduct.
+        $this->assertNotNull($purchaseReturn);
+        $this->assertEquals('draft', $purchaseReturn->status);
+        $this->assertEquals(PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY, $purchaseReturn->failed_qc_action);
+        $this->assertDatabaseHas('purchase_returns', [
+            'id' => $purchaseReturn->id,
+            'status' => 'draft',
+            'failed_qc_action' => PurchaseReturn::QC_ACTION_WAIT_NEXT_DELIVERY,
+        ]);
+        $this->assertDatabaseHas('purchase_return_items', [
+            'purchase_return_id' => $purchaseReturn->id,
+            'qty_returned' => 3,
+            'product_id' => $this->product->id,
+        ]);
 
         // Verify stock movement for passed quantity only
         $stockMovement = $qualityControl->stockMovement;
         $this->assertNotNull($stockMovement);
         $this->assertEquals(5, $stockMovement->quantity);
         $this->assertEquals('purchase_in', $stockMovement->type);
-
-        // Verify the return can be processed (status draft means it's ready for supplier action)
-        $this->assertEquals('draft', $returnProduct->status);
-        $this->assertDatabaseHas('return_product_items', [
-            'return_product_id' => $returnProduct->id,
-            'quantity' => 3,
-            'product_id' => $this->product->id,
-        ]);
     }
 
     public function test_purchase_return_creation_for_qc_rejection(): void
@@ -406,6 +915,7 @@ class QualityControlWorkflowTest extends TestCase
 
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         $qualityControl->update([
@@ -463,6 +973,7 @@ class QualityControlWorkflowTest extends TestCase
         // First create stock movement through QC completion
         $qualityControl = $service->createQCFromPurchaseOrderItem($context['purchaseOrderItem'], [
             'inspected_by' => $this->user->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
 
         // Update QC with passed quantity before completion

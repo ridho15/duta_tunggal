@@ -8,7 +8,7 @@ use App\Models\ChartOfAccount;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 
-class BukuBesarPage extends Page
+class TestGroupedPage extends Page
 {
     protected static string $view = 'filament.pages.buku-besar-page';
 

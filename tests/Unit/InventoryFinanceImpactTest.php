@@ -367,7 +367,6 @@ class InventoryFinanceImpactTest extends TestCase
             'qty_accepted' => 10,
             'qty_rejected' => 0,
             'warehouse_id' => $warehouse->id,
-            'is_sent' => false, // Initially not sent to QC
         ]);
 
         // Verify no journal entries exist for this receipt item initially
@@ -388,9 +387,6 @@ class InventoryFinanceImpactTest extends TestCase
         // Verify journal entries were created
         $this->assertEquals('posted', $journalResult['status']);
         $this->assertCount(2, $journalResult['entries']); // Debit temporary procurement + Credit unbilled purchase
-
-        // Update receipt item to mark as sent to QC (this is done in the UI)
-        $receiptItem->update(['is_sent' => true]);
 
         // Verify journal entries for this receipt item
         $this->assertEquals(2, JournalEntry::where('source_type', \App\Models\PurchaseReceiptItem::class)
@@ -435,8 +431,5 @@ class InventoryFinanceImpactTest extends TestCase
     $totalCredit = JournalEntry::where('transaction_id', $transactionId)->sum('credit');
         $this->assertEquals($totalDebit, $totalCredit, 'Journal entries should be balanced');
 
-        // Verify receipt item is marked as sent to QC
-        $receiptItem->refresh();
-        $this->assertEquals(1, $receiptItem->is_sent, 'Receipt item should be marked as sent to QC');
     }
 }

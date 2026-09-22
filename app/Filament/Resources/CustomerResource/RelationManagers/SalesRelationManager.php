@@ -56,7 +56,7 @@ class SalesRelationManager extends RelationManager
                             ->visible(function ($get) {
                                 return $get('options_form') == 2;
                             })
-                            ->options(Quotation::where('status', 'approve')->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
+                            ->options(Quotation::usable()->select(['id', 'customer_id', 'quotation_number'])->get()->pluck('quotation_number', 'id'))
                             ->required(),
                         Select::make('sale_order_id')
                             ->label('Sales Order')
@@ -102,7 +102,6 @@ class SalesRelationManager extends RelationManager
                             ->disabled()
                             ->reactive()
                             ->default(0)
-                            ->numeric(),
                     ])
             ]);
     }

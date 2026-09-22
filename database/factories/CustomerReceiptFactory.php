@@ -13,19 +13,22 @@ class CustomerReceiptFactory extends Factory
 
     public function definition(): array
     {
+        $totalPayment = $this->faker->randomFloat(2, 100000, 10000000);
+
         return [
             'customer_id' => Customer::factory(),
             'selected_invoices' => null,
             'invoice_receipts' => null,
             'payment_date' => $this->faker->date(),
             'ntpn' => $this->faker->unique()->numerify('RCP-##########'),
-            'total_payment' => number_format($this->faker->randomFloat(2, 100000, 10000000), 2, '.', ''),
+            'total_payment' => number_format($totalPayment, 2, '.', ''),
+            'exchange_rate' => 1,
             'notes' => $this->faker->optional()->sentence(),
             'diskon' => number_format($this->faker->randomFloat(2, 0, 100000), 2, '.', ''),
             'payment_adjustment' => number_format($this->faker->randomFloat(2, 0, 50000), 2, '.', ''),
             'payment_method' => $this->faker->randomElement(['cash', 'bank_transfer', 'cheque', 'deposit', 'credit_card']),
             'coa_id' => ChartOfAccount::factory(),
-            'status' => $this->faker->randomElement(['Draft', 'Partial', 'Paid']),
+            'status' => 'Draft',
         ];
     }
 

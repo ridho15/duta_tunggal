@@ -32,6 +32,26 @@ class ViewProfitAndLoss extends Page
     public ?string $compareStartDate = null;
     public ?string $compareEndDate = null;
 
+    public function mount(): void
+    {
+        $this->startDate = request('startDate', now()->startOfMonth()->toDateString());
+        $this->endDate = request('endDate', now()->endOfMonth()->toDateString());
+        $this->cabang_id = request('cabang_id');
+        $this->compare = filter_var(request('compare', false), FILTER_VALIDATE_BOOL);
+        $this->compareStartDate = request('compareStartDate');
+        $this->compareEndDate = request('compareEndDate');
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cabang_id' => $this->cabang_id,
+            'compare' => $this->compare,
+            'compareStartDate' => $this->compareStartDate,
+            'compareEndDate' => $this->compareEndDate,
+        ]);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -52,12 +72,24 @@ class ViewProfitAndLoss extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return route('reports.profit-and-loss.preview', array_filter([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cabang_id' => $this->cabang_id,
+            'compare' => $this->compare ? 1 : 0,
+            'compareStartDate' => $this->compareStartDate,
+            'compareEndDate' => $this->compareEndDate,
+        ], fn ($value) => $value !== null && $value !== ''));
     }
 
     protected function getFormSchema(): array
@@ -153,7 +185,7 @@ class ViewProfitAndLoss extends Page
             });
         } else {
             $query->where('type', 'Expense')
-                ->where('perusahaan', 'like', '%HPP%');
+                ->where('name', 'like', '%HPP%');
         }
 
         $cogsAccounts = $query->get();
@@ -182,14 +214,14 @@ class ViewProfitAndLoss extends Page
 
     protected function getOtherIncomeExpense($start, $end): float
     {
-        $otherIncome = ChartOfAccount::where('type', 'Revenue')->where('perusahaan', 'like', '%Lain%')->get();
-        $otherExpense = ChartOfAccount::where('type', 'Expense')->where('perusahaan', 'like', '%Lain%')->get();
+        $otherIncome = ChartOfAccount::where('type', 'Revenue')->where('name', 'like', '%Lain%')->get();
+        $otherExpense = ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%Lain%')->get();
         return $this->sumByAccounts($otherIncome, $start, $end) - $this->sumByAccounts($otherExpense, $start, $end);
     }
 
     protected function getTaxExpense($start, $end): float
     {
-        $taxAccounts = ChartOfAccount::where('type', 'Expense')->where('perusahaan', 'like', '%Pajak%')->get();
+        $taxAccounts = ChartOfAccount::where('type', 'Expense')->where('name', 'like', '%Pajak%')->get();
         return $this->sumByAccounts($taxAccounts, $start, $end);
     }
 }

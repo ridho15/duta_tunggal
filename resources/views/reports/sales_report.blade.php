@@ -229,35 +229,44 @@
                 <tr>
                     <td class="summary-item">
                         <span class="icon">📋</span>
-                        <span class="value">{{ $data->count() }}</span>
+                        <span class="value">{{ $summary['total_orders'] }}</span>
                         <span class="label">Total Transaksi</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">💰</span>
-                        <span class="value">Rp {{ number_format($data->sum('total_amount'), 0, ',', '.') }}</span>
+                        <span class="value">Rp {{ number_format($summary['total_amount'], 0, ',', '.') }}</span>
                         <span class="label">Total Nilai</span>
                     </td>
                     <td class="summary-item">
                         <span class="icon">📊</span>
-                        <span class="value">Rp {{ $data->count() > 0 ? number_format($data->sum('total_amount') / $data->count(), 0, ',', '.') : '0' }}</span>
+                        <span class="value">Rp {{ number_format($summary['average_amount'], 0, ',', '.') }}</span>
                         <span class="label">Rata-rata per Transaksi</span>
                     </td>
                 </tr>
                 <tr>
                     <td class="summary-item">
                         <span class="icon">✅</span>
-                        <span class="value">{{ $data->where('status', 'confirmed')->count() }}</span>
-                        <span class="label">Transaksi Confirmed</span>
+                        <span class="value">{{ ($summary['status_counts']['approved'] ?? 0) + ($summary['status_counts']['confirmed'] ?? 0) }}</span>
+                        <span class="label">Disetujui / Dikonfirmasi</span>
                     </td>
                     <td class="summary-item">
-                        <span class="icon">⏳</span>
-                        <span class="value">{{ $data->where('status', 'draft')->count() }}</span>
-                        <span class="label">Transaksi Draft</span>
+                        <span class="icon">🚚</span>
+                        <span class="value">{{ $summary['status_counts']['partially_delivered'] ?? 0 }}</span>
+                        <span class="label">Dikirim Sebagian</span>
                     </td>
                     <td class="summary-item">
-                        <span class="icon">🚫</span>
-                        <span class="value">{{ $data->where('status', 'canceled')->count() }}</span>
-                        <span class="label">Transaksi Canceled</span>
+                        <span class="icon">🏁</span>
+                        <span class="value">{{ $summary['status_counts']['completed'] ?? 0 }}</span>
+                        <span class="label">Selesai</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="summary-item" colspan="3" style="text-align: left; font-size: 9px;">
+                        @foreach (\App\Models\SaleOrder::STATUS_LABELS as $statusKey => $statusLabel)
+                            @if (($summary['status_counts'][$statusKey] ?? 0) > 0)
+                                {{ $statusLabel }}: <strong>{{ $summary['status_counts'][$statusKey] }}</strong> &nbsp;
+                            @endif
+                        @endforeach
                     </td>
                 </tr>
             </tbody>
@@ -278,30 +287,30 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($data as $index => $order)
+            @foreach($rows as $index => $order)
             <tr>
                 <td class="text-center">{{ $index + 1 }}</td>
                 <td>{{ $order['so_number'] }}</td>
-                <td>{{ $order['created_at']->format('d/m/Y') }}</td>
+                <td>{{ \Carbon\Carbon::parse($order['created_at'])->format('d/m/Y') }}</td>
                 <td>{{ $order['customer_code'] }}</td>
                 <td>{{ $order['customer_name'] }}</td>
                 <td class="text-right">{{ number_format($order['total_amount'], 0, ',', '.') }}</td>
                 <td class="text-center">
                     <span style="padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold;
-                        {{ $order['status'] === 'confirmed' ? 'background-color: #d4edda; color: #155724;' :
-                           ($order['status'] === 'draft' ? 'background-color: #fff3cd; color: #856404;' :
+                        {{ in_array($order['status_key'], ['approved', 'confirmed', 'completed', 'received'], true) ? 'background-color: #d4edda; color: #155724;' :
+                           (in_array($order['status_key'], ['draft', 'request_approve', 'partially_delivered', 'partial_confirmed', 'request_close'], true) ? 'background-color: #fff3cd; color: #856404;' :
                            'background-color: #f8d7da; color: #721c24;') }}">
-                        {{ ucfirst($order['status']) }}
+                        {{ $order['status'] }}
                     </span>
                 </td>
-                <td>{{ $order['created_at']->format('H:i') }} WIB</td>
+                <td>{{ \Carbon\Carbon::parse($order['created_at'])->format('H:i') }} WIB</td>
             </tr>
             @endforeach
         </tbody>
         <tfoot>
             <tr style="background-color: #e9ecef; font-weight: bold;">
                 <td colspan="5" class="text-right">TOTAL:</td>
-                <td class="text-right">{{ number_format($data->sum('total_amount'), 0, ',', '.') }}</td>
+                <td class="text-right">{{ number_format($summary['total_amount'], 0, ',', '.') }}</td>
                 <td colspan="2"></td>
             </tr>
         </tfoot>

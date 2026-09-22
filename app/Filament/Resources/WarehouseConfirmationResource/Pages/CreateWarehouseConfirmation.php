@@ -5,6 +5,8 @@ namespace App\Filament\Resources\WarehouseConfirmationResource\Pages;
 use App\Filament\Resources\WarehouseConfirmationResource;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class CreateWarehouseConfirmation extends CreateRecord
 {
@@ -12,32 +14,49 @@ class CreateWarehouseConfirmation extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if ($data['confirmation_type'] === 'sales_order') {
-            // Handle Sales Order confirmation with simplified structure
-            $saleOrder = \App\Models\SaleOrder::find($data['sale_order_id']);
+        $type = $data['confirmation_type'] ?? 'sales_order';
+
+        if ($type === 'sales_order') {
+            $soId = $data['so_id_virtual'] ?? null;
+            $saleOrder = \App\Models\SaleOrder::find($soId);
             if (!$saleOrder) {
-                throw new \Exception('Sales Order not found');
+                Log::warning('CreateWarehouseConfirmation failed: sales order not found', [
+                    'so_id_virtual' => $soId,
+                    'confirmation_type' => $type,
+                    'user_id' => Auth::id(),
+                    'payload_keys' => array_keys($data),
+                ]);
+                \Filament\Notifications\Notification::make()
+                    ->title('Sales Order Tidak Ditemukan')
+                    ->body('Sales Order yang dipilih tidak ditemukan. Pastikan data SO sudah benar sebelum membuat konfirmasi gudang.')
+                    ->danger()
+                    ->send();
+                $this->halt();
             }
-
-            // Store confirmation items data for later processing
             $data['confirmation_items_data'] = $data['confirmation_items'] ?? [];
-
-            // Return basic data for warehouse confirmation record
             return [
-                'confirmation_type' => $data['confirmation_type'],
-                'sale_order_id' => $data['sale_order_id'],
-                'notes' => $data['notes'] ?? null,
-                'status' => 'request', // Start with request status
+                'confirmable_type'  => \App\Models\SaleOrder::class,
+                'confirmable_id'    => $soId,
+                'confirmation_type' => 'sales_order',
+                'note'              => $data['note'] ?? null,
+                'status'            => 'request',
+            ];
+        } elseif ($type === 'manufacturing_order') {
+            return [
+                'confirmable_type'  => \App\Models\ManufacturingOrder::class,
+                'confirmable_id'    => $data['mo_id_virtual'] ?? null,
+                'confirmation_type' => 'manufacturing_order',
+                'note'              => $data['note'] ?? null,
+                'status'            => 'request',
             ];
         } else {
-            // Handle Manufacturing Order confirmation (existing logic)
+            // delivery_order
             return [
-                'confirmation_type' => $data['confirmation_type'],
-                'manufacturing_order_id' => $data['manufacturing_order_id'],
-                'notes' => $data['notes'] ?? null,
-                'status' => 'confirmed',
-                'confirmed_by' => \Illuminate\Support\Facades\Auth::id(),
-                'confirmed_at' => now(),
+                'confirmable_type'  => \App\Models\DeliveryOrder::class,
+                'confirmable_id'    => $data['do_id_virtual'] ?? null,
+                'confirmation_type' => 'delivery_order',
+                'note'              => $data['note'] ?? null,
+                'status'            => 'request',
             ];
         }
     }

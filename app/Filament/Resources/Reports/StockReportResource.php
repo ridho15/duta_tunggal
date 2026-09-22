@@ -13,6 +13,8 @@ class StockReportResource extends Resource
 {
     protected static ?string $model = InventoryStock::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
 
     protected static ?string $navigationGroup = 'Persediaan';
@@ -22,6 +24,11 @@ class StockReportResource extends Resource
     protected static ?string $slug = 'reports/stock-report';
 
     protected static ?string $navigationLabel = 'Laporan Stok';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function form(Form $form): Form
     {

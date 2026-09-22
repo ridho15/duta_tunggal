@@ -38,7 +38,7 @@ class InventoryStockRelationManager extends RelationManager
                         return "({$warehouse->kode}) {$warehouse->name}";
                     }),
                 TextInput::make('qty_available')
-                    ->label('Quantity Available')
+                    ->label('Quantity Physical')
                     ->numeric()
                     ->default(0)
                     ->required(),
@@ -69,7 +69,7 @@ class InventoryStockRelationManager extends RelationManager
                     ->searchable()
                     ->label('Warehouse'),
                 TextColumn::make('qty_available')
-                    ->label('Quantity Available')
+                    ->label('Quantity Physical')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('qty_reserved')

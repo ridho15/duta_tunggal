@@ -3,8 +3,12 @@
 use App\Models\Asset;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Models\PurchaseOrder;
+use App\Models\Supplier;
+use App\Models\User;
 use App\Services\AssetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AssetServiceTest extends TestCase
@@ -19,12 +23,12 @@ class AssetServiceTest extends TestCase
         $this->assetService = new AssetService();
     }
 
-    /** @test */
+    #[Test]
     public function it_can_post_asset_acquisition_journal()
     {
         // Create test COAs
         $assetCoa = ChartOfAccount::factory()->create(['name' => 'Asset COA', 'type' => 'asset']);
-        $supplierCoa = ChartOfAccount::factory()->create(['perusahaan' => 'Supplier COA', 'type' => 'liability']);
+        $supplierCoa = ChartOfAccount::factory()->create(['name' => 'Supplier COA', 'type' => 'liability']);
 
         // Create test asset
         $asset = Asset::factory()->create([
@@ -58,7 +62,7 @@ class AssetServiceTest extends TestCase
         $this->assertEquals('posted', $asset->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_post_asset_depreciation_journal()
     {
         // Create test COAs
@@ -97,7 +101,7 @@ class AssetServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_check_if_asset_has_posted_journals()
     {
         // Create test asset
@@ -120,7 +124,7 @@ class AssetServiceTest extends TestCase
         $this->assertTrue($this->assetService->hasPostedJournals($asset));
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_asset_journals()
     {
         // Create test asset
@@ -148,5 +152,38 @@ class AssetServiceTest extends TestCase
         $this->assertCount(2, $journals);
         $this->assertEquals($acquisitionEntry->id, $journals->first()->id);
         $this->assertEquals($depreciationEntry->id, $journals->last()->id);
+    }
+
+    #[Test]
+    public function it_auto_posts_asset_acquisition_journal_when_asset_is_created_from_purchase_order()
+    {
+        $this->actingAs(User::factory()->create());
+
+        $assetCoa = ChartOfAccount::factory()->create(['name' => 'Asset COA', 'type' => 'asset']);
+        $accumulatedCoa = ChartOfAccount::factory()->create(['name' => 'Accumulated Depreciation', 'type' => 'asset']);
+        $expenseCoa = ChartOfAccount::factory()->create(['name' => 'Depreciation Expense', 'type' => 'expense']);
+        ChartOfAccount::factory()->create(['code' => '2100', 'name' => 'Hutang Usaha', 'type' => 'liability']);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => Supplier::factory()->create()->id,
+        ]);
+
+        $asset = Asset::factory()->create([
+            'name' => 'Auto Posted Asset',
+            'purchase_cost' => 1500000,
+            'asset_coa_id' => $assetCoa->id,
+            'accumulated_depreciation_coa_id' => $accumulatedCoa->id,
+            'depreciation_expense_coa_id' => $expenseCoa->id,
+            'purchase_order_id' => $purchaseOrder->id,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => Asset::class,
+            'source_id' => $asset->id,
+            'journal_type' => 'asset_acquisition',
+        ]);
+
+        $this->assertSame('posted', $asset->fresh()->status);
+        $this->assertSame(2, JournalEntry::where('source_type', Asset::class)->where('source_id', $asset->id)->count());
     }
 }

@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Models\VoucherRequest;
 use App\Models\CashBankTransaction;
+use App\Models\ChartOfAccount;
+use App\Models\VoucherNumberSequence;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -19,16 +22,46 @@ class VoucherRequestService
     public function generateVoucherNumber(): string
     {
         $date = now()->format('Ymd');
-        $cacheKey = "voucher_number_counter_{$date}";
+        $prefix = 'VR-' . $date . '-';
 
-        // Gunakan cache untuk tracking counter per hari
-        $counter = \Illuminate\Support\Facades\Cache::get($cacheKey, 0);
-        $counter += 1;
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            try {
+                return DB::transaction(function () use ($date, $prefix) {
+                    $sequence = VoucherNumberSequence::query()
+                        ->where('sequence_date', $date)
+                        ->lockForUpdate()
+                        ->first();
 
-        // Simpan counter ke cache dengan expiry 24 jam
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $counter, now()->addDay());
+                    if (! $sequence) {
+                        VoucherNumberSequence::query()->create([
+                            'sequence_date' => $date,
+                            'last_sequence' => 0,
+                        ]);
 
-        return 'VR-' . $date . '-' . str_pad($counter, 4, '0', STR_PAD_LEFT);
+                        $sequence = VoucherNumberSequence::query()
+                            ->where('sequence_date', $date)
+                            ->lockForUpdate()
+                            ->firstOrFail();
+                    }
+
+                    $sequence->increment('last_sequence');
+                    $sequence->refresh();
+
+                    return $prefix . str_pad((string) $sequence->last_sequence, 4, '0', STR_PAD_LEFT);
+                });
+            } catch (QueryException $exception) {
+                if (! $this->isDuplicateSequenceInsert($exception)) {
+                    throw $exception;
+                }
+            }
+        }
+
+        throw new \RuntimeException('Gagal menghasilkan nomor voucher yang unik setelah beberapa percobaan.');
+    }
+
+    protected function isDuplicateSequenceInsert(QueryException $exception): bool
+    {
+        return (int) ($exception->errorInfo[1] ?? 0) === 1062;
     }
 
     /**
@@ -123,6 +156,9 @@ class VoucherRequestService
                 if (empty($data['account_coa_id']) || empty($data['offset_coa_id'])) {
                     throw new \Exception('Untuk membuat transaksi otomatis, mohon pilih Akun COA (Kas/Bank) dan Akun COA Lawan.');
                 }
+
+                ChartOfAccount::query()->findOrFail($data['account_coa_id']);
+                ChartOfAccount::query()->findOrFail($data['offset_coa_id']);
 
                 $transaction = $this->createCashBankTransaction($voucherRequest, $data);
                 $voucherRequest->update([

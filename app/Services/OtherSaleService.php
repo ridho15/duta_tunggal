@@ -36,9 +36,9 @@ class OtherSaleService
                 $contraCoa = $otherSale->cashBankAccount->coa;
             } else {
                 // Otherwise, use Accounts Receivable
-                $contraCoa = ChartOfAccount::where('code', '1120')->first(); // PIUTANG DAGANG
+                $contraCoa = $this->resolveAccountsReceivableCoa();
                 if (!$contraCoa) {
-                    throw new \Exception('Accounts Receivable COA not found');
+                    throw new \Exception('Accounts Receivable COA not found for configured codes: ' . implode(', ', $this->getAccountsReceivableCodes()));
                 }
             }
 
@@ -137,5 +137,32 @@ class OtherSaleService
             ]);
             throw $e;
         }
+    }
+
+    private function resolveAccountsReceivableCoa(): ?ChartOfAccount
+    {
+        $codes = $this->getAccountsReceivableCodes();
+
+        $accounts = ChartOfAccount::query()
+            ->whereIn('code', $codes)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('code');
+
+        foreach ($codes as $code) {
+            if ($accounts->has($code)) {
+                return $accounts->get($code);
+            }
+        }
+
+        return null;
+    }
+
+    private function getAccountsReceivableCodes(): array
+    {
+        return array_values(array_unique(array_filter([
+            config('coa.accounts_receivable'),
+            '1120',
+        ])));
     }
 }

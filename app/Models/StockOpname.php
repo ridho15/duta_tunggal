@@ -4,13 +4,15 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 class StockOpname extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
 
     protected $table = 'stock_opnames';
 
@@ -96,13 +98,6 @@ class StockOpname extends Model
     {
         static::addGlobalScope(new CabangScope);
 
-        // Create journal entries when stock opname is approved
-        static::updating(function ($stockOpname) {
-            if ($stockOpname->isDirty('status') && $stockOpname->status === 'approved') {
-                $stockOpname->createAdjustmentJournalEntries();
-            }
-        });
-
         // Sync journal entries when relevant data changes
         static::updated(function ($stockOpname) {
             // Only sync if stock opname is approved and has journal entries
@@ -120,7 +115,11 @@ class StockOpname extends Model
      */
     public function createAdjustmentJournalEntries()
     {
+        $this->loadMissing('items', 'warehouse');
+
         $totalAdjustmentValue = $this->items->sum('difference_value');
+
+        $this->journalEntries()->where('journal_type', 'stock_opname')->delete();
 
         // If no adjustment needed, skip
         if ($totalAdjustmentValue == 0) {
@@ -132,17 +131,23 @@ class StockOpname extends Model
         $description = 'Penyesuaian inventory hasil stock opname ' . $this->opname_number;
 
         // Get inventory adjustment account (COA)
-        $inventoryAdjustmentCoa = ChartOfAccount::where('code', '5100')->first(); // Assuming 5100 is inventory adjustment account
-        if (!$inventoryAdjustmentCoa) {
-            // Fallback to first expense account
-            $inventoryAdjustmentCoa = ChartOfAccount::where('type', 'expense')->first();
-        }
+        $inventoryAdjustmentCoa = $this->findFirstExistingCoa([
+            '5100',
+            '5100.10',
+            config('coa.general_expense', '6100'),
+        ]);
 
         // Get inventory account
-        $inventoryCoa = ChartOfAccount::where('code', '1100')->first(); // Assuming 1100 is inventory account
-        if (!$inventoryCoa) {
-            // Fallback to first asset account
-            $inventoryCoa = ChartOfAccount::where('type', 'asset')->first();
+        $inventoryCoa = $this->findFirstExistingCoa([
+            '1100',
+            config('coa.inventory', '1140.01'),
+            '1140.10',
+        ]);
+
+        if (! $inventoryAdjustmentCoa || ! $inventoryCoa) {
+            throw ValidationException::withMessages([
+                'accounting' => 'Konfigurasi akun inventory dan inventory adjustment untuk stock opname belum lengkap.',
+            ]);
         }
 
         if ($totalAdjustmentValue > 0) {
@@ -223,5 +228,21 @@ class StockOpname extends Model
                 'date' => $this->opname_date,
             ]);
         }
+    }
+
+    protected function findFirstExistingCoa(array $codes): ?ChartOfAccount
+    {
+        foreach ($codes as $code) {
+            if (! $code) {
+                continue;
+            }
+
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa?->id) {
+                return $coa;
+            }
+        }
+
+        return ChartOfAccount::whereIn('type', ['Asset', 'asset', 'Expense', 'expense'])->first();
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class RoleSeeder extends Seeder
 {
@@ -16,95 +17,110 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
+        $roleDescriptions = HelperController::roleDescriptions();
+
         $owner = Role::updateOrCreate([
             'name' => 'Owner',
         ], [
             'name' => 'Owner',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Owner'] ?? null,
         ]);
 
         $superAdmin = Role::updateOrCreate([
             'name' => 'Super Admin',
         ], [
             'name' => 'Super Admin',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Super Admin'] ?? null,
         ]);
 
         $admin = Role::updateOrCreate([
             'name' => 'Admin',
         ], [
             'name' => 'Admin',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin'] ?? null,
         ]);
 
         $salesManager = Role::updateOrCreate([
             'name' => 'Sales Manager',
         ], [
             'name' => 'Sales Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Sales Manager'] ?? null,
         ]);
 
         $sales = Role::updateOrCreate([
             'name' => 'Sales',
         ], [
             'name' => 'Sales',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Sales'] ?? null,
         ]);
 
         $kasir = Role::updateOrCreate([
             'name' => 'Kasir',
         ], [
             'name' => 'Kasir',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Kasir'] ?? null,
         ]);
 
         $inventoryManager = Role::updateOrCreate([
             'name' => 'Inventory Manager',
         ], [
             'name' => 'Inventory Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Inventory Manager'] ?? null,
         ]);
 
         $adminInventory = Role::updateOrCreate([
             'name' => 'Admin Inventory',
         ], [
             'name' => 'Admin Inventory',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin Inventory'] ?? null,
         ]);
 
         $checker = Role::updateOrCreate([
             'name' => 'Checker',
         ], [
             'name' => 'Checker',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Checker'] ?? null,
         ]);
 
         $financeManager = Role::updateOrCreate([
             'name' => 'Finance Manager',
         ], [
             'name' => 'Finance Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Finance Manager'] ?? null,
         ]);
 
         $adminKeuangan = Role::updateOrCreate([
             'name' => 'Admin Keuangan',
         ], [
             'name' => 'Admin Keuangan',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin Keuangan'] ?? null,
         ]);
 
         $accounting = Role::updateOrCreate([
             'name' => 'Accounting',
         ], [
             'name' => 'Accounting',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Accounting'] ?? null,
         ]);
 
         $purchasing = Role::updateOrCreate([
             'name' => 'Purchasing',
         ], [
             'name' => 'Purchasing',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Purchasing'] ?? null,
         ]);
 
         // Additional recommended roles
@@ -112,42 +128,48 @@ class RoleSeeder extends Seeder
             'name' => 'Purchasing Manager',
         ], [
             'name' => 'Purchasing Manager',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Purchasing Manager'] ?? null,
         ]);
 
         $warehouseStaff = Role::updateOrCreate([
             'name' => 'Warehouse Staff',
         ], [
             'name' => 'Warehouse Staff',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Warehouse Staff'] ?? null,
         ]);
 
         $deliveryDriver = Role::updateOrCreate([
             'name' => 'Delivery Driver',
         ], [
             'name' => 'Delivery Driver',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Delivery Driver'] ?? null,
         ]);
 
         $customerService = Role::updateOrCreate([
             'name' => 'Customer Service',
         ], [
             'name' => 'Customer Service',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Customer Service'] ?? null,
         ]);
 
         $auditor = Role::updateOrCreate([
             'name' => 'Auditor',
         ], [
             'name' => 'Auditor',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Auditor'] ?? null,
         ]);
 
         $itSupport = Role::updateOrCreate([
             'name' => 'IT Support',
         ], [
             'name' => 'IT Support',
-            'guard_name' => 'web'
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['IT Support'] ?? null,
         ]);
 
 
@@ -157,53 +179,85 @@ class RoleSeeder extends Seeder
         // Role -> resource mapping: each role gets ALL permissions for the listed resources
         $roleResourceMap = [
             'Admin' => [
-                'user', 'role', 'permission', 'currency', 'chart of account', 'tax setting', 'cabang', 'asset', 'journal entry'
+                'user', 'role', 'permission', 'currency', 'chart of account',
+                'tax setting', 'cabang', 'asset', 'journal entry', 'delivery schedule',
+                'supplier', 'product', 'warehouse', 'unit of measure',
             ],
             'Finance Manager' => [
-                'account payable', 'account receivable', 'vendor payment', 'vendor payment detail', 'customer receipt', 'customer receipt item', 'invoice', 'invoice item', 'deposit', 'deposit log', 'ageing schedule', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
+                'account payable', 'account receivable', 'vendor payment', 'vendor payment detail',
+                'customer receipt', 'customer receipt item', 'invoice', 'invoice item',
+                'deposit', 'deposit log', 'ageing schedule', 'voucher request',
+                'asset', 'asset depreciation', 'asset disposal', 'asset transfer',
+                'cash bank account', 'cash bank transaction detail', 'journal entry',
+                'purchase return', 'customer return',
             ],
             'Admin Keuangan' => [
-                'account payable', 'vendor payment', 'deposit', 'invoice', 'invoice item', 'voucher request', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
+                'account payable', 'vendor payment', 'deposit', 'invoice', 'invoice item',
+                'voucher request', 'asset', 'asset depreciation', 'asset disposal',
+                'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry',
             ],
             'Accounting' => [
-                'chart of account', 'account payable', 'account receivable', 'deposit', 'invoice', 'invoice item', 'ageing schedule', 'asset', 'asset depreciation', 'asset disposal', 'asset transfer', 'cash bank account', 'cash bank transaction detail', 'journal entry'
+                'chart of account', 'account payable', 'account receivable', 'deposit',
+                'invoice', 'invoice item', 'ageing schedule', 'asset', 'asset depreciation',
+                'asset disposal', 'asset transfer', 'cash bank account',
+                'cash bank transaction detail', 'journal entry',
             ],
             'Purchasing' => [
-                'purchase order', 'purchase order item', 'purchase receipt', 'purchase receipt item', 'purchase order biaya', 'purchase order currency', 'purchase return'
+                'order request', 'order request item',
+                'purchase order', 'purchase order item', 'purchase receipt', 'purchase receipt item',
+                'purchase order biaya', 'purchase order currency', 'purchase return',
+                'supplier', 'product',
             ],
             'Purchasing Manager' => [
-                'purchase order', 'purchase order item', 'purchase receipt', 'vendor payment', 'purchase return', 'purchase order biaya', 'asset'
+                'order request', 'order request item',
+                'purchase order', 'purchase order item', 'purchase receipt',
+                'vendor payment', 'purchase return', 'purchase return item',
+                'purchase order biaya', 'purchase order currency',
+                'supplier', 'product', 'asset',
             ],
             'Inventory Manager' => [
-                'warehouse', 'warehouse confirmation', 'inventory stock', 'stock movement', 'stock transfer', 'stock transfer item', 'product', 'product category', 'rak', 'unit of measure', 'product unit conversion', 'quality control', 'asset transfer'
+                'warehouse', 'warehouse confirmation', 'inventory stock', 'stock movement',
+                'stock transfer', 'stock transfer item', 'product', 'product category',
+                'rak', 'unit of measure', 'product unit conversion', 'quality control',
+                'asset transfer', 'bill of material', 'bill of material item',
+                'production', 'production plan', 'material issue',
+                'order request', 'order request item',
             ],
             'Admin Inventory' => [
-                'warehouse', 'inventory stock', 'stock movement', 'product'
+                'warehouse', 'inventory stock', 'stock movement', 'product',
+                'product category', 'rak', 'unit of measure', 'product unit conversion',
             ],
             'Warehouse Staff' => [
-                'warehouse', 'warehouse confirmation', 'stock transfer', 'stock transfer item', 'inventory stock'
+                'warehouse', 'warehouse confirmation', 'stock transfer', 'stock transfer item',
+                'inventory stock', 'rak', 'quality control',
             ],
             'Checker' => [
-                'warehouse confirmation', 'quality control', 'inventory stock'
+                'warehouse confirmation', 'quality control', 'inventory stock',
+                'purchase receipt item',
             ],
             'Sales Manager' => [
-                'sales order', 'sales order item', 'quotation', 'quotation item', 'invoice', 'customer', 'customer receipt'
+                'sales order', 'sales order item', 'quotation', 'quotation item',
+                'invoice', 'customer', 'customer receipt', 'customer return',
+                'return product', 'return product item', 'delivery order', 'surat jalan',
+                'delivery schedule',
             ],
             'Sales' => [
-                'sales order', 'sales order item', 'quotation', 'customer'
+                'sales order', 'sales order item', 'quotation', 'customer',
             ],
             'Kasir' => [
-                'customer receipt', 'customer receipt item', 'invoice'
+                'customer receipt', 'customer receipt item', 'invoice', 'deposit',
+                'cash bank account',
             ],
             'Customer Service' => [
-                'customer', 'quotation', 'sales order', 'delivery order', 'surat jalan'
+                'customer', 'quotation', 'sales order', 'delivery order',
+                'surat jalan', 'delivery schedule', 'customer return',
             ],
             'Delivery Driver' => [
-                'delivery order', 'delivery order item', 'vehicle', 'surat jalan'
+                'delivery order', 'delivery order item', 'vehicle', 'surat jalan', 'delivery schedule',
             ],
-            'Auditor' => array_keys(HelperController::listPermission()), // auditor can view many modules; we'll grant view access in test verification
+            'Auditor' => [], // Auditor receives only 'view any' for every resource (via special block below)
             'IT Support' => [
-                'user', 'role', 'permission', 'tax setting', 'currency'
+                'user', 'role', 'permission', 'tax setting', 'currency',
             ],
         ];
 
@@ -216,6 +270,7 @@ class RoleSeeder extends Seeder
 
             $permsToAssign = [];
             $allDefined = HelperController::listPermission();
+            $missingResources = [];
             foreach ($resources as $res) {
                 // If mapping contains full list key (like auditor), handle separately
                 if (is_int($res)) {
@@ -232,9 +287,11 @@ class RoleSeeder extends Seeder
                         $allowedDestructiveRoles = [
                         'Owner',
                         'Super Admin',
+                        'Admin',
                         'Purchasing Manager',
                         'Inventory Manager',
                         'Finance Manager',
+                        'Sales Manager',
                     ];
 
                         foreach ($allDefined[$res] as $action) {
@@ -245,7 +302,19 @@ class RoleSeeder extends Seeder
 
                             $permsToAssign[] = $action . ' ' . $res;
                         }
+                    } else {
+                        // collect missing mapping for logging/alerting
+                        if (!in_array($res, ['AUDITOR_ALL'], true) && !is_int($res)) {
+                            $missingResources[] = $res;
+                        }
                     }
+            }
+
+            if (!empty($missingResources)) {
+                Log::warning('RoleSeeder: unknown resources referenced in roleResourceMap', [
+                    'role' => $roleName,
+                    'missing_resources' => array_values(array_unique($missingResources)),
+                ]);
             }
 
             // Special: Auditor — grant view any for all resources
@@ -262,6 +331,11 @@ class RoleSeeder extends Seeder
             $existingPerms = Permission::whereIn('name', $permsToAssign)->get();
             if ($existingPerms->count()) {
                 $role->syncPermissions($existingPerms);
+            } else {
+                Log::info('RoleSeeder: no existing permissions found to assign for role', [
+                    'role' => $roleName,
+                    'requested_permissions' => $permsToAssign,
+                ]);
             }
         }
     }

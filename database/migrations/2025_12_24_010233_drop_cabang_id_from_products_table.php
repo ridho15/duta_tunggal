@@ -12,6 +12,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('products') || ! Schema::hasColumn('products', 'cabang_id')) {
+            return;
+        }
+
         Schema::table('products', function (Blueprint $table) {
             $table->dropColumn('cabang_id');
         });
@@ -22,9 +26,15 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('products')) {
+            return;
+        }
+
         Schema::table('products', function (Blueprint $table) {
-            $table->unsignedBigInteger('cabang_id')->nullable();
-            $table->foreign('cabang_id')->references('id')->on('cabangs');
+            if (! Schema::hasColumn('products', 'cabang_id')) {
+                $table->unsignedBigInteger('cabang_id')->nullable();
+                $table->foreign('cabang_id')->references('id')->on('cabangs');
+            }
         });
     }
 };

@@ -7,6 +7,7 @@ use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Filament\Resources\CustomerResource\RelationManagers\SalesRelationManager;
 use App\Models\Cabang;
 use App\Models\Customer;
+use App\Rules\InternationalPhoneNumber;
 use App\Services\CustomerService;
 use App\Services\CreditValidationService;
 use Filament\Forms\Components\Actions\Action;
@@ -36,12 +37,14 @@ class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
     protected static ?string $navigationGroup = 'Master Data';
 
     // Position Master Data as the 7th group
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -64,13 +67,15 @@ class CustomerResource extends Resource
                             ]),
                         TextInput::make('code')
                             ->label('Kode Customer')
+                            ->default(fn () => app(\App\Services\CustomerService::class)->generateCode())
+                            ->helperText('Kode internal customer (contoh: CUST-0001). Jangan mengisi dengan nomor NIK pribadi.')
                             ->required()
                             ->reactive()
                             ->suffixAction(Action::make('generateCode')
                                 ->icon('heroicon-m-arrow-path') // ikon reload
                                 ->tooltip('Generate Kode Customer')
                                 ->action(function ($set, $get, $state) {
-                                    $customerService = app(CustomerService::class);
+                                    $customerService = app(\App\Services\CustomerService::class);
                                     $set('code', $customerService->generateCode());
                                 }))
                             ->validationMessages([
@@ -109,25 +114,29 @@ class CustomerResource extends Resource
                         TextInput::make('telephone')
                             ->label('Telepon')
                             ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
-                                'regex' => 'Telepon tidak valid !'
+                                'max' => 'Telepon terlalu panjang'
                             ])
-                            ->placeholder('Contoh: 0211234567')
-                            ->regex('/^0[2-9][0-9]{1,3}[0-9]{5,8}$/')
-                            ->helperText('Hanya nomor telepon rumah/kantor, bukan nomor HP.')
+                            ->placeholder('Contoh: (+62) 830 9787 333')
+                            ->rules([new InternationalPhoneNumber()])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 12345678, 0211234567')
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(50),
                         TextInput::make('phone')
                             ->label('Handphone')
                             ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
                                 'required' => 'Nomor handphone tidak boleh kosong',
-                                'regex' => 'Nomor handphone tidak valid !'
+                                'max' => 'Nomor handphone terlalu panjang'
                             ])
-                            ->maxLength(15)
-                            ->rules(['regex:/^08[0-9]{8,12}$/'])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                            ->rules([new InternationalPhoneNumber()])
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(50),
                         TextInput::make('email')
                             ->email()
                             ->required()
@@ -139,9 +148,16 @@ class CustomerResource extends Resource
                             ]),
                         TextInput::make('fax')
                             ->label('Fax')
+                            ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
                             ->required()
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                            ->rules([new InternationalPhoneNumber()])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789')
+                            ->maxLength(50)
                             ->validationMessages([
-                                'required' => 'Fax tidak boleh kosong'
+                                'required' => 'Fax tidak boleh kosong',
+                                'max' => 'Fax terlalu panjang'
                             ]),
                         TextInput::make('tempo_kredit')
                             ->numeric()
@@ -311,6 +327,17 @@ class CustomerResource extends Resource
                 TextColumn::make('nik_npwp')
                     ->label('NIK / NPWP')
                     ->searchable()
+                    ->formatStateUsing(function ($state) {
+                        if (empty($state)) return '-';
+                        $clean = trim((string) $state);
+                        if (strlen($clean) >= 12) {
+                            return substr($clean, 0, 4) . '********' . substr($clean, -4);
+                        }
+                        if (strlen($clean) >= 6) {
+                            return substr($clean, 0, 2) . '****' . substr($clean, -2);
+                        }
+                        return $clean;
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')
                     ->label('Handphone')

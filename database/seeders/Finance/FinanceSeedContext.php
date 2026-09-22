@@ -12,6 +12,7 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class FinanceSeedContext
 {
@@ -114,17 +115,28 @@ class FinanceSeedContext
         }
 
         $cabang = $this->ensureCabang();
-        $category = ProductCategory::where('cabang_id', $cabang->id)->first();
+        $categoryQuery = ProductCategory::query();
+
+        if (Schema::hasColumn('product_categories', 'cabang_id')) {
+            $categoryQuery->where('cabang_id', $cabang->id);
+        }
+
+        $category = $categoryQuery->first();
         if ($category) {
             return $this->cachedCategory = $category;
         }
 
-        return $this->cachedCategory = ProductCategory::create([
+        $categoryData = [
             'name' => 'Kategori Seeder',
             'kode' => 'CAT-SEED',
-            'cabang_id' => $cabang->id,
             'kenaikan_harga' => 0,
-        ]);
+        ];
+
+        if (Schema::hasColumn('product_categories', 'cabang_id')) {
+            $categoryData['cabang_id'] = $cabang->id;
+        }
+
+        return $this->cachedCategory = ProductCategory::create($categoryData);
     }
 
     public function ensureUnit(): UnitOfMeasure
@@ -161,10 +173,9 @@ class FinanceSeedContext
             $unit = $this->ensureUnit();
 
             for ($i = 0; $i < $needed; $i++) {
-                $products->push(Product::create([
+                $productData = [
                     'name' => 'Produk Seeder ' . ($i + 1),
                     'sku' => 'SEED-PROD-' . ($i + 1),
-                    'cabang_id' => $cabang->id,
                     'product_category_id' => $category->id,
                     'uom_id' => $unit->id,
                     'cost_price' => 1000000,
@@ -180,7 +191,13 @@ class FinanceSeedContext
                     'is_raw_material' => false,
                     'inventory_coa_id' => $this->getCoa('1140.01')?->id,
                     'is_active' => true,
-                ]));
+                ];
+
+                if (Schema::hasColumn('products', 'cabang_id')) {
+                    $productData['cabang_id'] = $cabang->id;
+                }
+
+                $products->push(Product::create($productData));
             }
 
             $products = Product::orderBy('id')->take(3)->get();

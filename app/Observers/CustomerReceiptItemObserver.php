@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\Log;
 
 class CustomerReceiptItemObserver
 {
+    public function creating(CustomerReceiptItem $customerReceiptItem): void
+    {
+        if ($customerReceiptItem->invoice_id) {
+            $invoice = \App\Models\Invoice::find($customerReceiptItem->invoice_id);
+            $rate = (float) ($invoice?->exchange_rate ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+
+            $customerReceiptItem->currency_id = is_numeric($invoice?->currency_id ?? null) ? (int) $invoice->currency_id : null;
+            $customerReceiptItem->exchange_rate = $rate;
+        } else {
+            $customerReceiptItem->exchange_rate = (float) ($customerReceiptItem->exchange_rate ?? 1) ?: 1;
+        }
+
+        $customerReceiptItem->amount_idr = (float) ($customerReceiptItem->amount_idr ?: $customerReceiptItem->amount);
+    }
+
     public function created(CustomerReceiptItem $customerReceiptItem): void
     {
         $customerReceipt = $customerReceiptItem->customerReceipt;
@@ -82,80 +98,25 @@ class CustomerReceiptItemObserver
             }
         }
 
-        if ($customerReceiptItem->coa_id || $customerReceipt->payment_method === 'Deposit') {
-            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($customerReceiptItem);
-            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($customerReceiptItem);
-            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($customerReceiptItem);
-            
-            $debitCoaId = $customerReceiptItem->coa_id;
-            $debitDescription = 'Customer receipt item';
-            
-            // Define AR COA for credit entry
-            $arCoaId = \App\Models\ChartOfAccount::where('code', '1120')->first()?->id ?? $customerReceiptItem->coa_id;
-            
-            if ($customerReceipt->payment_method === 'Deposit') {
-                // For deposit payments from customer:
-                // Dr: Hutang Titipan Konsumen (2160.04) - reduce liability
-                // Cr: Accounts Receivable (1120) - reduce receivable
-                $liabilityCoaId = \App\Models\ChartOfAccount::where('code', '2160.04')->first()?->id;
-                if ($liabilityCoaId) {
-                    // DEBIT entry for liability reduction
-                    $customerReceiptItem->journalEntry()->create([
-                        'coa_id' => $liabilityCoaId,
-                        'date' => Carbon::now(),
-                        'description' => 'Customer receipt item - Deposit liability reduction',
-                        'debit' => $customerReceiptItem->amount,
-                        'journal_type' => 'Sales',
-                        'cabang_id' => $branchId,
-                        'department_id' => $departmentId,
-                        'project_id' => $projectId,
-                    ]);
-                    
-                    // Skip the regular debit entry since we're using deposit
-                    $skipRegularDebit = true;
-                }
-            }
-            
-            // DEBIT entry (only for non-deposit payments)
-            if (!isset($skipRegularDebit) || !$skipRegularDebit) {
-                $customerReceiptItem->journalEntry()->create([
-                    'coa_id' => $debitCoaId,
-                    'date' => Carbon::now(),
-                    'description' => $debitDescription,
-                    'debit' => $customerReceiptItem->amount,
-                    'journal_type' => 'Sales',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                ]);
-            }
-            
-            // CREDIT: Accounts Receivable (reducing receivable)
-            $arCoaId = \App\Models\ChartOfAccount::where('code', '1120')->first()?->id ?? $customerReceiptItem->coa_id;
-            \App\Models\JournalEntry::create([
-                'coa_id' => $arCoaId,
-                'date' => Carbon::now(),
-                'reference' => 'CR-' . $customerReceiptItem->id,
-                'description' => 'Customer receipt item - Accounts Receivable',
-                'credit' => $customerReceiptItem->amount,
-                'journal_type' => 'Sales',
-                'source_type' => \App\Models\CustomerReceiptItem::class,
-                'source_id' => $customerReceiptItem->id,
-                'cabang_id' => $branchId,
-                'department_id' => $departmentId,
-                'project_id' => $projectId,
-            ]);
-        }
+        // Journal posting is handled at the CustomerReceipt level via LedgerPostingService.
+        // Item observer only keeps deposits and AR status in sync.
     }
     
     private function updateCustomerReceiptStatus($customerReceipt)
     {
         // Check status of all invoices in selected_invoices
         if (!empty($customerReceipt->selected_invoices)) {
+            $selectedInvoiceIds = array_values(array_unique(array_filter(array_map(
+                'intval',
+                is_array($customerReceipt->selected_invoices)
+                    ? $customerReceipt->selected_invoices
+                    : (json_decode($customerReceipt->selected_invoices, true) ?? [])
+            ))));
+
             $allPaid = true;
             $anyPartial = false;
             
-            foreach ($customerReceipt->selected_invoices as $invoiceId) {
+            foreach ($selectedInvoiceIds as $invoiceId) {
                 $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
                 if ($accountReceivable) {
                     if ($accountReceivable->remaining > 0) {

@@ -10,6 +10,7 @@ use App\Models\MaterialIssue;
 use App\Models\Product;
 use App\Services\ManufacturingService;
 use App\Services\ManufacturingJournalService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Components\Actions\Action as FormAction;
@@ -21,6 +22,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class MaterialIssueResource extends Resource
 {
@@ -28,13 +30,15 @@ class MaterialIssueResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
 
     protected static ?string $navigationLabel = 'Pengambilan Bahan Baku';
 
     protected static ?string $modelLabel = 'Pengambilan Bahan Baku';
 
-    protected static ?int $navigationSort = 4;
+    protected static bool $shouldRegisterNavigation = false;
+
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {
@@ -113,13 +117,14 @@ class MaterialIssueResource extends Resource
                                     if ($productionPlan && $productionPlan->billOfMaterial) {
                                         $items = [];
                                         foreach ($productionPlan->billOfMaterial->items as $bomItem) {
+                                            $warehouseId = self::resolveWarehouseIdForProduct($bomItem->product_id, $productionPlan->warehouse_id);
                                             $items[] = [
                                                 'product_id' => $bomItem->product_id,
                                                 'uom_id' => $bomItem->uom_id,
                                                 'quantity' => $bomItem->quantity * $productionPlan->quantity,
                                                 'cost_per_unit' => $bomItem->product->cost_price ?? 0,
                                                 'total_cost' => ($bomItem->quantity * $productionPlan->quantity) * ($bomItem->product->cost_price ?? 0),
-                                                'warehouse_id' => $productionPlan->warehouse_id, // Auto-fill from ProductionPlan
+                                                'warehouse_id' => $warehouseId,
                                                 'rak_id' => null,
                                                 'notes' => null,
                                             ];
@@ -160,7 +165,7 @@ class MaterialIssueResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = \App\Models\Warehouse::where('status', true)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                                                                $q->where('name', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 
@@ -224,14 +229,9 @@ class MaterialIssueResource extends Resource
                             })
                             ->mutateRelationshipDataBeforeFillUsing(function ($data) {
                                 if ($data['product_id'] && $data['warehouse_id']) {
-                                    $inventoryStock = InventoryStock::where('product_id', $data['product_id'])
-                                        ->where('warehouse_id', $data['warehouse_id'])
-                                        ->first();
-                                    if ($inventoryStock) {
-                                        $data['available_stock_display'] = $inventoryStock->qty_available;
-                                    } else {
-                                        $data['available_stock_display'] = 0;
-                                    }
+                                    $stockMetrics = self::getStockMetrics($data['product_id'], $data['warehouse_id']);
+                                    $data['available_stock_display'] = $stockMetrics['available'];
+                                    $data['reserved_stock_display'] = $stockMetrics['reserved'];
                                 }
                                 return $data;
                             })
@@ -257,7 +257,7 @@ class MaterialIssueResource extends Resource
                                     ])
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $state) {
-                                        $product = Product::find($state);
+                                        $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                         if ($product) {
                                             $set('uom_id', $product->uom_id);
                                             $set('cost_per_unit', $product->cost_price);
@@ -265,6 +265,7 @@ class MaterialIssueResource extends Resource
                                         $set('warehouse_id', null); // Reset warehouse when product changes
                                         // Reset available stock display when product changes
                                         $set('available_stock_display', '0.00');
+                                        $set('reserved_stock_display', '0.00');
                                     })
                                     ->getOptionLabelFromRecordUsing(
                                         fn(Product $record) =>
@@ -294,12 +295,11 @@ class MaterialIssueResource extends Resource
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get) {
                                         $qty = (float) $get('quantity');
-                                        $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
+                                        $cost = \App\Helpers\MoneyHelper::safeParse($get('cost_per_unit') ?? '0');
                                         $set('total_cost', $qty * $cost);
                                     }),
                                 Forms\Components\TextInput::make('cost_per_unit')
                                     ->label('Cost Price')
-                                    ->numeric()
                                     ->required()
                                     ->default(0)
                                     ->indonesianMoney()
@@ -309,26 +309,20 @@ class MaterialIssueResource extends Resource
                                         'numeric' => 'Cost Price harus berupa angka.',
                                         'min' => 'Cost Price minimal 0.',
                                     ])
-                                    ->reactive()
+                                    ->live(debounce: 500)
                                     ->afterStateUpdated(function ($set, $get) {
                                         $qty = (float) $get('quantity');
-                                        $cost = HelperController::parseIndonesianMoney($get('cost_per_unit') ?? '0');
+                                        $cost = \App\Helpers\MoneyHelper::safeParse($get('cost_per_unit') ?? '0');
                                         $set('total_cost', $qty * $cost);
                                     }),
                                 Forms\Components\TextInput::make('total_cost')
                                     ->label('Subtotal')
                                     ->disabled()
                                     ->indonesianMoney()
-                                    ->dehydrated()
-                                    ->rules(['numeric', 'min:0'])
-                                    ->validationMessages([
-                                        'numeric' => 'Subtotal harus berupa angka.',
-                                        'min' => 'Subtotal minimal 0.',
-                                    ]),
+                                    ->dehydrated(false),
                                 Select::make('warehouse_id')
                                     ->label('Gudang')
-                                    ->relationship('warehouse', 'name')
-                                    ->searchable('kode', 'name')
+                                    ->searchable()
                                     ->reactive()
                                     ->nullable()
                                     ->required()
@@ -339,36 +333,23 @@ class MaterialIssueResource extends Resource
                                     ])
                                     ->default(null)
                                     ->options(function (callable $get) {
-                                        $productId = $get('product_id');
-                                        if ($productId) {
-                                            return \App\Models\Warehouse::whereHas('inventoryStock', function ($q) use ($productId) {
-                                                $q->where('product_id', $productId)->whereRaw('qty_available > 0');
-                                            })
-                                                ->orderBy('kode')
-                                                ->limit(50)
-                                                ->get()
-                                                ->mapWithKeys(function ($warehouse) {
-                                                    return [$warehouse->id => $warehouse->kode . ' - ' . $warehouse->name];
-                                                })
-                                                ->toArray();
-                                        }
-                                        return [];
+                                        return self::resolveWarehouseOptionsForProduct($get('product_id'));
                                     })
-                                    ->getOptionLabelFromRecordUsing(
-                                        fn(\App\Models\Warehouse $record): string =>
-                                        $record->kode . ' - ' . $record->name
-                                    )
+                                    ->getSearchResultsUsing(function (string $search, callable $get) {
+                                        return self::resolveWarehouseOptionsForProduct($get('product_id'), $search);
+                                    })
+                                    ->getOptionLabelUsing(fn ($value): ?string => self::resolveWarehouseLabel(is_numeric($value) ? (int) $value : null))
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $productId = $get('product_id');
                                         $warehouseId = $state;
+
                                         if ($productId && $warehouseId) {
-                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                                                ->where('warehouse_id', $warehouseId)
-                                                ->first();
-                                            $available = $stock ? $stock->qty_available : 0;
-                                            $set('available_stock_display', number_format($available, 2));
+                                            $stockMetrics = self::getStockMetrics($productId, $warehouseId);
+                                            $set('available_stock_display', number_format($stockMetrics['available'], 2, '.', ''));
+                                            $set('reserved_stock_display', number_format($stockMetrics['reserved'], 2, '.', ''));
                                         } else {
                                             $set('available_stock_display', '0.00');
+                                            $set('reserved_stock_display', '0.00');
                                         }
                                     }),
                                 Select::make('rak_id')
@@ -382,11 +363,10 @@ class MaterialIssueResource extends Resource
                                         $warehouseId = $get('warehouse_id');
 
                                         if ($productId && $warehouseId) {
-                                            // Get racks that have inventory stock for this product in this warehouse
                                             return \App\Models\Rak::whereHas('inventoryStock', function ($q) use ($productId, $warehouseId) {
                                                 $q->where('product_id', $productId)
                                                     ->where('warehouse_id', $warehouseId)
-                                                    ->whereRaw('qty_available - qty_reserved > 0');
+                                                    ->whereRaw('(qty_available - qty_reserved) > 0');
                                             })
                                                 ->orderBy('name')
                                                 ->get()
@@ -397,7 +377,6 @@ class MaterialIssueResource extends Resource
                                         }
 
                                         if ($warehouseId) {
-                                            // If no product selected, show all racks in the warehouse
                                             return \App\Models\Rak::where('warehouse_id', $warehouseId)
                                                 ->orderBy('name')
                                                 ->get()
@@ -416,40 +395,52 @@ class MaterialIssueResource extends Resource
                                     ->disabled(fn(callable $get) => !$get('warehouse_id'))
                                     ->helperText('Rak akan tersedia setelah gudang dipilih. Rak dengan stock tersedia akan diprioritaskan jika produk sudah dipilih.'),
                                 Forms\Components\TextInput::make('available_stock_display')
-                                    ->label('Stock Tersedia')
+                                    ->label('Stock Available')
+                                    ->helperText('Stok bebas pakai setelah dikurangi reservasi aktif.')
                                     ->disabled()
                                     ->reactive()
                                     ->dehydrated(false)
                                     ->default(function ($get) {
-                                        $productId = $get('product_id');
-                                        $warehouseId = $get('warehouse_id');
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
 
-                                        if ($productId && $warehouseId) {
-                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                                                ->where('warehouse_id', $warehouseId)
-                                                ->first();
-                                            return number_format($stock ? $stock->qty_available : 0, 2);
-                                        }
-
-                                        return '0.00';
+                                        return number_format($stockMetrics['available'], 2, '.', '');
                                     })
                                     ->extraInputAttributes(function ($get) {
-                                        $productId = $get('product_id');
-                                        $warehouseId = $get('warehouse_id');
                                         $quantity = (float) $get('quantity');
 
-                                        if ($productId && $warehouseId) {
-                                            $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                                                ->where('warehouse_id', $warehouseId)
-                                                ->first();
-                                            $available = $stock ? $stock->qty_available : 0;
-                                            if ($available >= $quantity) {
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
+
+                                        if ($get('product_id') && $get('warehouse_id')) {
+                                            if ($stockMetrics['available'] >= $quantity) {
                                                 return ['class' => 'text-green-600 font-semibold'];
-                                            } else {
-                                                return ['class' => 'text-red-600 font-semibold'];
                                             }
+
+                                            return ['class' => 'text-red-600 font-semibold'];
                                         }
+
                                         return ['class' => 'text-gray-500'];
+                                    }),
+                                Forms\Components\TextInput::make('reserved_stock_display')
+                                    ->label('Stock Reserved')
+                                    ->helperText('Total stok yang sedang direservasi di gudang ini.')
+                                    ->disabled()
+                                    ->reactive()
+                                    ->dehydrated(false)
+                                    ->default(function ($get) {
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
+
+                                        return number_format($stockMetrics['reserved'], 2, '.', '');
+                                    })
+                                    ->extraInputAttributes(function ($get) {
+                                        $stockMetrics = self::getStockMetrics($get('product_id'), $get('warehouse_id'));
+
+                                        if (! $get('product_id') || ! $get('warehouse_id')) {
+                                            return ['class' => 'text-gray-500'];
+                                        }
+
+                                        return $stockMetrics['reserved'] > 0
+                                            ? ['class' => 'text-amber-600 font-semibold']
+                                            : ['class' => 'text-gray-500'];
                                     }),
 
                                 Forms\Components\Textarea::make('notes')
@@ -474,7 +465,7 @@ class MaterialIssueResource extends Resource
                                 $items = $get('items') ?? [];
                                 $total = 0;
                                 foreach ($items as $item) {
-                                    $total += HelperController::parseIndonesianMoney($item['total_cost'] ?? '0');
+                                    $total += \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? '0');
                                 }
                                 return 'Rp ' . number_format($total, 2, ',', '.');
                             }),
@@ -510,7 +501,7 @@ class MaterialIssueResource extends Resource
                                 $totalMaterial = 0;
                                 $items = $get('items') ?? [];
                                 foreach ($items as $item) {
-                                    $totalMaterial += HelperController::parseIndonesianMoney($item['total_cost'] ?? '0');
+                                    $totalMaterial += \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? '0');
                                 }
                                 $labor = 0;
                                 $overhead = 0;
@@ -649,13 +640,15 @@ class MaterialIssueResource extends Resource
                     Tables\Actions\ViewAction::make()->color('primary'),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('request_approval')
-                        ->label('Request Approval')
+                        ->label(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation() ? 'Request Konfirmasi Gudang' : 'Request Approval')
                         ->icon('heroicon-o-paper-airplane')
                         ->color('warning')
                         ->visible(fn(MaterialIssue $record) => $record->isDraft() && !$record->approved_by)
                         ->requiresConfirmation()
-                        ->modalHeading('Request Approval Material Issue')
-                        ->modalDescription('Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
+                        ->modalHeading(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation() ? 'Request Konfirmasi Gudang' : 'Request Approval Material Issue')
+                        ->modalDescription(fn (MaterialIssue $record) => $record->requiresWarehouseConfirmation()
+                            ? 'Konfirmasi gudang per item bahan akan dibuat atau diperbarui. Material Issue akan otomatis di-approve hanya jika semua item disetujui dan akan ditolak jika ada item yang ditolak.'
+                            : 'Apakah Anda yakin ingin mengirim request approval untuk Material Issue ini?')
                         ->action(function (MaterialIssue $record) {
                             // Validate stock before request approval
                             $stockValidation = static::validateStockAvailability($record);
@@ -668,6 +661,44 @@ class MaterialIssueResource extends Resource
                                     ->send();
                                 return;
                             }
+
+                            if ($record->requiresWarehouseConfirmation()) {
+                                $warehouseConfirmation = $record->ensureWarehouseConfirmationRequest();
+
+                                if (! $warehouseConfirmation) {
+                                    Notification::make()
+                                        ->title('Konfirmasi Gudang Gagal Dibuat')
+                                        ->body('Manufacturing Order terkait tidak ditemukan sehingga konfirmasi gudang tidak dapat dibuat.')
+                                        ->danger()
+                                        ->send();
+                                    return;
+                                }
+
+                                if ($record->hasConfirmedWarehouseConfirmation()) {
+                                    $record->approveFromWarehouseConfirmation($record->latestWarehouseConfirmation() ?? $warehouseConfirmation);
+
+                                    Notification::make()
+                                        ->title('Material Issue Di-approve Otomatis')
+                                        ->body("Material Issue {$record->issue_number} langsung di-approve karena konfirmasi gudang sudah confirmed.")
+                                        ->success()
+                                        ->send();
+                                    return;
+                                }
+
+                                $record->update([
+                                    'approved_by' => null,
+                                    'approved_at' => null,
+                                    'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+                                ]);
+
+                                Notification::make()
+                                    ->title('Request Konfirmasi Gudang Terkirim')
+                                    ->body("Konfirmasi gudang per item untuk Material Issue {$record->issue_number} telah dibuat atau diperbarui. Material Issue akan otomatis di-approve jika semua item disetujui atau ditolak jika ada item yang ditolak.")
+                                    ->success()
+                                    ->send();
+                                return;
+                            }
+
                             // Super Admin bisa approve dari semua cabang, user lain harus di cabang yang sama
                             $currentUser = \Illuminate\Support\Facades\Auth::user();
                             if ($currentUser && $currentUser->hasRole('Super Admin')) {
@@ -717,6 +748,8 @@ class MaterialIssueResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->visible(function (MaterialIssue $record) {
+                            if ($record->requiresWarehouseConfirmation()) return false;
+
                             $currentUser = \Illuminate\Support\Facades\Auth::user();
                             if (!$currentUser) return false;
 
@@ -734,6 +767,15 @@ class MaterialIssueResource extends Resource
                         ->modalHeading('Approve Material Issue')
                         ->modalDescription('Setelah di-approve, Material Issue dapat diproses menjadi Completed.')
                         ->action(function (MaterialIssue $record) {
+                            if ($message = $record->warehouseConfirmationBlockingMessage()) {
+                                Notification::make()
+                                    ->title('Konfirmasi Gudang Diperlukan')
+                                    ->body($message)
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
                             // Validate stock before approval
                             $stockValidation = static::validateStockAvailability($record);
                             if (!$stockValidation['valid']) {
@@ -763,6 +805,8 @@ class MaterialIssueResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->visible(function (MaterialIssue $record) {
+                            if ($record->requiresWarehouseConfirmation()) return false;
+
                             $currentUser = \Illuminate\Support\Facades\Auth::user();
                             if (!$currentUser) return false;
 
@@ -800,46 +844,6 @@ class MaterialIssueResource extends Resource
                                 ->warning()
                                 ->send();
                         }),
-                    Tables\Actions\Action::make('complete')
-                        ->label('Selesai')
-                        ->icon('heroicon-o-check')
-                        ->color('success')
-                        ->visible(function (MaterialIssue $record) {
-                            $currentUser = \Illuminate\Support\Facades\Auth::user();
-                            if (!$currentUser) return false;
-
-                            // Super Admin can complete all approved records
-                            if ($currentUser->hasRole('Super Admin')) {
-                                return $record->isApproved();
-                            }
-
-                            // Users with 'approve warehouse' permission can complete approved records
-                            return $record->isApproved() && userHasPermission('approve warehouse');
-                        })
-                        ->requiresConfirmation()
-                        ->modalHeading('Selesaikan Material Issue')
-                        ->modalDescription('Apakah Anda yakin ingin menyelesaikan Material Issue ini? Stock akan dikurangi dan journal entry akan dibuat.')
-                        ->action(function (MaterialIssue $record) {
-                            // Validate stock before completion
-                            $stockValidation = static::validateStockAvailability($record);
-                            if (!$stockValidation['valid']) {
-                                Notification::make()
-                                    ->title('Tidak Dapat Menyelesaikan Material Issue')
-                                    ->body($stockValidation['message'])
-                                    ->danger()
-                                    ->duration(10000)
-                                    ->send();
-                                return;
-                            }
-
-                            $record->update(['status' => MaterialIssue::STATUS_COMPLETED]);
-
-                            Notification::make()
-                                ->title('Material Issue Diselesaikan')
-                                ->body("Material Issue {$record->issue_number} telah diselesaikan. Stock dikurangi dan journal entry dibuat.")
-                                ->success()
-                                ->send();
-                        }),
                     Tables\Actions\Action::make('generate_journal')
                         ->label('Generate Jurnal')
                         ->icon('heroicon-o-document-text')
@@ -860,12 +864,12 @@ class MaterialIssueResource extends Resource
                                     ->title('Jurnal Berhasil Dibuat')
                                     ->success()
                                     ->send();
-                            } catch (\Exception $e) {
-                                Notification::make()
-                                    ->title('Gagal Membuat Jurnal')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
+                            } catch (Throwable $exception) {
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Membuat Jurnal',
+                                    $exception,
+                                    'Jurnal material issue belum dapat dibuat. Periksa data dokumen lalu coba lagi.'
+                                );
                             }
                         }),
                     Tables\Actions\DeleteAction::make(),
@@ -891,8 +895,8 @@ class MaterialIssueResource extends Resource
                             '<li><strong>Integration:</strong> Terintegrasi dengan <em>Production Plan</em> (dibuat otomatis), <em>Manufacturing Order</em> (proses produksi), dan <em>Inventory</em> (pengurangan stock).</li>' .
                             '<li><strong>Actions:</strong> <em>Request Approval</em> (draft → pending), <em>Approve/Reject</em> (pending → approved/rejected), <em>Complete</em> (approved → completed, stock berkurang), <em>Generate Journal</em> (untuk akuntansi).</li>' .
                             '<li><strong>Permissions:</strong> <em>view any material issue</em>, <em>create material issue</em>, <em>update material issue</em>, <em>delete material issue</em>, <em>restore material issue</em>, <em>force-delete material issue</em>.</li>' .
-                            '<li><strong>Stock Management:</strong> Stock bahan baku otomatis berkurang saat completed. Sistem mencegah pengambilan jika stock tidak mencukupi.</li>' .
-                            '<li><strong>Accounting:</strong> Journal entry otomatis dibuat untuk mencatat pengeluaran bahan baku ke Work in Progress (WIP).</li>' .
+                            '<li><strong>Stock Management:</strong> Stock bahan baku otomatis di-reserve saat approved lalu dikonsumsi saat completed. Sistem mencegah pengambilan jika stock tidak mencukupi.</li>' .
+                            '<li><strong>Accounting:</strong> Journal entry otomatis dibuat untuk mencatat pengeluaran bahan baku ke Pos Sementara Produksi.</li>' .
                         '</ul>' .
                     '</div>' .
                 '</details>'
@@ -930,10 +934,84 @@ class MaterialIssueResource extends Resource
         ];
     }
 
+    public static function resolveWarehouseIdForProduct(?int $productId, ?int $preferredWarehouseId = null): ?int
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        $options = self::resolveWarehouseOptionsForProduct($productId);
+
+        if ($preferredWarehouseId && array_key_exists($preferredWarehouseId, $options)) {
+            return $preferredWarehouseId;
+        }
+
+        $firstWarehouseId = array_key_first($options);
+
+        return $firstWarehouseId !== null ? (int) $firstWarehouseId : null;
+    }
+
+    public static function resolveWarehouseOptionsForProduct(?int $productId, ?string $search = null): array
+    {
+        if (! $productId) {
+            return [];
+        }
+
+        $warehouseIds = InventoryStock::query()
+            ->where('product_id', $productId)
+            ->whereRaw('(qty_available - qty_reserved) > 0')
+            ->distinct()
+            ->pluck('warehouse_id')
+            ->all();
+
+        if (empty($warehouseIds)) {
+            return [];
+        }
+
+        $query = \App\Models\Warehouse::withoutGlobalScopes()
+            ->whereIn('id', $warehouseIds)
+            ->orderBy('kode');
+
+        if (! app()->runningInConsole()) {
+            $user = Auth::user();
+            $manageType = $user?->manage_type ?? [];
+
+            if (! $user || ! is_array($manageType) || ! in_array('all', $manageType)) {
+                $query->where('cabang_id', $user?->cabang_id);
+            }
+        }
+
+        if (filled($search)) {
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('kode', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(function ($warehouse) {
+                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+            })
+            ->toArray();
+    }
+
+    public static function resolveWarehouseLabel(?int $warehouseId): ?string
+    {
+        if (! $warehouseId) {
+            return null;
+        }
+
+        $warehouse = \App\Models\Warehouse::withoutGlobalScopes()->find($warehouseId);
+
+        return $warehouse ? "({$warehouse->kode}) {$warehouse->name}" : null;
+    }
+
     /**
      * Validate stock availability for material issue items
      */
-    protected static function validateStockAvailability(MaterialIssue $materialIssue): array
+    public static function validateStockAvailability(MaterialIssue $materialIssue): array
     {
         $materialIssue->loadMissing('items.product');
 
@@ -945,13 +1023,20 @@ class MaterialIssueResource extends Resource
                 ->where('warehouse_id', $item->warehouse_id ?? $materialIssue->warehouse_id)
                 ->first();
 
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
+            $availableQty = $inventoryStock ? (float) $inventoryStock->qty_available : 0;
+            $reservedQty = $inventoryStock ? $inventoryStock->qty_reserved : 0;
+            $ownReservedQty = self::getReservedQuantityForIssue(
+                $materialIssue,
+                $item->product_id,
+                $item->warehouse_id ?? $materialIssue->warehouse_id
+            );
+            $effectiveQty = max(0, $availableQty - $reservedQty + $ownReservedQty);
             $requiredQty = $item->quantity;
 
-            if ($availableQty <= 0) {
-                $outOfStock[] = "{$item->product->name} (Stock: 0)";
-            } elseif ($availableQty < $requiredQty) {
-                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            if ($effectiveQty <= 0) {
+                $outOfStock[] = "{$item->product->name} (Available: {$availableQty}, Reserved: {$reservedQty})";
+            } elseif ($effectiveQty < $requiredQty) {
+                $insufficientStock[] = "{$item->product->name} (Dibutuhkan: {$requiredQty}, Available: {$availableQty}, Reserved: {$reservedQty}, Reserved Dokumen Ini: {$ownReservedQty})";
             }
         }
 
@@ -973,5 +1058,54 @@ class MaterialIssueResource extends Resource
             'valid' => true,
             'message' => 'Stock tersedia untuk semua item'
         ];
+    }
+
+    public static function getStockMetrics(?int $productId, ?int $warehouseId, ?MaterialIssue $materialIssue = null): array
+    {
+        if (! $productId || ! $warehouseId) {
+            return [
+                'physical' => 0.0,
+                'reserved' => 0.0,
+                'free' => 0.0,
+                'own_reserved' => 0.0,
+                'effective' => 0.0,
+                'available' => 0.0,
+            ];
+        }
+
+        $inventoryStock = InventoryStock::query()
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->first();
+
+        $physicalQty = (float) ($inventoryStock->qty_available ?? 0);
+        $reservedQty = (float) ($inventoryStock->qty_reserved ?? 0);
+        $ownReservedQty = $materialIssue
+            ? self::getReservedQuantityForIssue($materialIssue, $productId, $warehouseId)
+            : 0.0;
+        $freeQty = max(0, $physicalQty - $reservedQty);
+        $effectiveQty = max(0, $physicalQty - $reservedQty + $ownReservedQty);
+
+        return [
+            'physical' => $physicalQty,
+            'reserved' => $reservedQty,
+            'free' => $freeQty,
+            'own_reserved' => $ownReservedQty,
+            'effective' => $effectiveQty,
+            'available' => $materialIssue ? $effectiveQty : $freeQty,
+        ];
+    }
+
+    protected static function getReservedQuantityForIssue(MaterialIssue $materialIssue, int $productId, ?int $warehouseId): float
+    {
+        if (! $materialIssue->id || ! $warehouseId) {
+            return 0.0;
+        }
+
+        return (float) \App\Models\StockReservation::query()
+            ->where('material_issue_id', $materialIssue->id)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->sum('quantity');
     }
 }

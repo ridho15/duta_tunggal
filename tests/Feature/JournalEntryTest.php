@@ -2,8 +2,13 @@
 
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseReceipt;
+use App\Models\PurchaseReceiptItem;
+use App\Models\Supplier;
 use App\Models\Cabang;
 use App\Models\User;
+use App\Filament\Resources\JournalEntryResource;
 use App\Services\JournalEntryAggregationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -281,6 +286,49 @@ test('journal entry polymorphic relationships work', function () {
     // Test polymorphic relationship
     expect($entry->source)->toBeInstanceOf(User::class)
         ->and($entry->source->id)->toBe($this->user->id);
+});
+
+test('journal entry source urls resolve to the correct view routes', function () {
+    $supplier = Supplier::factory()->create();
+    $purchaseOrder = PurchaseOrder::factory()->create([
+        'supplier_id' => $supplier->id,
+    ]);
+    $purchaseReceipt = PurchaseReceipt::factory()->create([
+        'purchase_order_id' => $purchaseOrder->id,
+        'received_by' => $this->user->id,
+    ]);
+
+    $purchaseOrderJournal = JournalEntry::factory()->create([
+        'source_type' => PurchaseOrder::class,
+        'source_id' => $purchaseOrder->id,
+    ]);
+
+    $purchaseReceiptJournal = JournalEntry::factory()->create([
+        'source_type' => PurchaseReceipt::class,
+        'source_id' => $purchaseReceipt->id,
+    ]);
+
+    $purchaseReceiptItemJournal = new JournalEntry([
+        'source_type' => PurchaseReceiptItem::class,
+        'source_id' => 999,
+    ]);
+    $purchaseReceiptItemJournal->setRelation('source', new PurchaseReceiptItem([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+    ]));
+
+    $manualJournal = new JournalEntry([
+        'source_type' => null,
+        'source_id' => null,
+    ]);
+
+    expect(JournalEntryResource::resolveSourceViewUrl($purchaseOrderJournal))
+        ->toBe(route('filament.admin.resources.purchase-orders.view', $purchaseOrder->id))
+        ->and(JournalEntryResource::resolveSourceViewUrl($purchaseReceiptJournal))
+        ->toBe(route('filament.admin.resources.purchase-receipts.view', $purchaseReceipt->id))
+        ->and(JournalEntryResource::resolveSourceViewUrl($purchaseReceiptItemJournal))
+        ->toBe(route('filament.admin.resources.purchase-receipts.view', $purchaseReceipt->id))
+        ->and(JournalEntryResource::resolveSourceViewUrl($manualJournal))
+        ->toBeNull();
 });
 
 test('journal entry aggregation service calculates balances correctly', function () {

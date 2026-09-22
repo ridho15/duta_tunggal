@@ -54,6 +54,13 @@ class AssetService
                 }
             }
 
+            if (!$creditCoa) {
+                $creditCoa = ChartOfAccount::where('code', '2100')->first();
+                if ($creditCoa) {
+                    $description .= ' (Default AP)';
+                }
+            }
+
             // If no purchase order or accounts payable not found, we need manual intervention
             if (!$creditCoa) {
                 throw new \Exception('Cannot determine credit account for asset acquisition. Please specify the funding source.');

@@ -7,6 +7,7 @@ use App\Filament\Resources\DriverResource\Pages\ViewDriver;
 use App\Filament\Resources\DriverResource\RelationManagers\DeliveryOrderRelationManager;
 use App\Models\Cabang;
 use App\Models\Driver;
+use App\Rules\InternationalPhoneNumber;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -28,6 +29,8 @@ class DriverResource extends Resource
 {
     protected static ?string $model = Driver::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-user';
 
     protected static ?string $navigationGroup = 'Master Data';
@@ -48,12 +51,14 @@ class DriverResource extends Resource
                                 'max' => 'Nama driver terlalu panjang'
                             ]),
                         TextInput::make('phone')
-                            ->tel()->tel() // HTML input type "tel"
-                            ->rules(['regex:/^08[0-9]{8,12}$/'])
-                            ->maxLength(15)
+                            ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                            ->rules([new InternationalPhoneNumber()])
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                            ->maxLength(50)
                             ->default(null)
                             ->validationMessages([
-                                'regex' => 'Nomor telepon tidak valid (harus dimulai dengan 08)',
                                 'max'   => 'Nomor telepon terlalu panjang',
                             ]),
                         TextInput::make('license')

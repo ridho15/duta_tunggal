@@ -37,6 +37,10 @@ class PurchaseOrderPolicy
      */
     public function update(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! in_array($purchaseOrder->status, ['draft', 'request_approve'])) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update purchase order');
     }
 
@@ -45,6 +49,10 @@ class PurchaseOrderPolicy
      */
     public function delete(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if ($purchaseOrder->status !== 'draft') {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete purchase order');
     }
 

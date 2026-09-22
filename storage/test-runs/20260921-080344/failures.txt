@@ -1,0 +1,20 @@
+Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest :: it applies receipt backed purchase invoice repair and reposts journals in idr
+Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest :: it keeps account payable ageing amounts in idr while retaining source currency
+Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest :: it normalizes malformed receipt backed invoice item prices from purchase order items
+Tests\Feature\PurchaseInvoiceResourceTest :: Mark as sent action shows friendly notification when update fails
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice audit command dry runs and repairs with reversal
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice create normalizes tax to percentage
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice create page persists receipt biaya items
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice creation rolls back when finalisation fails
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice derives source from receipt and ignores hidden source state
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice form does not render duplicate source amount fields
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice from receipt persists full nominal branch ap and journals
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice ignores manual ppn for mixed tax receipts
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice ignores zero value other fee items
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice live preview uses service totals without money mask distortion
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice manual money fields update on blur to keep mask stable
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice multi po source is derived from selected receipts
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice total recalculation uses full formatted money values
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice uses receipt branch when order request creator has different branch
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase orders require order request before submit
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase receipt checkbox labels use rupiah format

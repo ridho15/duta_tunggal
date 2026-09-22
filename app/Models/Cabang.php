@@ -28,6 +28,14 @@ class Cabang extends Model
         'label_invoice_non_pajak',
         'logo_invoice_non_pajak',
         'lihat_stok_cabang_lain',
+        'nama_legal',
+        'npwp',
+        'alamat_pajak',
+        'rekening',
+    ];
+
+    protected $casts = [
+        'rekening' => 'array',
     ];
 
     public function warehouse()

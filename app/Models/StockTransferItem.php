@@ -26,7 +26,7 @@ class StockTransferItem extends Model
     {
         parent::boot();
 
-        // static::observe(StockTransferItemObserver::class);
+        static::observe(StockTransferItemObserver::class);
     }
 
     public function stockTransfer()
@@ -61,6 +61,8 @@ class StockTransferItem extends Model
 
     public function stockMovement()
     {
-        return $this->morphMany(StockMovement::class, 'from_model');
+        return $this->hasMany(StockMovement::class, 'from_model_id', 'stock_transfer_id')
+            ->where('from_model_type', StockTransfer::class)
+            ->where('meta->stock_transfer_item_id', $this->id);
     }
 }

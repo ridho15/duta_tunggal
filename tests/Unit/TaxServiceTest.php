@@ -204,3 +204,47 @@ test('inklusif dpp and ppn are integers (rounded to nearest Rupiah)', function (
     expect(fmod($res['dpp'], 1.0))->toBe(0.0)
         ->and(fmod($res['ppn'], 1.0))->toBe(0.0);
 });
+
+// ─── English tax_type variants (Inclusive / Exclusive) ───────────────────────
+
+test('normalizeType maps English Inclusive to Inklusif', function () {
+    expect(TaxService::normalizeType('Inclusive'))->toBe('Inklusif')
+        ->and(TaxService::normalizeType('inclusive'))->toBe('Inklusif')
+        ->and(TaxService::normalizeType('PPN Included'))->toBe('Inklusif')
+        ->and(TaxService::normalizeType('ppn included'))->toBe('Inklusif');
+});
+
+test('normalizeType maps English Exclusive to Eksklusif', function () {
+    expect(TaxService::normalizeType('Exclusive'))->toBe('Eksklusif')
+        ->and(TaxService::normalizeType('exclusive'))->toBe('Eksklusif')
+        ->and(TaxService::normalizeType('PPN Excluded'))->toBe('Eksklusif')
+        ->and(TaxService::normalizeType('ppn excluded'))->toBe('Eksklusif');
+});
+
+test('compute Exclusive tax_type: price=2500000 rate=12 gives tax=300000 total=2800000', function () {
+    // Section 3 spec: Exclusive, price 2,500,000, rate 12% → tax 300,000, total 2,800,000
+    $res = TaxService::compute(2500000.0, 12.0, 'Exclusive');
+    expect($res['ppn'])->toBe(300000.0)
+        ->and($res['total'])->toBe(2800000.0)
+        ->and($res['dpp'])->toBe(2500000.0);
+});
+
+test('compute Inclusive tax_type: amount=2500000 rate=12 gives dpp=2232143 ppn=267857 total=2500000', function () {
+    // Section 3 spec: Inclusive, amount 2,500,000, rate 12% → dpp ≈ 2,232,143, ppn ≈ 267,857
+    $res = TaxService::compute(2500000.0, 12.0, 'Inclusive');
+    expect($res['dpp'])->toBe(2232143.0)
+        ->and($res['ppn'])->toBe(267857.0)
+        ->and($res['total'])->toBe(2500000.0);
+});
+
+test('hitungSubtotal with Exclusive tax_type adds tax on top', function () {
+    // 1 qty × 2,500,000, 0 discount, 12% Exclusive → total = 2,800,000
+    $result = HelperController::hitungSubtotal(1, 2500000, 0, 12, 'Exclusive');
+    expect($result)->toBe(2800000.0);
+});
+
+test('hitungSubtotal with Inclusive tax_type total stays same', function () {
+    // 1 qty × 2,500,000, 0 discount, 12% Inclusive → total = 2,500,000
+    $result = HelperController::hitungSubtotal(1, 2500000, 0, 12, 'Inclusive');
+    expect($result)->toBe(2500000.0);
+});

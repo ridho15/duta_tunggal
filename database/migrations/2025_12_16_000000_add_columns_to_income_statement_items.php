@@ -7,6 +7,17 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (! Schema::hasTable('income_statement_items')) {
+            Schema::create('income_statement_items', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('income_statement_id')->nullable()->constrained('income_statements')->nullOnDelete();
+                $table->string('name');
+                $table->string('type')->nullable();
+                $table->decimal('balance', 15, 2)->default(0);
+                $table->timestamps();
+            });
+        }
+
         Schema::table('income_statement_items', function (Blueprint $table) {
             if (!Schema::hasColumn('income_statement_items', 'code')) {
                 $table->string('code')->nullable()->after('id');
@@ -25,6 +36,10 @@ return new class extends Migration {
 
     public function down(): void
     {
+        if (! Schema::hasTable('income_statement_items')) {
+            return;
+        }
+
         Schema::table('income_statement_items', function (Blueprint $table) {
             if (Schema::hasColumn('income_statement_items', 'row_type')) {
                 $table->dropColumn('row_type');

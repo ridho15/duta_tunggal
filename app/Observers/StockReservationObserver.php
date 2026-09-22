@@ -4,96 +4,127 @@ namespace App\Observers;
 
 use App\Models\InventoryStock;
 use App\Models\StockReservation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Menjaga `inventory_stocks.qty_reserved` selaras dengan baris `stock_reservations`.
+ *
+ * Perbaikan T2.1:
+ *  - SIMETRIS: kuantitas yang TURUN kini juga menurunkan qty_reserved (sebelumnya hanya kenaikan yang ditangani,
+ *    sehingga penurunan harus dikerjakan manual oleh pemanggil);
+ *  - baris stok dipilih DETERMINISTIK (rak cocok → rak null → id terkecil), bukan `first()` sembarang;
+ *  - penurunan menguras baris terpilih lalu baris lain produk×gudang yang sama, dan TIDAK PERNAH membuat qty_reserved negatif.
+ * qty_reserved tetap dijaga per produk×gudang (jumlahnya sumber kebenaran; pembagian antar baris rak hanya teknis).
+ */
 class StockReservationObserver
 {
-    /**
-     * Handle the StockReservation "created" event.
-     */
     public function created(StockReservation $stockReservation): void
     {
-        Log::info('StockReservationObserver: created event triggered', [
-            'reservation_id' => $stockReservation->id,
-            'material_issue_id' => $stockReservation->material_issue_id,
-            'quantity' => $stockReservation->quantity,
-        ]);
-        $this->updateReservedStock($stockReservation, 'increment');
+        $this->applyDelta($stockReservation, (float) $stockReservation->quantity);
     }
 
-    /**
-     * Handle the StockReservation "updated" event.
-     */
     public function updated(StockReservation $stockReservation): void
     {
-        // Only handle quantity increases, not decreases (decreases are handled manually in partial releases)
-        $originalQuantity = $stockReservation->getOriginal('quantity');
-        $newQuantity = $stockReservation->quantity;
+        $delta = (float) $stockReservation->quantity - (float) $stockReservation->getOriginal('quantity');
 
-        if ($originalQuantity !== $newQuantity && $newQuantity > $originalQuantity) {
-            $difference = $newQuantity - $originalQuantity;
-            $this->updateReservedStock($stockReservation, 'increment', $difference);
+        if (abs($delta) > 0.00001) {
+            $this->applyDelta($stockReservation, $delta);
         }
     }
 
-    /**
-     * Handle the StockReservation "deleted" event.
-     */
     public function deleted(StockReservation $stockReservation): void
     {
-        Log::info('StockReservationObserver: deleted event triggered', [
-            'reservation_id' => $stockReservation->id,
-            'product_id' => $stockReservation->product_id,
-            'quantity' => $stockReservation->quantity,
-        ]);
-        $this->updateReservedStock($stockReservation, 'decrement');
+        $this->applyDelta($stockReservation, -1 * (float) $stockReservation->getOriginal('quantity', $stockReservation->quantity));
     }
 
-    /**
-     * Handle the StockReservation "restored" event.
-     */
     public function restored(StockReservation $stockReservation): void
     {
-        $this->updateReservedStock($stockReservation, 'increment');
+        $this->applyDelta($stockReservation, (float) $stockReservation->quantity);
     }
 
-    /**
-     * Handle the StockReservation "force deleted" event.
-     */
     public function forceDeleted(StockReservation $stockReservation): void
     {
-        $this->updateReservedStock($stockReservation, 'decrement');
+        $this->applyDelta($stockReservation, -1 * (float) $stockReservation->quantity);
     }
 
-    /**
-     * Update the reserved stock quantity in inventory.
-     */
-    private function updateReservedStock(StockReservation $stockReservation, string $operation, ?float $quantity = null): void
+    /** delta > 0 menaikkan, delta < 0 menurunkan qty_reserved produk×gudang reservasi ini. */
+    private function applyDelta(StockReservation $reservation, float $delta): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockReservation->product_id)
-            ->where('warehouse_id', $stockReservation->warehouse_id)
-            ->first();
+        Log::debug('StockReservationObserver: applyDelta', [
+            'reservation_id' => $reservation->id,
+            'product_id' => $reservation->product_id,
+            'warehouse_id' => $reservation->warehouse_id,
+            'delta' => $delta,
+        ]);
 
-        if (!$inventoryStock) {
-            // Create inventory stock if it doesn't exist
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockReservation->product_id,
-                'warehouse_id' => $stockReservation->warehouse_id,
-                'rak_id' => $stockReservation->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-                'qty_min' => 0,
-            ]);
+        DB::transaction(function () use ($reservation, $delta) {
+            $rows = InventoryStock::where('product_id', $reservation->product_id)
+                ->where('warehouse_id', $reservation->warehouse_id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($rows->isEmpty()) {
+                if ($delta <= 0) {
+                    return;
+                }
+
+                $rows = collect([InventoryStock::create([
+                    'product_id' => $reservation->product_id,
+                    'warehouse_id' => $reservation->warehouse_id,
+                    'rak_id' => $reservation->rak_id,
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                    'qty_min' => 0,
+                ])]);
+            }
+
+            $preferred = self::pickRow($rows, $reservation->rak_id);
+
+            if ($delta > 0) {
+                $preferred->increment('qty_reserved', $delta);
+
+                return;
+            }
+
+            // Penurunan: kuras baris terpilih dulu, lalu baris lain; jangan pernah di bawah nol.
+            $remaining = abs($delta);
+            $ordered = $rows->sortBy(fn ($row) => $row->id === $preferred->id ? 0 : 1)->values();
+
+            foreach ($ordered as $row) {
+                if ($remaining <= 0.00001) {
+                    break;
+                }
+
+                $take = min($remaining, max(0.0, (float) $row->qty_reserved));
+                if ($take > 0) {
+                    $row->decrement('qty_reserved', $take);
+                    $remaining -= $take;
+                }
+            }
+
+            if ($remaining > 0.00001) {
+                Log::warning('StockReservationObserver: qty_reserved lebih kecil dari reservasi yang dilepas (tidak dibuat negatif)', [
+                    'reservation_id' => $reservation->id,
+                    'product_id' => $reservation->product_id,
+                    'warehouse_id' => $reservation->warehouse_id,
+                    'tidak_terkuras' => round($remaining, 4),
+                ]);
+            }
+        });
+    }
+
+    /** Rak cocok → rak null → id terkecil. */
+    public static function pickRow($rows, ?int $rakId): InventoryStock
+    {
+        if ($rakId) {
+            $match = $rows->firstWhere('rak_id', $rakId);
+            if ($match) {
+                return $match;
+            }
         }
 
-        $qtyToUpdate = $quantity ?? $stockReservation->quantity;
-
-        if ($operation === 'increment') {
-            $inventoryStock->increment('qty_reserved', $qtyToUpdate);
-            $inventoryStock->decrement('qty_available', $qtyToUpdate); // Kurangi qty_available saat reservation dibuat
-        } elseif ($operation === 'decrement') {
-            $inventoryStock->decrement('qty_reserved', $qtyToUpdate);
-            $inventoryStock->increment('qty_available', $qtyToUpdate); // Tambah kembali qty_available saat reservation dihapus
-        }
+        return $rows->first(fn ($row) => $row->rak_id === null) ?? $rows->first();
     }
 }

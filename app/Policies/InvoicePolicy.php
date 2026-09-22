@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\PurchaseInvoiceCancellationService;
 use Illuminate\Auth\Access\Response;
 
 class InvoicePolicy
@@ -37,7 +38,18 @@ class InvoicePolicy
      */
     public function update(User $user, Invoice $invoice): bool
     {
-        return $user->hasPermissionTo('update invoice');
+        return $user->hasPermissionTo('update invoice')
+            && strtolower((string) $invoice->status) === Invoice::STATUS_DRAFT;
+    }
+
+    /**
+     * Mengisi/mengubah No. Faktur Pajak pada invoice yang sudah terbit (kolom non-keuangan, tidak memicu jurnal).
+     * Memakai izin `update invoice` (izin khusus menyusul di T3); invoice draft memakai form biasa, invoice batal ditolak.
+     */
+    public function updateTaxNumber(User $user, Invoice $invoice): bool
+    {
+        return $user->hasPermissionTo('update invoice')
+            && \App\Services\SalesInvoiceTaxNumber::canSetOn($invoice);
     }
 
     /**
@@ -45,7 +57,18 @@ class InvoicePolicy
      */
     public function delete(User $user, Invoice $invoice): bool
     {
-        return $user->hasPermissionTo('delete invoice');
+        return $user->hasPermissionTo('delete invoice')
+            && strtolower((string) $invoice->status) === Invoice::STATUS_DRAFT;
+    }
+
+    /**
+     * Membatalkan invoice yang sudah diposting (jurnal balik, bukan hapus). Memakai izin `delete invoice`
+     * (izin khusus menyusul); invoice draft cukup dihapus lewat delete().
+     */
+    public function cancel(User $user, Invoice $invoice): bool
+    {
+        return $user->hasPermissionTo('delete invoice')
+            && in_array(strtolower((string) $invoice->status), PurchaseInvoiceCancellationService::POSTED_STATUSES, true);
     }
 
     /**

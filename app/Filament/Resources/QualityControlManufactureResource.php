@@ -18,6 +18,7 @@ use App\Services\ReturnProductService;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -44,13 +45,200 @@ class QualityControlManufactureResource extends Resource
 {
     protected static ?string $model = QualityControl::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationGroup = 'Manufacturing Order';
+    protected static ?string $navigationGroup = 'Manufaktur';
 
-    protected static ?string $navigationLabel = 'Quality Control Manufacture';
+    protected static ?string $navigationLabel = 'Kontrol Kualitas Produksi';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?string $modelLabel = 'Kontrol Kualitas Produksi';
+
+    protected static ?string $pluralModelLabel = 'Kontrol Kualitas Produksi';
+
+    protected static ?int $navigationSort = 6;
+
+    public static function canChooseInspector(): bool
+    {
+        return Auth::user()?->hasRole(['Super Admin', 'Owner']) === true;
+    }
+
+    public static function getProductionQuery(?QualityControl $record = null): Builder
+    {
+        $currentProductionId = $record?->from_model_type === Production::class
+            ? $record->from_model_id
+            : null;
+        $qualityControlTable = (new QualityControl())->getTable();
+        $productionTable = (new Production())->getTable();
+
+        return Production::query()
+            ->with(['manufacturingOrder.productionPlan.product'])
+            ->whereIn('status', ['finished', 'completed'])
+            ->where(function (Builder $query) use ($currentProductionId, $qualityControlTable, $productionTable) {
+                $query->whereNotExists(function ($subQuery) use ($qualityControlTable, $productionTable) {
+                    $subQuery->selectRaw('1')
+                        ->from($qualityControlTable)
+                        ->whereColumn("{$qualityControlTable}.from_model_id", "{$productionTable}.id")
+                        ->where("{$qualityControlTable}.from_model_type", Production::class)
+                        ->whereNull("{$qualityControlTable}.deleted_at");
+                });
+
+                if ($currentProductionId) {
+                    $query->orWhere('id', $currentProductionId);
+                }
+            })
+            ->orderByDesc('production_date')
+            ->orderByDesc('id');
+    }
+
+    public static function getProductionOptionLabel(?Production $production): string
+    {
+        if (! $production || ! $production->exists) {
+            return '-';
+        }
+
+        $production->loadMissing('manufacturingOrder.productionPlan.product');
+
+        $manufacturingOrder = $production->manufacturingOrder;
+        $productionPlan = $manufacturingOrder?->productionPlan;
+        $product = $productionPlan?->product;
+        $quantity = $production->quantity_produced ?? $productionPlan?->quantity ?? 0;
+
+        return sprintf(
+            'MO: %s - %s (Qty: %s)',
+            $manufacturingOrder?->mo_number ?? '-',
+            $product?->name ?? '-',
+            rtrim(rtrim(number_format((float) $quantity, 2, '.', ''), '0'), '.')
+        );
+    }
+
+    public static function getProductionSelectOptions(?QualityControl $record = null): array
+    {
+        return static::getProductionQuery($record)
+            ->get()
+            ->mapWithKeys(function (Production $production) {
+                return [$production->id => static::getProductionOptionLabel($production)];
+            })
+            ->all();
+    }
+
+    public static function findProductionOptionLabel($value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        $production = Production::query()
+            ->with(['manufacturingOrder.productionPlan.product'])
+            ->find($value);
+
+        if (! $production) {
+            return null;
+        }
+
+        return static::getProductionOptionLabel($production);
+    }
+
+    public static function resolveProductionContext(?Production $production): array
+    {
+        $production?->loadMissing('manufacturingOrder.productionPlan.product');
+
+        $manufacturingOrder = $production?->manufacturingOrder;
+        $productionPlan = $manufacturingOrder?->productionPlan;
+
+        return [
+            'product_id' => $productionPlan?->product_id,
+            'product_name' => $productionPlan?->product?->name,
+            'warehouse_id' => $production?->warehouse_id ?? $productionPlan?->warehouse_id,
+            'rak_id' => $production?->rak_id,
+            'passed_quantity' => (float) ($production?->quantity_produced ?? $productionPlan?->quantity ?? 0),
+            'rejected_quantity' => 0,
+            'total_inspected' => (float) ($production?->quantity_produced ?? $productionPlan?->quantity ?? 0),
+            'cabang_id' => $manufacturingOrder?->cabang_id ?? $productionPlan?->cabang_id ?? Auth::user()?->cabang_id,
+        ];
+    }
+
+    public static function buildProcessingFormSchema(?QualityControl $record): array
+    {
+        $production = $record?->fromModel;
+        $manufacturingOrder = $production?->manufacturingOrder;
+        $productionPlan = $manufacturingOrder?->productionPlan;
+        $product = $record?->product;
+        $targetQuantity = (float) ($production?->quantity_produced ?? $productionPlan?->quantity ?? 0);
+
+        return [
+            TextInput::make('product_info')
+                ->label('Produk')
+                ->default($product ? "({$product->sku}) {$product->name}" : '-')
+                ->disabled()
+                ->dehydrated(false),
+            TextInput::make('production_reference')
+                ->label('Referensi Produksi')
+                ->default($production ? "{$production->production_number} / {$manufacturingOrder?->mo_number}" : '-')
+                ->disabled()
+                ->dehydrated(false),
+            TextInput::make('target_quantity')
+                ->label('Total Produksi')
+                ->default($targetQuantity)
+                ->disabled()
+                ->dehydrated(false),
+            TextInput::make('passed_quantity')
+                ->label('Passed Quantity')
+                ->numeric()
+                ->required()
+                ->default((float) ($record?->passed_quantity ?? 0))
+                ->helperText($targetQuantity > 0 ? 'Total passed + reject tidak boleh melebihi total produksi.' : null),
+            TextInput::make('rejected_quantity')
+                ->label('Rejected Quantity')
+                ->numeric()
+                ->required()
+                ->default((float) ($record?->rejected_quantity ?? 0)),
+            Textarea::make('reason_reject')
+                ->label('Reason Reject')
+                ->rows(3)
+                ->default($record?->reason_reject),
+            Select::make('warehouse_id')
+                ->label('Gudang')
+                ->options(function () {
+                    $user = Auth::user();
+                    $manageType = $user?->manage_type ?? [];
+                    $query = Warehouse::where('status', 1);
+
+                    if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                        $query->where('cabang_id', $user?->cabang_id);
+                    }
+
+                    return $query->orderBy('name')
+                        ->get()
+                        ->mapWithKeys(function ($warehouse) {
+                            return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                        });
+                })
+                ->default($record?->warehouse_id)
+                ->required()
+                ->searchable()
+                ->preload()
+                ->reactive(),
+            Select::make('rak_id')
+                ->label('Rak')
+                ->options(function ($get) {
+                    $warehouseId = $get('warehouse_id');
+
+                    if (!$warehouseId) {
+                        return [];
+                    }
+
+                    return Rak::query()
+                        ->where('warehouse_id', $warehouseId)
+                        ->pluck('name', 'id')
+                        ->toArray();
+                })
+                ->default($record?->rak_id)
+                ->searchable()
+                ->preload(),
+        ];
+    }
 
     public static function form(Form $form): Form
     {
@@ -63,29 +251,30 @@ class QualityControlManufactureResource extends Resource
                             ->columns(2)
                             ->columnSpanFull()
                             ->schema([
+                                Hidden::make('from_model_type')
+                                    ->default(Production::class),
+                                Hidden::make('product_id')
+                                    ->default(fn (?QualityControl $record) => $record?->product_id),
+                                Hidden::make('cabang_id')
+                                    ->default(fn (?QualityControl $record) => $record?->cabang_id ?? Auth::user()?->cabang_id),
                                 Select::make('from_model_id')
                                     ->label('From Production')
-                                    ->options(Production::with(['manufacturingOrder.productionPlan.product'])
-                                        ->whereDoesntHave('qualityControl')
-                                        ->whereIn('status', ['finished', 'completed'])
-                                        ->get()
-                                        ->mapWithKeys(function ($production) {
-                                            $mo = $production->manufacturingOrder;
-                                            $product = $mo->productionPlan->product;
-
-                                            $label = "MO: {$mo->mo_number} - {$product->name} (Qty: {$production->quantity_produced})";
-                                            return [$production->id => $label];
-                                        }))
+                                    ->options(fn (?QualityControl $record) => static::getProductionSelectOptions($record))
+                                    ->getOptionLabelUsing(fn ($value) => static::findProductionOptionLabel($value))
                                     ->preload()
                                     ->searchable()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $production = Production::with(['manufacturingOrder'])->find($state);
+                                        $production = Production::query()
+                                            ->with(['manufacturingOrder.productionPlan.product'])
+                                            ->find($state);
+
                                         if ($production) {
-                                            $set('product_id', $production->manufacturingOrder->productionPlan->product_id);
-                                            $set('warehouse_id', $production->warehouse_id);
-                                            $set('passed_quantity', $production->quantity_produced);
-                                            $set('rejected_quantity', 0);
+                                            $context = static::resolveProductionContext($production);
+
+                                            foreach ($context as $field => $value) {
+                                                $set($field, $value);
+                                            }
                                         }
                                     })
                                     ->required()
@@ -109,6 +298,7 @@ class QualityControlManufactureResource extends Resource
                             ->schema([
                                 TextInput::make('product_name')
                                     ->label('Product')
+                                    ->default(fn (?QualityControl $record) => $record?->product?->name)
                                     ->disabled()
                                     ->dehydrated(false)
                                     ->afterStateUpdated(function ($set, $get) {
@@ -120,7 +310,21 @@ class QualityControlManufactureResource extends Resource
                                     }),
                                 Select::make('warehouse_id')
                                     ->label('Warehouse')
-                                    ->options(Warehouse::pluck('name', 'id'))
+                                    ->options(function () {
+                                        $user = Auth::user();
+                                        $manageType = $user?->manage_type ?? [];
+                                        $query = Warehouse::where('status', 1);
+
+                                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                                            $query->where('cabang_id', $user?->cabang_id);
+                                        }
+
+                                        return $query->orderBy('name')
+                                            ->get()
+                                            ->mapWithKeys(function ($warehouse) {
+                                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                                            });
+                                    })
                                     ->required()
                                     ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                         return "({$warehouse->kode}) {$warehouse->name}";
@@ -193,6 +397,7 @@ class QualityControlManufactureResource extends Resource
                                     ]),
                                 TextInput::make('total_inspected')
                                     ->label('Total Inspected')
+                                    ->default(fn (?QualityControl $record) => (float) (($record?->passed_quantity ?? 0) + ($record?->rejected_quantity ?? 0)))
                                     ->disabled()
                                     ->dehydrated(false)
                                     ->reactive()
@@ -208,6 +413,11 @@ class QualityControlManufactureResource extends Resource
                                 Select::make('inspected_by')
                                     ->label('Inspected By')
                                     ->options(\App\Models\User::pluck('name', 'id'))
+                                    ->default(fn (?QualityControl $record) => $record?->inspected_by ?? Auth::id())
+                                    ->disabled(fn () => ! static::canChooseInspector())
+                                    ->dehydrated(true)
+                                    ->searchable(fn () => static::canChooseInspector())
+                                    ->preload(fn () => static::canChooseInspector())
                                     ->required()
                                     ->validationMessages([
                                         'required' => 'Inspected by wajib dipilih'
@@ -274,7 +484,18 @@ class QualityControlManufactureResource extends Resource
                     ]),
                 SelectFilter::make('warehouse_id')
                     ->label('Warehouse')
-                    ->options(Warehouse::pluck('name', 'id')),
+                    ->options(function () {
+                        $user = Auth::user();
+                        $manageType = $user?->manage_type ?? [];
+                        $query = Warehouse::where('status', 1);
+
+                        if (!$user || !is_array($manageType) || !in_array('all', $manageType)) {
+                            $query->where('cabang_id', $user?->cabang_id);
+                        }
+
+                        return $query->orderBy('name')
+                            ->pluck('name', 'id');
+                    }),
                 Filter::make('created_at')
                     ->form([
                         DatePicker::make('created_from'),
@@ -301,10 +522,11 @@ class QualityControlManufactureResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->visible(fn ($record) => !$record->status)
-                        ->action(function ($record) {
+                        ->form(fn ($record) => static::buildProcessingFormSchema($record))
+                        ->action(function (array $data, $record) {
                             $qcService = new QualityControlService();
-                            $qcService->completeQualityControl($record, []);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed");
+                            $qcService->completeQualityControl($record, $data);
+                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Quality Control Manufacture Completed. Proses selanjutnya: Tim Gudang perlu memindahkan barang hasil produksi ke lokasi penyimpanan dan memperbarui stok inventori.");
                         }),
                     DeleteAction::make(),
                 ])

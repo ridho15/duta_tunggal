@@ -3,18 +3,33 @@
 namespace App\Filament\Resources\PurchaseInvoiceResource\Pages;
 
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Services\PurchaseInvoiceCancellationService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
+use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ViewPurchaseInvoice extends ViewRecord
 {
     protected static string $resource = PurchaseInvoiceResource::class;
 
+    protected function canManageStatus(): bool
+    {
+        return PurchaseInvoiceResource::canManuallySetStatus();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            Actions\EditAction::make()
+                ->icon('heroicon-o-pencil')
+                ->visible(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT),
             Actions\Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-book-open')
@@ -32,47 +47,113 @@ class ViewPurchaseInvoice extends ViewRecord
                         // Jika multiple entries, gunakan filter dengan format yang sesuai dengan filter options
                         $sourceType = 'App\\Models\\Invoice'; // Format yang sama dengan filter options
                         $sourceId = $record->id;
-                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                        // Filter 'source_id' adalah Filter::make() dengan field form 'source_id' (bukan SelectFilter),
+                        // jadi kuncinya harus 'source_id', bukan 'value' (yang hanya berlaku untuk SelectFilter).
+                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}");
                     }
                 }),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
-            Actions\Action::make('mark_as_sent')
-                ->label('Mark as Sent')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('warning')
-                ->visible(fn ($record) => $record->status === 'draft')
+            Actions\DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->visible(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT),
+            Actions\Action::make('post_invoice')
+                ->label('Posting Invoice')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT)
                 ->requiresConfirmation()
-                ->modalHeading('Mark Invoice as Sent')
-                ->modalDescription('Are you sure you want to mark this invoice as sent? This action cannot be undone.')
-                ->modalSubmitActionLabel('Yes, Mark as Sent')
+                ->modalHeading('Posting Invoice Pembelian')
+                ->modalDescription('Apakah Anda yakin ingin memposting invoice ini? Tindakan ini akan membentuk Hutang Usaha (Account Payable) dan memposting jurnal ke Buku Besar.')
+                ->modalSubmitActionLabel('Ya, Posting Invoice')
                 ->action(function ($record) {
-                    $record->update(['status' => 'sent']);
-                    \Filament\Notifications\Notification::make()
-                        ->title('Invoice marked as sent')
-                        ->success()
-                        ->send();
+                    try {
+                        app(\App\Services\PurchaseInvoiceAccountingService::class)->postAndApproveInvoice($record);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Invoice Berhasil Diposting')
+                            ->body('Hutang dan jurnal telah berhasil dibukukan.')
+                            ->success()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Log::error('ViewPurchaseInvoice post_invoice failed', [
+                            'invoice_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Memposting Invoice',
+                            $exception,
+                            'Invoice pembelian belum berhasil diposting. Silakan coba lagi.'
+                        );
+                    }
+                }),
+            Actions\Action::make('cancel_invoice')
+                ->label('Batalkan Invoice')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->visible(fn ($record) => auth()->user()?->can('cancel', $record) ?? false)
+                ->modalHeading('Batalkan Invoice Pembelian')
+                ->modalDescription('Jurnal invoice akan dibalik (bukan dihapus), hutang usaha dikeluarkan, dan invoice ditandai Dibatalkan. Penerimaan barang (GRN) dapat ditagihkan kembali lewat invoice baru. Invoice yang sudah dibayar atau masih tercakup Permintaan Pembayaran aktif tidak dapat dibatalkan.')
+                ->modalSubmitActionLabel('Ya, Batalkan Invoice')
+                ->form([
+                    Forms\Components\DatePicker::make('reversal_date')
+                        ->label('Tanggal Pembatalan (Jurnal Balik)')
+                        ->default(now())
+                        ->maxDate(now())
+                        ->required(),
+                    Forms\Components\Textarea::make('reason')
+                        ->label('Alasan Pembatalan')
+                        ->required()
+                        ->minLength(5)
+                        ->maxLength(500),
+                ])
+                ->action(function ($record, array $data) {
+                    try {
+                        app(PurchaseInvoiceCancellationService::class)->cancel(
+                            $record,
+                            (string) $data['reason'],
+                            $data['reversal_date'] ?? null,
+                            Auth::id()
+                        );
+
+                        $this->record->refresh();
+
+                        Notification::make()
+                            ->title('Invoice Dibatalkan')
+                            ->body('Jurnal telah dibalik dan hutang usaha dikeluarkan. Penerimaan barang dapat ditagihkan kembali.')
+                            ->success()
+                            ->send();
+                    } catch (\DomainException $exception) {
+                        Notification::make()
+                            ->title('Invoice Belum Dapat Dibatalkan')
+                            ->body($exception->getMessage())
+                            ->danger()
+                            ->persistent()
+                            ->send();
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Data Pembatalan Tidak Valid')
+                            ->body(collect($exception->errors())->flatten()->implode(' '))
+                            ->danger()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Log::error('ViewPurchaseInvoice cancel_invoice failed', [
+                            'invoice_id' => $record->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        ProcurementFailureNotifier::danger(
+                            'Gagal Membatalkan Invoice',
+                            $exception,
+                            'Invoice pembelian belum berhasil dibatalkan. Tidak ada perubahan yang disimpan; silakan coba lagi.'
+                        );
+                    }
                 }),
             Actions\Action::make('print_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    // Load necessary relationships for PDF
-                    $record->load([
-                        'fromModel.supplier',
-                        'fromModel.purchaseOrderBiaya',
-                        'invoiceItem.product',
-                        'cabang'
-                    ]);
-                    
-                    $pdf = Pdf::loadView('pdf.purchase-order-invoice-2', [
-                        'invoice' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Invoice_PO_' . $record->invoice_number . '.pdf');
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'purchase-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 

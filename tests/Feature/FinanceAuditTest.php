@@ -16,6 +16,7 @@ use App\Services\IncomeStatementService;
 use App\Services\CashBankService;
 use App\Services\VoucherRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -69,7 +70,7 @@ class FinanceAuditTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function test_chart_of_accounts_hierarchy_and_balance_calculation()
     {
         // Test COA hierarchy
@@ -127,7 +128,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(800000, $balance);
     }
 
-    /** @test */
+    #[Test]
     public function test_double_entry_bookkeeping_validation()
     {
         // Test that all journal entries maintain double-entry principle
@@ -168,7 +169,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(1000000, $totalCredits);
     }
 
-    /** @test */
+    #[Test]
     public function test_general_ledger_running_balance_calculation()
     {
         // Test running balance calculation for different account types
@@ -225,7 +226,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(1200000, $runningBalance);
     }
 
-    /** @test */
+    #[Test]
     public function test_cash_bank_transaction_posting()
     {
         // Test cash/bank transaction with automatic journal posting
@@ -249,7 +250,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals($amount, $transaction->amount);
     }
 
-    /** @test */
+    #[Test]
     public function test_bank_transfer_with_fee_posting()
     {
         // Test bank transfer with admin fee
@@ -272,7 +273,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals($feeAmount, $transfer->other_costs);
     }
 
-    /** @test */
+    #[Test]
     public function test_voucher_request_workflow_and_approval()
     {
         // Test complete voucher request workflow
@@ -311,7 +312,7 @@ class FinanceAuditTest extends TestCase
         $this->assertNotNull($voucher->approved_at);
     }
 
-    /** @test */
+    #[Test]
     public function test_balance_sheet_calculation_and_verification()
     {
         // Test balance sheet calculation with proper balancing
@@ -382,7 +383,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals($assets, $liabilities + $equity);
     }
 
-    /** @test */
+    #[Test]
     public function test_income_statement_period_calculation()
     {
         // Test income statement calculation for a period
@@ -428,7 +429,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(1500000, $netIncome); // Revenue - Expenses
     }
 
-    /** @test */
+    #[Test]
     public function test_financial_ratios_calculation()
     {
         // Test calculation of key financial ratios
@@ -523,7 +524,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(1200000, $workingCapital);
     }
 
-    /** @test */
+    #[Test]
     public function test_multi_branch_financial_reporting()
     {
         // Test financial reporting across multiple branches
@@ -589,7 +590,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(1500000, $consolidatedBalance);
     }
 
-    /** @test */
+    #[Test]
     public function test_audit_trail_and_activity_logging()
     {
         // Test that all financial transactions are properly logged
@@ -616,7 +617,7 @@ class FinanceAuditTest extends TestCase
         $this->assertEquals(250000, $transaction->amount);
     }
 
-    /** @test */
+    #[Test]
     public function test_financial_period_closing_and_opening_balances()
     {
         // Test period-end closing and opening balance carry-forward

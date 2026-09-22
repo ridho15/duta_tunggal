@@ -22,7 +22,7 @@ class InvoiceFactory extends Factory
             'from_model_id' => 1, // will be overridden
             'invoice_date' => now(),
             'subtotal' => number_format($this->faker->numberBetween(100000, 10000000), 2, '.', ''),
-            'tax' => number_format($this->faker->numberBetween(0, 100000), 2, '.', ''),
+            'tax' => 11,
             'other_fee' => [],
             'total' => number_format($this->faker->numberBetween(100000, 10000000), 2, '.', ''),
             'due_date' => now()->addDays(30),

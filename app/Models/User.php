@@ -12,12 +12,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
-use Spatie\Permission\Traits\HasPermissions;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
-    use HasFactory, Notifiable, HasRoles, HasPermissions, LogsGlobalActivity;
+    use HasFactory, Notifiable, HasRoles {
+        hasPermissionTo as protected spatieHasPermissionTo;
+    }
+    use LogsGlobalActivity;
     protected $fillable = [
         'name', // Gabungan dari first name dan last name
         'email',
@@ -48,6 +51,31 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'password' => 'hashed',
             // 'manage_type' => 'array', // Removed to handle manually
         ];
+    }
+
+    protected static function booted()
+    {
+        static::creating(function ($user) {
+            if (empty($user->kode_user)) {
+                $latestUser = static::where('kode_user', 'like', 'USR-%')
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $number = 1;
+                if ($latestUser && preg_match('/^USR-(\d+)$/', $latestUser->kode_user, $matches)) {
+                    $number = intval($matches[1]) + 1;
+                } else {
+                    $count = static::where('kode_user', 'like', 'USR-%')->count();
+                    $number = $count + 1;
+                }
+
+                while (static::where('kode_user', 'USR-' . str_pad($number, 4, '0', STR_PAD_LEFT))->exists()) {
+                    $number++;
+                }
+
+                $user->kode_user = 'USR-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+            }
+        });
     }
 
     public function getManageTypeAttribute($value)
@@ -88,5 +116,14 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function hasPermission(string $permission): bool
     {
         return $this->hasPermissionTo($permission);
+    }
+
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        try {
+            return $this->spatieHasPermissionTo($permission, $guardName);
+        } catch (PermissionDoesNotExist $exception) {
+            return false;
+        }
     }
 }

@@ -4,44 +4,30 @@ namespace App\Observers;
 
 use App\Models\InventoryStock;
 use App\Models\StockMovement;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StockMovementObserver
 {
-    private static $originalQuantities = [];
+    private static $originalStates = [];
 
     /**
      * Handle the StockMovement "created" event.
      */
     public function created(StockMovement $stockMovement): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-        if (!$inventoryStock) {
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockMovement->product_id,
-                'warehouse_id' => $stockMovement->warehouse_id,
-                'rak_id' => $stockMovement->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-            ]);
-        }
-
-        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
-
-        // Skip stock update if flag is set (e.g., for material issue completed movements)
-        if (isset($stockMovement->meta['skip_stock_update']) && $stockMovement->meta['skip_stock_update']) {
+        if ($this->shouldSkipStockUpdate($stockMovement->meta)) {
             return;
         }
 
-        if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
-            $inventoryStock->save();
-        } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
-            $inventoryStock->save();
+        $delta = $this->stockEffectDelta($stockMovement->type, $stockMovement->quantity);
+        if ($delta !== 0.0) {
+            $this->adjustAvailableStockByKey(
+                $stockMovement->product_id,
+                $stockMovement->warehouse_id,
+                $stockMovement->rak_id,
+                $delta
+            );
         }
     }
 
@@ -50,8 +36,14 @@ class StockMovementObserver
      */
     public function updating(StockMovement $stockMovement): void
     {
-        // Store original quantity before update
-        self::$originalQuantities[$stockMovement->id] = $stockMovement->getOriginal('quantity');
+        self::$originalStates[$stockMovement->id] = [
+            'product_id' => $stockMovement->getOriginal('product_id'),
+            'warehouse_id' => $stockMovement->getOriginal('warehouse_id'),
+            'rak_id' => $stockMovement->getOriginal('rak_id'),
+            'quantity' => $stockMovement->getOriginal('quantity'),
+            'type' => $stockMovement->getOriginal('type'),
+            'meta' => $stockMovement->getOriginal('meta'),
+        ];
     }
 
     /**
@@ -66,47 +58,55 @@ class StockMovementObserver
         // }
 
         // Only handle quantity changes that affect inventory
-        if (!isset(self::$originalQuantities[$stockMovement->id])) {
+        if (!isset(self::$originalStates[$stockMovement->id])) {
             return;
         }
 
-        $originalQuantity = self::$originalQuantities[$stockMovement->id];
-        $currentQuantity = $stockMovement->quantity;
+        $originalState = self::$originalStates[$stockMovement->id];
+        unset(self::$originalStates[$stockMovement->id]);
 
-        if ($originalQuantity == $currentQuantity) {
-            unset(self::$originalQuantities[$stockMovement->id]);
+        $currentState = [
+            'product_id' => $stockMovement->product_id,
+            'warehouse_id' => $stockMovement->warehouse_id,
+            'rak_id' => $stockMovement->rak_id,
+            'quantity' => $stockMovement->quantity,
+            'type' => $stockMovement->type,
+            'meta' => $stockMovement->meta,
+        ];
+
+        if (
+            $originalState['product_id'] == $currentState['product_id']
+            && $originalState['warehouse_id'] == $currentState['warehouse_id']
+            && $originalState['rak_id'] == $currentState['rak_id']
+            && $this->stockEffectDelta($originalState['type'], $originalState['quantity']) === $this->stockEffectDelta($currentState['type'], $currentState['quantity'])
+            && $this->shouldSkipStockUpdate($originalState['meta']) === $this->shouldSkipStockUpdate($currentState['meta'])
+        ) {
             return;
         }
 
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-
-        if (!$inventoryStock) {
-            unset(self::$originalQuantities[$stockMovement->id]);
-            return;
+        if (! $this->shouldSkipStockUpdate($originalState['meta'])) {
+            $originalDelta = $this->stockEffectDelta($originalState['type'], $originalState['quantity']);
+            if ($originalDelta !== 0.0) {
+                $this->adjustAvailableStockByKey(
+                    $originalState['product_id'],
+                    $originalState['warehouse_id'],
+                    $originalState['rak_id'],
+                    -1 * $originalDelta
+                );
+            }
         }
 
-        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
-
-        // Skip stock update if flag is set (e.g., for material issue completed movements)
-        if (isset($stockMovement->meta['skip_stock_update']) && $stockMovement->meta['skip_stock_update']) {
-            unset(self::$originalQuantities[$stockMovement->id]);
-            return;
+        if (! $this->shouldSkipStockUpdate($currentState['meta'])) {
+            $currentDelta = $this->stockEffectDelta($currentState['type'], $currentState['quantity']);
+            if ($currentDelta !== 0.0) {
+                $this->adjustAvailableStockByKey(
+                    $currentState['product_id'],
+                    $currentState['warehouse_id'],
+                    $currentState['rak_id'],
+                    $currentDelta
+                );
+            }
         }
-
-        $quantityDiff = $currentQuantity - $originalQuantity;
-
-        if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $quantityDiff;
-            $inventoryStock->save();
-        } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $quantityDiff;
-            $inventoryStock->save();
-        }
-
-        unset(self::$originalQuantities[$stockMovement->id]);
     }
 
     /**
@@ -114,29 +114,18 @@ class StockMovementObserver
      */
     public function deleted(StockMovement $stockMovement): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-
-        if (!$inventoryStock) {
+        if ($this->shouldSkipStockUpdate($stockMovement->meta)) {
             return;
         }
 
-        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
-
-        // Skip stock update if flag is set (e.g., for material issue completed movements)
-        if (isset($stockMovement->meta['skip_stock_update']) && $stockMovement->meta['skip_stock_update']) {
-            return;
-        }
-
-        // Reverse the stock movement effect when deleted
-        if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
-            $inventoryStock->save();
-        } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
-            $inventoryStock->save();
+        $delta = $this->stockEffectDelta($stockMovement->type, $stockMovement->quantity);
+        if ($delta !== 0.0) {
+            $this->adjustAvailableStockByKey(
+                $stockMovement->product_id,
+                $stockMovement->warehouse_id,
+                $stockMovement->rak_id,
+                -1 * $delta
+            );
         }
     }
 
@@ -145,36 +134,73 @@ class StockMovementObserver
      */
     public function restored(StockMovement $stockMovement): void
     {
-        $inventoryStock = InventoryStock::where('product_id', $stockMovement->product_id)
-            ->where('warehouse_id', $stockMovement->warehouse_id)
-            ->first();
-
-        if (!$inventoryStock) {
-            $inventoryStock = InventoryStock::create([
-                'product_id' => $stockMovement->product_id,
-                'warehouse_id' => $stockMovement->warehouse_id,
-                'rak_id' => $stockMovement->rak_id,
-                'qty_available' => 0,
-                'qty_reserved' => 0,
-            ]);
-        }
-
-        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
-
-        // Skip stock update if flag is set (e.g., for material issue completed movements)
-        if (isset($stockMovement->meta['skip_stock_update']) && $stockMovement->meta['skip_stock_update']) {
+        if ($this->shouldSkipStockUpdate($stockMovement->meta)) {
             return;
         }
 
-        // Re-apply the stock movement effect when restored
-        if (in_array($stockMovement->type, $inTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available + $stockMovement->quantity;
-            $inventoryStock->save();
-        } elseif (in_array($stockMovement->type, $outTypes, true)) {
-            $inventoryStock->qty_available = $inventoryStock->qty_available - $stockMovement->quantity;
-            $inventoryStock->save();
+        $delta = $this->stockEffectDelta($stockMovement->type, $stockMovement->quantity);
+        if ($delta !== 0.0) {
+            $this->adjustAvailableStockByKey(
+                $stockMovement->product_id,
+                $stockMovement->warehouse_id,
+                $stockMovement->rak_id,
+                $delta
+            );
         }
+    }
+
+    private function adjustAvailableStock(StockMovement $stockMovement, float $delta): void
+    {
+        $this->adjustAvailableStockByKey(
+            $stockMovement->product_id,
+            $stockMovement->warehouse_id,
+            $stockMovement->rak_id,
+            $delta
+        );
+    }
+
+    private function adjustAvailableStockByKey(?int $productId, ?int $warehouseId, ?int $rakId, float $delta): void
+    {
+        if (! $productId || ! $warehouseId || $delta === 0.0) {
+            return;
+        }
+
+        DB::transaction(function () use ($productId, $warehouseId, $rakId, $delta) {
+            $inventoryStock = InventoryStock::where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->where('rak_id', $rakId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$inventoryStock) {
+                $inventoryStock = InventoryStock::create([
+                    'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
+                    'rak_id' => $rakId,
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                ]);
+            }
+
+            $inventoryStock->qty_available = (float) $inventoryStock->qty_available + $delta;
+            $inventoryStock->save();
+        });
+    }
+
+    private function stockEffectDelta(?string $type, mixed $quantity): float
+    {
+        $normalizedQuantity = abs((float) $quantity);
+
+        return match ($type) {
+            'purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in' => $normalizedQuantity,
+            'sales', 'transfer_out', 'manufacture_out', 'adjustment_out' => -1 * $normalizedQuantity,
+            default => 0.0,
+        };
+    }
+
+    private function shouldSkipStockUpdate(mixed $meta): bool
+    {
+        return (bool) data_get($meta, 'skip_stock_update', false);
     }
 
     /**

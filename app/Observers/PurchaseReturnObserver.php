@@ -25,11 +25,5 @@ class PurchaseReturnObserver
                 'nota_retur' => $this->purchaseReturnService->generateNotaRetur()
             ]);
         }
-
-        // Create journal entries when status changes to approved
-        if ($purchaseReturn->wasChanged('status') && $purchaseReturn->status === 'approved') {
-            $this->purchaseReturnService->createJournalEntry($purchaseReturn);
-            $this->purchaseReturnService->adjustStock($purchaseReturn);
-        }
     }
 }

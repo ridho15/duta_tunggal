@@ -46,7 +46,7 @@ class FinanceSalesSeeder extends Seeder
                     ['product' => $finishedSecondary, 'qty' => 10, 'price' => 2500000],
                 ],
                 'invoice' => [
-                    'number' => 'INV-AR-001',
+                    'number' => 'FIN-INV-AR-001',
                     'invoice_date' => Carbon::now()->subDays(60),
                     'due_date' => Carbon::now()->subDays(15),
                     'status' => 'paid',
@@ -68,7 +68,7 @@ class FinanceSalesSeeder extends Seeder
                     ['product' => $finishedSecondary, 'qty' => 12, 'price' => 2200000],
                 ],
                 'invoice' => [
-                    'number' => 'INV-AR-002',
+                    'number' => 'FIN-INV-AR-002',
                     'invoice_date' => Carbon::now()->subDays(75),
                     'due_date' => Carbon::now()->subDays(45),
                     'status' => 'partially_paid',
@@ -89,7 +89,7 @@ class FinanceSalesSeeder extends Seeder
                     ['product' => $finishedSecondary, 'qty' => 10, 'price' => 1950000],
                 ],
                 'invoice' => [
-                    'number' => 'INV-AR-003',
+                    'number' => 'FIN-INV-AR-003',
                     'invoice_date' => Carbon::now()->subDays(140),
                     'due_date' => Carbon::now()->subDays(110),
                     'status' => 'overdue',
@@ -153,6 +153,7 @@ class FinanceSalesSeeder extends Seeder
                     'due_date' => $sale['invoice']['due_date']->toDateString(),
                     'subtotal' => $subtotal,
                     'tax' => $taxAmount,
+                    'ppn_rate' => $sale['invoice']['tax_rate'] * 100,
                     'other_fee' => 0,
                     'total' => $total,
                     'status' => $sale['invoice']['status'],

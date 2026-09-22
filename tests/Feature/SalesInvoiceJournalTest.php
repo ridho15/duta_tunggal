@@ -22,8 +22,8 @@ it('creates sales invoice journal entries automatically when sale order is appro
 
     // Create COAs
     $arCoa = ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Piutang Dagang']);
-    $revenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan']);
-    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran']);
+    $revenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan', 'type' => 'Revenue']);
+    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran', 'type' => 'Liability']);
     $cogsCoa = ChartOfAccount::factory()->create(['code' => '5100.10', 'name' => 'HPP Barang Dagangan']);
     $goodsDeliveryCoa = ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim']);
 
@@ -54,6 +54,7 @@ it('creates sales invoice journal entries automatically when sale order is appro
         'unit_price' => 12500000.00,
         'discount' => 0,
         'tax' => 11,
+        'tipe_pajak' => 'Eklusif',
     ]);
 
     // Update sale order totals
@@ -73,6 +74,9 @@ it('creates sales invoice journal entries automatically when sale order is appro
     $invoice->refresh();
     $invoice->load('invoiceItem');
     expect($invoice->total)->toBe('69375000.00'); // 62.5M + 11% tax
+    expect((float) $invoice->tax)->toBe(11.0);
+    expect((float) $invoice->ppn_rate)->toBe(11.0);
+    expect($invoice->tipe_pajak)->toBe('Eksklusif');
 
     // Assert invoice items created
     $invoiceItems = InvoiceItem::where('invoice_id', $invoice->id)->get();
@@ -125,8 +129,8 @@ it('uses default COAs when product has no specific COAs', function () {
 
     // Create COAs
     $arCoa = ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Piutang Dagang']);
-    $defaultRevenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan']);
-    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran']);
+    $defaultRevenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan', 'type' => 'Revenue']);
+    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran', 'type' => 'Liability']);
     $defaultCogsCoa = ChartOfAccount::factory()->create(['code' => '5100.10', 'name' => 'HPP Barang Dagangan']);
     $defaultGoodsDeliveryCoa = ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim']);
 

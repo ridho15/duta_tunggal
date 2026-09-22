@@ -41,11 +41,13 @@ class ReturnProductResource extends Resource
 {
     protected static ?string $model = ReturnProduct::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box-x-mark';
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 7;
 
     public static function form(Form $form): Form
     {
@@ -128,7 +130,7 @@ class ReturnProductResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = \App\Models\Warehouse::where('status', 1)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                                                                $q->where('name', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 
@@ -531,7 +533,7 @@ class ReturnProductResource extends Resource
                                 HelperController::sendNotification(
                                     isSuccess: true, 
                                     title: "Return Product Approved", 
-                                    message: "Return product {$record->return_number} berhasil diapprove. Quantity telah diperbarui sesuai aksi retur yang dipilih."
+                                    message: "Return product {$record->return_number} berhasil diapprove. Quantity telah diperbarui sesuai aksi retur yang dipilih. Proses selanjutnya: Tim Gudang perlu memproses pengembalian fisik barang dan memperbarui stok inventori."
                                 );
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(

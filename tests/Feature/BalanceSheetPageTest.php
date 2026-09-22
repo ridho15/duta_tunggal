@@ -277,4 +277,40 @@ describe('BalanceSheetPage Backend Tests', function () {
         expect($data['total_assets'])->toBe(5000000.0); // Only test branch amount
     });
 
+    it('builds balance alert data when sheet is unbalanced', function () {
+        JournalEntry::create([
+            'coa_id' => $this->cashAccount->id,
+            'cabang_id' => $this->cabang->id,
+            'date' => now(),
+            'reference' => 'BAL-ALERT-001',
+            'source_type' => 'manual',
+            'source_id' => 1,
+            'description' => 'Unbalanced asset',
+            'debit' => 5000000,
+            'credit' => 0,
+        ]);
+
+        JournalEntry::create([
+            'coa_id' => $this->capitalAccount->id,
+            'cabang_id' => $this->cabang->id,
+            'date' => now(),
+            'reference' => 'BAL-ALERT-002',
+            'source_type' => 'manual',
+            'source_id' => 1,
+            'description' => 'Unbalanced equity',
+            'debit' => 0,
+            'credit' => 3000000,
+        ]);
+
+        $component = Livewire::test(BalanceSheetPage::class)
+            ->set('as_of_date', now()->format('Y-m-d'))
+            ->set('showPreview', true);
+
+        $alert = $component->instance()->getBalanceAlertData();
+
+        expect($alert)->not()->toBeNull();
+        expect($alert['title'])->toBe('Neraca Tidak Seimbang');
+        expect($alert['difference'])->toBe(2000000.0);
+    });
+
 });

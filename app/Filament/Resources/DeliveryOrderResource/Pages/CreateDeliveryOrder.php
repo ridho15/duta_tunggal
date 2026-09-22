@@ -4,6 +4,7 @@ namespace App\Filament\Resources\DeliveryOrderResource\Pages;
 
 use App\Filament\Resources\DeliveryOrderResource;
 use App\Models\DeliveryOrder;
+use App\Models\InventoryStock;
 use App\Services\DeliveryOrderItemService;
 use App\Services\DeliveryOrderService;
 use Filament\Notifications\Notification;
@@ -68,8 +69,13 @@ class CreateDeliveryOrder extends CreateRecord
             throw new ValidationException($validator);
         }
 
+        // Aturan sumber DO tunggal (sama dengan form & Edit): status SO, sisa kuantitas yang belum terikat DO
+        // lain, customer sama, dan alamat kirim sama. Pesan kesalahan dikirim ke field salesOrders.
+        app(\App\Services\DeliveryOrderSourceValidator::class)->assertValid($salesOrderIds);
+
         // Validate warehouse confirmation for all selected sales orders
         if (!empty($salesOrderIds)) {
+            $sourceCabangIds = [];
             foreach ($salesOrderIds as $salesOrderId) {
                 $salesOrder = \App\Models\SaleOrder::find($salesOrderId);
                 if (!$salesOrder) {
@@ -84,29 +90,21 @@ class CreateDeliveryOrder extends CreateRecord
                     throw new ValidationException($validator);
                 }
 
-                if ($salesOrder->status !== 'confirmed') {
-                    \Filament\Notifications\Notification::make()
-                        ->title('Validation Error')
-                        ->body("Sales Order {$salesOrder->so_number} belum dikonfirmasi warehouse (status: {$salesOrder->status}).")
-                        ->danger()
-                        ->send();
-
-                    $validator = Validator::make([], []);
-                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} belum dikonfirmasi warehouse (status: {$salesOrder->status}).");
-                    throw new ValidationException($validator);
+                if (!empty($salesOrder->cabang_id)) {
+                    $sourceCabangIds[] = (int) $salesOrder->cabang_id;
                 }
+            }
 
-                if (!$salesOrder->warehouse_confirmed_at) {
-                    \Filament\Notifications\Notification::make()
-                        ->title('Validation Error')
-                        ->body("Sales Order {$salesOrder->so_number} belum memiliki tanggal konfirmasi warehouse.")
-                        ->danger()
-                        ->send();
+            $sourceCabangIds = array_values(array_unique($sourceCabangIds));
+            if (count($sourceCabangIds) > 1) {
+                $validator = Validator::make([], []);
+                $validator->errors()->add('salesOrders', 'Semua Sales Order yang dipilih harus berasal dari cabang yang sama.');
+                throw new ValidationException($validator);
+            }
 
-                    $validator = Validator::make([], []);
-                    $validator->errors()->add('salesOrders', "Sales Order {$salesOrder->so_number} belum memiliki tanggal konfirmasi warehouse.");
-                    throw new ValidationException($validator);
-                }
+            if (!empty($sourceCabangIds)) {
+                // Enforce branch inheritance from source Sales Order(s)
+                $data['cabang_id'] = $sourceCabangIds[0];
             }
             
             // Set warehouse_id from the first sales order item (assuming all items from same warehouse)
@@ -114,7 +112,11 @@ class CreateDeliveryOrder extends CreateRecord
             if ($firstSalesOrder) {
                 $firstItem = $firstSalesOrder->saleOrderItem()->first();
                 if ($firstItem && !isset($data['warehouse_id'])) {
-                    $data['warehouse_id'] = $firstItem->warehouse_id;
+                    $fallbackWarehouseId = $firstItem->warehouse_id;
+                    if (empty($fallbackWarehouseId)) {
+                        $fallbackWarehouseId = $firstItem->warehouseAllocations()->value('warehouse_id');
+                    }
+                    $data['warehouse_id'] = $fallbackWarehouseId;
                 }
             }
         }
@@ -129,14 +131,26 @@ class CreateDeliveryOrder extends CreateRecord
 
             foreach ($listSaleOrder as $saleOrder) {
                 foreach ($saleOrder->saleOrderItem as $saleOrderItem) {
-                    $remainingQty = $saleOrderItem->remaining_quantity;
+                    $remainingQty = $saleOrderItem->availableQuantityForDelivery();
                     // Only add items that still have remaining quantity
                     if ($remainingQty > 0) {
+                        $warehouseSources = $saleOrderItem->warehouseAllocations
+                            ->map(function ($allocation) {
+                                return [
+                                    'warehouse_id' => $allocation->warehouse_id,
+                                    'quantity' => (float) $allocation->quantity,
+                                    'rak_id' => null,
+                                ];
+                            })
+                            ->values()
+                            ->toArray();
+
                         $deliveryItems[] = [
                             'options_from' => 2,
                             'sale_order_item_id' => $saleOrderItem->id,
                             'product_id' => $saleOrderItem->product_id,
                             'quantity' => $remainingQty,
+                            'warehouseSources' => $warehouseSources,
                             'reason' => '',
                         ];
                     }
@@ -228,17 +242,50 @@ class CreateDeliveryOrder extends CreateRecord
                 }
 
                 // Additional validation: Check against remaining quantity
-                if ($quantity > $saleOrderItem->remaining_quantity) {
+                $availableQty = $saleOrderItem->availableQuantityForDelivery();
+                if ($quantity > $availableQty) {
                     $productName = $saleOrderItem->product->name ?? 'produk';
                     \Filament\Notifications\Notification::make()
                         ->title('Validation Error')
-                        ->body("Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).")
+                        ->body("Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$availableQty}).")
                         ->danger()
                         ->send();
 
                     $validator = Validator::make([], []);
-                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$saleOrderItem->remaining_quantity}).");
+                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$availableQty}).");
                     throw new ValidationException($validator);
+                }
+
+                $warehouseSources = collect($item['warehouseSources'] ?? []);
+                if ($warehouseSources->isNotEmpty()) {
+                    $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                        return (float) ($source['quantity'] ?? 0);
+                    });
+
+                    if (abs($sourceQty - $quantity) > 0.0001) {
+                        $validator = Validator::make([], []);
+                        $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Total qty sumber gudang harus sama dengan quantity item.");
+                        throw new ValidationException($validator);
+                    }
+
+                    foreach ($warehouseSources as $sourceIndex => $source) {
+                        $sourceWarehouseId = $source['warehouse_id'] ?? null;
+                        $sourceQtyItem = (float) ($source['quantity'] ?? 0);
+
+                        if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: gudang dan qty > 0 wajib diisi.");
+                            throw new ValidationException($validator);
+                        }
+
+                        $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, $saleOrderItemId ? (int) $saleOrderItemId : null);   // stok bebas + reservasi milik SO ini
+
+                        if ((float) $availableStock < $sourceQtyItem) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: stok tidak mencukupi di gudang sumber.");
+                            throw new ValidationException($validator);
+                        }
+                    }
                 }
             }
 
@@ -270,7 +317,28 @@ class CreateDeliveryOrder extends CreateRecord
             $deliveryOrder->salesOrders()->sync($this->processedSalesOrderIds);
         }
 
-        // Note: Delivery order items are now saved automatically by Filament relationship repeater
-        // This allows for approval/review before committing to inventory reduction
+        $warehouseConfirmations = app(\App\Services\DeliveryOrderService::class)
+            ->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);
+
+        if (! empty($warehouseConfirmations)) {
+            $warehouseCount = collect($warehouseConfirmations)
+                ->map(fn ($warehouseConfirmation) => $warehouseConfirmation->warehouseConfirmationItems->first()?->warehouse_id)
+                ->filter()
+                ->unique()
+                ->count();
+
+            // Advance DO status to request_stock (waiting for warehouse confirmations)
+            app(\App\Services\DeliveryOrderService::class)->updateStatus(
+                deliveryOrder: $deliveryOrder,
+                status: 'request_stock',
+                comments: 'WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang.',
+            );
+
+            \Filament\Notifications\Notification::make()
+                ->title('Delivery Order Dibuat')
+                ->success()
+                ->body('WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang. Status: Request Stock.')
+                ->send();
+        }
     }
 }

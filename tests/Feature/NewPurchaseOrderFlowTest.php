@@ -10,6 +10,7 @@ use App\Models\Warehouse;
 use App\Models\User;
 use App\Models\Cabang;
 use App\Models\Currency;
+use App\Models\PurchaseReturn;
 use App\Models\UnitOfMeasure;
 use App\Models\QualityControl;
 use App\Models\StockMovement;
@@ -179,11 +180,11 @@ it('executes new flow: PO → QC → Auto-Receipt → Stock → Complete', funct
     expect((int)$stockMovement->quantity)->toBe(95); // Only passed quantity
     expect($stockMovement->type)->toBe('purchase_in');
 
-    // Step 7: Assert PO Auto-Completed (since all items received)
+    // Step 7: PO remains partially received until rejected quantity is replaced/accepted
     $po->refresh();
-    expect($po->status)->toBe('completed');
-    expect($po->completed_by)->not->toBeNull();
-    expect($po->completed_at)->not->toBeNull();
+    expect($po->status)->toBe('partially_received');
+    expect($po->completed_by)->toBeNull();
+    expect($po->completed_at)->toBeNull();
 });
 
 it('supports partial QC and completion', function () {
@@ -329,14 +330,20 @@ it('creates return product for rejected items', function () {
 
     $this->qcService->completeQualityControl($qc->fresh(), []);
 
-    // Assert return product created
-    $returnProduct = $qc->returnProduct;
-    expect($returnProduct)->not->toBeNull();
-    expect($returnProduct->status)->toBe('draft');
+    // Assert purchase return created from the auto-generated receipt item rejection
+    $receipt = PurchaseReceipt::where('purchase_order_id', $po->id)
+        ->where('notes', 'like', '%' . $qc->qc_number . '%')
+        ->first();
 
-    $returnItem = $qc->returnProductItem->first();
+    expect($receipt)->not->toBeNull();
+
+    $purchaseReturn = PurchaseReturn::where('purchase_receipt_id', $receipt->id)->first();
+    expect($purchaseReturn)->not->toBeNull();
+    expect($purchaseReturn->status)->toBe('draft');
+
+    $returnItem = $purchaseReturn->purchaseReturnItem()->first();
     expect($returnItem)->not->toBeNull();
-    expect((int)$returnItem->quantity)->toBe(20);
+    expect((int)$returnItem->qty_returned)->toBe(20);
     expect($returnItem->product_id)->toBe($this->product->id);
 });
 

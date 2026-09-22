@@ -33,19 +33,30 @@ use App\Models\Product;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Services\PurchaseReturnService;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PurchaseReturnResource extends Resource
 {
     protected static ?string $model = PurchaseReturn::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up-on-square-stack';
 
     // Group updated to the standardized Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Retur Pembelian';
+
+    protected static ?string $modelLabel = 'Retur Pembelian';
+
+    protected static ?string $pluralModelLabel = 'Retur Pembelian';
+
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
@@ -70,14 +81,14 @@ class PurchaseReturnResource extends Resource
                                 'max' => 'Nota retur maksimal 50 karakter'
                             ]),
                         Select::make('purchase_receipt_id')
-                            ->required()
+                            ->nullable()
                             ->label('Purchase Receipt')
                             ->preload()
                             ->reactive()
                             ->searchable()
                             ->relationship('purchaseReceipt', 'receipt_number', function (Builder $query) {
                                 $query->whereHas('purchaseOrder', function (Builder $query) {
-                                    $query->where('status', 'closed');
+                                    $query->whereIn('status', ['completed', 'closed']);
                                 });
                             })
                             ->afterStateUpdated(function ($set, $state) {
@@ -132,7 +143,7 @@ class PurchaseReturnResource extends Resource
                                 'rejected' => 'Rejected',
                             ])
                             ->default('draft')
-                            ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
+                            ->disabled(fn () => !Auth::user()?->hasRole('Super Admin'))
                             ->dehydrated(),
                         Textarea::make('notes')
                             ->label('Keterangan')
@@ -191,7 +202,6 @@ class PurchaseReturnResource extends Resource
                                     ]),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price (Rp.)')
-                                    ->numeric()
                                     ->indonesianMoney()
                                     ->default(0)
                                     ->required()
@@ -356,6 +366,37 @@ class PurchaseReturnResource extends Resource
                     EditAction::make()
                         ->color('success')
                         ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
+                    \Filament\Tables\Actions\Action::make('edit_status')
+                        ->label('Edit Status')
+                        ->icon('heroicon-o-pencil-square')
+                        ->color('warning')
+                        ->visible(fn ($record) => Auth::user()?->hasRole('Super Admin'))
+                        ->form([
+                            Select::make('status')
+                                ->label('Status')
+                                ->options([
+                                    'draft' => 'Draft',
+                                    'pending_approval' => 'Pending Approval',
+                                    'approved' => 'Approved',
+                                    'rejected' => 'Rejected',
+                                ])
+                                ->required()
+                                ->default(fn ($record) => $record->status),
+                            Textarea::make('notes')
+                                ->label('Catatan Perubahan Status')
+                                ->nullable(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->update([
+                                'status' => $data['status'],
+                                'notes' => ($record->notes ? $record->notes . "\n\n" : '') . 'Status diubah oleh Super Admin: ' . ($data['notes'] ?? 'Tanpa catatan'),
+                            ]);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Status Purchase Return Diubah')
+                                ->body('Status berhasil diubah menjadi: ' . $data['status'])
+                                ->success()
+                                ->send();
+                        }),
                     \Filament\Tables\Actions\Action::make('submit_for_approval')
                         ->label('Submit for Approval')
                         ->icon('heroicon-o-paper-airplane')
@@ -363,11 +404,26 @@ class PurchaseReturnResource extends Resource
                         ->visible(fn ($record) => $record->status === 'draft')
                         ->action(function ($record) {
                             $service = app(PurchaseReturnService::class);
-                            $service->submitForApproval($record);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Purchase Return submitted for approval')
-                                ->success()
-                                ->send();
+                            try {
+                                $service->submitForApproval($record);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Purchase Return Diajukan')
+                                    ->body('Retur pembelian berhasil diajukan untuk persetujuan.')
+                                    ->success()
+                                    ->send();
+                            } catch (Throwable $exception) {
+                                Log::error('PurchaseReturn submit_for_approval failed', [
+                                    'purchase_return_id' => $record->id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'error' => $exception->getMessage(),
+                                ]);
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Mengajukan Retur',
+                                    $exception,
+                                    'Retur pembelian belum berhasil diajukan. Silakan coba lagi.'
+                                );
+                            }
                         }),
                     \Filament\Tables\Actions\Action::make('approve')
                         ->label('Approve')
@@ -381,11 +437,27 @@ class PurchaseReturnResource extends Resource
                         ])
                         ->action(function ($record, array $data) {
                             $service = app(PurchaseReturnService::class);
-                            $service->approve($record, $data);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Purchase Return approved')
-                                ->success()
-                                ->send();
+                            try {
+                                $service->approve($record, $data);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Retur Pembelian Disetujui')
+                                    ->body('Retur pembelian berhasil disetujui. Jurnal akuntansi dan penyesuaian stok telah diproses.')
+                                    ->success()
+                                    ->send();
+                            } catch (Throwable $exception) {
+                                Log::error('PurchaseReturn approve failed', [
+                                    'purchase_return_id' => $record->id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'approval_notes' => $data['approval_notes'] ?? null,
+                                    'error' => $exception->getMessage(),
+                                ]);
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Menyetujui Retur',
+                                    $exception,
+                                    'Retur pembelian belum dapat disetujui. Silakan coba lagi.'
+                                );
+                            }
                         }),
                     \Filament\Tables\Actions\Action::make('reject')
                         ->label('Reject')
@@ -399,11 +471,27 @@ class PurchaseReturnResource extends Resource
                         ])
                         ->action(function ($record, array $data) {
                             $service = app(PurchaseReturnService::class);
-                            $service->reject($record, $data);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Purchase Return rejected')
-                                ->danger()
-                                ->send();
+                            try {
+                                $service->reject($record, $data);
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Retur Pembelian Ditolak')
+                                    ->body('Retur pembelian telah ditolak.')
+                                    ->danger()
+                                    ->send();
+                            } catch (Throwable $exception) {
+                                Log::error('PurchaseReturn reject failed', [
+                                    'purchase_return_id' => $record->id,
+                                    'status' => $record->status,
+                                    'user_id' => Auth::id(),
+                                    'rejection_notes' => $data['rejection_notes'] ?? null,
+                                    'error' => $exception->getMessage(),
+                                ]);
+                                ProcurementFailureNotifier::danger(
+                                    'Gagal Menolak Retur',
+                                    $exception,
+                                    'Retur pembelian belum dapat ditolak. Silakan coba lagi.'
+                                );
+                            }
                         }),
                     DeleteAction::make()
                         ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
@@ -455,7 +543,7 @@ class PurchaseReturnResource extends Resource
                         TextEntry::make('qualityControl.fromModel.purchaseOrder.po_number')
                             ->label('PO Number')
                             ->visible(fn ($record) => $record->isQcReturn()),
-                        TextEntry::make('qualityControl.fromModel.purchaseOrder.supplier.name')
+                        TextEntry::make('qualityControl.fromModel.purchaseOrder.supplier.perusahaan')
                             ->label('Supplier')
                             ->visible(fn ($record) => $record->isQcReturn()),
                     ]),

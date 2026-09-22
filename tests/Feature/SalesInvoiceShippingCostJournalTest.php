@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\DeliverySalesOrder;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -23,12 +24,13 @@ it('creates sales invoice journal entries with shipping costs when delivery orde
     ]);
 
     // Create COAs
-    $arCoa = ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Piutang Dagang']);
-    $revenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan Barang Dagangan']);
-    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran']);
-    $biayaPengirimanCoa = ChartOfAccount::factory()->create(['code' => '6100.02', 'name' => 'Biaya Pengiriman / Pengangkutan']);
-    $cogsCoa = ChartOfAccount::factory()->create(['code' => '5100.10', 'name' => 'Harga Pokok Pembelian Barang Dagangan']);
-    $goodsDeliveryCoa = ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim']);
+    $arCoa = ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Piutang Dagang', 'type' => 'Asset', 'is_active' => true]);
+    $revenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan Barang Dagangan', 'type' => 'Revenue', 'is_active' => true]);
+    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran', 'type' => 'Liability', 'is_active' => true]);
+    $biayaPengirimanCoa = ChartOfAccount::factory()->create(['code' => '6100.02', 'name' => 'Biaya Pengiriman / Pengangkutan', 'type' => 'Expense', 'is_active' => true]);
+    $cogsCoa = ChartOfAccount::factory()->create(['code' => '5100.10', 'name' => 'Harga Pokok Pembelian Barang Dagangan', 'type' => 'Expense', 'is_active' => true]);
+    $goodsDeliveryCoa = ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset', 'is_active' => true]);
+    $inventoryCoa = ChartOfAccount::factory()->create(['code' => '1140.10', 'name' => 'Persediaan Barang Dagangan', 'type' => 'Asset', 'is_active' => true]); // diwajibkan jurnal DO
 
     // Create product with COAs
     $product = Product::factory()->create([
@@ -36,6 +38,7 @@ it('creates sales invoice journal entries with shipping costs when delivery orde
         'cost_price' => '1000000.00', // Rp 1.000.000
         'cogs_coa_id' => $cogsCoa->id,
         'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+        'inventory_coa_id' => $inventoryCoa->id,
         'sales_coa_id' => $revenueCoa->id,
     ]);
 
@@ -87,8 +90,15 @@ it('creates sales invoice journal entries with shipping costs when delivery orde
         'sales_order_id' => $saleOrder->id,
     ]);
 
-    // Approve sale order to trigger invoice creation
-    $saleOrder->update(['status' => 'completed']);
+    // Invoice untuk SO yang dikirim lewat DO terbit PER DO saat DO selesai (bukan saat SO selesai).
+    DeliveryOrderItem::create([
+        'delivery_order_id' => $deliveryOrder->id,
+        'sale_order_item_id' => $soItem->id,
+        'product_id' => $product->id,
+        'quantity' => $quantity,
+        'reason' => 'Uji biaya pengiriman',
+    ]);
+    $deliveryOrder->update(['status' => 'completed']);
 
     // Assert invoice created
     $invoice = Invoice::where('from_model_type', SaleOrder::class)
@@ -100,13 +110,14 @@ it('creates sales invoice journal entries with shipping costs when delivery orde
 
     // Calculate expected values
     $expectedSubtotal = '1200000.00'; // 1.200.000
-    $expectedTaxAmount = 132000; // 1.200.000 * 11% (integer for invoice)
+    $expectedTaxRate = 11; // invoice.tax stores the canonical PPN percentage rate
     $expectedTaxAmountJournal = '132000.00'; // 1.200.000 * 11% (string for journal)
     $expectedShippingCost = 50000; // 50.000
     $expectedTotal = '1382000.00'; // 1.382.000
 
     expect($invoice->subtotal)->toBe($expectedSubtotal);
-    expect($invoice->tax)->toBe($expectedTaxAmount);
+    expect((float) $invoice->tax)->toBe(11.0);
+    expect((float) $invoice->ppn_rate)->toBe(11.0);
     expect($invoice->getOtherFeeTotalAttribute())->toBe($expectedShippingCost);
     expect($invoice->total)->toBe($expectedTotal);
 
@@ -189,12 +200,13 @@ it('does not create shipping cost journal entry when delivery order has no addit
     ]);
 
     // Create COAs
-    $arCoa = ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Piutang Dagang']);
-    $revenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan Barang Dagangan']);
-    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran']);
-    $biayaPengirimanCoa = ChartOfAccount::factory()->create(['code' => '6100.02', 'name' => 'Biaya Pengiriman / Pengangkutan']);
-    $cogsCoa = ChartOfAccount::factory()->create(['code' => '5100.10', 'name' => 'Harga Pokok Pembelian Barang Dagangan']);
-    $goodsDeliveryCoa = ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim']);
+    $arCoa = ChartOfAccount::factory()->create(['code' => '1120', 'name' => 'Piutang Dagang', 'type' => 'Asset', 'is_active' => true]);
+    $revenueCoa = ChartOfAccount::factory()->create(['code' => '4000', 'name' => 'Penjualan Barang Dagangan', 'type' => 'Revenue', 'is_active' => true]);
+    $ppnKeluaranCoa = ChartOfAccount::factory()->create(['code' => '2120.06', 'name' => 'PPn Keluaran', 'type' => 'Liability', 'is_active' => true]);
+    $biayaPengirimanCoa = ChartOfAccount::factory()->create(['code' => '6100.02', 'name' => 'Biaya Pengiriman / Pengangkutan', 'type' => 'Expense', 'is_active' => true]);
+    $cogsCoa = ChartOfAccount::factory()->create(['code' => '5100.10', 'name' => 'Harga Pokok Pembelian Barang Dagangan', 'type' => 'Expense', 'is_active' => true]);
+    $goodsDeliveryCoa = ChartOfAccount::factory()->create(['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset', 'is_active' => true]);
+    $inventoryCoa = ChartOfAccount::factory()->create(['code' => '1140.10', 'name' => 'Persediaan Barang Dagangan', 'type' => 'Asset', 'is_active' => true]); // diwajibkan jurnal DO
 
     // Create product with COAs
     $product = Product::factory()->create([
@@ -202,6 +214,7 @@ it('does not create shipping cost journal entry when delivery order has no addit
         'cost_price' => '1000000.00',
         'cogs_coa_id' => $cogsCoa->id,
         'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
+        'inventory_coa_id' => $inventoryCoa->id,
         'sales_coa_id' => $revenueCoa->id,
     ]);
 
@@ -251,8 +264,15 @@ it('does not create shipping cost journal entry when delivery order has no addit
         'sales_order_id' => $saleOrder->id,
     ]);
 
-    // Approve sale order to trigger invoice creation
-    $saleOrder->update(['status' => 'completed']);
+    // Invoice untuk SO yang dikirim lewat DO terbit PER DO saat DO selesai (bukan saat SO selesai).
+    DeliveryOrderItem::create([
+        'delivery_order_id' => $deliveryOrder->id,
+        'sale_order_item_id' => $soItem->id,
+        'product_id' => $product->id,
+        'quantity' => $quantity,
+        'reason' => 'Uji biaya pengiriman',
+    ]);
+    $deliveryOrder->update(['status' => 'completed']);
 
     // Assert invoice created
     $invoice = Invoice::where('from_model_type', SaleOrder::class)

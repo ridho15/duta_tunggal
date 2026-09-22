@@ -11,6 +11,7 @@
             $multiPeriodData = [];
             $drillDownData = null;
         }
+        $balanceAlert = $this->showPreview ? $this->getBalanceAlertData() : null;
     @endphp
 
     <style>
@@ -106,6 +107,27 @@
         .liabilities-icon { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
         .equity-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
         .ratio-icon { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
+
+        .balance-alert {
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid #fecaca;
+            background: linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%);
+            color: #991b1b;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+        }
+
+        .balance-alert-title {
+            font-size: 1rem;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+        }
+
+        .balance-alert-meta {
+            font-weight: 700;
+            margin-top: 0.4rem;
+        }
 
         /* Section Headers */
         .section-header {
@@ -629,6 +651,14 @@
         }
     </style>
 
+        @if($balanceAlert)
+        <div class="balance-alert no-print">
+            <div class="balance-alert-title">⚠ {{ $balanceAlert['title'] }}</div>
+            <div>{{ $balanceAlert['message'] }}</div>
+            <div class="balance-alert-meta">Selisih aktual: Rp {{ number_format(abs($balanceAlert['difference']), 0, ',', '.') }}</div>
+        </div>
+        @endif
+
     <div class="print-header">
         <h1 style="margin: 0; font-size: 1.5rem;">NERACA (BALANCE SHEET)</h1>
         <p style="margin: 0.5rem 0;">Per Tanggal: {{ \Carbon\Carbon::parse($this->as_of_date)->format('d F Y') }}</p>
@@ -965,3 +995,12 @@
         });
     </script>
 </x-filament-panels::page>
+<script>
+window.addEventListener('open-report-preview', event => {
+    const url = event.detail?.url ?? event.detail?.[0]?.url;
+
+    if (url) {
+        window.open(url, '_blank', 'noopener');
+    }
+});
+</script>

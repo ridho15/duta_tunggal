@@ -1,32 +1,36 @@
-import { test as setup } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-const authFile = path.join(process.cwd(), 'playwright/.auth/user.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const authDir = path.join(__dirname, '../../playwright/.auth');
+if (!fs.existsSync(authDir)) {
+  fs.mkdirSync(authDir, { recursive: true });
+}
 
 /**
- * Auth setup: log in once and save storage state so all E2E tests reuse it.
- * This avoids the per-test login overhead that slows down the single-threaded
- * PHP artisan serve and causes intermittent timeouts.
+ * Login setup — runs once and persists the Filament auth session.
+ * Credentials: superadmin@gmail.com / superadmin
  */
-setup('authenticate', async ({ page }) => {
-  // Ensure auth directory exists
-  const authDir = path.dirname(authFile);
-  if (!fs.existsSync(authDir)) {
-    fs.mkdirSync(authDir, { recursive: true });
+test('setup auth state', async ({ page }) => {
+  await page.goto('/admin/login');
+
+  const currentPath = new URL(page.url()).pathname;
+  if (!currentPath.endsWith('/login')) {
+    await page.context().storageState({ path: 'playwright/.auth/user.json' });
+    return;
   }
 
-  await page.goto('/admin/login');
-  await page.waitForSelector('#data\\.email', { timeout: 15000 });
-  await page.fill('#data\\.email', 'e2e-test@duta-tunggal.test');
-  await page.fill('#data\\.password', 'e2e-password-123');
-  await page.click('button[type="submit"]');
+  await expect(page).toHaveTitle(/Masuk|Login|Duta Tunggal ERP/);
 
-  // Wait for redirect away from login page
-  await page.waitForURL(/\/admin(?!\/login)/, { timeout: 30000 });
-  await page.waitForLoadState('networkidle', { timeout: 30000 });
+  await page.locator('#data\\.email').fill('ralamzah@gmail.com');
+  await page.locator('#data\\.password').fill('ridho123');
+  await page.locator('form').getByRole('button', { name: /masuk|login|sign in/i }).click();
 
-  // Save authentication state (cookies + localStorage) to file
-  await page.context().storageState({ path: authFile });
-  console.log(`[Auth Setup] Saved auth state to ${authFile}`);
+  await page.waitForFunction(() => !window.location.pathname.endsWith('/login'), { timeout: 30_000 });
+
+  await page.context().storageState({ path: 'playwright/.auth/user.json' });
 });

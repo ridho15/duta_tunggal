@@ -73,6 +73,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Profiler request (config/perf.php): satu baris JSON per request lambat; retensi pendek.
+        'perf' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/perf.log'),
+            'level' => 'info',
+            'days' => env('PERF_LOG_DAYS', 7),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

@@ -10,6 +10,7 @@ use App\Models\Reports\CashFlowItem;
 use App\Models\Reports\CashFlowSection;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class CashFlowReportService
 {
@@ -30,7 +31,7 @@ class CashFlowReportService
     {
         $method = $filters['method'] ?? 'direct';
         $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->startOfMonth();
-        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfDay();
+        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfMonth();
         $this->filters = $filters;
 
         if ($method === 'indirect') {
@@ -165,7 +166,11 @@ class CashFlowReportService
         }
 
         // Adjust for changes in accounts receivable (working capital)
-        $arChange = $this->calculateWorkingCapitalChange('1120', $start, $end); // Piutang
+        $arChange = $this->calculateWorkingCapitalChange(
+            $this->getConfiguredAccountPrefixes('accounts_receivable', ['1120']),
+            $start,
+            $end
+        );
         if ($arChange !== 0) {
             $adjustments[] = [
                 'key' => 'ar_change',
@@ -176,7 +181,11 @@ class CashFlowReportService
         }
 
         // Adjust for changes in inventory (working capital)
-        $inventoryChange = $this->calculateWorkingCapitalChange('1140', $start, $end); // Persediaan
+        $inventoryChange = $this->calculateWorkingCapitalChange(
+            $this->getConfiguredAccountPrefixes('inventory', ['1140', '1140.01']),
+            $start,
+            $end
+        );
         if ($inventoryChange !== 0) {
             $adjustments[] = [
                 'key' => 'inventory_change',
@@ -187,7 +196,11 @@ class CashFlowReportService
         }
 
         // Adjust for changes in accounts payable (working capital)
-        $apChange = $this->calculateWorkingCapitalChange('2110', $start, $end); // Hutang
+        $apChange = $this->calculateWorkingCapitalChange(
+            $this->getConfiguredAccountPrefixes('accounts_payable', ['2110']),
+            $start,
+            $end
+        );
         if ($apChange !== 0) {
             $adjustments[] = [
                 'key' => 'ap_change',
@@ -203,13 +216,17 @@ class CashFlowReportService
     /**
      * Calculate working capital change for a COA prefix.
      */
-    private function calculateWorkingCapitalChange(string $prefix, Carbon $start, Carbon $end): float
+    private function calculateWorkingCapitalChange(array $prefixes, Carbon $start, Carbon $end): float
     {
+        if (empty($prefixes)) {
+            return 0.0;
+        }
+
         // Get beginning balance (end of previous period)
-        $beginningBalance = $this->getAccountBalanceAtDate($prefix, $start->copy()->subDay());
+        $beginningBalance = $this->getAccountBalanceAtDate($prefixes, $start->copy()->subDay());
 
         // Get ending balance
-        $endingBalance = $this->getAccountBalanceAtDate($prefix, $end);
+        $endingBalance = $this->getAccountBalanceAtDate($prefixes, $end);
 
         // Change = Ending - Beginning
         // For cash flow, we want to see how this affects cash:
@@ -221,11 +238,19 @@ class CashFlowReportService
     /**
      * Get account balance at a specific date for given prefix.
      */
-    private function getAccountBalanceAtDate(string $prefix, Carbon $date): float
+    private function getAccountBalanceAtDate(array $prefixes, Carbon $date): float
     {
+        if (empty($prefixes)) {
+            return 0.0;
+        }
+
         $query = \App\Models\JournalEntry::query()
             ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
-            ->where('chart_of_accounts.code', 'like', $prefix . '%')
+            ->where(function (Builder $query) use ($prefixes) {
+                foreach ($prefixes as $prefix) {
+                    $query->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
+                }
+            })
             ->where('journal_entries.date', '<=', $date);
 
         $this->applyTransactionFilters($query);
@@ -282,8 +307,73 @@ class CashFlowReportService
     {
         return match ($item->resolver) {
             'salesReceipts' => $this->sumSalesReceipts($start, $end),
+            'customerDeposits' => $this->sumCustomerDeposits($start, $end),
+            'supplierDeposits' => $this->sumSupplierDeposits($start, $end),
             default => $this->sumCashBankByConfig($item, $start, $end),
         };
+    }
+
+    private function sumCustomerDeposits(Carbon $start, Carbon $end): float
+    {
+        $prefixes = $this->getCashAccountPrefixes();
+        if (empty($prefixes)) {
+            return 0.0;
+        }
+
+        $query = \App\Models\JournalEntry::query()
+            ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
+            ->join('deposits', function ($join) {
+                $join->on('deposits.id', '=', 'journal_entries.source_id')
+                    ->where('journal_entries.source_type', \App\Models\Deposit::class);
+            })
+            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
+            ->where('journal_entries.source_type', \App\Models\Deposit::class)
+            ->where('journal_entries.journal_type', 'deposit')
+            ->where('deposits.from_model_type', \App\Models\Customer::class)
+            ->where(function (Builder $query) use ($prefixes) {
+                $query->where(function (Builder $inner) use ($prefixes) {
+                    foreach ($prefixes as $prefix) {
+                        $inner->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
+                    }
+                });
+            });
+
+        $debit = (float) $query->sum('journal_entries.debit');
+        $credit = (float) $query->sum('journal_entries.credit');
+
+        return $debit - $credit;
+    }
+
+    private function sumSupplierDeposits(Carbon $start, Carbon $end): float
+    {
+        $prefixes = $this->getCashAccountPrefixes();
+        if (empty($prefixes)) {
+            return 0.0;
+        }
+
+        $query = \App\Models\JournalEntry::query()
+            ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
+            ->join('deposits', function ($join) {
+                $join->on('deposits.id', '=', 'journal_entries.source_id')
+                    ->where('journal_entries.source_type', \App\Models\Deposit::class);
+            })
+            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
+            ->where('journal_entries.source_type', \App\Models\Deposit::class)
+            ->where('journal_entries.journal_type', 'deposit')
+            ->where('deposits.from_model_type', \App\Models\Supplier::class)
+            ->where(function (Builder $query) use ($prefixes) {
+                $query->where(function (Builder $inner) use ($prefixes) {
+                    foreach ($prefixes as $prefix) {
+                        $inner->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
+                    }
+                });
+            });
+
+        $credit = (float) $query->sum('journal_entries.credit');
+        $debit = (float) $query->sum('journal_entries.debit');
+        $amount = $credit - $debit;
+
+        return -abs($amount);
     }
 
     private function sumSalesReceipts(Carbon $start, Carbon $end): float
@@ -299,8 +389,8 @@ class CashFlowReportService
                     });
             })
             ->whereHas('customerReceipt', function (Builder $query) {
-                $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer', 'Deposit'])
-                    ->whereIn('status', ['Paid', 'paid', 'Partial', 'partial']);
+                $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer'])
+                    ->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
             })
             ->sum('amount');
 
@@ -443,11 +533,11 @@ class CashFlowReportService
     private function getSalesReceiptBreakdown(Carbon $start, Carbon $end): array
     {
         return CustomerReceiptItem::query()
-            ->with(['customerReceipt'])
+            ->with(['customerReceipt.customer'])
             ->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
             ->whereHas('customerReceipt', function (Builder $query) {
-                $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer', 'Deposit'])
-                    ->whereIn('status', ['Paid', 'paid', 'Partial', 'partial']);
+                $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer'])
+                    ->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
             })
             ->selectRaw('customer_receipt_id, SUM(amount) as total')
             ->groupBy('customer_receipt_id')
@@ -514,12 +604,23 @@ class CashFlowReportService
             ->when(!empty($this->filters['cash_accounts']), function (Builder $query) {
                 $query->whereIn('cash_bank_account_id', (array) $this->filters['cash_accounts']);
             })
-            ->whereHas('accountCoa', function (Builder $query) use ($prefixes) {
-                $query->where(function (Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('code', 'like', $prefix . '%');
-                    }
-                });
+            ->where(function (Builder $query) use ($prefixes) {
+                $query
+                    ->whereHas('accountCoa', function (Builder $accountQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($accountQuery, $prefixes);
+                    })
+                    ->orWhereHas('offsetCoa', function (Builder $offsetQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($offsetQuery, $prefixes);
+                    });
+            })
+            ->where(function (Builder $query) use ($prefixes) {
+                $query
+                    ->whereDoesntHave('accountCoa', function (Builder $accountQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($accountQuery, $prefixes);
+                    })
+                    ->orWhereDoesntHave('offsetCoa', function (Builder $offsetQuery) use ($prefixes) {
+                        $this->applyCodePrefixConstraint($offsetQuery, $prefixes);
+                    });
             });
 
         $inflow = (clone $baseQuery)->whereIn('type', self::CASH_IN_TYPES)->sum('amount');
@@ -545,6 +646,39 @@ class CashFlowReportService
         $journalBalance = $journalDebit - $journalCredit;
 
         return $cashBankBalance + $journalBalance;
+    }
+
+    private function getConfiguredAccountPrefixes(string $configKey, array $fallbacks = []): array
+    {
+        $configuredCode = config('coa.' . $configKey);
+        $codes = array_filter([$configuredCode, ...$fallbacks]);
+        $prefixes = [];
+
+        foreach ($codes as $code) {
+            $prefixes = array_merge($prefixes, $this->expandCodeVariants((string) $code));
+        }
+
+        return array_values(array_unique(array_filter($prefixes)));
+    }
+
+    private function expandCodeVariants(string $code): array
+    {
+        $variants = [$code];
+
+        if (str_contains($code, '.')) {
+            $variants[] = strstr($code, '.', true);
+        }
+
+        return $variants;
+    }
+
+    private function applyCodePrefixConstraint(Builder $query, array $prefixes): void
+    {
+        $query->where(function (Builder $inner) use ($prefixes) {
+            foreach ($prefixes as $prefix) {
+                $inner->orWhere('code', 'like', $prefix . '%');
+            }
+        });
     }
 
     private function getCashAccountPrefixes(): array
@@ -574,65 +708,64 @@ class CashFlowReportService
             return 0.0;
         }
 
-        // Sum journal entries for transfers (source_type = CashBankTransfer)
-        $query = \App\Models\JournalEntry::query()
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-            ->where('source_type', \App\Models\CashBankTransfer::class)
-            ->where('journal_type', 'transfer')
-            ->whereHas('coa', function (\Illuminate\Database\Eloquent\Builder $query) use ($prefixes) {
+        $entries = \App\Models\JournalEntry::query()
+            ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
+            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
+            ->where(function (\Illuminate\Database\Eloquent\Builder $query) {
+                $query->where(function (\Illuminate\Database\Eloquent\Builder $entryQuery) {
+                    $entryQuery->where('journal_entries.source_type', \App\Models\CashBankTransfer::class)
+                        ->where('journal_entries.journal_type', 'transfer');
+                })->orWhere(function (\Illuminate\Database\Eloquent\Builder $entryQuery) {
+                    $entryQuery->where('journal_entries.source_type', \App\Models\VendorPayment::class)
+                        ->where('journal_entries.journal_type', 'payment');
+                });
+            })
+            ->where(function (\Illuminate\Database\Eloquent\Builder $query) use ($prefixes) {
                 $query->where(function (\Illuminate\Database\Eloquent\Builder $inner) use ($prefixes) {
                     foreach ($prefixes as $prefix) {
-                        $inner->orWhere('code', 'like', $prefix . '%');
+                        $inner->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
                     }
                 });
-            });
+            })
+            ->get([
+                'journal_entries.debit',
+                'journal_entries.credit',
+                'journal_entries.source_type',
+                'journal_entries.journal_type',
+                'chart_of_accounts.type as coa_type',
+            ]);
 
-        $debit = (clone $query)->sum('debit');
-        $credit = (clone $query)->sum('credit');
+        $inflow = 0.0;
+        $outflow = 0.0;
+        $net = 0.0;
 
-        // For cash flow, we need to determine if this is inflow or outflow based on account type
-        // Expense accounts (debit balances) represent outflows
-        // Revenue accounts (credit balances) represent inflows
-        $accounts = \App\Models\ChartOfAccount::where(function ($q) use ($prefixes) {
-            foreach ($prefixes as $prefix) {
-                $q->orWhere('code', 'like', $prefix . '%');
+        foreach ($entries as $entry) {
+            $debit = (float) $entry->debit;
+            $credit = (float) $entry->credit;
+            $accountType = strtolower((string) $entry->coa_type);
+
+            if ($accountType === 'revenue') {
+                $amount = $credit - $debit;
+            } elseif ($accountType === 'liability' && $entry->source_type === \App\Models\VendorPayment::class && $entry->journal_type === 'payment') {
+                // Vendor payment entries debit AP; for cash flow this is an outflow.
+                $amount = $credit - $debit;
+            } else {
+                $amount = $debit - $credit;
             }
-        })->get();
 
-        $isExpenseAccount = $accounts->contains(function ($coa) {
-            return in_array($coa->type, ['Expense']);
-        });
+            $net += $amount;
 
-        $isRevenueAccount = $accounts->contains(function ($coa) {
-            return in_array($coa->type, ['Revenue']);
-        });
-
-        if ($isExpenseAccount) {
-            // Expense accounts: debits represent cash outflows
-            $amount = $debit;
-            return match ($type) {
-                'inflow' => 0,
-                'outflow' => -$amount,  // negative for cash outflow
-                'net' => -$amount,      // negative for net cash flow
-                default => 0.0,
-            };
-        } elseif ($isRevenueAccount) {
-            // Revenue accounts: credits represent cash inflows
-            $amount = $credit;
-            return match ($type) {
-                'inflow' => $amount,   // positive for cash inflow
-                'outflow' => 0,
-                'net' => $amount,      // positive for net cash flow
-                default => 0.0,
-            };
+            if ($amount > 0) {
+                $inflow += $amount;
+            } elseif ($amount < 0) {
+                $outflow += $amount;
+            }
         }
 
-        // For other account types, use net calculation
-        $netAmount = $debit - $credit;
         return match ($type) {
-            'inflow' => $netAmount > 0 ? $netAmount : 0,
-            'outflow' => $netAmount < 0 ? abs($netAmount) : 0,
-            'net' => $netAmount,
+            'inflow' => $inflow,
+            'outflow' => $outflow,
+            'net' => $net,
             default => 0.0,
         };
     }

@@ -18,6 +18,13 @@ use App\Models\StockTransferItem;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\StockMovement;
+use App\Models\Supplier;
+use App\Models\Customer;
+use App\Models\User;
+use App\Models\Warehouse;
+use App\Models\Rak;
+use App\Models\Driver;
+use App\Models\Vehicle;
 use App\Services\PurchaseReceiptService;
 use App\Services\ProductService;
 use App\Services\QualityControlService;
@@ -25,6 +32,7 @@ use App\Services\DeliveryOrderService;
 use App\Models\ChartOfAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 
 class StockMovementComprehensiveTest extends TestCase
 {
@@ -35,6 +43,15 @@ class StockMovementComprehensiveTest extends TestCase
     protected $purchaseReceiptService;
     protected $qualityControlService;
     protected $deliveryOrderService;
+    protected $user;
+    protected $supplier;
+    protected $customer;
+    protected $warehouseFrom;
+    protected $warehouseTo;
+    protected $rakFrom;
+    protected $rakTo;
+    protected $inventoryCoa;
+    protected $goodsDeliveryCoa;
 
     protected function setUp(): void
     {
@@ -46,7 +63,7 @@ class StockMovementComprehensiveTest extends TestCase
         $this->deliveryOrderService = app(DeliveryOrderService::class);
 
         // Create required COA accounts for testing
-        ChartOfAccount::factory()->create([
+        $this->inventoryCoa = ChartOfAccount::factory()->create([
             'code' => '1140.10',
             'name' => 'Inventory Account',
             'type' => 'asset',
@@ -88,17 +105,36 @@ class StockMovementComprehensiveTest extends TestCase
             'is_active' => true,
         ]);
 
+        $this->goodsDeliveryCoa = ChartOfAccount::factory()->create([
+            'code' => '1140.20',
+            'name' => 'Goods Delivery Account',
+            'type' => 'asset',
+            'is_active' => true,
+        ]);
+
+        $this->user = User::factory()->create();
+        $this->supplier = Supplier::factory()->create();
+        $this->customer = Customer::factory()->create();
+        $this->warehouseFrom = Warehouse::factory()->create();
+        $this->warehouseTo = Warehouse::factory()->create();
+        $this->rakFrom = Rak::factory()->create(['warehouse_id' => $this->warehouseFrom->id]);
+        $this->rakTo = Rak::factory()->create(['warehouse_id' => $this->warehouseTo->id]);
+        Driver::factory()->create();
+        Vehicle::factory()->create();
+
         // Create test product
         $this->product = Product::factory()->create([
             'name' => 'Comprehensive Stock Test Product',
             'sku' => 'SKU-CSTP-' . time(),
             'cost_price' => 100.00,
             'sell_price' => 150.00,
+            'inventory_coa_id' => $this->inventoryCoa->id,
+            'goods_delivery_coa_id' => $this->goodsDeliveryCoa->id,
             'is_active' => true,
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_comprehensive_stock_movement_test_data()
     {
         echo "\n=== CREATING COMPREHENSIVE STOCK MOVEMENT TEST DATA ===\n";
@@ -107,15 +143,15 @@ class StockMovementComprehensiveTest extends TestCase
         echo "\n--- STOCK IN FROM PURCHASE ---\n";
 
         $po = PurchaseOrder::factory()->create([
-            'supplier_id' => 1,
+            'supplier_id' => $this->supplier->id,
             'po_number' => 'PO-STOCKIN-' . time(),
             'status' => 'approved',
-            'warehouse_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
             'tempo_hutang' => 30,
             'expected_date' => now()->addDays(7),
             'total_amount' => 5000.00,
             'note' => 'Test PO for stock in',
-            'created_by' => 1,
+            'created_by' => $this->user->id,
         ]);
         echo "✓ Created PO: {$po->po_number}\n";
 
@@ -151,16 +187,16 @@ class StockMovementComprehensiveTest extends TestCase
             'passed_quantity' => 30,
             'rejected_quantity' => 0,
             'status' => 0,
-            'warehouse_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
             'product_id' => $this->product->id,
-            'rak_id' => 1,
+            'rak_id' => $this->rakFrom->id,
         ]);
         echo "✓ Created QC: {$qc->qc_number}\n";
 
         // Complete QC to trigger stock movement creation
         $this->qualityControlService->completeQualityControl($qc, [
-            'warehouse_id' => 1,
-            'rak_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
+            'rak_id' => $this->rakFrom->id,
         ]);
         echo "✓ Completed QC and created stock movement\n";
 
@@ -169,7 +205,7 @@ class StockMovementComprehensiveTest extends TestCase
 
         $so = SaleOrder::factory()->create([
             'so_number' => 'SO-STOCKOUT-' . time(),
-            'customer_id' => 1,
+            'customer_id' => $this->customer->id,
             'status' => 'approved',
         ]);
         echo "✓ Created SO: {$so->so_number}\n";
@@ -179,15 +215,16 @@ class StockMovementComprehensiveTest extends TestCase
             'product_id' => $this->product->id,
             'quantity' => 25,
             'unit_price' => 150.00,
-            'warehouse_id' => 1,
-            'rak_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
+            'rak_id' => $this->rakFrom->id,
         ]);
         echo "✓ Created SO Item\n";
 
         $do = DeliveryOrder::factory()->create([
             'do_number' => 'DO-STOCKOUT-' . time(),
-            'warehouse_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
             'status' => 'sent',
+            'cabang_id' => $this->warehouseFrom->cabang_id,
         ]);
         echo "✓ Created DO: {$do->do_number}\n";
 
@@ -212,8 +249,8 @@ class StockMovementComprehensiveTest extends TestCase
 
         $transfer = StockTransfer::factory()->create([
             'transfer_number' => 'ST-TEST-' . time(),
-            'from_warehouse_id' => 1,
-            'to_warehouse_id' => 2,
+            'from_warehouse_id' => $this->warehouseFrom->id,
+            'to_warehouse_id' => $this->warehouseTo->id,
             'status' => 'completed',
         ]);
         echo "✓ Created Stock Transfer: {$transfer->transfer_number}\n";
@@ -222,20 +259,20 @@ class StockMovementComprehensiveTest extends TestCase
             'stock_transfer_id' => $transfer->id,
             'product_id' => $this->product->id,
             'quantity' => 10,
-            'from_rak_id' => 1,
-            'to_rak_id' => 2,
+            'from_rak_id' => $this->rakFrom->id,
+            'to_rak_id' => $this->rakTo->id,
         ]);
         echo "✓ Created Stock Transfer Item\n";
 
         // Create stock movements for transfer
         $this->productService->createStockMovement(
-            $this->product->id, 1, 10, 'transfer_out', now(),
-            'Stock transfer out from warehouse 1', 1, $transferItem, null,
+            $this->product->id, $this->warehouseFrom->id, 10, 'transfer_out', now(),
+            'Stock transfer out from warehouse 1', $this->rakFrom->id, $transferItem, null,
             ['transfer_id' => $transfer->id]
         );
         $this->productService->createStockMovement(
-            $this->product->id, 2, 10, 'transfer_in', now(),
-            'Stock transfer in to warehouse 2', 2, $transferItem, null,
+            $this->product->id, $this->warehouseTo->id, 10, 'transfer_in', now(),
+            'Stock transfer in to warehouse 2', $this->rakTo->id, $transferItem, null,
             ['transfer_id' => $transfer->id]
         );
         echo "✓ Created transfer stock movements\n";
@@ -245,7 +282,7 @@ class StockMovementComprehensiveTest extends TestCase
 
         $adjustment = StockAdjustment::factory()->create([
             'adjustment_number' => 'SA-TEST-' . time(),
-            'warehouse_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
             'reason' => 'Test adjustment',
             'status' => 'approved',
         ]);
@@ -254,20 +291,20 @@ class StockMovementComprehensiveTest extends TestCase
         $adjustmentItem = StockAdjustmentItem::factory()->create([
             'stock_adjustment_id' => $adjustment->id,
             'product_id' => $this->product->id,
-            'rak_id' => 1,
+            'rak_id' => $this->rakFrom->id,
         ]);
         echo "✓ Created Stock Adjustment Item\n";
 
         // Create stock movement for adjustment
         StockMovement::create([
             'product_id' => $this->product->id,
-            'warehouse_id' => 1,
+            'warehouse_id' => $this->warehouseFrom->id,
             'quantity' => 5,
             'value' => 0,
             'type' => 'adjustment_in',
             'date' => now(),
             'notes' => 'Stock adjustment increase',
-            'rak_id' => 1,
+            'rak_id' => $this->rakFrom->id,
             'from_model_type' => StockAdjustment::class,
             'from_model_id' => $adjustment->id,
             'meta' => ['adjustment_id' => $adjustment->id]
@@ -276,7 +313,7 @@ class StockMovementComprehensiveTest extends TestCase
 
         echo "\n=== TEST DATA CREATION COMPLETED ===\n";
         echo "Product ID: {$this->product->id}\n";
-        echo "Expected final stock: 30 (purchase) - 25 (sales) + 5 (adjustment) = 10\n";
+        echo "Expected final stock (warehouse 1): 30 (purchase_in) - 25 (sales) - 10 (transfer_out) + 5 (adjustment_in) = 0\n";
 
         // Verify stock movements were created
         $stockMovements = StockMovement::where('product_id', $this->product->id)->get();
@@ -287,17 +324,19 @@ class StockMovementComprehensiveTest extends TestCase
         }
 
         // Verify final stock calculation
-        $stockMovements = StockMovement::where('product_id', $this->product->id)->get();
+        // Only count warehouse 1 movements to isolate the test scenario
+        // (transfers to other warehouses should not affect final warehouse 1 stock)
+        $stockMovements = StockMovement::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouseFrom->id)->get();
         $finalStock = 0;
         foreach ($stockMovements as $movement) {
             if (in_array($movement->type, ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'])) {
-                $finalStock += $movement->quantity;
+                $finalStock += abs((float) $movement->quantity);
             } elseif (in_array($movement->type, ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'])) {
-                $finalStock -= $movement->quantity;
+                $finalStock -= abs((float) $movement->quantity);
             }
         }
-        echo "\nFinal calculated stock: {$finalStock}\n";
-        $this->assertEquals(10, $finalStock);
+        echo "\nFinal calculated stock (warehouse 1): {$finalStock}\n";
+        $this->assertEquals(0, $finalStock);
 
         // Test source information display
         echo "\n=== TESTING SOURCE INFORMATION ===\n";
@@ -312,6 +351,14 @@ class StockMovementComprehensiveTest extends TestCase
         $sourceType = 'Unknown';
         $sourceNumber = 'N/A';
         $sourceLink = 'N/A';
+
+        if (empty($movement->from_model_type) || empty($movement->from_model_id) || !class_exists($movement->from_model_type)) {
+            return [
+                'type' => $sourceType,
+                'number' => $sourceNumber,
+                'link' => $sourceLink,
+            ];
+        }
 
         if ($movement->fromModel) {
             $model = $movement->fromModel;

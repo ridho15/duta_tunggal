@@ -37,9 +37,10 @@ class StockMinimumTable extends BaseWidget
                 TextColumn::make('warehouse')->formatStateUsing(function ($state) {
                     return "({$state->kode}) {$state->name}";
                 })->label('Gudang'),
-                TextColumn::make('qty_available')->label('Stok Tersedia')->numeric()->color(function ($record) {
+                TextColumn::make('qty_available')->label('Stok Fisik')->numeric()->color(function ($record) {
                     return $record->qty_available < $record->qty_min ? 'danger' : null;
                 }),
+                TextColumn::make('qty_on_hand')->label('Stok Bebas')->numeric(),
                 TextColumn::make('qty_min')->label('Stok Minimum')->numeric(),
                 TextColumn::make('rak')->formatStateUsing(function ($state) {
                     return "({$state->code}) {$state->name}";

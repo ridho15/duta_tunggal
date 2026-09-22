@@ -3,21 +3,24 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class QualityControl extends Model
 {
-    use SoftDeletes, LogsGlobalActivity, HasFactory;
+    use SoftDeletes, LogsGlobalActivity, HasFactory, CascadesJournalEntries;
     protected $table = 'quality_controls';
     protected $fillable = [
         'qc_number',
+        'purchase_order_id',
         'inspected_by',
         'passed_quantity',
         'rejected_quantity',
+        'quantity_received',
         'notes',
-        'status',  // send to stock / send return product
+        'status',  // 0: draft / belum diproses, 1: selesai / sudah diproses, 2: cancelled / batal
         'warehouse_id',
         'reason_reject',
         'product_id',
@@ -26,6 +29,7 @@ class QualityControl extends Model
         'from_model_id',
         'from_model_type',
         'purchase_return_processed',
+        'cabang_id',
     ];
 
     protected $appends = [
@@ -49,6 +53,21 @@ class QualityControl extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();
+    }
+
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id')->withDefault();
+    }
+
+    public function items()
+    {
+        return $this->hasMany(QualityControlItem::class, 'quality_control_id');
+    }
+
+    public function qualityControlItems()
+    {
+        return $this->hasMany(QualityControlItem::class, 'quality_control_id');
     }
 
     public function product()
@@ -84,6 +103,11 @@ class QualityControl extends Model
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function purchaseReceipt()

@@ -31,19 +31,25 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->seed(ChartOfAccountSeeder::class);
 
-    $this->user = User::factory()->create();
     $this->cabang = Cabang::factory()->create();
+    $this->user = User::factory()->create([
+        'cabang_id' => $this->cabang->id,
+        'manage_type' => 'all',
+    ]);
     $this->supplier = Supplier::factory()->create();
     $this->uom = UnitOfMeasure::factory()->create();
-    $this->category = ProductCategory::factory()->create([
-        'cabang_id' => $this->cabang->id,
-    ]);
+    $categoryData = [];
+    if (Schema::hasColumn('product_categories', 'cabang_id')) {
+        $categoryData['cabang_id'] = $this->cabang->id;
+    }
+    $this->category = ProductCategory::factory()->create($categoryData);
     $this->product = Product::factory()->create([
         'cabang_id' => $this->cabang->id,
         'supplier_id' => $this->supplier->id,
@@ -345,10 +351,13 @@ it('displays inventory stock details on the Filament view page', function () {
     ]);
 
     Livewire::test(ViewInventoryStock::class, ['record' => $inventoryStock->id])
-        ->assertOk();
+        ->assertOk()
+        ->assertSee('Satuan / UOM')
+        ->assertSee($this->uom->name);
 
     // Verify relationships are loaded correctly
     expect($inventoryStock->product->id)->toBe($this->product->id);
+    expect($inventoryStock->product->uom->id)->toBe($this->uom->id);
     expect($inventoryStock->warehouse->id)->toBe($warehouse->id);
     expect($inventoryStock->rak->id)->toBe($rak->id);
 });
@@ -378,7 +387,7 @@ it('covers the inventory management flow through finance posting', function () {
         'type' => 'Asset',
     ]);
 
-    $category = ProductCategory::factory()->create(['cabang_id' => $branch->id]);
+    $category = ProductCategory::factory()->create();
     $supplier = Supplier::factory()->create();
 
     $product = Product::factory()->create([
@@ -485,7 +494,9 @@ it('covers the inventory management flow through finance posting', function () {
         ->where('source_id', $purchaseReceiptItem->id)
         ->where(function ($query) {
             $query->where('description', 'like', '%Inventory Stock%')
-                  ->orWhere('description', 'like', '%Close Temporary Procurement%');
+                  ->orWhere('description', 'like', '%Close Temporary Procurement%')
+                  ->orWhere('description', 'like', '%Debit inventory for receipt item%')
+                  ->orWhere('description', 'like', '%Credit temporary procurement for receipt item%');
         })
         ->get();
 

@@ -3,10 +3,17 @@
 /public/build
 /public/hot
 /public/storage
+/public/*.sql
+/public/*.sql.gz
 /storage/*.key
 /storage/pail
 /vendor
+/tmp/*.png
+/tmp/*.jpg
+/tmp/*.jpeg
+/tmp/*.webp
 .env
+.env.docker
 .env.backup
 .env.production
 .phpactor.json
@@ -21,3 +28,13 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Playwright (generated)
+/playwright/.auth/
+/playwright-report/
+/test-results/
+
+# Local generated temp artifacts
+tmp/
+tmp/*.html
+tmp/*.htm

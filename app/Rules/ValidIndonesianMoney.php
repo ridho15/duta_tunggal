@@ -22,7 +22,7 @@ class ValidIndonesianMoney implements Rule
             return false;
         }
 
-        $parsed = MoneyHelper::parse($value);
+        $parsed = MoneyHelper::safeParse($value);
         if (!is_numeric($parsed)) {
             return false;
         }

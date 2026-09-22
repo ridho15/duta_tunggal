@@ -105,6 +105,8 @@ class DepositFeatureTest extends TestCase
 
         // Create sale order that uses deposit
         $product = Product::factory()->create();
+        // Ensure product has a cost price so invoice posting can compute HPP
+        $product->update(['cost_price' => 100000]);
         $branch = Cabang::factory()->create();
         $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
 
@@ -198,6 +200,12 @@ class DepositFeatureTest extends TestCase
             ['code' => '4000'],
             ['name' => 'Sales Revenue', 'type' => 'Revenue', 'is_active' => true]
         );
+
+        // Create fallback COAs used by InvoiceObserver when computing COGS/release
+        \App\Models\ChartOfAccount::firstOrCreate(['code' => '1140.20'], ['name' => 'Goods Delivery', 'type' => 'Expense', 'is_active' => true]);
+        \App\Models\ChartOfAccount::firstOrCreate(['code' => '1180.10'], ['name' => 'Goods Delivery Alt', 'type' => 'Expense', 'is_active' => true]);
+        \App\Models\ChartOfAccount::firstOrCreate(['code' => '5100.10'], ['name' => 'COGS', 'type' => 'Expense', 'is_active' => true]);
+        \App\Models\ChartOfAccount::firstOrCreate(['code' => '5000'], ['name' => 'COGS Alt', 'type' => 'Expense', 'is_active' => true]);
 
         $invoice = Invoice::factory()->create([
             'from_model_type' => SaleOrder::class,

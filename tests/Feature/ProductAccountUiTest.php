@@ -20,6 +20,15 @@ describe('Product account mapping form defaults', function () {
     beforeEach(function () {
         $this->seed(ChartOfAccountSeeder::class);
 
+        ChartOfAccount::firstOrCreate(
+            ['code' => '2100.10'],
+            [
+                'name' => 'Pembelian Belum Tertagih',
+                'type' => 'Liability',
+                'is_active' => true,
+            ]
+        );
+
         /** @var User $user */
         $user = User::factory()->create();
         $this->user = $user;
@@ -53,23 +62,21 @@ describe('Product account mapping form defaults', function () {
 
         $this->cabang = Cabang::factory()->create();
         $this->uom = UnitOfMeasure::factory()->create();
-        $this->category = ProductCategory::factory()->create([
-            'cabang_id' => $this->cabang->id,
-        ]);
+        $this->category = ProductCategory::factory()->create();
 
         actingAs($user);
     });
 
     it('applies default coa values and persists manual overrides through the create form', function () {
         $defaultAccountState = [
-            'inventory_coa_id' => ChartOfAccount::where('code', '1140.10')->value('id'),
+            'inventory_coa_id' => ChartOfAccount::where('code', '1140.01')->value('id'),
             'sales_coa_id' => ChartOfAccount::where('code', '4100.10')->value('id'),
             'sales_return_coa_id' => ChartOfAccount::where('code', '4120.10')->value('id'),
             'sales_discount_coa_id' => ChartOfAccount::where('code', '4110.10')->value('id'),
             'goods_delivery_coa_id' => ChartOfAccount::where('code', '1140.20')->value('id'),
             'cogs_coa_id' => ChartOfAccount::where('code', '5100.10')->value('id'),
             'purchase_return_coa_id' => ChartOfAccount::where('code', '5120.10')->value('id'),
-            'unbilled_purchase_coa_id' => ChartOfAccount::where('code', '2190.10')->value('id'),
+            'unbilled_purchase_coa_id' => ChartOfAccount::where('code', '2100.10')->value('id'),
         ];
 
         $baseFormData = [
@@ -152,4 +159,22 @@ describe('Product account mapping form defaults', function () {
             ->and($overrideProduct->purchase_return_coa_id)->toBe($customAccounts['purchase_return_coa_id'])
             ->and($overrideProduct->unbilled_purchase_coa_id)->toBe($customAccounts['unbilled_purchase_coa_id']);
     });
+
+it('switches inventory coa to 1-101 for raw material products', function () {
+    $component = Livewire::test(CreateProduct::class)
+        ->set('data.is_raw_material', true);
+
+    $component->assertFormSet([
+        'inventory_coa_id' => ChartOfAccount::where('code', '1-101')->value('id'),
+    ]);
+});
+
+it('switches inventory coa to 1140.02 for manufactured products', function () {
+    $component = Livewire::test(CreateProduct::class)
+        ->set('data.is_manufacture', true);
+
+    $component->assertFormSet([
+        'inventory_coa_id' => ChartOfAccount::where('code', '1140.02')->value('id'),
+    ]);
+});
 });

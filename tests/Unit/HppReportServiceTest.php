@@ -314,6 +314,73 @@ class HppReportServiceTest extends TestCase
         $this->assertEquals(1630.0, $report['raw_materials']['available']);
         $this->assertEquals(915.0, $report['raw_materials']['closing']);
         $this->assertEquals(715.0, $report['raw_materials']['used']);
+        $this->assertSame('purchase_accounts', $report['data_quality']['raw_material_purchase_source']);
+        $this->assertContains('raw_material_balance_stock_fallback', collect($report['data_quality']['warnings'])->pluck('code')->all());
+    }
+
+    public function test_raw_material_purchase_source_warns_when_falling_back_to_stock_movements(): void
+    {
+        Carbon::setTestNow('2025-02-01 00:00:00');
+
+        $branch = Cabang::factory()->create(['nama' => 'Fallback Purchase Branch']);
+        $uom = UnitOfMeasure::factory()->create();
+        $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
+
+        $rawMaterial = ChartOfAccount::create([
+            'code' => '1140.777',
+            'name' => 'Persediaan Bahan Baku - Warning',
+            'type' => 'Asset',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        ChartOfAccount::create([
+            'code' => '5110.777',
+            'name' => 'Pembelian Bahan Baku - Warning',
+            'type' => 'Expense',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        $product = Product::factory()->create([
+            'cabang_id' => $branch->id,
+            'is_raw_material' => true,
+            'inventory_coa_id' => $rawMaterial->id,
+            'cost_price' => 10_000,
+            'uom_id' => $uom->id,
+        ]);
+
+        StockMovement::create([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 100,
+            'value' => 1000.0,
+            'type' => 'purchase_in',
+            'date' => '2024-12-15',
+        ]);
+
+        StockMovement::create([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 60,
+            'value' => 600.0,
+            'type' => 'purchase_in',
+            'date' => '2025-01-20',
+        ]);
+
+        $report = app(HppReportService::class)->generate('2025-01-01', '2025-01-31', [
+            'branches' => [$branch->id],
+        ]);
+
+        $this->assertEquals(600.0, $report['raw_materials']['purchases']);
+        $this->assertSame('stock_movements', $report['data_quality']['raw_material_purchase_source']);
+        $this->assertContains('raw_material_purchase_stock_fallback', collect($report['data_quality']['warnings'])->pluck('code')->all());
     }
 
     private function createJournal(ChartOfAccount $coa, string $date, float $debit, float $credit, int $branchId): void
@@ -337,7 +404,7 @@ class HppReportServiceTest extends TestCase
         Carbon::setTestNow('2025-02-01 00:00:00');
 
         $branch = Cabang::factory()->create(['nama' => 'Test Branch']);
-        $product = Product::factory()->create(['cabang_id' => $branch->id, 'name' => 'Test Product']);
+        $product = Product::factory()->forCabang($branch)->create(['name' => 'Test Product']);
 
         // Create standard costs
         $standardCost = ProductStandardCost::create([

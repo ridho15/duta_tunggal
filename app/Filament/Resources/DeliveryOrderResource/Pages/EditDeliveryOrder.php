@@ -4,6 +4,7 @@ namespace App\Filament\Resources\DeliveryOrderResource\Pages;
 
 use App\Filament\Resources\DeliveryOrderResource;
 use App\Models\DeliveryOrder;
+use App\Models\InventoryStock;
 use App\Services\DeliveryOrderItemService;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -20,7 +21,8 @@ class EditDeliveryOrder extends EditRecord
         return DeliveryOrder::with([
             'salesOrders',
             'deliveryOrderItem.saleOrderItem.product',
-            'deliveryOrderItem.product'
+            'deliveryOrderItem.product',
+            'deliveryOrderItem.warehouseSources'
         ])->findOrFail($key);
     }
 
@@ -59,6 +61,14 @@ class EditDeliveryOrder extends EditRecord
             $validator->errors()->add('salesOrders', 'Minimal 1 Sales Order harus dipilih untuk Delivery Order.');
             throw new ValidationException($validator);
         }
+
+        // Aturan sumber DO yang sama dengan halaman Create: status SO, sisa kuantitas, customer & alamat sama.
+        // SO yang sudah terhubung ke DO ini tidak diperiksa ulang status/sisanya.
+        app(\App\Services\DeliveryOrderSourceValidator::class)->assertValid(
+            (array) $salesOrderIds,
+            (int) $this->record->id,
+            $this->record->salesOrders->pluck('id')->all()
+        );
 
         // Additional validation before updating
         // Validate delivery order items against all selected sales orders
@@ -125,13 +135,9 @@ class EditDeliveryOrder extends EditRecord
                     throw new ValidationException($validator);
                 }
 
-                // Additional validation: Check against remaining quantity
-                // For edit, we need to add back the current delivery order item's quantity to remaining_quantity
-                $currentDeliveryOrderItem = $this->record->deliveryOrderItem->where('sale_order_item_id', $saleOrderItemId)->first();
-                $adjustedRemainingQty = $saleOrderItem->remaining_quantity;
-                if ($currentDeliveryOrderItem) {
-                    $adjustedRemainingQty += $currentDeliveryOrderItem->quantity;
-                }
+                // Batas kuantitas: sisa SO yang belum terkirim/terikat DO LAIN. Kuantitas DO yang sedang
+                // diedit dikecualikan (tidak perlu lagi "menambah kembali" kuantitas item saat ini).
+                $adjustedRemainingQty = $saleOrderItem->availableQuantityForDelivery((int) $this->record->id);
 
                 if ($quantity > $adjustedRemainingQty) {
                     $productName = $saleOrderItem->product->name ?? 'produk';
@@ -144,6 +150,38 @@ class EditDeliveryOrder extends EditRecord
                     $validator = Validator::make([], []);
                     $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Quantity untuk {$productName} ({$quantity}) melebihi sisa quantity yang tersedia ({$adjustedRemainingQty}).");
                     throw new ValidationException($validator);
+                }
+
+                $warehouseSources = collect($item['warehouseSources'] ?? []);
+                if ($warehouseSources->isNotEmpty()) {
+                    $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                        return (float) ($source['quantity'] ?? 0);
+                    });
+
+                    if (abs($sourceQty - $quantity) > 0.0001) {
+                        $validator = Validator::make([], []);
+                        $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Total qty sumber gudang harus sama dengan quantity item.");
+                        throw new ValidationException($validator);
+                    }
+
+                    foreach ($warehouseSources as $sourceIndex => $source) {
+                        $sourceWarehouseId = $source['warehouse_id'] ?? null;
+                        $sourceQtyItem = (float) ($source['quantity'] ?? 0);
+
+                        if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: gudang dan qty > 0 wajib diisi.");
+                            throw new ValidationException($validator);
+                        }
+
+                        $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, !empty($item['sale_order_item_id']) ? (int) $item['sale_order_item_id'] : null);   // stok bebas + reservasi milik SO ini
+
+                        if ((float) $availableStock < $sourceQtyItem) {
+                            $validator = Validator::make([], []);
+                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: stok tidak mencukupi di gudang sumber.");
+                            throw new ValidationException($validator);
+                        }
+                    }
                 }
             }
 

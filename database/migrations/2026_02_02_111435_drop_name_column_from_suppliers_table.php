@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('suppliers') || ! Schema::hasColumn('suppliers', 'name')) {
+            return;
+        }
+
         Schema::table('suppliers', function (Blueprint $table) {
             $table->dropColumn('name');
         });
@@ -21,8 +25,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('suppliers')) {
+            return;
+        }
+
         Schema::table('suppliers', function (Blueprint $table) {
-            $table->string('name')->nullable()->after('code');
+            if (! Schema::hasColumn('suppliers', 'name')) {
+                $table->string('name')->nullable()->after('code');
+            }
         });
     }
 };

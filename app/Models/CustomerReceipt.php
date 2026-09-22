@@ -4,13 +4,14 @@ namespace App\Models;
 
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CustomerReceipt extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'customer_receipts';
     protected $fillable = [
         'invoice_id',
@@ -20,19 +21,31 @@ class CustomerReceipt extends Model
         'payment_date',
         'ntpn',
         'total_payment',
+        'total_payment_idr',
+        'overpayment_amount',
+        'deposit_id',
         'notes',
         'diskon',
         'payment_adjustment',
         'payment_method',
+        'payment_reference',
+        'bank_name',
+        'proof_path',
         'coa_id',
         'status', // 'Draft','Partial','Paid'
         'created_by',
-        'cabang_id'
+        'cabang_id',
+        'currency_id',
+        'exchange_rate',
     ];
 
     protected $casts = [
         'selected_invoices' => 'json',
         'invoice_receipts' => 'json',
+        'total_payment' => 'float',
+        'total_payment_idr' => 'float',
+        'overpayment_amount' => 'float',
+        'exchange_rate' => 'float',
     ];
 
     public function invoice()
@@ -50,9 +63,20 @@ class CustomerReceipt extends Model
         return $this->hasMany(CustomerReceiptItem::class, 'customer_receipt_id');
     }
 
+    /** Deposit Customer yang mencatat kelebihan bayar penerimaan ini (bila ada). */
+    public function deposit()
+    {
+        return $this->belongsTo(Deposit::class, 'deposit_id')->withDefault();
+    }
+
     public function coa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function journalEntries()

@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\SalesInvoiceResource\Pages;
 
+use App\Helpers\MoneyHelper;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\DeliveryOrder;
+use App\Support\CurrencyConversionResolver;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -21,6 +23,8 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
+
         // Load related data for form
         if ($this->record->from_model_type === 'App\Models\SaleOrder') {
             $data['selected_customer'] = $this->record->fromModel->customer_id ?? null;
@@ -28,9 +32,22 @@ class EditSalesInvoice extends EditRecord
             $data['selected_delivery_orders'] = $this->record->delivery_orders ?? [];
         }
 
+        $data['currency_id'] = $this->record->currency_id ?? $this->record->fromModel?->currency_id;
+        $data['exchange_rate'] = (float) ($this->record->exchange_rate ?? CurrencyConversionResolver::resolveRate(is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null));
+
         // Load invoice items
         $this->record->load('invoiceItem.product');
-        $data['invoiceItem'] = $this->record->invoiceItem->toArray();
+        $data['invoiceItem'] = $this->record->invoiceItem->map(function ($item) {
+            $item->setRelation('invoice', $this->record);
+            $b = $item->breakdown();
+
+            return array_merge($item->toArray(), [
+                'bd_gross' => \App\Support\LineAmounts::money($b['gross']),
+                'bd_discount' => number_format($b['discount_pct'], 2, ',', '.') . '% = ' . \App\Support\LineAmounts::money($b['discount_amount']),
+                'bd_dpp' => \App\Support\LineAmounts::money($b['dpp']),
+                'bd_ppn' => number_format($b['tax_rate'], 2, ',', '.') . '% = ' . \App\Support\LineAmounts::money($b['ppn']),
+            ]);
+        })->all();
 
         // Load other_fees from the other_fee column (always ensure it's an array)
         $rawOtherFee = $this->record->getAttributes()['other_fee'] ?? null;
@@ -81,11 +98,16 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
+
         // Remove temporary fields
         unset($data['selected_customer']);
         unset($data['selected_sale_order']);
         unset($data['selected_delivery_orders']);
         unset($data['delivery_order_items']);
+
+        $data['currency_id'] = is_numeric($data['currency_id'] ?? null) ? (int) $data['currency_id'] : null;
+        $data['exchange_rate'] = (float) ($data['exchange_rate'] ?? 1.0);
         
         return $data;
     }
@@ -94,12 +116,23 @@ class EditSalesInvoice extends EditRecord
     {
         // Sync invoice items
         if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            // Delete existing items
+            // Soft-delete existing items before recreating
             $this->record->invoiceItem()->delete();
-            
-            // Create new items
-            foreach ($this->data['invoiceItem'] as $item) {
-                $this->record->invoiceItem()->create($item);
+
+            // Rincian baku (harga gross, diskon, DPP, PPN, total) — sama dengan jalur otomatis.
+            $built = app(\App\Services\SalesInvoiceLineBuilder::class)->fromFormItems($this->record, $this->data['invoiceItem']);
+
+            foreach ($built['items'] as $itemData) {
+                $this->record->invoiceItem()->create($itemData);
+            }
+
+            if ($built['matched'] && $built['items'] !== []) {
+                $items = collect($built['items']);
+                $this->record->update([
+                    'subtotal' => round((float) $items->sum('subtotal'), 2),
+                    'dpp' => round((float) $items->sum('subtotal'), 2),
+                    'total' => round((float) $items->sum('total') + app(\App\Services\SalesInvoiceLineBuilder::class)->otherFeeTotal($this->record), 2),
+                ]);
             }
         }
     }

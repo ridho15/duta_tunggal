@@ -45,6 +45,28 @@ class CashFlowReportServiceTest extends TestCase
             'ending_balance' => 0,
         ]);
 
+        ChartOfAccount::create([
+            'code' => '1120',
+            'name' => 'Piutang Dagang',
+            'type' => 'Asset',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
+        ChartOfAccount::create([
+            'code' => '4000',
+            'name' => 'Penjualan',
+            'type' => 'Revenue',
+            'is_active' => true,
+            'opening_balance' => 0,
+            'debit' => 0,
+            'credit' => 0,
+            'ending_balance' => 0,
+        ]);
+
         $sellingCoa = ChartOfAccount::create([
             'code' => '6100.01',
             'name' => 'Biaya Penjualan',
@@ -63,18 +85,20 @@ class CashFlowReportServiceTest extends TestCase
             'status' => 'approved',
         ])->create();
 
-        $invoice = Invoice::create([
-            'invoice_number' => 'INV-001',
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => $saleOrder->id,
-            'invoice_date' => '2025-10-05',
-            'due_date' => '2025-10-20',
-            'subtotal' => 1000,
-            'tax' => 0,
-            'other_fee' => 0,
-            'total' => 1000,
-            'status' => 'paid',
-        ]);
+        $invoice = Invoice::withoutEvents(function () use ($saleOrder) {
+            return Invoice::create([
+                'invoice_number' => 'INV-001',
+                'from_model_type' => SaleOrder::class,
+                'from_model_id' => $saleOrder->id,
+                'invoice_date' => '2025-10-05',
+                'due_date' => '2025-10-20',
+                'subtotal' => 1000,
+                'tax' => 0,
+                'other_fee' => 0,
+                'total' => 1000,
+                'status' => 'paid',
+            ]);
+        });
 
         $receipt = CustomerReceipt::create([
             'invoice_id' => $invoice->id,
@@ -85,6 +109,7 @@ class CashFlowReportServiceTest extends TestCase
             'notes' => null,
             'status' => 'Paid',
             'payment_method' => 'Cash',
+            'coa_id' => $cashCoa->id,
             'selected_invoices' => [$invoice->id],
             'invoice_receipts' => [],
             'diskon' => 0,

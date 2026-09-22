@@ -82,7 +82,7 @@ class CreateDeposit extends CreateRecord
         HelperController::sendNotification(
             isSuccess: true, 
             title: 'Success', 
-            message: "Deposit successfully created for " . $fromName
+            message: "Deposit berhasil dibuat untuk " . $fromName . ". Proses selanjutnya: Tim Finance perlu memverifikasi deposit dan memastikan saldo awal telah tercatat dalam jurnal keuangan."
         );
     }
 
@@ -100,6 +100,11 @@ class CreateDeposit extends CreateRecord
                 'exception' => $e,
                 'component_data' => $this->data ?? null,
             ]);
+            Notification::make()
+                ->title('Gagal Membuat Deposit')
+                ->body('Terjadi kesalahan saat menyimpan deposit: ' . $e->getMessage())
+                ->danger()
+                ->send();
             throw $e;
         }
     }
@@ -165,11 +170,15 @@ class CreateDeposit extends CreateRecord
                 'project_id' => $projectId,
             ]);
 
-            // Get bank/cash COA from the form data (assuming it's passed)
+            // Get bank/cash COA from persisted record first, then from form state.
             $bankCoaId = $this->record->payment_coa_id ?? null;
+            if (!$bankCoaId && isset($this->form)) {
+                $formState = $this->form->getState();
+                $bankCoaId = $formState['payment_coa_id'] ?? null;
+            }
             if (!$bankCoaId) {
                 // Try to find default bank/cash COA
-                $bankCoaId = ChartOfAccount::where('code', 'LIKE', '111%')->first()?->id;
+                $bankCoaId = ChartOfAccount::where('code', 'LIKE', '11%')->first()?->id;
             }
 
             if ($bankCoaId) {

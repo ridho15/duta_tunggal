@@ -15,6 +15,7 @@ use App\Models\Cabang;
 use App\Exports\ProductionReportExport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Maatwebsite\Excel\Facades\Excel;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ProductionReportTest extends TestCase
@@ -191,7 +192,7 @@ class ProductionReportTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_production_summary_report()
     {
         Excel::fake();
@@ -202,7 +203,7 @@ class ProductionReportTest extends TestCase
         Excel::assertStored('test_production_summary_report.xlsx');
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_material_usage_report()
     {
         Excel::fake();
@@ -213,7 +214,7 @@ class ProductionReportTest extends TestCase
         Excel::assertStored('test_material_usage_report.xlsx');
     }
 
-    /** @test */
+    #[Test]
     public function it_can_generate_efficiency_report()
     {
         Excel::fake();
@@ -224,7 +225,7 @@ class ProductionReportTest extends TestCase
         Excel::assertStored('test_efficiency_report.xlsx');
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_production_summary_by_manufacturing_order()
     {
         Excel::fake();
@@ -236,7 +237,7 @@ class ProductionReportTest extends TestCase
         $this->assertEquals($this->manufacturingOrder->mo_number, $data[0]['No. MO']);
     }
 
-    /** @test */
+    #[Test]
     public function it_shows_correct_production_summary_data()
     {
         $export = new ProductionReportExport(null, now()->subDays(30), now(), 'summary');
@@ -253,7 +254,7 @@ class ProductionReportTest extends TestCase
         $this->assertArrayHasKey('Efisiensi (%)', $record);
     }
 
-    /** @test */
+    #[Test]
     public function it_shows_correct_material_usage_data()
     {
         $export = new ProductionReportExport(null, now()->subDays(30), now(), 'material_usage');
@@ -269,7 +270,7 @@ class ProductionReportTest extends TestCase
         $this->assertArrayHasKey('Total Biaya', $record);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_efficiency_correctly()
     {
         $export = new ProductionReportExport(null, now()->subDays(30), now(), 'efficiency');
@@ -293,7 +294,7 @@ class ProductionReportTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_reports_by_date_range()
     {
         Excel::fake();

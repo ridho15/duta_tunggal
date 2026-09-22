@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Reports;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Resources\Reports\AgeingReportResource\Pages;
 use App\Models\AccountReceivable;
 use App\Models\AccountPayable;
@@ -17,20 +18,24 @@ use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Actions\ExportAction;
 use App\Exports\AgeingReportExport;
 use App\Exports\AgeingReportPdfExport;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Reports\AgeingReportService;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 
 class AgeingReportResource extends Resource
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $model = AccountReceivable::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?string $navigationLabel = 'Aging Report (AR/AP)';
+
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 25;
 
@@ -47,14 +52,7 @@ class AgeingReportResource extends Resource
                     ->label('Customer/Supplier')
                     ->sortable()
                     ->searchable()
-                    ->getStateUsing(function ($record) {
-                        if ($record instanceof AccountReceivable) {
-                            return $record->customer->name ?? '-';
-                        } elseif ($record instanceof AccountPayable) {
-                            return $record->supplier->perusahaan ?? '-';
-                        }
-                        return '-';
-                    }),
+                    ->getStateUsing(fn ($record) => self::customerOrSupplierName($record)),
 
                 TextColumn::make('invoice.no_invoice')
                     ->label('Invoice Number')
@@ -73,19 +71,7 @@ class AgeingReportResource extends Resource
 
                 TextColumn::make('days_outstanding')
                     ->label('Days Outstanding')
-                    ->getStateUsing(function ($record) {
-                        $ageingSchedule = $record->ageingSchedule;
-                        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
-                            return $ageingSchedule->days_outstanding;
-                        }
-
-                        // Calculate if not exists
-                        if ($record->invoice && $record->invoice->invoice_date) {
-                            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-                            return $invoiceDate->diffInDays(now(), false);
-                        }
-                        return 0;
-                    })
+                    ->getStateUsing(fn ($record) => self::daysOutstandingForRecord($record, self::currentAsOfDate()))
                     ->sortable(),
 
                 TextColumn::make('total')
@@ -106,21 +92,7 @@ class AgeingReportResource extends Resource
 
                 TextColumn::make('aging_bucket')
                     ->label('Aging Bucket')
-                    ->getStateUsing(function ($record) {
-                        $ageingSchedule = $record->ageingSchedule;
-                        if ($ageingSchedule && $ageingSchedule->bucket) {
-                            return $ageingSchedule->bucket;
-                        }
-
-                        // Calculate bucket if not exists
-                        $days = 0;
-                        if ($record->invoice && $record->invoice->invoice_date) {
-                            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-                            $days = $invoiceDate->diffInDays(now(), false);
-                        }
-
-                        return self::calculateBucket($days);
-                    })
+                    ->getStateUsing(fn ($record) => self::bucketForRecord($record, self::currentAsOfDate()))
                     ->badge()
                     ->color(function ($state) {
                         return match ($state) {
@@ -136,8 +108,8 @@ class AgeingReportResource extends Resource
                     ->label('Status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Lunas' => 'success',
-                        'Belum Lunas' => 'warning',
+                        PaymentStatus::PAID->value => 'success',
+                        PaymentStatus::UNPAID->value => 'warning',
                         default => 'gray',
                     }),
 
@@ -184,28 +156,16 @@ class AgeingReportResource extends Resource
                     ->query(function (Builder $query, array $data): Builder {
                         if (!$data['value']) return $query;
 
-                        return $query->whereHas('ageingSchedule', function ($q) use ($data) {
-                            $q->where('bucket', $data['value']);
-                        })->orWhere(function ($q) use ($data) {
-                            $q->whereDoesntHave('ageingSchedule')
-                              ->whereHas('invoice', function ($invoiceQuery) use ($data) {
-                                  $days = match ($data['value']) {
-                                      'Current' => 30,
-                                      '31–60' => 60,
-                                      '61–90' => 90,
-                                      '>90' => PHP_INT_MAX,
-                                  };
+                        $ids = self::matchingBucketRecordIds($query, $data['value'], self::currentAsOfDate(), request('tableFilters.cabang_id.value'));
 
-                                  $invoiceQuery->whereRaw('DATEDIFF(NOW(), invoice_date) <= ?', [$days]);
-                              });
-                        });
+                        return $query->whereKey(empty($ids) ? [0] : $ids);
                     }),
 
                 Filter::make('overdue')
                     ->label('Overdue Only')
                     ->query(function (Builder $query): Builder {
                         return $query->whereHas('invoice', function ($q) {
-                            $q->where('due_date', '<', now());
+                            $q->where('due_date', '<', Carbon::parse(self::currentAsOfDate())->toDateString());
                         });
                     }),
 
@@ -248,10 +208,11 @@ class AgeingReportResource extends Resource
                     ->action(function () {
                         $type = request('tableFilters.type.value') ?? 'receivables';
                         $cabangId = request('tableFilters.cabang_id.value') ?? null;
+                        $asOfDate = self::currentAsOfDate();
 
                         return Excel::download(
-                            new AgeingReportExport(now(), $cabangId, $type),
-                            'aging-report-' . now()->format('Y-m-d') . '.xlsx'
+                            new AgeingReportExport($asOfDate, $cabangId, $type),
+                            'aging-report-' . Carbon::parse($asOfDate)->format('Y-m-d') . '.xlsx'
                         );
                     }),
 
@@ -262,13 +223,14 @@ class AgeingReportResource extends Resource
                     ->action(function () {
                         $type = request('tableFilters.type.value') ?? 'receivables';
                         $cabangId = request('tableFilters.cabang_id.value') ?? null;
+                        $asOfDate = self::currentAsOfDate();
 
-                        $export = new AgeingReportPdfExport(now(), $cabangId, $type);
+                        $export = new AgeingReportPdfExport($asOfDate, $cabangId, $type);
                         $pdf = $export->generatePdf();
 
                         return response()->streamDownload(function () use ($pdf) {
                             echo $pdf->output();
-                        }, 'ageing-report-' . now()->format('Y-m-d') . '.pdf');
+                        }, 'ageing-report-' . Carbon::parse($asOfDate)->format('Y-m-d') . '.pdf');
                     }),
             ])
             ->defaultSort('invoice.invoice_date', 'desc');
@@ -296,11 +258,55 @@ class AgeingReportResource extends Resource
         ];
     }
 
-    private static function calculateBucket($days)
+    public static function customerOrSupplierName($record): string
     {
-        if ($days <= 30) return 'Current';
-        if ($days <= 60) return '31–60';
-        if ($days <= 90) return '61–90';
-        return '>90';
+        if ($record instanceof AccountReceivable) {
+            return $record->customer->name ?? '-';
+        }
+
+        if ($record instanceof AccountPayable) {
+            return $record->supplier->perusahaan ?? '-';
+        }
+
+        return '-';
+    }
+
+    public static function daysOutstandingForRecord($record, Carbon|string|null $asOfDate = null): int
+    {
+        return self::ageingReportService()->resolveDaysOutstanding($record, $asOfDate);
+    }
+
+    public static function bucketForRecord($record, Carbon|string|null $asOfDate = null): string
+    {
+        return self::ageingReportService()->resolveBucketLabel($record, $asOfDate);
+    }
+
+    public static function currentAsOfDate(): string
+    {
+        return request('tableFilters.as_of_date.value')
+            ?? request('as_of_date')
+            ?? now()->toDateString();
+    }
+
+    private static function matchingBucketRecordIds(Builder $query, string $bucket, Carbon|string|null $asOfDate = null, $cabangId = null): array
+    {
+        $filters = [
+            'as_of_date' => $asOfDate,
+            'cabang_id' => $cabangId,
+        ];
+
+        $records = $query->getModel() instanceof AccountPayable
+            ? self::ageingReportService()->getPayableRecords($filters)
+            : self::ageingReportService()->getReceivableRecords($filters);
+
+        return $records
+            ->where('aging_bucket_computed', $bucket)
+            ->pluck('id')
+            ->all();
+    }
+
+    private static function ageingReportService(): AgeingReportService
+    {
+        return app(AgeingReportService::class);
     }
 }

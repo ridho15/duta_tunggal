@@ -23,7 +23,8 @@ class ProductService
     }
     public function updateHargaPerKategori($data)
     {
-        $listProduct = Product::where('cabang_id', $data['cabang_id'])
+        $listProduct = Product::query()
+            ->forCabang($data['cabang_id'])
             ->where('product_category_id', $data['product_category_id'])
             ->get();
         foreach ($listProduct as $product) {
@@ -48,7 +49,8 @@ class ProductService
     public function updateHargaPerProduct($data)
     {
         foreach ($data['listProduct'] as $item) {
-            $product = Product::where('cabang_id', $data['cabang_id'])
+            $product = Product::query()
+                ->forCabang($data['cabang_id'])
                 ->where('id', $item['product_id'])
                 ->first();
             if ($product) {

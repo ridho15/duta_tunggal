@@ -36,7 +36,7 @@ class OrderRequestFlowTest extends TestCase
 
         $this->actingAs($user);
 
-        $service = new OrderRequestService();
+        $service = app(OrderRequestService::class);
 
         $orderRequest = OrderRequest::factory()->create([
             'warehouse_id' => $warehouse->id,
@@ -80,7 +80,6 @@ class OrderRequestFlowTest extends TestCase
         $purchaseOrder = $approvedRequest->purchaseOrder;
         $this->assertNotNull($purchaseOrder);
         $this->assertEquals('PO-20251031-0001', $purchaseOrder->po_number);
-        $this->assertEquals($warehouse->id, $purchaseOrder->warehouse_id);
 
         // Check PO items created
         $this->assertDatabaseHas('purchase_order_items', [

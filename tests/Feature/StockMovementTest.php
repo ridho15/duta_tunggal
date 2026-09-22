@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Cabang;
+use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\Rak;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class StockMovementTest extends TestCase
@@ -17,6 +20,7 @@ class StockMovementTest extends TestCase
     protected $user;
     protected $cabang;
     protected $warehouse;
+    protected $rak;
     protected $product;
 
     protected function setUp(): void
@@ -34,13 +38,14 @@ class StockMovementTest extends TestCase
         ]);
         $this->cabang = Cabang::factory()->create();
         $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        $this->rak = Rak::factory()->create(['warehouse_id' => $this->warehouse->id]);
         $this->product = Product::factory()->create();
 
         // Authenticate user
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_track_inbound_stock_movement()
     {
         $quantity = 100;
@@ -68,7 +73,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals($unitCost, $movement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_track_outbound_stock_movement()
     {
         $quantity = -50; // Negative for outbound
@@ -96,7 +101,7 @@ class StockMovementTest extends TestCase
         $this->assertTrue($movement->quantity < 0); // Outbound should be negative
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_movement_types()
     {
         $validTypes = ['purchase_in', 'sales', 'transfer_in', 'transfer_out', 'manufacture_in', 'manufacture_out', 'adjustment_in', 'adjustment_out'];
@@ -112,7 +117,7 @@ class StockMovementTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_fifo_costing_correctly()
     {
         // First purchase at lower cost
@@ -148,7 +153,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(50000, $saleMovement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_lifo_costing_correctly()
     {
         // First purchase at lower cost
@@ -184,7 +189,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(60000, $saleMovement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_average_costing_correctly()
     {
         // First purchase
@@ -222,7 +227,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals($averageCost, $saleMovement->value);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_stock_valuation_correctly()
     {
         // Multiple purchases
@@ -267,7 +272,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(6250000, $remainingValue);
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_stock_transfers_between_warehouses()
     {
         $warehouse2 = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
@@ -304,7 +309,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(25, $warehouse2Stock);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_stock_adjustments()
     {
         // Initial stock
@@ -335,7 +340,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(95, $currentStock);
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_production_movements()
     {
         // Raw material consumption
@@ -376,7 +381,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(5, $finishedGoodsStock);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_return_movements()
     {
         // Initial sale
@@ -408,7 +413,7 @@ class StockMovementTest extends TestCase
         $this->assertEquals(-15, $currentStock); // -20 + 5 = -15
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_stock_movement_report()
     {
         // Create various movements
@@ -431,5 +436,69 @@ class StockMovementTest extends TestCase
             $this->assertNotNull($movement->quantity);
             $this->assertNotNull($movement->value);
         }
+    }
+
+    #[Test]
+    public function outbound_negative_quantity_reduces_inventory_stock()
+    {
+        InventoryStock::create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'qty_available' => 100,
+            'qty_reserved' => 0,
+        ]);
+
+        StockMovement::create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'type' => 'sales',
+            'quantity' => -5,
+            'value' => 50000,
+            'date' => now(),
+        ]);
+
+        $stock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('rak_id', $this->rak->id)
+            ->firstOrFail();
+
+        $this->assertSame(95.0, (float) $stock->qty_available);
+    }
+
+    #[Test]
+    public function updating_stock_movement_location_rebalances_inventory_between_locations()
+    {
+        $warehouse2 = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        $rak2 = Rak::factory()->create(['warehouse_id' => $warehouse2->id]);
+
+        $movement = StockMovement::create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'type' => 'purchase_in',
+            'quantity' => 10,
+            'value' => 50000,
+            'date' => now(),
+        ]);
+
+        $movement->update([
+            'warehouse_id' => $warehouse2->id,
+            'rak_id' => $rak2->id,
+        ]);
+
+        $originStock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('rak_id', $this->rak->id)
+            ->first();
+
+        $destinationStock = InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $warehouse2->id)
+            ->where('rak_id', $rak2->id)
+            ->firstOrFail();
+
+        $this->assertSame(0.0, (float) ($originStock?->qty_available ?? 0));
+        $this->assertSame(10.0, (float) $destinationStock->qty_available);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Services\BalanceSheetService;
 use Illuminate\Database\Seeder;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
@@ -60,5 +61,21 @@ class AutoBalanceSeeder extends Seeder
         $offset->save();
 
         $this->command?->info('Adjusted 3199 opening from '.number_format($before,2).' to '.number_format($offset->opening_balance,2).' (delta '.number_format($diff,2).')');
+
+        $balanceSheetService = app(BalanceSheetService::class);
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $balanceSheet = $balanceSheetService->generate(['as_of_date' => $asOf->toDateString()]);
+            $remainingDifference = (float) ($balanceSheet['difference'] ?? 0);
+
+            if (abs($remainingDifference) < 0.01) {
+                return;
+            }
+
+            $before = (float) ($offset->opening_balance ?? 0);
+            $offset->opening_balance = $before + $remainingDifference;
+            $offset->save();
+
+            $this->command?->warn('Reconciled 3199 again from '.number_format($before,2).' to '.number_format($offset->opening_balance,2).' (remaining '.number_format($remainingDifference,2).')');
+        }
     }
 }

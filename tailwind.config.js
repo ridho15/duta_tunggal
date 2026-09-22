@@ -1,6 +1,7 @@
 // Minimal Tailwind configuration to ensure content paths include Blade and Livewire
 // Project uses ESM (see package.json "type": "module") so export default is used.
 export default {
+    darkMode: 'class',
     content: [
         './resources/views/**/*.blade.php',
         './resources/js/**/*.{js,vue,ts,jsx,tsx}',

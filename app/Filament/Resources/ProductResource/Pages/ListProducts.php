@@ -62,7 +62,7 @@ class ListProducts extends ListRecords
                                             $set('product_info_message', 'Memuat produk...');
 
                                             $listProduct = Product::select(['id', 'sku', 'name', 'sell_price', 'cost_price'])
-                                                ->where('cabang_id', $state)
+                                                ->forCabang($state)
                                                 ->orderBy('sku')
                                                 ->get();
                                             $items = [];
@@ -102,7 +102,7 @@ class ListProducts extends ListRecords
                                             }
 
                                             $query = Product::select(['id', 'sku', 'name', 'sell_price', 'cost_price'])
-                                                ->where('cabang_id', $cabangId);
+                                                ->forCabang($cabangId);
 
                                             if ($state) {
                                                 $query->where(function ($q) use ($state) {
@@ -171,13 +171,11 @@ class ListProducts extends ListRecords
                                                 }),
                                             TextInput::make('sell_price')
                                                 ->label('Harga')
-                                                ->numeric()
                                                 ->indonesianMoney()
                                                 ->default(0)
                                                 ->required(),
                                             TextInput::make('cost_price')
                                                 ->label('Cost')
-                                                ->numeric()
                                                 ->indonesianMoney()
                                                 ->default(0)
                                                 ->required()
@@ -280,7 +278,10 @@ class ListProducts extends ListRecords
                                         ->reactive()
                                         ->searchable(['sku', 'name'])
                                         ->options(function ($get) {
-                                            return Product::where('cabang_id', $get('cabang_id'))->get()->pluck('sku', 'id');
+                                            return Product::query()
+                                                ->forCabang($get('cabang_id'))
+                                                ->orderBy('sku')
+                                                ->pluck('sku', 'id');
                                         })
                                         ->getOptionLabelFromRecordUsing(function (Product $product) {
                                             return "({$product->sku}) {$product->name}";
@@ -294,7 +295,10 @@ class ListProducts extends ListRecords
                                         ->reactive()
                                         ->searchable(['sku', 'name'])
                                         ->options(function ($get) {
-                                            return Product::where('cabang_id', $get('cabang_id'))->get()->pluck('sku', 'id');
+                                            return Product::query()
+                                                ->forCabang($get('cabang_id'))
+                                                ->orderBy('sku')
+                                                ->pluck('sku', 'id');
                                         })
                                         ->getOptionLabelFromRecordUsing(function (Product $product) {
                                             return "({$product->sku}) {$product->name}";
@@ -312,7 +316,7 @@ class ListProducts extends ListRecords
                         if ($data['hasil_cetak'] == 'Excel') {
                             return Excel::download(new ProductExport($data), 'Product_' . $date . '.xlsx');
                         } elseif ($data['hasil_cetak'] == 'Pdf') {
-                            $listProduct = Product::with(['cabang', 'productCategory'])->where('cabang_id', $data['cabang_id'])
+                            $listProduct = Product::with(['cabang', 'productCategory'])->forCabang($data['cabang_id'])
                                 ->where('id', '>=', $data['dari_product_id'])
                                 ->where('id', '<=', $data['sampai_product_id'])
                                 ->get();

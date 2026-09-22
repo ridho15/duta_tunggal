@@ -17,12 +17,13 @@ class WarehouseConfirmationFactory extends Factory
     public function definition(): array
     {
         return [
-            'sale_order_id' => \App\Models\SaleOrder::factory(),
-            'manufacturing_order_id' => null,
-            'status' => 'Confirmed',
-            'note' => $this->faker->sentence(),
-            'confirmed_by' => \App\Models\User::factory(),
-            'confirmed_at' => now(),
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => \App\Models\SaleOrder::factory(),
+            'confirmation_type' => 'sales_order',
+            'status'           => 'confirmed',
+            'note'             => $this->faker->sentence(),
+            'confirmed_by'     => \App\Models\User::factory(),
+            'confirmed_at'     => now(),
         ];
     }
 }

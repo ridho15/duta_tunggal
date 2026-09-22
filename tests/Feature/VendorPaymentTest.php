@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\VendorPayment;
 use App\Models\VendorPaymentDetail;
 use App\Models\Warehouse;
+use App\Enums\PaymentStatus;
 use App\Services\LedgerPostingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -126,6 +127,8 @@ class VendorPaymentTest extends TestCase
             'invoice_number' => 'INV-TEST-001',
             'from_model_type' => PurchaseOrder::class,
             'from_model_id' => $purchaseOrder->id,
+            'currency_id' => $this->currency->id,
+            'exchange_rate' => 1,
             'supplier_name' => $this->supplier->perusahaan,
             'subtotal' => 110000,
             'tax' => 0,
@@ -189,6 +192,60 @@ class VendorPaymentTest extends TestCase
 
         // Test calculated total
         $this->assertEquals(110000, $vendorPayment->getCalculatedTotalAttribute());
+    }
+
+    public function test_payment_details_mapping_includes_extra_fields()
+    {
+        // create an invoice with dates and amount
+        $purchaseOrder = PurchaseOrder::factory()->create(['status'=>'completed']);
+        $purchaseOrderItem = PurchaseOrderItem::factory()->create([
+            'purchase_order_id'=>$purchaseOrder->id,
+            'product_id'=>$this->product->id,
+            'quantity'=>5,
+            'unit_price'=>20000,
+            'tax'=>0,
+            'discount'=>0
+        ]);
+        $invoice = Invoice::factory()->create([
+            'invoice_number'=>'INV-MAP-001',
+            'from_model_type'=>PurchaseOrder::class,
+            'from_model_id'=>$purchaseOrder->id,
+            'supplier_name'=>$this->supplier->perusahaan,
+            'subtotal'=>100000,
+            'tax'=>0,
+            'total'=>100000,
+            'status'=>'draft',
+            'invoice_date'=>now()->subDays(10),
+            'due_date'=>now()->addDays(20),
+        ]);
+        InvoiceItem::factory()->create([
+            'invoice_id'=>$invoice->id,
+            'product_id'=>$this->product->id,
+            'quantity'=>5,
+            'price'=>20000,
+            'total'=>100000
+        ]);
+
+        // simulate mapping logic from resource
+        $invoices = collect([$invoice->load('accountPayable')]);
+        $paymentDetails = $invoices->map(function ($invoice) {
+            return [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                'due_date' => $invoice->due_date ? $invoice->due_date->toDateString() : null,
+                'total_invoice' => $invoice->total,
+                'remaining_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
+                'payment_amount' => $invoice->accountPayable->remaining ?? $invoice->total,
+            ];
+        })->toArray();
+
+        $this->assertArrayHasKey('invoice_date', $paymentDetails[0]);
+        $this->assertArrayHasKey('due_date', $paymentDetails[0]);
+        $this->assertArrayHasKey('total_invoice', $paymentDetails[0]);
+        $this->assertEquals($invoice->invoice_date->toDateString(), $paymentDetails[0]['invoice_date']);
+        $this->assertEquals($invoice->due_date->toDateString(), $paymentDetails[0]['due_date']);
+        $this->assertEquals($invoice->total, $paymentDetails[0]['total_invoice']);
     }
 
     public function test_payment_methods_cash_bank_transfer_cheque()
@@ -417,7 +474,6 @@ class VendorPaymentTest extends TestCase
 
         // Create partial payment
         $partialPayment = VendorPayment::factory()->create([
-            'invoice_id' => $invoice->id,
             'supplier_id' => $this->supplier->id,
             'payment_date' => now(),
             'total_payment' => 55000,
@@ -605,7 +661,6 @@ class VendorPaymentTest extends TestCase
 
         // Create payment in draft status
         $draftPayment = VendorPayment::factory()->create([
-            'invoice_id' => $invoice->id,
             'supplier_id' => $this->supplier->id,
             'payment_date' => now(),
             'total_payment' => 110000,
@@ -648,6 +703,98 @@ class VendorPaymentTest extends TestCase
         $this->assertEquals(110000, $accountPayable->paid);
         $this->assertEquals(0, $accountPayable->remaining);
         $this->assertEquals('Lunas', $accountPayable->status);
+    }
+
+    public function test_vendor_payment_detail_without_selected_invoices_posts_foreign_currency_in_idr()
+    {
+        $usd = Currency::factory()->create([
+            'code' => 'USD',
+            'name' => 'US Dollar',
+            'symbol' => '$',
+            'to_rupiah' => 15000,
+        ]);
+
+        $purchaseOrder = PurchaseOrder::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'status' => 'completed',
+        ]);
+
+        $invoice = Invoice::factory()->create([
+            'from_model_type' => PurchaseOrder::class,
+            'from_model_id' => $purchaseOrder->id,
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+            'subtotal' => 100,
+            'tax' => 0,
+            'total' => 100,
+            'status' => Invoice::STATUS_SENT,
+        ]);
+
+        AccountPayable::create([
+            'invoice_id' => $invoice->id,
+            'supplier_id' => $this->supplier->id,
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+            'total_original' => 100,
+            'paid_original' => 0,
+            'remaining_original' => 100,
+            'total' => 1500000,
+            'paid' => 0,
+            'remaining' => 1500000,
+            'status' => PaymentStatus::UNPAID->value,
+            'created_by' => $this->user->id,
+        ]);
+
+        $payment = VendorPayment::factory()->create([
+            'supplier_id' => $this->supplier->id,
+            'selected_invoices' => [],
+            'currency_id' => $usd->id,
+            'exchange_rate' => 15000,
+            'total_payment' => 100,
+            'payment_method' => 'Cash',
+            'coa_id' => $this->chartOfAccount->id,
+            'status' => 'Draft',
+        ]);
+
+        VendorPaymentDetail::factory()->create([
+            'vendor_payment_id' => $payment->id,
+            'invoice_id' => $invoice->id,
+            'method' => 'Cash',
+            'amount' => 100,
+            'coa_id' => $this->chartOfAccount->id,
+        ]);
+
+        app(LedgerPostingService::class)->postVendorPayment($payment->fresh());
+
+        $entries = JournalEntry::where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->get();
+
+        $this->assertEquals(1500000.0, (float) $entries->sum('debit'));
+        $this->assertEquals(1500000.0, (float) $entries->sum('credit'));
+        $this->assertTrue($entries->every(fn (JournalEntry $entry) => (float) $entry->exchange_rate === 15000.0));
+        $this->assertEquals(1500000.0, (float) $payment->fresh()->total_payment_idr);
+    }
+
+    public function test_account_payable_status_is_normalized_from_legacy_values()
+    {
+        $invoice = $this->createTestInvoice();
+
+        $accountPayable = AccountPayable::create([
+            'invoice_id' => $invoice->id,
+            'supplier_id' => $this->supplier->id,
+            'total' => 110000,
+            'paid' => 0,
+            'remaining' => 110000,
+            'status' => 'paid',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->assertSame(PaymentStatus::PAID->value, $accountPayable->fresh()->status);
+
+        $accountPayable->update(['status' => 'unpaid']);
+
+        $this->assertSame(PaymentStatus::UNPAID->value, $accountPayable->fresh()->status);
     }
 
     public function test_recalculate_total_payment_method()
@@ -762,6 +909,11 @@ class VendorPaymentTest extends TestCase
         AccountPayable::factory()->create([
             'invoice_id' => $invoice->id,
             
+            'currency_id' => $this->currency->id,
+            'exchange_rate' => 1,
+            'total_original' => 110000,
+            'paid_original' => 0,
+            'remaining_original' => 110000,
             'total' => 110000,
             'paid' => 0,
             'remaining' => 110000,
@@ -770,5 +922,14 @@ class VendorPaymentTest extends TestCase
         ]);
 
         return $invoice;
+    }
+
+    public function test_invoice_status_is_normalized_to_canonical_lowercase_value()
+    {
+        $invoice = $this->createTestInvoice();
+
+        $invoice->update(['status' => 'Paid']);
+
+        $this->assertSame(Invoice::STATUS_PAID, $invoice->fresh()->status);
     }
 }

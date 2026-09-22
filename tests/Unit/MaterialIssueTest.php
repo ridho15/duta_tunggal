@@ -16,9 +16,12 @@ use App\Models\Rak;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WarehouseConfirmation;
 use App\Services\ManufacturingJournalService;
+use App\Services\ManufacturingService;
 use App\Services\StockReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MaterialIssueTest extends TestCase
@@ -65,8 +68,8 @@ class MaterialIssueTest extends TestCase
 
         // Create WIP COA for manufacturing journal
         $this->wipCoa = ChartOfAccount::factory()->create([
-            'code' => '1140.02',
-            'name' => 'Work in Progress',
+            'code' => '1400.04',
+            'name' => 'POS SEMENTARA PRODUKSI',
             'type' => 'asset'
         ]);
 
@@ -118,7 +121,19 @@ class MaterialIssueTest extends TestCase
         ]);
     }
 
-    /** @test */
+    protected function confirmWarehouseForMaterialIssue(MaterialIssue $materialIssue): void
+    {
+        $confirmation = app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($materialIssue);
+
+        $confirmation->warehouseConfirmationItems->each(function ($item) {
+            $item->update([
+                'status' => 'confirmed',
+                'confirmed_qty' => $item->requested_qty,
+            ]);
+        });
+    }
+
+    #[Test]
     public function it_can_create_material_issue()
     {
         $materialIssueData = [
@@ -141,7 +156,7 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals(0, $materialIssue->total_cost);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_add_material_issue_items()
     {
         $materialIssue = MaterialIssue::factory()->create([
@@ -172,7 +187,7 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals($materialIssue->id, $issueItem->material_issue_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_total_cost_when_items_are_added()
     {
         $materialIssue = MaterialIssue::factory()->create([
@@ -213,10 +228,11 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals(400000, $materialIssue->fresh()->total_cost);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_approve_material_issue()
     {
         $materialIssue = MaterialIssue::factory()->create([
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'status' => MaterialIssue::STATUS_DRAFT,
         ]);
 
@@ -231,6 +247,8 @@ class MaterialIssueTest extends TestCase
             'total_cost' => 250000,
             'status' => MaterialIssueItem::STATUS_DRAFT,
         ]);
+
+        $this->confirmWarehouseForMaterialIssue($materialIssue);
 
         // Approve the material issue
         $materialIssue->update([
@@ -244,7 +262,7 @@ class MaterialIssueTest extends TestCase
         $this->assertNotNull($materialIssue->fresh()->approved_at);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_complete_material_issue_and_update_inventory()
     {
         $initialStock = InventoryStock::where('product_id', $this->rawMaterial->id)
@@ -253,6 +271,7 @@ class MaterialIssueTest extends TestCase
 
         $materialIssue = MaterialIssue::factory()->create([
             'warehouse_id' => $this->warehouse->id,
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'status' => MaterialIssue::STATUS_DRAFT,
         ]);
 
@@ -268,8 +287,32 @@ class MaterialIssueTest extends TestCase
             'status' => MaterialIssueItem::STATUS_DRAFT,
         ]);
 
+        $this->confirmWarehouseForMaterialIssue($materialIssue);
+
         // Approve the material issue to create reservations
         $materialIssue->update(['status' => MaterialIssue::STATUS_APPROVED]);
+
+        // Ensure inventory stock values are present and reservations are created deterministically
+        InventoryStock::updateOrCreate(
+            [
+                'product_id' => $this->rawMaterial->id,
+                'warehouse_id' => $this->warehouse->id,
+                'rak_id' => $this->rak->id,
+            ],
+            [
+                'qty_available' => 100,
+                'qty_reserved' => 0,
+            ]
+        );
+
+        app(\App\Services\StockReservationService::class)->reserveStockForMaterialIssue($materialIssue);
+
+        $reservedStock = InventoryStock::where('product_id', $this->rawMaterial->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+
+        $this->assertEquals(5, $reservedStock->qty_reserved);
+        $this->assertEquals(100, $reservedStock->qty_available);
 
         // Complete the material issue
         $materialIssue->update(['status' => MaterialIssue::STATUS_COMPLETED]);
@@ -286,12 +329,22 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals(MaterialIssue::STATUS_COMPLETED, $materialIssue->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_journal_entries_when_completed()
     {
+        WarehouseConfirmation::create([
+            'confirmable_type' => ManufacturingOrder::class,
+            'confirmable_id' => $this->manufacturingOrder->id,
+            'confirmation_type' => 'manufacturing_order',
+            'status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ]);
+
         $materialIssue = MaterialIssue::factory()->create([
             'issue_number' => 'MI-JOURNAL-TEST',
             'warehouse_id' => $this->warehouse->id,
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'type' => 'issue',
             'status' => MaterialIssue::STATUS_COMPLETED,
             'total_cost' => 250000,
@@ -326,7 +379,7 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals(250000, $totalDebit);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_required_fields()
     {
         $this->expectException(\Illuminate\Database\QueryException::class);
@@ -335,7 +388,7 @@ class MaterialIssueTest extends TestCase
         MaterialIssue::create([]);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_relationships_with_other_models()
     {
         $materialIssue = MaterialIssue::factory()->create([
@@ -368,7 +421,7 @@ class MaterialIssueTest extends TestCase
         $this->assertInstanceOf(Product::class, $item->product);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_soft_delete_material_issue()
     {
         $materialIssue = MaterialIssue::factory()->create();
@@ -380,7 +433,7 @@ class MaterialIssueTest extends TestCase
         $this->assertNotNull(MaterialIssue::withTrashed()->find($materialIssue->id));
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_stock_reservation_during_material_issue()
     {
         $initialStock = InventoryStock::where('product_id', $this->rawMaterial->id)
@@ -388,6 +441,63 @@ class MaterialIssueTest extends TestCase
             ->first();
 
         $materialIssue = MaterialIssue::factory()->create([
+            'warehouse_id' => $this->warehouse->id,
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
+            'status' => MaterialIssue::STATUS_DRAFT,
+        ]);
+
+        MaterialIssueItem::create([
+            'material_issue_id' => $materialIssue->id,
+            'product_id' => $this->rawMaterial->id,
+            'uom_id' => $this->uom->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'quantity' => 5,
+            'cost_per_unit' => 50000,
+            'total_cost' => 250000,
+            'status' => MaterialIssueItem::STATUS_DRAFT,
+        ]);
+
+        $this->confirmWarehouseForMaterialIssue($materialIssue);
+
+        // Approve the material issue to trigger stock reservation
+        $materialIssue->update(['status' => MaterialIssue::STATUS_APPROVED]);
+
+        // Ensure inventory stock values are present and reservations are created deterministically
+        InventoryStock::updateOrCreate(
+            [
+                'product_id' => $this->rawMaterial->id,
+                'warehouse_id' => $this->warehouse->id,
+                'rak_id' => $this->rak->id,
+            ],
+            [
+                'qty_available' => 100,
+                'qty_reserved' => 0,
+            ]
+        );
+
+        app(\App\Services\StockReservationService::class)->reserveStockForMaterialIssue($materialIssue);
+
+        // Check that stock reservation was created
+        $reservations = \App\Models\StockReservation::where('material_issue_id', $materialIssue->id)->get();
+        $this->assertGreaterThan(0, $reservations->count());
+
+        $totalReserved = $reservations->sum('quantity');
+        $this->assertEquals(5, $totalReserved);
+
+        $updatedStock = InventoryStock::where('product_id', $this->rawMaterial->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+
+        $this->assertEquals(100, $updatedStock->qty_available); // Reserved stock should not reduce available until completion
+        $this->assertEquals(5, $updatedStock->qty_reserved); // And reserved should increase
+    }
+
+    #[Test]
+    public function it_requires_confirmed_warehouse_confirmation_before_approval()
+    {
+        $materialIssue = MaterialIssue::factory()->create([
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
             'warehouse_id' => $this->warehouse->id,
             'status' => MaterialIssue::STATUS_DRAFT,
         ]);
@@ -404,25 +514,45 @@ class MaterialIssueTest extends TestCase
             'status' => MaterialIssueItem::STATUS_DRAFT,
         ]);
 
-        // Approve the material issue to trigger stock reservation
-        $materialIssue->update(['status' => MaterialIssue::STATUS_APPROVED]);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
 
-        // Check that stock reservation was created
-        $reservations = \App\Models\StockReservation::where('material_issue_id', $materialIssue->id)->get();
-        $this->assertGreaterThan(0, $reservations->count());
-
-        $totalReserved = $reservations->sum('quantity');
-        $this->assertEquals(5, $totalReserved);
-
-        $updatedStock = InventoryStock::where('product_id', $this->rawMaterial->id)
-            ->where('warehouse_id', $this->warehouse->id)
-            ->first();
-
-        $this->assertEquals(95, $updatedStock->qty_available); // Stock should be reduced when reserved
-        $this->assertEquals(5, $updatedStock->qty_reserved); // And reserved should increase
+        $materialIssue->update([
+            'status' => MaterialIssue::STATUS_APPROVED,
+            'approved_by' => $this->user->id,
+            'approved_at' => now(),
+        ]);
     }
 
-    /** @test */
+    #[Test]
+    public function it_can_request_approval_before_warehouse_confirmation_is_confirmed()
+    {
+        $materialIssue = MaterialIssue::factory()->create([
+            'manufacturing_order_id' => $this->manufacturingOrder->id,
+            'warehouse_id' => $this->warehouse->id,
+            'status' => MaterialIssue::STATUS_DRAFT,
+        ]);
+
+        MaterialIssueItem::create([
+            'material_issue_id' => $materialIssue->id,
+            'product_id' => $this->rawMaterial->id,
+            'uom_id' => $this->uom->id,
+            'warehouse_id' => $this->warehouse->id,
+            'rak_id' => $this->rak->id,
+            'quantity' => 5,
+            'cost_per_unit' => 50000,
+            'total_cost' => 250000,
+            'status' => MaterialIssueItem::STATUS_DRAFT,
+        ]);
+
+        $materialIssue->update([
+            'status' => MaterialIssue::STATUS_PENDING_APPROVAL,
+        ]);
+
+        $this->assertEquals(MaterialIssue::STATUS_PENDING_APPROVAL, $materialIssue->fresh()->status);
+        $this->assertNull($materialIssue->fresh()->approved_by);
+    }
+
+    #[Test]
     public function it_can_request_approval_for_material_issue()
     {
         // Create a warehouse approver user
@@ -471,7 +601,7 @@ class MaterialIssueTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_cannot_request_approval_if_already_approved()
     {
         $warehouseApprover = User::factory()->create();
@@ -494,7 +624,7 @@ class MaterialIssueTest extends TestCase
         $this->assertEquals(MaterialIssue::STATUS_APPROVED, $materialIssue->fresh()->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_only_request_approval_for_draft_status()
     {
         $warehouseApprover = User::factory()->create();

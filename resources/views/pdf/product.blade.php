@@ -75,7 +75,7 @@
             <tr>
                 <td>{{ $product->sku }}</td>
                 <td>{{ $product->name }}</td>
-                <td>({{ $product->cabang->kode }}) {{ $product->cabang->nama }}</td>
+                <td>{{ $product->cabang_id ? '(' . $product->cabang->kode . ') ' . $product->cabang->nama : 'Semua Cabang' }}</td>
                 <td>{{ $product->productCategory->name }}</td>
                 <td>Rp {{ number_format($product->sell_price, 0, ',', '.') }}</td>
                 <td>Rp {{ number_format($product->cost_price, 0, ',', '.') }}</td>

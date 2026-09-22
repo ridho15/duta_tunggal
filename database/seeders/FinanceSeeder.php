@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use Database\Seeders\Finance\FinanceBankReconciliationSeeder;
 use Database\Seeders\Finance\FinanceCashBankTransactionSeeder;
 use Database\Seeders\Finance\FinanceChartOfAccountSeeder;
-use Database\Seeders\Finance\FinanceCurrencySeeder;
 use Database\Seeders\Finance\FinanceCustomerSupplierSeeder;
 use Database\Seeders\Finance\FinanceFixedAssetSeeder;
 use Database\Seeders\Finance\FinanceHppSeeder;
@@ -24,7 +23,6 @@ class FinanceSeeder extends Seeder
         DB::transaction(function () {
             $context = new FinanceSeedContext();
 
-            (new FinanceCurrencySeeder($context))->run();
             (new FinanceChartOfAccountSeeder($context))->run();
             (new FinanceReportConfigSeeder())->run();
             (new FinanceCustomerSupplierSeeder($context))->run();
@@ -37,6 +35,7 @@ class FinanceSeeder extends Seeder
             (new FinanceFixedAssetSeeder($context))->run();
             (new FinanceHppSeeder($context))->run();
             (new FinanceMiscSeeder($context))->run();
+            (new AutoBalanceSeeder())->run();
         });
     }
 }

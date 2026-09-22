@@ -221,4 +221,55 @@ class ProductTest extends TestCase
             throw $e;
         }
     }
+
+    public function test_product_creation_automatically_creates_empty_inventory_stocks()
+    {
+        \DB::beginTransaction();
+
+        try {
+            // Check current warehouses count
+            $warehouseCount = \App\Models\Warehouse::count();
+            if ($warehouseCount === 0) {
+                // Get or create default Cabang
+                $cabangId = \App\Models\Cabang::value('id') ?? \App\Models\Cabang::create([
+                    'code' => 'HO',
+                    'name' => 'Head Office',
+                    'address' => 'Jakarta',
+                ])->id;
+
+                // Create mock warehouses if none exist
+                \App\Models\Warehouse::create(['name' => 'Gudang Mock A', 'kode' => 'GMA', 'location' => 'Jakarta', 'cabang_id' => $cabangId]);
+                \App\Models\Warehouse::create(['name' => 'Gudang Mock B', 'kode' => 'GMB', 'location' => 'Surabaya', 'cabang_id' => $cabangId]);
+                $warehouseCount = 2;
+            }
+
+            // Create product
+            $product = Product::create([
+                'sku' => 'TEST-AUTO-STOCK-' . time(),
+                'name' => 'Auto Stock Product',
+                'product_category_id' => 1,
+                'uom_id' => 1,
+                'kode_merk' => 'TEST',
+                'cost_price' => 10000,
+                'sell_price' => 15000,
+            ]);
+
+            // Retrieve inventory stocks created for this product
+            $stocks = \App\Models\InventoryStock::where('product_id', $product->id)->get();
+
+            // Assert that an empty stock is created for EVERY warehouse
+            $this->assertCount($warehouseCount, $stocks);
+            foreach ($stocks as $stock) {
+                $this->assertEquals(0, (float) $stock->qty_available);
+                $this->assertEquals(0, (float) $stock->qty_reserved);
+                $this->assertEquals(0, (float) $stock->qty_min);
+                $this->assertNull($stock->rak_id);
+            }
+
+            \DB::rollBack();
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            throw $e;
+        }
+    }
 }

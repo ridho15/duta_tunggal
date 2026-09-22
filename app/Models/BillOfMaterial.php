@@ -24,8 +24,9 @@ class BillOfMaterial extends Model
         'labor_cost',
         'overhead_cost',
         'total_cost',
-        'finished_goods_coa_id',
         'work_in_progress_coa_id',
+        'labor_coa_id',
+        'overhead_coa_id',
     ];
 
     protected $casts = [
@@ -99,14 +100,19 @@ class BillOfMaterial extends Model
             ->exists();
     }
 
-    public function finishedGoodsCoa()
-    {
-        return $this->belongsTo(ChartOfAccount::class, 'finished_goods_coa_id');
-    }
-
     public function workInProgressCoa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'work_in_progress_coa_id');
+    }
+
+    public function laborCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'labor_coa_id');
+    }
+
+    public function overheadCoa()
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'overhead_coa_id');
     }
 
     /**

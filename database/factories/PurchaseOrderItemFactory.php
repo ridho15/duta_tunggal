@@ -20,7 +20,7 @@ class PurchaseOrderItemFactory extends Factory
             'unit_price' => $this->faker->numberBetween(10000, 100000),
             'discount' => $this->faker->numberBetween(0, 20),
             'tax' => $this->faker->numberBetween(0, 11),
-            'tipe_pajak' => $this->faker->randomElement(['Non Pajak', 'Inklusif', 'Eklusif']),
+            'tipe_pajak' => $this->faker->randomElement(['none', 'inklusif', 'eklusif']),
             'refer_item_model_id' => null,
             'refer_item_model_type' => null,
             'currency_id' => 1, // ID mata uang

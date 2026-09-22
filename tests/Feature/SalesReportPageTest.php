@@ -43,29 +43,36 @@ class SalesReportPageTest extends TestCase
 
         SaleOrder::factory()->create([
             'customer_id' => $customer1->id,
+            'so_number' => 'SO-FILTER-A',
             'total_amount' => 1000000,
-            'created_at' => now()->subDays(10),
+            'order_date' => now()->subDay(),
+            'created_at' => now()->subDay(),
         ]);
 
         SaleOrder::factory()->create([
             'customer_id' => $customer2->id,
+            'so_number' => 'SO-FILTER-B',
             'total_amount' => 2000000,
+            'order_date' => now(),
             'created_at' => now(),
         ]);
 
         $this->actingAs($this->createUserWithRole('admin'));
 
-        // Test filter by customer
+        // Test filter by customer (mode Pesanan/SO — default halaman kini Penjualan/Invoice)
         Livewire::test(SalesReportPage::class)
+            ->set('mode', 'order')
             ->set('customer_id', $customer1->id)
-            ->assertSee('Customer A')
-            ->assertDontSee('Customer B');
+            ->assertSee('SO-FILTER-A')
+            ->assertDontSee('SO-FILTER-B');
     }
 
     private function createUserWithRole($role)
     {
         $user = \App\Models\User::factory()->create();
         $user->assignRole($role);
+        $user->manage_type = ['all'];
+        $user->save();
         return $user;
     }
 }

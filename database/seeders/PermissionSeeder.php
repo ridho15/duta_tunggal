@@ -14,13 +14,17 @@ class PermissionSeeder extends Seeder
      */
     public function run(): void
     {
+        $descriptions = HelperController::permissionDescriptions();
+
         foreach (HelperController::listPermission() as $index => $permission) {
             foreach ($permission as $item) {
+                $name = $item . ' ' . $index;
                 Permission::updateOrCreate([
-                    'name' => $item . ' ' . $index
+                    'name' => $name
                 ], [
-                    'name' => $item . ' ' . $index,
-                    'guard_name' => 'web'
+                    'name' => $name,
+                    'guard_name' => 'web',
+                    'description' => $descriptions[$name] ?? null,
                 ]);
             }
         }
@@ -38,16 +42,19 @@ class PermissionSeeder extends Seeder
                 'name' => $perm
             ], [
                 'name' => $perm,
-                'guard_name' => 'web'
+                'guard_name' => 'web',
+                'description' => $descriptions[$perm] ?? null,
             ]);
         }
 
         // Ensure warehouse approval permission exists for material issue tests
+        $perm = 'approve warehouse';
         Permission::updateOrCreate([
-            'name' => 'approve warehouse'
+            'name' => $perm
         ], [
-            'name' => 'approve warehouse',
-            'guard_name' => 'web'
+            'name' => $perm,
+            'guard_name' => 'web',
+            'description' => $descriptions[$perm] ?? null,
         ]);
     }
 }

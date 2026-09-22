@@ -7,6 +7,7 @@ use App\Filament\Resources\UserResource\Pages\ViewUser;
 use App\Models\Cabang;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Rules\InternationalPhoneNumber;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -33,13 +34,15 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
 
     // Use the user-friendly group name
     protected static ?string $navigationGroup = 'User Roles Management';
 
     // Order similarly with other role/permission resources
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -47,6 +50,23 @@ class UserResource extends Resource
             ->schema([
                 Fieldset::make('Form User')
                     ->schema([
+                        TextInput::make('first_name')
+                            ->label('Nama Depan')
+                            ->string()
+                            ->maxLength(50)
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'Nama depan wajib diisi',
+                                'max' => 'Nama depan maksimal 50 karakter'
+                            ]),
+                        TextInput::make('last_name')
+                            ->label('Nama Belakang')
+                            ->maxLength(50)
+                            ->string()
+                            ->nullable()
+                            ->validationMessages([
+                                'max' => 'Nama belakang maksimal 50 karakter'
+                            ]),
                         TextInput::make('username')
                             ->label('Username')
                             ->required()
@@ -58,8 +78,13 @@ class UserResource extends Resource
                         TextInput::make('telepon')
                             ->label('Telepon')
                             ->tel()
+                            ->telRegex('/^[0-9+\s().-]*$/')
+                            ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                            ->rules([new InternationalPhoneNumber()])
+                            ->maxLength(50)
                             ->validationMessages([
-                                'tel' => 'Format telepon tidak valid'
+                                'max' => 'Nomor telepon terlalu panjang'
                             ]),
                         TextInput::make('password')
                             ->password()
@@ -75,8 +100,7 @@ class UserResource extends Resource
                             ->required(fn(string $context): bool => $context === 'create'),
                         TextInput::make('konfirmasi_password')
                             ->password()
-                            ->dehydrateStateUsing(fn($state) => Hash::make($state))
-                            ->dehydrated(fn($state) => filled($state))
+                            ->dehydrated(false)
                             ->revealable()
                             ->same('password')
                             ->validationMessages([
@@ -129,9 +153,10 @@ class UserResource extends Resource
                             ->helperText("Untuk mengaktifkan cabang silahkan pilih cabang pada kelola")
                             ->reactive()
                             ->disabled(function ($set, $get) {
-                                if (in_array('all', $get('manage_type'))) {
+                                $manageType = (array) ($get('manage_type') ?? []);
+                                if (in_array('all', $manageType)) {
                                     return true;
-                                } elseif (in_array('cabang', $get('manage_type'))) {
+                                } elseif (in_array('cabang', $manageType)) {
                                     return false;
                                 }
 
@@ -145,18 +170,11 @@ class UserResource extends Resource
                         Select::make('warehouse_id')
                             ->label('Gudang')
                             ->preload()
-                            ->helperText("Untuk mengaktifkan gudang silahkan pilih gudang pada kelola")
+                            ->helperText("Pilih gudang untuk staff gudang (aktif jika Kelola = Gudang)")
                             ->searchable()
                             ->reactive()
-                            ->disabled(function ($set, $get) {
-                                if (in_array('all', $get('manage_type'))) {
-                                    return true;
-                                } elseif (in_array('warehouse', $get('manage_type'))) {
-                                    return false;
-                                }
-
-                                return true;
-                            })
+                            // S4: show warehouse field only when manage_type includes 'warehouse'
+                            ->visible(fn($get) => in_array('warehouse', (array) ($get('manage_type') ?? [])))
                             ->relationship('warehouse', 'name', function (Builder $query, $get) {
                                 $query->where('cabang_id', $get('cabang_id'));
                             })
@@ -164,33 +182,6 @@ class UserResource extends Resource
                                 return "({$warehouse->kode}) {$warehouse->name}";
                             })
                             ->nullable(),
-                        TextInput::make('first_name')
-                            ->label('Nama Depan')
-                            ->string()
-                            ->maxLength(50)
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Nama depan wajib diisi',
-                                'max' => 'Nama depan maksimal 50 karakter'
-                            ]),
-                        TextInput::make('last_name')
-                            ->label('Nama Belakang')
-                            ->maxLength(50)
-                            ->string()
-                            ->nullable()
-                            ->validationMessages([
-                                'max' => 'Nama belakang maksimal 50 karakter'
-                            ]),
-                        TextInput::make('kode_user')
-                            ->label('Kode User')
-                            ->maxLength(50)
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->validationMessages([
-                                'required' => 'Kode user wajib diisi',
-                                'unique' => 'Kode user sudah digunakan',
-                                'max' => 'Kode user maksimal 50 karakter'
-                            ]),
                         TextInput::make('posisi')
                             ->label('Posisi')
                             ->string()
@@ -216,6 +207,23 @@ class UserResource extends Resource
             ]);
     }
 
+    protected static function formatManageTypeLabel(mixed $state): string
+    {
+        $values = is_array($state) ? $state : explode(',', (string) $state);
+
+        return collect($values)
+            ->filter()
+            ->map(function (string $value): string {
+                return match ($value) {
+                    'all' => 'Semua Cabang / Gudang',
+                    'cabang' => 'Cabang',
+                    'warehouse' => 'Gudang',
+                    default => Str::headline($value),
+                };
+            })
+            ->implode(', ');
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -238,9 +246,7 @@ class UserResource extends Resource
                     ->sortable(),
                 TextColumn::make('manage_type')
                     ->badge()
-                    ->formatStateUsing(function ($state) {
-                        return Str::upper($state);
-                    })
+                    ->formatStateUsing(fn($state) => static::formatManageTypeLabel($state) ?: '-')
                     ->label('Kelola'),
                 ImageColumn::make('signature')
                     ->label('Tanda Tangan'),

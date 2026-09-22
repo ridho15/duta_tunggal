@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Helpers\MoneyHelper;
 use App\Models\VoucherRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
@@ -33,7 +34,7 @@ class VoucherRequestApprovalRequestedToOwner extends Notification
                     ->greeting('Halo ' . ($notifiable->name ?? 'Owner'))
                     ->line('Sebuah voucher telah diajukan dan membutuhkan persetujuan Anda.')
                     ->line('Nomor: ' . $this->voucher->voucher_number)
-                    ->line('Nominal: Rp ' . number_format($this->voucher->amount, 2, ',', '.'))
+                    ->line('Nominal: ' . MoneyHelper::rupiah($this->voucher->amount))
                     ->action('Lihat Pengajuan', $url)
                     ->line('Terima kasih.');
     }

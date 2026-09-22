@@ -156,11 +156,9 @@ class DepositLogRelationManager extends RelationManager
                             ->schema([
                                 Forms\Components\TextInput::make('min_amount')
                                     ->label('Min Amount')
-                                    ->numeric()
                                     ->indonesianMoney(),
                                 Forms\Components\TextInput::make('max_amount')
                                     ->label('Max Amount')
-                                    ->numeric()
                                     ->indonesianMoney(),
                             ]),
                     ])

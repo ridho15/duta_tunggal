@@ -275,6 +275,7 @@ describe('Warehouse Audit Test Suite', function () {
             $initialStock = InventoryStock::factory()->create([
                 'product_id' => $this->product1->id,
                 'warehouse_id' => $this->warehouse1->id,
+                'rak_id' => $this->rak1->id,
                 'qty_available' => 50
             ]);
 
@@ -289,10 +290,7 @@ describe('Warehouse Audit Test Suite', function () {
                 'rak_id' => $this->rak1->id
             ]);
 
-            // Update inventory
-            $initialStock->increment('qty_available', 25);
-
-            expect($initialStock->fresh()->qty_available)->toBe(100.0);
+            expect($initialStock->fresh()->qty_available)->toBe(75.0);
 
             // Verify movement record
             $this->assertDatabaseHas('stock_movements', [
@@ -347,7 +345,8 @@ describe('Warehouse Audit Test Suite', function () {
 
             // Verify warehouse confirmation
             $this->assertDatabaseHas('warehouse_confirmations', [
-                'sale_order_id' => $saleOrder->id,
+                'confirmable_type' => SaleOrder::class,
+                'confirmable_id' => $saleOrder->id,
                 'status' => 'confirmed'
             ]);
         });
@@ -370,6 +369,7 @@ describe('Warehouse Audit Test Suite', function () {
             $inventoryStock = InventoryStock::factory()->create([
                 'product_id' => $this->product1->id,
                 'warehouse_id' => $this->warehouse1->id,
+                'rak_id' => $this->rak1->id,
                 'qty_available' => 50,
                 'qty_reserved' => 5
             ]);
@@ -384,12 +384,9 @@ describe('Warehouse Audit Test Suite', function () {
                 'date' => now(),
                 'rak_id' => $this->rak1->id
             ]);
-
-            // Update inventory (reduce available and reserved)
-            $inventoryStock->decrement('qty_available', 5);
             $inventoryStock->decrement('qty_reserved', 5);
 
-            expect($inventoryStock->fresh()->qty_available)->toBe(50.0);
+            expect($inventoryStock->fresh()->qty_available)->toBe(45.0);
             expect($inventoryStock->fresh()->qty_reserved)->toBe(0.0);
         });
 
@@ -458,6 +455,7 @@ describe('Warehouse Audit Test Suite', function () {
             $sourceStock = InventoryStock::factory()->create([
                 'product_id' => $this->product1->id,
                 'warehouse_id' => $this->warehouse1->id,
+                'rak_id' => $this->rak1->id,
                 'qty_available' => 100
             ]);
 
@@ -465,6 +463,7 @@ describe('Warehouse Audit Test Suite', function () {
             $destStock = InventoryStock::factory()->create([
                 'product_id' => $this->product1->id,
                 'warehouse_id' => $this->warehouse2->id,
+                'rak_id' => $this->rak2->id,
                 'qty_available' => 0
             ]);
 
@@ -494,6 +493,7 @@ describe('Warehouse Audit Test Suite', function () {
             StockMovement::create([
                 'product_id' => $this->product1->id,
                 'warehouse_id' => $this->warehouse1->id,
+                'rak_id' => $this->rak1->id,
                 'quantity' => -30,
                 'type' => 'transfer_out',
                 'reference_id' => $transfer->id,
@@ -503,18 +503,15 @@ describe('Warehouse Audit Test Suite', function () {
             StockMovement::create([
                 'product_id' => $this->product1->id,
                 'warehouse_id' => $this->warehouse2->id,
+                'rak_id' => $this->rak2->id,
                 'quantity' => 30,
                 'type' => 'transfer_in',
                 'reference_id' => $transfer->id,
                 'date' => now()
             ]);
 
-            // Update inventory
-            $sourceStock->decrement('qty_available', 30);
-            $destStock->increment('qty_available', 30);
-
-            expect($sourceStock->fresh()->qty_available)->toBe(100.0);
-            expect($destStock->fresh()->qty_available)->toBe(60.0);
+            expect($sourceStock->fresh()->qty_available)->toBe(70.0);
+            expect($destStock->fresh()->qty_available)->toBe(30.0);
             expect($transfer->fresh()->status)->toBe('Completed');
         });
 
@@ -894,7 +891,9 @@ describe('Warehouse Audit Test Suite', function () {
             $this->salesOrderService->confirmWarehouse($saleOrder, $confirmationData);
 
             // Check confirmation accuracy
-            $confirmation = WarehouseConfirmation::where('sale_order_id', $saleOrder->id)->first();
+            $confirmation = WarehouseConfirmation::where('confirmable_type', SaleOrder::class)
+                ->where('confirmable_id', $saleOrder->id)
+                ->first();
             $confirmationItem = WarehouseConfirmationItem::where('warehouse_confirmation_id', $confirmation->id)->first();
 
             expect($confirmationItem->confirmed_qty)->toBe('10.00');
@@ -978,7 +977,7 @@ describe('Warehouse Audit Test Suite', function () {
             $confirmation = WarehouseConfirmation::create([
                 'sale_order_id' => $saleOrder->id,
                 'status' => 'confirmed',
-                'confirmed_by' => $user->id ?? 1
+                'confirmed_by' => Auth::id() ?? 1
             ]);
 
             $confirmationItem = WarehouseConfirmationItem::create([
@@ -991,7 +990,8 @@ describe('Warehouse Audit Test Suite', function () {
             ]);
 
             // Verify workflow integrity
-            expect($confirmation->sale_order_id)->toBe($saleOrder->id);
+            expect($confirmation->confirmable_type)->toBe(SaleOrder::class);
+            expect($confirmation->confirmable_id)->toBe($saleOrder->id);
             expect($confirmationItem->warehouse_confirmation_id)->toBe($confirmation->id);
             expect($confirmationItem->sale_order_item_id)->toBe($saleOrderItem->id);
             expect($confirmation->status)->toBe('confirmed');

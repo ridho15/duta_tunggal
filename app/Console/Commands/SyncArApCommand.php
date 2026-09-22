@@ -2,9 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PaymentStatus;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
+use App\Models\CustomerReceiptItem;
 use App\Models\Invoice;
+use App\Models\VendorPaymentDetail;
 use Illuminate\Console\Command;
 
 class SyncArApCommand extends Command
@@ -14,7 +17,9 @@ class SyncArApCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'ar-ap:sync {--force : Force update existing AR/AP records}';
+    protected $signature = 'ar-ap:sync
+                            {--force : Force update existing AR/AP records}
+                            {--invoice-id= : Restrict sync to a specific invoice ID}';
 
     /**
      * The console command description.
@@ -32,23 +37,25 @@ class SyncArApCommand extends Command
         $this->newLine();
 
         $force = $this->option('force');
+        $invoiceId = $this->option('invoice-id');
         
         // Sync Account Receivables from Customer Invoices
-        $this->syncAccountReceivables($force);
+        $this->syncAccountReceivables($force, $invoiceId);
         
         // Sync Account Payables from Supplier Invoices
-        $this->syncAccountPayables($force);
+        $this->syncAccountPayables($force, $invoiceId);
         
         $this->newLine();
         $this->info('✅ AR & AP Synchronization completed successfully!');
     }
 
-    private function syncAccountReceivables($force = false)
+    private function syncAccountReceivables($force = false, $invoiceId = null)
     {
         $this->info('📊 Syncing Account Receivables from Customer Invoices...');
         
         // Get all customer invoices (from Sale Orders)
         $customerInvoices = Invoice::where('from_model_type', 'App\Models\SaleOrder')
+            ->when($invoiceId, fn ($query) => $query->where('id', $invoiceId))
             ->with(['fromModel.customer', 'accountReceivable'])
             ->get();
 
@@ -71,11 +78,12 @@ class SyncArApCommand extends Command
             }
 
             // Calculate remaining amount
-            $totalPaid = \App\Models\CustomerReceipt::whereJsonContains('selected_invoices', (string)$invoice->id)
-                ->sum('total_payment');
+            $totalPaid = (float) CustomerReceiptItem::query()
+                ->where('invoice_id', $invoice->id)
+                ->sum('amount');
             
             $remaining = max(0, $invoice->total - $totalPaid);
-            $status = $remaining > 0 ? 'Belum Lunas' : 'Lunas';
+            $status = $remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
 
             $arData = [
                 'invoice_id' => $invoice->id,
@@ -100,12 +108,13 @@ class SyncArApCommand extends Command
         $this->info("📈 Account Receivables: {$created} created, {$updated} updated, {$skipped} skipped");
     }
 
-    private function syncAccountPayables($force = false)
+    private function syncAccountPayables($force = false, $invoiceId = null)
     {
         $this->info('📊 Syncing Account Payables from Supplier Invoices...');
         
         // Get all supplier invoices (from Purchase Orders)
         $supplierInvoices = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
+            ->when($invoiceId, fn ($query) => $query->where('id', $invoiceId))
             ->with(['fromModel.supplier', 'accountPayable'])
             ->get();
 
@@ -128,11 +137,16 @@ class SyncArApCommand extends Command
             }
 
             // Calculate remaining amount
-            $totalPaid = \App\Models\VendorPayment::whereJsonContains('selected_invoices', (string)$invoice->id)
-                ->sum('total_payment');
-            
-            $remaining = max(0, $invoice->total - $totalPaid);
-            $status = $remaining > 0 ? 'Belum Lunas' : 'Lunas';
+            $totalPaid = (float) VendorPaymentDetail::query()
+                ->where('invoice_id', $invoice->id)
+                ->sum('amount');
+
+            $totalAdjustments = (float) VendorPaymentDetail::query()
+                ->where('invoice_id', $invoice->id)
+                ->sum('adjustment_amount');
+
+            $remaining = max(0, $invoice->total - ($totalPaid + $totalAdjustments));
+            $status = $remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
 
             $apData = [
                 'invoice_id' => $invoice->id,

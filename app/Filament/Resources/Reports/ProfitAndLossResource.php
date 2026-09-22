@@ -22,8 +22,9 @@ class ProfitAndLossResource extends Resource
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
     protected static ?string $navigationLabel = 'Laporan Laba Rugi (P&L)';
-    protected static bool $shouldRegisterNavigation = true; // Task 15a: show in Finance - Laporan group
-    protected static ?string $navigationGroup = 'Finance - Laporan';
+    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationGroup = 'Laporan Keuangan';
+    protected static ?string $navigationParentItem = 'Laporan Keuangan';
     protected static ?int $navigationSort = 3;
     protected static ?string $model = JournalEntry::class;
 

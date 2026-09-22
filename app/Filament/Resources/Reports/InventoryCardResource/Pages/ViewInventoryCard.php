@@ -90,7 +90,7 @@ class ViewInventoryCard extends Page
 
                     Select::make('productId')
                         ->label('Item (Produk)')
-                        ->options(fn () => Product::query()->orderBy('name')->get()->mapWithKeys(fn ($product) => [
+                        ->options(fn () => Product::query()->orderBy('name')->limit(50)->get()->mapWithKeys(fn ($product) => [
                             $product->id => $product->name . ($product->sku ? ' (' . $product->sku . ')' : '')
                         ]))
                         ->searchable()

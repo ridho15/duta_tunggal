@@ -12,6 +12,7 @@
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
         "blade-ui-kit/blade-heroicons": "^2.6",
+        "fakerphp/faker": "^1.24",
         "filament/filament": "^3.3",
         "filament/notifications": "^3.3",
         "laravel/framework": "^12.0",
@@ -26,7 +27,6 @@
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "*",
-        "fakerphp/faker": "^1.23",
         "laravel/dusk": "^8.3",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.18",
@@ -54,7 +54,9 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi",
+            "@php artisan package:discover --ansi"
+        ],
+        "filament-upgrade": [
             "@php artisan filament:upgrade"
         ],
         "post-update-cmd": [
@@ -75,11 +77,26 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "test:chunked": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php scripts/run-tests-chunked.php"
+        ],
+        "test:compare": [
+            "@php scripts/compare-test-failures.php"
+        ],
+        "test:safe": [
+            "@php scripts/run-tests-safe.php"
+        ],
+        "test:unit-safe": [
+            "@php scripts/run-tests-safe.php --testsuite=Unit"
         ]
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "laravel/dusk"
+            ]
         }
     },
     "config": {

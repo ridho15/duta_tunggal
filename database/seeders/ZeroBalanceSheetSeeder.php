@@ -34,20 +34,32 @@ class ZeroBalanceSheetSeeder extends Seeder
         'deposits',
         'deposit_logs',
         'voucher_requests',
+        'payment_requests',
+        'accounting_periods',
 
         // Sales & Distribution
         'quotations',
         'quotation_items',
         'sale_orders',
         'sale_order_items',
+        'sale_order_item_warehouse_allocations',
         'delivery_sales_orders',
         'delivery_orders',
         'delivery_order_items',
         'delivery_order_logs',
+        'delivery_order_item_warehouse_sources',
+        'delivery_schedules',
+        'delivery_schedule_delivery_orders',
+        'delivery_schedule_surat_jalans',
         'surat_jalans',
         'surat_jalan_delivery_orders',
         'warehouse_confirmations',
         'warehouse_confirmation_items',
+        'warehouse_confirmation_warehouses',
+
+        // Customer Returns
+        'customer_returns',
+        'customer_return_items',
 
         // Purchasing & Logistics
         'purchase_orders',
@@ -68,6 +80,10 @@ class ZeroBalanceSheetSeeder extends Seeder
         'return_products',
         'return_product_items',
         'quality_controls',
+
+        // Stock Adjustments
+        'stock_adjustments',
+        'stock_adjustment_items',
 
         // Inventory & Manufacturing
         'stock_movements',

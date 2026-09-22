@@ -38,7 +38,7 @@ class QuotationItemRelationManager extends RelationManager
                             ->searchable()
                             ->reactive()
                             ->afterStateUpdated(function ($set, $get, $state) {
-                                $product = Product::find($state);
+                                $product = Product::withoutGlobalScope('product_cabang')->find($state);
                                 $set('unit_price', $product->sell_price);
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $get('tax')));
                             })
@@ -48,8 +48,7 @@ class QuotationItemRelationManager extends RelationManager
                             }),
                         TextInput::make('unit_price')
                             ->label('Unit Price')
-                            ->numeric()
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $state, $get('discount'), $get('tax')));
                             })
@@ -57,7 +56,6 @@ class QuotationItemRelationManager extends RelationManager
                             ->indonesianMoney(),
                         TextInput::make('quantity')
                             ->label('Quantity')
-                            ->numeric()
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($state, $get('unit_price'), $get('discount'), $get('tax')));
                             })
@@ -81,11 +79,10 @@ class QuotationItemRelationManager extends RelationManager
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $set('total_price', HelperController::hitungSubtotal($get('quantity'), $get('unit_price'), $get('discount'), $state));
                             })
-                            ->default(0)
+                            ->default(fn () => \App\Models\TaxSetting::activeRate('PPN'))
                             ->suffix('%'),
                         TextInput::make('total_price')
                             ->label('Total Price')
-                            ->numeric()
                             ->reactive()
                             ->default(0)
                             ->indonesianMoney(),

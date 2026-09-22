@@ -2,6 +2,8 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\PaymentStatus;
+use App\Filament\Resources\PurchaseInvoiceResource;
 use App\Helpers\MoneyHelper;
 use App\Models\AccountPayable;
 use App\Models\AccountReceivable;
@@ -19,32 +21,35 @@ class ArApSummaryWidget extends BaseWidget
 
     public function getStats(): array
     {
+        $unpaid = PaymentStatus::UNPAID->value;
+
         // Account Receivables Summary
         $arStats = AccountReceivable::selectRaw('
             SUM(total) as total_ar,
             SUM(paid) as paid_ar,
             SUM(remaining) as outstanding_ar,
             COUNT(*) as count_ar,
-            COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as unpaid_count_ar
+            COUNT(CASE WHEN status = "' . $unpaid . '" THEN 1 END) as unpaid_count_ar
         ')->first();
 
-        // Account Payables Summary  
-        $apStats = AccountPayable::selectRaw('
-            SUM(total) as total_ap,
-            SUM(paid) as paid_ap,
-            SUM(remaining) as outstanding_ap,
-            COUNT(*) as count_ap,
-            COUNT(CASE WHEN status = "Belum Lunas" THEN 1 END) as unpaid_count_ap
-        ')->first();
+        // Account Payables Summary. Purchase AP amounts are stored in invoice source
+        // currency, so global dashboard totals must be converted to IDR first.
+        $accountPayables = AccountPayable::with('invoice')->get();
+        $apTotal = $accountPayables->sum(fn ($ap) => PurchaseInvoiceResource::invoiceAmountToIdr($ap->invoice, $ap->total));
+        $apOutstanding = $accountPayables->sum(fn ($ap) => PurchaseInvoiceResource::invoiceAmountToIdr($ap->invoice, $ap->remaining));
+        $apCount = $accountPayables->count();
+        $apUnpaidCount = $accountPayables->where('status', $unpaid)->count();
 
         // Overdue calculations
         $overdueAR = AccountReceivable::whereHas('invoice', function ($query) {
             $query->where('due_date', '<', now());
-        })->where('status', 'Belum Lunas')->sum('remaining');
+        })->where('status', PaymentStatus::UNPAID->value)->sum('remaining');
 
-        $overdueAP = AccountPayable::whereHas('invoice', function ($query) {
+        $overdueAP = AccountPayable::with('invoice')->whereHas('invoice', function ($query) {
             $query->where('due_date', '<', now());
-        })->where('status', 'Belum Lunas')->sum('remaining');
+        })->where('status', PaymentStatus::UNPAID->value)
+            ->get()
+            ->sum(fn ($ap) => PurchaseInvoiceResource::invoiceAmountToIdr($ap->invoice, $ap->remaining));
 
         return [
             Card::make('Total Account Receivable', MoneyHelper::rupiah($arStats->total_ar ?? 0))
@@ -68,22 +73,22 @@ class ArApSummaryWidget extends BaseWidget
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-receivables.index', ['tableFilters[overdue][isActive]' => true])),
                 
-            Card::make('Total Account Payable', MoneyHelper::rupiah($apStats->total_ap ?? 0))
-                ->description($apStats->count_ap . ' invoices, ' . $apStats->unpaid_count_ap . ' unpaid')
+            Card::make('Total Account Payable', MoneyHelper::rupiah($apTotal))
+                ->description($apCount . ' invoices, ' . $apUnpaidCount . ' unpaid, converted to IDR')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color('info')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-payables.index')),
                 
-            Card::make('Outstanding AP', MoneyHelper::rupiah($apStats->outstanding_ap ?? 0))
-                ->description('Remaining to pay')
+            Card::make('Outstanding AP', MoneyHelper::rupiah($apOutstanding))
+                ->description('Remaining to pay, converted to IDR')
                 ->descriptionIcon('heroicon-m-clock')
-                ->color($apStats->outstanding_ap > 0 ? 'warning' : 'success')
+                ->color($apOutstanding > 0 ? 'warning' : 'success')
                 ->extraAttributes(['class' => 'cursor-pointer'])
                 ->url(route('filament.admin.resources.account-payables.index', ['tableFilters[outstanding_only][isActive]' => true])),
                 
             Card::make('Overdue AP', MoneyHelper::rupiah($overdueAP))
-                ->description('Past due amount')
+                ->description('Past due amount, converted to IDR')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color($overdueAP > 0 ? 'danger' : 'success')
                 ->extraAttributes(['class' => 'cursor-pointer'])

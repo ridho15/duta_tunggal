@@ -21,7 +21,13 @@ class EditManufacturingOrder extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $product = $this->getRecord()->product;
+        $record = $this->getRecord()->load('productionPlan.product.unitConversions');
+        $product = $record->productionPlan->product;
+
+        if (! $product) {
+            return $data;
+        }
+
         $listConversions = [];
         foreach ($product->unitConversions as $index => $conversion) {
             $listConversions[$index] = [
@@ -31,6 +37,10 @@ class EditManufacturingOrder extends EditRecord
         }
 
         $data['satuan_konversi'] = $listConversions;
+        if (empty($data['items'])) {
+            $data['items'] = ManufacturingOrderResource::resolveMaterialItems($record);
+        }
+
         return $data;
     }
 }

@@ -48,37 +48,26 @@
                     <th>Kode Produk</th>
                     <th>Nama Produk</th>
                     <th>Rak</th>
-                    <th>Qty Tersedia</th>
-                    <th>Qty Dipesan</th>
+                    <th>Qty Fisik</th>
+                    <th>Qty Reserved</th>
                     <th>Qty Minimum</th>
-                    <th>Qty On Hand</th>
+                    <th>Qty Tersedia Bebas</th>
                     <th>Status</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($data as $stock)
-                    @php
-                        $onHand = $stock->qty_available - $stock->qty_reserved;
-                        $statusClass = $onHand <= 0 ? 'status-habis' : ($onHand <= $stock->qty_min ? 'status-minimum' : 'status-normal');
-                    @endphp
+                    @php($statusClass = ($stock['Status'] ?? '') === 'Habis' ? 'status-habis' : (($stock['Status'] ?? '') === 'Minimum' ? 'status-minimum' : 'status-normal'))
                 <tr>
-                    <td>{{ $stock->warehouse->name ?? '-' }}</td>
-                    <td>{{ $stock->product->code ?? '-' }}</td>
-                    <td>{{ $stock->product->name ?? '-' }}</td>
-                    <td>{{ $stock->rak->name ?? '-' }}</td>
-                    <td>{{ $stock->qty_available }}</td>
-                    <td>{{ $stock->qty_reserved }}</td>
-                    <td>{{ $stock->qty_min }}</td>
-                    <td>{{ $onHand }}</td>
-                    <td class="{{ $statusClass }}">
-                        @if($onHand <= 0)
-                            Habis
-                        @elseif($onHand <= $stock->qty_min)
-                            Minimum
-                        @else
-                            Normal
-                        @endif
-                    </td>
+                    <td>{{ $stock['Gudang'] ?? '-' }}</td>
+                    <td>{{ $stock['Kode Produk'] ?? '-' }}</td>
+                    <td>{{ $stock['Nama Produk'] ?? '-' }}</td>
+                    <td>{{ $stock['Rak'] ?? '-' }}</td>
+                    <td>{{ $stock['Qty Fisik'] ?? 0 }}</td>
+                    <td>{{ $stock['Qty Reserved'] ?? 0 }}</td>
+                    <td>{{ $stock['Qty Minimum'] ?? 0 }}</td>
+                    <td>{{ $stock['Qty Tersedia Bebas'] ?? 0 }}</td>
+                    <td class="{{ $statusClass }}">{{ $stock['Status'] ?? 'Normal' }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -101,24 +90,17 @@
             </thead>
             <tbody>
                 @foreach($data as $movement)
-                    @php
-                        $reference = '-';
-                        if ($movement->from_model_type && $movement->from_model_id) {
-                            $modelName = class_basename($movement->from_model_type);
-                            $reference = $modelName . ' #' . $movement->from_model_id;
-                        }
-                    @endphp
                 <tr>
-                    <td>{{ $movement->date }}</td>
-                    <td>{{ $movement->product->code ?? '-' }}</td>
-                    <td>{{ $movement->product->name ?? '-' }}</td>
-                    <td>{{ $movement->warehouse->name ?? '-' }}</td>
-                    <td>{{ $movement->rak->name ?? '-' }}</td>
-                    <td>{{ $movement->type }}</td>
-                    <td>{{ $movement->quantity }}</td>
-                    <td>Rp {{ number_format($movement->value ?? 0, 0, ',', '.') }}</td>
-                    <td>{{ $reference }}</td>
-                    <td>{{ $movement->notes ?? '-' }}</td>
+                    <td>{{ $movement['Tanggal'] ?? '-' }}</td>
+                    <td>{{ $movement['Kode Produk'] ?? '-' }}</td>
+                    <td>{{ $movement['Nama Produk'] ?? '-' }}</td>
+                    <td>{{ $movement['Gudang'] ?? '-' }}</td>
+                    <td>{{ $movement['Rak'] ?? '-' }}</td>
+                    <td>{{ $movement['Tipe Movement'] ?? '-' }}</td>
+                    <td>{{ $movement['Quantity'] ?? 0 }}</td>
+                    <td>Rp {{ number_format($movement['Nilai'] ?? 0, 0, ',', '.') }}</td>
+                    <td>{{ $movement['Referensi'] ?? '-' }}</td>
+                    <td>{{ $movement['Catatan'] ?? '-' }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -131,9 +113,9 @@
                     <th>Kode Produk</th>
                     <th>Nama Produk</th>
                     <th>Rak</th>
-                    <th>Qty Tersedia</th>
-                    <th>Qty Dipesan</th>
-                    <th>Qty On Hand</th>
+                    <th>Qty Fisik</th>
+                    <th>Qty Reserved</th>
+                    <th>Qty Tersedia Bebas</th>
                     <th>Terakhir Movement</th>
                     <th>Hari Aging</th>
                     <th>Kategori Aging</th>
@@ -141,43 +123,18 @@
             </thead>
             <tbody>
                 @foreach($data as $stock)
-                    @php
-                        $onHand = $stock->qty_available - $stock->qty_reserved;
-
-                        // Get last movement date
-                        $lastMovement = \App\Models\StockMovement::where('product_id', $stock->product_id)
-                            ->where('warehouse_id', $stock->warehouse_id)
-                            ->orderBy('date', 'desc')
-                            ->first();
-
-                        $lastMovementDate = $lastMovement ? $lastMovement->date : null;
-                        $agingDays = $lastMovement ? \Carbon\Carbon::parse($lastMovement->date)->diffInDays(now()) : 999;
-
-                        if ($agingDays <= 30) {
-                            $agingCategory = 'Aktif';
-                            $agingClass = 'aging-aktif';
-                        } elseif ($agingDays <= 90) {
-                            $agingCategory = 'Slow Moving';
-                            $agingClass = 'aging-slow';
-                        } elseif ($agingDays <= 180) {
-                            $agingCategory = 'Stagnan';
-                            $agingClass = 'aging-stagnan';
-                        } else {
-                            $agingCategory = 'Dead Stock';
-                            $agingClass = 'aging-dead';
-                        }
-                    @endphp
+                    @php($agingClass = ($stock['Kategori Aging'] ?? '') === 'Aktif' ? 'aging-aktif' : (($stock['Kategori Aging'] ?? '') === 'Slow Moving' ? 'aging-slow' : (($stock['Kategori Aging'] ?? '') === 'Stagnan' ? 'aging-stagnan' : 'aging-dead')))
                 <tr>
-                    <td>{{ $stock->warehouse->name ?? '-' }}</td>
-                    <td>{{ $stock->product->code ?? '-' }}</td>
-                    <td>{{ $stock->product->name ?? '-' }}</td>
-                    <td>{{ $stock->rak->name ?? '-' }}</td>
-                    <td>{{ $stock->qty_available }}</td>
-                    <td>{{ $stock->qty_reserved }}</td>
-                    <td>{{ $onHand }}</td>
-                    <td>{{ $lastMovementDate ?: 'Tidak Ada Data' }}</td>
-                    <td>{{ $agingDays === 999 ? 'Tidak Ada Data' : $agingDays }}</td>
-                    <td class="{{ $agingClass }}">{{ $agingCategory }}</td>
+                    <td>{{ $stock['Gudang'] ?? '-' }}</td>
+                    <td>{{ $stock['Kode Produk'] ?? '-' }}</td>
+                    <td>{{ $stock['Nama Produk'] ?? '-' }}</td>
+                    <td>{{ $stock['Rak'] ?? '-' }}</td>
+                    <td>{{ $stock['Qty Fisik'] ?? 0 }}</td>
+                    <td>{{ $stock['Qty Reserved'] ?? 0 }}</td>
+                    <td>{{ $stock['Qty Tersedia Bebas'] ?? 0 }}</td>
+                    <td>{{ $stock['Terakhir Movement'] ?? 'Tidak Ada Data' }}</td>
+                    <td>{{ $stock['Hari Aging'] ?? 'Tidak Ada Data' }}</td>
+                    <td class="{{ $agingClass }}">{{ $stock['Kategori Aging'] ?? 'Tidak Ada Movement' }}</td>
                 </tr>
                 @endforeach
             </tbody>

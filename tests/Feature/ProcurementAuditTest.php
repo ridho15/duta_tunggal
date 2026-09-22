@@ -20,6 +20,7 @@ use App\Models\InventoryStock;
 use App\Models\StockMovement;
 use App\Models\Currency;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ class ProcurementAuditTest extends TestCase
         $this->vehicle = \App\Models\Vehicle::factory()->create();
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_order_creation_and_approval_workflow()
     {
         // Test complete purchase order lifecycle
@@ -109,7 +110,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertEquals(5000000, $calculatedTotal);
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_receipt_processing_and_stock_updates()
     {
         // Create approved PO first
@@ -225,7 +226,7 @@ class ProcurementAuditTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function test_quality_control_workflow_and_approval()
     {
         // Create PO first
@@ -266,7 +267,7 @@ class ProcurementAuditTest extends TestCase
             'purchase_receipt_id' => $receipt->id,
             'product_id' => $this->product->id,
             'warehouse_id' => $this->warehouse->id,
-            'quantity' => 50,
+            'qty_received' => 50,
             'unit_price' => 50000,
             'total_amount' => 2500000,
         ]);
@@ -306,7 +307,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertEquals(0, $qcRejected->status);
     }
 
-    /** @test */
+    #[Test]
     public function test_delivery_order_generation_from_purchase()
     {
         // Create PO first
@@ -382,7 +383,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertEquals(100, $do->deliveryOrderItem()->first()->quantity);
     }
 
-    /** @test */
+    #[Test]
     public function test_purchase_return_processing()
     {
         // Create PO first
@@ -453,7 +454,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertEquals(10, $return->purchaseReturnItem()->first()->qty_returned);
     }
 
-    /** @test */
+    #[Test]
     public function test_cross_module_data_integrity()
     {
         // Test data consistency across procurement modules
@@ -518,7 +519,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertEquals(100, $totalReceived);
     }
 
-    /** @test */
+    #[Test]
     public function test_supplier_performance_and_pricing()
     {
         // Test supplier data integrity and pricing
@@ -563,7 +564,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertDatabaseHas('suppliers', ['code' => 'SUP-AUDIT-001']);
     }
 
-    /** @test */
+    #[Test]
     public function test_end_to_end_procurement_workflow()
     {
         // Complete procurement workflow from PO to delivery
@@ -666,7 +667,7 @@ class ProcurementAuditTest extends TestCase
         $this->assertEquals($receiptItem1->id, $qc->from_model_id);
     }
 
-    /** @test */
+    #[Test]
     public function test_procurement_data_validation_and_constraints()
     {
         // Test data validation rules

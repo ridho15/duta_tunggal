@@ -28,9 +28,16 @@ class ViewHpp extends Page
 
     public function mount(): void
     {
-        $this->startDate = now()->startOfMonth()->subMonths(11)->toDateString();
-        $this->endDate = now()->endOfMonth()->toDateString();
-        $this->branchIds = [];
+        $this->startDate = request('startDate', now()->startOfMonth()->subMonths(11)->toDateString());
+        $this->endDate = request('endDate', now()->endOfMonth()->toDateString());
+        $this->branchIds = (array) request('branchIds', []);
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
+
+        $this->form->fill([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'branchIds' => $this->branchIds,
+        ]);
     }
 
     protected function getFormSchema(): array
@@ -108,12 +115,21 @@ class ViewHpp extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return route('reports.hpp.preview', array_filter([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'branchIds' => array_filter($this->branchIds),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     public function getReportData(): array
@@ -255,6 +271,12 @@ class ViewHpp extends Page
                             // ignore logging errors
                         }
 
+                        \Filament\Notifications\Notification::make()
+                            ->title('Gagal Ekspor PDF HPP')
+                            ->body('Tidak dapat membuat file PDF. Silakan coba ekspor ke Excel atau hubungi administrator.')
+                            ->danger()
+                            ->send();
+
                         throw $e2;
                     }
                 }
@@ -266,6 +288,12 @@ class ViewHpp extends Page
                     'report_keys' => array_keys($report),
                     'branch_count' => count($branchNames)
                 ]);
+
+                \Filament\Notifications\Notification::make()
+                    ->title('Gagal Ekspor PDF HPP')
+                    ->body('Tidak dapat membuat file PDF laporan HPP. Silakan coba ekspor ke Excel atau hubungi administrator.')
+                    ->danger()
+                    ->send();
 
                 // Return user-friendly error
                 throw new \Exception('Gagal membuat PDF: ' . $e->getMessage());

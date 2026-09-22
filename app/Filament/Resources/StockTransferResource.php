@@ -32,10 +32,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class StockTransferResource extends Resource
 {
     protected static ?string $model = StockTransfer::class;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-up-down';
 
@@ -43,7 +46,7 @@ class StockTransferResource extends Resource
 
     protected static ?string $navigationGroup = 'Gudang';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -107,11 +110,12 @@ class StockTransferResource extends Resource
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('warehouse_id', $get('../../from_warehouse_id'))
                                             ->where('product_id', $get('product_id'))->first();
-                                        if ($inventoryStock) {
-                                            return "Rak : ({$inventoryStock->rak->code}) {$inventoryStock->rak->name}";
+                                        if ($inventoryStock && $inventoryStock->rak) {
+                                            $codeStr = filled($inventoryStock->rak->code) ? "({$inventoryStock->rak->code}) " : '';
+                                            return "Rak: " . $codeStr . ($inventoryStock->rak->name ?? '-');
                                         }
 
-                                        return "Rak : -";
+                                        return "Rak: -";
                                     })
                                     ->relationship('product', 'id', function (Builder $query, $get) {
                                         $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
@@ -151,16 +155,16 @@ class StockTransferResource extends Resource
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('from_rak_id'))->first();
                                         if ($inventoryStock) {
-                                            return "Jumlah stock {$inventoryStock->qty_available}";
+                                            return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
 
-                                        return "Jumlah Stock 0";
+                                        return 'Jumlah stok fisik 0';
                                     })
                                     ->relationship('fromRak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('from_warehouse_id'));
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return "({$rak->code}) {$rak->name}";
+                                        return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     })
                                     ->required(),
                                 Select::make('to_warehouse_id')
@@ -187,16 +191,16 @@ class StockTransferResource extends Resource
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('to_rak_id'))->first();
                                         if ($inventoryStock) {
-                                            return "Jumlah Stock {$inventoryStock->qty_available}";
+                                            return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
 
-                                        return "Jumlah Stock 0";
+                                        return 'Jumlah stok fisik 0';
                                     })
                                     ->relationship('toRak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('to_warehouse_id'));
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return "({$rak->code}) {$rak->name}";
+                                        return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     })
                                     ->required()
                             ])
@@ -278,8 +282,10 @@ class StockTransferResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
+                        ->visible(fn ($record) => in_array($record->status, ['Draft', 'Request'], true))
                         ->color('success'),
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->visible(fn ($record) => in_array($record->status, ['Draft', 'Request', 'Reject'], true)),
                     ActionsAction::make('request_transfer')
                         ->label('Request Transfer')
                         ->color('success')
@@ -289,9 +295,13 @@ class StockTransferResource extends Resource
                         })
                         ->icon('heroicon-o-arrow-down-circle')
                         ->action(function ($record) {
-                            $stockTransferService = app(StockTransferService::class);
-                            $stockTransferService->requestTransfer($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Information", message: "Berhasil mengirimkan request stock transfer");
+                            try {
+                                $stockTransferService = app(StockTransferService::class);
+                                $stockTransferService->requestTransfer($record);
+                                HelperController::sendNotification(isSuccess: true, title: "Information", message: "Request stock transfer berhasil dikirimkan. Proses selanjutnya: Manajer Gudang atau Manajer Logistik perlu mereview dan menyetujui permintaan transfer stok ini.");
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Validasi Transfer Stok', message: collect($exception->errors())->flatten()->implode("\n"));
+                            }
                         }),
                     ActionsAction::make('approve')
                         ->label('Approve')
@@ -302,9 +312,13 @@ class StockTransferResource extends Resource
                             return Auth::user()->hasPermissionTo('response stock transfer') && $record->status == 'Request';
                         })
                         ->action(function ($record) {
-                            $stockTransferService = app(StockTransferService::class);
-                            $stockTransferService->approveStockTransfer($record);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil di approve");
+                            try {
+                                $stockTransferService = app(StockTransferService::class);
+                                $stockTransferService->approveStockTransfer($record);
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil diapprove. Proses selanjutnya: Tim Gudang perlu memproses dan mengirimkan barang sesuai dengan jumlah transfer yang telah disetujui.");
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Validasi Transfer Stok', message: collect($exception->errors())->flatten()->implode("\n"));
+                            }
                         }),
                     ActionsAction::make('reject')
                         ->label('Reject')
@@ -318,7 +332,7 @@ class StockTransferResource extends Resource
                             $record->update([
                                 'status' => 'Reject'
                             ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock berhasil di reject");
+                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock ditolak. Proses selanjutnya: Pemohon perlu merevisi permintaan transfer sesuai keterangan penolakan dan mengajukan kembali.");
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)

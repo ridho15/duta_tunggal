@@ -4,7 +4,10 @@ namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
 use App\Services\ManufacturingJournalService;
+use App\Services\ManufacturingService;
 use App\Services\StockReservationService;
+use App\Traits\CascadesJournalEntries;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MaterialIssue extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
 
     protected $fillable = [
         'issue_number',
@@ -34,6 +37,7 @@ class MaterialIssue extends Model
     const STATUS_PENDING_APPROVAL = 'pending_approval';
     const STATUS_APPROVED = 'approved';
     const STATUS_COMPLETED = 'completed';
+    const STATUS_REJECTED = 'rejected';
 
     protected $casts = [
         'issue_date' => 'date',
@@ -61,6 +65,11 @@ class MaterialIssue extends Model
         return $this->hasMany(MaterialIssueItem::class, 'material_issue_id');
     }
 
+    public function warehouseConfirmations()
+    {
+        return $this->morphMany(WarehouseConfirmation::class, 'confirmable');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
@@ -76,12 +85,27 @@ class MaterialIssue extends Model
         return $this->morphOne(JournalEntry::class, 'source');
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     /**
      * Calculate total cost from items
      */
     public function calculateTotalCost(): float
     {
-        return $this->items()->sum('total_cost');
+        if (! $this->exists) {
+            return (float) ($this->total_cost ?? 0);
+        }
+
+        $items = $this->items();
+
+        if (! $items->exists()) {
+            return (float) ($this->getRawOriginal('total_cost') ?? $this->total_cost ?? 0);
+        }
+
+        return (float) $items->sum('total_cost');
     }
 
     /**
@@ -90,7 +114,7 @@ class MaterialIssue extends Model
     public function updateTotalCost(): void
     {
         $this->total_cost = $this->calculateTotalCost();
-        $this->save();
+        $this->saveQuietly();
     }
 
     /**
@@ -173,11 +197,186 @@ class MaterialIssue extends Model
         return $this->status === self::STATUS_COMPLETED;
     }
 
+    public function requiresWarehouseConfirmation(): bool
+    {
+        return $this->items()->exists();
+    }
+
+    public function hasConfirmedWarehouseConfirmation(): bool
+    {
+        if (! $this->requiresWarehouseConfirmation()) {
+            return true;
+        }
+
+        return $this->warehouseConfirmationStatusSummary()['all_confirmed'];
+    }
+
+    public function warehouseConfirmationBlockingMessage(): ?string
+    {
+        if (! $this->requiresWarehouseConfirmation()) {
+            return null;
+        }
+
+        $summary = $this->warehouseConfirmationStatusSummary();
+
+        if ($summary['all_confirmed']) {
+            return null;
+        }
+
+        if ($summary['any_rejected']) {
+            return 'Konfirmasi gudang untuk pengambilan bahan baku telah ditolak.';
+        }
+
+        return 'Pengambilan bahan baku harus melalui konfirmasi gudang per item bahan sebelum dapat di-approve atau diselesaikan.';
+    }
+
+    public function warehouseConfirmationStatusSummary(): array
+    {
+        $statuses = $this->warehouseConfirmations()
+            ->pluck('status')
+            ->map(fn ($status) => strtolower((string) $status))
+            ->values();
+
+        $requiredCount = $this->items()->count();
+        $confirmationCount = $statuses->count();
+        $hasConfirmations = $confirmationCount > 0;
+
+        return [
+            'required_count' => $requiredCount,
+            'confirmation_count' => $confirmationCount,
+            'all_confirmed' => $hasConfirmations
+                && $confirmationCount >= $requiredCount
+                && $statuses->every(fn ($status) => $status === 'confirmed'),
+            'any_rejected' => $statuses->contains('rejected'),
+            'all_rejected' => $hasConfirmations && $statuses->every(fn ($status) => $status === 'rejected'),
+        ];
+    }
+
+    public function latestWarehouseConfirmation(): ?WarehouseConfirmation
+    {
+        return $this->warehouseConfirmations()
+            ->latest('id')
+            ->first();
+    }
+
+    public function ensureWarehouseConfirmationRequest(): ?WarehouseConfirmation
+    {
+        if (! $this->exists) {
+            return null;
+        }
+
+        return app(ManufacturingService::class)->createWarehouseConfirmationForMaterialIssue($this, [
+            'note' => 'Auto-generated from Material Issue request approval',
+        ]);
+    }
+
+    public function approveFromWarehouseConfirmation(WarehouseConfirmation $warehouseConfirmation): bool
+    {
+        if (
+            $warehouseConfirmation->confirmable_type !== self::class
+            || (int) $warehouseConfirmation->confirmable_id !== (int) $this->id
+        ) {
+            return false;
+        }
+
+        $summary = $this->warehouseConfirmationStatusSummary();
+
+        if ($summary['all_confirmed']) {
+            $approvedAt = $warehouseConfirmation->confirmed_at ?? now();
+            $approvedBy = $warehouseConfirmation->confirmed_by ?? $this->approved_by ?? $this->created_by;
+
+            $this->update([
+                'approved_by' => $approvedBy,
+                'approved_at' => $approvedAt,
+                'status' => self::STATUS_APPROVED,
+            ]);
+
+            $result = $this->update([
+                'approved_by' => $approvedBy,
+                'approved_at' => $approvedAt,
+                'status' => self::STATUS_COMPLETED,
+            ]);
+
+            Log::info('MaterialIssue auto-completed from confirmed warehouse confirmation', [
+                'material_issue_id' => $this->id,
+                'issue_number' => $this->issue_number,
+                'warehouse_confirmation_id' => $warehouseConfirmation->id,
+                'warehouse_confirmation_status' => $warehouseConfirmation->status,
+                'approval_summary' => $summary,
+                'result' => $result,
+            ]);
+
+            return $result;
+        }
+
+        if ($summary['any_rejected']) {
+            $notes = (string) $this->notes;
+            $rejectionNote = 'Konfirmasi gudang ditolak.';
+
+            if (! str_contains($notes, $rejectionNote)) {
+                $notes = trim(($notes ? $notes . "\n\n" : '') . $rejectionNote);
+            }
+
+            return $this->update([
+                'approved_by' => null,
+                'approved_at' => null,
+                'status' => self::STATUS_REJECTED,
+                'notes' => $notes,
+            ]);
+        }
+
+        return $this->update([
+            'approved_by' => null,
+            'approved_at' => null,
+            'status' => self::STATUS_PENDING_APPROVAL,
+        ]);
+    }
+
     /**
      * Booted model events to auto generate manufacturing journals
      */
     protected static function booted()
     {
+        // Guard against forbidden status regressions:
+        // Approved, completed, or cancelled statuses cannot be downgraded
+        static::saving(function (MaterialIssue $issue) {
+            $forbiddenRegressions = [
+                self::STATUS_APPROVED    => [self::STATUS_PENDING_APPROVAL, self::STATUS_DRAFT],
+                self::STATUS_COMPLETED   => [self::STATUS_APPROVED, self::STATUS_PENDING_APPROVAL, self::STATUS_DRAFT],
+                self::STATUS_REJECTED    => [self::STATUS_APPROVED, self::STATUS_COMPLETED],
+            ];
+
+            $originalStatus = $issue->getOriginal('status');
+            $newStatus = $issue->status;
+
+            if ($originalStatus && $newStatus !== $originalStatus
+                && isset($forbiddenRegressions[$originalStatus])
+                && in_array($newStatus, $forbiddenRegressions[$originalStatus])) {
+                // Silently revert the status to prevent forbidden regression
+                $issue->status = $originalStatus;
+                Log::warning('MaterialIssue forbidden status regression blocked', [
+                    'material_issue_id' => $issue->id,
+                    'from' => $originalStatus,
+                    'attempted_to' => $newStatus,
+                ]);
+            }
+
+            if (
+                in_array($newStatus, [self::STATUS_APPROVED, self::STATUS_COMPLETED], true)
+                && $newStatus !== $originalStatus
+                && ($message = $issue->warehouseConfirmationBlockingMessage())
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => $message,
+                ]);
+            }
+
+            if ($newStatus === self::STATUS_REJECTED && $issue->latestWarehouseConfirmation()) {
+                // Allow rejection to be driven by warehouse confirmation only.
+                return;
+            }
+        });
+
         // Handle status transition updates for material fulfillment
         static::updated(function (MaterialIssue $issue) {
             Log::info('MaterialIssue booted() triggered', [

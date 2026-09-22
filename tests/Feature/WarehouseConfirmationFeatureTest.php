@@ -3,8 +3,10 @@
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\Customer;
+use App\Models\Driver;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\Vehicle;
 use App\Models\Warehouse;
 use App\Models\Rak;
 use App\Models\WarehouseConfirmation;
@@ -45,6 +47,10 @@ describe('Warehouse Confirmation Feature', function () {
         ]);
 
         $this->salesOrderService = app(SalesOrderService::class);
+
+        // Required for createDeliveryOrder – FK constraints on delivery_orders
+        $this->driver  = Driver::factory()->create();
+        $this->vehicle = Vehicle::factory()->create();
     });
 
     it('can fully confirm warehouse for approved SO', function () {
@@ -89,8 +95,9 @@ describe('Warehouse Confirmation Feature', function () {
 
         // Check if warehouse confirmation record exists
         $this->assertDatabaseHas('warehouse_confirmations', [
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'confirmed'
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'confirmed'
         ]);
     });
 
@@ -134,8 +141,9 @@ describe('Warehouse Confirmation Feature', function () {
         expect($saleOrder->fresh()->status)->toBe('confirmed');
 
         $this->assertDatabaseHas('warehouse_confirmations', [
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'confirmed'
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'confirmed'
         ]);
     });
 
@@ -179,8 +187,9 @@ describe('Warehouse Confirmation Feature', function () {
         expect($saleOrder->fresh()->status)->toBe('reject');
 
         $this->assertDatabaseHas('warehouse_confirmations', [
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'rejected'
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'rejected'
         ]);
     });
 
@@ -219,7 +228,7 @@ describe('Warehouse Confirmation Feature', function () {
 
         // Should throw exception or return false
         expect(fn() => $this->salesOrderService->confirmWarehouse($saleOrder, $confirmationData))
-            ->toThrow(Exception::class, 'Sales Order must be approved before warehouse confirmation');
+            ->toThrow(Exception::class, 'Sales Order harus disetujui terlebih dahulu sebelum konfirmasi gudang.');
     });
 
     it('updates SO status after warehouse confirmation', function () {
@@ -285,10 +294,11 @@ describe('Warehouse Confirmation Feature', function () {
 
         // Create warehouse confirmation for the SO
         $warehouseConfirmation = WarehouseConfirmation::factory()->create([
-            'sale_order_id' => $saleOrder->id,
-            'status' => 'confirmed',
-            'confirmed_by' => 1,
-            'confirmed_at' => now()
+            'confirmable_type' => \App\Models\SaleOrder::class,
+            'confirmable_id'   => $saleOrder->id,
+            'status'           => 'confirmed',
+            'confirmed_by'     => 1,
+            'confirmed_at'     => now()
         ]);
 
         WarehouseConfirmationItem::factory()->create([
@@ -362,5 +372,14 @@ describe('Warehouse Confirmation Feature', function () {
             'rak_id' => $this->rak->id,
             'status' => 'confirmed'
         ]);
+    });
+
+    it('does not mutate sale order item quantity from warehouse confirmation resource input', function () {
+        $resourceSource = file_get_contents(
+            app_path('Filament/Resources/WarehouseConfirmationResource.php')
+        );
+
+        expect($resourceSource)->not->toContain("SaleOrderItem::where('id', \$saleOrderItemId)->update(['quantity' => \$state])");
+        expect($resourceSource)->not->toContain("->update(['quantity' => \$state])");
     });
 });

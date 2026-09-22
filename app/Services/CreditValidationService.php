@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
 use App\Models\Customer;
 use App\Models\AccountReceivable;
 use App\Models\Invoice;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CreditValidationService
 {
@@ -34,11 +36,21 @@ class CreditValidationService
             if ($creditUsage >= 80 && $creditUsage < 100) {
                 $result['warnings'][] = "Peringatan: Penggunaan kredit customer sudah mencapai {$creditUsage}% dari limit";
             }
+        } elseif ($this->policyEnabled()) {
+            // D7: COD/Bebas tidak diblokir oleh limit — hanya informasi (tagihan jatuh tempo & piutang berjalan).
+            $overdueCheck = $this->checkOverdueCredits($customer);
+            if (! $overdueCheck['is_valid']) {
+                $result['warnings'][] = 'Peringatan: ' . $overdueCheck['message'];
+            }
         }
 
         return $result;
     }
 
+    /**
+     * Check credit limit atomically using a row-level lock to prevent race conditions
+     * where two concurrent SO submissions both pass the credit limit check.
+     */
     public function checkCreditLimit(Customer $customer, float $orderAmount): array
     {
         if ($customer->kredit_limit <= 0) {
@@ -48,26 +60,41 @@ class CreditValidationService
             ];
         }
 
-        $currentCreditUsage = $this->getCurrentCreditUsage($customer);
-        $totalAfterOrder = $currentCreditUsage + $orderAmount;
+        // Lock the customer row for the duration of this check so that concurrent
+        // requests cannot both read the same outstanding balance before either commits.
+        return DB::transaction(function () use ($customer, $orderAmount) {
+            // Re-fetch inside the transaction with a write lock.
+            $lockedCustomer = Customer::withoutGlobalScopes()
+                ->where('id', $customer->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($totalAfterOrder > $customer->kredit_limit) {
+            // T3.2 (flag credit_policy, D27): pemakaian = paparan (piutang + SO aktif yang belum ditagih); perilaku lama: piutang saja.
+            $exposure = $this->policyEnabled() ? app(CreditExposure::class) : null;
+            $currentCreditUsage = $exposure ? $exposure->exposure($lockedCustomer) : $this->getCurrentCreditUsage($lockedCustomer);
+            $totalAfterOrder = $currentCreditUsage + $orderAmount;
+
+            if ($totalAfterOrder > $lockedCustomer->kredit_limit) {
+                $openSo = $exposure ? $exposure->openSalesOrders($lockedCustomer)['total'] : 0;
+
+                return [
+                    'is_valid' => false,
+                    'message' => sprintf(
+                        'Kredit limit tidak mencukupi. Limit: Rp %s, Terpakai: Rp %s%s, Order: Rp %s, Total akan menjadi: Rp %s',
+                        number_format($lockedCustomer->kredit_limit, 0, ',', '.'),
+                        number_format($currentCreditUsage, 0, ',', '.'),
+                        $openSo > 0 ? ' (termasuk SO terbuka Rp ' . number_format($openSo, 0, ',', '.') . ')' : '',
+                        number_format($orderAmount, 0, ',', '.'),
+                        number_format($totalAfterOrder, 0, ',', '.')
+                    )
+                ];
+            }
+
             return [
-                'is_valid' => false,
-                'message' => sprintf(
-                    'Kredit limit tidak mencukupi. Limit: Rp %s, Terpakai: Rp %s, Order: Rp %s, Total akan menjadi: Rp %s',
-                    number_format($customer->kredit_limit, 0, ',', '.'),
-                    number_format($currentCreditUsage, 0, ',', '.'),
-                    number_format($orderAmount, 0, ',', '.'),
-                    number_format($totalAfterOrder, 0, ',', '.')
-                )
+                'is_valid' => true,
+                'message' => 'Kredit limit mencukupi'
             ];
-        }
-
-        return [
-            'is_valid' => true,
-            'message' => 'Kredit limit mencukupi'
-        ];
+        });
     }
 
     public function checkOverdueCredits(Customer $customer): array
@@ -100,7 +127,7 @@ class CreditValidationService
     public function getCurrentCreditUsage(Customer $customer): float
     {
         return AccountReceivable::where('customer_id', $customer->id)
-            ->where('status', 'Belum Lunas')
+            ->where('status', PaymentStatus::UNPAID->value)
             ->sum('remaining') ?? 0;
     }
 
@@ -135,7 +162,7 @@ class CreditValidationService
         $overdueInvoices = $this->getOverdueInvoices($customer);
         $usagePercentage = $this->getCreditUsagePercentage($customer);
 
-        return [
+        $legacy = [
             'credit_limit' => $customer->kredit_limit,
             'current_usage' => $currentUsage,
             'available_credit' => $customer->kredit_limit - $currentUsage,
@@ -145,5 +172,15 @@ class CreditValidationService
             'tempo_kredit_days' => $customer->tempo_kredit,
             'payment_type' => $customer->tipe_pembayaran
         ];
+
+        // T3.2: kunci tambahan (paparan, SO terbuka, umur tagihan tertua, deposit, kebijakan) untuk SEMUA tipe pembayaran;
+        // kunci lama tidak berubah nilainya.
+        return $legacy + array_diff_key(app(CreditExposure::class)->summary($customer), $legacy);
+    }
+
+    /** Kebijakan kredit T3.2 (paparan, COD/Bebas informasi) aktif? */
+    public function policyEnabled(): bool
+    {
+        return (bool) config('sales.controls.credit_policy', false);
     }
 }

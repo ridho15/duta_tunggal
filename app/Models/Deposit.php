@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Deposit extends Model
 {
-    use HasFactory, SoftDeletes, LogsGlobalActivity;
+    use HasFactory, SoftDeletes, LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'deposits';
     protected $fillable = [
         'from_model_type',

@@ -3,12 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\RoleResource\Pages;
+use App\Filament\Resources\RoleResource\Pages\ViewRole;
 use App\Models\Role;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -16,13 +18,15 @@ class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
 
     // Rename Roles group to the requested label
     protected static ?string $navigationGroup = 'User Roles Management';
 
     // Put roles near the end as requested
-    protected static ?int $navigationSort = 8;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -35,6 +39,10 @@ class RoleResource extends Resource
                         'required' => 'Nama role wajib diisi',
                         'max' => 'Nama role maksimal 255 karakter'
                     ]),
+                TextInput::make('description')
+                    ->label('Deskripsi')
+                    ->maxLength(65535)
+                    ->columnSpanFull(),
                 Select::make('id_user')
                     ->label('User')
                     ->searchable()
@@ -58,6 +66,9 @@ class RoleResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->wrap(),
                 TextColumn::make('guard_name')
                     ->searchable(),
                 TextColumn::make('permissions.name')
@@ -73,6 +84,7 @@ class RoleResource extends Resource
                 //
             ])
             ->actions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->bulkActions([]);
@@ -89,8 +101,9 @@ class RoleResource extends Resource
     {
         return [
             'index' => Pages\ListRoles::route('/'),
-            // 'create' => Pages\CreateRole::route('/create'),
-            // 'edit' => Pages\EditRole::route('/{record}/edit'),
+            'create' => Pages\CreateRole::route('/create'),
+            'view' => ViewRole::route('/{record}'),
+            'edit' => Pages\EditRole::route('/{record}/edit'),
         ];
     }
 }

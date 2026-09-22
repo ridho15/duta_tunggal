@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InventoryStockResource\Pages;
 use App\Filament\Resources\InventoryStockResource\Pages\ViewInventoryStock;
+use App\Filament\Resources\InventoryStockResource\RelationManagers\StockMovementRelationManager;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Warehouse;
@@ -17,6 +18,7 @@ use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
@@ -28,12 +30,14 @@ class InventoryStockResource extends Resource
 {
     protected static ?string $model = InventoryStock::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
 
     protected static ?string $navigationGroup = 'Gudang';
 
     // Position Gudang as the 6th group
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
@@ -76,7 +80,7 @@ class InventoryStockResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = Warehouse::where('status', true)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                                                                $q->where('name', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 
@@ -190,13 +194,17 @@ class InventoryStockResource extends Resource
                         });
                     }),
                 TextColumn::make('qty_available')
-                    ->label('Quantity Available')
+                    ->label('Quantity Physical')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('qty_reserved')
                     ->label('Quantity Reserved')
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('qty_on_hand')
+                    ->label('Quantity Free')
+                    ->numeric()
+                    ->sortable(query: fn (Builder $query, string $direction) => $query->orderByRaw("(qty_available - qty_reserved) {$direction}")),
                 TextColumn::make('qty_min')
                     ->label('Quantity Minimal')
                     ->numeric()
@@ -217,6 +225,7 @@ class InventoryStockResource extends Resource
                     ->preload(),
             ])
             ->actions([
+                ViewAction::make(),
                 ActionGroup::make([
                     EditAction::make()
                         ->color('success'),
@@ -234,9 +243,9 @@ class InventoryStockResource extends Resource
                     '<summary class="cursor-pointer font-semibold">Panduan Inventory Stock (Stok Inventory)</summary>' .
                     '<div class="mt-2 text-sm">' .
                         '<ul class="list-disc pl-5">' .
-                            '<li><strong>Apa ini:</strong> Inventory Stock adalah record stok produk yang tersedia di setiap gudang dan rak, melacak quantity available, reserved, dan minimum stock level.</li>' .
-                            '<li><strong>Komponen Utama:</strong> <em>Product</em> (produk yang di-stock), <em>Warehouse</em> (gudang penyimpanan), <em>Rak</em> (lokasi spesifik dalam gudang), <em>Qty Available</em> (stok tersedia), <em>Qty Reserved</em> (stok dipesan), <em>Qty Min</em> (minimum stock).</li>' .
-                            '<li><strong>Stock Management:</strong> <em>Qty Available</em> = total stock yang bisa digunakan. <em>Qty Reserved</em> = stock yang sudah dipesan tapi belum dikirim. <em>Qty Min</em> = batas minimum stock untuk trigger reorder.</li>' .
+                            '<li><strong>Apa ini:</strong> Inventory Stock adalah record stok produk per gudang dan rak, melacak stok fisik, stok yang sedang di-reserve, dan batas minimum stock.</li>' .
+                            '<li><strong>Komponen Utama:</strong> <em>Product</em> (produk yang di-stock), <em>Warehouse</em> (gudang penyimpanan), <em>Rak</em> (lokasi spesifik dalam gudang), <em>Qty Physical</em> (stok fisik/gross), <em>Qty Reserved</em> (stok yang sudah dipesan), <em>Qty Free</em> (stok bebas = physical - reserved), <em>Qty Min</em> (minimum stock).</li>' .
+                            '<li><strong>Stock Management:</strong> <em>Qty Physical</em> = stok fisik saat ini. <em>Qty Reserved</em> = komitmen transaksi yang belum selesai. <em>Qty Free</em> = stok yang masih bisa dipakai untuk transaksi baru. <em>Qty Min</em> = batas minimum stock untuk trigger reorder.</li>' .
                             '<li><strong>Stock Location:</strong> Setiap produk dapat disimpan di multiple warehouse dan rak. Sistem melacak lokasi spesifik untuk memudahkan picking dan putaway.</li>' .
                             '<li><strong>Auto-Update:</strong> Stock otomatis bertambah dari Purchase Receipt (pembelian) dan berkurang dari Material Issue (produksi) atau Delivery Order (penjualan).</li>' .
                             '<li><strong>Validasi:</strong> <em>Stock Check</em> - mencegah pengeluaran stock jika tidak mencukupi. <em>Negative Stock Prevention</em> - sistem tidak mengizinkan stock negatif. <em>Reservation Management</em> - stock yang di-reserve tidak bisa digunakan untuk transaksi lain.</li>' .
@@ -254,7 +263,7 @@ class InventoryStockResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            StockMovementRelationManager::class,
         ];
     }
 

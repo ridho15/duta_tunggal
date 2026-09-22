@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Cabang;
 use App\Models\PaymentRequest;
 use App\Models\Supplier;
 use App\Models\User;
@@ -16,10 +15,12 @@ class PaymentRequestFactory extends Factory
     {
         static $sequence = 1;
 
+        $supplier = Supplier::factory()->create();
+
         return [
             'request_number'    => 'PR-' . now()->format('Ymd') . '-' . str_pad($sequence++, 4, '0', STR_PAD_LEFT),
-            'supplier_id'       => Supplier::factory(),
-            'cabang_id'         => fn () => Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id,
+            'supplier_id'       => $supplier->id,
+            'cabang_id'         => $supplier->cabang_id,
             'requested_by'      => User::factory(),
             'approved_by'       => null,
             'request_date'      => $this->faker->dateTimeBetween('-30 days', 'now')->format('Y-m-d'),

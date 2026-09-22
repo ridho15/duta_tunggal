@@ -1,0 +1,190 @@
+# Baseline tes gagal (dibuat oleh scripts/run-tests-chunked.php)
+# commit: 66e78a3 · tanggal: 2026-09-20 · PHP 8.3.25
+# Format: Kelas :: nama tes. Perbarui HANYA lewat commit terpisah yang menjelaskan alasannya.
+QualityControlPageTest :: Index shows supplier and po and filters exist
+QualityControlPageTest :: Quality control page loads without errors
+QualityControlWorkflowTest :: Journal posting is skipped when coa accounts are missing
+Tests\Feature\AccountPayableFilamentFlowTest :: Complete purchase invoice to vendor payment flow with form simulation
+Tests\Feature\BillOfMaterialResourceReactivePriceTest :: bom item price refreshes when material changes
+Tests\Feature\BranchInheritanceFlowTest :: purchase invoice inherits cabang from selected purchase order source
+Tests\Feature\FinanceSeederBalanceAuditTest :: finance seeder produces a balanced balance sheet
+Tests\Feature\IncomeStatementServiceTest :: service detects missing expense accounts
+Tests\Feature\IndonesianMoneyValidationTest :: `Manual money inputs without live calculations stay on blur` → it updates app/Filament/Resources/PurchaseInvoiceResource.php total money input on blur
+Tests\Feature\IndonesianMoneyValidationTest :: `OrderRequestResource price field validation` → it updates manual override price fields with debounce to keep live calculations stable
+Tests\Feature\InventoryFlowTest :: it covers the inventory management flow through finance posting
+Tests\Feature\InventoryReportPreviewTest :: Inventory preview view renders service backed stock and aging data
+Tests\Feature\InventoryReportTest :: It calculates aging categories correctly
+Tests\Feature\InventoryReportTest :: It filters stock report by warehouse
+Tests\Feature\InventoryReportTest :: It shows correct stock levels
+Tests\Feature\JournalEntryTest :: journal entries can be filtered by date range
+Tests\Feature\JournalEntryTest :: journal entries can be filtered by journal type
+Tests\Feature\LargePurchaseFlowDemoSeederTest :: large purchase item UX keeps repeaters safe and relation manager review paginated
+Tests\Feature\LargePurchaseFlowDemoSeederTest :: order request index uses limited summaries for large item records
+Tests\Feature\ManufacturingJournalLateIssueTest :: qc completion uses refreshed wip when material issue completes after production creation
+Tests\Feature\MaterialIssueAutoJournalTest :: auto journal generates once for material issue completion (idempotent)
+Tests\Feature\MaterialIssueViewPageTest :: material issue view shows selected warehouse product requirement and stock availability
+Tests\Feature\MaterialIssueWorkflowTest :: confirmed manufacturing warehouse confirmation consumes stock and resolves stock movement source
+Tests\Feature\MaterialIssueWorkflowTest :: material issue stock metrics include own reservation in effective stock
+Tests\Feature\OrderRequestFrontendLogicTest :: order request fillable attributes
+Tests\Feature\OrderRequestQuantityLockTest :: Creating multiple partial pos via filament action works
+Tests\Feature\OrderRequestQuantityLockTest :: Creating multiple partial pos with receiving and status changes works
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the list table action and creates a single purchase order
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the list table action and creates grouped purchase orders
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the list table action without creating purchase order
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the view page action and auto-generates a purchase order number
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the view page action and updates status
+Tests\Feature\OrderRequestResourceTest :: it approves from the view action without automatic purchase order when item decisions are provided
+Tests\Feature\OrderRequestResourceTest :: it approves from the view action without purchase order when approved item is not included
+Tests\Feature\OrderRequestResourceTest :: it blocks approval from the view action when any item is still draft
+Tests\Feature\OrderRequestResourceTest :: it does not remove an inline order request item that is already referenced by purchase order
+Tests\Feature\OrderRequestResourceTest :: it loads item approval decisions from current item status in the approve modal
+Tests\Feature\OrderRequestResourceTest :: it loads item approval decisions from current item status in the create purchase order modal
+Tests\Feature\OrderRequestResourceTest :: it order request create PO modals expose cabang and localized date labels
+Tests\Feature\OrderRequestResourceTest :: it persists and shows granular plastic USD values without rounding to whole dollars
+Tests\Feature\OrderRequestResourceTest :: it rejects an order request from the view action when all items are rejected
+Tests\Feature\OrderRequestResourceTest :: it shows create purchase order action when an approved item has remaining quantity
+Tests\Feature\OrderRequestResourceTest :: it shows decimal unit price on the Filament view page
+Tests\Feature\OrderRequestResourceTest :: it shows localized item validation messages and opens the first invalid inline item
+Tests\Feature\OrderRequestResourceTest :: it views order request details on the Filament view page
+Tests\Feature\OrderRequestServiceTest :: approval rejects partial decision while any item remains draft
+Tests\Feature\OrderRequestServiceTest :: approval without approved item keeps header from becoming approved
+Tests\Feature\OrderRequestServiceTest :: approval without selected item decisions is rejected
+Tests\Feature\OrderRequestServiceTest :: createPurchaseOrder with selected_items only converts approved order request items
+Tests\Feature\OrderRequestServiceTest :: createPurchaseOrder without selected_items only converts approved order request items
+Tests\Feature\PaymentLedgerPostingTest :: Import purchase invoice does not post ppn masukan
+Tests\Feature\PermissionRoleBranchTaxAuditTest :: Sale Order total reflects inherited Inclusive tax correctly
+Tests\Feature\PermissionRoleBranchTaxAuditTest :: SaleOrderItem tipe_pajak can be set to Inclusive
+Tests\Feature\PermissionRoleBranchTaxAuditTest :: SaleOrderItem tipe_pajak column defaults to None
+Tests\Feature\ProcurementAuditTest :: Delivery order generation from purchase
+Tests\Feature\ProcurementAuditTest :: End to end procurement workflow
+Tests\Feature\ProductAccountUiTest :: `Product account mapping form defaults` → it applies default coa values and persists manual overrides through the create form
+Tests\Feature\ProductCrudUiTest :: it edits a product through the Filament edit page
+Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest :: it applies receipt backed purchase invoice repair and reposts journals in idr
+Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest :: it keeps account payable ageing amounts in idr while retaining source currency
+Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest :: it normalizes malformed receipt backed invoice item prices from purchase order items
+Tests\Feature\PurchaseInvoiceResourceTest :: Form validation requires due date
+Tests\Feature\PurchaseInvoiceResourceTest :: Form validation requires invoice date
+Tests\Feature\PurchaseInvoiceResourceTest :: Invoice creation with valid data
+Tests\Feature\PurchaseInvoiceResourceTest :: Invoice number generation action
+Tests\Feature\PurchaseInvoiceResourceTest :: Mark as sent action shows friendly notification when update fails
+Tests\Feature\PurchaseInvoiceResourceTest :: Order request selection leaves cabang empty until purchase order is selected
+Tests\Feature\PurchaseInvoiceResourceTest :: Partial purchase receipt can be selected for purchase invoice
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice audit command dry runs and repairs with reversal
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice create normalizes tax to percentage
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice create page persists receipt biaya items
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice creation rolls back when finalisation fails
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice derives source from receipt and ignores hidden source state
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice form does not render duplicate source amount fields
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice form has required fields
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice from receipt persists full nominal branch ap and journals
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice ignores manual ppn for mixed tax receipts
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice ignores zero value other fee items
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice live preview uses service totals without money mask distortion
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice locks cabang from first purchase order and reopens options when cleared
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice manual money fields update on blur to keep mask stable
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice multi po source is derived from selected receipts
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice requires purchase order and receipt before submit
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice requires receipt after purchase order is selected
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice resource can render create page
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice source state is cleared when purchase order is removed
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice total recalculation uses full formatted money values
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice uses receipt branch when order request creator has different branch
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase order selection loads receipts
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase orders require order request before submit
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase receipt checkbox labels use rupiah format
+Tests\Feature\PurchaseInvoiceResourceTest :: Receipt selection calculates invoice items
+Tests\Feature\PurchaseInvoiceResourceTest :: Supplier selection filters purchase orders
+Tests\Feature\PurchaseInvoiceResourceTest :: Tax and other fees calculations
+Tests\Feature\PurchaseOrderFrontendTest :: purchase order form uses collapsed product item repeater and disabled field styling
+Tests\Feature\PurchaseOrderFrontendTest :: purchase order resource no longer exposes cabang item or warehouse list labels
+Tests\Feature\PurchaseOrderLivewireTest :: existing order request backed purchase order item can be saved again at allocated quantity
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval auto approves purchase order when it consumes remaining quantity after draft allocation
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval auto approves purchase order when item quantity consumes full order request quantity
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval keeps multi item purchase order draft when one item is partial
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval keeps purchase order draft when item quantity is partial
+Tests\Feature\PurchaseOrderLivewireTest :: order request backed purchase order item over allocation shows visible validation feedback
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order can be created through livewire create page
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order create form preserves inclusive tax type from order request item even when disabled state is wrong
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order edit and view pages show supplier code and name
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order subtotal and total amount stay formatted after reactive updates and hydration
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order total amount includes formatted other fee values correctly
+Tests\Feature\PurchaseOrderMixedCurrencyTest :: Purchase order pdf separates expected date from top due date and respects item currency
+Tests\Feature\PurchaseReturnFeatureTest :: can approve pending purchase return
+Tests\Feature\PurchaseReturnFeatureTest :: can create purchase return with auto generated number
+Tests\Feature\PurchaseReturnFeatureTest :: can reject pending purchase return
+Tests\Feature\PurchaseReturnFeatureTest :: can submit purchase return for approval
+Tests\Feature\PurchaseReturnFeatureTest :: journal entry creation on approval
+Tests\Feature\PurchaseReturnFeatureTest :: purchase receipt rejected item sync failure sends friendly warning notification
+Tests\Feature\PurchaseReturnFeatureTest :: purchase return auto created for rejected items in receipt
+Tests\Feature\PurchaseReturnFeatureTest :: purchase return not created when no rejected items
+Tests\Feature\PurchaseReturnFeatureTest :: stock adjustment on approval
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase batch action rejects items from different cabang
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase batch action rejects warehouse outside selected item cabang
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create form validates passed quantity against received quantity via auto-correction
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query filters multiple eligible items to selected purchase order
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query preselects one eligible purchase order item and fills remaining quantity
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query returns form errors when quantity exceeds remaining purchase order item quantity
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query submits default remaining quantity successfully
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create rejects warehouse from another cabang
+Tests\Feature\QuotationFeatureTest :: quotation tax type options follow purchase request radio values
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it applies green highlight class for confirmed entries
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it applies red highlight class for unconfirmed entries
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays COA select dropdown
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays checkbox for each entry
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays date inputs with wire:model.live
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays empty state when no COA selected
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays filter section with proper styling
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays journal entries in table when COA selected
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays modern gradient styling on filters
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays status badges correctly
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays table headers correctly
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays table with proper container styling
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays toggle button for show/hide confirmed
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it formats credit amount with thousand separator
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it formats date in dd/mm/yyyy format
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it formats debit amount with thousand separator
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it hides confirmed entries when showConfirmed is false
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it includes responsive styling for mobile
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it renders the rekonsiliasi page correctly
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it shows all entries when showConfirmed is true
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it shows checked checkbox for confirmed entries
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it shows proper empty icon and text
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it updates entries when date range changes
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it updates toggle button text when clicked
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it auto loads entries when date range changes
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it auto loads entries when selectedCoaId changes
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it can mount the page with default values
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it can toggle confirmation status from confirmed to unconfirmed
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it can toggle confirmation status from unconfirmed to confirmed
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it filters out confirmed entries when showConfirmed is false
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it includes both debit and credit entries
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it loads COA options for bank and cash accounts
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it loads journal entries when COA is selected
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it orders entries by date descending
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it returns empty array when no COA is selected
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it sends success notification when toggling confirmation
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it toggles showConfirmed state correctly
+Tests\Feature\StatusRowClassesTest :: sale order index renders status row classes and legend
+Tests\Feature\UATUIUXAuditVerificationTest :: Quality control preselects by specific item query param
+Tests\Feature\UATUIUXAuditVerificationTest :: Quality control preselects first eligible item when po has multiple items
+Tests\Feature\VendorPaymentFlowAdjustmentTest :: Manual mode creates details and updates ap with adjustment
+Tests\Feature\VendorPaymentFlowAdjustmentTest :: Vendor payment observer keeps adjustment amount in account payable remaining
+Tests\Feature\WarehouseAuditTest :: `Warehouse Audit Test Suite` → `Inventory Alerts and Monitoring` → it detects low stock conditions
+Tests\Feature\WarehouseAuditTest :: `Warehouse Audit Test Suite` → `Inventory Stock Management` → it detects low stock alerts
+Tests\Unit\LargeOrderRequestNavigatorTest :: large order request navigator keeps server pagination and single editor controls
+Tests\Unit\LedgerPostingServiceTest :: Post invoice without receipt debits inventory
+Tests\Unit\MaterialIssueTest :: It can complete material issue and update inventory
+Tests\Unit\MaterialIssueTest :: It handles stock reservation during material issue
+Tests\Unit\Observers\StockTransferItemObserverTest :: It does not create movements for draft transfer items
+Tests\Unit\OrderRequestIndexSummaryLayoutTest :: it bounds order request index supplier and item summaries to prevent overlap
+Tests\Unit\OrderRequestInlineNavigatorMoneyMaskTest :: it masks inline navigator override price as live money input
+Tests\Unit\OrderRequestItemApprovalStatusStaticTest :: it only allows approved order request items to feed purchase orders
+Tests\Unit\OrderRequestItemApprovalStatusStaticTest :: it wires item approval decisions into order request approval service
+Tests\Unit\OrderRequestStatusTest :: `OrderRequest::syncFulfillmentStatus()` → it transitions approved → complete when all items fully fulfilled
+Tests\Unit\OrderRequestStatusTest :: `OrderRequest::syncFulfillmentStatus()` → it transitions approved → partial when some items partially fulfilled
+Tests\Unit\OrderRequestStatusTest :: `OrderRequest::syncFulfillmentStatus()` → it transitions partial → complete once last item is fulfilled
+Tests\Unit\PurchaseFlowComprehensiveTest :: `Complete Purchase Flow Integration` → it runs complete flow: PO -> Receipt -> Invoice -> Payment
+Tests\Unit\PurchaseOrderResourceCreateTest :: it creates purchase order with complete data through service
+Tests\Unit\RolePermissionMappingTest :: Roles have expected permissions based on mapping
+Tests\Unit\Smoke\DestructivePermissionSmokeTest :: Only allowed roles have destructive permissions
+Tests\Unit\StockMovementComprehensiveTest :: It creates comprehensive stock movement test data

@@ -8,6 +8,7 @@ use Database\Seeders\BukuBesarTestSeeder;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BukuBesarPageFrontendTest extends TestCase
@@ -30,7 +31,7 @@ class BukuBesarPageFrontendTest extends TestCase
         $this->actingAs($user);
     }
 
-    /** @test */
+    #[Test]
     public function it_shows_dynamic_buttons_when_no_coa_selected()
     {
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
@@ -38,7 +39,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertSee('Buku Besar berdasarkan Journal Entry');
     }
 
-    /** @test */
+    #[Test]
     public function show_all_button_clears_coa_selection()
     {
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
@@ -48,7 +49,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertSet('coa_ids', []);
     }
 
-    /** @test */
+    #[Test]
     public function show_by_journal_entry_button_clears_coa_selection()
     {
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
@@ -58,12 +59,13 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertSet('coa_ids', []);
     }
 
-    /** @test */
+    #[Test]
     public function selecting_coa_displays_ledger()
     {
         $coa = ChartOfAccount::where('code', '1111.01')->first(); // KAS BESAR
         
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
+            ->set('showPreview', true)
             ->set('coa_ids', [$coa->id])
             ->assertSee($coa->code)
             ->assertSee($coa->name)
@@ -72,7 +74,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertSee('Kredit');
     }
 
-    /** @test */
+    #[Test]
     public function changing_start_date_updates_component()
     {
         $newDate = now()->subMonth()->startOfMonth()->format('Y-m-d');
@@ -82,7 +84,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertSet('start_date', $newDate);
     }
 
-    /** @test */
+    #[Test]
     public function changing_end_date_updates_component()
     {
         $newDate = now()->subMonth()->endOfMonth()->format('Y-m-d');
@@ -92,7 +94,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertSet('end_date', $newDate);
     }
 
-    /** @test */
+    #[Test]
     public function refresh_button_reloads_component()
     {
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
@@ -100,7 +102,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function coa_options_are_sorted_by_code()
     {
         $component = Livewire::test(\App\Filament\pages\BukuBesarPage::class);
@@ -120,7 +122,7 @@ class BukuBesarPageFrontendTest extends TestCase
         $this->assertEquals($sortedCodes, $codes, 'COA options should be sorted by code');
     }
 
-    /** @test */
+    #[Test]
     public function ledger_displays_journal_entries_within_date_range()
     {
         $coa = ChartOfAccount::where('code', '1112.01')->first(); // BANK BCA
@@ -151,6 +153,7 @@ class BukuBesarPageFrontendTest extends TestCase
         ]);
 
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
+            ->set('showPreview', true)
             ->set('coa_ids', [$coa->id])
             ->set('start_date', now()->startOfMonth()->format('Y-m-d'))
             ->set('end_date', now()->endOfMonth()->format('Y-m-d'))
@@ -158,7 +161,7 @@ class BukuBesarPageFrontendTest extends TestCase
             ->assertDontSee('OLD-TEST');
     }
 
-    /** @test */
+    #[Test]
     public function multiple_coa_selections_work_correctly()
     {
         $coa1 = ChartOfAccount::where('code', '1111.01')->first(); // KAS BESAR
@@ -177,7 +180,7 @@ class BukuBesarPageFrontendTest extends TestCase
         $this->assertEquals($coa2->id, $selectedCoas[1]->id);
     }
 
-    /** @test */
+    #[Test]
     public function computed_properties_work_correctly()
     {
         $coa = ChartOfAccount::where('code', '1111.01')->first();

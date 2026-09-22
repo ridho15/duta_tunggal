@@ -29,10 +29,11 @@ class ViewCashFlow extends Page
 
     public function mount(): void
     {
-        $this->startDate = $this->startDate ?? now()->startOfMonth()->toDateString();
-        $this->endDate = $this->endDate ?? now()->endOfMonth()->toDateString();
-        $this->method = $this->method ?? 'direct';
-        $this->branchIds = $this->branchIds ?? [];
+        $this->startDate = request('startDate', $this->startDate ?? now()->startOfMonth()->toDateString());
+        $this->endDate = request('endDate', $this->endDate ?? now()->endOfMonth()->toDateString());
+        $this->method = request('method', $this->method ?? 'direct');
+        $this->branchIds = (array) request('branchIds', $this->branchIds ?? []);
+        $this->showPreview = filter_var(request('preview', false), FILTER_VALIDATE_BOOL);
 
         $this->form->fill([
             'startDate' => $this->startDate,
@@ -83,12 +84,22 @@ class ViewCashFlow extends Page
 
     public function generateReport(): void
     {
-        $this->showPreview = true;
+        $this->dispatch('open-report-preview', url: $this->getPreviewUrl());
     }
 
     public function resetReport(): void
     {
-        $this->showPreview = false;
+        $this->redirect(static::getResource()::getUrl('index'));
+    }
+
+    public function getPreviewUrl(): string
+    {
+        return route('reports.cash-flow.preview', array_filter([
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'method' => $this->method,
+            'branchIds' => array_filter($this->branchIds),
+        ], fn ($value) => $value !== null && $value !== '' && $value !== []));
     }
 
     protected function getFormSchema(): array
@@ -279,6 +290,12 @@ class ViewCashFlow extends Page
                     } catch (\Throwable $_) {
                         // ignore logging errors
                     }
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Gagal Ekspor PDF Arus Kas')
+                        ->body('Tidak dapat membuat file PDF. Silakan coba ekspor ke Excel atau hubungi administrator.')
+                        ->danger()
+                        ->send();
 
                     throw $e2;
                 }

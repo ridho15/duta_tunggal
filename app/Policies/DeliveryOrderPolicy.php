@@ -13,8 +13,8 @@ class DeliveryOrderPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Super Sales, Sales Manager dan Admin bisa lihat semua
-        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+        // Sales Manager dan Admin bisa lihat semua
+        if ($user->hasRole(['Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
             return $user->hasPermissionTo('view any delivery order');
         }
         
@@ -31,8 +31,8 @@ class DeliveryOrderPolicy
      */
     public function view(User $user, DeliveryOrder $deliveryOrder): bool
     {
-        // Super Sales, Sales Manager dan Admin bisa lihat semua delivery order
-        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+        // Sales Manager dan Admin bisa lihat semua delivery order
+        if ($user->hasRole(['Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
             return $user->hasPermissionTo('view delivery order');
         }
         
@@ -60,8 +60,13 @@ class DeliveryOrderPolicy
      */
     public function update(User $user, DeliveryOrder $deliveryOrder): bool
     {
-        // Super Sales, Sales Manager dan Admin bisa update semua delivery order
-        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+        // T3.3 (flag sales.controls.doc_lock): DO yang sudah diproses terkunci; koreksi lewat Batalkan DO / Pengiriman Gagal.
+        if (\App\Services\DocumentLock::blocks($deliveryOrder, 'update')) {
+            return false;
+        }
+
+        // Sales Manager dan Admin bisa update semua delivery order
+        if ($user->hasRole(['Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
             return $user->hasPermissionTo('update delivery order');
         }
         
@@ -80,8 +85,13 @@ class DeliveryOrderPolicy
      */
     public function delete(User $user, DeliveryOrder $deliveryOrder): bool
     {
-        // Super Sales, Sales Manager dan Admin bisa delete semua delivery order
-        if ($user->hasRole(['Super Sales', 'Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
+        // T3.3 (flag sales.controls.doc_lock): DO yang sudah diproses terkunci; koreksi lewat Batalkan DO / Pengiriman Gagal.
+        if (\App\Services\DocumentLock::blocks($deliveryOrder, 'delete')) {
+            return false;
+        }
+
+        // Sales Manager dan Admin bisa delete semua delivery order
+        if ($user->hasRole(['Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
             return $user->hasPermissionTo('delete delivery order');
         }
         

@@ -25,6 +25,8 @@ class ProductCategoryResource extends Resource
 {
     protected static ?string $model = ProductCategory::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
     protected static ?string $modelLabel = 'Kategori Produk';
@@ -33,7 +35,7 @@ class ProductCategoryResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {

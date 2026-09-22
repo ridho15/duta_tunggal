@@ -3,6 +3,7 @@
 use App\Filament\Resources\OrderRequestResource\Pages\CreateOrderRequest;
 use App\Models\Currency;
 use App\Models\Product;
+use App\Models\TaxSetting;
 use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
@@ -48,23 +49,6 @@ beforeEach(function () {
 
     $this->productA = Product::factory()->create(['supplier_id' => $this->supplierA->id]);
     $this->productB = Product::factory()->create(['supplier_id' => $this->supplierB->id]);
-});
-
-it('clears repeater items when supplier is changed', function () {
-    Livewire::actingAs($this->user)
-        ->test(\App\Filament\Resources\OrderRequestResource\Pages\CreateOrderRequest::class)
-        ->set('data.supplier_id', $this->supplierA->id)
-        ->set('data.warehouse_id', $this->warehouse->id)
-        ->set('data.orderRequestItem', [
-            [
-                'product_id' => $this->productA->id,
-                'quantity' => 2,
-            ],
-        ])
-        ->assertSet('data.orderRequestItem.0.product_id', $this->productA->id)
-        // Change supplier to B - our afterStateUpdated should clear the repeater
-        ->set('data.supplier_id', $this->supplierB->id)
-        ->assertSet('data.orderRequestItem', []);
 });
 
 it('only shows products belonging to selected supplier', function () {
@@ -152,6 +136,66 @@ it('filters product options based on selected supplier', function () {
     // Actually, the form allows any product to be set programmatically, but the options() should filter
     $component->set('data.orderRequestItem.0.product_id', $productB->id);
     $component->assertSet('data.orderRequestItem.0.product_id', $productB->id);
+});
+
+it('prefers product tax, then active setting, then zero for order request items', function () {
+    TaxSetting::factory()->ppn()->create([
+        'effective_date' => now()->subDay()->toDateString(),
+        'status' => true,
+    ]);
+
+    $productWithTax = Product::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'pajak' => 7,
+    ]);
+
+    $productWithoutTax = Product::factory()->create([
+        'supplier_id' => $this->supplierA->id,
+        'pajak' => null,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->set('data.supplier_id', $this->supplierA->id)
+        ->set('data.warehouse_id', $this->warehouse->id)
+        ->set('data.orderRequestItem', [
+            [
+                'product_id' => $productWithTax->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+            ],
+        ])
+        ->set('data.tax_type', 'PPN Excluded')
+        ->assertSet('data.orderRequestItem.0.tax', 11)
+        ->set('data.orderRequestItem.0.tax', 11)
+        ->assertSet('data.orderRequestItem.0.tax', 11)
+        ->set('data.tax_type', 'PPN Included')
+        ->assertSet('data.orderRequestItem.0.tax', 11)
+        ->set('data.orderRequestItem.0.product_id', $productWithoutTax->id)
+        ->set('data.tax_type', 'PPN Excluded')
+        ->assertSet('data.orderRequestItem.0.tax', 11);
+
+    TaxSetting::query()->delete();
+
+    Livewire::actingAs($this->user)
+        ->test(CreateOrderRequest::class)
+        ->set('data.supplier_id', $this->supplierA->id)
+        ->set('data.warehouse_id', $this->warehouse->id)
+        ->set('data.orderRequestItem', [
+            [
+                'product_id' => $productWithoutTax->id,
+                'quantity' => 1,
+                'unit_price' => 100000,
+                'discount' => 0,
+                'tax' => 0,
+            ],
+        ])
+        ->set('data.tax_type', 'PPN Excluded')
+        ->assertSet('data.orderRequestItem.0.tax', 0)
+        ->set('data.tax_type', 'PPN Included')
+        ->assertSet('data.orderRequestItem.0.tax', 0);
 });
 
 

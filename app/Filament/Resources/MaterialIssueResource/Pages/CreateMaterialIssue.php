@@ -6,9 +6,11 @@ use App\Filament\Resources\MaterialIssueResource;
 use App\Models\MaterialIssue;
 use App\Services\ManufacturingJournalService;
 use App\Services\ManufacturingService;
+use App\Support\ProcurementFailureNotifier;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class CreateMaterialIssue extends CreateRecord
 {
@@ -73,7 +75,7 @@ class CreateMaterialIssue extends CreateRecord
         $this->record->update(['total_cost' => $totalCost]);
 
         // 2) Auto journal if created directly as completed
-        /** @var MaterialIssue $mi */
+        $mi = $this->record;
         if ($this->record->status === 'completed') {
             try {
                 $journalService = app(ManufacturingJournalService::class);
@@ -84,8 +86,12 @@ class CreateMaterialIssue extends CreateRecord
                 }
                 // And ensure MO qty_used aggregation is up to date
                 $this->updateMoQtyUsed($mi);
-            } catch (\Throwable $e) {
-                // ignore
+            } catch (Throwable $exception) {
+                ProcurementFailureNotifier::warning(
+                    'Peringatan: Jurnal Otomatis Gagal',
+                    $exception,
+                    'Material Issue berhasil dibuat, namun jurnal otomatis belum dapat dibuat.'
+                );
             }
         }
     }
@@ -96,45 +102,8 @@ class CreateMaterialIssue extends CreateRecord
      */
     private function updateMoQtyUsed(MaterialIssue $materialIssue): void
     {
-        // Resolve target MO: prefer explicit manufacturing_order_id, fallback to production_plan_id
-        $mo = null;
-        if ($materialIssue->manufacturing_order_id) {
-            $mo = \App\Models\ManufacturingOrder::find($materialIssue->manufacturing_order_id);
-        }
-        if (!$mo && $materialIssue->production_plan_id) {
-            $mo = \App\Models\ManufacturingOrder::where('production_plan_id', $materialIssue->production_plan_id)
-                ->latest('id')
-                ->first();
-        }
-
-        if (!$mo) {
-            return;
-        }
-
-        $mo->loadMissing(['manufacturingOrderMaterial']);
-
-        foreach ($mo->manufacturingOrderMaterial as $mom) {
-            // Sum of quantities from completed Material Issues of type 'issue' that relate to this MO
-            $issuedQty = \App\Models\MaterialIssueItem::query()
-                ->where('product_id', $mom->material_id)
-                ->whereHas('materialIssue', function ($q) use ($mo) {
-                    $q->where('type', 'issue')
-                        ->where('status', 'completed')
-                        ->where(function ($q2) use ($mo) {
-                            $q2->where('manufacturing_order_id', $mo->id)
-                                ->orWhere(function ($q3) use ($mo) {
-                                    $q3->whereNull('manufacturing_order_id')
-                                        ->where('production_plan_id', $mo->production_plan_id);
-                                });
-                        });
-                })
-                ->sum('quantity');
-
-            if ($mom->qty_used != $issuedQty) {
-                $mom->qty_used = $issuedQty;
-                $mom->save();
-            }
-        }
+        // Legacy manufacturing_order_materials table has been removed.
+        // Material fulfillment is now derived directly from MaterialIssue + BOM data.
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
@@ -149,12 +118,7 @@ class CreateMaterialIssue extends CreateRecord
                 $warehouseId = $item['warehouse_id'] ?? null;
 
                 // Normalize quantity (handle formatted strings like "1.000,00")
-                $rawQuantity = $item['quantity'] ?? 0;
-                if (is_string($rawQuantity)) {
-                    $rawQuantity = str_replace('.', '', $rawQuantity);
-                    $rawQuantity = str_replace(',', '.', $rawQuantity);
-                }
-                $quantity = (float) $rawQuantity;
+                $quantity = (float) \App\Helpers\MoneyHelper::safeParse($item['quantity'] ?? 0);
 
                 if (!$productId || !$warehouseId) {
                     throw ValidationException::withMessages([
@@ -162,32 +126,21 @@ class CreateMaterialIssue extends CreateRecord
                     ]);
                 }
 
-                $stock = \App\Models\InventoryStock::where('product_id', $productId)
-                    ->where('warehouse_id', $warehouseId)
-                    ->sum('qty_available');
+                $stockMetrics = MaterialIssueResource::getStockMetrics($productId, $warehouseId);
+                $effectiveStock = (float) $stockMetrics['effective'];
 
-                if ($stock < $quantity) {
+                if ($effectiveStock < $quantity) {
                     $product = \App\Models\Product::find($productId);
                     $productName = $product ? $product->name : 'Produk';
                     throw ValidationException::withMessages([
-                        'items.' . $index . '.quantity' => "Stock {$productName} di gudang ini tidak mencukupi untuk item " . ($index + 1) . ". Tersedia: " . number_format($stock, 2, ',', '.') . ", diminta: " . number_format($quantity, 2, ',', '.'),
+                        'items.' . $index . '.quantity' => "Stok efektif {$productName} di gudang ini tidak mencukupi untuk item " . ($index + 1) . ". Fisik: " . number_format($stockMetrics['physical'], 2, ',', '.') . ", Reserved: " . number_format($stockMetrics['reserved'], 2, ',', '.') . ", Efektif: " . number_format($effectiveStock, 2, ',', '.') . ", diminta: " . number_format($quantity, 2, ',', '.'),
                     ]);
                 }
 
                 // Normalize cost_per_unit and total_cost (handle formatted strings)
-                $rawCostPerUnit = $item['cost_per_unit'] ?? 0;
-                if (is_string($rawCostPerUnit)) {
-                    $rawCostPerUnit = str_replace('.', '', $rawCostPerUnit);
-                    $rawCostPerUnit = str_replace(',', '.', $rawCostPerUnit);
-                }
-                $costPerUnit = (float) $rawCostPerUnit;
+                $costPerUnit = (float) \App\Helpers\MoneyHelper::safeParse($item['cost_per_unit'] ?? 0);
 
-                $rawItemTotal = $item['total_cost'] ?? ($quantity * $costPerUnit);
-                if (is_string($rawItemTotal)) {
-                    $rawItemTotal = str_replace('.', '', $rawItemTotal);
-                    $rawItemTotal = str_replace(',', '.', $rawItemTotal);
-                }
-                $itemTotalCost = (float) $rawItemTotal;
+                $itemTotalCost = (float) \App\Helpers\MoneyHelper::safeParse($item['total_cost'] ?? ($quantity * $costPerUnit));
 
                 // Ensure the item values stored are numeric (so DB receives correct types)
                 $data['items'][$index]['quantity'] = $quantity;
@@ -219,31 +172,31 @@ class CreateMaterialIssue extends CreateRecord
                 continue;
             }
 
-            $inventoryStock = \App\Models\InventoryStock::where('product_id', $item['product_id'])
-                ->where('warehouse_id', $item['warehouse_id'] ?? $warehouseId)
-                ->first();
-
-            $availableQty = $inventoryStock ? $inventoryStock->qty_available : 0;
-            $requiredQty = (float) $item['quantity'];
+            $stockMetrics = MaterialIssueResource::getStockMetrics(
+                $item['product_id'],
+                $item['warehouse_id'] ?? $warehouseId
+            );
+            $effectiveQty = (float) $stockMetrics['effective'];
+            $requiredQty = (float) \App\Helpers\MoneyHelper::safeParse($item['quantity'] ?? 0);
 
             $product = \App\Models\Product::find($item['product_id']);
 
-            if ($availableQty <= 0) {
-                $outOfStock[] = "{$product->name} (Stock: 0)";
-            } elseif ($availableQty < $requiredQty) {
-                $insufficientStock[] = "{$product->name} (Dibutuhkan: {$requiredQty}, Tersedia: {$availableQty})";
+            if ($effectiveQty <= 0) {
+                $outOfStock[] = "{$product->name} (Fisik: {$stockMetrics['physical']}, Reserved: {$stockMetrics['reserved']}, Efektif: {$stockMetrics['effective']})";
+            } elseif ($effectiveQty < $requiredQty) {
+                $insufficientStock[] = "{$product->name} (Dibutuhkan: {$requiredQty}, Fisik: {$stockMetrics['physical']}, Reserved: {$stockMetrics['reserved']}, Efektif: {$stockMetrics['effective']})";
             }
         }
 
         if (!empty($outOfStock)) {
             throw ValidationException::withMessages([
-                'items' => 'Stock habis untuk produk berikut: ' . implode(', ', $outOfStock)
+                'items' => 'Stok efektif habis untuk produk berikut: ' . implode(', ', $outOfStock)
             ]);
         }
 
         if (!empty($insufficientStock)) {
             throw ValidationException::withMessages([
-                'items' => 'Stock tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
+                'items' => 'Stok efektif tidak mencukupi untuk produk berikut: ' . implode(', ', $insufficientStock)
             ]);
         }
     }

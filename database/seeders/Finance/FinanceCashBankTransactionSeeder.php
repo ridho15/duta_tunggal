@@ -34,7 +34,7 @@ class FinanceCashBankTransactionSeeder extends Seeder
                 'offset' => $receivableAccount,
                 'amount' => 76500000,
                 'counterparty' => 'PT. Nusantara Retail',
-                'description' => 'Pelunasan lanjutan invoice INV-AR-001',
+                'description' => 'Pelunasan lanjutan invoice FIN-INV-AR-001',
             ],
             [
                 'number' => 'CBT-SEED-AR-002',
@@ -44,7 +44,7 @@ class FinanceCashBankTransactionSeeder extends Seeder
                 'offset' => $receivableAccount,
                 'amount' => 90000000,
                 'counterparty' => 'PT. Nusantara Retail',
-                'description' => 'Pembayaran pertama invoice INV-AR-001',
+                'description' => 'Pembayaran pertama invoice FIN-INV-AR-001',
             ],
             [
                 'number' => 'CBT-SEED-AR-003',
@@ -54,7 +54,7 @@ class FinanceCashBankTransactionSeeder extends Seeder
                 'offset' => $receivableAccount,
                 'amount' => 60000000,
                 'counterparty' => 'CV. Sinar Elektrik',
-                'description' => 'Pembayaran sebagian invoice INV-AR-002',
+                'description' => 'Pembayaran sebagian invoice FIN-INV-AR-002',
             ],
             [
                 'number' => 'CBT-SEED-EXP-6100',

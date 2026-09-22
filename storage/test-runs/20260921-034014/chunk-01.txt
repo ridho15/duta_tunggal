@@ -1,0 +1,293 @@
+
+   FAIL  Tests\Feature\AccountPayableFilamentFlowTest
+  ⨯ complete purchase invoice to vendor payment flow with form simulat… 13.28s  
+  ✓ account payable form auto populates from invoice selection           0.67s  
+  ✓ vendor payment ntpn auto generation works                            0.55s  
+  ✓ account payable remaining field calculates correctly when paid is u… 0.60s  
+
+   PASS  Tests\Feature\AccountPayableSummaryQueryTest
+  ✓ account payable summary query excludes paid and soft deleted record… 0.49s  
+  ✓ overdue filter works on a joined account payable query without ambi… 0.46s  
+  ✓ overdue grouping marks deleted invoices before overdue buckets       0.46s  
+  ✓ overdue days filter reuses shared date buckets                       0.89s  
+
+   PASS  Tests\Feature\AccountReceivableSummaryQueryTest
+  ✓ account receivable summary query excludes paid and soft deleted rec… 0.98s  
+  ✓ overdue filter works on a joined account receivable query without a… 1.83s  
+  ✓ overdue grouping marks deleted invoices before overdue buckets for…  1.19s  
+  ✓ overdue days filter reuses shared date buckets for receivables       1.11s  
+
+   PASS  Tests\Feature\AccountingPeriodClosingTest
+  ✓ cannot create journal entry in closed accounting period              2.01s  
+  ✓ cannot update journal entry in closed accounting period              1.62s  
+  ✓ cannot delete journal entry in closed accounting period              2.19s  
+  ✓ close period posts closing entries and marks period closed           2.11s  
+
+   PASS  Tests\Feature\AccountsPayableFeatureTest
+  ✓ can create vendor master data                                        0.55s  
+  ✓ can update vendor financial terms                                    0.46s  
+  ✓ can update vendor performance metrics                                1.62s  
+  ✓ can generate ap aging schedule                                       1.40s  
+  ✓ can filter ap aging schedule by vendor                               0.51s  
+  ✓ can filter ap aging schedule by date range                           0.45s  
+  ✓ can filter ap aging schedule by aging bracket                        0.57s  
+  ✓ can create vendor deposit                                            0.63s  
+  ✓ can process vendor deposit refund                                    0.47s  
+  ✓ can calculate vendor performance score                               0.56s  
+  ✓ can get vendor credit utilization                                    0.55s  
+  ✓ can generate vendor payment reminder                                 0.53s  
+
+   PASS  Tests\Feature\AdditionalHubGroupingTest
+  ✓ master data hub page is configured as the visible master data entry  0.47s  
+  ✓ manufacturing hub page is configured as the visible manufacturing e… 0.51s  
+  ✓ asset management hub page is hidden and only exposed through the ac… 0.48s  
+  ✓ user roles management hub page is configured as the visible admin e… 0.47s  
+  ✓ master data sidebar items are hidden and only exposed through the m… 0.47s  
+  ✓ manufacturing sidebar items are hidden and only exposed through the… 0.48s  
+  ✓ asset and admin sidebar items are hidden and only exposed through t… 0.46s  
+
+   PASS  Tests\Feature\AdminPageTest
+  ✓ admin page redirects to filament login for guests                    1.96s  
+
+   PASS  Tests\Feature\AgeingReportPreviewControllerTest
+  ✓ ageing report preview matches ageing report service                  3.29s  
+
+   PASS  Tests\Feature\AlkGraficPageTest
+  ✓ it returns empty report data when preview is disabled                2.20s  
+  ✓ it returns report data from the shared ALK report service            2.37s  
+  ✓ it builds preview and export urls using current filters              3.42s  
+  ✓ it resetReport clears preview state                                  3.35s  
+
+   PASS  Tests\Feature\AlkGrafikPreviewControllerTest
+  ✓ alk grafik preview matches shared service payload                    3.40s  
+  ✓ alk grafik embedded preview hides toolbar actions                    1.88s  
+  ✓ alk grafik excel export downloads expected workbook                  1.40s  
+  ✓ alk grafik pdf export downloads pdf                                  3.95s  
+
+   PASS  Tests\Feature\Api\OrderRequestApiTest
+  ✓ can fetch order request dependencies                                 1.52s  
+  ✓ can generate request number                                          0.39s  
+  ✓ can store order request via api                                      0.95s  
+  ✓ can update order request via api                                     0.62s  
+  ✓ filament create order request page renders successfully              1.15s  
+  ✓ filament edit order request page renders successfully                0.42s  
+
+   PASS  Tests\Feature\Api\PurchaseOrderApiTest
+  ✓ can fetch purchase order dependencies                                0.45s  
+  ✓ can generate po number                                               0.29s  
+  ✓ can store purchase order via api                                     0.49s  
+  ✓ can show and update purchase order via api                           0.86s  
+  ✓ order request reference flow mirrors legacy filament                 0.40s  
+  ✓ dependencies lists only active warehouses                            0.32s  
+  ✓ store requires warehouse in po header                                0.30s  
+
+   PASS  Tests\Feature\Api\QuotationApiTest
+  ✓ dependencies returns complete master data and next quotation number  0.45s  
+  ✓ can generate new quotation number                                    0.35s  
+  ✓ create quotation stores record and calculates total amount           0.40s  
+  ✓ show and update quotation                                            0.65s  
+
+   PASS  Tests\Feature\Api\SaleOrderApiTest
+  ✓ dependencies returns complete master data and next so number         0.93s  
+  ✓ can generate new so number                                           0.39s  
+  ✓ create sale order standalone and calculates total amount             0.54s  
+  ✓ create sale order from approved quotation                            0.43s  
+  ✓ show and update sale order                                           0.46s  
+  ✓ can fetch customer credit on demand                                  0.26s  
+
+   PASS  Tests\Feature\AppSettingTest
+  ✓ it returns default when key is absent                                0.26s  
+  ✓ it persists and retrieves a setting                                  0.29s  
+  ✓ it upserts existing setting                                          0.27s  
+  ✓ it casts truthy strings to boolean true                              0.26s  
+  ✓ it casts falsy strings to boolean false                              0.25s  
+  ✓ do approval required returns true by default                         0.25s  
+  ✓ do approval required returns false when disabled via db              0.26s  
+  ✓ do approval required returns true when enabled via db                0.28s  
+  ✓ when approval required do sent action requires approved status       0.34s  
+  ✓ when approval not required do can be sent from draft                 0.44s  
+
+   PASS  Tests\Feature\AssetDepreciationServiceTest
+  ✓ generateMonthlyDepreciation creates correct depreciation record      0.53s  
+  ✓ generateMonthlyDepreciation creates balanced journal entries         0.29s  
+  ✓ generateMonthlyDepreciation uses correct COAs                        0.53s  
+  ✓ generateMonthlyDepreciation updates asset accumulated depreciation   0.33s  
+  ✓ generateMonthlyDepreciation handles transaction rollback on error    0.34s  
+  ✓ generateAllMonthlyDepreciation processes only active assets          0.27s  
+  ✓ generateAllMonthlyDepreciation skips assets not yet in use           0.28s  
+  ✓ generateAllMonthlyDepreciation reports errors correctly              0.27s  
+  ✓ reverseDepreciation changes status to reversed                       0.29s  
+  ✓ reverseDepreciation deletes related journal entries                  0.30s  
+  ✓ reverseDepreciation updates asset accumulated depreciation           0.39s  
+  ✓ journal entries have correct journal_type                            0.70s  
+  ✓ depreciation links to journal entry                                  0.85s  
+
+   PASS  Tests\Feature\AssetDepreciationTest
+  ✓ asset automatically calculates depreciation on creation              0.44s  
+  ✓ asset recalculates depreciation when purchase cost changes           0.28s  
+  ✓ generate monthly depreciation creates journal entries                0.28s  
+  ✓ cannot create duplicate depreciation for same period                 0.29s  
+  ✓ depreciation updates asset accumulated depreciation and book value   0.30s  
+  ✓ cannot depreciate inactive asset                                     0.25s  
+  ✓ cannot depreciate before usage date                                  0.26s  
+  ✓ generate all monthly depreciation processes multiple assets          0.30s  
+  ✓ reverse depreciation deletes journal entries and updates asset       0.27s  
+  ✓ asset status changes to fully depreciated when book value reaches s… 0.41s  
+  ✓ journal entries have correct reference and description               0.29s  
+
+   PASS  AssetDisposalTest
+  ✓ it can create asset disposal with sale                               0.29s  
+  ✓ it can create asset disposal with loss                               0.28s  
+  ✓ it can create asset disposal without sale                            0.28s  
+  ✓ it handles transaction rollback on error                             0.26s  
+  ✓ it calculates gain loss correctly                                    0.33s  
+
+   PASS  Tests\Feature\AssetObserverTest
+  ✓ asset creation uses selected depreciation method                     0.26s  
+  ✓ asset update recalculates using current depreciation method          0.29s  
+
+   FAIL  AssetPurchaseWorkflowTest
+  ✓ complete asset purchase workflow                                     0.29s  
+  ✓ asset creation without purchase order                                0.29s  
+  ✓ asset depreciation calculation                                       0.30s  
+  ⨯ asset purchase flow with pre set signature                           1.34s  
+  ✓ asset purchase fails without user signature                          0.50s  
+
+   PASS  AssetServiceTest
+  ✓ it can post asset acquisition journal                                0.38s  
+  ✓ it can post asset depreciation journal                               0.28s  
+  ✓ it can check if asset has posted journals                            0.26s  
+  ✓ it can get asset journals                                            0.29s  
+  ✓ it auto posts asset acquisition journal when asset is created from…  0.33s  
+
+   PASS  AssetStatsWidgetTest
+  ✓ widget returns correct total asset count                             0.28s  
+  ✓ widget counts only active and posted assets                          0.27s  
+  ✓ widget counts fully depreciated assets                               0.26s  
+  ✓ widget total value stat has currency icon                            0.26s  
+  ✓ widget book value stat has calculator icon                           0.25s  
+  ✓ widget shows zero when no assets exist                               0.25s  
+  ✓ widget returns five stats                                            0.27s  
+
+   PASS  Tests\Feature\AssetTransferDisposalFormValidationTest
+  ✓ asset transfer validation uses the selected branch state             0.47s  
+  ✓ asset disposal validation requires sale price for sale disposals     0.48s  
+
+   PASS  Tests\Feature\AssetTransferTest
+  ✓ can create asset transfer request                                    0.32s  
+  ✓ can approve transfer request                                         0.33s  
+  ✓ can complete transfer                                                0.28s  
+  ✓ prevents duplicate pending transfers                                 0.27s  
+  ✓ cannot approve non pending transfer                                  0.32s  
+  ✓ cannot complete non approved transfer                                0.26s  
+  ✓ handles transaction rollback on approval error                       0.27s  
+  ✓ can reject transfer request                                          0.26s  
+  ✓ tracks transfer workflow correctly                                   0.25s  
+
+   PASS  Tests\Feature\AuditFixesTest
+  ✓ MoneyHelper::parse() → it parses a plain integer string              0.25s  
+  ✓ MoneyHelper::parse() → it parses Indonesian thousands-dot format "2… 0.24s  
+  ✓ MoneyHelper::parse() → it parses Indonesian format with Rp prefix "… 0.39s  
+  ✓ MoneyHelper::parse() → it parses Western decimal format "1500000.50… 0.27s  
+  ✓ MoneyHelper::parse() → it parses Indonesian decimal format "1.500.0… 0.29s  
+  ✓ MoneyHelper::parse() → it returns 0.0 for null                       0.43s  
+  ✓ MoneyHelper::parse() → it returns 0.0 for empty string               0.28s  
+  ✓ MoneyHelper::parse() → it returns 0.0 for a dash "-"                 0.25s  
+  ✓ MoneyHelper::parse() → it parses raw DB decimal "20000000.00"        0.26s  
+  ✓ PaymentRequest approved_at accessor → it returns null when raw DB a… 0.25s  
+  ✓ PaymentRequest approved_at accessor → it returns null when DB store… 0.25s  
+  ✓ PaymentRequest approved_at accessor → it returns a Carbon instance…  0.25s  
+  ✓ PaymentRequest approved_at accessor → it mutator converts "-" to nu… 0.28s  
+  ✓ PaymentRequest approved_at accessor → it mutator converts empty str… 0.24s  
+  ✓ Deposit money validation rule → it passes for "20.000.000" (Indones… 0.34s  
+  ✓ Deposit money validation rule → it passes for "1.000" (one thousand… 0.26s  
+  ✓ Deposit money validation rule → it passes for plain integer "500000… 0.26s  
+  ✓ Deposit money validation rule → it fails for "0"                     0.25s  
+  ✓ Deposit money validation rule → it fails for empty string            0.25s  
+  ✓ Deposit money validation rule → it would have FAILED under the old…  0.26s  
+  ✓ OrderRequest status enum migration → it accepts request_approve sta… 0.26s  
+  ✓ OrderRequest status enum migration → it accepts partial status       0.26s  
+  ✓ OrderRequest status enum migration → it accepts complete status      0.25s  
+  ✓ OrderRequest status enum migration → it retains existing draft and…  0.28s  
+  ✓ order_request_items supplier_id column → it has supplier_id column…  0.27s  
+  ✓ order_request_items supplier_id column → it allows saving supplier_… 0.27s  
+  ✓ order_request_items supplier_id column → it allows null supplier_id… 0.28s  
+
+   PASS  Tests\Feature\Auth\AuthenticationTest
+  ✓ login screen can be rendered                                         0.26s  
+  ✓ users can authenticate using the login screen                        0.32s  
+  ✓ users can not authenticate with invalid password                     0.51s  
+  ✓ users can logout                                                     0.32s  
+
+   PASS  Tests\Feature\Auth\EmailVerificationTest
+  ✓ email verification screen can be rendered                            0.29s  
+  ✓ email can be verified                                                0.29s  
+  ✓ email is not verified with invalid hash                              0.30s  
+
+   PASS  Tests\Feature\Auth\PasswordConfirmationTest
+  ✓ confirm password screen can be rendered                              0.26s  
+  ✓ password can be confirmed                                            0.27s  
+  ✓ password is not confirmed with invalid password                      0.48s  
+
+   PASS  Tests\Feature\Auth\PasswordResetTest
+  ✓ reset password link screen can be rendered                           0.29s  
+  ✓ reset password link can be requested                                 0.49s  
+  ✓ reset password screen can be rendered                                0.57s  
+  ✓ password can be reset with valid token                               0.57s  
+
+   PASS  Tests\Feature\Auth\RegistrationTest
+  ✓ registration screen can be rendered                                  0.31s  
+  ✓ new users can register                                               0.30s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\AccountPayableFilamentFlowTest > complete purchase…    
+  Failed asserting that two strings are equal.
+  -'Payment to supplier for payment id 1'
+  +'Pembayaran Hutang: UD Hariyah (VP-202609-0001)'
+  
+
+  at tests/Feature/AccountPayableFilamentFlowTest.php:258
+    254▕         $debitEntry = $journalEntries->first(fn($entry) => $entry->debit > 0);
+    255▕         $this->assertEquals(100000, $debitEntry->debit);
+    256▕         $this->assertEquals(0, $debitEntry->credit);
+    257▕         $this->assertEquals($this->apCoa->id, $debitEntry->coa_id);
+  ➜ 258▕         $this->assertEquals('Payment to supplier for payment id ' . $vendorPayment->id, $debitEntry->description);
+    259▕ 
+    260▕         // Verify credit entry (Cash reduction)
+    261▕         $creditEntry = $journalEntries->first(fn($entry) => $entry->credit > 0);
+    262▕         $this->assertEquals(0, $creditEntry->debit);
+
+  1   tests/Feature/AccountPayableFilamentFlowTest.php:258
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  AssetPurchaseWorkflowTest > asset purchase flow with pre set sign…   
+  Failed asserting that a row in the table [inventory_stocks] does not match the attributes {
+    "product_id": 10
+}.
+
+Found similar results: [
+    {
+        "product_id": 10
+    },
+    {
+        "product_id": 10
+    },
+    {
+        "product_id": 10
+    }
+] and 3 others.
+
+  at tests/Feature/AssetPurchaseWorkflowTest.php:440
+    436▕         $this->assertEquals(5, $asset->useful_life_years);
+    437▕ 
+    438▕         // Step 6: Verify asset stock is SEPARATE from inventory stock
+    439▕         // Asset should NOT create inventory stock entry
+  ➜ 440▕         $this->assertDatabaseMissing('inventory_stocks', [
+    441▕             'product_id' => $this->product->id,
+    442▕         ]);
+    443▕ 
+    444▕         // Asset should have depreciation fields (not quantity)
+
+
+  Tests:    2 failed, 178 passed (646 assertions)
+  Duration: 119.15s
+

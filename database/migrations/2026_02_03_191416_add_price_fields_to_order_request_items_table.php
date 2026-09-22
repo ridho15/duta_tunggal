@@ -11,11 +11,23 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('order_request_items')) {
+            return;
+        }
+
         Schema::table('order_request_items', function (Blueprint $table) {
-            $table->decimal('unit_price', 15, 2)->default(0)->after('quantity');
-            $table->decimal('discount', 15, 2)->default(0)->after('unit_price');
-            $table->decimal('tax', 15, 2)->default(0)->after('discount');
-            $table->decimal('subtotal', 15, 2)->default(0)->after('tax');
+            if (! Schema::hasColumn('order_request_items', 'unit_price')) {
+                $table->decimal('unit_price', 15, 2)->default(0)->after('quantity');
+            }
+            if (! Schema::hasColumn('order_request_items', 'discount')) {
+                $table->decimal('discount', 15, 2)->default(0)->after('unit_price');
+            }
+            if (! Schema::hasColumn('order_request_items', 'tax')) {
+                $table->decimal('tax', 15, 2)->default(0)->after('discount');
+            }
+            if (! Schema::hasColumn('order_request_items', 'subtotal')) {
+                $table->decimal('subtotal', 15, 2)->default(0)->after('tax');
+            }
         });
     }
 
@@ -24,8 +36,15 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('order_request_items')) {
+            return;
+        }
+
         Schema::table('order_request_items', function (Blueprint $table) {
-            $table->dropColumn(['unit_price', 'discount', 'tax', 'subtotal']);
+            $columns = array_filter(['unit_price', 'discount', 'tax', 'subtotal'], fn ($column) => Schema::hasColumn('order_request_items', $column));
+            if (! empty($columns)) {
+                $table->dropColumn($columns);
+            }
         });
     }
 };

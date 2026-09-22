@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Helpers\MoneyHelper;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -61,6 +62,6 @@ class AssetDisposal extends Model
         $type = $this->gain_loss_type;
         $amount = abs($this->gain_loss_amount);
 
-        return $type === 'gain' ? "Gain: Rp " . number_format($amount, 0, ',', '.') : "Loss: Rp " . number_format($amount, 0, ',', '.');
+        return $type === 'gain' ? 'Gain: ' . MoneyHelper::rupiah($amount) : 'Loss: ' . MoneyHelper::rupiah($amount);
     }
 }

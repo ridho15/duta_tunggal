@@ -14,12 +14,20 @@ class WarehouseConfirmationItem extends Model
     protected $fillable = [
         'warehouse_confirmation_id',
         'sale_order_item_id',
+        'material_issue_item_id',
+        'product_id',
         'product_name',
         'requested_qty',
         'confirmed_qty',
         'warehouse_id',
         'rak_id',
         'status'
+    ];
+
+    protected $appends = [
+        'product_display',
+        'source_item_display',
+        'material_summary',
     ];
 
     public function warehouseConfirmation()
@@ -32,6 +40,16 @@ class WarehouseConfirmationItem extends Model
         return $this->belongsTo(SaleOrderItem::class)->withDefault();
     }
 
+    public function materialIssueItem()
+    {
+        return $this->belongsTo(MaterialIssueItem::class)->withDefault();
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class)->withDefault();
+    }
+
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class)->withDefault();
@@ -42,41 +60,186 @@ class WarehouseConfirmationItem extends Model
         return $this->belongsTo(Rak::class)->withDefault();
     }
 
+    public function getProductDisplayAttribute(): string
+    {
+        $product = $this->saleOrderItem?->product;
+
+        if (! $product || ! $product->exists) {
+            $product = $this->materialIssueItem?->product;
+        }
+
+        if (! $product || ! $product->exists) {
+            $product = $this->product;
+        }
+
+        if (! $product || ! $product->exists) {
+            return '-';
+        }
+
+        return sprintf('(%s) %s', $product->sku ?? '-', $product->name ?? '-');
+    }
+
+    public function getSourceItemDisplayAttribute(): string
+    {
+        if ($this->material_issue_item_id) {
+            return 'Material Issue Item #' . $this->material_issue_item_id;
+        }
+
+        if ($this->sale_order_item_id) {
+            return 'Sales Order Item #' . $this->sale_order_item_id;
+        }
+
+        return '-';
+    }
+
+    public function getMaterialSummaryAttribute(): string
+    {
+        $productDisplay = $this->product_display;
+
+        return sprintf(
+            '%s | Request %s | Confirm %s | Gudang %s | Status %s',
+            $productDisplay,
+            (string) $this->requested_qty,
+            (string) $this->confirmed_qty,
+            $this->warehouse?->name ?? '-',
+            ucfirst((string) $this->status)
+        );
+    }
+
+    public function syncLinkedDeliveryOrderItemStatus(?string $overrideStatus = null): void
+    {
+        $warehouseConfirmation = $this->warehouseConfirmation()->first();
+
+        if (! $warehouseConfirmation || $warehouseConfirmation->confirmable_type !== DeliveryOrder::class) {
+            return;
+        }
+
+        if (! $this->sale_order_item_id) {
+            return;
+        }
+
+        $deliveryOrderItem = DeliveryOrderItem::query()
+            ->where('delivery_order_id', $warehouseConfirmation->confirmable_id)
+            ->where('sale_order_item_id', $this->sale_order_item_id)
+            ->first();
+
+        if (! $deliveryOrderItem) {
+            return;
+        }
+
+        $mappedStatus = $overrideStatus ?? $this->mapDeliveryOrderItemStatus();
+        $updatePayload = ['status' => $mappedStatus];
+
+        if ($overrideStatus !== null) {
+            $updatePayload['confirmed_qty'] = match (strtolower($overrideStatus)) {
+                'confirmed' => $this->requested_qty,
+                'rejected', 'pending' => 0,
+                default => $this->confirmed_qty,
+            };
+        }
+
+        if ($deliveryOrderItem->status === $mappedStatus) {
+            return;
+        }
+
+        $deliveryOrderItem->update($updatePayload);
+    }
+
+    protected function mapDeliveryOrderItemStatus(): string
+    {
+        return match (strtolower((string) $this->status)) {
+            'confirmed' => 'confirmed',
+            'partial_confirmed' => 'partial',
+            'rejected' => 'rejected',
+            'request' => 'requested',
+            default => 'pending',
+        };
+    }
+
+    protected function syncLinkedMaterialIssueItemStatus(): void
+    {
+        if (! $this->material_issue_item_id) {
+            return;
+        }
+
+        $status = strtolower((string) $this->status);
+
+        if (! in_array($status, ['confirmed', 'partial_confirmed'], true)) {
+            return;
+        }
+
+        $materialIssueItem = $this->materialIssueItem()->first();
+
+        if (! $materialIssueItem || ! $materialIssueItem->exists) {
+            return;
+        }
+
+        $warehouseConfirmation = $this->warehouseConfirmation()->first();
+
+        $materialIssueItem->update([
+            'status' => MaterialIssueItem::STATUS_APPROVED,
+            'approved_by' => $warehouseConfirmation?->confirmed_by ?? $materialIssueItem->approved_by,
+            'approved_at' => $warehouseConfirmation?->confirmed_at ?? $materialIssueItem->approved_at ?? now(),
+        ]);
+    }
+
     protected static function booted()
     {
+        static::saved(function (WarehouseConfirmationItem $warehouseConfirmationItem) {
+            $warehouseConfirmationItem->syncLinkedMaterialIssueItemStatus();
+            $warehouseConfirmationItem->syncLinkedDeliveryOrderItemStatus();
+        });
+
         static::updating(function ($warehouseConfirmationItem) {
             // When item status changes, check if all items in the warehouse confirmation are confirmed
             if ($warehouseConfirmationItem->isDirty('status')) {
                 $warehouseConfirmation = $warehouseConfirmationItem->warehouseConfirmation;
 
                 if ($warehouseConfirmation) {
-                    // Check if all items are confirmed (including the current item being updated)
-                    $totalItems = $warehouseConfirmation->warehouseConfirmationItems()->count();
-                    $confirmedItems = $warehouseConfirmation->warehouseConfirmationItems()
-                        ->where('status', 'confirmed')
-                        ->where('id', '!=', $warehouseConfirmationItem->id) // Exclude current item
-                        ->count();
+                    $confirmationType = strtolower((string) $warehouseConfirmation->confirmation_type);
+                    $statuses = $warehouseConfirmation->warehouseConfirmationItems()
+                        ->get(['id', 'status'])
+                        ->mapWithKeys(function ($item) {
+                            return [$item->id => strtolower((string) $item->status)];
+                        })
+                        ->toArray();
 
-                    // Add 1 if the current item is being set to confirmed
-                    if ($warehouseConfirmationItem->status === 'confirmed') {
-                        $confirmedItems++;
+                    $statuses[$warehouseConfirmationItem->id] = strtolower((string) $warehouseConfirmationItem->status);
+                    $statusValues = collect(array_values($statuses));
+
+                    $allConfirmed = $statusValues->every(fn ($status) => $status === 'confirmed');
+                    $allRejected = $statusValues->every(fn ($status) => $status === 'rejected');
+                    $hasPartial = $statusValues->contains('partial_confirmed');
+                    $hasConfirmed = $statusValues->contains('confirmed');
+                    $hasRejected = $statusValues->contains('rejected');
+
+                    $parentStatus = 'request';
+                    if ($confirmationType === 'material_issue') {
+                        if ($allConfirmed) {
+                            $parentStatus = 'confirmed';
+                        } elseif ($hasRejected || $allRejected) {
+                            $parentStatus = 'rejected';
+                        } elseif ($hasConfirmed) {
+                            $parentStatus = 'partial_confirmed';
+                        }
+                    } elseif ($allConfirmed) {
+                        $parentStatus = 'confirmed';
+                    } elseif ($allRejected) {
+                        $parentStatus = 'rejected';
+                    } elseif ($hasPartial || ($hasConfirmed && $hasRejected)) {
+                        $parentStatus = 'partial_confirmed';
                     }
 
-                    $allConfirmed = $confirmedItems === $totalItems;
+                    $updatePayload = [
+                        'status' => $parentStatus,
+                    ];
 
-                    // Update parent status based on item statuses
-                    if ($allConfirmed) {
-                        $warehouseConfirmation->update([
-                            'status' => 'Confirmed', // Use the correct enum value
-                            'confirmed_by' => \Illuminate\Support\Facades\Auth::id(),
-                            'confirmed_at' => now()
-                        ]);
-                    } else {
-                        // If not all items are confirmed, keep status as 'Request'
-                        $warehouseConfirmation->update([
-                            'status' => 'Request'
-                        ]);
+                    if (in_array($parentStatus, ['confirmed', 'partial_confirmed', 'rejected'])) {
+                        $updatePayload['confirmed_by'] = \Illuminate\Support\Facades\Auth::id();
+                        $updatePayload['confirmed_at'] = now();
                     }
+
+                    $warehouseConfirmation->update($updatePayload);
                 }
             }
         });

@@ -1,74 +1,35 @@
-{{-- resources/views/pdf/kwitansi.blade.php --}}
 <!DOCTYPE html>
-<html>
+<html lang="id">
 
 <head>
-    <meta charset="utf-8">
-    <title>Kwitansi Penjualan</title>
+    <meta charset="UTF-8">
+    <title>Kwitansi {{ $receipt->id }}</title>
     <style>
-        body {
-            font-family: sans-serif;
-            font-size: 12px;
-        }
-
-        .kop {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .garis {
-            border-top: 2px solid #000;
-            margin-top: 5px;
-            margin-bottom: 10px;
-        }
-
-        table {
-            width: 100%;
-        }
-
-        .ttd {
-            margin-top: 50px;
-            text-align: right;
-        }
+        @page { margin: 14mm 16mm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #000; }
+        .box { border: 2px solid #333; padding: 8px 12px; margin: 10px 0; }
     </style>
 </head>
 
 <body>
-    <div class="kop">
-        <strong>PT Duta Tunggal</strong><br>
-        Jl. Contoh Alamat No. 123, Padang<br>
-        Telp. 08xx-xxxx-xxxx
-        <div class="garis"></div>
-        <h3>KWITANSI</h3>
+    @php $doc = $doc ?? app(\App\Services\DocumentPrintBuilder::class)->receipt($receipt); @endphp
+    @include('pdf.partials.watermark')
+    @include('pdf.partials.company-header')
+    @include('pdf.partials.doc-meta')
+
+    <div class="box">
+        <div style="font-size: 10px; color: #555;">Terbilang</div>
+        <div style="font-size: 14px; font-style: italic;">{{ $doc['amount_words'] }}</div>
+    </div>
+    <div class="box" style="width: 45%;">
+        <div style="font-size: 10px; color: #555;">Jumlah</div>
+        <div style="font-size: 20px; font-weight: bold;">{{ \App\Support\LineAmounts::money($doc['amount']) }}</div>
     </div>
 
-    <table>
-        <tr>
-            <td>No. Kwitansi</td>
-            <td>: {{ 'KW-'.$transaksi->id }}</td>
-        </tr>
-        <tr>
-            <td>Tanggal</td>
-            <td>: {{ \Carbon\Carbon::parse($transaksi->tanggal)->format('d/m/Y') }}</td>
-        </tr>
-        <tr>
-            <td>Telah Terima Dari</td>
-            <td>: {{ $transaksi->nama_pelanggan }}</td>
-        </tr>
-        <tr>
-            <td>Untuk Pembayaran</td>
-            <td>: {{ $transaksi->keterangan }}</td>
-        </tr>
-        <tr>
-            <td>Jumlah</td>
-            <td>: <strong>Rp {{ number_format($transaksi->jumlah, 0, ',', '.') }}</strong></td>
-        </tr>
-    </table>
+    @include('pdf.partials.signature-block')
 
-    <div class="ttd">
-        Padang, {{ \Carbon\Carbon::parse($transaksi->tanggal)->translatedFormat('d F Y') }}<br>
-        Hormat Kami,<br><br><br><br>
-        <strong>{{ $transaksi->diterima_oleh ?? 'Petugas Kasir' }}</strong>
+    <div style="margin-top: 16px; font-size: 9px; color: #666; text-align: center;">
+        Kwitansi ini sah setelah dana diterima. Dicetak {{ $doc['printed_at'] }}@if ($doc['printed_by']) oleh {{ $doc['printed_by'] }}@endif
     </div>
 </body>
 

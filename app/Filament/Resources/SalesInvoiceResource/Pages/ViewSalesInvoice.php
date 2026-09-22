@@ -14,10 +14,24 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
+use App\Support\CurrencyConversionResolver;
+use App\Support\LineAmounts;
 
 class ViewSalesInvoice extends ViewRecord
 {
     protected static string $resource = SalesInvoiceResource::class;
+
+    public function mount($record): void
+    {
+        parent::mount($record);
+        // debug log invoice whenever the page is instantiated
+        \Illuminate\Support\Facades\Log::debug('Viewing invoice for debug', [
+            'id' => $this->record->id,
+            'tax_rate' => $this->record->tax,
+            'ppn_amount' => $this->record->ppn_amount,
+            'account_payable' => optional($this->record->accountPayable)->toArray(),
+        ]);
+    }
 
     public function infolist(Infolist $infolist): Infolist
     {
@@ -29,6 +43,14 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('invoice_number')
                                     ->label('Invoice Number'),
+                                TextEntry::make('tax_invoice_number')
+                                    ->label('No. Faktur Pajak')
+                                    ->badge()
+                                    ->placeholder(fn ($record) => \App\Services\SalesInvoiceTaxNumber::isMissing($record) ? 'Belum diisi' : '–')
+                                    ->color(fn ($state, $record) => filled($state) ? 'success' : (\App\Services\SalesInvoiceTaxNumber::isMissing($record) ? 'danger' : 'gray')),
+                                TextEntry::make('currency_display')
+                                    ->label('Mata Uang')
+                                    ->state(fn ($record) => $record->displayCurrency?->code ? ($record->displayCurrency?->symbol . ' ' . $record->displayCurrency?->code) : '-'),
                                 TextEntry::make('invoice_date')
                                     ->label('Invoice Date')
                                     ->date(),
@@ -38,6 +60,7 @@ class ViewSalesInvoice extends ViewRecord
                                 TextEntry::make('status')
                                     ->label('Status')
                                     ->badge()
+                                    ->formatStateUsing(\App\Support\StatusLabels::formatter('invoice'))
                                     ->color(fn (string $state): string => match ($state) {
                                         'draft' => 'gray',
                                         'unpaid' => 'gray',
@@ -45,6 +68,7 @@ class ViewSalesInvoice extends ViewRecord
                                         'paid' => 'success',
                                         'partially_paid' => 'primary',
                                         'overdue' => 'danger',
+                                        'cancelled' => 'gray',
                                         default => 'gray',
                                     }),
                             ]),
@@ -67,25 +91,36 @@ class ViewSalesInvoice extends ViewRecord
                             ->schema([
                                 TextEntry::make('dpp')
                                     ->label('DPP')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id)),
                                 TextEntry::make('other_fee_total')
                                     ->label('Other Fee')
-                                    ->rupiah(),
-                                TextEntry::make('tax')
-                                    ->label('PPN Amount')
-                                    ->rupiah(),
-                                TextEntry::make('ppn_rate')
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id)),
+                                TextEntry::make('tax_type_display')
+                                    ->label('Tipe Pajak')
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'Non Pajak' => 'gray',
+                                        'Inklusif' => 'info',
+                                        'Eksklusif' => 'warning',
+                                        default => 'gray',
+                                    }),
+                                TextEntry::make('effective_ppn_rate')
                                     ->label('PPN Rate (%)')
-                                    ->suffix('%'),
+                                    ->suffix('%')
+                                    ->visible(fn ($record) => (float) ($record->effective_ppn_rate ?? 0) > 0),
                             ]),
-                        Grid::make(2)
+                        Grid::make(4)
                             ->schema([
+                                TextEntry::make('ppn_amount')
+                                    ->label('Nominal PPN (Rp)')
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id))
+                                    ->visible(fn ($record) => (float) ($record->ppn_amount ?? 0) > 0),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
-                                    ->rupiah(),
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id)),
                                 TextEntry::make('total')
                                     ->label('Grand Total')
-                                    ->rupiah()
+                                    ->formatStateUsing(fn ($state, $record) => LineAmounts::money((float) $state, $record->display_currency_id))
                                     ->weight('bold')
                                     ->size('lg'),
                             ]),
@@ -108,6 +143,7 @@ class ViewSalesInvoice extends ViewRecord
                     ]),
 
                 Section::make('Invoice Items')
+                    ->description('Harga Satuan × Qty = Jumlah · Diskon · DPP · PPN · Total baris. Angka identik dengan PDF invoice.')
                     ->schema([
                         RepeatableEntry::make('invoiceItem')
                             ->label('')
@@ -118,15 +154,38 @@ class ViewSalesInvoice extends ViewRecord
                                             ->label('Product')
                                             ->formatStateUsing(function($state){
                                                 return "{$state['sku']} - {$state['name']}";
+                                            })
+                                            ->columnSpan(2),
+                                        TextEntry::make('quantity_display')
+                                            ->label('Qty')
+                                            ->getStateUsing(fn ($record) => rtrim(rtrim(number_format($record->breakdown()['quantity'], 2, ',', '.'), '0'), ',')),
+                                        TextEntry::make('unit_price_display')
+                                            ->label('Harga Satuan')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['unit_price'])),
+                                        TextEntry::make('gross_display')
+                                            ->label('Jumlah (Harga × Qty)')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['gross'])),
+                                        TextEntry::make('discount_display')
+                                            ->label('Diskon')
+                                            ->getStateUsing(function ($record) {
+                                                $b = $record->breakdown();
+
+                                                return number_format($b['discount_pct'], 2, ',', '.') . '% = ' . LineAmounts::money($b['discount_amount']);
                                             }),
-                                        TextEntry::make('quantity')
-                                            ->label('Quantity'),
-                                        TextEntry::make('price')
-                                            ->label('Price')
-                                            ->rupiah(),
-                                        TextEntry::make('total')
-                                            ->label('Total')
-                                            ->rupiah(),
+                                        TextEntry::make('dpp_display')
+                                            ->label('DPP')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['dpp'])),
+                                        TextEntry::make('ppn_display')
+                                            ->label('PPN')
+                                            ->getStateUsing(function ($record) {
+                                                $b = $record->breakdown();
+
+                                                return number_format($b['tax_rate'], 2, ',', '.') . '% = ' . LineAmounts::money($b['ppn']);
+                                            }),
+                                        TextEntry::make('total_display')
+                                            ->label('Total Baris')
+                                            ->getStateUsing(fn ($record) => LineAmounts::money($record->breakdown()['total']))
+                                            ->weight('bold'),
                                     ]),
                             ])
                             ->columnSpanFull(),
@@ -146,8 +205,17 @@ class ViewSalesInvoice extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        return \App\Filament\Support\DocumentActions::layout($this->headerActionList(), ['edit', 'delete', 'print_invoice', 'view_journal_entries', 'cancel_invoice']);
+    }
+
+    /** Daftar lengkap aksi header; pengelompokan utama/"Lainnya" oleh DocumentActions (D13). */
+    private function headerActionList(): array
+    {
         return [
             Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            SalesInvoiceResource::taxNumberPageAction(),
+            \App\Filament\Support\CreditNoteActions::create(Actions\Action::make('create_credit_note')),
+            \App\Filament\Support\CreditNoteActions::cancelInvoice(Actions\Action::make('cancel_invoice')),
             Actions\DeleteAction::make()->icon('heroicon-o-trash'),
             Actions\Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
@@ -166,22 +234,15 @@ class ViewSalesInvoice extends ViewRecord
                         // Jika multiple entries, gunakan filter
                         $sourceType = urlencode(\App\Models\Invoice::class);
                         $sourceId = $record->id;
-                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][value]={$sourceId}");
+                        return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}");
                     }
                 }),
             Actions\Action::make('print_invoice')
-                ->label('Cetak Invoice')
+                ->label('Preview Invoice')
                 ->color('primary')
                 ->icon('heroicon-o-document-text')
-                ->action(function ($record) {
-                    $pdf = Pdf::loadView('pdf.sale-order-invoice', [
-                        'invoice' => $record
-                    ])->setPaper('A4', 'portrait');
-
-                    return response()->streamDownload(function () use ($pdf) {
-                        echo $pdf->stream();
-                    }, 'Invoice_SO_' . $record->invoice_number . '.pdf');
-                })
+                ->url(fn($record) => route('pdf-stream', ['type' => 'sales-invoice', 'id' => $record->id]))
+                ->openUrlInNewTab(),
         ];
     }
 }

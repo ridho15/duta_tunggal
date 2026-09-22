@@ -15,8 +15,7 @@ class AssetTransferTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
-    public function it_can_create_asset_transfer_request()
+    public function test_can_create_asset_transfer_request()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -56,8 +55,7 @@ class AssetTransferTest extends TestCase
         $this->assertEquals('Asset needed in new branch', $transfer->reason);
     }
 
-    /** @test */
-    public function it_can_approve_transfer_request()
+    public function test_can_approve_transfer_request()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -99,8 +97,7 @@ class AssetTransferTest extends TestCase
         $this->assertNotNull($transfer->fresh()->approved_at);
     }
 
-    /** @test */
-    public function it_can_complete_transfer()
+    public function test_can_complete_transfer()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -146,8 +143,7 @@ class AssetTransferTest extends TestCase
         // Note: Asset cabang_id is not automatically updated in this implementation
     }
 
-    /** @test */
-    public function it_prevents_duplicate_pending_transfers()
+    public function test_prevents_duplicate_pending_transfers()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -188,8 +184,7 @@ class AssetTransferTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function it_cannot_approve_non_pending_transfer()
+    public function test_cannot_approve_non_pending_transfer()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -233,8 +228,7 @@ class AssetTransferTest extends TestCase
         $this->assertNotNull($transfer->fresh()->approved_at);
     }
 
-    /** @test */
-    public function it_cannot_complete_non_approved_transfer()
+    public function test_cannot_complete_non_approved_transfer()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -278,8 +272,7 @@ class AssetTransferTest extends TestCase
         $this->assertNotNull($transfer->fresh()->completed_at);
     }
 
-    /** @test */
-    public function it_handles_transaction_rollback_on_approval_error()
+    public function test_handles_transaction_rollback_on_approval_error()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -322,8 +315,7 @@ class AssetTransferTest extends TestCase
         throw new \Exception('Simulated error after approval');
     }
 
-    /** @test */
-    public function it_can_reject_transfer_request()
+    public function test_can_reject_transfer_request()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);
@@ -361,8 +353,7 @@ class AssetTransferTest extends TestCase
         $this->assertEquals('cancelled', $transfer->fresh()->status);
     }
 
-    /** @test */
-    public function it_tracks_transfer_workflow_correctly()
+    public function test_tracks_transfer_workflow_correctly()
     {
         // Create test data
         $cabangFrom = Cabang::factory()->create(['nama' => 'Branch A']);

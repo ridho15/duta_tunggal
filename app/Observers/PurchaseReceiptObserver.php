@@ -7,6 +7,7 @@ use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Services\PurchaseReceiptService;
 use App\Services\PurchaseReturnService;
+use App\Support\ProcurementFailureNotifier;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -83,6 +84,12 @@ class PurchaseReceiptObserver
 
         } catch (\Exception $e) {
             Log::error("Failed to auto-create PurchaseReturn for PurchaseReceipt {$purchaseReceipt->id}: " . $e->getMessage());
+
+            ProcurementFailureNotifier::warning(
+                'Retur Otomatis Belum Berhasil Dibuat',
+                $e,
+                'Penerimaan barang sudah tersimpan, tetapi retur otomatis untuk item yang ditolak belum berhasil dibuat. Silakan periksa data retur pembelian.'
+            );
         }
     }
 

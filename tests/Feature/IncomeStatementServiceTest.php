@@ -866,10 +866,13 @@ test('service can retrieve journal entries for drill-down', function () {
 
     $cabang = Cabang::factory()->create();
 
+    // Use a fixed mid-month date to avoid month-boundary issues
+    $baseDate = now()->startOfMonth()->addDays(10)->format('Y-m-d');
+
     // Create multiple journal entries
     JournalEntry::factory()->create([
         'coa_id' => $revenueAccount->id,
-        'date' => now()->format('Y-m-d'),
+        'date' => $baseDate,
         'debit' => 0,
         'credit' => 500000,
         'cabang_id' => $cabang->id,
@@ -877,7 +880,7 @@ test('service can retrieve journal entries for drill-down', function () {
 
     JournalEntry::factory()->create([
         'coa_id' => $revenueAccount->id,
-        'date' => now()->format('Y-m-d'),
+        'date' => $baseDate,
         'debit' => 0,
         'credit' => 300000,
         'cabang_id' => $cabang->id,
@@ -885,7 +888,7 @@ test('service can retrieve journal entries for drill-down', function () {
 
     JournalEntry::factory()->create([
         'coa_id' => $revenueAccount->id,
-        'date' => now()->subDay()->format('Y-m-d'),
+        'date' => now()->startOfMonth()->addDays(5)->format('Y-m-d'), // also within month
         'debit' => 50000, // Sales return
         'credit' => 0,
         'cabang_id' => $cabang->id,

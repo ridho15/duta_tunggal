@@ -1,0 +1,52 @@
+
+   PASS  Tests\Feature\VendorPaymentResourceTest
+  ✓ vendor payment resource can render list page                         3.29s  
+  ✓ vendor payment resource can render create page                       0.66s  
+  ✓ vendor payment form has required fields                              0.66s  
+  ✓ supplier selection is required                                       0.83s  
+  ✓ payment date is required                                             0.82s  
+  ✓ ntpn is optional                                                     0.86s  
+  ✓ coa selection is required                                            0.83s  
+  ✓ payment method is required                                           0.83s  
+  ✓ payment method options available                                     0.67s  
+  ✓ supplier selection filters available invoices                        0.80s  
+  ✓ selected invoices use fallback remaining when account payable is mi… 0.74s  
+  ✓ form can be filled with basic data                                   0.80s  
+  ✓ cash payment method selection                                        0.82s  
+  ✓ bank transfer payment method selection                               0.79s  
+  ✓ credit payment method selection                                      0.79s  
+  ✓ deposit payment method selection                                     0.80s  
+  ✓ total payment field exists for auto calculation                      0.66s  
+  ✓ ntpn field has max length validation                                 0.82s  
+  ✓ coa options are available                                            0.66s  
+  ✓ supplier options are available                                       0.66s  
+  ✓ form has hidden fields for backward compatibility                    0.66s  
+  ✓ vendor payment resource can render edit page                         0.67s  
+  ✓ vendor payment resource can render view page                         0.66s  
+  ✓ form validation messages are customized                              1.01s  
+  ✓ payment date defaults to today                                       0.67s  
+  ✓ status field defaults to draft                                       0.67s  
+  ✓ payment adjustment defaults to zero                                  0.66s  
+  ✓ diskon defaults to zero                                              0.68s  
+  ✓ vendor payment infolist debugging                                    0.65s  
+
+   PASS  Tests\Feature\VendorPaymentTest
+  ✓ vendor payment creation with proper relationships                    0.49s  
+  ✓ payment details mapping includes extra fields                        0.48s  
+  ✓ payment methods cash bank transfer cheque                            0.51s  
+  ✓ deposit usage for payment                                            0.47s  
+  ✓ deposit not used for cash payment                                    0.47s  
+  ✓ multiple payment methods split payment                               0.50s  
+  ✓ invoice allocation and account payable updates                       0.52s  
+  ✓ journal entry creation for payments                                  0.51s  
+  ✓ payment with deposit journal entries                                 0.54s  
+  ✓ payment reconciliation and status updates                            0.51s  
+  ✓ vendor payment detail without selected invoices posts foreign curre… 0.50s  
+  ✓ account payable status is normalized from legacy values              0.49s  
+  ✓ recalculate total payment method                                     0.49s  
+  ✓ payment soft delete cascades                                         0.51s  
+  ✓ invoice status is normalized to canonical lowercase value            0.51s  
+
+  Tests:    44 passed (185 assertions)
+  Duration: 31.66s
+

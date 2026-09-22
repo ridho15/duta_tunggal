@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\PurchaseOrder;
+use App\Services\Reports\PurchaseReportService;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -23,148 +23,7 @@ class PurchaseReportExport implements FromCollection, WithHeadings, WithStyles, 
 
     public function collection()
     {
-        $data = collect();
-
-        $orders = $this->query->with(['supplier', 'purchaseOrderItem.product'])->get();
-
-        $totalOrders = $orders->count();
-        $totalAmount = $orders->sum('total_amount');
-        $completedOrders = $orders->where('status', 'completed')->count();
-        $cancelledOrders = $orders->where('status', 'cancelled')->count();
-        $draftOrders = $orders->where('status', 'draft')->count();
-        $processingOrders = $orders->where('status', 'processing')->count();
-        $confirmedOrders = $orders->where('status', 'confirmed')->count();
-
-        // Calculate additional statistics
-        $totalQuantity = $orders->sum(function ($order) {
-            return $order->purchaseOrderItem->sum('quantity');
-        });
-        $averageAmount = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
-        $uniqueProducts = $orders->flatMap(function ($order) {
-            return $order->purchaseOrderItem->pluck('product_id');
-        })->unique()->count();
-
-        foreach ($orders as $order) {
-            // Header row for each order
-            $data->push([
-                'No. PO' => $order->po_number,
-                'Tanggal' => $order->order_date->format('d/m/Y'),
-                'Kode Supplier' => $order->supplier->code ?? '-',
-                'Nama Supplier' => $order->supplier->perusahaan ?? '-',
-                'Alamat Supplier' => $order->supplier->address ?? '-',
-                'No. Telp' => $order->supplier->phone ?? '-',
-                'Email' => $order->supplier->email ?? '-',
-                'Produk' => '',
-                'Qty' => '',
-                'Harga Satuan' => '',
-                'Subtotal' => '',
-                'Total PO' => 'Rp ' . number_format($order->total_amount ?? 0, 0, ',', '.'),
-                'Status' => $order->status,
-            ]);
-
-            // Item rows
-            foreach ($order->purchaseOrderItem as $item) {
-                $data->push([
-                    'No. PO' => '',
-                    'Tanggal' => '',
-                    'Kode Supplier' => '',
-                    'Nama Supplier' => '',
-                    'Alamat Supplier' => '',
-                    'No. Telp' => '',
-                    'Email' => '',
-                    'Produk' => $item->product->name ?? '-',
-                    'Qty' => $item->quantity ?? 0,
-                    'Harga Satuan' => 'Rp ' . number_format($item->unit_price ?? 0, 0, ',', '.'),
-                    'Subtotal' => 'Rp ' . number_format(($item->quantity ?? 0) * ($item->unit_price ?? 0), 0, ',', '.'),
-                    'Total PO' => '',
-                    'Status' => '',
-                ]);
-            }
-
-            // Empty row for separation
-            $data->push([
-                'No. PO' => '',
-                'Tanggal' => '',
-                'Kode Supplier' => '',
-                'Nama Supplier' => '',
-                'Alamat Supplier' => '',
-                'No. Telp' => '',
-                'Email' => '',
-                'Produk' => '',
-                'Qty' => '',
-                'Harga Satuan' => '',
-                'Subtotal' => '',
-                'Total PO' => '',
-                'Status' => '',
-            ]);
-        }
-
-        // Summary row
-        $data->push([
-            'No. PO' => 'SUMMARY',
-            'Tanggal' => '',
-            'Kode Supplier' => '',
-            'Nama Supplier' => '',
-            'Alamat Supplier' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => '',
-            'Qty' => '',
-            'Harga Satuan' => '',
-            'Subtotal' => '',
-            'Total PO' => 'Total: Rp ' . number_format($totalAmount, 0, ',', '.'),
-            'Status' => '',
-        ]);
-
-        $data->push([
-            'No. PO' => '',
-            'Tanggal' => '',
-            'Kode Supplier' => '',
-            'Nama Supplier' => '',
-            'Alamat Supplier' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => 'Total Orders: ' . $totalOrders,
-            'Qty' => 'Completed: ' . $completedOrders,
-            'Harga Satuan' => 'Cancelled: ' . $cancelledOrders,
-            'Subtotal' => '',
-            'Total PO' => '',
-            'Status' => '',
-        ]);
-
-        $data->push([
-            'No. PO' => '',
-            'Tanggal' => '',
-            'Kode Supplier' => '',
-            'Nama Supplier' => '',
-            'Alamat Supplier' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => 'Draft: ' . $draftOrders,
-            'Qty' => 'Processing: ' . $processingOrders,
-            'Harga Satuan' => 'Confirmed: ' . $confirmedOrders,
-            'Subtotal' => '',
-            'Total PO' => '',
-            'Status' => '',
-        ]);
-
-        $data->push([
-            'No. PO' => '',
-            'Tanggal' => '',
-            'Kode Supplier' => '',
-            'Nama Supplier' => '',
-            'Alamat Supplier' => '',
-            'No. Telp' => '',
-            'Email' => '',
-            'Produk' => 'Total Qty: ' . $totalQuantity,
-            'Qty' => 'Avg Transaction: Rp ' . number_format($averageAmount, 0, ',', '.'),
-            'Harga Satuan' => 'Unique Products: ' . $uniqueProducts,
-            'Subtotal' => '',
-            'Total PO' => '',
-            'Status' => '',
-        ]);
-
-        return $data;
+        return app(PurchaseReportService::class)->exportCollectionFromQuery($this->query);
     }
 
     public function headings(): array

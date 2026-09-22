@@ -63,93 +63,21 @@ class ViewStockMovement extends ViewRecord
                     ->schema([
                         TextEntry::make('from_model_type')
                             ->label('Source Type')
-                            ->formatStateUsing(function ($state) {
-                                return match ($state) {
-                                    'App\Models\SaleOrder' => 'Sales Order',
-                                    'App\Models\PurchaseOrder' => 'Purchase Order',
-                                    'App\Models\DeliveryOrder' => 'Delivery Order',
-                                    'App\Models\PurchaseReceipt' => 'Purchase Receipt',
-                                    'App\Models\PurchaseReceiptItem' => 'Purchase Receipt',
-                                    'App\Models\DeliveryOrderItem' => 'Delivery Order',
-                                    'App\Models\StockTransfer' => 'Stock Transfer',
-                                    'App\Models\ManufacturingOrder' => 'Manufacturing Order',
-                                    'App\Models\StockAdjustment' => 'Stock Adjustment',
-                                    default => 'Unknown'
-                                };
+                            ->formatStateUsing(function ($state, $record) {
+                                return $record->source_type_label;
                             }),
                         TextEntry::make('fromModel')
                             ->label('Source Number')
                             ->formatStateUsing(function ($record) {
-                                if ($record->fromModel) {
-                                    $modelType = $record->from_model_type;
-                                    return match ($modelType) {
-                                        'App\Models\SaleOrder' => $record->fromModel->so_number ?? 'N/A',
-                                        'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
-                                        'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
-                                        'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
-                                        'App\Models\PurchaseReceiptItem' => $record->fromModel->purchaseReceipt->receipt_number ?? 'N/A',
-                                        'App\Models\DeliveryOrderItem' => $record->fromModel->deliveryOrder->do_number ?? 'N/A',
-                                        'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
-                                        'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
-                                        'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
-                                        default => 'N/A'
-                                    };
-                                }
-                                return 'N/A';
+                                return $record->source_number;
                             }),
                         TextEntry::make('fromModel')
                             ->label('Source Link')
                             ->formatStateUsing(function ($record) {
-                                if ($record->fromModel) {
-                                    $modelType = $record->from_model_type;
-                                    $modelName = match ($modelType) {
-                                        'App\Models\SaleOrder' => 'Sales Order',
-                                        'App\Models\PurchaseOrder' => 'Purchase Order',
-                                        'App\Models\DeliveryOrder' => 'Delivery Order',
-                                        'App\Models\PurchaseReceipt' => 'Purchase Receipt',
-                                        'App\Models\PurchaseReceiptItem' => 'Purchase Receipt',
-                                        'App\Models\DeliveryOrderItem' => 'Delivery Order',
-                                        'App\Models\StockTransfer' => 'Stock Transfer',
-                                        'App\Models\ManufacturingOrder' => 'Manufacturing Order',
-                                        'App\Models\StockAdjustment' => 'Stock Adjustment',
-                                        default => 'Unknown'
-                                    };
-
-                                    $sourceNumber = match ($modelType) {
-                                        'App\Models\SaleOrder' => $record->fromModel->so_number ?? 'N/A',
-                                        'App\Models\PurchaseOrder' => $record->fromModel->po_number ?? 'N/A',
-                                        'App\Models\DeliveryOrder' => $record->fromModel->do_number ?? 'N/A',
-                                        'App\Models\PurchaseReceipt' => $record->fromModel->receipt_number ?? 'N/A',
-                                        'App\Models\PurchaseReceiptItem' => $record->fromModel->purchaseReceipt->receipt_number ?? 'N/A',
-                                        'App\Models\DeliveryOrderItem' => $record->fromModel->deliveryOrder->do_number ?? 'N/A',
-                                        'App\Models\StockTransfer' => $record->fromModel->transfer_number ?? 'N/A',
-                                        'App\Models\ManufacturingOrder' => $record->fromModel->mo_number ?? 'N/A',
-                                        'App\Models\StockAdjustment' => $record->fromModel->adjustment_number ?? 'N/A',
-                                        default => 'N/A'
-                                    };
-
-                                    return $modelName . ' - ' . $sourceNumber;
-                                }
-                                return 'No Source';
+                                return $record->source_display === '-' ? 'No Source' : $record->source_display;
                             })
                             ->url(function ($record) {
-                                if ($record->fromModel) {
-                                    $modelType = $record->from_model_type;
-
-                                    return match ($modelType) {
-                                        'App\Models\SaleOrder' => route('filament.admin.resources.sale-orders.view', $record->fromModel->id),
-                                        'App\Models\PurchaseOrder' => route('filament.admin.resources.purchase-orders.view', $record->fromModel->id),
-                                        'App\Models\DeliveryOrder' => route('filament.admin.resources.delivery-orders.view', $record->fromModel->id),
-                                        'App\Models\PurchaseReceipt' => route('filament.admin.resources.purchase-receipts.view', $record->fromModel->id),
-                                        'App\Models\PurchaseReceiptItem' => route('filament.admin.resources.purchase-receipts.view', $record->fromModel->purchaseReceipt->id),
-                                        'App\Models\DeliveryOrderItem' => route('filament.admin.resources.delivery-orders.view', $record->fromModel->deliveryOrder->id),
-                                        'App\Models\StockTransfer' => route('filament.admin.resources.stock-transfers.view', $record->fromModel->id),
-                                        'App\Models\ManufacturingOrder' => route('filament.admin.resources.manufacturing-orders.view', $record->fromModel->id),
-                                        'App\Models\StockAdjustment' => route('filament.admin.resources.stock-adjustments.view', $record->fromModel->id),
-                                        default => null
-                                    };
-                                }
-                                return null;
+                                return $record->source_resource_url;
                             })
                             ->color('primary')
                             ->openUrlInNewTab(false)

@@ -274,14 +274,14 @@
             <div class="card-sub">baris stok</div>
         </div>
         <div class="summary-card card-green">
-            <div class="card-label">Total On Hand</div>
+            <div class="card-label">Total Stok Bebas</div>
             <div class="card-value">{{ number_format($totals['qty_on_hand'], 2, ',', '.') }}</div>
-            <div class="card-sub">tersedia – terpesan</div>
+            <div class="card-sub">fisik - reserved</div>
         </div>
         <div class="summary-card card-orange">
             <div class="card-label">Total Nilai Stok</div>
             <div class="card-value" style="font-size:14px;">Rp {{ number_format($totals['total_value'], 0, ',', '.') }}</div>
-            <div class="card-sub">qty on hand × HPP</div>
+            <div class="card-sub">stok bebas x HPP</div>
         </div>
         <div class="summary-card card-purple">
             <div class="card-label">Mutasi Periode</div>
@@ -300,9 +300,9 @@
                     <th>Nama Produk</th>
                     <th>Gudang</th>
                     <th>Rak</th>
-                    <th class="right">Qty Tersedia</th>
-                    <th class="right">Qty Dipesan</th>
-                    <th class="right">Qty On Hand</th>
+                    <th class="right">Qty Fisik</th>
+                    <th class="right">Qty Reserved</th>
+                    <th class="right">Qty Stok Bebas</th>
                     <th class="right">Qty Min</th>
                     <th class="right">Masuk (Periode)</th>
                     <th class="right">Keluar (Periode)</th>

@@ -19,7 +19,9 @@ use App\Models\StockOpnameItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\StockOpnameService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -36,6 +38,7 @@ class StockOpnameTest extends TestCase
     protected $product;
     protected $inventoryCoa;
     protected $adjustmentCoa;
+    protected $stockOpnameService;
 
     protected function setUp(): void
     {
@@ -57,7 +60,7 @@ class StockOpnameTest extends TestCase
         ]);
 
         // Create product category
-        $category = ProductCategory::factory()->create(['cabang_id' => $this->cabang->id]);
+        $category = ProductCategory::factory()->create();
 
         // Create product
         $this->product = Product::factory()->create([
@@ -87,6 +90,8 @@ class StockOpnameTest extends TestCase
             'qty_available' => 100,
             'qty_reserved' => 0,
         ]);
+
+        $this->stockOpnameService = app(StockOpnameService::class);
     }
 
     protected function tearDown(): void
@@ -335,11 +340,7 @@ class StockOpnameTest extends TestCase
         ]);
 
         // Approve the opname
-        $opname->update([
-            'status' => 'approved',
-            'approved_by' => $this->user->id,
-            'approved_at' => now(),
-        ]);
+        $this->stockOpnameService->approveStockOpname($opname, $this->user->id);
 
         // Check journal entries created
         $journalEntries = JournalEntry::where('source_type', StockOpname::class)
@@ -381,11 +382,7 @@ class StockOpnameTest extends TestCase
         ]);
 
         // Approve the opname
-        $opname->update([
-            'status' => 'approved',
-            'approved_by' => $this->user->id,
-            'approved_at' => now(),
-        ]);
+        $this->stockOpnameService->approveStockOpname($opname, $this->user->id);
 
         // Check journal entries created
         $journalEntries = JournalEntry::where('source_type', StockOpname::class)
@@ -423,11 +420,7 @@ class StockOpnameTest extends TestCase
         ]);
 
         // Approve the opname
-        $opname->update([
-            'status' => 'approved',
-            'approved_by' => $this->user->id,
-            'approved_at' => now(),
-        ]);
+        $this->stockOpnameService->approveStockOpname($opname, $this->user->id);
 
         // Check no journal entries created
         $journalEntries = JournalEntry::where('source_type', StockOpname::class)
@@ -457,7 +450,7 @@ class StockOpnameTest extends TestCase
         $product2 = Product::factory()->create([
             'cabang_id' => $this->cabang->id,
             'supplier_id' => $this->supplier->id,
-            'product_category_id' => ProductCategory::factory()->create(['cabang_id' => $this->cabang->id])->id,
+            'product_category_id' => ProductCategory::factory()->create()->id,
         ]);
 
         StockOpnameItem::factory()->create([
@@ -467,11 +460,9 @@ class StockOpnameTest extends TestCase
         ]);
 
         // Approve the opname
-        $opname->update([
-            'status' => 'approved',
-            'approved_by' => $this->user->id,
-            'approved_at' => now(),
-        ]);
+        $this->stockOpnameService->approveStockOpname($opname, $this->user->id);
+
+        $this->assertEquals('approved', $opname->fresh()->status);
 
         // Check journal entries for net positive adjustment (20000 - 15000 = 5000)
         $journalEntries = JournalEntry::where('source_type', StockOpname::class)
@@ -485,6 +476,42 @@ class StockOpnameTest extends TestCase
 
         $this->assertEquals(5000, $totalDebit);
         $this->assertEquals(5000, $totalCredit);
+    }
+
+    #[Test]
+    public function it_requires_completed_status_before_approval()
+    {
+        $opname = StockOpname::factory()->create([
+            'warehouse_id' => $this->warehouse->id,
+            'status' => 'draft',
+            'created_by' => $this->user->id,
+        ]);
+
+        StockOpnameItem::factory()->create([
+            'stock_opname_id' => $opname->id,
+            'product_id' => $this->product->id,
+            'rak_id' => $this->rak->id,
+            'difference_value' => 1000,
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Hanya stock opname berstatus selesai yang dapat disetujui.');
+
+        $this->stockOpnameService->approveStockOpname($opname, $this->user->id);
+    }
+
+    #[Test]
+    public function it_requires_items_before_approval()
+    {
+        $opname = StockOpname::factory()->completed()->create([
+            'warehouse_id' => $this->warehouse->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Tambahkan minimal satu item sebelum menyetujui stock opname.');
+
+        $this->stockOpnameService->approveStockOpname($opname, $this->user->id);
     }
 
     #[Test]

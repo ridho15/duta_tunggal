@@ -8,6 +8,7 @@ use Database\Seeders\BukuBesarTestSeeder;
 use Database\Seeders\ChartOfAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BukuBesarPageTest extends TestCase
@@ -27,7 +28,7 @@ class BukuBesarPageTest extends TestCase
         $this->actingAs($user);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_render_buku_besar_page()
     {
         // Filament pages are accessible via Livewire component testing
@@ -37,7 +38,7 @@ class BukuBesarPageTest extends TestCase
             ->assertSee('Pilih Akun');
     }
 
-    /** @test */
+    #[Test]
     public function it_displays_coa_options_in_dropdown()
     {
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
@@ -47,20 +48,21 @@ class BukuBesarPageTest extends TestCase
             ->assertSee('4100');   // PENJUALAN
     }
 
-    /** @test */
+    #[Test]
     public function it_can_select_a_coa_and_display_ledger()
     {
         $coa = ChartOfAccount::where('code', '1111.01')->first(); // KAS BESAR
         $this->assertNotNull($coa, 'KAS BESAR account should exist');
 
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
+            ->set('showPreview', true)
             ->set('coa_ids', [$coa->id])
             ->assertSet('coa_ids', [$coa->id])
             ->assertSee($coa->code)
             ->assertSee($coa->name);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_journal_entries_by_date_range()
     {
         $coa = ChartOfAccount::where('code', '1112.01')->first(); // BANK BCA
@@ -95,6 +97,7 @@ class BukuBesarPageTest extends TestCase
         $endDate = now()->format('Y-m-d');
 
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
+            ->set('showPreview', true)
             ->set('coa_ids', [$coa->id])
             ->set('start_date', $startDate)
             ->set('end_date', $endDate)
@@ -102,7 +105,7 @@ class BukuBesarPageTest extends TestCase
             ->assertDontSee('OLD-001');
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_no_coa_selected_gracefully()
     {
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
@@ -110,7 +113,7 @@ class BukuBesarPageTest extends TestCase
             ->assertSee('Pilih Akun'); // Should still show the filter form
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_coa_with_no_transactions()
     {
         // Create a COA with no transactions
@@ -133,7 +136,7 @@ class BukuBesarPageTest extends TestCase
         // Should not error out, just show no transactions
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_running_balance_correctly()
     {
         $coa = ChartOfAccount::where('code', '1111.01')->first(); // KAS BESAR (Asset)
@@ -174,6 +177,7 @@ class BukuBesarPageTest extends TestCase
         // Expected: 10,000,000 + 5,000,000 - 2,000,000 = 13,000,000
 
         Livewire::test(\App\Filament\pages\BukuBesarPage::class)
+            ->set('showPreview', true)
             ->set('coa_ids', [$coa->id])
             ->set('start_date', now()->startOfMonth()->format('Y-m-d'))
             ->set('end_date', now()->endOfMonth()->format('Y-m-d'))
@@ -184,7 +188,7 @@ class BukuBesarPageTest extends TestCase
         // which is better tested in browser/Dusk tests
     }
 
-    /** @test */
+    #[Test]
     public function it_provides_correct_coa_options()
     {
         $component = Livewire::test(\App\Filament\pages\BukuBesarPage::class);
@@ -200,7 +204,7 @@ class BukuBesarPageTest extends TestCase
         $this->assertStringContainsString(' - ', $options[$firstKey]);
     }
 
-    /** @test */
+    #[Test]
     public function it_defaults_to_current_month_date_range()
     {
         $component = Livewire::test(\App\Filament\pages\BukuBesarPage::class);
@@ -212,7 +216,7 @@ class BukuBesarPageTest extends TestCase
         $this->assertEquals(now()->endOfMonth()->format('Y-m-d'), $endDate);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_update_date_range()
     {
         $newStart = now()->subMonth()->startOfMonth()->format('Y-m-d');

@@ -10,4 +10,8 @@ return [
     // Automatically create a Purchase Invoice when a PurchaseReceipt is fully completed.
     // Set to true to enable auto-invoice creation, false to require manual creation.
     'auto_create_invoice' => env('PROCUREMENT_AUTO_CREATE_INVOICE', false),
+
+    // Require Delivery Order approval before it can be marked as Sent.
+    // Set to false to allow DOs to be marked as Sent directly from draft/request_approve.
+    'do_approval_required' => env('DO_APPROVAL_REQUIRED', true),
 ];

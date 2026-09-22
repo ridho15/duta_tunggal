@@ -15,8 +15,9 @@ use Filament\Support\Enums\MaxWidth;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
-class GroupedJournalEntries extends Page
+class GroupedJournalEntries extends Page implements HasForms
 {
+    use InteractsWithForms;
 
     protected static string $resource = JournalEntryResource::class;
 
@@ -26,7 +27,7 @@ class GroupedJournalEntries extends Page
 
     protected static ?string $title = 'Journal Entries - Grouped by Parent COA';
     // Register this page for navigation so it can be accessed
-    protected static bool $shouldRegisterNavigation = true;
+    protected static bool $shouldRegisterNavigation = false;
     // Make the page title/navigation label explicit (useful in breadcrumbs and
     // for clarity if the page is ever exposed in sub-navigation). Also set the
     // parent item so, if registered in the future, it will be grouped under
@@ -40,55 +41,68 @@ class GroupedJournalEntries extends Page
 
     public function mount(): void
     {
+        $this->form->fill([
+            'start_date' => null,
+            'end_date'   => null,
+            'journal_type' => null,
+            'cabang_id' => null,
+        ]);
         $this->loadData();
     }
 
-    // public function form(Form $form): Form
-    // {
-    //     return $form
-    //         ->schema([
-    //             Forms\Components\Section::make('Filters')
-    //             ->schema([
-    //                 Forms\Components\DatePicker::make('start_date')
-    //                     ->label('Start Date')
-    //                     ->default(now()->startOfMonth())
-    //                     ->reactive(),
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\Section::make('Filters')
+                ->schema([
+                    Forms\Components\DatePicker::make('start_date')
+                        ->label('Start Date')
+                        ->placeholder('All dates'),
                 
-    //                 Forms\Components\DatePicker::make('end_date')
-    //                     ->label('End Date')
-    //                     ->default(now()->endOfMonth())
-    //                     ->reactive(),
+                    Forms\Components\DatePicker::make('end_date')
+                        ->label('End Date')
+                        ->placeholder('All dates'),
                 
-    //                 Forms\Components\Select::make('journal_type')
-    //                     ->label('Journal Type')
-    //                     ->options([
-    //                         'sales' => 'Sales',
-    //                         'purchase' => 'Purchase',
-    //                         'depreciation' => 'Depreciation',
-    //                         'manual' => 'Manual',
-    //                         'transfer' => 'Transfer',
-    //                         'payment' => 'Payment',
-    //                         'receipt' => 'Receipt',
-    //                     ])
-    //                     ->placeholder('All Types')
-    //                     ->reactive(),
+                    Forms\Components\Select::make('journal_type')
+                        ->label('Journal Type')
+                        ->options([
+                            'sales' => 'Sales',
+                            'purchase' => 'Purchase',
+                            'depreciation' => 'Depreciation',
+                            'manual' => 'Manual',
+                            'transfer' => 'Transfer',
+                            'payment' => 'Payment',
+                            'receipt' => 'Receipt',
+                        ])
+                        ->placeholder('All Types'),
                 
-    //                 Forms\Components\Select::make('cabang_id')
-    //                     ->label('Branch')
-    //                     ->options(Cabang::pluck('nama', 'id')->toArray())
-    //                     ->searchable()
-    //                     ->placeholder('All Branches')
-    //                     ->reactive(),
-    //             ])
-    //             ->columns(4),
-    //         ])
-    //         ->statePath('data');
-    // }
+                    Forms\Components\Select::make('cabang_id')
+                        ->label('Branch')
+                        ->options(Cabang::pluck('nama', 'id')->toArray())
+                        ->searchable()
+                        ->placeholder('All Branches'),
+                ])
+                ->columns(4),
+            ])
+            ->statePath('data');
+    }
 
-    // public function applyFilters(): void
-    // {
-    //     $this->loadData();
-    // }
+    public function applyFilters(): void
+    {
+        $this->loadData();
+    }
+
+    public function resetFilters(): void
+    {
+        $this->form->fill([
+            'start_date'   => null,
+            'end_date'     => null,
+            'journal_type' => null,
+            'cabang_id'    => null,
+        ]);
+        $this->loadData();
+    }
 
     protected function loadData(): void
     {
@@ -126,8 +140,14 @@ class GroupedJournalEntries extends Page
             \Filament\Actions\Action::make('export')
                 ->label('Export to Excel')
                 ->icon('heroicon-o-arrow-down-tray')
-                ->action('exportToExcel')
-                ->color('success'),
+                ->color('success')
+                ->action(function () {
+                    Notification::make()
+                        ->title('Export belum tersedia')
+                        ->warning()
+                        ->body('Fitur export Excel sedang dalam pengembangan.')
+                        ->send();
+                }),
         ];
     }
 

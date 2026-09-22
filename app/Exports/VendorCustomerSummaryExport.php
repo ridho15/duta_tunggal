@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Helpers\MoneyHelper;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -25,8 +26,8 @@ class VendorCustomerSummaryExport implements FromCollection, WithHeadings
                 'Kode' => $item->code ?? '-',
                 'Nama' => $item->name ?? '-',
                 'Jumlah Transaksi' => $item->transaction_count ?? 0,
-                'Total Nilai' => 'Rp ' . number_format($item->total_amount ?? 0, 0, ',', '.'),
-                'Rata-rata' => 'Rp ' . number_format($item->average_amount ?? 0, 0, ',', '.'),
+                'Total Nilai' => MoneyHelper::rupiah($item->total_amount ?? 0),
+                'Rata-rata' => MoneyHelper::rupiah($item->average_amount ?? 0),
                 'Transaksi Terakhir' => $item->last_transaction_date
                     ? (\is_string($item->last_transaction_date)
                         ? $item->last_transaction_date

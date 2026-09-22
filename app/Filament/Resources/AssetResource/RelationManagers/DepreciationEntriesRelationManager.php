@@ -38,7 +38,6 @@ class DepreciationEntriesRelationManager extends RelationManager
                 
                 Forms\Components\TextInput::make('amount')
                     ->label('Nilai Penyusutan')
-                    ->numeric()
                     ->indonesianMoney()
                     ->required(),
                 

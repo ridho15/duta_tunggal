@@ -12,7 +12,7 @@ class DeliveryOrderItemObserver
      */
     public function updated(DeliveryOrderItem $deliveryOrderItem): void
     {
-        // Check if quantity has changed and delivery order status is 'sent'
+        // Check if quantity has changed and delivery order status is 'completed'
         $originalQuantity = $deliveryOrderItem->getOriginal('quantity');
         $currentQuantity = $deliveryOrderItem->quantity;
 
@@ -23,8 +23,8 @@ class DeliveryOrderItemObserver
             'delivery_order_status' => $deliveryOrderItem->deliveryOrder?->status,
         ]);
 
-        if ($originalQuantity != $currentQuantity && $deliveryOrderItem->deliveryOrder?->status === 'sent') {
-            \Illuminate\Support\Facades\Log::info('DeliveryOrderItemObserver: Quantity changed for sent delivery order', [
+        if ($originalQuantity != $currentQuantity && $deliveryOrderItem->deliveryOrder?->status === 'completed') {
+            \Illuminate\Support\Facades\Log::info('DeliveryOrderItemObserver: Quantity changed for completed delivery order', [
                 'delivery_order_item_id' => $deliveryOrderItem->id,
                 'delivery_order_id' => $deliveryOrderItem->delivery_order_id,
                 'original_quantity' => $originalQuantity,
@@ -33,7 +33,7 @@ class DeliveryOrderItemObserver
 
             // Use DeliveryOrderObserver to handle journal entry updates
             $deliveryOrderObserver = app(\App\Observers\DeliveryOrderObserver::class);
-            $deliveryOrderObserver->handleQuantityUpdateAfterSent($deliveryOrderItem->deliveryOrder);
+            $deliveryOrderObserver->handleQuantityUpdateAfterCompleted($deliveryOrderItem->deliveryOrder);
         }
     }
 }

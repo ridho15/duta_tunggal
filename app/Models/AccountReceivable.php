@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
 use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,13 +22,22 @@ class AccountReceivable extends Model
         'remaining',
         'status', //Lunas / Belum Lunas
         'created_by',
-        'cabang_id'
+        'cabang_id',
+        'currency_id',
+        'exchange_rate',
+        'total_original',
+        'paid_original',
+        'remaining_original',
     ];
 
     protected $casts = [
         'total' => 'decimal:2',
         'paid' => 'decimal:2',
         'remaining' => 'decimal:2',
+        'exchange_rate' => 'float',
+        'total_original' => 'float',
+        'paid_original' => 'float',
+        'remaining_original' => 'float',
     ];
 
     public function invoice()
@@ -38,6 +48,11 @@ class AccountReceivable extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
+    }
+
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class, 'currency_id')->withDefault();
     }
 
     public function createdBy()
@@ -68,7 +83,7 @@ class AccountReceivable extends Model
 
         static::updated(function ($accountReceivable) {
             // Hapus ageing schedule ketika account receivable lunas
-            if ($accountReceivable->status === 'Lunas' && $accountReceivable->wasChanged('status')) {
+            if ($accountReceivable->status === PaymentStatus::PAID->value && $accountReceivable->wasChanged('status')) {
                 if ($accountReceivable->ageingSchedule) {
                     $accountReceivable->ageingSchedule->delete();
                 }

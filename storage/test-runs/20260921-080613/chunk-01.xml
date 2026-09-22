@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="36" assertions="159" errors="0" failures="3" skipped="0" time="21.782469">
+    <testsuite name="Tests\Feature\CustomerReceiptCashPaymentTest" file="Customer Receipt Cash Payment (Tests\Feature\CustomerReceiptCashPayment)" tests="1" assertions="16" errors="0" failures="0" skipped="0" time="3.762425">
+      <testcase name="Cash payment creates correct journal entries and updates ar" file="Customer Receipt Cash Payment (Tests\Feature\CustomerReceiptCashPayment)::Cash payment creates correct journal entries and updates ar" class="Tests\Feature\CustomerReceiptCashPaymentTest" classname="Tests.Feature.CustomerReceiptCashPaymentTest" assertions="16" time="3.762425">
+        <system-out>
+=== JOURNAL ENTRIES CREATED ===
+COA: 1120 - PIUTANG DAGANG
+Description: Customer receipt for receipt id 1
+Debit: 0.00, Credit: 1000000.00
+Reference: REC-1
+---
+COA: 977720 - Test Account 88261
+Description: Bank/Cash for receipt id 1 via cash
+Debit: 1000000.00, Credit: 0.00
+Reference: REC-1
+---
+=== ACCOUNT RECEIVABLE STATUS ===
+Total: 1000000.00
+Paid: 1000000.00
+Remaining: 0.00
+Status: Lunas
+=== INVOICE STATUS ===
+Status: paid</system-out>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptVsVendorPaymentTest" file="Customer Receipt Vs Vendor Payment (Tests\Feature\CustomerReceiptVsVendorPayment)" tests="1" assertions="29" errors="0" failures="0" skipped="0" time="0.554661">
+      <testcase name="Customer receipt and vendor payment mechanisms comparison" file="Customer Receipt Vs Vendor Payment (Tests\Feature\CustomerReceiptVsVendorPayment)::Customer receipt and vendor payment mechanisms comparison" class="Tests\Feature\CustomerReceiptVsVendorPaymentTest" classname="Tests.Feature.CustomerReceiptVsVendorPaymentTest" assertions="29" time="0.554661">
+        <system-out>
+=== Customer Receipt vs Vendor Payment Mechanism Comparison ===
+
+✅ Model structures are similar
+✅ Both have header-detail relationship
+✅ Both support multiple payment methods
+✅ Both track payment amounts and dates
+✅ Both integrate with Chart of Accounts
+✅ Both have status tracking (Draft/Partial/Paid)
+✅ Both support invoice allocation
+
+Key Similarities:
+- Same attribute names and types
+- Same relationship patterns
+- Same payment processing logic
+- Same journal entry integration
+
+Conclusion: Customer Receipt mechanism is implemented similarly to Vendor Payment mechanism.
+</system-out>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\InvoicePaymentFlowConsistencyTest" file="tests/Feature/InvoicePaymentFlowConsistencyTest.php" tests="1" assertions="7" errors="0" failures="0" skipped="0" time="0.692392">
+      <testcase name="converted invoice total drives receivable and partial receipt balances in idr" file="tests/Feature/InvoicePaymentFlowConsistencyTest.php::converted invoice total drives receivable and partial receipt balances in idr" class="Tests\Feature\InvoicePaymentFlowConsistencyTest" classname="Tests.Feature.InvoicePaymentFlowConsistencyTest" assertions="7" time="0.692392"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\PaymentCurrencyAuditTest" file="Payment Currency Audit (Tests\Feature\PaymentCurrencyAudit)" tests="1" assertions="3" errors="0" failures="0" skipped="0" time="0.677368">
+      <testcase name="Payment recorded in idr or has amount idr" file="Payment Currency Audit (Tests\Feature\PaymentCurrencyAudit)::Payment recorded in idr or has amount idr" class="Tests\Feature\PaymentCurrencyAuditTest" classname="Tests.Feature.PaymentCurrencyAuditTest" assertions="3" time="0.677368"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\PaymentLedgerPostingTest" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)" tests="9" assertions="39" errors="0" failures="1" skipped="0" time="4.695521">
+      <testcase name="Post vendor payment creates debit ap and credit bank" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Post vendor payment creates debit ap and credit bank" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="6" time="0.588953"/>
+      <testcase name="Post vendor payment is idempotent for same payment" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Post vendor payment is idempotent for same payment" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="6" time="0.681763"/>
+      <testcase name="Post vendor payment using deposit credits deposit coa" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Post vendor payment using deposit credits deposit coa" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="4" time="0.489631"/>
+      <testcase name="Post vendor payment with deposit throws when deposit coa is missing" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Post vendor payment with deposit throws when deposit coa is missing" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="2" time="0.483143"/>
+      <testcase name="Vendor payment detail creation fails early when supplier deposit is insufficient" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Vendor payment detail creation fails early when supplier deposit is insufficient" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="4" time="0.473576"/>
+      <testcase name="Vendor payment status update fails early when deposit is unavailable" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Vendor payment status update fails early when deposit is unavailable" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="3" time="0.458544"/>
+      <testcase name="Post deposit creates journal entries" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Post deposit creates journal entries" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="4" time="0.490004"/>
+      <testcase name="Import purchase invoice does not post ppn masukan" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Import purchase invoice does not post ppn masukan" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="1" time="0.513514">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Import purchase invoice does not post ppn masukanInvoice posting should be posted or skipped
+Failed asserting that false is true.
+at tests/Feature/PaymentLedgerPostingTest.php:518</failure>
+      </testcase>
+      <testcase name="Import payment posts ppn masukan and other import taxes" file="Payment Ledger Posting (Tests\Feature\PaymentLedgerPosting)::Import payment posts ppn masukan and other import taxes" class="Tests\Feature\PaymentLedgerPostingTest" classname="Tests.Feature.PaymentLedgerPostingTest" assertions="9" time="0.516394"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\PaymentRequestVendorPaymentFlowTest" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)" tests="19" assertions="43" errors="0" failures="0" skipped="0" time="9.259459">
+      <testcase name="It can create a payment request in draft status" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::It can create a payment request in draft status" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.462163"/>
+      <testcase name="Payment request total amount is formatted as rupiah in the create form" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Payment request total amount is formatted as rupiah in the create form" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.708814"/>
+      <testcase name="Payment request generates unique request number" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Payment request generates unique request number" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="2" time="0.495497"/>
+      <testcase name="It can submit payment request for approval" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::It can submit payment request for approval" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.468838"/>
+      <testcase name="Submit action is only visible from draft status" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Submit action is only visible from draft status" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="3" time="0.466641"/>
+      <testcase name="It can approve a pending payment request" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::It can approve a pending payment request" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="4" time="0.464150"/>
+      <testcase name="Approve action is only visible when pending approval" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Approve action is only visible when pending approval" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="3" time="0.466905"/>
+      <testcase name="It can reject a pending payment request" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::It can reject a pending payment request" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="3" time="0.465994"/>
+      <testcase name="Reject action requires approval notes" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Reject action requires approval notes" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.470715"/>
+      <testcase name="It can create vendor payment linked to approved payment request" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::It can create vendor payment linked to approved payment request" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.481974"/>
+      <testcase name="After creating vendor payment payment request status becomes paid" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::After creating vendor payment payment request status becomes paid" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="2" time="0.485346"/>
+      <testcase name="Creating vendor payment without payment request id does not affect any pr" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Creating vendor payment without payment request id does not affect any pr" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="2" time="0.487505"/>
+      <testcase name="Vendor payment select only shows approved prs without vendor payment id" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Vendor payment select only shows approved prs without vendor payment id" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="3" time="0.482225"/>
+      <testcase name="Paid payment request is excluded from vendor payment select" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Paid payment request is excluded from vendor payment select" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.482797"/>
+      <testcase name="Payment request belongs to vendor payment" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Payment request belongs to vendor payment" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="2" time="0.493721"/>
+      <testcase name="Vendor payment belongs to payment request" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Vendor payment belongs to payment request" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="2" time="0.478623"/>
+      <testcase name="Payment request status constants are correctly defined" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Payment request status constants are correctly defined" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="5" time="0.462629"/>
+      <testcase name="Payment request status labels cover all statuses" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Payment request status labels cover all statuses" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="5" time="0.467983"/>
+      <testcase name="Payment request status is normalized to canonical lowercase value" file="Payment Request Vendor Payment Flow (Tests\Feature\PaymentRequestVendorPaymentFlow)::Payment request status is normalized to canonical lowercase value" class="Tests\Feature\PaymentRequestVendorPaymentFlowTest" classname="Tests.Feature.PaymentRequestVendorPaymentFlowTest" assertions="1" time="0.466940"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\VendorPaymentFlowAdjustmentTest" file="Vendor Payment Flow Adjustment (Tests\Feature\VendorPaymentFlowAdjustment)" tests="2" assertions="11" errors="0" failures="2" skipped="0" time="0.993212">
+      <testcase name="Vendor payment observer keeps adjustment amount in account payable remaining" file="Vendor Payment Flow Adjustment (Tests\Feature\VendorPaymentFlowAdjustment)::Vendor payment observer keeps adjustment amount in account payable remaining" class="Tests\Feature\VendorPaymentFlowAdjustmentTest" classname="Tests.Feature.VendorPaymentFlowAdjustmentTest" assertions="2" time="0.489375">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Vendor payment observer keeps adjustment amount in account payable remainingFailed asserting that 75349.0 matches expected 75000.0.
+at tests/Feature/VendorPaymentFlowAdjustmentTest.php:83</failure>
+      </testcase>
+      <testcase name="Manual mode creates details and updates ap with adjustment" file="Vendor Payment Flow Adjustment (Tests\Feature\VendorPaymentFlowAdjustment)::Manual mode creates details and updates ap with adjustment" class="Tests\Feature\VendorPaymentFlowAdjustmentTest" classname="Tests.Feature.VendorPaymentFlowAdjustmentTest" assertions="9" time="0.503837">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Manual mode creates details and updates ap with adjustmentFailed asserting that 809473.0 matches expected 75000.0.
+at tests/Feature/VendorPaymentFlowAdjustmentTest.php:230</failure>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\VendorPaymentFromPaymentRequestTest" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)" tests="2" assertions="11" errors="0" failures="0" skipped="0" time="1.147430">
+      <testcase name="Create page prefills from payment request query with remaining amount" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)::Create page prefills from payment request query with remaining amount" class="Tests\Feature\VendorPaymentFromPaymentRequestTest" classname="Tests.Feature.VendorPaymentFromPaymentRequestTest" assertions="8" time="0.685541"/>
+      <testcase name="Helpers used by the create page are publicly callable" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)::Helpers used by the create page are publicly callable" class="Tests\Feature\VendorPaymentFromPaymentRequestTest" classname="Tests.Feature.VendorPaymentFromPaymentRequestTest" assertions="3" time="0.461889"/>
+    </testsuite>
+  </testsuite>
+</testsuites>

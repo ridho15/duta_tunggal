@@ -31,30 +31,31 @@ class AddDepositAction
                             ->label('Deposit Amount')
                             ->indonesianMoney()
                             ->required()
-                            ->numeric()
                             ->default(0)
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $usedAmount = $get('used_amount') ?? 0;
-                                $set('remaining_amount', $state - $usedAmount);
+                                $parsed     = \App\Helpers\MoneyHelper::safeParse($state);
+                                $parsedUsed = \App\Helpers\MoneyHelper::safeParse($usedAmount);
+                                $set('remaining_amount', $parsed - $parsedUsed);
                             }),
-                            
+
                         TextInput::make('used_amount')
                             ->label('Already Used Amount')
                             ->indonesianMoney()
-                            ->numeric()
                             ->default(0)
-                            ->reactive()
+                            ->live(debounce: 500)
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $totalAmount = $get('amount') ?? 0;
-                                $set('remaining_amount', $totalAmount - $state);
+                                $parsedTotal = \App\Helpers\MoneyHelper::safeParse($totalAmount);
+                                $parsedUsed  = \App\Helpers\MoneyHelper::safeParse($state);
+                                $set('remaining_amount', $parsedTotal - $parsedUsed);
                             }),
                     ]),
                     
                 TextInput::make('remaining_amount')
                     ->label('Remaining Amount')
                     ->indonesianMoney()
-                    ->numeric()
                     ->default(0)
                     ->disabled()
                     ->dehydrated(),

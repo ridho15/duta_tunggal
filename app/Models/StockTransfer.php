@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +11,7 @@ use Illuminate\Testing\Fluent\Concerns\Has;
 
 class StockTransfer extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory,LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'stock_transfers';
     protected $fillable = [
         'transfer_number',
@@ -38,6 +39,31 @@ class StockTransfer extends Model
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    public static function generateTransferNumber(): string
+    {
+        $prefix = 'ST-' . now()->format('Ymd') . '-';
+        static $dailyCounter = [];
+
+        if (isset($dailyCounter[$prefix])) {
+            $dailyCounter[$prefix]++;
+            return $prefix . str_pad((string) $dailyCounter[$prefix], 4, '0', STR_PAD_LEFT);
+        }
+
+        $last = self::withTrashed()
+            ->where('transfer_number', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->first();
+
+        $next = 1;
+        if ($last && preg_match('/^(?:ST-\d{8}-)(\d{4})$/', (string) $last->transfer_number, $matches)) {
+            $next = ((int) $matches[1]) + 1;
+        }
+
+        $dailyCounter[$prefix] = $next;
+
+        return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
     protected static function booted()

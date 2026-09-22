@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Cabang;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -27,7 +26,6 @@ class PurchaseOrderFactory extends Factory
             'close_reason' => $this->faker->optional()->sentence(),
             'date_approved' => now(),
             'approved_by' => 1, // user id
-            'warehouse_id' => 1, // warehouse id
             'tempo_hutang' => rand(0, 60),
             'note' => $this->faker->optional()->sentence(),
             'close_requested_by' => 1,
@@ -40,10 +38,6 @@ class PurchaseOrderFactory extends Factory
             'refer_model_type' => null,
             'refer_model_id' => null,
             'is_import' => false,
-            'ppn_option' => 'standard',
-            'cabang_id' => function () {
-                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
-            },
         ];
     }
 }

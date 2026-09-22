@@ -47,15 +47,17 @@ class PurchaseReturn extends Model
     ];
 
     /** Resolution options for QC-based returns */
-    const QC_ACTION_REDUCE_STOCK      = 'reduce_stock';
+    const QC_ACTION_REDUCE_STOCK       = 'reduce_stock';
     const QC_ACTION_WAIT_NEXT_DELIVERY = 'wait_next_delivery';
-    const QC_ACTION_MERGE_NEXT_ORDER  = 'merge_next_order';
+    const QC_ACTION_MERGE_NEXT_ORDER   = 'merge_next_order';
+    const QC_ACTION_RETURN_SUPPLIER    = 'return_supplier';
 
     public static function qcActionOptions(): array
     {
         return [
-            self::QC_ACTION_REDUCE_STOCK       => 'Kurangi Qty PO (Sesuaikan Pesanan)',
-            self::QC_ACTION_WAIT_NEXT_DELIVERY  => 'Tunggu Pengiriman Berikutnya (Supplier Kirim Ulang)',
+            self::QC_ACTION_WAIT_NEXT_DELIVERY => 'Tunggu Pengganti (PO Tetap Terbuka)',
+            self::QC_ACTION_RETURN_SUPPLIER    => 'Retur ke Supplier (Buat Dokumen Retur)',
+            self::QC_ACTION_REDUCE_STOCK       => 'Batalkan Sisa PO (Kurangi Qty PO & Selesaikan)',
             self::QC_ACTION_MERGE_NEXT_ORDER   => 'Gabung ke PO Berikutnya (Bawa Harga Asli)',
         ];
     }
@@ -99,6 +101,16 @@ class PurchaseReturn extends Model
     public function purchaseReturnItem()
     {
         return $this->hasMany(PurchaseReturnItem::class, 'purchase_return_id');
+    }
+
+    public function items()
+    {
+        return $this->purchaseReturnItem();
+    }
+
+    public function purchaseReturnItems()
+    {
+        return $this->purchaseReturnItem();
     }
 
     protected static function booted()

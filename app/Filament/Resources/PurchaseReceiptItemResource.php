@@ -35,9 +35,9 @@ class PurchaseReceiptItemResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-chevron-up-down';
 
     // Put Purchase Receipt Item under the Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian (Purchase Order)';
+    protected static ?string $navigationGroup = 'Pembelian';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 6;
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -101,7 +101,7 @@ class PurchaseReceiptItemResource extends Resource
                                 $manageType = $user?->manage_type ?? [];
                                 $query = \App\Models\Warehouse::where('status', true)
                                     ->where(function ($q) use ($search) {
-                                        $q->where('perusahaan', 'like', "%{$search}%")
+                                        $q->where('name', 'like', "%{$search}%")
                                           ->orWhere('kode', 'like', "%{$search}%");
                                     });
                                 

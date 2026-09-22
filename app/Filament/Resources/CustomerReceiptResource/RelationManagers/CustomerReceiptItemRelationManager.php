@@ -29,7 +29,6 @@ class CustomerReceiptItemRelationManager extends RelationManager
                     ->required(),
                 Forms\Components\TextInput::make('amount')
                     ->label('Jumlah Pembayaran')
-                    ->numeric()
                     ->indonesianMoney()
                     ->required(),
                 Forms\Components\Select::make('method')

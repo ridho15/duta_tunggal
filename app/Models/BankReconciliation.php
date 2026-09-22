@@ -4,13 +4,14 @@ namespace App\Models;
 
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BankReconciliation extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, CascadesJournalEntries;
 
     protected $fillable = [
         'coa_id', 'period_start', 'period_end', 'statement_ending_balance', 'book_balance', 'difference', 'reference', 'notes', 'status'

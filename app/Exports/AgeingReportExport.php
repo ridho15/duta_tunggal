@@ -2,10 +2,9 @@
 
 namespace App\Exports;
 
-use App\Models\AccountReceivable;
-use App\Models\AccountPayable;
-use App\Models\AgeingSchedule;
+use App\Helpers\MoneyHelper;
 use App\Models\Cabang;
+use App\Services\Reports\AgeingReportService;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -88,6 +87,7 @@ class SummarySheet implements FromCollection, WithHeadings, WithTitle, WithStyle
 
     public function collection()
     {
+        $service = app(AgeingReportService::class);
         $cabangName = $this->cabangId ? Cabang::find($this->cabangId)->nama ?? 'All Branches' : 'All Branches';
 
         $data = [
@@ -99,129 +99,49 @@ class SummarySheet implements FromCollection, WithHeadings, WithTitle, WithStyle
 
         // Calculate receivables summary
         if ($this->type === 'receivables' || $this->type === 'both') {
-            $receivablesData = $this->calculateAgeingSummary('receivables');
+            $receivablesData = $service->summarizeBuckets(
+                $service->getReceivableRecords([
+                    'as_of_date' => $this->asOfDate,
+                    'cabang_id' => $this->cabangId,
+                ]),
+                true
+            );
             $data[] = ['Account Receivables Summary', '', '', 'Count', $receivablesData['current']['count'], $receivablesData['31-60']['count'], $receivablesData['61-90']['count'], $receivablesData['>90']['count'], $receivablesData['total']['count']];
-            $data[] = ['', '', '', 'Amount', 'Rp ' . number_format($receivablesData['current']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['31-60']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['61-90']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['>90']['amount'], 0, ',', '.'), 'Rp ' . number_format($receivablesData['total']['amount'], 0, ',', '.')];
+            $data[] = ['', '', '', 'Amount', MoneyHelper::rupiah($receivablesData['current']['amount']), MoneyHelper::rupiah($receivablesData['31-60']['amount']), MoneyHelper::rupiah($receivablesData['61-90']['amount']), MoneyHelper::rupiah($receivablesData['>90']['amount']), MoneyHelper::rupiah($receivablesData['total']['amount'])];
         }
 
         $data[] = ['', '', '', '', '', '', '', '', ''];
 
         // Calculate payables summary
         if ($this->type === 'payables' || $this->type === 'both') {
-            $payablesData = $this->calculateAgeingSummary('payables');
+            $payablesData = $service->summarizeBuckets(
+                $service->getPayableRecords([
+                    'as_of_date' => $this->asOfDate,
+                    'cabang_id' => $this->cabangId,
+                ]),
+                true
+            );
             $data[] = ['Account Payables Summary', '', '', 'Count', $payablesData['current']['count'], $payablesData['31-60']['count'], $payablesData['61-90']['count'], $payablesData['>90']['count'], $payablesData['total']['count']];
-            $data[] = ['', '', '', 'Amount', 'Rp ' . number_format($payablesData['current']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['31-60']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['61-90']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['>90']['amount'], 0, ',', '.'), 'Rp ' . number_format($payablesData['total']['amount'], 0, ',', '.')];
+            $data[] = ['', '', '', 'Amount', MoneyHelper::rupiah($payablesData['current']['amount']), MoneyHelper::rupiah($payablesData['31-60']['amount']), MoneyHelper::rupiah($payablesData['61-90']['amount']), MoneyHelper::rupiah($payablesData['>90']['amount']), MoneyHelper::rupiah($payablesData['total']['amount'])];
         }
 
         // Add cash flow projection
         $data[] = ['', '', '', '', '', '', '', '', ''];
         $data[] = ['Cash Flow Projection (Next 30 Days)', '', '', '', '', '', '', '', ''];
 
-        $cashFlow30 = $this->calculateCashFlowProjection(30);
-        $cashFlow60 = $this->calculateCashFlowProjection(60);
-        $cashFlow90 = $this->calculateCashFlowProjection(90);
+        $baseFilters = [
+            'as_of_date' => $this->asOfDate,
+            'cabang_id' => $this->cabangId,
+        ];
+        $cashFlow30 = $service->projectCashFlow($baseFilters, 30);
+        $cashFlow60 = $service->projectCashFlow($baseFilters, 60);
+        $cashFlow90 = $service->projectCashFlow($baseFilters, 90);
 
-        $data[] = ['Expected Collections (30 days)', 'Rp ' . number_format($cashFlow30['receivables'], 0, ',', '.'), '', 'Expected Payments (30 days)', 'Rp ' . number_format($cashFlow30['payables'], 0, ',', '.'), '', 'Net Cash Flow', 'Rp ' . number_format($cashFlow30['receivables'] - $cashFlow30['payables'], 0, ',', '.'), ''];
-        $data[] = ['Expected Collections (60 days)', 'Rp ' . number_format($cashFlow60['receivables'], 0, ',', '.'), '', 'Expected Payments (60 days)', 'Rp ' . number_format($cashFlow60['payables'], 0, ',', '.'), '', 'Net Cash Flow', 'Rp ' . number_format($cashFlow60['receivables'] - $cashFlow60['payables'], 0, ',', '.'), ''];
-        $data[] = ['Expected Collections (90 days)', 'Rp ' . number_format($cashFlow90['receivables'], 0, ',', '.'), '', 'Expected Payments (90 days)', 'Rp ' . number_format($cashFlow90['payables'], 0, ',', '.'), '', 'Net Cash Flow', 'Rp ' . number_format($cashFlow90['receivables'] - $cashFlow90['payables'], 0, ',', '.'), ''];
+        $data[] = ['Expected Collections (30 days)', MoneyHelper::rupiah($cashFlow30['receivables']), '', 'Expected Payments (30 days)', MoneyHelper::rupiah($cashFlow30['payables']), '', 'Net Cash Flow', MoneyHelper::rupiah($cashFlow30['receivables'] - $cashFlow30['payables']), ''];
+        $data[] = ['Expected Collections (60 days)', MoneyHelper::rupiah($cashFlow60['receivables']), '', 'Expected Payments (60 days)', MoneyHelper::rupiah($cashFlow60['payables']), '', 'Net Cash Flow', MoneyHelper::rupiah($cashFlow60['receivables'] - $cashFlow60['payables']), ''];
+        $data[] = ['Expected Collections (90 days)', MoneyHelper::rupiah($cashFlow90['receivables']), '', 'Expected Payments (90 days)', MoneyHelper::rupiah($cashFlow90['payables']), '', 'Net Cash Flow', MoneyHelper::rupiah($cashFlow90['receivables'] - $cashFlow90['payables']), ''];
 
         return collect($data);
-    }
-
-    private function calculateAgeingSummary($type)
-    {
-        $query = null;
-
-        if ($type === 'receivables') {
-            $query = AccountReceivable::with(['ageingSchedule', 'invoice'])->where('remaining', '>', 0);
-            if ($this->cabangId) {
-                $query->where('cabang_id', $this->cabangId);
-            }
-        } elseif ($type === 'payables') {
-            $query = AccountPayable::with(['ageingSchedule', 'invoice'])->where('remaining', '>', 0);
-            if ($this->cabangId) {
-                $query->whereHas('invoice', function($q) {
-                    $q->where('cabang_id', $this->cabangId);
-                });
-            }
-        }
-
-        if (!$query) return [
-            'current' => ['count' => 0, 'amount' => 0],
-            '31-60' => ['count' => 0, 'amount' => 0],
-            '61-90' => ['count' => 0, 'amount' => 0],
-            '>90' => ['count' => 0, 'amount' => 0],
-            'total' => ['count' => 0, 'amount' => 0]
-        ];
-
-        $records = $query->get();
-        $summary = [
-            'current' => ['count' => 0, 'amount' => 0],
-            '31-60' => ['count' => 0, 'amount' => 0],
-            '61-90' => ['count' => 0, 'amount' => 0],
-            '>90' => ['count' => 0, 'amount' => 0],
-            'total' => ['count' => 0, 'amount' => 0]
-        ];
-
-        foreach ($records as $record) {
-            $bucket = $this->calculateBucket($record);
-            $summary[$bucket]['count']++;
-            $summary[$bucket]['amount'] += $record->remaining;
-            $summary['total']['count']++;
-            $summary['total']['amount'] += $record->remaining;
-        }
-
-        return $summary;
-    }
-
-    private function calculateBucket($record)
-    {
-        $ageingSchedule = $record->ageingSchedule;
-        $daysOutstanding = 0;
-
-        if ($ageingSchedule && $ageingSchedule->days_outstanding) {
-            $daysOutstanding = $ageingSchedule->days_outstanding;
-        } elseif ($record->invoice && $record->invoice->invoice_date) {
-            $invoiceDate = Carbon::parse($record->invoice->invoice_date);
-            $daysOutstanding = $invoiceDate->diffInDays($this->asOfDate, false);
-        }
-
-        if ($daysOutstanding <= 30) return 'current';
-        if ($daysOutstanding <= 60) return '31-60';
-        if ($daysOutstanding <= 90) return '61-90';
-        return '>90';
-    }
-
-    private function calculateCashFlowProjection($days)
-    {
-        $futureDate = $this->asOfDate->copy()->addDays($days);
-
-        // Receivables expected to be collected
-        $receivablesQuery = AccountReceivable::where('remaining', '>', 0)
-            ->whereHas('invoice', function($q) use ($futureDate) {
-                $q->where('due_date', '<=', $futureDate->format('Y-m-d'));
-            });
-        if ($this->cabangId) {
-            $receivablesQuery->where('cabang_id', $this->cabangId);
-        }
-        $receivablesAmount = $receivablesQuery->sum('remaining');
-
-        // Payables expected to be paid
-        $payablesQuery = AccountPayable::where('remaining', '>', 0)
-            ->whereHas('invoice', function($q) use ($futureDate) {
-                $q->where('due_date', '<=', $futureDate->format('Y-m-d'));
-            });
-        if ($this->cabangId) {
-            $payablesQuery->whereHas('invoice', function($q) {
-                $q->where('cabang_id', $this->cabangId);
-            });
-        }
-        $payablesAmount = $payablesQuery->sum('remaining');
-
-        return [
-            'receivables' => $receivablesAmount,
-            'payables' => $payablesAmount
-        ];
     }
 
     public function styles(Worksheet $sheet)
@@ -347,40 +267,17 @@ class ReceivablesAgeingSheet implements FromCollection, WithHeadings, WithTitle,
 
     public function collection()
     {
-        $query = AccountReceivable::with([
-            'customer',
-            'invoice.fromModel', // Use polymorphic relationship instead of purchaseOrder
-            'cabang',
-            'ageingSchedule'
-        ])->where('remaining', '>', 0);
-
-        if ($this->cabangId) {
-            $query->where('cabang_id', $this->cabangId);
-        }
-
-        $records = $query->get();
+        $service = app(AgeingReportService::class);
+        $records = $service->getReceivableRecords([
+            'as_of_date' => $this->asOfDate,
+            'cabang_id' => $this->cabangId,
+        ]);
         $counter = 1;
 
         return $records->map(function ($receivable) use (&$counter) {
-            $ageingSchedule = $receivable->ageingSchedule;
-            $daysOutstanding = 0;
-            $bucket = 'Current';
-
-            if ($ageingSchedule) {
-                $daysOutstanding = $ageingSchedule->days_outstanding ?? 0;
-                $bucket = $ageingSchedule->bucket ?? 'Current';
-            } else {
-                // Calculate days outstanding if ageing schedule doesn't exist
-                if ($receivable->invoice && $receivable->invoice->invoice_date) {
-                    $invoiceDate = Carbon::parse($receivable->invoice->invoice_date);
-                    $daysOutstanding = $invoiceDate->diffInDays($this->asOfDate, false);
-                    $bucket = $this->calculateBucket($daysOutstanding);
-                }
-            }
-
             // Get sales person from related sales order through polymorphic relationship
             $salesPerson = '-';
-            if ($receivable->invoice && $receivable->invoice->fromModel && $receivable->invoice->fromModel_type === 'App\\Models\\SalesOrder') {
+            if ($receivable->invoice && $receivable->invoice->fromModel && $receivable->invoice->from_model_type === 'App\\Models\\SaleOrder') {
                 $salesPerson = $receivable->invoice->fromModel->sales_person ?? '-';
             }
 
@@ -394,25 +291,17 @@ class ReceivablesAgeingSheet implements FromCollection, WithHeadings, WithTitle,
                 'Invoice Date' => $receivable->invoice->invoice_date ? Carbon::parse($receivable->invoice->invoice_date)->format('d/m/Y') : '-',
                 'Due Date' => $receivable->invoice->due_date ? Carbon::parse($receivable->invoice->due_date)->format('d/m/Y') : '-',
                 'Payment Terms' => $receivable->invoice->payment_terms ?? '-',
-                'Days Outstanding' => $daysOutstanding,
-                'Invoice Amount' => $receivable->total ? 'Rp ' . number_format($receivable->total, 0, ',', '.') : 'Rp 0',
-                'Paid Amount' => $receivable->paid ? 'Rp ' . number_format($receivable->paid, 0, ',', '.') : 'Rp 0',
-                'Remaining Amount' => $receivable->remaining ? 'Rp ' . number_format($receivable->remaining, 0, ',', '.') : 'Rp 0',
-                'Aging Bucket' => $bucket,
+                'Days Outstanding' => $receivable->days_outstanding_computed,
+                'Invoice Amount' => MoneyHelper::rupiah($receivable->total ?? 0),
+                'Paid Amount' => MoneyHelper::rupiah($receivable->paid ?? 0),
+                'Remaining Amount' => MoneyHelper::rupiah($receivable->remaining ?? 0),
+                'Aging Bucket' => $receivable->aging_bucket_computed,
                 'Status' => $receivable->status ?? 'Active',
                 'Branch' => $receivable->cabang->nama ?? '-',
                 'Sales Person' => $salesPerson,
                 'Notes' => $receivable->notes ?? '-'
             ];
         });
-    }
-
-    private function calculateBucket($days)
-    {
-        if ($days <= 30) return 'Current';
-        if ($days <= 60) return '31–60';
-        if ($days <= 90) return '61–90';
-        return '>90';
     }
 
     public function styles(Worksheet $sheet)
@@ -528,42 +417,18 @@ class PayablesAgeingSheet implements FromCollection, WithHeadings, WithTitle, Wi
 
     public function collection()
     {
-        $query = AccountPayable::with([
-            'supplier',
-            'invoice.fromModel', // Use polymorphic relationship instead of purchaseOrder
-            'ageingSchedule'
+        $service = app(AgeingReportService::class);
+        $records = $service->getPayableRecords([
+            'as_of_date' => $this->asOfDate,
+            'cabang_id' => $this->cabangId,
         ]);
-
-        if ($this->cabangId) {
-            $query->whereHas('invoice', function($q) {
-                $q->where('cabang_id', $this->cabangId);
-            });
-        }
-
-        $records = $query->where('remaining', '>', 0)->get();
         $counter = 1;
 
         return $records->map(function ($payable) use (&$counter) {
-            $ageingSchedule = $payable->ageingSchedule;
-            $daysOutstanding = 0;
-            $bucket = 'Current';
-
-            if ($ageingSchedule) {
-                $daysOutstanding = $ageingSchedule->days_outstanding ?? 0;
-                $bucket = $ageingSchedule->bucket ?? 'Current';
-            } else {
-                // Calculate days outstanding if ageing schedule doesn't exist
-                if ($payable->invoice && $payable->invoice->invoice_date) {
-                    $invoiceDate = Carbon::parse($payable->invoice->invoice_date);
-                    $daysOutstanding = $invoiceDate->diffInDays($this->asOfDate, false);
-                    $bucket = $this->calculateBucket($daysOutstanding);
-                }
-            }
-
             // Get procurement person from related purchase order through polymorphic relationship
             $procurementPerson = '-';
             $purchaseType = '-';
-            if ($payable->invoice && $payable->invoice->fromModel && $payable->invoice->fromModel_type === 'App\\Models\\PurchaseOrder') {
+            if ($payable->invoice && $payable->invoice->fromModel && $payable->invoice->from_model_type === 'App\\Models\\PurchaseOrder') {
                 $procurementPerson = $payable->invoice->fromModel->procurement_person ?? '-';
                 $purchaseType = $payable->invoice->fromModel->type ?? '-';
             }
@@ -578,25 +443,17 @@ class PayablesAgeingSheet implements FromCollection, WithHeadings, WithTitle, Wi
                 'Invoice Date' => $payable->invoice->invoice_date ? Carbon::parse($payable->invoice->invoice_date)->format('d/m/Y') : '-',
                 'Due Date' => $payable->invoice->due_date ? Carbon::parse($payable->invoice->due_date)->format('d/m/Y') : '-',
                 'Payment Terms' => $payable->invoice->payment_terms ?? '-',
-                'Days Outstanding' => $daysOutstanding,
-                'Invoice Amount' => $payable->total ? 'Rp ' . number_format($payable->total, 0, ',', '.') : 'Rp 0',
-                'Paid Amount' => $payable->paid ? 'Rp ' . number_format($payable->paid, 0, ',', '.') : 'Rp 0',
-                'Remaining Amount' => $payable->remaining ? 'Rp ' . number_format($payable->remaining, 0, ',', '.') : 'Rp 0',
-                'Aging Bucket' => $bucket,
+                'Days Outstanding' => $payable->days_outstanding_computed,
+                'Invoice Amount' => MoneyHelper::rupiah($payable->total ?? 0),
+                'Paid Amount' => MoneyHelper::rupiah($payable->paid ?? 0),
+                'Remaining Amount' => MoneyHelper::rupiah($payable->remaining ?? 0),
+                'Aging Bucket' => $payable->aging_bucket_computed,
                 'Status' => $payable->status ?? 'Active',
                 'Purchase Type' => $purchaseType,
                 'Procurement Person' => $procurementPerson,
                 'Notes' => $payable->notes ?? '-'
             ];
         });
-    }
-
-    private function calculateBucket($days)
-    {
-        if ($days <= 30) return 'Current';
-        if ($days <= 60) return '31–60';
-        if ($days <= 90) return '61–90';
-        return '>90';
     }
 
     public function styles(Worksheet $sheet)

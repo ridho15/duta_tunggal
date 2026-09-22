@@ -6,6 +6,7 @@ use App\Models\DeliveryOrder;
 use App\Models\StockReservation;
 use App\Models\SaleOrder;
 use App\Services\ProductService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DeliveryOrderObserver
@@ -25,25 +26,89 @@ class DeliveryOrderObserver
         $originalStatus = $deliveryOrder->getOriginal('status');
         $newStatus = $deliveryOrder->status;
 
+        // T2.3 (flag stock.strict_dispatch): status item + log + pengembalian stok gagal-kirim seragam untuk SEMUA pintu.
+        if ($deliveryOrder->wasChanged('status') && \App\Services\DeliveryOrderTransitions::enabled()) {
+            $this->handleStrictStatusEffects($deliveryOrder, (string) $originalStatus, (string) $newStatus);
+        }
+
         // Jika status berubah ke 'approved', buat stock reservations
         if ($originalStatus !== 'approved' && $newStatus === 'approved') {
             $this->handleApprovedStatus($deliveryOrder);
         }
 
-        // Jika status berubah ke 'sent', hapus stock reservations
+        // Jika status berubah ke 'sent', lepaskan stock reservations
         if ($originalStatus !== 'sent' && $newStatus === 'sent') {
-            $this->handleSentStatus($deliveryOrder);
+            $this->handleReservationReleaseStatus($deliveryOrder);
         }
 
-        // Jika status berubah ke 'completed', update related sales orders to completed
+        // Jika status berubah ke 'completed', posting jurnal dan update related sales orders
         if ($originalStatus !== 'completed' && $newStatus === 'completed') {
             $this->handleCompletedStatus($deliveryOrder);
         }
 
-        // Jika status sudah 'sent' dan ada perubahan quantity, update journal entries
-        if ($newStatus === 'sent' && $this->hasQuantityChanges($deliveryOrder)) {
-            $this->handleQuantityUpdateAfterSent($deliveryOrder);
+        // Jika status sudah 'completed' dan ada perubahan quantity, update journal entries
+        if ($newStatus === 'completed' && $this->hasQuantityChanges($deliveryOrder)) {
+            $this->handleQuantityUpdateAfterCompleted($deliveryOrder);
         }
+
+        // T2.1 (flag stock.ledger): DO ditutup/ditolak → reservasi DO dilepas lewat buku besar.
+        if ($deliveryOrder->wasChanged('status') && in_array($newStatus, ['closed', 'reject'], true) && $this->ledgerEnabled()) {
+            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} {$newStatus}");
+        }
+
+        // Perubahan status lain (mis. delivery_failed, closed, reject, kembali ke draft) juga
+        // dapat mengubah kuantitas terkirim/terikat -> sinkronkan progres SO.
+        // sent & completed sudah disinkronkan di handler masing-masing.
+        if ($deliveryOrder->wasChanged('status') && ! in_array($newStatus, ['sent', 'completed'], true)) {
+            $this->syncDeliveryProgress($deliveryOrder);
+        }
+    }
+
+    /**
+     * T2.3: efek yang harus sama di semua pintu status — status item mengikuti status DO, log berjejak (alasan/penerima/pengecualian),
+     * dan pengiriman gagal SETELAH barang berangkat mengembalikan stok fisik (D18) serta membuat ulang reservasi DO untuk dijadwalkan ulang.
+     */
+    protected function handleStrictStatusEffects(DeliveryOrder $deliveryOrder, string $from, string $to): void
+    {
+        $itemStatus = \App\Services\DeliveryOrderTransitions::itemStatusFor($to);
+        if ($itemStatus !== null) {
+            $deliveryOrder->deliveryOrderItem()->update(['status' => $itemStatus]);
+        }
+
+        if ($to === 'delivery_failed' && in_array($from, ['sent', 'received'], true)) {
+            $context = \App\Services\DeliveryOrderTransitions::context();
+            $reason = (string) ($context['reason'] ?? 'pengiriman gagal');
+
+            app(\App\Services\DeliveryShipments::class)->reverse($deliveryOrder, $reason);
+            app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "DO {$deliveryOrder->do_number} gagal kirim — reservasi dibuat ulang untuk penjadwalan ulang");
+        }
+
+        \App\Services\DeliveryOrderTransitions::writeLog($deliveryOrder, $from, $to);
+    }
+
+    /**
+     * DO dipulihkan dari soft-delete: kuantitasnya kembali terikat ke SO.
+     */
+    public function restored(DeliveryOrder $deliveryOrder): void
+    {
+        $this->syncDeliveryProgress($deliveryOrder);
+    }
+
+    /** Buku besar reservasi & pengiriman idempoten (flag sales.stock.ledger, T2.1). */
+    protected function ledgerEnabled(): bool
+    {
+        return \App\Services\StockReservationLedger::enabled();
+    }
+
+    /**
+     * Hitung ulang cache delivered_quantity dan status SO untuk SO yang disentuh DO ini.
+     */
+    protected function syncDeliveryProgress(DeliveryOrder $deliveryOrder): void
+    {
+        app(\App\Services\SaleOrderDeliveryProgress::class)->syncForDeliveryOrder($deliveryOrder);
+
+        // T2.4 (flag stock.reserve_on_so_approve): kebutuhan/penahanan SO berubah bersama DO → reservasi level-SO disusun ulang.
+        app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "DO {$deliveryOrder->do_number} → {$deliveryOrder->status}");
     }
 
     /**
@@ -57,9 +122,46 @@ class DeliveryOrderObserver
             'do_number' => $deliveryOrder->do_number,
         ]);
 
+        // T2.1 (flag stock.ledger): reservasi DO lewat buku besar (idempoten, tercatat, kuantitas ≤ item DO).
+        if ($this->ledgerEnabled()) {
+            app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "DO {$deliveryOrder->do_number} disetujui (Siap Kirim)");
+
+            return;
+        }
+
+        $deliveryOrder->loadMissing('deliveryOrderItem.warehouseSources');
+
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             $quantity = max(0, $item->quantity ?? 0);
             if ($quantity <= 0) {
+                continue;
+            }
+
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    $sourceWarehouseId = $source->warehouse_id;
+
+                    if ($sourceQty <= 0 || !$sourceWarehouseId) {
+                        Log::error('DeliveryOrderObserver: invalid source warehouse configuration', [
+                            'delivery_order_id' => $deliveryOrder->id,
+                            'item_id' => $item->id,
+                            'product_id' => $item->product_id,
+                        ]);
+                        throw new \Exception('Warehouse source configuration is required for stock reservation');
+                    }
+
+                    StockReservation::create([
+                        'sale_order_id' => $item->saleOrderItem->sale_order_id ?? null,
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $sourceWarehouseId,
+                        'rak_id' => $source->rak_id,
+                        'quantity' => $sourceQty,
+                        'delivery_order_id' => $deliveryOrder->id,
+                    ]);
+                }
+
                 continue;
             }
 
@@ -87,67 +189,62 @@ class DeliveryOrderObserver
     }
 
     /**
-     * Handle when Delivery Order status becomes 'sent'
-     * Release qty_reserved by deleting stock reservations and create journal entries for goods delivery
+     * Handle when Delivery Order enters the reservation-release stage.
+     * Create stock movements to reduce qty_available (barang sudah keluar gudang).
+     * NOTE: StockReservation is NOT deleted - qty_reserved remains for tracking
+     * until delivery is completed.
      */
-    protected function handleSentStatus(DeliveryOrder $deliveryOrder): void
+    protected function handleReservationReleaseStatus(DeliveryOrder $deliveryOrder): void
     {
-        Log::info('DeliveryOrderObserver: Handling sent status', [
+        Log::info('DeliveryOrderObserver: Handling reservation release', [
             'delivery_order_id' => $deliveryOrder->id,
             'do_number' => $deliveryOrder->do_number,
         ]);
 
-        // Create journal entries for goods delivery
-        $this->createJournalEntriesForDelivery($deliveryOrder);
+        // =========================================================
+        // MODIFIKASI: Buat StockMovement untuk mengurangi qty_available
+        // saat barang mulai dikirim (status = 'sent')
+        // =========================================================
+        $this->createStockMovementsForShippingStart($deliveryOrder);
 
-        // Hapus stock reservations yang terkait dengan delivery order ini
-        $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-
-        foreach ($reservations as $reservation) {
-            // Hapus reservation, yang akan trigger observer untuk mengembalikan qty_available
-            $reservation->delete();
+        // T2.1 (flag stock.ledger): reservasi DO DIKONSUMSI saat barang berangkat — gerakan stok fisik sudah dibuat di atas.
+        // Tanpa ini reservasi tidak pernah dilepas dan stok bebas terus menyusut (reservasi yatim, temuan X1).
+        if ($this->ledgerEnabled()) {
+            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder(
+                $deliveryOrder->id,
+                "DO {$deliveryOrder->do_number} dikirim — reservasi dikonsumsi",
+                \App\Models\StockReservationEvent::CONSUMED
+            );
         }
 
-        // Update delivered_quantity untuk semua sale order items yang terkait
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
+        // =========================================================
+        // JANGAN hapus StockReservation - biarkan untuk tracking
+        // qty_reserved tetap ada sampai delivery selesai
+        // Ini memastikan free_qty tidak berubah secara tidak sengaja
+        // =========================================================
 
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
-            }
-        }
+        // Progres SO (cache delivered_quantity + status SO) dihitung ulang oleh satu service.
+        $this->syncDeliveryProgress($deliveryOrder);
     }
 
     /**
-     * Handle when Delivery Order status becomes 'completed'
-     * Update all related sales orders to completed status and create stock movements
+     * Buat StockMovement untuk mengurangi qty_available
+     * saat DO mulai dikirim (status = 'sent')
+     *
+     * Ini memastikan:
+     * - qty_available (stok fisik) BERKURANG saat barang meninggalkan gudang
+     * - qty_reserved TETAP ADA (untuk tracking sampai delivery selesai)
+     * - free_qty = qty_available - qty_reserved (tidak berubah secara tidak sengaja)
      */
-    protected function handleCompletedStatus(DeliveryOrder $deliveryOrder): void
+    protected function createStockMovementsForShippingStart(DeliveryOrder $deliveryOrder): void
     {
-        Log::info('DeliveryOrderObserver: Handling completed status', [
-            'delivery_order_id' => $deliveryOrder->id,
-            'do_number' => $deliveryOrder->do_number,
-        ]);
-
-        // Load delivery order items with related data for stock movements
-        $deliveryOrder->load('deliveryOrderItem.product');
+        $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
 
         $date = $deliveryOrder->delivery_date ?? now()->toDateString();
 
-        // Create stock movements for physical inventory reduction
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            $qtyDelivered = max(0, $item->quantity ?? 0);
-            if ($qtyDelivered <= 0) {
+            $qtyToShip = max(0, $item->quantity ?? 0);
+            if ($qtyToShip <= 0) {
                 continue;
             }
 
@@ -156,64 +253,229 @@ class DeliveryOrderObserver
                 continue;
             }
 
-            // Skip if warehouse_id is null
+            $productService = app(\App\Services\ProductService::class);
+
+            // Handle multi-warehouse sources
+            $sources = $item->warehouseSources;
+            if ($sources->isNotEmpty()) {
+                foreach ($sources as $source) {
+                    $sourceQty = max(0, (float) ($source->quantity ?? 0));
+                    if ($sourceQty <= 0 || !$source->warehouse_id) {
+                        continue;
+                    }
+
+                    // T2.1 (flag stock.ledger): idempoten — jangan memotong stok dua kali untuk kuantitas yang sudah keluar
+                    // (mis. DO gagal kirim lalu dijadwalkan ulang).
+                    if ($this->ledgerEnabled()) {
+                        $sourceQty = max(0, $sourceQty - \App\Services\DeliveryShipments::netShipped($item, (int) $source->warehouse_id, $source->rak_id));
+                        if ($sourceQty <= 0) {
+                            continue;
+                        }
+                    }
+
+                    $productService->createStockMovement(
+                        product_id: $product->id,
+                        warehouse_id: $source->warehouse_id,
+                        quantity: $sourceQty,
+                        type: 'sales',
+                        date: $date,
+                        notes: "Shipping start for DO {$deliveryOrder->do_number}",
+                        rak_id: $source->rak_id,
+                        fromModel: $item,
+                        value: $product->cost_price * $sourceQty,
+                        meta: [
+                            'delivery_status' => 'sent',
+                            'shipping_start' => true,
+                            'source' => 'delivery_order_observer',
+                        ]
+                    );
+                }
+                continue;
+            }
+
+            // Single warehouse
             if (!$deliveryOrder->warehouse_id) {
                 continue;
             }
 
-            // Create sales stock movement to reduce physical inventory
-            $productService = app(\App\Services\ProductService::class);
+            if ($this->ledgerEnabled()) {
+                $qtyToShip = max(0, $qtyToShip - \App\Services\DeliveryShipments::netShipped($item, (int) $deliveryOrder->warehouse_id, $item->rak_id));
+                if ($qtyToShip <= 0) {
+                    continue;
+                }
+            }
+
             $productService->createStockMovement(
                 product_id: $product->id,
                 warehouse_id: $deliveryOrder->warehouse_id,
-                quantity: $qtyDelivered,
+                quantity: $qtyToShip,
                 type: 'sales',
                 date: $date,
-                notes: "Sales delivery for DO {$deliveryOrder->do_number}",
+                notes: "Shipping start for DO {$deliveryOrder->do_number}",
                 rak_id: $item->rak_id,
                 fromModel: $item,
-                value: $product->cost_price * $qtyDelivered
+                value: $product->cost_price * $qtyToShip,
+                meta: [
+                    'delivery_status' => 'sent',
+                    'shipping_start' => true,
+                    'source' => 'delivery_order_observer',
+                ]
             );
         }
+    }
 
-        // Get all sales orders related to this delivery order
-        $salesOrders = $deliveryOrder->salesOrders;
+    /**
+     * Handle when Delivery Order status becomes 'completed'
+     * Update all related sales orders to completed status and create stock movements
+     *
+     * NOTE: StockMovement for qty_available reduction is now created in
+     * handleReservationReleaseStatus() when status changes to 'sent'.
+     * This method only handles journal entries and sale order updates.
+     */
+    protected function handleCompletedStatus(DeliveryOrder $deliveryOrder): void
+    {
+        Log::info('DeliveryOrderObserver: Handling completed status', [
+            'delivery_order_id' => $deliveryOrder->id,
+            'do_number' => $deliveryOrder->do_number,
+        ]);
 
-        foreach ($salesOrders as $saleOrder) {
-            // Only update if not already completed
-            if ($saleOrder->status !== 'completed') {
-                Log::info('DeliveryOrderObserver: Updating sale order to completed', [
-                    'sale_order_id' => $saleOrder->id,
-                    'so_number' => $saleOrder->so_number,
-                    'delivery_order_id' => $deliveryOrder->id,
-                ]);
+        $this->createJournalEntriesForDelivery($deliveryOrder);
 
-                // Update sale order status to completed
-                $saleOrder->update([
-                    'status' => 'completed',
-                    'completed_at' => now()
-                ]);
-            }
+        // =========================================================
+        // MODIFIKASI: Skip StockMovement creation here
+        // StockMovement sudah dibuat saat status berubah ke 'sent'
+        // di handleReservationReleaseStatus()
+        // =========================================================
+
+        // Progres SO: hitung ulang delivered_quantity dan turunkan status SO dari kuantitas
+        // (approved -> partially_delivered -> completed) lewat satu service, bukan dari event DO.
+        $this->syncDeliveryProgress($deliveryOrder);
+
+        // Terbitkan invoice otomatis khusus untuk item dan kuantitas yang dikirim pada Delivery Order ini
+        $this->createInvoiceForCompletedDeliveryOrder($deliveryOrder);
+    }
+
+    /**
+     * Create invoice automatically for the items delivered in this Delivery Order
+     */
+    protected function createInvoiceForCompletedDeliveryOrder(DeliveryOrder $deliveryOrder): void
+    {
+        $deliveryOrder->loadMissing('salesOrders.customer', 'deliveryOrderItem.saleOrderItem', 'deliveryOrderItem.product');
+
+        $primarySo = $deliveryOrder->salesOrders->first();
+        if (!$primarySo) {
+            Log::warning('DeliveryOrderObserver: Cannot create invoice, no related sale order found', [
+                'delivery_order_id' => $deliveryOrder->id,
+            ]);
+            return;
         }
 
-        // Update delivered_quantity untuk semua sale order items yang terkait
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Hitung total delivered quantity dari semua delivery orders yang sudah sent/completed
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
+        // Cek apakah DO ini atau SO terkait sudah pernah dibuatkan invoice aktif
+        $existingInvoice = \App\Models\Invoice::where('from_model_type', SaleOrder::class)
+            ->whereNotIn('status', ['canceled', 'cancelled'])
+            ->where(function ($q) use ($deliveryOrder, $primarySo) {
+                $q->whereJsonContains('delivery_orders', $deliveryOrder->id)
+                  ->orWhere(function ($sub) use ($primarySo) {
+                      $sub->where('from_model_id', $primarySo->id)
+                          ->where(function ($emptyDo) {
+                              $emptyDo->whereNull('delivery_orders')
+                                      ->orWhereJsonLength('delivery_orders', 0);
+                          });
+                  });
+            })
+            ->first();
 
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
+        if ($existingInvoice) {
+            // Jika invoice SO sudah ada tanpa DO ID ini, kaitkan DO ke invoice tersebut
+            $currentDos = (array) ($existingInvoice->delivery_orders ?? []);
+            if (!in_array($deliveryOrder->id, $currentDos)) {
+                $currentDos[] = $deliveryOrder->id;
+                $existingInvoice->update(['delivery_orders' => array_values(array_unique($currentDos))]);
             }
+
+            Log::info('DeliveryOrderObserver: Invoice already exists for delivery order or sale order', [
+                'do_id' => $deliveryOrder->id,
+                'invoice_id' => $existingInvoice->id,
+            ]);
+            return;
         }
+
+        // Satu-satunya perhitungan nilai DO (juga dipakai label pilihan DO & PDF DO): DeliveryOrderValuation.
+        $valuation = app(\App\Services\DeliveryOrderValuation::class)->forDeliveryOrder($deliveryOrder);
+        $ppnRate = $valuation['ppn_rate'];
+        $tipePajak = $valuation['tipe_pajak'];
+        $subtotal = $valuation['dpp'];
+        $totalTax = $valuation['tax'];
+        $lineTotals = $valuation['goods_total'];
+        $invoiceItems = $valuation['lines'];
+
+        if (empty($invoiceItems) || $subtotal <= 0) {
+            Log::warning('DeliveryOrderObserver: Skipping invoice creation, no valid items or subtotal is 0', [
+                'do_id' => $deliveryOrder->id,
+                'subtotal' => $subtotal,
+            ]);
+            return;
+        }
+
+        $additionalCosts = (float) ($deliveryOrder->additional_cost ?? 0);
+        $otherFees = [];
+        if ($additionalCosts > 0) {
+            $otherFees[] = [
+                'amount' => $additionalCosts,
+                'description' => $deliveryOrder->additional_cost_description ?: 'Biaya pengiriman DO ' . $deliveryOrder->do_number,
+                'type' => 'delivery_cost',
+                'reference' => $deliveryOrder->do_number,
+            ];
+        }
+
+        $grandTotal = round($lineTotals + $additionalCosts, 2);
+        $invoiceNumber = (new \App\Services\InvoiceService())->generateSalesInvoiceNumber($deliveryOrder->cabang_id ? (int) $deliveryOrder->cabang_id : null, ($tipePajak ?? 'none') !== 'none');
+
+        $invoiceData = [
+            'invoice_number' => $invoiceNumber,
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $primarySo->id,
+            'customer_name' => $primarySo->customer?->name,
+            'customer_phone' => $primarySo->customer?->phone,
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(
+                $primarySo->tempo_pembayaran
+                    ?? $primarySo->customer?->tempo_kredit
+                    ?? 30
+            )->toDateString(),
+            'subtotal' => $subtotal,
+            'tax' => $ppnRate,
+            'ppn_rate' => $ppnRate,
+            'tipe_pajak' => $tipePajak,
+            'dpp' => $subtotal,
+            'total' => $grandTotal,
+            'currency_id' => $primarySo->currency_id ?? \App\Support\CurrencyConversionResolver::resolveCurrencyIdByCode('IDR'),
+            'exchange_rate' => (float) ($primarySo->exchange_rate ?? 1.0),
+            'other_fee' => $otherFees,
+            'delivery_orders' => [$deliveryOrder->id],
+            'cabang_id' => $deliveryOrder->cabang_id ?? $primarySo->cabang_id,
+            'status' => 'unpaid',
+            'notes' => 'Auto-generated dari Delivery Order ' . $deliveryOrder->do_number,
+        ];
+
+        $invoice = new \App\Models\Invoice($invoiceData);
+        $invoice->save();
+
+        foreach ($invoiceItems as $itemData) {
+            \App\Models\InvoiceItem::create(array_merge($itemData, ['invoice_id' => $invoice->id]));
+        }
+
+        // Post journal entries immediately
+        $invoiceObserver = new \App\Observers\InvoiceObserver();
+        $invoiceObserver->postSalesInvoice($invoice);
+
+        Log::info('DeliveryOrderObserver: Invoice auto-created for DO', [
+            'delivery_order_id' => $deliveryOrder->id,
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'subtotal' => $subtotal,
+            'total' => $grandTotal,
+        ]);
     }
 
     /**
@@ -242,32 +504,17 @@ class DeliveryOrderObserver
         }
 
         // Delete related stock reservations
-        $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        foreach ($reservations as $reservation) {
-            $reservation->delete();
-        }
-
-        // Update delivered_quantity for related sale order items (set to 0 since DO is deleted)
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Recalculate total delivered quantity excluding this deleted delivery order
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->whereHas('deliveryOrder', function ($query) use ($deliveryOrder) {
-                            $query->where('id', '!=', $deliveryOrder->id); // Exclude this deleted DO
-                        })
-                        ->sum('quantity');
-
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
+        if ($this->ledgerEnabled()) {
+            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} dihapus");
+        } else {
+            $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
+            foreach ($reservations as $reservation) {
+                $reservation->delete();
             }
         }
+
+        // DO dihapus: hitung ulang progres SO (kuantitas DO ini kembali ke SO).
+        $this->syncDeliveryProgress($deliveryOrder);
     }
 
     /**
@@ -287,12 +534,12 @@ class DeliveryOrderObserver
     }
 
     /**
-     * Handle quantity updates after delivery order status is 'sent'
+    * Handle quantity updates after delivery order status is 'completed'
      * Update journal entries to reflect new quantities
      */
-    public function handleQuantityUpdateAfterSent(DeliveryOrder $deliveryOrder): void
+    public function handleQuantityUpdateAfterCompleted(DeliveryOrder $deliveryOrder): void
     {
-        Log::info('DeliveryOrderObserver: Handling quantity update after sent', [
+        Log::info('DeliveryOrderObserver: Handling quantity update after completed', [
             'delivery_order_id' => $deliveryOrder->id,
             'do_number' => $deliveryOrder->do_number,
         ]);
@@ -313,28 +560,12 @@ class DeliveryOrderObserver
         // Recreate journal entries with updated quantities
         $this->createJournalEntriesForDelivery($deliveryOrder);
 
-        // Update delivered_quantity for related sale order items
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            if ($item->sale_order_item_id) {
-                $saleOrderItem = $item->saleOrderItem;
-                if ($saleOrderItem) {
-                    // Recalculate total delivered quantity from all delivery orders that are sent/completed
-                    $totalDelivered = $saleOrderItem->deliveryOrderItems()
-                        ->whereHas('deliveryOrder', function ($query) {
-                            $query->whereIn('status', ['sent', 'received', 'completed']);
-                        })
-                        ->sum('quantity');
-
-                    $saleOrderItem->update([
-                        'delivered_quantity' => $totalDelivered
-                    ]);
-                }
-            }
-        }
+        // Kuantitas berubah setelah completed: hitung ulang progres SO.
+        $this->syncDeliveryProgress($deliveryOrder);
     }
 
     /**
-     * Create journal entries for delivery order (extracted from handleSentStatus)
+    * Create journal entries for delivery order (extracted from the status transition handlers)
      */
     protected function createJournalEntriesForDelivery(DeliveryOrder $deliveryOrder): void
     {
@@ -344,8 +575,8 @@ class DeliveryOrderObserver
         $date = $deliveryOrder->delivery_date ?? now()->toDateString();
 
         // Build journal entries for cost-of-goods-sold (goods delivery) and inventory credit
-        $defaultInventoryCoa = \App\Models\ChartOfAccount::whereIn('code', ['1140.10', '1140.01'])->first();
-        $defaultGoodsDeliveryCoa = \App\Models\ChartOfAccount::whereIn('code', ['1140.20', '1180.10'])->first();
+        $defaultInventoryCoa = app(\App\Services\AccountingSettings::class)->anyOf('inventory');
+        $defaultGoodsDeliveryCoa = app(\App\Services\AccountingSettings::class)->anyOf('goods_in_transit');
 
         $debitTotals = [];
         $creditTotals = [];
@@ -367,15 +598,16 @@ class DeliveryOrderObserver
                 continue;
             }
 
-            $inventoryCoa = $product?->inventoryCoa?->id ? $product->inventoryCoa : $defaultInventoryCoa;
-            $goodsDeliveryCoa = $product?->goodsDeliveryCoa?->id ? $product->goodsDeliveryCoa : $defaultGoodsDeliveryCoa;
+            $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+            $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
 
             if (!$inventoryCoa || !$goodsDeliveryCoa) {
-                Log::warning('Skipping journal entry due to missing COA', [
-                    'inventory_coa_null' => is_null($inventoryCoa),
-                    'goods_delivery_coa_null' => is_null($goodsDeliveryCoa),
-                ]);
-                continue;
+                throw new \Exception(
+                    'Akun COA untuk produk "' . ($product?->name ?? 'tidak diketahui') . '" tidak ditemukan. '
+                    . 'Diperlukan: Persediaan (' . ($inventoryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('inventory')[0] ?? '-')) . ') dan '
+                    . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('goods_in_transit')[0] ?? '-')) . '). '
+                    . 'Silakan konfigurasi COA produk tersebut sebelum mengirim Delivery Order.'
+                );
             }
 
             $debitTotals[$goodsDeliveryCoa->id]['coa'] = $goodsDeliveryCoa;
@@ -398,6 +630,7 @@ class DeliveryOrderObserver
                     'journal_type' => 'sales',
                     'source_type' => \App\Models\DeliveryOrder::class,
                     'source_id' => $deliveryOrder->id,
+                    'cabang_id' => $deliveryOrder->cabang_id,
                 ]);
             }
 
@@ -412,6 +645,7 @@ class DeliveryOrderObserver
                     'journal_type' => 'sales',
                     'source_type' => \App\Models\DeliveryOrder::class,
                     'source_id' => $deliveryOrder->id,
+                    'cabang_id' => $deliveryOrder->cabang_id,
                 ]);
             }
         }

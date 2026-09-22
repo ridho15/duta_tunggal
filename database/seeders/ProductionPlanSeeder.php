@@ -104,9 +104,12 @@ class ProductionPlanSeeder extends Seeder
             $planData['warehouse_id'] = $warehouses->first()->id;
             $planData['created_by'] = $user->id;
 
-            ProductionPlan::create($planData);
+            $plan = ProductionPlan::updateOrCreate(
+                ['plan_number' => $planData['plan_number']],
+                $planData
+            );
 
-            $this->command->info("Created production plan: {$planData['name']}");
+            $this->command->info("Created or updated production plan: {$plan->name}");
         }
 
         $this->command->info('Production plans created successfully!');

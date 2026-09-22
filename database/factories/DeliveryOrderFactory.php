@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Cabang;
 use App\Models\Driver;
+use App\Models\Warehouse;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -19,17 +19,17 @@ class DeliveryOrderFactory extends Factory
      */
     public function definition(): array
     {
+        $warehouse = Warehouse::factory()->create();
+
         return [
             'do_number' => $this->faker->unique()->word(),
             'delivery_date' => $this->faker->date(),
             'driver_id' => 1, // Use static ID for testing
             'vehicle_id' => 1, // Use static ID for testing
             'notes' => $this->faker->sentence(),
-            'warehouse_id' => \App\Models\Warehouse::factory(),
+            'warehouse_id' => $warehouse->id,
             'status' => 'draft',
-            'cabang_id' => function () {
-                return Cabang::inRandomOrder()->first()?->id ?? Cabang::factory()->create()->id;
-            },
+            'cabang_id' => $warehouse->cabang_id,
         ];
     }
 }
