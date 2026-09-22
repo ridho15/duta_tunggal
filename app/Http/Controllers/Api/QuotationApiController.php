@@ -173,7 +173,7 @@ class QuotationApiController extends Controller
         }
 
         $wantsApproval = $request->input('header.status') === Quotation::STATUS_REQUEST_APPROVE;
-        if ($wantsApproval && ! Auth::user()?->hasPermissionTo('request-approve quotation')) {
+        if ($wantsApproval && ! Auth::user()?->can('requestApprove', Quotation::class)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Anda tidak memiliki izin untuk mengajukan persetujuan Quotation.',
@@ -408,7 +408,7 @@ class QuotationApiController extends Controller
         }
 
         $wantsApproval = $request->input('header.status') === Quotation::STATUS_REQUEST_APPROVE;
-        if ($wantsApproval && ! Auth::user()?->hasPermissionTo('request-approve quotation')) {
+        if ($wantsApproval && ! Auth::user()?->can('requestApprove', $quotation)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Anda tidak memiliki izin untuk mengajukan persetujuan Quotation.',

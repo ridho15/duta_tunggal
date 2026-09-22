@@ -75,7 +75,7 @@ class QuotationPolicy
             && $user->hasPermissionTo('create quotation');
     }
 
-    public function requestApprove(User $user, Quotation $quotation): bool
+    public function requestApprove(User $user, ?Quotation $quotation = null): bool
     {
         return $user->hasPermissionTo('request-approve quotation');
     }

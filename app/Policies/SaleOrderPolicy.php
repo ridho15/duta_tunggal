@@ -72,7 +72,7 @@ class SaleOrderPolicy
         return $user->hasPermissionTo('force-delete sales order');
     }
 
-    public function request(User $user, SaleOrder $saleOrder): bool
+    public function request(User $user, ?SaleOrder $saleOrder = null): bool
     {
         return $user->hasPermissionTo('request sales order');
     }

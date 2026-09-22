@@ -347,6 +347,8 @@ class SaleOrderApiTest extends TestCase
 
     public function test_can_fetch_customer_credit_on_demand(): void
     {
+        $this->apiUser();
+
         $customer = Customer::factory()->create([
             'kredit_limit' => 50000000,
             'tempo_kredit' => 30,

@@ -47,9 +47,19 @@ class SuratJalanService
 
         $invalid = $deliveryOrders->where('status', '!=', 'approved');
         if ($invalid->isNotEmpty()) {
+            $details = $invalid->map(function ($do) {
+                $statusLabel = match ($do->status) {
+                    'draft' => 'Draft (belum diajukan)',
+                    'request_stock' => 'Permintaan Stok (belum disetujui)',
+                    'sent' => 'Sudah Dikirim',
+                    'received' => 'Sudah Diterima',
+                    default => $do->status,
+                };
+                return "{$do->do_number} (Status: {$statusLabel})";
+            })->implode(', ');
+
             throw ValidationException::withMessages([
-                $field => 'Surat Jalan hanya dapat dibuat dari Delivery Order berstatus approved. Tidak memenuhi: '
-                    . $invalid->pluck('do_number')->implode(', ') . '.',
+                $field => "Surat Jalan hanya dapat dibuat dari Delivery Order berstatus approved (disetujui). DO berikut belum memenuhi syarat: {$details}.",
             ]);
         }
 

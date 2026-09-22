@@ -354,6 +354,8 @@ class ViewOrderRequest extends ViewRecord
                                 return;
                             }
 
+                            $data['po_number'] = $data['po_number'] ?? self::generateUniquePoNumber();
+                            $data['supplier_id'] = $data['supplier_id'] ?? self::resolveFirstIncludedSupplierId($includedItems);
                             $pusatCabangId = \App\Models\Cabang::where('kode', 'CBG-001')->orWhere('nama', 'like', '%pusat%')->value('id') ?? 1;
                             $data['cabang_id'] = $data['cabang_id'] ?? ($includedItems->first()['item_cabang_id'] ?? $pusatCabangId);
 

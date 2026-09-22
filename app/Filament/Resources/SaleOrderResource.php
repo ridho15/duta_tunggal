@@ -1786,82 +1786,82 @@ class SaleOrderResource extends Resource
                 return trim(implode(' ', array_filter($classes)));
             })
             ->actions([
-                ViewAction::make()
-                    ->label('Lihat')
-                    ->color('primary'),
-                EditAction::make()
-                    ->label('Ubah')
-                    ->color('primary')
-                    ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('update sales order') &&
-                            in_array($record->status, ['draft', 'request_approve']);
-                    }),
-                Action::make('request_approve')
-                    ->label('Ajukan Persetujuan')
-                    ->requiresConfirmation()
-                    ->modalHeading('Ajukan Persetujuan Sales Order')
-                    ->modalDescription(function ($record) {
-                        $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
-                        $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
-                        return "Ajukan Sales Order {$record->so_number} untuk customer {$cust} senilai {$total} ke Manajer Sales. Lanjutkan?";
-                    })
-                    ->modalSubmitActionLabel('Ya, Ajukan')
-                    ->color('success')
-                    ->icon('heroicon-o-arrow-uturn-up')
-                    ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('request sales order')
-                            && $record->status == 'draft';
-                    })
-                    ->action(function ($record) {
-                        try {
-                            $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->requestApprove($record);
-                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
-                        } catch (ValidationException $e) {
-                            $messages = collect($e->errors())->flatten()->implode(' ');
-
-                            HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: $messages ?: 'Validasi pengajuan persetujuan gagal.');
-                        }
-                    }),
-                Action::make('approve')
-                    ->label('Setujui')
-                    ->requiresConfirmation()
-                    ->modalHeading('Setujui Sales Order')
-                    ->modalDescription(function ($record) {
-                        $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
-                        $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
-                        return "Dengan menyetujui SO {$record->so_number} ({$cust} - {$total}), status pesanan menjadi Disetujui dan tim logistik dapat membuat Delivery Order (DO). Lanjutkan?";
-                    })
-                    ->modalSubmitActionLabel('Ya, Setujui SO')
-                    ->color('success')
-                    ->form(fn ($record) => \App\Filament\Support\ApprovalActions::saleOrderForm($record))
-                    ->visible(function ($record) {
-                        if ($record->status !== 'request_approve') {
-                            return false;
-                        }
-                        $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
-                        return $check['allowed'];
-                    })
-                    ->action(function ($record, array $data = []) {
-                        try {
-                            $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
-                            if (! $check['allowed']) {
-                                HelperController::sendNotification(isSuccess: false, title: "Persetujuan Ditolak", message: $check['reason'] ?? 'Akses persetujuan ditolak.');
-                                return;
-                            }
-
-                            $salesOrderService = app(SalesOrderService::class);
-                            $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null, 'credit_override_reason' => $data['credit_override_reason'] ?? null]);
-                            HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
-                        } catch (ValidationException $e) {
-                            $messages = collect($e->errors())->flatten()->implode(' ');
-
-                            HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
-                        }
-                    }),
-                \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
-                \App\Filament\Support\SaleOrderStockActions::retryReservation(Action::make('retry_reservation')),
                 ActionGroup::make([
+                    ViewAction::make()
+                        ->label('Lihat')
+                        ->color('primary'),
+                    EditAction::make()
+                        ->label('Ubah')
+                        ->color('primary')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('update sales order') &&
+                                in_array($record->status, ['draft', 'request_approve']);
+                        }),
+                    Action::make('request_approve')
+                        ->label('Ajukan Persetujuan')
+                        ->requiresConfirmation()
+                        ->modalHeading('Ajukan Persetujuan Sales Order')
+                        ->modalDescription(function ($record) {
+                            $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
+                            $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
+                            return "Ajukan Sales Order {$record->so_number} untuk customer {$cust} senilai {$total} ke Manajer Sales. Lanjutkan?";
+                        })
+                        ->modalSubmitActionLabel('Ya, Ajukan')
+                        ->color('success')
+                        ->icon('heroicon-o-arrow-uturn-up')
+                        ->visible(function ($record) {
+                            return Auth::user()->hasPermissionTo('request sales order')
+                                && $record->status == 'draft';
+                        })
+                        ->action(function ($record) {
+                            try {
+                                $salesOrderService = app(SalesOrderService::class);
+                                $salesOrderService->requestApprove($record);
+                                HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah diajukan untuk persetujuan. Proses selanjutnya: Persetujuan oleh Manajer Sales.");
+                            } catch (ValidationException $e) {
+                                $messages = collect($e->errors())->flatten()->implode(' ');
+
+                                HelperController::sendNotification(isSuccess: false, title: "Gagal Mengajukan Persetujuan", message: $messages ?: 'Validasi pengajuan persetujuan gagal.');
+                            }
+                        }),
+                    Action::make('approve')
+                        ->label('Setujui')
+                        ->requiresConfirmation()
+                        ->modalHeading('Setujui Sales Order')
+                        ->modalDescription(function ($record) {
+                            $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
+                            $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
+                            return "Dengan menyetujui SO {$record->so_number} ({$cust} - {$total}), status pesanan menjadi Disetujui dan tim logistik dapat membuat Delivery Order (DO). Lanjutkan?";
+                        })
+                        ->modalSubmitActionLabel('Ya, Setujui SO')
+                        ->color('success')
+                        ->form(fn ($record) => \App\Filament\Support\ApprovalActions::saleOrderForm($record))
+                        ->visible(function ($record) {
+                            if ($record->status !== 'request_approve') {
+                                return false;
+                            }
+                            $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                            return $check['allowed'];
+                        })
+                        ->action(function ($record, array $data = []) {
+                            try {
+                                $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                                if (! $check['allowed']) {
+                                    HelperController::sendNotification(isSuccess: false, title: "Persetujuan Ditolak", message: $check['reason'] ?? 'Akses persetujuan ditolak.');
+                                    return;
+                                }
+
+                                $salesOrderService = app(SalesOrderService::class);
+                                $salesOrderService->approve($record, ['override_reason' => $data['override_reason'] ?? null, 'credit_override_reason' => $data['credit_override_reason'] ?? null]);
+                                HelperController::sendNotification(isSuccess: true, title: "Informasi", message: "Sales Order telah disetujui. Proses selanjutnya: Pembuatan Delivery Order oleh Tim Gudang/Logistik.");
+                            } catch (ValidationException $e) {
+                                $messages = collect($e->errors())->flatten()->implode(' ');
+
+                                HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
+                            }
+                        }),
+                    \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
+                    \App\Filament\Support\SaleOrderStockActions::retryReservation(Action::make('retry_reservation')),
                     DeleteAction::make()
                         ->label('Hapus')
                         ->visible(function ($record) {

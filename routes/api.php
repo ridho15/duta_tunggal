@@ -16,9 +16,9 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware(['web'])->group(function () {
     // Pencarian dropdown sisi-server (T7.2) — butuh sesi login dan izin lihat pada modelnya
-    Route::middleware(['web', 'auth'])->get('/search/{type}', [\App\Http\Controllers\Api\SearchController::class, 'index'])->name('api.search');
+    Route::middleware(['auth'])->get('/search/{type}', [\App\Http\Controllers\Api\SearchController::class, 'index'])->name('api.search');
 
     // Order Requests
     Route::prefix('order-requests')->group(function () {

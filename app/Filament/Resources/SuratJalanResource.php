@@ -95,7 +95,7 @@ class SuratJalanResource extends Resource
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get, ?SuratJalan $record) {
                                 // Buat: hanya DO approved yang belum tercantum di Surat Jalan lain yang masih berlaku.
                                 // Ubah (Draft): DO yang sudah tertaut tetap boleh dipilih untuk kompatibilitas.
-                                $isCreatePage = str_ends_with((string) request()->path(), 'surat-jalans/create');
+                                $isCreatePage = ! $record || ! $record->exists;
                                 if ($isCreatePage) {
                                     $query->where('status', 'approved');
                                 } else {

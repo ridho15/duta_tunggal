@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(\App\Http\Middleware\IncreaseMemoryLimit::class);
         $middleware->api(\App\Http\Middleware\IncreaseMemoryLimit::class);
+        $middleware->validateCsrfTokens(except: ['api/*']);
         // Profiler request: tidak melakukan apa pun kecuali PERF_PROFILE=true (config/perf.php).
         // Global (bukan grup web/api): rute panel Filament memakai daftar middleware panel sendiri, bukan grup web.
         $middleware->append(\App\Http\Middleware\ProfileRequest::class);
