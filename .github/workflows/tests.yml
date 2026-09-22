@@ -5,6 +5,9 @@ on:
     branches:
       - develop
       - main
+      - 'feat/**'
+      - 'chore/**'
+      - 'fix/**'
   pull_request:
     branches:
       - develop
@@ -14,6 +17,20 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     environment: Testing
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: duta_tunggal_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout
@@ -52,3 +69,9 @@ jobs:
 
       - name: Run Tests
         run: ./vendor/bin/pest
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: duta_tunggal_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
