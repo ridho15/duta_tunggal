@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Invoice;
+use App\Services\OverdueInvoiceNotifier;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,7 @@ class CheckOverdueInvoicesCommand extends Command
 
         $updatedToOverdue = 0;
         $restoredFromOverdue = 0;
+        $newlyOverdue = collect();
 
         foreach ($invoicesToCheck as $invoice) {
             $remaining = $invoice->getRemainingAmount();
@@ -64,6 +66,7 @@ class CheckOverdueInvoicesCommand extends Command
                             'due_date' => $invoice->due_date?->format('Y-m-d'),
                             'remaining' => $remaining,
                         ]);
+                        $newlyOverdue->push($invoice);
                     }
                     $updatedToOverdue++;
                 }
@@ -99,6 +102,11 @@ class CheckOverdueInvoicesCommand extends Command
                 $inv->update(['status' => $newStatus]);
             }
             $restoredFromOverdue++;
+        }
+
+        // Notifikasi ke finance (Isu 8): hanya invoice yang BENAR-BENAR baru berubah pada jalankan ini (bukan dry-run).
+        if ($newlyOverdue->isNotEmpty()) {
+            app(OverdueInvoiceNotifier::class)->notify($newlyOverdue);
         }
 
         $this->info("Pemeriksaan selesai.");
