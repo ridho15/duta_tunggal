@@ -65,11 +65,21 @@ class PaymentRequestResource extends Resource
 
                                 Select::make('supplier_id')
                                     ->label('Vendor / Supplier')
-                                    ->options(fn () => Supplier::orderBy('perusahaan')->limit(50)->get()->mapWithKeys(fn ($s) => [
-                                        $s->id => "({$s->code}) {$s->perusahaan}"
-                                    ]))
+                                    ->relationship('supplier', 'perusahaan')
+                                    ->getSearchResultsUsing(fn (string $search) =>
+                                        Supplier::where('perusahaan', 'like', "%{$search}%")
+                                            ->orWhere('code', 'like', "%{$search}%")
+                                            ->orderBy('perusahaan')
+                                            ->limit(30)
+                                            ->get()
+                                            ->mapWithKeys(fn ($s) => [$s->id => "({$s->code}) {$s->perusahaan}"])
+                                            ->toArray()
+                                    )
+                                    ->getOptionLabelUsing(function ($value) {
+                                        $s = Supplier::find($value);
+                                        return $s ? "({$s->code}) {$s->perusahaan}" : null;
+                                    })
                                     ->searchable()
-                                    ->preload()
                                     ->required()
                                     ->reactive()
                                     ->afterStateUpdated(fn ($set) => $set('selected_invoices', [])),
@@ -85,7 +95,7 @@ class PaymentRequestResource extends Resource
 
                                 Select::make('cabang_id')
                                     ->label('Cabang')
-                                    ->options(fn () => Cabang::orderBy('kode')->limit(50)->get()->mapWithKeys(fn ($c) => [
+                                    ->options(fn () => Cabang::orderBy('kode')->get()->mapWithKeys(fn ($c) => [
                                         $c->id => "({$c->kode}) {$c->nama}"
                                     ]))
                                     ->searchable()
