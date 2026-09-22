@@ -26,18 +26,18 @@ class AccountPayableStatsWidget extends StatsOverviewWidget
         $remainingAmount = $records->sum(fn ($record) => PurchaseInvoiceResource::invoiceAmountToIdr($record->invoice, $record->remaining));
         
         return [
-            StatsOverviewWidget\Stat::make('Total Amount', MoneyHelper::rupiah($totalAmount))
-                ->description($records->count() . ' records, converted to IDR')
+            StatsOverviewWidget\Stat::make('Total Hutang', MoneyHelper::rupiah($totalAmount))
+                ->description($records->count() . ' data, dikonversi ke IDR')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('primary'),
                 
-            StatsOverviewWidget\Stat::make('Paid Amount', MoneyHelper::rupiah($paidAmount))
-                ->description('Already paid, converted to IDR')
+            StatsOverviewWidget\Stat::make('Sudah Dibayar', MoneyHelper::rupiah($paidAmount))
+                ->description('Telah dibayar, dikonversi ke IDR')
                 ->descriptionIcon('heroicon-m-check-circle')
                 ->color('success'),
                 
-            StatsOverviewWidget\Stat::make('Outstanding', MoneyHelper::rupiah($remainingAmount))
-                ->description('Remaining to pay, converted to IDR')
+            StatsOverviewWidget\Stat::make('Sisa Hutang', MoneyHelper::rupiah($remainingAmount))
+                ->description('Sisa yang harus dibayar, dikonversi ke IDR')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('warning'),
         ];

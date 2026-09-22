@@ -60,9 +60,9 @@ class UATPhase2Batch3VerificationTest extends TestCase
         $this->assertStringContainsString('due_date', $resourceFile,
             'AccountPayableResource.php harus memiliki kolom due_date');
         $this->assertStringContainsString('formatStateUsing', $resourceFile,
-            'Kolom tanggal harus menggunakan formatStateUsing() untuk format d M Y tanpa timestamp');
-        $this->assertStringContainsString('format(\'d M Y\')', $resourceFile,
-            'Format tanggal harus "d M Y" (misal: 18 Sep 2026)');
+            'Kolom tanggal harus menggunakan formatStateUsing() untuk format d/m/Y tanpa timestamp');
+        $this->assertStringContainsString('format(\'d/m/Y\')', $resourceFile,
+            'Format tanggal harus "d/m/Y" (misal: 18/09/2026)');
     }
 
     // =========================================================================
