@@ -17,11 +17,27 @@ class EditPurchaseReturn extends EditRecord
 {
     protected static string $resource = PurchaseReturnResource::class;
 
+    protected function authorizeAccess(): void
+    {
+        parent::authorizeAccess();
+
+        if (!in_array($this->record->status, ['draft', 'rejected'])) {
+            \Filament\Notifications\Notification::make()
+                ->title('Akses Ditolak')
+                ->body('Retur pembelian dengan status "' . $this->record->status . '" telah dikunci dan tidak dapat diubah lagi.')
+                ->warning()
+                ->send();
+
+            $this->redirect(static::getResource()::getUrl('view', ['record' => $this->record]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             DeleteAction::make()
-                ->icon('heroicon-o-trash'),
+                ->icon('heroicon-o-trash')
+                ->visible(fn () => in_array($this->record->status, ['draft', 'rejected'])),
         ];
     }
 

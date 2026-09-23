@@ -20,7 +20,8 @@ class ViewPurchaseReturn extends ViewRecord
     {
         return [
             EditAction::make()
-                ->icon('heroicon-o-pencil-square'),
+                ->icon('heroicon-o-pencil-square')
+                ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
             Action::make('submit_for_approval')
                 ->label('Submit for Approval')
                 ->icon('heroicon-o-paper-airplane')

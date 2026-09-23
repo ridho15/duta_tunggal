@@ -203,16 +203,30 @@ class SuratJalanResource extends Resource
                     ->label('Driver / Ekspedisi')
                     ->getStateUsing(function (SuratJalan $record): string {
                         $schedule = $record->primaryDeliverySchedule();
+                        if ($schedule) {
+                            return $schedule->senderName();
+                        }
+                        $firstDo = $record->deliveryOrder->first(fn ($d) => $d->driver_id);
+                        if ($firstDo?->driver) {
+                            return $firstDo->driver->name;
+                        }
 
-                        return $schedule ? $schedule->senderName() : SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
+                        return SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
                     })
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('vehicle_info')
                     ->label('Kendaraan')
                     ->getStateUsing(function (SuratJalan $record): string {
                         $schedule = $record->primaryDeliverySchedule();
+                        if ($schedule) {
+                            return $schedule->vehicleLabel();
+                        }
+                        $firstDo = $record->deliveryOrder->first(fn ($d) => $d->vehicle_id);
+                        if ($firstDo?->vehicle) {
+                            return trim($firstDo->vehicle->plate . ($firstDo->vehicle->type ? ' (' . $firstDo->vehicle->type . ')' : ''));
+                        }
 
-                        return $schedule ? $schedule->vehicleLabel() : SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
+                        return SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('issued_at')
@@ -560,10 +574,12 @@ class SuratJalanResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        // Muat relasi yang dipakai kolom tabel supaya daftar tidak N+1 (driver/kendaraan dari jadwal).
+        // Muat relasi yang dipakai kolom tabel supaya daftar tidak N+1 (driver/kendaraan dari jadwal atau DO).
         $query = parent::getEloquentQuery()->with([
             'deliveryOrder.salesOrders.customer',
             'deliveryOrder.cabang',
+            'deliveryOrder.driver',
+            'deliveryOrder.vehicle',
             'deliverySchedules.driver',
             'deliverySchedules.vehicle',
             'cabang',

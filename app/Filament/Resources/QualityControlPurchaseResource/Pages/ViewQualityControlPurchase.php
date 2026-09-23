@@ -25,10 +25,14 @@ class ViewQualityControlPurchase extends ViewRecord
     protected function getActions(): array
     {
         return [
+            // FIX #8: Edit hanya diizinkan jika QC belum Selesai (status !== 1)
             EditAction::make()
-                ->icon('heroicon-o-pencil-square'),
+                ->icon('heroicon-o-pencil-square')
+                ->visible(fn ($record) => ! $record->status),
+            // FIX #8: Hapus hanya diizinkan jika QC belum Selesai (status !== 1)
             DeleteAction::make()
-                ->icon('heroicon-o-trash'),
+                ->icon('heroicon-o-trash')
+                ->visible(fn ($record) => ! $record->status),
             Action::make('Complete')
                 ->color('success')
                 ->label('Complete QC')

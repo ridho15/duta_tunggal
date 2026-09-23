@@ -14,6 +14,25 @@ class EditWarehouseConfirmation extends EditRecord
 {
     protected static string $resource = WarehouseConfirmationResource::class;
 
+    /**
+     * FIX #8: Blokir akses halaman edit jika konfirmasi gudang sudah final (confirmed/rejected).
+     * Mencegah bypass via URL langsung (mis. /admin/warehouse-confirmations/1/edit).
+     */
+    public function authorizeAccess(): void
+    {
+        parent::authorizeAccess();
+
+        if (strtolower((string) $this->getRecord()->status) !== 'request') {
+            \Filament\Notifications\Notification::make()
+                ->title('Konfirmasi Gudang Terkunci')
+                ->body('Konfirmasi gudang yang sudah disetujui atau ditolak tidak dapat diubah.')
+                ->danger()
+                ->send();
+
+            $this->redirect(WarehouseConfirmationResource::getUrl('view', ['record' => $this->getRecord()]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -59,7 +78,9 @@ class EditWarehouseConfirmation extends EditRecord
 
                     $this->redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
                 }),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            Actions\DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->visible(fn () => strtolower((string) $this->record->status) === 'request'),
         ];
     }
 

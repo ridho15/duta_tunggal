@@ -67,6 +67,7 @@ class CreateQualityControlPurchase extends CreateRecord
                     'cabang_id'         => $po->cabang_id ?? 1,
                     'items'             => $items,
                     'auto_process'      => true,
+                    'inspected_by'      => Auth::id(), // FIX #4: Pertahankan user yang login sebagai petugas QC
                 ]);
 
                 return;
@@ -86,6 +87,7 @@ class CreateQualityControlPurchase extends CreateRecord
         $this->form->fill(array_merge(
             $state,
             QualityControlPurchaseResource::formStateForPurchaseOrderItem($purchaseOrderItem),
+            ['inspected_by' => Auth::id()], // FIX #4: Pastikan inspected_by tidak tertimpa menjadi null
         ));
     }
 
@@ -172,6 +174,13 @@ class CreateQualityControlPurchase extends CreateRecord
                 }
 
                 if (! empty($messages)) {
+                    \Filament\Notifications\Notification::make()
+                        ->title('Validasi Quantity QC Gagal')
+                        ->body(implode("\n", array_values($messages)))
+                        ->danger()
+                        ->persistent()
+                        ->send();
+
                     throw ValidationException::withMessages($messages);
                 }
 
@@ -253,9 +262,19 @@ class CreateQualityControlPurchase extends CreateRecord
             ]);
 
             if ($this->isQuantityException($exception)) {
+                // Tampilkan notifikasi danger yang deskriptif agar pesan error jelas
+                \Filament\Notifications\Notification::make()
+                    ->title('Quantity Melebihi Sisa PO')
+                    ->body($exception->getMessage())
+                    ->danger()
+                    ->persistent()
+                    ->send();
+
                 throw ValidationException::withMessages([
-                    'quantity_received' => $exception->getMessage(),
-                    'passed_quantity' => $exception->getMessage(),
+                    'items.0.quantity_received' => $exception->getMessage(),
+                    'items'                     => $exception->getMessage(),
+                    'quantity_received'         => $exception->getMessage(),
+                    'passed_quantity'           => 'Periksa kembali qty yang diisi.',
                 ]);
             }
 

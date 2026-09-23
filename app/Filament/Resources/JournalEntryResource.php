@@ -1129,7 +1129,8 @@ class JournalEntryResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
-                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn($record) => empty($record->source_type) && empty($record->source_id)),
                     Tables\Actions\Action::make('view_source')
                         ->label('Lihat Detail Source')
                         ->icon('heroicon-o-eye')
@@ -1216,7 +1217,18 @@ class JournalEntryResource extends Resource
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->before(function (\Illuminate\Database\Eloquent\Collection $records, $action) {
+                            $hasSystem = $records->contains(fn ($r) => !empty($r->source_type) || !empty($r->source_id));
+                            if ($hasSystem) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Gagal Hapus')
+                                    ->body('Pilihan Anda berisi jurnal yang diterbitkan otomatis oleh sistem. Jurnal sistem tidak dapat dihapus massal.')
+                                    ->danger()
+                                    ->send();
+                                $action->halt();
+                            }
+                        }),
                 ]),
             ])
             ->defaultSort('date', 'desc')

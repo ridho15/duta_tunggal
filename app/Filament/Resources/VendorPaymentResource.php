@@ -528,29 +528,25 @@ class VendorPaymentResource extends Resource
 
                                         switch ($state) {
                                             case 'Cash':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%kas%')
-                                                            ->orWhere('name', 'LIKE', '%tunai%');
-                                                    })
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1111%')
+                                                    ->whereDoesntHave('children')
+                                                    ->where('code', '!=', '1110')
                                                     ->first();
                                                 break;
                                             case 'Bank Transfer':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%bank%')
-                                                            ->orWhere('name', 'LIKE', '%rekening%');
-                                                    })
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1112%')
+                                                    ->whereDoesntHave('children')
+                                                    ->where('code', '!=', '1110')
                                                     ->first();
                                                 break;
                                             case 'Credit':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where('name', 'LIKE', '%piutang%')
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1120%')
+                                                    ->whereDoesntHave('children')
                                                     ->first();
                                                 break;
                                             case 'Deposit':
-                                                $firstCoa = ChartOfAccount::where('type', 'asset')
-                                                    ->where('name', 'LIKE', '%deposit%')
+                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1113%')
+                                                    ->whereDoesntHave('children')
                                                     ->first();
                                                 break;
                                         }
@@ -647,25 +643,29 @@ class VendorPaymentResource extends Resource
 
                                         try {
                                             $coas = match ($paymentMethod) {
-                                                'Cash' => ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%kas%')
-                                                            ->orWhere('name', 'LIKE', '%tunai%');
-                                                    })
+                                                'Cash' => ChartOfAccount::where('code', 'LIKE', '1111%')
+                                                    ->whereDoesntHave('children')
+                                                    ->where('code', '!=', '1110')
+                                                    ->orderBy('code')
                                                     ->get(),
-                                                'Bank Transfer' => ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where(function ($q) {
-                                                        $q->where('name', 'LIKE', '%bank%')
-                                                            ->orWhere('name', 'LIKE', '%rekening%');
-                                                    })
+                                                'Bank Transfer' => ChartOfAccount::where('code', 'LIKE', '1112%')
+                                                    ->whereDoesntHave('children')
+                                                    ->where('code', '!=', '1110')
+                                                    ->orderBy('code')
                                                     ->get(),
-                                                'Credit' => ChartOfAccount::where('code', 'LIKE', '11%')
-                                                    ->where('name', 'LIKE', '%piutang%')
+                                                'Credit' => ChartOfAccount::where('code', 'LIKE', '1120%')
+                                                    ->whereDoesntHave('children')
+                                                    ->orderBy('code')
                                                     ->get(),
-                                                'Deposit' => ChartOfAccount::where('type', 'asset')
-                                                    ->where('name', 'LIKE', '%deposit%')
+                                                'Deposit' => ChartOfAccount::where('code', 'LIKE', '1113%')
+                                                    ->whereDoesntHave('children')
+                                                    ->orderBy('code')
                                                     ->get(),
-                                                default => ChartOfAccount::all()
+                                                default => ChartOfAccount::where('code', 'LIKE', '111%')
+                                                    ->whereDoesntHave('children')
+                                                    ->where('code', '!=', '1110')
+                                                    ->orderBy('code')
+                                                    ->get()
                                             };
 
                                             $options = [];

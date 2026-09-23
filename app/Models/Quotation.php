@@ -79,16 +79,24 @@ class Quotation extends Model
             return "Quotation {$number} sudah digantikan oleh revisi yang lebih baru. Gunakan versi terbaru.";
         }
 
+        if ($this->saleOrders()->whereNotIn('status', ['cancelled', 'rejected'])->exists()) {
+            $soNumbers = $this->saleOrders()->whereNotIn('status', ['cancelled', 'rejected'])->pluck('so_number')->implode(', ');
+            return "Quotation {$number} sudah digunakan untuk Sales Order ({$soNumbers}).";
+        }
+
         return null;
     }
 
-    /** Quotation yang boleh dijadikan SO: Approved, belum kedaluwarsa, belum digantikan revisi. */
+    /** Quotation yang boleh dijadikan SO: Approved, belum kedaluwarsa, belum digantikan revisi, belum pernah dibuatkan SO aktif. */
     public function scopeUsable(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_APPROVE)
             ->whereNull('superseded_at')
             ->where(function (Builder $q) {
                 $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', now()->toDateString());
+            })
+            ->whereDoesntHave('saleOrders', function (Builder $q) {
+                $q->whereNotIn('status', ['cancelled', 'rejected']);
             });
     }
 
@@ -108,6 +116,11 @@ class Quotation extends Model
     public function revisions()
     {
         return $this->hasMany(Quotation::class, 'revision_of_id');
+    }
+
+    public function saleOrders()
+    {
+        return $this->hasMany(SaleOrder::class, 'quotation_id');
     }
     protected $table = 'quotations';
     protected $casts = [

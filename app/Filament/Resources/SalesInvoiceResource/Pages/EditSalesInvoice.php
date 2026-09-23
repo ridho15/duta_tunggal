@@ -13,11 +13,46 @@ class EditSalesInvoice extends EditRecord
 {
     protected static string $resource = SalesInvoiceResource::class;
 
+    /**
+     * FIX #2: Blokir akses halaman edit jika invoice sudah final.
+     * Mencegah bypass via URL langsung (mis. /admin/sales-invoices/1/edit).
+     */
+    public function authorizeAccess(): void
+    {
+        parent::authorizeAccess();
+
+        $record = $this->getRecord();
+        $lockedStatuses = [
+            \App\Models\Invoice::STATUS_PAID,
+            \App\Models\Invoice::STATUS_PARTIALLY_PAID,
+            \App\Models\Invoice::STATUS_OVERDUE,
+            \App\Models\Invoice::STATUS_CANCELLED,
+        ];
+
+        if (in_array($record->status, $lockedStatuses)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Invoice tidak dapat diedit')
+                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$record->status] ?? $record->status) . '" tidak dapat diubah. Gunakan Nota Kredit atau Pembatalan.')
+                ->danger()
+                ->send();
+
+            $this->redirect(SalesInvoiceResource::getUrl('view', ['record' => $record]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            // FIX #2: Hapus hanya untuk invoice yang belum final
+            Actions\DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->visible(fn () => !in_array($this->record->status, [
+                    \App\Models\Invoice::STATUS_PAID,
+                    \App\Models\Invoice::STATUS_PARTIALLY_PAID,
+                    \App\Models\Invoice::STATUS_OVERDUE,
+                    \App\Models\Invoice::STATUS_CANCELLED,
+                ])),
         ];
     }
 

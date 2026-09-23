@@ -9,9 +9,9 @@ use Carbon\Carbon;
 
 class InventoryCardReportService
 {
-    private const IN_TYPES = ['purchase_in', 'manufacture_in', 'transfer_in', 'adjustment_in'];
+    private const IN_TYPES = ['purchase_in', 'manufacture_in', 'transfer_in', 'adjustment_in', 'customer_return'];
 
-    private const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+    private const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'purchase_return'];
 
     public function reportData(array $filters = []): array
     {

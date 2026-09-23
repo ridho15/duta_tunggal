@@ -302,7 +302,15 @@ export const SaleOrderItemTable: React.FC<Props> = ({
                       Tipe Pajak
                     </label>
                     <select
-                      value={item.tax_type}
+                      value={
+                        item.tax_type?.toLowerCase() === 'eklusif' || item.tax_type?.toLowerCase() === 'eksklusif'
+                          ? 'Eksklusif'
+                          : item.tax_type?.toLowerCase() === 'inklusif'
+                          ? 'Inklusif'
+                          : item.tax_type === 'Eksklusif' || item.tax_type === 'Inklusif'
+                          ? item.tax_type
+                          : 'None'
+                      }
                       onChange={(e) => {
                         const newType = e.target.value;
                         const newTax = newType === 'None' ? 0 : 11;

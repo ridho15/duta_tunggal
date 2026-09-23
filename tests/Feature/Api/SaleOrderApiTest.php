@@ -289,8 +289,8 @@ class SaleOrderApiTest extends TestCase
             'quantity' => 1,
             'unit_price' => 100000,
             'discount' => 0,
-            'tax' => 0,
-            'tipe_pajak' => 'None',
+            'tax' => 11,
+            'tipe_pajak' => 'eklusif',
             'currency_id' => $currency->id,
         ]);
 
@@ -303,6 +303,12 @@ class SaleOrderApiTest extends TestCase
                     'header' => [
                         'id' => $saleOrder->id,
                         'customer_id' => $customer->id,
+                    ],
+                    'items' => [
+                        [
+                            'tax_type' => 'Eksklusif',
+                            'tax' => 11,
+                        ],
                     ],
                 ],
             ]);

@@ -101,36 +101,7 @@ class CustomerReturnResource extends Resource
                     Forms\Components\Grid::make(2)->schema([
                         Forms\Components\Select::make('customer_id')
                             ->label('Pelanggan')
-                            ->searchable()
-                            ->getSearchResultsUsing(function (string $search) {
-                                return Customer::query()
-                                    ->where(function ($q) use ($search) {
-                                        $q->where('name', 'like', "%{$search}%")
-                                            ->orWhere('code', 'like', "%{$search}%")
-                                            ->orWhere('phone', 'like', "%{$search}%");
-                                    })
-                                    ->limit(50)
-                                    ->get()
-                                    ->mapWithKeys(function ($customer) {
-                                        $label = $customer->code ? "({$customer->code}) {$customer->name}" : $customer->name;
-                                        if ($customer->phone) {
-                                            $label .= " - {$customer->phone}";
-                                        }
-                                        return [$customer->id => $label];
-                                    })
-                                    ->toArray();
-                            })
-                            ->getOptionLabelUsing(function ($value) {
-                                $customer = Customer::find($value);
-                                if (!$customer) {
-                                    return null;
-                                }
-                                $label = $customer->code ? "({$customer->code}) {$customer->name}" : $customer->name;
-                                if ($customer->phone) {
-                                    $label .= " - {$customer->phone}";
-                                }
-                                return $label;
-                            })
+                            ->remoteSearch('customers')
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn (Forms\Set $set) => $set('invoice_id', null))
@@ -213,13 +184,21 @@ class CustomerReturnResource extends Resource
                                     if (! $invoiceId) {
                                         return [];
                                     }
+                                    $currentReturnId = $get('../../id');
                                     return InvoiceItem::with('product')
                                         ->where('invoice_id', $invoiceId)
                                         ->whereNull('deleted_at')
                                         ->get()
-                                        ->mapWithKeys(fn ($item) => [
-                                            $item->id => ($item->product?->name ?? '-') . ' (Qty: ' . $item->quantity . ')',
-                                        ]);
+                                        ->mapWithKeys(function ($item) use ($currentReturnId) {
+                                            $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $item->id)
+                                                ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
+                                                ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [CustomerReturn::STATUS_COMPLETED, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_SUBMITTED]))
+                                                ->sum('quantity');
+                                            $returnable = max(0, (float) $item->quantity - (float) $alreadyReturned);
+                                            return [
+                                                $item->id => ($item->product?->name ?? '-') . ' (Bisa diretur: ' . $returnable . ' / ' . $item->quantity . ' pcs)',
+                                            ];
+                                        });
                                 })
                                 ->searchable()
                                 ->required()
@@ -242,6 +221,39 @@ class CustomerReturnResource extends Resource
                                 ->required()
                                 ->default(1)
                                 ->minValue(0.01)
+                                ->maxValue(function (Forms\Get $get) {
+                                    $invoiceItemId = $get('invoice_item_id');
+                                    if (! $invoiceItemId) {
+                                        return null;
+                                    }
+                                    $item = InvoiceItem::find($invoiceItemId);
+                                    if (! $item) {
+                                        return null;
+                                    }
+                                    $currentReturnId = $get('../../id');
+                                    $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
+                                        ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
+                                        ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [CustomerReturn::STATUS_COMPLETED, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_SUBMITTED]))
+                                        ->sum('quantity');
+                                    return max(0, (float) $item->quantity - (float) $alreadyReturned);
+                                })
+                                ->helperText(function (Forms\Get $get) {
+                                    $invoiceItemId = $get('invoice_item_id');
+                                    if (! $invoiceItemId) {
+                                        return null;
+                                    }
+                                    $item = InvoiceItem::find($invoiceItemId);
+                                    if (! $item) {
+                                        return null;
+                                    }
+                                    $currentReturnId = $get('../../id');
+                                    $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
+                                        ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
+                                        ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [CustomerReturn::STATUS_COMPLETED, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_SUBMITTED]))
+                                        ->sum('quantity');
+                                    $max = max(0, (float) $item->quantity - (float) $alreadyReturned);
+                                    return "Maksimal dapat diretur: {$max} pcs";
+                                })
                                 ->step(0.01)
                                 ->columnSpan(2),
 

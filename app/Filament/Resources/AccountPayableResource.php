@@ -49,6 +49,21 @@ class AccountPayableResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -124,6 +139,7 @@ class AccountPayableResource extends Resource
                             ->label('Paid Source')
                             ->required()
                             ->indonesianMoney()
+                            ->disabled()
                             ->validationMessages([
                                 'required' => 'Jumlah pembayaran tidak boleh kosong',
                                 'numeric' => 'Jumlah pembayaran harus berupa angka'
@@ -147,6 +163,7 @@ class AccountPayableResource extends Resource
                             ->label('Remaining Source')
                             ->required()
                             ->indonesianMoney()
+                            ->disabled()
                             ->validationMessages([
                                 'required' => 'Sisa pembayaran tidak boleh kosong',
                                 'numeric' => 'Sisa pembayaran harus berupa angka'
@@ -519,9 +536,6 @@ class AccountPayableResource extends Resource
                 ActionGroup::make([
                     ViewAction::make()
                         ->color('primary'),
-                    EditAction::make()
-                        ->color('success'),
-                    DeleteAction::make(),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([])
@@ -532,8 +546,7 @@ class AccountPayableResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Account Payable adalah catatan hutang perusahaan kepada supplier berdasarkan invoice pembelian yang belum dibayar.</li>' .
                             '<li><strong>Status:</strong> <em>Belum Lunas</em> (outstanding), <em>Lunas</em> (paid). Hanya menampilkan yang belum lunas secara default.</li>' .
-                            '<li><strong>Validasi:</strong> Total, Paid, dan Remaining dihitung otomatis. Status pembayaran diperbarui berdasarkan pembayaran.</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah pembayaran), <em>Delete</em> (hapus record).</li>' .
+                            '<li><strong>Imutabilitas:</strong> Utang Usaha dimutasi otomatis oleh sistem (Invoice, Pembayaran, Retur). Tidak dapat ditambah, diubah, atau dihapus manual.</li>' .
                             '<li><strong>Grouping:</strong> Berdasarkan Supplier, Status Pembayaran, dan Status Overdue (Current, Overdue, dll.).</li>' .
                             '<li><strong>Filters:</strong> Supplier, Status, Amount Range, Outstanding Only, Overdue, Date Range, dll.</li>' .
                             '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan AP dari cabang tersebut jika tidak memiliki akses all.</li>' .
@@ -568,9 +581,7 @@ class AccountPayableResource extends Resource
     {
         return [
             'index' => Pages\ListAccountPayables::route('/'),
-            'create' => Pages\CreateAccountPayable::route('/create'),
             'view' => Pages\ViewAccountPayable::route('/{record}'),
-            'edit' => Pages\EditAccountPayable::route('/{record}/edit'),
         ];
     }
 

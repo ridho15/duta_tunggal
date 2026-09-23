@@ -387,7 +387,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                               {/* Cabang (SearchableSelect) — sorted alphabetically, wider to prevent text truncation */}
                               <div className="flex-1 min-w-[280px]">
                                 <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                                  Cabang <span className="text-rose-500">*</span>
+                                  Cabang <span className="text-[10px] font-normal text-gray-400">(Opsional / Berlaku Umum)</span>
                                 </label>
                                 <SearchableSelect
                                   options={[...(dependencies?.cabangs || [])]
@@ -398,7 +398,7 @@ export const OrderRequestItemTable: React.FC<Props> = ({
                                       badge: c.kode,
                                     }))}
                                   value={item.cabang_id}
-                                  placeholder="Pilih Cabang"
+                                  placeholder="Umum / Semua Cabang (Opsional)"
                                   hasError={Boolean(errors[`${itemErrorPrefix}.cabang_id`])}
                                   onChange={(val) => onUpdateRow(item.rowId, 'cabang_id', val ? Number(val) : null)}
                                   disabled={disabled}

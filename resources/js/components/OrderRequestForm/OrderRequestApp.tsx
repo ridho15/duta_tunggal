@@ -58,7 +58,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
         product_id: null,
         unit: '-',
         quantity: 1,
-        cabang_id: defaultCabangId ?? dependencies?.default_cabang_id ?? null,
+        cabang_id: defaultCabangId ?? null,
         supplier_id: null,
         currency_id: defaultCurrencyId,
         original_price: 0,
@@ -380,7 +380,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
                 product_id: product.id,
                 unit: product.uom,
                 supplier_id: defaultSupplier,
-                cabang_id: row.cabang_id || product.cabang_id || dependencies?.default_cabang_id || null,
+                cabang_id: row.cabang_id || null,
                 unit_price_idr: rawPriceIdr,
                 original_price_idr: rawPriceIdr,
                 unit_price: convertedPrice,
@@ -609,7 +609,6 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
     }
 
     validItems.forEach((item, index) => {
-      if (!item.cabang_id) errors[`items.${index}.cabang_id`] = ['Cabang tujuan wajib dipilih.'];
       if ((Number(item.quantity) || 0) <= 0) errors[`items.${index}.quantity`] = ['Quantity harus lebih besar dari 0.'];
     });
 
@@ -639,7 +638,7 @@ export const OrderRequestApp: React.FC<Props> = ({ initialData, initialRecord })
             original_price: item.original_price,
             unit_price_idr: item.unit_price_idr,
             original_price_idr: item.original_price_idr,
-            cabang_id: item.cabang_id,
+            cabang_id: item.cabang_id || null,
             supplier_id: item.supplier_id,
             currency_id: item.currency_id,
             discount: item.discount,

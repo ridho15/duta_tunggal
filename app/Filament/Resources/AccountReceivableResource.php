@@ -47,6 +47,21 @@ class AccountReceivableResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -61,12 +76,14 @@ class AccountReceivableResource extends Resource
                             ->default(function () {
                                 return Auth::user()->cabang_id;
                             })
+                            ->disabled()
                             ->required()
                             ->helperText('Pilih cabang untuk account receivable ini'),
                         Select::make('invoice_id')
                             ->required()
                             ->preload()
                             ->searchable()
+                            ->disabled()
                             ->reactive()
                             ->afterStateUpdated(function ($get, $set, $state) {
                                 $invoice = Invoice::find($state);
@@ -85,6 +102,7 @@ class AccountReceivableResource extends Resource
                             ->label('Customer')
                             ->preload()
                             ->reactive()
+                            ->disabled()
                             ->validationMessages([
                                 'required' => 'Customer belum dipilih'
                             ])
@@ -96,15 +114,19 @@ class AccountReceivableResource extends Resource
                             ->relationship('customer', 'name'),
                         TextInput::make('total')
                             ->required()
+                            ->disabled()
                             ->indonesianMoney(),
                         TextInput::make('paid')
                             ->required()
+                            ->disabled()
                             ->indonesianMoney()
                             ->default(0.00),
                         TextInput::make('remaining')
                             ->required()
+                            ->disabled()
                             ->indonesianMoney(),
                         Checkbox::make('status')
+                            ->disabled()
                             ->label('Lunas / Belum Lunas')
                     ])
             ]);
@@ -410,9 +432,6 @@ class AccountReceivableResource extends Resource
                 ActionGroup::make([
                     ViewAction::make()
                         ->color('primary'),
-                    EditAction::make()
-                        ->color('success'),
-                    DeleteAction::make(),
                 ])->button()
                     ->label('Action')
             ], position: ActionsPosition::BeforeColumns)
@@ -424,8 +443,7 @@ class AccountReceivableResource extends Resource
                         '<ul class="list-disc pl-5">' .
                             '<li><strong>Apa ini:</strong> Account Receivable adalah catatan piutang perusahaan dari customer berdasarkan invoice penjualan yang belum dibayar.</li>' .
                             '<li><strong>Status:</strong> <em>Belum Lunas</em> (outstanding), <em>Lunas</em> (paid). Hanya menampilkan yang belum lunas secara default.</li>' .
-                            '<li><strong>Validasi:</strong> Total, Paid, dan Remaining dihitung otomatis. Status pembayaran diperbarui berdasarkan penerimaan pembayaran.</li>' .
-                            '<li><strong>Actions:</strong> <em>View</em> (lihat detail), <em>Edit</em> (ubah pembayaran), <em>Delete</em> (hapus record).</li>' .
+                            '<li><strong>Imutabilitas:</strong> Piutang Usaha dimutasi otomatis oleh sistem (Invoice, Pembayaran, Retur). Tidak dapat ditambah, diubah, atau dihapus manual.</li>' .
                             '<li><strong>Grouping:</strong> Berdasarkan Customer, Status Pembayaran, dan Status Overdue (Current, Overdue, dll.).</li>' .
                             '<li><strong>Filters:</strong> Customer, Status, Amount Range, Outstanding Only, Overdue, Date Range, dll.</li>' .
                             '<li><strong>Permissions:</strong> Tergantung pada cabang user, hanya menampilkan AR dari cabang tersebut jika tidak memiliki akses all.</li>' .
@@ -446,8 +464,7 @@ class AccountReceivableResource extends Resource
     {
         return [
             'index' => Pages\ListAccountReceivables::route('/'),
-            'create' => Pages\CreateAccountReceivable::route('/create'),
-            'edit' => Pages\EditAccountReceivable::route('/{record}/edit'),
+            'view' => Pages\ViewAccountReceivable::route('/{record}'),
         ];
     }
 

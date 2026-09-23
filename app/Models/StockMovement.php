@@ -64,6 +64,7 @@ class StockMovement extends Model
             StockAdjustment::class => 'Stock Adjustment',
             QualityControl::class => 'Quality Control',
             PurchaseReturn::class => 'Purchase Return',
+            CustomerReturn::class => 'Customer Return',
             default => 'Unknown',
         };
     }
@@ -90,6 +91,7 @@ class StockMovement extends Model
             StockAdjustment::class => $source->adjustment_number ?? 'N/A',
             QualityControl::class => $source->qc_number ?? 'N/A',
             PurchaseReturn::class => $source->nota_retur ?? 'N/A',
+            CustomerReturn::class => $source->return_number ?? 'N/A',
             default => 'N/A',
         };
     }
@@ -132,6 +134,8 @@ class StockMovement extends Model
             MaterialIssue::class => route('filament.admin.resources.material-issues.view', $source->id),
             StockAdjustment::class => route('filament.admin.resources.stock-adjustments.view', $source->id),
             QualityControl::class => route('filament.admin.resources.quality-control-manufactures.view', $source->id),
+            PurchaseReturn::class => route('filament.admin.resources.purchase-returns.view', $source->id),
+            CustomerReturn::class => route('filament.admin.resources.customer-returns.view', $source->id),
             default => null,
         };
     }

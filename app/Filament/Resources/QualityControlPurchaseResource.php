@@ -617,16 +617,19 @@ class QualityControlPurchaseResource extends Resource
 
     public static function purchaseOrderItemQcProgressSummary(PurchaseOrderItem $purchaseOrderItem): array
     {
-        $purchaseOrderItem->loadMissing('qualityControls');
+        // FIX #12: query QualityControlItem langsung dengan purchase_order_item_id,
+        // karena qualityControls morph relation di PurchaseOrderItem selalu kosong
+        // untuk multi-item QC (QC tersimpan di level PO, items-nya di quality_control_items).
+        $qcItems = \App\Models\QualityControlItem::query()
+            ->where('purchase_order_item_id', $purchaseOrderItem->id)
+            ->whereNull('deleted_at')
+            ->with('qualityControl')
+            ->get();
 
-        $pendingQualityControls = $purchaseOrderItem->qualityControls
-            ->filter(fn(QualityControl $qualityControl) => (int) ($qualityControl->status ?? 0) !== 1);
-        $processedQualityControls = $purchaseOrderItem->qualityControls
-            ->filter(fn(QualityControl $qualityControl) => (int) ($qualityControl->status ?? 0) === 1);
+        $processedCount = $qcItems->filter(fn ($item) => (int) ($item->qualityControl?->status ?? 0) === 1)->count();
+        $pendingCount   = $qcItems->filter(fn ($item) => (int) ($item->qualityControl?->status ?? 0) !== 1)->count();
 
         $remaining = static::purchaseOrderItemQcRemaining($purchaseOrderItem)['remaining'];
-        $processedCount = $processedQualityControls->count();
-        $pendingCount = $pendingQualityControls->count();
 
         if ($processedCount === 0 && $pendingCount === 0) {
             $statusLabel = 'Belum ada QC';
@@ -640,9 +643,9 @@ class QualityControlPurchaseResource extends Resource
 
         return [
             'processed_count' => $processedCount,
-            'pending_count' => $pendingCount,
-            'remaining' => $remaining,
-            'status_label' => $statusLabel,
+            'pending_count'   => $pendingCount,
+            'remaining'       => $remaining,
+            'status_label'    => $statusLabel,
         ];
     }
 
@@ -1281,10 +1284,11 @@ class QualityControlPurchaseResource extends Resource
                                 Select::make('inspected_by')
                                     ->label('Petugas QC (Inspected By)')
                                     ->options(\App\Models\User::pluck('name', 'id'))
-                                    ->default(Auth::id())
-                                    ->disabled()
+                                    ->default(fn () => Auth::id() ?? auth()->guard('web')->id() ?? \App\Models\User::first()?->id)
+                                    ->searchable()
+                                    ->preload()
                                     ->dehydrated(true)
-                                    ->helperText('Terisi otomatis dengan akun pengguna yang login dan tidak dapat diubah.')
+                                    ->helperText('Terisi otomatis dengan akun login, dapat dipilih jika berbeda.')
                                     ->required()
                                     ->validationMessages(['required' => 'Petugas QC harus terisi']),
                                 \Filament\Forms\Components\DatePicker::make('inspection_date')
@@ -1300,7 +1304,7 @@ class QualityControlPurchaseResource extends Resource
                     ->action(function (array $data) {
                         $created = 0;
                         $selectedItemIds = $data['selected_po_item_ids'] ?? [];
-                        $inspectedBy = Auth::id();
+                        $inspectedBy = $data['inspected_by'] ?? Auth::id() ?? auth()->guard('web')->id();
                         $batchCabangId = static::resolveBatchQcPurchaseCabangId(
                             is_numeric($data['purchase_order_id'] ?? null) ? (int) $data['purchase_order_id'] : null,
                             (array) $selectedItemIds
@@ -1526,7 +1530,9 @@ class QualityControlPurchaseResource extends Resource
                                 );
                             }
                         }),
-                    DeleteAction::make(),
+                    // FIX #8: Hapus hanya diizinkan jika QC belum Selesai (status !== 1)
+                    DeleteAction::make()
+                        ->visible(fn (QualityControl $record): bool => ! $record->status),
                 ])
                     ->icon('heroicon-m-ellipsis-horizontal'),
             ], position: ActionsPosition::BeforeColumns)

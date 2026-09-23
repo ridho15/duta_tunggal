@@ -250,7 +250,7 @@ class SaleOrderApiController extends Controller
                         'quantity' => (float) $item->quantity,
                         'unit_price' => (float) $item->unit_price,
                         'discount' => (float) ($item->discount ?? 0),
-                        'tax_type' => $item->tax_type ?? 'None',
+                        'tax_type' => $this->formatTaxTypeForFrontend($item->tax_type ?? null),
                         'tax' => (float) ($item->tax ?? 0),
                         'notes' => $item->notes ?? '',
                     ];
@@ -425,9 +425,9 @@ class SaleOrderApiController extends Controller
                 ]);
 
                 foreach ($itemsData as $item) {
-                    $taxType = $item['tax_type'] ?? 'None';
+                    $taxType = $this->normalizeTaxTypeForDatabase($item['tax_type'] ?? null);
                     $taxRate = (float) ($item['tax'] ?? 0);
-                    if ($taxType === 'None') {
+                    if ($taxType === 'none') {
                         $taxRate = 0;
                     }
 
@@ -504,7 +504,7 @@ class SaleOrderApiController extends Controller
                 'quantity' => (float) $item->quantity,
                 'unit_price' => (float) $item->unit_price,
                 'discount' => (float) ($item->discount ?? 0),
-                'tax_type' => $item->tipe_pajak ?? 'None',
+                'tax_type' => $this->formatTaxTypeForFrontend($item->tipe_pajak ?? null),
                 'tax' => (float) ($item->tax ?? 0),
                 'notes' => $item->notes ?? '',
             ];
@@ -677,9 +677,9 @@ class SaleOrderApiController extends Controller
                 SaleOrderItem::where('sale_order_id', $saleOrder->id)->delete();
 
                 foreach ($itemsData as $item) {
-                    $taxType = $item['tax_type'] ?? 'None';
+                    $taxType = $this->normalizeTaxTypeForDatabase($item['tax_type'] ?? null);
                     $taxRate = (float) ($item['tax'] ?? 0);
-                    if ($taxType === 'None') {
+                    if ($taxType === 'none') {
                         $taxRate = 0;
                     }
 
@@ -740,5 +740,33 @@ class SaleOrderApiController extends Controller
 
             return [];
         }
+    }
+
+    /**
+     * Memetakan tipe pajak dari database ke Title Case yang diharapkan oleh React frontend ('None', 'Inklusif', 'Eksklusif').
+     */
+    protected function formatTaxTypeForFrontend(?string $taxType): string
+    {
+        $normalized = strtolower(trim((string) $taxType));
+
+        return match ($normalized) {
+            'eklusif', 'eksklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'Eksklusif',
+            'inklusif', 'included', 'ppn included', 'ppn-included' => 'Inklusif',
+            default => 'None',
+        };
+    }
+
+    /**
+     * Menormalkan tipe pajak dari request ke nilai standar database ('eklusif', 'inklusif', 'none').
+     */
+    protected function normalizeTaxTypeForDatabase(?string $taxType): string
+    {
+        $normalized = strtolower(trim((string) $taxType));
+
+        return match ($normalized) {
+            'eklusif', 'eksklusif', 'exclusive', 'ppn excluded', 'ppn_excluded' => 'eklusif',
+            'inklusif', 'included', 'ppn included', 'ppn-included' => 'inklusif',
+            default => 'none',
+        };
     }
 }

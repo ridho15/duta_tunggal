@@ -30,6 +30,8 @@ class SuratJalanDocumentBuilder
         'createdBy',
         'cancelledBy',
         'deliveryOrder.cabang',
+        'deliveryOrder.driver',
+        'deliveryOrder.vehicle',
         'deliveryOrder.salesOrders.customer',
         'deliveryOrder.deliveryOrderItem.product.uom',
         'deliverySchedules.driver',
@@ -67,7 +69,7 @@ class SuratJalanDocumentBuilder
             'groups' => $groups->all(),
             'total_lines' => $groups->sum(fn ($g) => count($g['items'])),
             'signatures' => [
-                'driver_name' => $delivery['scheduled'] && $delivery['sender_name'] !== '-' ? $delivery['sender_name'] : null,
+                'driver_name' => ($delivery['sender_name'] !== '-' && filled($delivery['sender_name'])) ? $delivery['sender_name'] : null,
                 'driver_role' => $delivery['is_third_party'] ? 'Ekspedisi / Kurir' : 'Driver',
             ],
             'printed_at' => now()->locale('id')->translatedFormat('d F Y H:i'),
@@ -108,14 +110,24 @@ class SuratJalanDocumentBuilder
         $schedule = $suratJalan->primaryDeliverySchedule();
 
         if (! $schedule) {
+            $firstDo = $suratJalan->deliveryOrder->first(fn (DeliveryOrder $d) => $d->driver_id || $d->vehicle_id);
+
+            $driverName = $firstDo?->driver?->name;
+            $vehiclePlate = $firstDo?->vehicle?->plate;
+            if ($vehiclePlate && $firstDo?->vehicle?->type) {
+                $vehiclePlate .= " ({$firstDo->vehicle->type})";
+            }
+
+            $hasLogistics = filled($driverName) || filled($vehiclePlate);
+
             return [
-                'scheduled' => false,
+                'scheduled' => $hasLogistics,
                 'is_third_party' => false,
                 'schedule_number' => null,
-                'departure' => null,
-                'method_label' => self::NOT_SCHEDULED_LABEL,
-                'sender_name' => '-',
-                'vehicle' => '-',
+                'departure' => $firstDo?->delivery_date ? $this->formatDate($firstDo->delivery_date) : null,
+                'method_label' => $hasLogistics ? 'Pengiriman Langsung' : self::NOT_SCHEDULED_LABEL,
+                'sender_name' => $driverName ?: '-',
+                'vehicle' => $vehiclePlate ?: '-',
                 'tracking_number' => null,
             ];
         }

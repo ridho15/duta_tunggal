@@ -156,6 +156,11 @@ class Customer extends Model
      */
     public function getDisplayName(): string
     {
-        return "({$this->getDisplayCode()}) {$this->name}";
+        $code = $this->getDisplayCode();
+        $label = $code ? "({$code}) {$this->name}" : $this->name;
+        if (!empty($this->perusahaan) && strcasecmp(trim($this->perusahaan), trim($this->name)) !== 0) {
+            $label .= " - {$this->perusahaan}";
+        }
+        return $label;
     }
 }

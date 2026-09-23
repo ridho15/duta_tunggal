@@ -51,9 +51,10 @@ class DeliveryOrderObserver
             $this->handleQuantityUpdateAfterCompleted($deliveryOrder);
         }
 
-        // T2.1 (flag stock.ledger): DO ditutup/ditolak → reservasi DO dilepas lewat buku besar.
-        if ($deliveryOrder->wasChanged('status') && in_array($newStatus, ['closed', 'reject'], true) && $this->ledgerEnabled()) {
+        // DO ditutup/ditolak → reservasi DO selalu dilepas agar stok bebas kembali normal.
+        if ($deliveryOrder->wasChanged('status') && in_array($newStatus, ['closed', 'reject'], true)) {
             app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} {$newStatus}");
+            StockReservation::where('delivery_order_id', $deliveryOrder->id)->get()->each->delete();
         }
 
         // Perubahan status lain (mis. delivery_failed, closed, reject, kembali ke draft) juga
@@ -207,21 +208,14 @@ class DeliveryOrderObserver
         // =========================================================
         $this->createStockMovementsForShippingStart($deliveryOrder);
 
-        // T2.1 (flag stock.ledger): reservasi DO DIKONSUMSI saat barang berangkat — gerakan stok fisik sudah dibuat di atas.
-        // Tanpa ini reservasi tidak pernah dilepas dan stok bebas terus menyusut (reservasi yatim, temuan X1).
-        if ($this->ledgerEnabled()) {
-            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder(
-                $deliveryOrder->id,
-                "DO {$deliveryOrder->do_number} dikirim — reservasi dikonsumsi",
-                \App\Models\StockReservationEvent::CONSUMED
-            );
-        }
-
-        // =========================================================
-        // JANGAN hapus StockReservation - biarkan untuk tracking
-        // qty_reserved tetap ada sampai delivery selesai
-        // Ini memastikan free_qty tidak berubah secara tidak sengaja
-        // =========================================================
+        // Reservasi DO DIKONSUMSI saat barang berangkat — gerakan stok fisik sudah dibuat di atas.
+        // Reservasi harus dilepas agar stok cadangan (qty_reserved) berkurang seiring berkurangnya stok fisik (qty_available).
+        app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder(
+            $deliveryOrder->id,
+            "DO {$deliveryOrder->do_number} dikirim — reservasi dikonsumsi",
+            \App\Models\StockReservationEvent::CONSUMED
+        );
+        StockReservation::where('delivery_order_id', $deliveryOrder->id)->get()->each->delete();
 
         // Progres SO (cache delivered_quantity + status SO) dihitung ulang oleh satu service.
         $this->syncDeliveryProgress($deliveryOrder);
@@ -346,6 +340,14 @@ class DeliveryOrderObserver
         // StockMovement sudah dibuat saat status berubah ke 'sent'
         // di handleReservationReleaseStatus()
         // =========================================================
+
+        // Pastikan reservasi dilepas jika DO langsung selesai
+        app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder(
+            $deliveryOrder->id,
+            "DO {$deliveryOrder->do_number} selesai — reservasi dikonsumsi",
+            \App\Models\StockReservationEvent::CONSUMED
+        );
+        StockReservation::where('delivery_order_id', $deliveryOrder->id)->get()->each->delete();
 
         // Progres SO: hitung ulang delivered_quantity dan turunkan status SO dari kuantitas
         // (approved -> partially_delivered -> completed) lewat satu service, bukan dari event DO.
@@ -504,14 +506,8 @@ class DeliveryOrderObserver
         }
 
         // Delete related stock reservations
-        if ($this->ledgerEnabled()) {
-            app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} dihapus");
-        } else {
-            $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-            foreach ($reservations as $reservation) {
-                $reservation->delete();
-            }
-        }
+        app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder($deliveryOrder->id, "DO {$deliveryOrder->do_number} dihapus");
+        StockReservation::where('delivery_order_id', $deliveryOrder->id)->get()->each->delete();
 
         // DO dihapus: hitung ulang progres SO (kuantitas DO ini kembali ke SO).
         $this->syncDeliveryProgress($deliveryOrder);

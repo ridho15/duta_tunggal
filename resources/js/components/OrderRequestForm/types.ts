@@ -79,7 +79,7 @@ export interface ExistingItemData {
     uom?: { abbreviation?: string; name?: string };
   };
   supplier_id?: number | null;
-  cabang_id: number;
+  cabang_id?: number | null;
   currency_id?: number;
   quantity: number | string;
   unit_price: number | string;

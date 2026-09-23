@@ -460,7 +460,10 @@ class WarehouseConfirmationResource extends Resource
             ->actions([
                 ActionGroup::make([
                     ViewAction::make()->color('primary'),
-                    EditAction::make()->color('success'),
+                    // FIX #8: Edit hanya untuk konfirmasi gudang yang belum final (masih 'request')
+                    EditAction::make()
+                        ->color('success')
+                        ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
                     Action::make('approve')
                         ->label('Approve')
                         ->icon('heroicon-o-check-circle')
@@ -498,7 +501,9 @@ class WarehouseConfirmationResource extends Resource
                             $record->getLinkedDeliveryOrder()?->updateStatusFromWarehouseConfirmations();
                         })
                         ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
-                    DeleteAction::make(),
+                    // FIX #8: Hapus hanya untuk konfirmasi gudang yang masih 'request' (belum approved/rejected)
+                    DeleteAction::make()
+                        ->visible(fn (WarehouseConfirmation $record): bool => strtolower($record->status) === 'request'),
                 ]),
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

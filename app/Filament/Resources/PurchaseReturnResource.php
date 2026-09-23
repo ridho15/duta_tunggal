@@ -143,8 +143,8 @@ class PurchaseReturnResource extends Resource
                                 'rejected' => 'Rejected',
                             ])
                             ->default('draft')
-                            ->disabled(fn () => !Auth::user()?->hasRole('Super Admin'))
-                            ->dehydrated(),
+                            ->disabled()
+                            ->dehydrated(fn (string $operation, $state) => $operation === 'create' ? 'draft' : $state),
                         Textarea::make('notes')
                             ->label('Keterangan')
                             ->nullable(),
@@ -163,14 +163,17 @@ class PurchaseReturnResource extends Resource
                                     ->required()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $purchaseReceiptItem = PurchaseReceiptItem::find($state);
-                                        $set('product_id', $purchaseReceiptItem->product_id);
-                                        $set('unit_price', $purchaseReceiptItem->purchaseOrderItem->unit_price);
+                                        if ($purchaseReceiptItem) {
+                                            $set('product_id', $purchaseReceiptItem->product_id);
+                                            $set('unit_price', $purchaseReceiptItem->purchaseOrderItem?->unit_price ?? 0);
+                                        }
                                     })
                                     ->relationship('purchaseReceiptItem', 'id', function (Builder $query, $get) {
                                         $query->where('purchase_receipt_id', $get('../../purchase_receipt_id'));
                                     })
                                     ->getOptionLabelFromRecordUsing(function (PurchaseReceiptItem $purchaseReceiptItem) {
-                                        return "({$purchaseReceiptItem->product->sku}) {$purchaseReceiptItem->product->name}";
+                                        $qty = (float) ($purchaseReceiptItem->qty_accepted ?? $purchaseReceiptItem->qty_received ?? 0);
+                                        return "({$purchaseReceiptItem->product->sku}) {$purchaseReceiptItem->product->name} (Diterima: {$qty})";
                                     })
                                     ->validationMessages([
                                         'required' => 'Purchase receipt item wajib dipilih'
@@ -180,7 +183,8 @@ class PurchaseReturnResource extends Resource
                                     ->preload()
                                     ->searchable()
                                     ->required()
-                                    ->disabled(fn () => !in_array('all', Auth::user()?->manage_type ?? []))
+                                    ->disabled()
+                                    ->dehydrated(true)
                                     ->reactive()
                                     ->relationship('product', 'id')
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
@@ -195,17 +199,44 @@ class PurchaseReturnResource extends Resource
                                     ->default(0)
                                     ->required()
                                     ->minValue(0.01)
+                                    ->maxValue(function ($get) {
+                                        $receiptItemId = $get('purchase_receipt_item_id');
+                                        if (!$receiptItemId) {
+                                            return null;
+                                        }
+                                        $receiptItem = PurchaseReceiptItem::find($receiptItemId);
+                                        if (!$receiptItem) {
+                                            return null;
+                                        }
+                                        $max = (float) ($receiptItem->qty_accepted ?? $receiptItem->qty_received ?? 0);
+                                        return $max > 0 ? $max : null;
+                                    })
+                                    ->helperText(function ($get) {
+                                        $receiptItemId = $get('purchase_receipt_item_id');
+                                        if (!$receiptItemId) {
+                                            return null;
+                                        }
+                                        $receiptItem = PurchaseReceiptItem::find($receiptItemId);
+                                        if (!$receiptItem) {
+                                            return null;
+                                        }
+                                        $max = (float) ($receiptItem->qty_accepted ?? $receiptItem->qty_received ?? 0);
+                                        return "Maksimal kuantitas retur: {$max}";
+                                    })
                                     ->validationMessages([
                                         'required' => 'Quantity retur wajib diisi',
                                         'numeric' => 'Quantity retur harus berupa angka',
-                                        'min' => 'Quantity retur minimal 0.01'
+                                        'min' => 'Quantity retur minimal 0.01',
                                     ]),
                                 TextInput::make('unit_price')
                                     ->label('Unit Price (Rp.)')
                                     ->indonesianMoney()
                                     ->default(0)
                                     ->required()
+                                    ->disabled()
+                                    ->dehydrated(true)
                                     ->minValue(0)
+                                    ->helperText('Harga satuan terkunci sesuai harga pesanan/penerimaan asli')
                                     ->validationMessages([
                                         'required' => 'Unit price wajib diisi',
                                         'numeric' => 'Unit price harus berupa angka',
@@ -366,37 +397,6 @@ class PurchaseReturnResource extends Resource
                     EditAction::make()
                         ->color('success')
                         ->visible(fn ($record) => in_array($record->status, ['draft', 'rejected'])),
-                    \Filament\Tables\Actions\Action::make('edit_status')
-                        ->label('Edit Status')
-                        ->icon('heroicon-o-pencil-square')
-                        ->color('warning')
-                        ->visible(fn ($record) => Auth::user()?->hasRole('Super Admin'))
-                        ->form([
-                            Select::make('status')
-                                ->label('Status')
-                                ->options([
-                                    'draft' => 'Draft',
-                                    'pending_approval' => 'Pending Approval',
-                                    'approved' => 'Approved',
-                                    'rejected' => 'Rejected',
-                                ])
-                                ->required()
-                                ->default(fn ($record) => $record->status),
-                            Textarea::make('notes')
-                                ->label('Catatan Perubahan Status')
-                                ->nullable(),
-                        ])
-                        ->action(function ($record, array $data) {
-                            $record->update([
-                                'status' => $data['status'],
-                                'notes' => ($record->notes ? $record->notes . "\n\n" : '') . 'Status diubah oleh Super Admin: ' . ($data['notes'] ?? 'Tanpa catatan'),
-                            ]);
-                            \Filament\Notifications\Notification::make()
-                                ->title('Status Purchase Return Diubah')
-                                ->body('Status berhasil diubah menjadi: ' . $data['status'])
-                                ->success()
-                                ->send();
-                        }),
                     \Filament\Tables\Actions\Action::make('submit_for_approval')
                         ->label('Submit for Approval')
                         ->icon('heroicon-o-paper-airplane')

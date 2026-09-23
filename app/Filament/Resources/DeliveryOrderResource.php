@@ -27,6 +27,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -218,10 +219,10 @@ class DeliveryOrderResource extends Resource
                                         // Only add items that still have remaining quantity
                                         if ($remainingQty > 0) {
                                             $warehouseSources = $saleOrderItem->warehouseAllocations
-                                                ->map(function ($allocation) {
+                                                ->map(function ($allocation) use ($remainingQty) {
                                                     return [
                                                         'warehouse_id' => $allocation->warehouse_id,
-                                                        'quantity' => (float) $allocation->quantity,
+                                                        'quantity' => (float) min((float) $allocation->quantity, $remainingQty),
                                                         'rak_id' => null,
                                                     ];
                                                 })
@@ -427,32 +428,8 @@ class DeliveryOrderResource extends Resource
                                                 }
                                                 return 0;
                                             }),
-                                        Select::make('sale_order_item_id')
-                                            ->label('Sales Order Item')
-                                            ->preload()
-                                            ->reactive()
-                                            ->hidden() // Hidden: auto-populated from Sales Order
-                                            ->afterStateUpdated(function ($set, $get, $state, $livewire) {
-                                                $saleOrderItem = SaleOrderItem::find($state);
-                                                if ($saleOrderItem) {
-                                                    $set('product_id', $saleOrderItem->product_id);
-                                                    $set('quantity', static::availableFor($saleOrderItem, $livewire));
-                                                }
-                                            })
-                                            ->searchable()
-                                            ->relationship('saleOrderItem', 'id', function (Builder $query, $get) {
-                                                $listSalesOrderId = $get('../../salesOrders');
-                                                $query->with(['saleOrder', 'product'])
-                                                    ->when(count($listSalesOrderId) > 0, function (Builder $query) use ($listSalesOrderId) {
-                                                        $query->whereIn('sale_order_id', $listSalesOrderId);
-                                                    });
-                                            })
-                                            ->getOptionLabelFromRecordUsing(function (SaleOrderItem $saleOrderItem) {
-                                                $remaining = $saleOrderItem->remaining_quantity;
-                                                $total = $saleOrderItem->quantity;
-                                                return "{$saleOrderItem->saleOrder->so_number} - ({$saleOrderItem->product->sku}) {$saleOrderItem->product->name} [Sisa: {$remaining}/{$total}]";
-                                            })
-                                            ->nullable(),
+                                        Hidden::make('sale_order_item_id')
+                                            ->dehydrated(true),
                                         Select::make('product_id')
                                             ->label('Product')
                                             ->preload()
@@ -591,7 +568,15 @@ class DeliveryOrderResource extends Resource
                                                         //               → deliveryOrderItem_repeater → form_root.
                                                         $cabangId = $get('../../../../cabang_id')
                                                             ?? $get('../../../cabang_id')
+                                                            ?? $get('../../cabang_id')
                                                             ?? null;
+
+                                                        if (!$cabangId) {
+                                                            $soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id');
+                                                            if ($soItemId) {
+                                                                $cabangId = \App\Models\SaleOrderItem::find($soItemId)?->saleOrder?->cabang_id;
+                                                            }
+                                                        }
 
                                                         return WarehouseStockOptions::forProduct(
                                                             $get('../../product_id') ?? $get('../product_id'),

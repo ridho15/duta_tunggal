@@ -316,11 +316,20 @@ class PurchaseReturnService
                     '5120',
                 ]);
 
-                $accountsPayableCoa = $this->findFirstExistingCoa([
-                    config('coa.accounts_payable'),
-                    '2110',
-                    '2101.01',
-                ]);
+                $hasAp = $this->findRelatedAccountPayable($purchaseReturn) !== null;
+                $liabilityCoa = $hasAp
+                    ? $this->findFirstExistingCoa([
+                        config('coa.accounts_payable'),
+                        '2110',
+                        '2101.01',
+                    ])
+                    : $this->findFirstExistingCoa([
+                        config('coa.unbilled_purchase'),
+                        '2100.10',
+                        '2190.10',
+                        config('coa.accounts_payable'),
+                        '2110',
+                    ]);
 
                 $inventoryCredits = [];
 
@@ -354,24 +363,25 @@ class PurchaseReturnService
                     $inventoryCredits[$inventoryCoa->id]['amount'] += $lineAmount;
                 }
 
-                if (empty($inventoryCredits) || !$accountsPayableCoa) {
+                if (empty($inventoryCredits) || !$liabilityCoa) {
                     Log::error('Missing COA accounts for purchase return journal', [
                         'inventory' => $defaultInventoryCoa?->id,
                         'purchase_return' => $purchaseReturnCoa?->id,
-                        'accounts_payable' => $accountsPayableCoa?->id,
+                        'liability' => $liabilityCoa?->id,
                         'purchase_return_id' => $purchaseReturn->id,
                     ]);
-                    throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur pembelian. Periksa akun persediaan dan hutang dagang yang aktif. Legacy mapping yang masih didukung: 1101.01, 5120.10, 2101.01.');
+                    throw new \Exception('Akun COA tidak ditemukan untuk jurnal retur pembelian. Periksa akun persediaan dan hutang dagang yang aktif.');
                 }
 
                 $entries = [];
 
-                // Debit Accounts Payable (reduce liability to supplier)
+                // Debit Liability (Accounts Payable or Unbilled Purchase GRNI)
+                $liabilityDesc = $hasAp ? ' - Reduce accounts payable' : ' - Reduce unbilled purchase (GRNI)';
                 $entries[] = JournalEntry::create([
-                    'coa_id' => $accountsPayableCoa->id,
+                    'coa_id' => $liabilityCoa->id,
                     'date' => $date,
                     'reference' => $reference,
-                    'description' => $description . ' - Reduce accounts payable',
+                    'description' => $description . $liabilityDesc,
                     'debit' => round($totalReturnAmount, 2),
                     'credit' => 0,
                     'journal_type' => 'purchase_return',
@@ -497,10 +507,14 @@ class PurchaseReturnService
                 foreach ($purchaseReturn->purchaseReturnItem as $item) {
                     $resolvedLine = $this->resolveReturnItemJournalAmount($item);
 
+                    $warehouseId = $purchaseReturn->purchaseReceipt?->warehouse_id
+                        ?? $purchaseReturn->qualityControl?->warehouse_id
+                        ?? 1;
+
                     // Lock the inventory stock row to prevent concurrent returns
                     // from both reading the same qty and each decrementing incorrectly.
                     $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                        ->where('warehouse_id', $purchaseReturn->purchaseReceipt->warehouse_id ?? 1)
+                        ->where('warehouse_id', $warehouseId)
                         ->lockForUpdate()
                         ->first();
 
@@ -512,7 +526,7 @@ class PurchaseReturnService
                     // Create reverse stock movement
                     StockMovement::create([
                         'product_id' => $item->product_id,
-                        'warehouse_id' => $purchaseReturn->purchaseReceipt->warehouse_id ?? 1,
+                        'warehouse_id' => $warehouseId,
                         'rak_id' => $item->rak_id,
                         'quantity' => $item->qty_returned,
                         'value' => $resolvedLine['amount_idr'],
@@ -549,6 +563,109 @@ class PurchaseReturnService
     }
 
     /**
+     * Find related AccountPayable for a purchase return
+     */
+    public function findRelatedAccountPayable(PurchaseReturn $purchaseReturn): ?AccountPayable
+    {
+        $purchaseReceipt = $purchaseReturn->purchaseReceipt;
+        $poId = $purchaseReceipt?->purchase_order_id ?? $purchaseReturn->qualityControl?->purchase_order_id;
+
+        if ($purchaseReceipt) {
+            $invoice = \App\Models\Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
+                ->whereJsonContains('purchase_receipts', (int) $purchaseReceipt->id)
+                ->where('status', '!=', \App\Models\Invoice::STATUS_CANCELLED)
+                ->first();
+
+            if ($invoice) {
+                return AccountPayable::where('invoice_id', $invoice->id)->first();
+            }
+        }
+
+        if ($poId) {
+            $invoice = \App\Models\Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
+                ->where('from_model_id', $poId)
+                ->where('status', '!=', \App\Models\Invoice::STATUS_CANCELLED)
+                ->first();
+
+            if ($invoice) {
+                return AccountPayable::where('invoice_id', $invoice->id)->first();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Adjust Account Payable when a purchase return is approved.
+     */
+    public function adjustAccountPayable(PurchaseReturn $purchaseReturn): bool
+    {
+        try {
+            $accountPayable = $this->findRelatedAccountPayable($purchaseReturn);
+            if (!$accountPayable) {
+                Log::info('adjustAccountPayable: No active AccountPayable found for purchase return', [
+                    'purchase_return_id' => $purchaseReturn->id,
+                    'receipt_id' => $purchaseReturn->purchase_receipt_id,
+                ]);
+                return false;
+            }
+
+            $returnAmountIdr = $this->calculateReturnTotalIdr($purchaseReturn);
+            if ($returnAmountIdr <= 0) {
+                return false;
+            }
+
+            $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
+            $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
+            $returnAmountOriginal = round($returnAmountIdr / $exchangeRate, 2);
+
+            $totalIdr = (float) $accountPayable->total;
+            $totalOriginal = (float) ($accountPayable->total_original ?? ($totalIdr / $exchangeRate));
+
+            $newPaidIdr = min($totalIdr, (float) $accountPayable->paid + $returnAmountIdr);
+            $newRemainingIdr = max(0.0, $totalIdr - $newPaidIdr);
+
+            $newPaidOriginal = min($totalOriginal, (float) ($accountPayable->paid_original ?? 0) + $returnAmountOriginal);
+            $newRemainingOriginal = max(0.0, $totalOriginal - $newPaidOriginal);
+
+            $newStatus = ($newRemainingIdr <= 0.01) ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+
+            $accountPayable->forceFill([
+                'paid' => $newPaidIdr,
+                'remaining' => $newRemainingIdr,
+                'paid_original' => $newPaidOriginal,
+                'remaining_original' => $newRemainingOriginal,
+                'status' => $newStatus,
+            ])->save();
+
+            // Sync invoice status
+            if ($accountPayable->invoice) {
+                $accountPayable->invoice->status = ($newRemainingIdr <= 0.01)
+                    ? \App\Models\Invoice::STATUS_PAID
+                    : ($newPaidIdr > 0 ? \App\Models\Invoice::STATUS_PARTIALLY_PAID : $accountPayable->invoice->status);
+                $accountPayable->invoice->saveQuietly();
+            }
+
+            Log::info('AccountPayable adjusted successfully from PurchaseReturn approval', [
+                'purchase_return_id' => $purchaseReturn->id,
+                'account_payable_id' => $accountPayable->id,
+                'invoice_id' => $accountPayable->invoice_id,
+                'return_amount_idr' => $returnAmountIdr,
+                'new_remaining_idr' => $newRemainingIdr,
+                'status' => $newStatus,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Failed to adjust AccountPayable for purchase return', [
+                'purchase_return_id' => $purchaseReturn->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * Process credit note for purchase return
      */
     public function processCreditNote(PurchaseReturn $purchaseReturn, array $data): bool
@@ -562,7 +679,7 @@ class PurchaseReturnService
             ]);
 
             // Update account payable
-            $accountPayable = AccountPayable::where('invoice_id', $purchaseReturn->purchaseReceipt->invoice_id ?? null)->first();
+            $accountPayable = $this->findRelatedAccountPayable($purchaseReturn);
             if ($accountPayable) {
                 $accountPayable->decrement('remaining', $purchaseReturn->credit_note_amount);
                 $accountPayable->increment('paid', $purchaseReturn->credit_note_amount);
@@ -596,7 +713,7 @@ class PurchaseReturnService
             ]);
 
             // Update account payable
-            $accountPayable = AccountPayable::where('invoice_id', $purchaseReturn->purchaseReceipt->invoice_id ?? null)->first();
+            $accountPayable = $this->findRelatedAccountPayable($purchaseReturn);
             if ($accountPayable) {
                 $accountPayable->decrement('remaining', $purchaseReturn->refund_amount);
                 $accountPayable->increment('paid', $purchaseReturn->refund_amount);
@@ -646,19 +763,29 @@ class PurchaseReturnService
                 'approval_notes' => $data['approval_notes'] ?? null,
             ]);
 
+            // If receipt is not linked directly, try linking from QC's PO
+            if (!$purchaseReturn->purchase_receipt_id && $purchaseReturn->qualityControl?->purchase_order_id) {
+                $receipt = \App\Models\PurchaseReceipt::where('purchase_order_id', $purchaseReturn->qualityControl->purchase_order_id)
+                    ->latest('id')
+                    ->first();
+                if ($receipt) {
+                    $purchaseReturn->forceFill(['purchase_receipt_id' => $receipt->id])->saveQuietly();
+                }
+            }
+
             if ($purchaseReturn->isQcReturn()) {
-                // QC-based return: items were rejected before entering stock.
-                // Execute the chosen resolution (reduce PO qty / wait / merge) instead of
-                // the standard inventory reversal + journal.
                 $this->executeQcResolution($purchaseReturn);
-            } else {
-                // Standard receipt-based return: reverse inventory and create journal entries.
+            }
+
+            // Always create journal, adjust stock, and adjust AP if goods have entered warehouse (receipt exists or standard return)
+            if ($purchaseReturn->purchase_receipt_id || ! $purchaseReturn->isQcReturn()) {
                 if (!$this->createJournalEntry($purchaseReturn)) {
-                    throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA inventory dan hutang dagang aktif. Legacy mapping yang masih didukung: 1101.01, 5120.10, 2101.01.');
+                    throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA inventory dan hutang dagang aktif.');
                 }
                 if (!$this->adjustStock($purchaseReturn)) {
                     throw new \Exception('Gagal menyesuaikan stok untuk retur pembelian. Silakan coba lagi atau hubungi administrator.');
                 }
+                $this->adjustAccountPayable($purchaseReturn);
             }
         });
 

@@ -58,9 +58,10 @@ class WarehouseStockOptions
 
         $warehouses = $query->orderBy('name')->get();
 
-        // Jika filter menghasilkan 0 gudang (mis. cabang SO belum punya gudang aktif),
-        // fallback ke semua gudang aktif agar form tidak kosong.
-        if ($warehouses->isEmpty()) {
+        // Jika filter menghasilkan 0 gudang dan TIDAK ada filter cabang eksplisit,
+        // baru fallback ke semua gudang aktif agar form tidak kosong.
+        // Jika ada filter cabang eksplisit ($cabangId), JANGAN fallback ke cabang lain!
+        if (! $cabangId && $warehouses->isEmpty()) {
             $warehouses = Warehouse::query()->where('status', 1)->orderBy('name')->get();
         }
 

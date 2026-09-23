@@ -185,7 +185,7 @@ class OrderRequestApiController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.cabang_id' => 'required|integer|exists:cabangs,id',
+            'items.*.cabang_id' => 'nullable|integer|exists:cabangs,id',
             'items.*.supplier_id' => 'nullable|integer|exists:suppliers,id',
             'items.*.currency_id' => 'nullable|integer|exists:currencies,id',
             'items.*.original_price' => 'nullable|numeric|min:0',
@@ -203,7 +203,6 @@ class OrderRequestApiController extends Controller
             'items.min' => 'Harus ada setidaknya satu item produk.',
             'items.*.product_id.required' => 'Produk pada setiap baris wajib dipilih.',
             'items.*.quantity.min' => 'Kuantitas minimal 0.01.',
-            'items.*.cabang_id.required' => 'Cabang pada setiap item wajib dipilih.',
             'items.*.tipe_pajak.required' => 'Tipe pajak wajib ditentukan.',
         ]);
 
@@ -264,7 +263,7 @@ class OrderRequestApiController extends Controller
                     'order_request_id' => $orderRequest->id,
                     'product_id' => $itemData['product_id'],
                     'supplier_id' => $itemData['supplier_id'] ?? null,
-                    'cabang_id' => $itemData['cabang_id'],
+                    'cabang_id' => $itemData['cabang_id'] ?? null,
                     'currency_id' => $itemCurrencyId,
                     'quantity' => $quantity,
                     'fulfilled_quantity' => 0,
@@ -323,7 +322,7 @@ class OrderRequestApiController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.cabang_id' => 'required|integer|exists:cabangs,id',
+            'items.*.cabang_id' => 'nullable|integer|exists:cabangs,id',
             'items.*.supplier_id' => 'nullable|integer|exists:suppliers,id',
             'items.*.currency_id' => 'nullable|integer|exists:currencies,id',
             'items.*.original_price' => 'nullable|numeric|min:0',
@@ -342,7 +341,6 @@ class OrderRequestApiController extends Controller
             'items.min' => 'Harus ada setidaknya satu item produk.',
             'items.*.product_id.required' => 'Produk pada setiap baris wajib dipilih.',
             'items.*.quantity.min' => 'Kuantitas minimal 0.01.',
-            'items.*.cabang_id.required' => 'Cabang pada setiap item wajib dipilih.',
             'items.*.tipe_pajak.required' => 'Tipe pajak wajib ditentukan.',
         ]);
 
@@ -402,7 +400,7 @@ class OrderRequestApiController extends Controller
                     'order_request_id' => $orderRequest->id,
                     'product_id' => $itemData['product_id'],
                     'supplier_id' => $itemData['supplier_id'] ?? null,
-                    'cabang_id' => $itemData['cabang_id'],
+                    'cabang_id' => $itemData['cabang_id'] ?? null,
                     'currency_id' => $itemCurrencyId,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,

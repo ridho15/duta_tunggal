@@ -16,12 +16,32 @@ class EditQualityControlPurchase extends EditRecord
 {
     protected static string $resource = QualityControlPurchaseResource::class;
 
+    /**
+     * FIX #8: Blokir akses halaman edit jika QC sudah selesai diproses.
+     * Mencegah bypass via URL langsung (mis. /admin/quality-control-purchases/5/edit).
+     */
+    public function authorizeAccess(): void
+    {
+        parent::authorizeAccess();
+
+        if ((int) ($this->getRecord()->status ?? 0) === 1) {
+            \Filament\Notifications\Notification::make()
+                ->title('QC Pembelian sudah selesai')
+                ->body('Quality Control yang sudah selesai diproses tidak dapat diubah.')
+                ->danger()
+                ->send();
+
+            $this->redirect(QualityControlPurchaseResource::getUrl('view', ['record' => $this->getRecord()]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
             DeleteAction::make()
-                ->icon('heroicon-o-trash'),
+                ->icon('heroicon-o-trash')
+                ->visible(fn () => (int) ($this->record->status ?? 0) !== 1),
         ];
     }
 

@@ -49,7 +49,13 @@ export const SaleOrderToolbar: React.FC<Props> = ({
           {/* Bulk Tax Type */}
           <div className="flex items-center gap-1.5">
             <select
-              value={bulkTaxType}
+              value={
+                bulkTaxType?.toLowerCase() === 'eklusif' || bulkTaxType?.toLowerCase() === 'eksklusif'
+                  ? 'Eksklusif'
+                  : bulkTaxType?.toLowerCase() === 'inklusif'
+                  ? 'Inklusif'
+                  : bulkTaxType || 'None'
+              }
               onChange={(e) => setBulkTaxType(e.target.value)}
               className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none"
             >

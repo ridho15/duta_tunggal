@@ -74,20 +74,42 @@ class ViewSuratJalan extends ViewRecord
                     ])
                     ->columns(2),
                 Section::make('Pengiriman')
-                    ->description('Driver dan kendaraan ditentukan oleh Jadwal Pengiriman.')
+                    ->description('Driver dan kendaraan ditentukan oleh Jadwal Pengiriman atau Delivery Order.')
                     ->schema([
                         TextEntry::make('shipping_method')
                             ->label('Metode Pengiriman')
-                            ->getStateUsing(fn (SuratJalan $record): string => $record->primaryDeliverySchedule()?->delivery_method_label ?? SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL),
+                            ->getStateUsing(fn (SuratJalan $record): string => $record->primaryDeliverySchedule()?->delivery_method_label ?? ($record->deliveryOrder->first()?->shipping_method ?? SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL)),
                         TextEntry::make('schedule_number')
                             ->label('No. Jadwal')
                             ->getStateUsing(fn (SuratJalan $record): string => $record->primaryDeliverySchedule()?->schedule_number ?? SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL),
                         TextEntry::make('sender')
                             ->label('Driver / Ekspedisi')
-                            ->getStateUsing(fn (SuratJalan $record): string => $record->primaryDeliverySchedule()?->senderName() ?? SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL),
+                            ->getStateUsing(function (SuratJalan $record): string {
+                                $schedule = $record->primaryDeliverySchedule();
+                                if ($schedule) {
+                                    return $schedule->senderName();
+                                }
+                                $firstDo = $record->deliveryOrder->first(fn ($d) => $d->driver_id);
+                                if ($firstDo?->driver) {
+                                    return $firstDo->driver->name;
+                                }
+
+                                return SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
+                            }),
                         TextEntry::make('vehicle')
                             ->label('Kendaraan')
-                            ->getStateUsing(fn (SuratJalan $record): string => $record->primaryDeliverySchedule()?->vehicleLabel() ?? SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL),
+                            ->getStateUsing(function (SuratJalan $record): string {
+                                $schedule = $record->primaryDeliverySchedule();
+                                if ($schedule) {
+                                    return $schedule->vehicleLabel();
+                                }
+                                $firstDo = $record->deliveryOrder->first(fn ($d) => $d->vehicle_id);
+                                if ($firstDo?->vehicle) {
+                                    return trim($firstDo->vehicle->plate . ($firstDo->vehicle->type ? ' (' . $firstDo->vehicle->type . ')' : ''));
+                                }
+
+                                return SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
+                            }),
                         TextEntry::make('tracking_number')
                             ->label('No. Resi')
                             ->getStateUsing(fn (SuratJalan $record): ?string => $record->primaryDeliverySchedule()?->tracking_number)

@@ -195,22 +195,48 @@ class SalesInvoiceResource extends Resource
                                         $customerId = $get('selected_customer');
                                         if (!$customerId) return [];
 
+                                        // FIX #1: Sertakan SO berstatus 'partially_delivered', 'completed', atau SO yang memiliki DO terkirim
                                         return SaleOrder::with('customer:id,name')
                                             ->where('customer_id', $customerId)
-                                            ->where('status', 'completed')
+                                            ->where(function ($q) {
+                                                $q->whereIn('status', ['completed', 'partially_delivered'])
+                                                  ->orWhereHas('deliverySalesOrder.deliveryOrder', function ($doQuery) {
+                                                      $doQuery->whereIn('status', \App\Models\DeliveryOrder::DELIVERED_STATUSES);
+                                                  });
+                                            })
                                             ->get()
                                             ->mapWithKeys(function ($so) {
-                                                return [$so->id => \App\Support\DocumentLabels::saleOrder($so)];
+                                                $label = \App\Support\DocumentLabels::saleOrder($so);
+                                                // Tandai status pengiriman
+                                                if ($so->status === 'partially_delivered') {
+                                                    $label .= ' [Pengiriman Sebagian]';
+                                                } elseif ($so->status === 'completed') {
+                                                    $label .= ' [Selesai]';
+                                                } else {
+                                                    $label .= ' [Ada DO Terkirim]';
+                                                }
+                                                return [$so->id => $label];
                                             });
                                     })
                                     ->searchable()
                                     ->reactive()
                                     ->helperText(function ($get) {
-                                        $hint = 'Hanya SO berstatus Selesai yang muncul di sini. Untuk pengiriman bertahap, invoice terbit OTOMATIS per Delivery Order saat DO selesai.';
-
                                         $customerId = $get('selected_customer');
-                                        if ($customerId && ! SaleOrder::where('customer_id', $customerId)->where('status', 'completed')->exists()) {
-                                            return 'Belum ada SO Selesai untuk customer ini. ' . $hint;
+
+                                        // FIX #1: cek juga SO yang memiliki DO terkirim
+                                        $hasSo = $customerId && SaleOrder::where('customer_id', $customerId)
+                                            ->where(function ($q) {
+                                                $q->whereIn('status', ['completed', 'partially_delivered'])
+                                                  ->orWhereHas('deliverySalesOrder.deliveryOrder', function ($doQuery) {
+                                                      $doQuery->whereIn('status', \App\Models\DeliveryOrder::DELIVERED_STATUSES);
+                                                  });
+                                            })
+                                            ->exists();
+
+                                        $hint = 'SO berstatus Selesai, Pengiriman Sebagian, atau yang memiliki DO terkirim muncul di sini. Pilih SO lalu centang DO yang ingin ditagih.';
+
+                                        if ($customerId && ! $hasSo) {
+                                            return 'Belum ada SO dengan barang terkirim untuk customer ini. ' . $hint;
                                         }
 
                                         return $hint;
@@ -300,7 +326,8 @@ class SalesInvoiceResource extends Resource
                                             return [];
                                         }
 
-                                        // Get all DOs from this SO
+                                        // Get all DOs from this SO — tampilkan semua DO yang sudah terkirim (DELIVERED_STATUSES)
+                                        // FIX #1b: DO berstatus sent/received/completed semuanya sudah kirim barang, bisa ditagih.
                                         $deliveryOrders = $saleOrder->deliverySalesOrder()
                                             ->with(['deliveryOrder' => function ($query) {
                                                 $query->with('deliveryOrderItem.saleOrderItem');
@@ -308,7 +335,7 @@ class SalesInvoiceResource extends Resource
                                             ->get()
                                             ->pluck('deliveryOrder')
                                             ->filter(function ($do) {
-                                                return $do && $do->status === 'completed';
+                                                return $do && in_array($do->status, \App\Models\DeliveryOrder::DELIVERED_STATUSES);
                                             });
                                         // Get current invoice record if editing (for allowing already selected DOs)
                                         $currentInvoiceId = $get('id') ?? null;
@@ -1052,7 +1079,14 @@ class SalesInvoiceResource extends Resource
             ->actions([
                 ActionGroup::make([
                     ViewAction::make(),
-                    EditAction::make(),
+                    // FIX #2: Edit hanya muncul untuk invoice yang belum final
+                    EditAction::make()
+                        ->visible(fn ($record) => !in_array($record->status, [
+                            \App\Models\Invoice::STATUS_PAID,
+                            \App\Models\Invoice::STATUS_PARTIALLY_PAID,
+                            \App\Models\Invoice::STATUS_OVERDUE,
+                            \App\Models\Invoice::STATUS_CANCELLED,
+                        ])),
                     Tables\Actions\Action::make('print_invoice')
                         ->label('Preview Invoice')
                         ->icon('heroicon-o-document-text')
@@ -1082,7 +1116,14 @@ class SalesInvoiceResource extends Resource
                                 return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}");
                             }
                         }),
-                    DeleteAction::make(),
+                    // FIX #2: Hapus hanya muncul untuk invoice yang belum final
+                    DeleteAction::make()
+                        ->visible(fn ($record) => !in_array($record->status, [
+                            \App\Models\Invoice::STATUS_PAID,
+                            \App\Models\Invoice::STATUS_PARTIALLY_PAID,
+                            \App\Models\Invoice::STATUS_OVERDUE,
+                            \App\Models\Invoice::STATUS_CANCELLED,
+                        ])),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([

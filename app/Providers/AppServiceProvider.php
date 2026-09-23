@@ -122,7 +122,7 @@ class AppServiceProvider extends ServiceProvider
             $service = fn () => app(\App\Services\RemoteSearch::class);
 
             return $this->searchable()
-                ->options(fn () => $service()->options($type, null, $filters))
+                ->searchDebounce(300)
                 ->getSearchResultsUsing(fn (string $search): array => $service()->options($type, $search, $filters))
                 ->getOptionLabelUsing(fn ($value): ?string => $service()->label($type, $value))
                 ->searchPrompt(\App\Services\RemoteSearch::HINT)

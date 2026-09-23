@@ -242,6 +242,7 @@ class PaymentRequest extends Model
         $activePrs = static::query()
             ->when($excludePrId, fn ($q) => $q->where('id', '!=', $excludePrId))
             ->whereIn('status', [
+                self::STATUS_DRAFT,   // FIX #3: Draft PR sudah harus diperhitungkan agar tidak ada double claim
                 self::STATUS_PENDING,
                 self::STATUS_APPROVED,
                 self::STATUS_PARTIAL,

@@ -51,10 +51,14 @@ class DeliveryOrderValuation
                 continue;
             }
 
-            // Relasi saleOrderItem memakai withDefault(): item DO tanpa tautan tetap "ada" (model kosong, harga 0).
-            // Perilaku ini dipertahankan (sama dengan invoice otomatis — tidak menebak harga jual), tetapi DITANDAI agar terlihat.
-            $saleOrderItem = $item->saleOrderItem;
-            if (! $saleOrderItem?->exists) {
+            // Relasi saleOrderItem memakai withDefault(): pastikan cek exists agar model kosong tidak dianggap ada.
+            // Jika item DO belum bertaut langsung, cari dari SO terkait berdasarkan product_id.
+            $saleOrderItem = ($item->saleOrderItem && $item->saleOrderItem->exists) ? $item->saleOrderItem : null;
+            if (! $saleOrderItem && $primarySo) {
+                $saleOrderItem = $primarySo->saleOrderItem->firstWhere('product_id', $item->product_id);
+            }
+
+            if (! $saleOrderItem) {
                 $unlinked[] = (int) $item->id;
             }
 

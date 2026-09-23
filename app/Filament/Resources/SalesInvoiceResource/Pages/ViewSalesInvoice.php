@@ -212,11 +212,27 @@ class ViewSalesInvoice extends ViewRecord
     private function headerActionList(): array
     {
         return [
-            Actions\EditAction::make()->icon('heroicon-o-pencil'),
+            // FIX #2: Tombol Ubah hanya muncul jika invoice belum final (bukan Lunas/Dibayar Sebagian/Terlambat/Dibatalkan)
+            Actions\EditAction::make()
+                ->icon('heroicon-o-pencil')
+                ->visible(fn () => !in_array($this->record->status, [
+                    \App\Models\Invoice::STATUS_PAID,
+                    \App\Models\Invoice::STATUS_PARTIALLY_PAID,
+                    \App\Models\Invoice::STATUS_OVERDUE,
+                    \App\Models\Invoice::STATUS_CANCELLED,
+                ])),
             SalesInvoiceResource::taxNumberPageAction(),
             \App\Filament\Support\CreditNoteActions::create(Actions\Action::make('create_credit_note')),
             \App\Filament\Support\CreditNoteActions::cancelInvoice(Actions\Action::make('cancel_invoice')),
-            Actions\DeleteAction::make()->icon('heroicon-o-trash'),
+            // FIX #2: Tombol Hapus hanya muncul jika invoice masih draft atau belum pernah ada transaksi
+            Actions\DeleteAction::make()
+                ->icon('heroicon-o-trash')
+                ->visible(fn () => !in_array($this->record->status, [
+                    \App\Models\Invoice::STATUS_PAID,
+                    \App\Models\Invoice::STATUS_PARTIALLY_PAID,
+                    \App\Models\Invoice::STATUS_OVERDUE,
+                    \App\Models\Invoice::STATUS_CANCELLED,
+                ])),
             Actions\Action::make('view_journal_entries')
                 ->label('Lihat Journal Entries')
                 ->icon('heroicon-o-book-open')

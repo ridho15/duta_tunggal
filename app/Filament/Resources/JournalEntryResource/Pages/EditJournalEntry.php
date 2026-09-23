@@ -12,11 +12,28 @@ class EditJournalEntry extends EditRecord
 {
     protected static string $resource = JournalEntryResource::class;
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        $journal = $this->getRecord();
+        if (!empty($journal->source_type) || !empty($journal->source_id)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Akses Ditolak')
+                ->body('Jurnal otomatis buatan sistem tidak dapat diedit langsung. Koreksi harus dilakukan melalui dokumen transaksi sumber.')
+                ->warning()
+                ->send();
+
+            $this->redirect(JournalEntryResource::getUrl('view', ['record' => $record]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\ViewAction::make(),
             Actions\DeleteAction::make()
+                ->visible(fn () => empty($this->getRecord()->source_type) && empty($this->getRecord()->source_id))
                 ->requiresConfirmation()
                 ->modalDescription('This will delete all journal entries with the same reference.')
                 ->action(function () {

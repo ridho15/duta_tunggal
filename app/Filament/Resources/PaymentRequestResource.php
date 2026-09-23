@@ -80,6 +80,7 @@ class PaymentRequestResource extends Resource
                                         return $s ? "({$s->code}) {$s->perusahaan}" : null;
                                     })
                                     ->searchable()
+                                    ->preload() // FIX #13: preload agar supplier langsung muncul tanpa harus ketik dulu
                                     ->required()
                                     ->reactive()
                                     ->afterStateUpdated(fn ($set) => $set('selected_invoices', [])),
@@ -179,7 +180,9 @@ class PaymentRequestResource extends Resource
                                             return PurchaseInvoiceResource::invoiceAmountToIdr($invoice, $remainingPayable);
                                         });
 
-                                        $set('total_amount', number_format((float) $total, 0, ',', '.'));
+                                        // FIX #6: Gunakan 2 desimal agar sisa sen tidak terpotong
+                                        // (number_format(..., 0) membulatkan ke bawah, sisa sen < Rp1 menggantung di AP)
+                                        $set('total_amount', number_format((float) $total, 2, ',', '.'));
                                     }),
                             ]),
 

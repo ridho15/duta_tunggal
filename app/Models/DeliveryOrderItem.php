@@ -135,6 +135,22 @@ class DeliveryOrderItem extends Model
         });
 
         static::saving(function ($deliveryOrderItem) {
+            // Fallback linking: jika sale_order_item_id kosong tapi item DO terkait ke DO yang punya SO, kaitkan otomatis berdasarkan product_id
+            if (! $deliveryOrderItem->sale_order_item_id && $deliveryOrderItem->delivery_order_id && $deliveryOrderItem->product_id) {
+                $do = $deliveryOrderItem->deliveryOrder;
+                if ($do) {
+                    $soIds = $do->salesOrders()->pluck('sale_orders.id')->filter()->all();
+                    if (!empty($soIds)) {
+                        $matched = SaleOrderItem::whereIn('sale_order_id', $soIds)
+                            ->where('product_id', $deliveryOrderItem->product_id)
+                            ->first();
+                        if ($matched) {
+                            $deliveryOrderItem->sale_order_item_id = $matched->id;
+                        }
+                    }
+                }
+            }
+
             // Guard: kuantitas item DO tidak boleh melebihi sisa SO yang BELUM terikat DO lain
             // (terkirim ATAU masih diproses). Baris ini sendiri dikecualikan agar edit tidak menghitung dua kali.
             if (! $deliveryOrderItem->sale_order_item_id) {

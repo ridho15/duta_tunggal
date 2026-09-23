@@ -2763,6 +2763,13 @@ class PurchaseOrderResource extends Resource
                             });
                         });
                     }),
+                TextColumn::make('warehouse.name')
+                    ->label('Gudang Tujuan')
+                    ->sortable()
+                    ->searchable()
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('-'),
                 TextColumn::make('po_number')
                     ->label('PO Number')
                     ->searchable(),
@@ -3045,6 +3052,12 @@ class PurchaseOrderResource extends Resource
                         0 => 'Non Asset',
                     ])
                     ->placeholder('Pilih Tipe'),
+                SelectFilter::make('warehouse_id')
+                    ->label('Gudang Tujuan')
+                    ->relationship('warehouse', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->placeholder('Semua Gudang'),
             ])
             ->actions([
                 ActionGroup::make([
