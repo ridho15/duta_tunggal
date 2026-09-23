@@ -1085,16 +1085,28 @@ class QualityControlPurchaseResource extends Resource
                 TextColumn::make('product.name')
                     ->label('Product')
                     ->getStateUsing(function ($record) {
+                        $items = $record->items;
+                        if ($items && $items->count() > 1) {
+                            $names = $items->map(fn($i) => $i->product?->name)->filter()->join(', ');
+                            return "Multi-item ({$items->count()} produk): {$names}";
+                        }
+
                         if ($record->product?->name) {
                             return $record->product->name;
                         }
 
-                        return $record->items->isNotEmpty()
-                            ? "Multi-item ({$record->items->count()} produk)"
-                            : 'N/A';
+                        if ($items && $items->isNotEmpty()) {
+                            return $items->first()->product?->name ?? 'N/A';
+                        }
+
+                        return 'N/A';
                     })
+                    ->wrap()
                     ->searchable(query: function (Builder $query, $search) {
                         return $query->whereHas('product', function ($query) use ($search) {
+                            return $query->where('name', 'LIKE', '%' . $search . '%')
+                                ->orWhere('sku', 'LIKE', '%' . $search . '%');
+                        })->orWhereHas('items.product', function ($query) use ($search) {
                             return $query->where('name', 'LIKE', '%' . $search . '%')
                                 ->orWhere('sku', 'LIKE', '%' . $search . '%');
                         });
@@ -1552,8 +1564,30 @@ class QualityControlPurchaseResource extends Resource
                     ->schema([
                         TextEntry::make('qc_number')->label('QC Number'),
                         TextEntry::make('created_at')->date()->label('QC Date'),
-                        TextEntry::make('product.name')->label('Product')->placeholder('Multi-item (lihat tabel item di bawah)'),
-                        TextEntry::make('product.sku')->label('SKU')->placeholder('-'),
+                        TextEntry::make('product.name')
+                            ->label('Product')
+                            ->getStateUsing(function (?QualityControl $record) {
+                                if (! $record) {
+                                    return '-';
+                                }
+                                $items = $record->items;
+                                if ($items && $items->count() > 1) {
+                                    $names = $items->map(fn($i) => $i->product?->name)->filter()->join(', ');
+                                    return "Multi-item ({$items->count()} produk): {$names}";
+                                }
+                                return $record->product?->name ?? ($items?->first()?->product?->name ?? '-');
+                            }),
+                        TextEntry::make('product.sku')
+                            ->label('SKU')
+                            ->getStateUsing(function (?QualityControl $record) {
+                                if (! $record) {
+                                    return '-';
+                                }
+                                if ($record->items && $record->items->count() > 1) {
+                                    return 'Multi-item';
+                                }
+                                return $record->product?->sku ?? ($record->items?->first()?->product?->sku ?? '-');
+                            }),
                         TextEntry::make('warehouse.name')->label('Warehouse'),
                         TextEntry::make('warehouse.cabang.nama')->label('Cabang'),
                         TextEntry::make('rak.name')->label('Rack'),

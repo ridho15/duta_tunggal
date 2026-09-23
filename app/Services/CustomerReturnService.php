@@ -90,13 +90,17 @@ class CustomerReturnService
                 $itemCostTotal = round($qty * $unitCost, 2);
 
                 // ── Selling price & VAT for financial reversal ────────────────────
-                $invItem = $item->invoiceItem;
-                if ($invItem) {
-                    $invQty = max(0.0001, (float) $invItem->quantity);
-                    $dppPerUnit = (float) $invItem->subtotal / $invQty;
-                    $ppnPerUnit = (float) $invItem->tax_amount / $invQty;
-                    $totalDpp += round($qty * $dppPerUnit, 2);
-                    $totalPpn += round($qty * $ppnPerUnit, 2);
+                // Hanya dihitung untuk item dengan keputusan 'credit' (refund / nota kredit)
+                // dan hanya jika CreditNoteService TIDAK aktif (karena jika CreditNote aktif, Nota Kredit yang menjurnal finansial)
+                if ($item->decision === CustomerReturnItem::DECISION_CREDIT && ! CreditNoteService::enabled()) {
+                    $invItem = $item->invoiceItem;
+                    if ($invItem) {
+                        $invQty = max(0.0001, (float) $invItem->quantity);
+                        $dppPerUnit = (float) $invItem->subtotal / $invQty;
+                        $ppnPerUnit = (float) $invItem->tax_amount / $invQty;
+                        $totalDpp += round($qty * $dppPerUnit, 2);
+                        $totalPpn += round($qty * $ppnPerUnit, 2);
+                    }
                 }
 
                 // For 'repair' items, goods come back for fixing but are NOT immediately
@@ -320,20 +324,20 @@ class CustomerReturnService
             '4120',
             '4101',
             '4100.10',
-        ]);
+        ], 'Retur Penjualan');
 
         $vatCoa = $this->firstExistingCoa([
             $settings->codes('sales_output_vat')[0] ?? null,
             config('coa.sales_output_vat'),
             '2120.06',
             '2130',
-        ]);
+        ], 'PPN Keluaran');
 
         $arCoa = $this->firstExistingCoa([
             $settings->codes('accounts_receivable')[0] ?? null,
             config('coa.accounts_receivable'),
             '1120',
-        ]);
+        ], 'Piutang');
 
         if (! $salesReturnCoa || ! $arCoa) {
             Log::warning('CustomerReturnService: COA account(s) not found for financial journal', [
@@ -341,7 +345,7 @@ class CustomerReturnService
                 'sales_return_ok'  => (bool) $salesReturnCoa,
                 'ar_ok'            => (bool) $arCoa,
             ]);
-            throw new \Exception('Akun COA retur penjualan atau piutang dagang tidak ditemukan untuk jurnal finansial retur.');
+            return;
         }
 
         // Debit Retur Penjualan (DPP)
@@ -428,7 +432,7 @@ class CustomerReturnService
         }
     }
 
-    protected function firstExistingCoa(array $codes): ?ChartOfAccount
+    protected function firstExistingCoa(array $codes, ?string $fallbackNameLike = null, ?string $fallbackType = null): ?ChartOfAccount
     {
         foreach ($codes as $code) {
             if (! $code) {
@@ -436,6 +440,17 @@ class CustomerReturnService
             }
 
             $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa?->id) {
+                return $coa;
+            }
+        }
+
+        if ($fallbackNameLike) {
+            $query = ChartOfAccount::where('name', 'LIKE', '%' . $fallbackNameLike . '%');
+            if ($fallbackType) {
+                $query->where('type', $fallbackType);
+            }
+            $coa = $query->first();
             if ($coa?->id) {
                 return $coa;
             }

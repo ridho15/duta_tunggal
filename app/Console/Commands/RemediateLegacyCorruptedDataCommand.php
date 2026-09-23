@@ -57,6 +57,15 @@ class RemediateLegacyCorruptedDataCommand extends Command
             // 4. Remediasi / Pembersihan Data Uji Retur Pembelian (NR-20260922-8073 / Retur #17)
             $remediatedCount += $this->remediateTestPurchaseReturn($dryRun);
 
+            // 5. Remediasi Phantom Reserved Stock (Kalkulasi Ulang Cadangan Stok ke Sumber Asli)
+            $remediatedCount += $this->remediatePhantomStockReservations($dryRun);
+
+            // 6. Remediasi Pembayaran Vendor yang Menggunakan Akun Induk (1100 / 1110)
+            $remediatedCount += $this->remediateVendorPaymentsWithParentCoa($dryRun);
+
+            // 7. Remediasi / Pembersihan Dokumen Uji Tambahan (CR-2026-0001 & DO-20260922-0003)
+            $remediatedCount += $this->remediateTestDocuments($dryRun);
+
             if ($dryRun) {
                 DB::rollBack();
                 $this->newLine();
@@ -295,6 +304,177 @@ class RemediateLegacyCorruptedDataCommand extends Command
             $this->info($dryRun ? '   [DRY-RUN] Entri retur uji coba #17 akan dihapus permanen.' : '   ✓ Entri retur uji coba #17 berhasil dihapus permanen.');
         } else {
             $this->line('   ✓ Data uji retur pembelian NR-20260922-8073 / #17 sudah tidak ada di database.');
+        }
+
+        return $changes;
+    }
+
+    /**
+     * 5. Sinkronisasi cadangan stok (qty_reserved) di inventory_stocks dengan reservasi aktual di stock_reservations.
+     */
+    protected function remediatePhantomStockReservations(bool $dryRun): int
+    {
+        $this->newLine();
+        $this->info('5. Memeriksa dan Menghitung Ulang Cadangan Stok (qty_reserved)...');
+        $changes = 0;
+
+        $stocksWithReservation = DB::table('inventory_stocks')
+            ->whereNull('deleted_at')
+            ->where('qty_reserved', '>', 0)
+            ->get();
+
+        if ($stocksWithReservation->isNotEmpty()) {
+            $this->warn("   Ditemukan {$stocksWithReservation->count()} baris stok dengan nilai cadangan (qty_reserved > 0).");
+
+            foreach ($stocksWithReservation as $stock) {
+                // Hitung reservasi aktif sebenarnya dari tabel stock_reservations
+                $actualReserved = (float) DB::table('stock_reservations')
+                    ->where('product_id', $stock->product_id)
+                    ->where('warehouse_id', $stock->warehouse_id)
+                    ->when($stock->rak_id, fn ($q) => $q->where('rak_id', $stock->rak_id))
+                    ->sum('quantity');
+
+                if (abs((float) $stock->qty_reserved - $actualReserved) > 0.001) {
+                    $product = DB::table('products')->where('id', $stock->product_id)->first();
+                    $warehouse = DB::table('warehouses')->where('id', $stock->warehouse_id)->first();
+                    $productName = $product ? $product->name : "ID {$stock->product_id}";
+                    $warehouseName = $warehouse ? $warehouse->name : "ID {$stock->warehouse_id}";
+
+                    $this->line("   - Stok ID {$stock->id} [{$productName} @ {$warehouseName}]: qty_reserved {$stock->qty_reserved} -> {$actualReserved}");
+
+                    if (! $dryRun) {
+                        DB::table('inventory_stocks')
+                            ->where('id', $stock->id)
+                            ->update([
+                                'qty_reserved' => $actualReserved,
+                                'updated_at' => now(),
+                            ]);
+                    }
+                    $changes++;
+                }
+            }
+
+            $this->info($dryRun ? "   [DRY-RUN] {$changes} baris cadangan stok phantom akan disinkronkan." : "   ✓ {$changes} baris cadangan stok berhasil disinkronkan ke nilai aktual.");
+        } else {
+            $this->line('   ✓ Tidak ada baris stok dengan cadangan phantom.');
+        }
+
+        return $changes;
+    }
+
+    /**
+     * 6. Alihkan pembayaran vendor dan jurnal terkait yang menggunakan akun induk (1100 / 1110) ke akun kas/bank operasional.
+     */
+    protected function remediateVendorPaymentsWithParentCoa(bool $dryRun): int
+    {
+        $this->newLine();
+        $this->info('6. Memeriksa Penggunaan Akun Induk pada Pembayaran Vendor (Vendor Payment)...');
+        $changes = 0;
+
+        // Akun induk yang tidak boleh dipakai posting langsung: 1100, 1110, 1111, 1112
+        $parentCoaIds = DB::table('chart_of_accounts')
+            ->whereIn('code', ['1100', '1110', '1111', '1112'])
+            ->pluck('id')
+            ->toArray();
+
+        // Cari akun operasional Bank BCA Operasional (1112.01)
+        $targetBcaCoa = DB::table('chart_of_accounts')
+            ->where('code', '1112.01')
+            ->first();
+        $targetCoaId = $targetBcaCoa ? $targetBcaCoa->id : 93;
+
+        $invalidPayments = DB::table('vendor_payments')
+            ->whereIn('coa_id', $parentCoaIds)
+            ->get();
+
+        if ($invalidPayments->isNotEmpty()) {
+            $this->warn("   Ditemukan {$invalidPayments->count()} pembayaran vendor menggunakan akun induk:");
+            foreach ($invalidPayments as $vp) {
+                $this->line("   - VP {$vp->payment_number} (ID {$vp->id}): coa_id {$vp->coa_id} -> {$targetCoaId} (Bank BCA Operasional)");
+                if (! $dryRun) {
+                    DB::table('vendor_payments')->where('id', $vp->id)->update([
+                        'coa_id' => $targetCoaId,
+                        'updated_at' => now(),
+                    ]);
+
+                    // Perbarui juga jurnal kredit kas/bank yang bersumber dari pembayaran ini
+                    DB::table('journal_entries')
+                        ->where('source_type', 'App\Models\VendorPayment')
+                        ->where('source_id', $vp->id)
+                        ->whereIn('coa_id', $parentCoaIds)
+                        ->update([
+                            'coa_id' => $targetCoaId,
+                            'updated_at' => now(),
+                        ]);
+
+                    DB::table('journal_entries')
+                        ->where('reference', $vp->payment_number)
+                        ->whereIn('coa_id', $parentCoaIds)
+                        ->update([
+                            'coa_id' => $targetCoaId,
+                            'updated_at' => now(),
+                        ]);
+                }
+                $changes++;
+            }
+            $this->info($dryRun ? "   [DRY-RUN] {$changes} transaksi pembayaran vendor akan dialihkan ke akun operasional." : "   ✓ {$changes} transaksi pembayaran vendor dialihkan ke akun operasional.");
+        } else {
+            $this->line('   ✓ Seluruh pembayaran vendor telah menggunakan akun kas/bank operasional yang valid.');
+        }
+
+        return $changes;
+    }
+
+    /**
+     * 7. Bersihkan dokumen uji coba tambahan (CR-2026-0001 & DO-20260922-0003).
+     */
+    protected function remediateTestDocuments(bool $dryRun): int
+    {
+        $this->newLine();
+        $this->info('7. Memeriksa Dokumen Uji Coba Tambahan (CR-2026-0001 & DO-20260922-0003)...');
+        $changes = 0;
+
+        // A. Cek Retur Pelanggan CR-2026-0001
+        $testReturns = DB::table('customer_returns')
+            ->where('return_number', 'like', '%CR-2026-0001%')
+            ->get();
+
+        foreach ($testReturns as $tr) {
+            $this->warn("   Ditemukan dokumen retur pelanggan uji coba: ID {$tr->id} ({$tr->return_number})");
+            if (! $dryRun) {
+                // Hapus item
+                DB::table('customer_return_items')->where('customer_return_id', $tr->id)->delete();
+                // Hapus jurnal terkait
+                DB::table('journal_entries')
+                    ->where(function ($q) use ($tr) {
+                        $q->where('source_type', 'App\Models\CustomerReturn')->where('source_id', $tr->id)
+                            ->orWhere('reference', $tr->return_number);
+                    })->delete();
+                // Hapus retur
+                DB::table('customer_returns')->where('id', $tr->id)->delete();
+            }
+            $changes++;
+        }
+
+        // B. Cek DO-20260922-0003
+        $testDos = DB::table('delivery_orders')
+            ->where('do_number', 'like', '%DO-20260922-0003%')
+            ->get();
+
+        foreach ($testDos as $td) {
+            $this->warn("   Ditemukan dokumen DO uji coba: ID {$td->id} ({$td->do_number})");
+            if (! $dryRun) {
+                DB::table('delivery_order_items')->where('delivery_order_id', $td->id)->delete();
+                DB::table('delivery_sales_orders')->where('delivery_order_id', $td->id)->delete();
+                DB::table('delivery_orders')->where('id', $td->id)->delete();
+            }
+            $changes++;
+        }
+
+        if ($changes === 0) {
+            $this->line('   ✓ Tidak ditemukan dokumen uji coba tersisa (CR-2026-0001 / DO-20260922-0003).');
+        } else {
+            $this->info($dryRun ? "   [DRY-RUN] {$changes} dokumen uji coba akan dibersihkan." : "   ✓ {$changes} dokumen uji coba berhasil dibersihkan.");
         }
 
         return $changes;
