@@ -59,7 +59,9 @@ class PurchaseInvoiceAccountingService
 
                 if ($subItem && isset($subItem['price']) && $subItem['price'] !== '') {
                     $enteredPrice = (float) MoneyHelper::safeParse($subItem['price']);
-                    if ($enteredPrice > 0) {
+                    if (abs($enteredPrice - ($poPrice * 100)) <= 0.05) {
+                        $unitPrice = $poPrice;
+                    } elseif ($enteredPrice > 0) {
                         $unitPrice = $enteredPrice;
                     }
                 }
@@ -589,6 +591,7 @@ class PurchaseInvoiceAccountingService
                 throw new \RuntimeException("Invoice {$invoice->id} tidak memiliki purchase receipt yang dapat dijadikan source of truth.");
             }
 
+            $hasOpenJournal = false;
             if ($reverseExistingJournals) {
                 $hasOpenJournal = JournalEntry::withoutGlobalScopes()
                     ->where('source_type', Invoice::class)
@@ -638,6 +641,13 @@ class PurchaseInvoiceAccountingService
                     $repairedFull->fresh(),
                     (float) $repairedFull->total,
                     $repairedFull->cabang_id
+                );
+            }
+
+            if ($hasOpenJournal && strtolower((string) $repairedFull->status) === Invoice::STATUS_DRAFT) {
+                app(LedgerPostingService::class)->postInvoice(
+                    $repairedFull->fresh(),
+                    allowRepostAfterReversal: true
                 );
             }
 
@@ -1134,11 +1144,13 @@ class PurchaseInvoiceAccountingService
     public function repairInvoice(Invoice $invoice, bool $reverseExistingJournals = true): Invoice
     {
         return DB::transaction(function () use ($invoice, $reverseExistingJournals): Invoice {
+            $hasJournal = false;
             if ($reverseExistingJournals) {
                 $hasJournal = JournalEntry::withoutGlobalScopes()
                     ->where('source_type', Invoice::class)
                     ->where('source_id', $invoice->id)
                     ->where('is_reversal', false)
+                    ->whereNull('reversal_of_transaction_id')
                     ->exists();
 
                 if ($hasJournal) {
@@ -1146,7 +1158,24 @@ class PurchaseInvoiceAccountingService
                 }
             }
 
-            return $this->finaliseInvoice($invoice, replaceExistingJournals: false);
+            $repaired = $this->finaliseInvoice($invoice, replaceExistingJournals: false);
+
+            if ($hasJournal || ($invoice->accountPayable && $invoice->accountPayable->exists) || strtolower((string) $repaired->status) === Invoice::STATUS_DRAFT) {
+                $this->syncAccountPayable(
+                    $repaired->fresh(),
+                    (float) $repaired->total,
+                    $repaired->cabang_id
+                );
+            }
+
+            if ($hasJournal && strtolower((string) $repaired->status) === Invoice::STATUS_DRAFT) {
+                app(LedgerPostingService::class)->postInvoice(
+                    $repaired->fresh(),
+                    allowRepostAfterReversal: true
+                );
+            }
+
+            return $repaired->fresh(['invoiceItem', 'accountPayable']);
         });
     }
 

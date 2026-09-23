@@ -1505,6 +1505,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'selected_supplier' => $supplier->id,
+                'supplier_invoice_number' => 'INV-SUPP-NORM-001',
+                'tax_invoice_number' => '010.000-26.00000001',
                 'selected_order_request' => $orderRequest->id,
                 'selected_purchase_orders' => [$purchaseOrder->id],
                 'selected_purchase_receipts' => [$receipt->id],
@@ -1611,7 +1613,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame(11.0, (float) $invoice->invoiceItem->first()->tax_rate);
         $this->assertSame(792000.0, (float) $invoice->invoiceItem->first()->tax_amount);
         // No AP or journals in DRAFT state
-        $this->assertNull($invoice->accountPayable);
+        $this->assertFalse($invoice->accountPayable->exists);
+        $this->assertDatabaseMissing('account_payables', ['invoice_id' => $invoice->id]);
 
         // Now post the invoice — AP and journals should be created
         $service = app(PurchaseInvoiceAccountingService::class);
@@ -1805,7 +1808,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         $this->assertSame($this->cabang->id, (int) $invoice->cabang_id);
         $this->assertNotSame($creatorBranch->id, (int) $invoice->cabang_id);
         // No AP in DRAFT state yet
-        $this->assertNull($invoice->accountPayable);
+        $this->assertFalse($invoice->accountPayable->exists);
+        $this->assertDatabaseMissing('account_payables', ['invoice_id' => $invoice->id]);
 
         // Post the invoice so AP is created with the correct cabang
         $service = app(PurchaseInvoiceAccountingService::class);
@@ -1998,7 +2002,7 @@ class PurchaseInvoiceResourceTest extends TestCase
             ->assertHasFormErrors(['selected_supplier' => 'required']);
     }
 
-    public function test_purchase_orders_require_order_request_before_submit()
+    public function test_purchase_orders_do_not_require_order_request_before_submit()
     {
         $supplier = Supplier::factory()->create();
         $orderRequest = OrderRequest::factory()->create();
@@ -2013,13 +2017,16 @@ class PurchaseInvoiceResourceTest extends TestCase
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'selected_supplier' => $supplier->id,
-                'invoice_number' => 'PINV-OR-REQ-001',
+                'supplier_invoice_number' => 'INV-SUP-OPT-001',
+                'tax_invoice_number' => '010.000-26.00000001',
+                'invoice_number' => 'PINV-OR-OPT-001',
                 'invoice_date' => now()->format('Y-m-d'),
                 'due_date' => now()->addDays(30)->format('Y-m-d'),
                 'selected_purchase_orders' => [$purchaseOrder->id],
+                'selected_order_request' => null,
             ])
             ->call('create')
-            ->assertHasFormErrors(['selected_order_request' => 'required']);
+            ->assertHasNoFormErrors(['selected_order_request']);
     }
 
     public function test_purchase_invoice_requires_purchase_order_and_receipt_before_submit(): void
@@ -2525,6 +2532,8 @@ class PurchaseInvoiceResourceTest extends TestCase
         Livewire::test(PurchaseInvoiceResource\Pages\CreatePurchaseInvoice::class)
             ->fillForm([
                 'selected_supplier' => $supplier->id,
+                'supplier_invoice_number' => 'INV-SUPP-ZERO-001',
+                'tax_invoice_number' => '010.000-26.00000001',
                 'selected_order_request' => $orderRequest->id,
                 'selected_purchase_orders' => [$purchaseOrder->id],
                 'selected_purchase_receipts' => [$receipt->id],
