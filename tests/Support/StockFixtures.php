@@ -38,11 +38,13 @@ function stkContext(array $overrides = []): array
 
     $coa = fn (string $code, string $name, string $type) => ChartOfAccount::firstOrCreate(['code' => $code], ['name' => $name, 'type' => $type, 'is_active' => true, 'opening_balance' => 0]);
     $coa('1120', 'Piutang Dagang', 'Asset');
+    $coa('1112.01', 'Kas dan Bank', 'Asset');
     $revenue = $coa('4000', 'Penjualan', 'Revenue');
     $coa('2120.06', 'PPn Keluaran', 'Liability');
     $cogs = $coa('5100.10', 'HPP', 'Expense');
     $goods = $coa('1140.20', 'Barang Terkirim', 'Asset');
     $inventory = $coa('1140.10', 'Persediaan', 'Asset');
+    $coa('4120.10', 'Retur Penjualan', 'Revenue');
     $coa('6100.02', 'Biaya Pengiriman', 'Expense');
 
     $uom = UnitOfMeasure::factory()->create(['name' => 'Pieces', 'abbreviation' => 'pcs']);
