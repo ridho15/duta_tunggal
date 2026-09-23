@@ -507,7 +507,8 @@ class PurchaseReturnService
                 foreach ($purchaseReturn->purchaseReturnItem as $item) {
                     $resolvedLine = $this->resolveReturnItemJournalAmount($item);
 
-                    $warehouseId = $purchaseReturn->purchaseReceipt?->warehouse_id
+                    $warehouseId = $item->purchaseReceiptItem?->warehouse_id
+                        ?? $purchaseReturn->purchaseReceipt?->warehouse_id
                         ?? $purchaseReturn->qualityControl?->warehouse_id
                         ?? 1;
 
@@ -520,7 +521,9 @@ class PurchaseReturnService
 
                     if ($inventoryStock) {
                         $inventoryStock->decrement('qty_available', $item->qty_returned);
-                        $inventoryStock->decrement('qty_on_hand', $item->qty_returned);
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('inventory_stocks', 'qty_on_hand')) {
+                            $inventoryStock->decrement('qty_on_hand', $item->qty_returned);
+                        }
                     }
 
                     // Create reverse stock movement
