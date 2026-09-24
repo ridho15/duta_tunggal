@@ -192,7 +192,13 @@ class CustomerReturnResource extends Resource
                                         ->mapWithKeys(function ($item) use ($currentReturnId) {
                                             $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $item->id)
                                                 ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
-                                                ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [CustomerReturn::STATUS_COMPLETED, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_SUBMITTED]))
+                                                ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [
+                                                    CustomerReturn::STATUS_PENDING,
+                                                    CustomerReturn::STATUS_RECEIVED,
+                                                    CustomerReturn::STATUS_QC_INSPECTION,
+                                                    CustomerReturn::STATUS_APPROVED,
+                                                    CustomerReturn::STATUS_COMPLETED,
+                                                ]))
                                                 ->sum('quantity');
                                             $returnable = max(0, (float) $item->quantity - (float) $alreadyReturned);
                                             return [
@@ -233,7 +239,13 @@ class CustomerReturnResource extends Resource
                                     $currentReturnId = $get('../../id');
                                     $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
                                         ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
-                                        ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [CustomerReturn::STATUS_COMPLETED, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_SUBMITTED]))
+                                        ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [
+                                            CustomerReturn::STATUS_PENDING,
+                                            CustomerReturn::STATUS_RECEIVED,
+                                            CustomerReturn::STATUS_QC_INSPECTION,
+                                            CustomerReturn::STATUS_APPROVED,
+                                            CustomerReturn::STATUS_COMPLETED,
+                                        ]))
                                         ->sum('quantity');
                                     return max(0, (float) $item->quantity - (float) $alreadyReturned);
                                 })
@@ -249,7 +261,13 @@ class CustomerReturnResource extends Resource
                                     $currentReturnId = $get('../../id');
                                     $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
                                         ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
-                                        ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [CustomerReturn::STATUS_COMPLETED, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_SUBMITTED]))
+                                        ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [
+                                            CustomerReturn::STATUS_PENDING,
+                                            CustomerReturn::STATUS_RECEIVED,
+                                            CustomerReturn::STATUS_QC_INSPECTION,
+                                            CustomerReturn::STATUS_APPROVED,
+                                            CustomerReturn::STATUS_COMPLETED,
+                                        ]))
                                         ->sum('quantity');
                                     $max = max(0, (float) $item->quantity - (float) $alreadyReturned);
                                     return "Maksimal dapat diretur: {$max} pcs";

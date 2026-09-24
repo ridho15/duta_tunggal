@@ -24,6 +24,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 class InventoryStockResource extends Resource
@@ -38,6 +39,26 @@ class InventoryStockResource extends Resource
 
     // Position Gudang as the 6th group
     protected static ?int $navigationSort = 4;
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
 
     public static function form(Form $form): Form
     {
@@ -119,17 +140,17 @@ class InventoryStockResource extends Resource
                                 }
                             ]),
                         TextInput::make('qty_available')
-                            ->required()
+                            ->label('Stok Tersedia (Fisik)')
                             ->numeric()
-                            ->validationMessages([
-                                'required' => 'Quantity available tidak boleh kosong'
-                            ])
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Stok fisik terkunci. Perubahan stok hanya dapat dilakukan melalui dokumen resmi (Penerimaan Pembelian, Pengiriman DO, Penyesuaian Stok, atau Stock Opname).')
                             ->default(0),
                         TextInput::make('qty_reserved')
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'Quantity reserved tidak boleh kosong'
-                            ])
+                            ->label('Stok Dipesan (Reservasi)')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Stok reservasi dikelola otomatis oleh sistem komitmen Sales Order dan Delivery Order.')
                             ->numeric()
                             ->default(0),
                         TextInput::make('qty_min')
@@ -226,17 +247,8 @@ class InventoryStockResource extends Resource
             ])
             ->actions([
                 ViewAction::make(),
-                ActionGroup::make([
-                    EditAction::make()
-                        ->color('success'),
-                    DeleteAction::make()
-                ])
             ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ])
+            ->bulkActions([])
             ->defaultSort('updated_at', 'desc')
             ->description(new \Illuminate\Support\HtmlString(
                 '<details class="mb-4">' .
@@ -285,9 +297,7 @@ class InventoryStockResource extends Resource
     {
         return [
             'index' => Pages\ListInventoryStocks::route('/'),
-            'create' => Pages\CreateInventoryStock::route('/create'),
             'view' => ViewInventoryStock::route('/{record}'),
-            'edit' => Pages\EditInventoryStock::route('/{record}/edit'),
         ];
     }
 }

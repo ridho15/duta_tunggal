@@ -26,18 +26,20 @@ class InventoryStockPolicy
 
     /**
      * Determine whether the user can create models.
+     * Stok hanya boleh dibuat melalui dokumen transaksi (Penerimaan Barang / Penyesuaian).
      */
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('create inventory stock');
+        return false;
     }
 
     /**
      * Determine whether the user can update the model.
+     * Stok hanya boleh berubah melalui dokumen transaksi resmi.
      */
     public function update(User $user, InventoryStock $inventoryStock): bool
     {
-        return $user->hasPermissionTo('update inventory stock');
+        return false;
     }
 
     /**
@@ -45,7 +47,7 @@ class InventoryStockPolicy
      */
     public function delete(User $user, InventoryStock $inventoryStock): bool
     {
-        return $user->hasPermissionTo('delete inventory stock');
+        return false;
     }
 
     /**
@@ -53,7 +55,7 @@ class InventoryStockPolicy
      */
     public function restore(User $user, InventoryStock $inventoryStock): bool
     {
-        return $user->hasPermissionTo('restore inventory stock');
+        return false;
     }
 
     /**
@@ -61,6 +63,6 @@ class InventoryStockPolicy
      */
     public function forceDelete(User $user, InventoryStock $inventoryStock): bool
     {
-        return $user->hasPermissionTo('force-delete inventory stock');
+        return false;
     }
 }
