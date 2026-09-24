@@ -87,16 +87,60 @@ class PurchaseReturnResource extends Resource
                             ->reactive()
                             ->searchable()
                             ->relationship('purchaseReceipt', 'receipt_number', function (Builder $query) {
-                                $query->whereHas('purchaseOrder', function (Builder $query) {
-                                    $query->whereIn('status', ['completed', 'closed']);
-                                });
+                                $query->whereIn('status', ['completed', 'partial'])
+                                    ->orWhereHas('purchaseOrder', function (Builder $query) {
+                                        $query->whereIn('status', ['completed', 'closed', 'partially_received', 'approved']);
+                                    });
                             })
                             ->afterStateUpdated(function ($set, $state) {
                                 if ($state) {
-                                    $purchaseReceipt = \App\Models\PurchaseReceipt::find($state);
-                                    if ($purchaseReceipt && !in_array('all', Auth::user()?->manage_type ?? [])) {
-                                        $set('cabang_id', $purchaseReceipt->cabang_id);
+                                    $purchaseReceipt = \App\Models\PurchaseReceipt::with([
+                                        'purchaseReceiptItem.purchaseOrderItem',
+                                        'purchaseReceiptItem.product',
+                                        'purchaseOrder.purchaseOrderItem',
+                                    ])->find($state);
+
+                                    if ($purchaseReceipt) {
+                                        if (!in_array('all', Auth::user()?->manage_type ?? [])) {
+                                            $set('cabang_id', $purchaseReceipt->cabang_id);
+                                        }
+
+                                        $items = [];
+                                        foreach ($purchaseReceipt->purchaseReceiptItem as $receiptItem) {
+                                            $alreadyReturned = (float) \App\Models\PurchaseReturnItem::where('purchase_receipt_item_id', $receiptItem->id)
+                                                ->whereHas('purchaseReturn', fn ($q) => $q->whereNotIn('status', ['rejected']))
+                                                ->sum('qty_returned');
+
+                                            $acceptedQty = (float) ($receiptItem->qty_accepted ?? $receiptItem->qty_received ?? 0);
+                                            $availableQty = max(0, $acceptedQty - $alreadyReturned);
+
+                                            if ($availableQty > 0) {
+                                                $poItem = $receiptItem->purchaseOrderItem
+                                                    ?? $purchaseReceipt->purchaseOrder?->purchaseOrderItem?->firstWhere('product_id', $receiptItem->product_id);
+
+                                                $unitPrice = (float) (
+                                                    $poItem?->unit_price
+                                                    ?? $receiptItem->product?->cost_price
+                                                    ?? $receiptItem->product?->purchase_price
+                                                    ?? 0
+                                                );
+
+                                                $items[] = [
+                                                    'purchase_receipt_item_id' => $receiptItem->id,
+                                                    'product_id' => $receiptItem->product_id,
+                                                    'qty_returned' => $availableQty,
+                                                    'unit_price' => $unitPrice,
+                                                    'reason' => null,
+                                                ];
+                                            }
+                                        }
+
+                                        if (!empty($items)) {
+                                            $set('purchaseReturnItem', $items);
+                                        }
                                     }
+                                } else {
+                                    $set('purchaseReturnItem', []);
                                 }
                             })
                             ->validationMessages([
@@ -162,10 +206,33 @@ class PurchaseReturnResource extends Resource
                                     ->searchable()
                                     ->required()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        $purchaseReceiptItem = PurchaseReceiptItem::find($state);
+                                        $purchaseReceiptItem = PurchaseReceiptItem::with([
+                                            'purchaseOrderItem',
+                                            'product',
+                                            'purchaseReceipt.purchaseOrder.purchaseOrderItem'
+                                        ])->find($state);
                                         if ($purchaseReceiptItem) {
                                             $set('product_id', $purchaseReceiptItem->product_id);
-                                            $set('unit_price', $purchaseReceiptItem->purchaseOrderItem?->unit_price ?? 0);
+
+                                            $poItem = $purchaseReceiptItem->purchaseOrderItem
+                                                ?? $purchaseReceiptItem->purchaseReceipt?->purchaseOrder?->purchaseOrderItem?->firstWhere('product_id', $purchaseReceiptItem->product_id);
+
+                                            $unitPrice = (float) (
+                                                $poItem?->unit_price
+                                                ?? $purchaseReceiptItem->product?->cost_price
+                                                ?? $purchaseReceiptItem->product?->purchase_price
+                                                ?? 0
+                                            );
+                                            $set('unit_price', $unitPrice);
+
+                                            $alreadyReturned = (float) \App\Models\PurchaseReturnItem::where('purchase_receipt_item_id', $purchaseReceiptItem->id)
+                                                ->whereHas('purchaseReturn', fn ($q) => $q->whereNotIn('status', ['rejected']))
+                                                ->sum('qty_returned');
+                                            $acceptedQty = (float) ($purchaseReceiptItem->qty_accepted ?? $purchaseReceiptItem->qty_received ?? 0);
+                                            $availableQty = max(0, $acceptedQty - $alreadyReturned);
+                                            if ($availableQty > 0) {
+                                                $set('qty_returned', $availableQty);
+                                            }
                                         }
                                     })
                                     ->relationship('purchaseReceiptItem', 'id', function (Builder $query, $get) {
@@ -429,7 +496,7 @@ class PurchaseReturnResource extends Resource
                         ->label('Approve')
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
-                        ->visible(fn ($record) => $record->status === 'pending_approval')
+                        ->visible(fn ($record) => in_array($record->status, ['draft', 'pending_approval']))
                         ->form([
                             \Filament\Forms\Components\Textarea::make('approval_notes')
                                 ->label('Approval Notes')

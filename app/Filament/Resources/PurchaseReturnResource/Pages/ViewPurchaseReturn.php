@@ -53,7 +53,7 @@ class ViewPurchaseReturn extends ViewRecord
                 ->label('Approve')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->visible(fn($record) => $record->status === 'pending_approval')
+                ->visible(fn($record) => in_array($record->status, ['draft', 'pending_approval']))
                 ->form([
                     \Filament\Forms\Components\Textarea::make('approval_notes')
                         ->label('Approval Notes')

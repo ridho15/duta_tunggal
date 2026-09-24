@@ -35,9 +35,9 @@ class DeliveryOrderTransitions
         'request_stock' => ['approved', 'reject', 'request_approve', 'request_close'],
         'request_approve' => ['approved', 'reject', 'request_close', 'request_stock'],
         'reject' => ['request_stock', 'request_approve', 'approved', 'draft'],
-        'approved' => ['sent', 'closed', 'delivery_failed'],
-        'confirmed' => ['sent', 'closed', 'delivery_failed'],
-        'partial' => ['sent', 'closed', 'delivery_failed'],
+        'approved' => ['sent', 'closed', 'delivery_failed', 'completed'],
+        'confirmed' => ['sent', 'closed', 'delivery_failed', 'completed'],
+        'partial' => ['sent', 'closed', 'delivery_failed', 'completed'],
         'supplier' => ['request_stock', 'approved', 'reject', 'closed'],
         'sent' => ['received', 'completed', 'delivery_failed'],
         'received' => ['completed'],
@@ -157,7 +157,10 @@ class DeliveryOrderTransitions
         DB::transaction(function () use ($deliveryOrder, $options) {
             $deliveryOrder->refresh();
 
-            if ($deliveryOrder->status === 'sent') {
+            if (in_array($deliveryOrder->status, ['approved', 'confirmed', 'partial', 'request_stock'], true)) {
+                $this->to($deliveryOrder, 'sent', $options + ['comments' => 'Dikirim otomatis saat DO diselesaikan']);
+                $this->to($deliveryOrder, 'received', $options + ['comments' => 'Diterima otomatis saat DO diselesaikan']);
+            } elseif ($deliveryOrder->status === 'sent') {
                 $this->to($deliveryOrder, 'received', $options + ['comments' => 'Diterima otomatis saat DO diselesaikan']);
             }
 

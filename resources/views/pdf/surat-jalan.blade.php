@@ -220,12 +220,15 @@
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width: 5%;" class="center">No</th>
-                    <th style="width: 16%;">SKU</th>
+                    <th style="width: 4%;" class="center">No</th>
+                    <th style="width: 14%;">SKU</th>
                     <th>Nama Barang</th>
-                    <th style="width: 10%;" class="num">Qty</th>
-                    <th style="width: 9%;">Satuan</th>
-                    <th style="width: 22%;">Keterangan</th>
+                    <th style="width: 8%;" class="num">Total Pesan</th>
+                    <th style="width: 8%;" class="num">Sudah Dikirim</th>
+                    <th style="width: 8%;" class="num">Kirim Sekarang</th>
+                    <th style="width: 8%;" class="num">Sisa Pesanan</th>
+                    <th style="width: 7%;">Satuan</th>
+                    <th style="width: 15%;">Keterangan</th>
                 </tr>
             </thead>
             <tbody>
@@ -234,13 +237,16 @@
                         <td class="center">{{ $item['no'] }}</td>
                         <td>{{ $item['sku'] }}</td>
                         <td>{{ $item['name'] }}</td>
-                        <td class="num">{{ $item['quantity'] }}</td>
+                        <td class="num">{{ $item['ordered_quantity'] ?? $item['quantity'] }}</td>
+                        <td class="num">{{ $item['delivered_quantity'] ?? '0' }}</td>
+                        <td class="num"><strong>{{ $item['quantity'] }}</strong></td>
+                        <td class="num">{{ $item['remaining_quantity'] ?? '0' }}</td>
                         <td>{{ $item['unit'] }}</td>
                         <td>{{ $item['note'] }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="center muted">Tidak ada barang pada Delivery Order ini.</td>
+                        <td colspan="9" class="center muted">Tidak ada barang pada Delivery Order ini.</td>
                     </tr>
                 @endforelse
             </tbody>

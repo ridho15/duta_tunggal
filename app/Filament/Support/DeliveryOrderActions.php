@@ -22,12 +22,13 @@ class DeliveryOrderActions
 
     private static function can(): bool
     {
-        return (bool) Auth::user()?->hasPermissionTo('response delivery order');
+        $user = Auth::user();
+        return (bool) ($user?->hasRole(['Super Admin', 'Owner', 'Admin']) || $user?->hasPermissionTo('response delivery order'));
     }
 
     private static function strictAnd(callable $check): \Closure
     {
-        return fn ($record) => DeliveryOrderTransitions::enabled() && self::can() && $check($record);
+        return fn ($record) => self::can() && $check($record);
     }
 
     /** Jalankan transisi; galat matriks/stok ditampilkan sebagai notifikasi (tanpa halaman galat). */
@@ -118,7 +119,7 @@ class DeliveryOrderActions
             ->modalDescription('Dokumen pengiriman selesai: jurnal DO dan invoice otomatis diterbitkan. Bila belum dicatat diterima, sistem mencatat penerimaan otomatis.')
             ->modalSubmitActionLabel('Ya, Selesaikan')
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
-            ->visible(self::strictAnd(fn ($record) => in_array($record->status, ['sent', 'received'], true)))
+            ->visible(self::strictAnd(fn ($record) => in_array($record->status, ['approved', 'confirmed', 'partial', 'sent', 'received'], true)))
             ->action(function ($record) {
                 self::run(
                     fn () => app(DeliveryOrderTransitions::class)->complete($record, ['source' => 'action']),

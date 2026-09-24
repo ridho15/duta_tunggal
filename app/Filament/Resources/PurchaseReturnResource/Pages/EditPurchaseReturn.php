@@ -35,6 +35,55 @@ class EditPurchaseReturn extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            \Filament\Actions\Action::make('submit_for_approval')
+                ->label('Submit for Approval')
+                ->icon('heroicon-o-paper-airplane')
+                ->color('warning')
+                ->visible(fn () => $this->record->status === 'draft')
+                ->action(function () {
+                    try {
+                        $service = app(\App\Services\PurchaseReturnService::class);
+                        $service->submitForApproval($this->record);
+                        $this->refreshFormData(['status']);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Retur pembelian berhasil diajukan')
+                            ->success()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        \App\Support\ProcurementFailureNotifier::danger(
+                            'Gagal Mengajukan Retur',
+                            $exception,
+                            'Retur pembelian belum berhasil diajukan.'
+                        );
+                    }
+                }),
+            \Filament\Actions\Action::make('approve')
+                ->label('Approve')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn () => in_array($this->record->status, ['draft', 'pending_approval']))
+                ->form([
+                    \Filament\Forms\Components\Textarea::make('approval_notes')
+                        ->label('Approval Notes')
+                        ->nullable(),
+                ])
+                ->action(function (array $data) {
+                    try {
+                        $service = app(\App\Services\PurchaseReturnService::class);
+                        $service->approve($this->record, $data);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Retur pembelian berhasil disetujui')
+                            ->success()
+                            ->send();
+                        $this->redirect(static::getResource()::getUrl('view', ['record' => $this->record]));
+                    } catch (Throwable $exception) {
+                        \App\Support\ProcurementFailureNotifier::danger(
+                            'Gagal Menyetujui Retur',
+                            $exception,
+                            'Retur pembelian belum dapat disetujui.'
+                        );
+                    }
+                }),
             DeleteAction::make()
                 ->icon('heroicon-o-trash')
                 ->visible(fn () => in_array($this->record->status, ['draft', 'rejected'])),

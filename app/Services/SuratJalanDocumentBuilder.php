@@ -148,17 +148,35 @@ class SuratJalanDocumentBuilder
     {
         $salesOrders = $deliveryOrder->salesOrders;
 
-        $items = $deliveryOrder->deliveryOrderItem
+        $itemsList = $deliveryOrder->deliveryOrderItem
             ->filter(fn (DeliveryOrderItem $item) => (float) $item->quantity > 0)
-            ->values()
-            ->map(fn (DeliveryOrderItem $item, int $index) => [
-                'no' => $index + 1,
-                'sku' => $item->product->sku ?: '-',
-                'name' => $item->product->name ?: '-',
-                'quantity' => $this->formatQuantity($item->quantity),
-                'unit' => $item->product->uom->abbreviation ?: ($item->product->uom->name ?: '-'),
-                'note' => $item->reason ?: '',
-            ])
+            ->values();
+
+        $saleOrderItemIds = $itemsList->pluck('sale_order_item_id')->filter()->unique()->all();
+        $progress = ! empty($saleOrderItemIds)
+            ? app(SaleOrderDeliveryProgress::class)->forItems($saleOrderItemIds, excludeDeliveryOrderId: $deliveryOrder->id)
+            : [];
+
+        $items = $itemsList
+            ->map(function (DeliveryOrderItem $item, int $index) use ($progress) {
+                $prog = $item->sale_order_item_id ? ($progress[$item->sale_order_item_id] ?? null) : null;
+                $ordered = $prog ? (float) $prog['ordered'] : (float) $item->quantity;
+                $deliveredPrior = $prog ? (float) $prog['delivered'] : 0.0;
+                $sendNow = (float) $item->quantity;
+                $remaining = max(0.0, $ordered - $deliveredPrior - $sendNow);
+
+                return [
+                    'no' => $index + 1,
+                    'sku' => $item->product->sku ?: '-',
+                    'name' => $item->product->name ?: '-',
+                    'ordered_quantity' => $this->formatQuantity($ordered),
+                    'delivered_quantity' => $this->formatQuantity($deliveredPrior),
+                    'quantity' => $this->formatQuantity($sendNow),
+                    'remaining_quantity' => $this->formatQuantity($remaining),
+                    'unit' => $item->product->uom->abbreviation ?: ($item->product->uom->name ?: '-'),
+                    'note' => $item->reason ?: '',
+                ];
+            })
             ->all();
 
         return [

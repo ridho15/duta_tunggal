@@ -88,7 +88,12 @@ class SaleOrder extends Model
     {
         return $query->where(function (Builder $outer) use ($alwaysIncludeIds) {
             $outer->where(function (Builder $main) {
-                $main->whereIn($main->getModel()->getTable() . '.status', self::DELIVERABLE_STATUSES)
+                $table = $main->getModel()->getTable();
+                $main->whereIn($table . '.status', self::DELIVERABLE_STATUSES)
+                    ->where(function ($q) use ($table) {
+                        $q->whereNull($table . '.tipe_pengiriman')
+                          ->orWhere($table . '.tipe_pengiriman', '!=', 'Ambil Sendiri');
+                    })
                     ->whereHas('saleOrderItem', function (Builder $items) {
                         $items->whereRaw(\App\Services\SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items') . ' > 0');
                     });

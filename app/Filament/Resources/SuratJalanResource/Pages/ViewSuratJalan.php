@@ -87,11 +87,11 @@ class ViewSuratJalan extends ViewRecord
                             ->getStateUsing(function (SuratJalan $record): string {
                                 $schedule = $record->primaryDeliverySchedule();
                                 if ($schedule) {
-                                    return $schedule->senderName();
+                                    return (string) ($schedule->senderName() ?: SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL);
                                 }
                                 $firstDo = $record->deliveryOrder->first(fn ($d) => $d->driver_id);
-                                if ($firstDo?->driver) {
-                                    return $firstDo->driver->name;
+                                if ($firstDo?->driver?->name) {
+                                    return (string) $firstDo->driver->name;
                                 }
 
                                 return SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;
@@ -101,11 +101,14 @@ class ViewSuratJalan extends ViewRecord
                             ->getStateUsing(function (SuratJalan $record): string {
                                 $schedule = $record->primaryDeliverySchedule();
                                 if ($schedule) {
-                                    return $schedule->vehicleLabel();
+                                    return (string) ($schedule->vehicleLabel() ?: SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL);
                                 }
                                 $firstDo = $record->deliveryOrder->first(fn ($d) => $d->vehicle_id);
                                 if ($firstDo?->vehicle) {
-                                    return trim($firstDo->vehicle->plate . ($firstDo->vehicle->type ? ' (' . $firstDo->vehicle->type . ')' : ''));
+                                    $label = trim(($firstDo->vehicle->plate ?? '') . ($firstDo->vehicle->type ? ' (' . $firstDo->vehicle->type . ')' : ''));
+                                    if ($label !== '') {
+                                        return $label;
+                                    }
                                 }
 
                                 return SuratJalanDocumentBuilder::NOT_SCHEDULED_LABEL;

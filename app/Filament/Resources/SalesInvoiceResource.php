@@ -191,24 +191,71 @@ class SalesInvoiceResource extends Resource
 
                                 Select::make('selected_sale_order')
                                     ->label('SO (Sales Order)')
-                                    ->options(function ($get) {
+                                    ->options(function ($get, $livewire) {
                                         $customerId = $get('selected_customer');
                                         if (!$customerId) return [];
 
-                                        // FIX #1: Sertakan SO berstatus 'partially_delivered', 'completed', atau SO yang memiliki DO terkirim
-                                        return SaleOrder::with('customer:id,name')
+                                        $currentInvoiceId = $get('id') ?? ($livewire instanceof \Filament\Resources\Pages\EditRecord ? $livewire->record?->id : null);
+                                        $currentInvoice = $currentInvoiceId ? \App\Models\Invoice::find($currentInvoiceId) : null;
+                                        $currentInvoiceSoId = ($currentInvoice && $currentInvoice->from_model_type === 'App\Models\SaleOrder')
+                                            ? (int) $currentInvoice->from_model_id
+                                            : null;
+
+                                        // Ambil semua ID DO yang sudah ditagih pada invoice aktif
+                                        $invoicedDOIds = \App\Models\Invoice::where('from_model_type', 'App\Models\SaleOrder')
+                                            ->whereNotNull('delivery_orders')
+                                            ->whereNotIn('status', ['canceled', 'cancelled'])
+                                            ->when($currentInvoiceId, fn ($q) => $q->where('id', '!=', $currentInvoiceId))
+                                            ->get()
+                                            ->pluck('delivery_orders')
+                                            ->flatten()
+                                            ->filter()
+                                            ->unique()
+                                            ->toArray();
+
+                                        return SaleOrder::with(['customer:id,name', 'deliverySalesOrder.deliveryOrder'])
                                             ->where('customer_id', $customerId)
                                             ->where(function ($q) {
-                                                $q->whereIn('status', ['completed', 'partially_delivered'])
+                                                $q->whereIn('status', ['completed', 'partially_delivered', 'confirmed', 'approved'])
                                                   ->orWhereHas('deliverySalesOrder.deliveryOrder', function ($doQuery) {
                                                       $doQuery->whereIn('status', \App\Models\DeliveryOrder::DELIVERED_STATUSES);
                                                   });
                                             })
                                             ->get()
+                                            ->filter(function ($so) use ($invoicedDOIds, $currentInvoiceId, $currentInvoiceSoId) {
+                                                // Jika sedang edit invoice dan SO ini adalah asal invoice saat ini, selalu izinkan
+                                                if ($currentInvoiceId && (int) $so->id === (int) $currentInvoiceSoId) {
+                                                    return true;
+                                                }
+
+                                                if ($so->tipe_pengiriman === 'Ambil Sendiri') {
+                                                    // Ambil Sendiri: hanya tampil jika belum pernah terbit invoice aktif
+                                                    $alreadyInvoiced = \App\Models\Invoice::where('from_model_type', 'App\Models\SaleOrder')
+                                                        ->where('from_model_id', $so->id)
+                                                        ->whereNotIn('status', ['canceled', 'cancelled'])
+                                                        ->when($currentInvoiceId, fn ($q) => $q->where('id', '!=', $currentInvoiceId))
+                                                        ->exists();
+                                                    return ! $alreadyInvoiced;
+                                                }
+
+                                                // Pengiriman lewat DO: hanya tampil jika masih ada DO terkirim yang BELUM ditagih
+                                                $deliveredDos = $so->deliverySalesOrder
+                                                    ? $so->deliverySalesOrder
+                                                        ->map(fn ($dso) => $dso->deliveryOrder)
+                                                        ->filter(fn ($do) => $do && in_array($do->status, \App\Models\DeliveryOrder::DELIVERED_STATUSES, true))
+                                                    : collect();
+
+                                                if ($deliveredDos->isEmpty()) {
+                                                    return false;
+                                                }
+
+                                                return $deliveredDos->contains(fn ($do) => ! in_array($do->id, $invoicedDOIds));
+                                            })
                                             ->mapWithKeys(function ($so) {
                                                 $label = \App\Support\DocumentLabels::saleOrder($so);
-                                                // Tandai status pengiriman
-                                                if ($so->status === 'partially_delivered') {
+                                                if ($so->tipe_pengiriman === 'Ambil Sendiri') {
+                                                    $label .= ' [Ambil Sendiri]';
+                                                } elseif ($so->status === 'partially_delivered') {
                                                     $label .= ' [Pengiriman Sebagian]';
                                                 } elseif ($so->status === 'completed') {
                                                     $label .= ' [Selesai]';
@@ -222,24 +269,11 @@ class SalesInvoiceResource extends Resource
                                     ->reactive()
                                     ->helperText(function ($get) {
                                         $customerId = $get('selected_customer');
-
-                                        // FIX #1: cek juga SO yang memiliki DO terkirim
-                                        $hasSo = $customerId && SaleOrder::where('customer_id', $customerId)
-                                            ->where(function ($q) {
-                                                $q->whereIn('status', ['completed', 'partially_delivered'])
-                                                  ->orWhereHas('deliverySalesOrder.deliveryOrder', function ($doQuery) {
-                                                      $doQuery->whereIn('status', \App\Models\DeliveryOrder::DELIVERED_STATUSES);
-                                                  });
-                                            })
-                                            ->exists();
-
-                                        $hint = 'SO berstatus Selesai, Pengiriman Sebagian, atau yang memiliki DO terkirim muncul di sini. Pilih SO lalu centang DO yang ingin ditagih.';
-
-                                        if ($customerId && ! $hasSo) {
-                                            return 'Belum ada SO dengan barang terkirim untuk customer ini. ' . $hint;
+                                        if (!$customerId) {
+                                            return 'Pilih customer terlebih dahulu untuk memuat daftar Sales Order yang siap ditagih.';
                                         }
 
-                                        return $hint;
+                                        return 'Hanya menampilkan SO yang memiliki pengiriman barang belum ditagih (atau SO Ambil Sendiri yang belum terbit invoice).';
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_delivery_orders', []);
@@ -604,9 +638,9 @@ class SalesInvoiceResource extends Resource
                                     }),
                             ]),
 
-                        // Edit Delivery Order Items Section
-                        Section::make('Edit Item Delivery Order')
-                            ->description('Edit quantity dan harga dari delivery order yang dipilih')
+                        // Delivery Order Items Section
+                        Section::make('Rincian Item Delivery Order')
+                            ->description('Kuantitas untuk invoice dari delivery order yang dipilih (harga satuan terkunci sesuai Sales Order yang disepakati)')
                             ->schema([
                                 Repeater::make('delivery_order_items')
                                     ->label('')
@@ -654,21 +688,12 @@ class SalesInvoiceResource extends Resource
                                         TextInput::make('unit_price')
                                             ->label('Harga Satuan')
                                             ->indonesianMoney()
-                                            ->required()
+                                            ->disabled()
+                                            ->dehydrated(true)
+                                            ->extraInputAttributes(static::readonlyInputAttributes())
+                                            ->helperText('Terkunci sesuai Sales Order yang disepakati')
                                             ->default(function ($get) {
                                                 return $get('original_price') ?? 0;
-                                            })
-                                            ->minValue(0)
-                                            ->validationMessages([
-                                                'required' => 'Harga satuan tidak boleh kosong',
-                                                'numeric' => 'Harga satuan harus berupa angka',
-                                                'min' => 'Harga satuan tidak boleh negatif'
-                                            ])
-                                            ->reactive()
-                                            ->afterStateUpdated(function ($set, $get) {
-                                                $quantity = (float) ($get('invoice_quantity') ?? 0);
-                                                $price = (float) \App\Helpers\MoneyHelper::safeParse($get('unit_price') ?? 0);
-                                                $set('total_price', $quantity * $price);
                                             })
                                             ->columnSpan(1),
                                         TextInput::make('total_price')

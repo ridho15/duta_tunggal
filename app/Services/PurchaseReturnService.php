@@ -411,7 +411,7 @@ class PurchaseReturnService
                     'total_amount' => $totalReturnAmount,
                     'entries_count' => count($entries),
                     'purchase_return_coa' => $purchaseReturnCoa?->code,
-                    'accounts_payable_coa' => $accountsPayableCoa?->code,
+                    'accounts_payable_coa' => $liabilityCoa?->code,
                     'inventory_coa_ids' => array_keys($inventoryCredits),
                 ]);
             });
@@ -451,19 +451,21 @@ class PurchaseReturnService
 
         if ($item->purchaseReceiptItem?->exists) {
             $unitCost = JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item->purchaseReceiptItem);
-            $amountIdr = round($qty * $unitCost['unit_price_idr'], 2);
+            $unitPriceIdr = (float) ($unitCost['unit_price_idr'] > 0 ? $unitCost['unit_price_idr'] : $fallbackRawUnitPrice);
+            $rawUnitPrice = (float) ($unitCost['raw_unit_price'] > 0 ? $unitCost['raw_unit_price'] : $fallbackRawUnitPrice);
+            $amountIdr = round($qty * $unitPriceIdr, 2);
 
             return [
                 'item' => $item,
                 'amount_idr' => $amountIdr,
-                'raw_unit_price' => $unitCost['raw_unit_price'],
-                'unit_price_idr' => $unitCost['unit_price_idr'],
+                'raw_unit_price' => $rawUnitPrice,
+                'unit_price_idr' => $unitPriceIdr,
                 'currency_id' => $unitCost['currency_id'],
                 'currency_code' => $unitCost['currency_code'],
                 'exchange_rate' => $unitCost['exchange_rate'],
                 'amount_original_currency' => $unitCost['exchange_rate'] > 0
                     ? round($amountIdr / $unitCost['exchange_rate'], 4)
-                    : round($qty * $unitCost['raw_unit_price'], 4),
+                    : round($qty * $rawUnitPrice, 4),
             ];
         }
 
@@ -514,16 +516,14 @@ class PurchaseReturnService
 
                     // Lock the inventory stock row to prevent concurrent returns
                     // from both reading the same qty and each decrementing incorrectly.
-                    $inventoryStock = InventoryStock::where('product_id', $item->product_id)
-                        ->where('warehouse_id', $warehouseId)
-                        ->lockForUpdate()
-                        ->first();
+                    $inventoryStock = InventoryStock::firstOrCreate(
+                        ['product_id' => $item->product_id, 'warehouse_id' => $warehouseId],
+                        ['qty_available' => 0, 'qty_reserved' => 0]
+                    );
 
-                    if ($inventoryStock) {
-                        $inventoryStock->decrement('qty_available', $item->qty_returned);
-                        if (\Illuminate\Support\Facades\Schema::hasColumn('inventory_stocks', 'qty_on_hand')) {
-                            $inventoryStock->decrement('qty_on_hand', $item->qty_returned);
-                        }
+                    $inventoryStock->decrement('qty_available', $item->qty_returned);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('inventory_stocks', 'qty_on_hand')) {
+                        $inventoryStock->decrement('qty_on_hand', $item->qty_returned);
                     }
 
                     // Create reverse stock movement
@@ -574,9 +574,15 @@ class PurchaseReturnService
         $poId = $purchaseReceipt?->purchase_order_id ?? $purchaseReturn->qualityControl?->purchase_order_id;
 
         if ($purchaseReceipt) {
-            $invoice = \App\Models\Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
-                ->whereJsonContains('purchase_receipts', (int) $purchaseReceipt->id)
-                ->where('status', '!=', \App\Models\Invoice::STATUS_CANCELLED)
+            $invoice = \App\Models\Invoice::where(function ($q) use ($purchaseReceipt) {
+                    $q->where(function ($m) use ($purchaseReceipt) {
+                        $m->where('from_model_type', \App\Models\PurchaseReceipt::class)
+                          ->where('from_model_id', $purchaseReceipt->id);
+                    })
+                    ->orWhereJsonContains('purchase_receipts', (int) $purchaseReceipt->id)
+                    ->orWhereJsonContains('purchase_receipts', (string) $purchaseReceipt->id);
+                })
+                ->whereNotIn('status', [\App\Models\Invoice::STATUS_CANCELLED, 'canceled'])
                 ->first();
 
             if ($invoice) {
@@ -754,8 +760,8 @@ class PurchaseReturnService
      */
     public function approve(PurchaseReturn $purchaseReturn, array $data = []): bool
     {
-        if ($purchaseReturn->status !== 'pending_approval') {
-            throw new \Exception('Retur pembelian hanya bisa disetujui saat statusnya masih menunggu persetujuan.');
+        if (!in_array($purchaseReturn->status, ['draft', 'pending_approval'])) {
+            throw new \Exception('Retur pembelian hanya bisa disetujui saat statusnya draft atau menunggu persetujuan.');
         }
 
         DB::transaction(function () use ($purchaseReturn, $data) {

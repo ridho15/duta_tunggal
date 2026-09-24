@@ -149,10 +149,21 @@ class DeliveryOrderResource extends Resource
                             ->options(function ($livewire) {
                                 // SO layak kirim (Disetujui/Dikonfirmasi/Dikirim Sebagian) yang masih punya sisa yang belum
                                 // terikat DO manapun; SO yang sudah terhubung ke DO yang sedang diedit tetap tampil.
-                                return SaleOrder::with('customer')
-                                    ->deliverable(static::linkedSaleOrderIds($livewire))
+                                $linkedIds = static::linkedSaleOrderIds($livewire);
+                                return SaleOrder::with(['customer', 'saleOrderItem'])
+                                    ->deliverable($linkedIds)
                                     ->latest('id')
                                     ->get()
+                                    ->filter(function ($so) use ($linkedIds) {
+                                        if (in_array($so->id, $linkedIds, true)) {
+                                            return true;
+                                        }
+                                        if ($so->status === 'completed') {
+                                            return false;
+                                        }
+                                        $summary = app(\App\Services\SaleOrderDeliveryProgress::class)->forSaleOrder($so);
+                                        return ($summary['totals']['available'] ?? 0) > 0.0001;
+                                    })
                                     ->mapWithKeys(function ($so) {
                                         $customer = $so->customer;
                                         $custName = $customer
@@ -450,7 +461,39 @@ class DeliveryOrderResource extends Resource
                                             ->label('Quantity')
                                             ->numeric()
                                             ->reactive()
-                                            ->default(0)
+                                            ->default(function ($get, $livewire) {
+                                                $saleOrderItemId = $get('sale_order_item_id');
+                                                if ($saleOrderItemId) {
+                                                    $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
+                                                    if ($saleOrderItem) {
+                                                        return static::availableFor($saleOrderItem, $livewire);
+                                                    }
+                                                }
+                                                return 0;
+                                            })
+                                            ->maxValue(function ($get, $livewire) {
+                                                $saleOrderItemId = $get('sale_order_item_id');
+                                                if ($saleOrderItemId) {
+                                                    $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
+                                                    if ($saleOrderItem) {
+                                                        return static::availableFor($saleOrderItem, $livewire);
+                                                    }
+                                                }
+                                                return null;
+                                            })
+                                            ->helperText(function ($get, $livewire) {
+                                                $saleOrderItemId = $get('sale_order_item_id');
+                                                if (!$saleOrderItemId) {
+                                                    return null;
+                                                }
+                                                $progress = app(\App\Services\SaleOrderDeliveryProgress::class)
+                                                    ->forItems([$saleOrderItemId], static::editingDeliveryOrderId($livewire));
+                                                $itemProg = $progress[$saleOrderItemId] ?? null;
+                                                if (!$itemProg) {
+                                                    return null;
+                                                }
+                                                return "Total Dipesan: {$itemProg['ordered']} | Sudah Terkirim: {$itemProg['delivered']} | Sisa Belum Terkirim: {$itemProg['remaining']} | Tersedia untuk DO: {$itemProg['available']}";
+                                            })
                                             ->rules(['required', 'numeric', 'min:1'])
                                             ->validationAttribute('quantity')
                                             ->live()

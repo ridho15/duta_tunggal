@@ -47,8 +47,9 @@ class JournalCurrencyAmountResolver
             'purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
         ]);
 
-        $poItem = $item->purchaseOrderItem;
-        $rawUnitPrice = (float) ($poItem?->unit_price ?? $item->product?->cost_price ?? 0);
+        $poItem = $item->purchaseOrderItem
+            ?? $item->purchaseReceipt?->purchaseOrder?->purchaseOrderItem?->firstWhere('product_id', $item->product_id);
+        $rawUnitPrice = (float) ($poItem?->unit_price ?? $item->product?->cost_price ?? $item->product?->purchase_price ?? 0);
         $currencyId = is_numeric($poItem?->currency_id ?? null)
             ? (int) $poItem->currency_id
             : null;
