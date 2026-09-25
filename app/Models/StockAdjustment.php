@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\CascadesJournalEntries;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StockAdjustment extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
 
     protected $table = 'stock_adjustments';
 
@@ -54,6 +55,22 @@ class StockAdjustment extends Model
     public function stockMovements()
     {
         return $this->morphMany(StockMovement::class, 'fromModel', 'from_model_type', 'from_model_id');
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source', 'source_type', 'source_id');
+    }
+
+    protected static function booted()
+    {
+        static::updated(function (StockAdjustment $stockAdjustment) {
+            if ($stockAdjustment->status === 'approved' && $stockAdjustment->journalEntries()->exists()) {
+                if ($stockAdjustment->wasChanged(['adjustment_number', 'adjustment_date'])) {
+                    app(\App\Services\StockAdjustmentService::class)->syncJournalEntries($stockAdjustment);
+                }
+            }
+        });
     }
 
     /**

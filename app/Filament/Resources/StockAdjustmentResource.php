@@ -179,7 +179,8 @@ class StockAdjustmentResource extends Resource
                                     ->label('Rak')
                                     ->searchable()
                                     ->preload()
-                                    ->required()
+                                    ->nullable()
+                                    ->placeholder('Pilih rak (opsional)')
                                     ->options(function (Forms\Get $get) {
                                         return self::resolveRakOptions($get('../../warehouse_id'));
                                     })
@@ -382,7 +383,7 @@ class StockAdjustmentResource extends Resource
                                 HelperController::sendNotification(
                                     isSuccess: true,
                                     title: 'Information',
-                                    message: 'Stock adjustment berhasil disetujui dan mutasi stok sudah dicatat.'
+                                    message: 'Stock adjustment berhasil disetujui, mutasi stok dan jurnal penyesuaian sudah dicatat.'
                                 );
                             } catch (ValidationException $exception) {
                                 HelperController::sendNotification(

@@ -557,6 +557,7 @@ class JournalEntryResource extends Resource
                                             'App\\Models\\QualityControl' => 'Quality Control',
                                             'App\\Models\\OtherSale' => 'Other Sale',
                                             'App\\Models\\StockOpname' => 'Stock Opname',
+                                            'App\\Models\\StockAdjustment' => 'Stock Adjustment',
                                             default => $record->source_type,
                                         };
                                     })
@@ -585,6 +586,11 @@ class JournalEntryResource extends Resource
                                         // Special handling for StockOpname
                                         if ($record->source_type === 'App\\Models\\StockOpname') {
                                             return 'orange';
+                                        }
+
+                                        // Special handling for StockAdjustment
+                                        if ($record->source_type === 'App\\Models\\StockAdjustment') {
+                                            return 'warning';
                                         }
 
                                         return 'primary'; // Default color for other types
@@ -653,6 +659,8 @@ class JournalEntryResource extends Resource
                                                 return $source->reference_number ?: 'N/A';
                                             case 'App\\Models\\StockOpname':
                                                 return $source->opname_number ?: 'N/A';
+                                            case 'App\\Models\\StockAdjustment':
+                                                return $source->adjustment_number ?: 'N/A';
                                             default:
                                                 return 'N/A';
                                         }
@@ -759,6 +767,9 @@ class JournalEntryResource extends Resource
                                             case 'App\\Models\\StockOpname':
                                                 $warehouseName = $source->warehouse ? $source->warehouse->name : 'N/A';
                                                 return "Stock Opname: {$source->opname_number} - {$warehouseName}";
+                                            case 'App\\Models\\StockAdjustment':
+                                                $warehouseName = $source->warehouse ? $source->warehouse->name : 'N/A';
+                                                return "Stock Adjustment: {$source->adjustment_number} - {$warehouseName}";
                                             default:
                                                 return 'Unknown Source';
                                         }
@@ -804,6 +815,8 @@ class JournalEntryResource extends Resource
                                                     'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
                                                     'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
                                                     'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $record->source_id),
+                                                    'App\\Models\\StockAdjustment' => route('filament.admin.resources.stock-adjustments.view', $record->source_id),
+                                                    'App\\Models\\StockOpname' => route('filament.admin.resources.stock-opnames.edit', $record->source_id),
                                                     'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
                                                     'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
                                                     default => null,
@@ -905,6 +918,7 @@ class JournalEntryResource extends Resource
                             'App\\Models\\Deposit' => 'primary',
                             'App\\Models\\OtherSale' => 'info',
                             'App\\Models\\StockOpname' => 'orange',
+                            'App\\Models\\StockAdjustment' => 'warning',
                             default => 'gray',
                         };
                     })
@@ -950,6 +964,7 @@ class JournalEntryResource extends Resource
                             'App\\Models\\QualityControl' => 'Quality Control',
                             'App\\Models\\OtherSale' => 'Other Sale',
                             'App\\Models\\StockOpname' => 'Stock Opname',
+                            'App\\Models\\StockAdjustment' => 'Stock Adjustment',
                             null => '-',
                             default => $record->source_type
                         };
@@ -1007,6 +1022,7 @@ class JournalEntryResource extends Resource
                                 'App\\Models\\Invoice' => 'invoice_number',
                                 'App\\Models\\OtherSale' => 'reference_number',
                                 'App\\Models\\StockOpname' => 'opname_number',
+                                'App\\Models\\StockAdjustment' => 'adjustment_number',
                                 default => 'id'
                             };
 
@@ -1345,6 +1361,8 @@ class JournalEntryResource extends Resource
                 'App\\Models\\Asset' => route('filament.admin.resources.assets.view', $record->source_id),
                 'App\\Models\\Deposit' => route('filament.admin.resources.deposits.view', $record->source_id),
                 'App\\Models\\OtherSale' => route('filament.admin.resources.other-sales.view', $record->source_id),
+                'App\\Models\\StockAdjustment' => route('filament.admin.resources.stock-adjustments.view', $record->source_id),
+                'App\\Models\\StockOpname' => route('filament.admin.resources.stock-opnames.edit', $record->source_id),
                 'App\\Models\\QualityControl' => self::getQualityControlViewUrl($record->source),
                 'App\\Models\\Invoice' => self::getInvoiceViewUrl($record->source),
                 default => null,

@@ -35,6 +35,19 @@ class StockOpnameItem extends Model
         'total_value' => 'float',
     ];
 
+    protected static function booted()
+    {
+        static::saving(function (StockOpnameItem $item) {
+            $systemQty = (float) ($item->system_qty ?? 0);
+            $physicalQty = (float) ($item->physical_qty ?? 0);
+            $item->difference_qty = $physicalQty - $systemQty;
+
+            $unitCost = (float) ($item->unit_cost ?: ($item->average_cost ?: 0));
+            $item->difference_value = $item->difference_qty * $unitCost;
+            $item->total_value = $physicalQty * $unitCost;
+        });
+    }
+
     public function stockOpname()
     {
         return $this->belongsTo(StockOpname::class, 'stock_opname_id');

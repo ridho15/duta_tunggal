@@ -72,7 +72,9 @@ class StockOpnameItemsRelationManager extends RelationManager
                             ->pluck('name', 'id');
                     })
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->nullable()
+                    ->placeholder('Pilih rak (opsional)'),
 
                 TextInput::make('system_qty')
                     ->label('Qty Sistem')
@@ -161,9 +163,10 @@ class StockOpnameItemsRelationManager extends RelationManager
                     ->numeric()
                     ->sortable(),
 
-                TextColumn::make('physical_qty')
+                Tables\Columns\TextInputColumn::make('physical_qty')
                     ->label('Qty Fisik')
-                    ->numeric()
+                    ->rules(['numeric', 'min:0'])
+                    ->disabled(fn () => $this->getOwnerRecord()->status === 'approved')
                     ->sortable(),
 
                 TextColumn::make('difference_qty')
@@ -198,6 +201,23 @@ class StockOpnameItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
+                Tables\Actions\Action::make('populate_products')
+                    ->label('Muat / Perbarui Stok Produk')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('primary')
+                    ->visible(fn () => $this->getOwnerRecord()->status !== 'approved')
+                    ->requiresConfirmation()
+                    ->modalHeading('Muat Stok Produk Gudang')
+                    ->modalDescription('Sistem akan memuat seluruh daftar stok produk di gudang ini untuk proses stock opname.')
+                    ->modalSubmitActionLabel('Ya, Muat Produk')
+                    ->action(function () {
+                        $count = app(\App\Services\StockOpnameService::class)->startPhysicalCount($this->getOwnerRecord());
+                        \App\Http\Controllers\HelperController::sendNotification(
+                            isSuccess: true,
+                            title: 'Stok Produk Dimuat',
+                            message: "Berhasil memuat {$count} produk ke daftar hitung fisik."
+                        );
+                    }),
                 Tables\Actions\CreateAction::make()
                     ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
             ])

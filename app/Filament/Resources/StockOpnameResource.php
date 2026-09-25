@@ -266,38 +266,90 @@ class StockOpnameResource extends Resource
             ->actions([
                 ActionGroup::make([
                     Tables\Actions\ViewAction::make()
-                    ->color('info'),
-                Tables\Actions\EditAction::make()
-                    ->visible(fn (StockOpname $record) => $record->status !== 'approved')
-                    ->color('warning'),
-                Tables\Actions\Action::make('approve')
-                    ->label('Setujui')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(function ($record) {
-                        return $record->status === 'completed';
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Setujui Stock Opname')
-                    ->modalDescription('Apakah Anda yakin ingin menyetujui stock opname ini?')
-                    ->modalSubmitActionLabel('Ya, Setujui')
-                    ->action(function ($record) {
-                        try {
-                            app(StockOpnameService::class)->approveStockOpname($record, Auth::id());
+                        ->color('info'),
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn (StockOpname $record) => $record->status !== 'approved')
+                        ->color('warning'),
+                    Tables\Actions\Action::make('start_physical_count')
+                        ->label('Mulai Hitung Fisik')
+                        ->icon('heroicon-o-play')
+                        ->color('primary')
+                        ->visible(fn (StockOpname $record) => in_array($record->status, ['draft', 'in_progress']))
+                        ->requiresConfirmation()
+                        ->modalHeading('Mulai Hitung Fisik Stock Opname')
+                        ->modalDescription('Sistem akan memuat seluruh daftar stok produk di gudang ini agar dapat dilakukan pencatatan hitung fisik.')
+                        ->modalSubmitActionLabel('Ya, Mulai Hitung')
+                        ->action(function (StockOpname $record) {
+                            try {
+                                $count = app(StockOpnameService::class)->startPhysicalCount($record);
 
-                            HelperController::sendNotification(
-                                isSuccess: true,
-                                title: 'Information',
-                                message: 'Stock opname berhasil disetujui dan jurnal penyesuaian sudah dibuat.'
-                            );
-                        } catch (ValidationException $exception) {
-                            HelperController::sendNotification(
-                                isSuccess: false,
-                                title: 'Validasi Stock Opname',
-                                message: collect($exception->errors())->flatten()->implode("\n")
-                            );
-                        }
-                    }),
+                                HelperController::sendNotification(
+                                    isSuccess: true,
+                                    title: 'Hitung Fisik Dimulai',
+                                    message: "Berhasil memuat {$count} produk ke daftar hitung fisik opname."
+                                );
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: 'Gagal Memulai Hitung Fisik',
+                                    message: collect($exception->errors())->flatten()->implode("\n")
+                                );
+                            }
+                        }),
+                    Tables\Actions\Action::make('complete_counting')
+                        ->label('Tandai Selesai Hitung')
+                        ->icon('heroicon-o-check')
+                        ->color('warning')
+                        ->visible(fn (StockOpname $record) => $record->status === 'in_progress')
+                        ->requiresConfirmation()
+                        ->modalHeading('Selesaikan Hitung Fisik')
+                        ->modalDescription('Apakah seluruh pencatatan hitung fisik telah selesai dan siap disetujui?')
+                        ->modalSubmitActionLabel('Ya, Tandai Selesai')
+                        ->action(function (StockOpname $record) {
+                            try {
+                                app(StockOpnameService::class)->completePhysicalCount($record);
+
+                                HelperController::sendNotification(
+                                    isSuccess: true,
+                                    title: 'Hitung Fisik Selesai',
+                                    message: 'Stock opname telah ditandai selesai dan siap disetujui.'
+                                );
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: 'Validasi Stock Opname',
+                                    message: collect($exception->errors())->flatten()->implode("\n")
+                                );
+                            }
+                        }),
+                    Tables\Actions\Action::make('approve')
+                        ->label('Setujui')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(function ($record) {
+                            return $record->status === 'completed';
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Setujui Stock Opname')
+                        ->modalDescription('Apakah Anda yakin ingin menyetujui stock opname ini? Mutasi stok dan jurnal akuntansi penyesuaian akan dibuat.')
+                        ->modalSubmitActionLabel('Ya, Setujui')
+                        ->action(function ($record) {
+                            try {
+                                app(StockOpnameService::class)->approveStockOpname($record, Auth::id());
+
+                                HelperController::sendNotification(
+                                    isSuccess: true,
+                                    title: 'Information',
+                                    message: 'Stock opname berhasil disetujui, mutasi stok fisik dan jurnal penyesuaian sudah dicatat.'
+                                );
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: 'Validasi Stock Opname',
+                                    message: collect($exception->errors())->flatten()->implode("\n")
+                                );
+                            }
+                        }),
                 ])
                 ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
