@@ -452,7 +452,7 @@ class VendorPaymentResource extends Resource
                                                 return function ($attribute, $value, $fail) use ($get) {
                                                     $remaining = \App\Helpers\MoneyHelper::safeParse($get('remaining_amount') ?? 0);
                                                     $paid = \App\Helpers\MoneyHelper::safeParse($value ?? 0);
-                                                    if ($paid > $remaining + 0.01) { // 0.01 tolerance for float rounding
+                                                    if ($paid > $remaining + 1.00) { // 1.00 tolerance for rupiah rounding
                                                         $fail('Jumlah pembayaran tidak boleh melebihi sisa hutang (' . ($get('remaining_amount_display') ?: MoneyHelper::rupiah($remaining)) . ').');
                                                     }
                                                 };

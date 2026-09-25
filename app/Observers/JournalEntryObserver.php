@@ -317,12 +317,12 @@ class JournalEntryObserver
 
             $accountPayable->paid = $newPaid;
             $accountPayable->remaining = $newRemaining;
-            $accountPayable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+            $accountPayable->status = $newRemaining <= 1.00 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemaining <= 0.01
+                $accountPayable->invoice->status = $newRemaining <= 1.00
                     ? Invoice::STATUS_PAID
                     : ($newPaid > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
@@ -351,12 +351,12 @@ class JournalEntryObserver
 
             $accountReceivable->paid = $newPaid;
             $accountReceivable->remaining = $newRemaining;
-            $accountReceivable->status = $newRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+            $accountReceivable->status = $newRemaining <= 1.00 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountReceivable->save();
 
             // Sync invoice status with AR
             if ($accountReceivable->invoice) {
-                $accountReceivable->invoice->status = $newRemaining <= 0.01 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
+                $accountReceivable->invoice->status = $newRemaining <= 1.00 ? 'paid' : ($newPaid > 0 ? 'partially_paid' : 'unpaid');
                 $accountReceivable->invoice->save();
             }
         }

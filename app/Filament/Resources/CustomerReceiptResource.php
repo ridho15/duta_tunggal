@@ -111,7 +111,7 @@ class CustomerReceiptResource extends Resource
                     $sub->selectRaw('1')
                         ->from('account_receivables')
                         ->whereColumn('account_receivables.invoice_id', 'invoices.id')
-                        ->where('account_receivables.remaining', '>', 0)
+                        ->where('account_receivables.remaining', '>', 1.00)
                         ->whereNull('account_receivables.deleted_at');
                 });
 
@@ -797,7 +797,7 @@ class CustomerReceiptResource extends Resource
             $invoiceTotal = (float) ($accountReceivable?->total ?? $invoice?->total ?? $fallbackPayment);
             $totalPaid = (float) ($accountReceivable?->paid ?? $fallbackPayment);
             $remaining = (float) ($accountReceivable?->remaining ?? max(0, $invoiceTotal - $totalPaid));
-            $status = static::normalizeAccountReceivableStatus($accountReceivable?->status ?? ($remaining <= 0 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value));
+            $status = static::normalizeAccountReceivableStatus($accountReceivable?->status ?? ($remaining <= 1.00 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value));
 
             $summaries[] = [
                 'invoice_number' => $invoice?->invoice_number ?? ('#' . $invoiceId),

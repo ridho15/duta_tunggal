@@ -418,7 +418,7 @@
             let note = receiptInput.parentElement.querySelector('.receipt-overpay-note');
             const excess = Math.round(amount - remaining);
 
-            if (excess > 0) {
+            if (excess > 1) {
                 if (!note) {
                     note = document.createElement('div');
                     note.className = 'receipt-overpay-note text-xs text-red-600 dark:text-red-400 mt-1';

@@ -28,7 +28,7 @@ use Illuminate\Validation\ValidationException;
  */
 class CustomerReceiptAllocator
 {
-    private const TOLERANCE = 0.01;
+    private const TOLERANCE = 1.00;
 
     /**
      * @param  array<int|string, mixed>  $invoiceReceipts  invoice_id => nominal yang diterima
@@ -100,7 +100,11 @@ class CustomerReceiptAllocator
                 $excess[$invoiceId] = $over;
                 $applied[$invoiceId] = round($remaining, 2);
             } else {
-                $applied[$invoiceId] = min($amount, round($remaining, 2));
+                if (abs($amount - $remaining) <= self::TOLERANCE) {
+                    $applied[$invoiceId] = round($remaining, 2);
+                } else {
+                    $applied[$invoiceId] = min($amount, round($remaining, 2));
+                }
             }
         }
 

@@ -175,8 +175,8 @@ function updateVendorReceiptAmount(invoiceId, amount) {
     const balanceInput = row.querySelector('.vendor-balance-input');
     const remaining = parseFloat(checkbox.dataset.remaining || 0);
     
-    // Validate amount doesn't exceed remaining
-    if (numericAmount > remaining) {
+    // Validate amount doesn't exceed remaining (with 1 rupiah tolerance)
+    if (numericAmount > remaining + 1) {
         alert(`Pembayaran tidak boleh melebihi sisa tagihan: Rp. ${remaining.toLocaleString('id-ID')}`);
         receiptInput.value = remaining;
         numericAmount = remaining;

@@ -915,9 +915,16 @@ class QuotationResource extends Resource
                                         })(),
                                     ])
                                     ->action(function (Repeater $component): void {
-                                        $newUuid = $component->generateUuid();
-                                        $items = $component->getState();
+                                        $items = (array) ($component->getState() ?? []);
+                                        $lastItem = end($items);
+                                        if (is_array($lastItem) && count($items) > 0) {
+                                            $nonEmpty = array_filter($lastItem, fn ($val) => !is_null($val) && $val !== '' && $val !== []);
+                                            if (empty($nonEmpty)) {
+                                                return;
+                                            }
+                                        }
 
+                                        $newUuid = $component->generateUuid();
                                         if ($newUuid) {
                                             $items[$newUuid] = [];
                                         } else {

@@ -84,13 +84,20 @@ class VendorPaymentDetailObserver
             $totalReductionOriginal = (float) $vendorPaymentDetail->amount + (float) ($vendorPaymentDetail->adjustment_amount ?? 0);
             $newPaidOriginal = min((float) ($accountPayable->paid_original ?? 0) + (float) $vendorPaymentDetail->amount, $totalOriginal);
             $newRemainingOriginal = max(0, (float) ($accountPayable->remaining_original ?? $totalOriginal) - $totalReductionOriginal);
+            $isPaid = $newRemainingOriginal <= 1.00 || round($newRemainingOriginal * $exchangeRate, 2) <= 1.00;
             $accountPayable->update([
                 'paid_original' => $newPaidOriginal,
-                'remaining_original' => $newRemainingOriginal,
+                'remaining_original' => $isPaid ? 0 : $newRemainingOriginal,
                 'paid' => round($newPaidOriginal * $exchangeRate, 2),
-                'remaining' => round($newRemainingOriginal * $exchangeRate, 2),
-                'status' => $newRemainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+                'remaining' => $isPaid ? 0 : round($newRemainingOriginal * $exchangeRate, 2),
+                'status' => $isPaid ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
             ]);
+
+            if ($accountPayable->invoice) {
+                $accountPayable->invoice->update([
+                    'status' => $isPaid ? 'paid' : ($newPaidOriginal > 0 ? 'partially_paid' : $accountPayable->invoice->status),
+                ]);
+            }
         }
 
         if ($vendorPaymentDetail->coa_id) {

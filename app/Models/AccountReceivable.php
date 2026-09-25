@@ -70,6 +70,37 @@ class AccountReceivable extends Model
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
+    public function getStatusAttribute($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            'lunas', 'paid' => PaymentStatus::PAID->value,
+            'belum lunas', 'unpaid' => PaymentStatus::UNPAID->value,
+            default => $value,
+        };
+    }
+
+    public function setStatusAttribute(mixed $value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['status'] = null;
+            return;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        $this->attributes['status'] = match ($normalized) {
+            'lunas', 'paid' => PaymentStatus::PAID->value,
+            'belum lunas', 'unpaid' => PaymentStatus::UNPAID->value,
+            default => $value,
+        };
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -82,11 +113,36 @@ class AccountReceivable extends Model
         });
 
         static::updated(function ($accountReceivable) {
+            if ($accountReceivable->wasChanged('paid') && ! $accountReceivable->wasChanged('remaining')) {
+                $expectedRemaining = (float) $accountReceivable->total - (float) $accountReceivable->paid;
+
+                if ((float) $accountReceivable->remaining !== $expectedRemaining) {
+                    $isPaid = $expectedRemaining <= 1.00;
+                    $rate = (float) ($accountReceivable->exchange_rate ?: 1);
+                    $rate = $rate > 0 ? $rate : 1.0;
+
+                    $accountReceivable->forceFill([
+                        'remaining' => $isPaid ? 0 : max(0, $expectedRemaining),
+                        'remaining_original' => $isPaid ? 0 : round(max(0, $expectedRemaining) / $rate, 4),
+                        'status' => $isPaid ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+                    ])->saveQuietly();
+
+                    if ($isPaid) {
+                        $accountReceivable->invoice?->update(['status' => 'paid']);
+                        AgeingSchedule::where('from_model_type', AccountReceivable::class)
+                            ->where('from_model_id', $accountReceivable->id)
+                            ->delete();
+                    }
+
+                    return;
+                }
+            }
+
             // Hapus ageing schedule ketika account receivable lunas
             if ($accountReceivable->status === PaymentStatus::PAID->value && $accountReceivable->wasChanged('status')) {
-                if ($accountReceivable->ageingSchedule) {
-                    $accountReceivable->ageingSchedule->delete();
-                }
+                AgeingSchedule::where('from_model_type', AccountReceivable::class)
+                    ->where('from_model_id', $accountReceivable->id)
+                    ->delete();
             }
         });
     }

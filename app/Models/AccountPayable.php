@@ -118,10 +118,22 @@ class AccountPayable extends Model
                 $expectedRemaining = (float) $accountPayable->total - (float) $accountPayable->paid;
 
                 if ((float) $accountPayable->remaining !== $expectedRemaining) {
+                    $isPaid = $expectedRemaining <= 1.00;
+                    $rate = (float) ($accountPayable->exchange_rate ?: 1);
+                    $rate = $rate > 0 ? $rate : 1.0;
+
                     $accountPayable->forceFill([
-                        'remaining' => $expectedRemaining,
-                        'status' => $expectedRemaining <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
+                        'remaining' => $isPaid ? 0 : max(0, $expectedRemaining),
+                        'remaining_original' => $isPaid ? 0 : round(max(0, $expectedRemaining) / $rate, 4),
+                        'status' => $isPaid ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value,
                     ])->saveQuietly();
+
+                    if ($isPaid) {
+                        $accountPayable->invoice?->update(['status' => 'paid']);
+                        AgeingSchedule::where('from_model_type', AccountPayable::class)
+                            ->where('from_model_id', $accountPayable->id)
+                            ->delete();
+                    }
 
                     return;
                 }
@@ -129,9 +141,9 @@ class AccountPayable extends Model
 
             // Hapus ageing schedule ketika account payable lunas
             if ($accountPayable->status === PaymentStatus::PAID->value && $accountPayable->wasChanged('status')) {
-                if ($accountPayable->ageingSchedule) {
-                    $accountPayable->ageingSchedule->delete();
-                }
+                AgeingSchedule::where('from_model_type', AccountPayable::class)
+                    ->where('from_model_id', $accountPayable->id)
+                    ->delete();
             }
         });
     }

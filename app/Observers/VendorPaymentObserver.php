@@ -162,12 +162,19 @@ class VendorPaymentObserver
             $accountPayable->remaining_original = $newRemainingOriginal;
             $accountPayable->paid = round($newPaidOriginal * $exchangeRate, 2);
             $accountPayable->remaining = round($newRemainingOriginal * $exchangeRate, 2);
-            $accountPayable->status = $newRemainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+            $isPaid = $newRemainingOriginal <= 1.00 || (float) $accountPayable->remaining <= 1.00;
+            if ($isPaid) {
+                $accountPayable->remaining = 0;
+                $accountPayable->remaining_original = 0;
+                $accountPayable->status = PaymentStatus::PAID->value;
+            } else {
+                $accountPayable->status = PaymentStatus::UNPAID->value;
+            }
             $accountPayable->save();
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemainingOriginal <= 0.01
+                $accountPayable->invoice->status = $isPaid
                     ? Invoice::STATUS_PAID
                     : ($newPaidOriginal > 0 ? Invoice::STATUS_PARTIALLY_PAID : $accountPayable->invoice->status);
                 $accountPayable->invoice->save();
@@ -205,12 +212,13 @@ class VendorPaymentObserver
             $accountPayable->remaining_original = $newRemainingOriginal;
             $accountPayable->paid = round($newPaidOriginal * $exchangeRate, 2);
             $accountPayable->remaining = round($newRemainingOriginal * $exchangeRate, 2);
-            $accountPayable->status = $newRemainingOriginal <= 0.01 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
+            $isPaid = $newRemainingOriginal <= 1.00 || (float) $accountPayable->remaining <= 1.00;
+            $accountPayable->status = $isPaid ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
             if ($accountPayable->invoice) {
-                $accountPayable->invoice->status = $newRemainingOriginal <= 0.01
+                $accountPayable->invoice->status = $isPaid
                     ? Invoice::STATUS_PAID
                     : ($newPaidOriginal > 0 ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
                 $accountPayable->invoice->save();
@@ -314,8 +322,8 @@ class VendorPaymentObserver
                     ?? $invoice->total;
             });
 
-        // Check if payment amount exceeds total remaining balance
-        if ($payment->total_payment > $totalRemaining) {
+        // Check if payment amount exceeds total remaining balance (with 1.00 tolerance for rounding)
+        if ($payment->total_payment > $totalRemaining + 1.00) {
             throw new \Exception("Payment amount ({$payment->total_payment}) exceeds total remaining balance ({$totalRemaining}). Overpayment is not allowed.");
         }
     }

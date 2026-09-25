@@ -621,7 +621,7 @@ function handleReceiptInputChange(input, eventType) {
         // Nominal di atas sisa tagihan TIDAK dipotong dan tanpa alert(): tampilkan penjelasan di bawah kolom.
         // Server menolak kelebihan, atau mencatatnya sebagai Deposit Customer bila opsinya dinyalakan.
         let overNote = input.parentElement.querySelector('.receipt-overpay-note');
-        if (cleanValue > remainingInteger) {
+        if (cleanValue > remainingInteger + 1) {
             if (!overNote) {
                 overNote = document.createElement('div');
                 overNote.className = 'receipt-overpay-note text-xs text-red-600 dark:text-red-400 mt-1';

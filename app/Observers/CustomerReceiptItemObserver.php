@@ -119,7 +119,7 @@ class CustomerReceiptItemObserver
             foreach ($selectedInvoiceIds as $invoiceId) {
                 $accountReceivable = AccountReceivable::where('invoice_id', $invoiceId)->first();
                 if ($accountReceivable) {
-                    if ($accountReceivable->remaining > 0) {
+                    if ($accountReceivable->remaining > 1.00) {
                         $allPaid = false;
                         if ($accountReceivable->paid > 0) {
                             $anyPartial = true;

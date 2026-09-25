@@ -188,12 +188,16 @@ class CustomerReceiptObserver
 
     private function syncArStatus(AccountReceivable $ar): void
     {
-        if ($ar->remaining <= 0) {
+        if ($ar->remaining <= 1.00) {
             $ar->invoice?->update(['status' => 'paid']);
-            $ar->update(['status' => PaymentStatus::PAID->value]);
-            if ($ar->ageingSchedule) {
-                $ar->ageingSchedule->delete();
-            }
+            $ar->update([
+                'status' => PaymentStatus::PAID->value,
+                'remaining' => 0,
+                'remaining_original' => 0,
+            ]);
+            \App\Models\AgeingSchedule::where('from_model_type', AccountReceivable::class)
+                ->where('from_model_id', $ar->id)
+                ->delete();
         } elseif ($ar->paid > 0) {
             $ar->invoice?->update(['status' => 'partially_paid']);
         }

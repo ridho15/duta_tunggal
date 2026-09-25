@@ -50,6 +50,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Enums\ThemeMode;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -145,6 +146,10 @@ class AdminPanelProvider extends PanelProvider
                 \Filament\Support\Assets\Css::make('filament-sidebar', secure_asset('css/filament-sidebar.css')),
             ])
             ->databaseNotifications()
-            ->databaseNotificationsPolling('30s');
+            ->databaseNotificationsPolling('30s')
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('filament.hooks.anti-double-click'),
+            );
     }
 }
