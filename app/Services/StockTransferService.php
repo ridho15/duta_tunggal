@@ -45,6 +45,21 @@ class StockTransferService
         return $stockTransfer->fresh();
     }
 
+    public function rejectTransfer(StockTransfer $stockTransfer, ?string $reason = null): StockTransfer
+    {
+        if ($stockTransfer->status !== 'Request') {
+            throw ValidationException::withMessages([
+                'status' => 'Hanya transfer stok berstatus Request yang dapat ditolak.',
+            ]);
+        }
+
+        $stockTransfer->update([
+            'status' => 'Reject',
+        ]);
+
+        return $stockTransfer->fresh();
+    }
+
     public function approveStockTransfer(StockTransfer $stockTransfer): StockTransfer
     {
         return DB::transaction(function () use ($stockTransfer) {
@@ -77,12 +92,30 @@ class StockTransferService
             foreach ($lockedTransfer->stockTransferItem as $item) {
                 $this->validateTransferItemShape($item);
 
-                $sourceStock = InventoryStock::query()
+                $sourceStockQuery = InventoryStock::query()
                     ->where('product_id', $item->product_id)
-                    ->where('warehouse_id', $item->from_warehouse_id)
-                    ->where('rak_id', $item->from_rak_id)
-                    ->lockForUpdate()
-                    ->first();
+                    ->where('warehouse_id', $item->from_warehouse_id);
+
+                if ($item->from_rak_id) {
+                    $sourceStockQuery->where('rak_id', $item->from_rak_id);
+                } else {
+                    $sourceStockQuery->whereNull('rak_id');
+                }
+
+                $sourceStock = $sourceStockQuery->lockForUpdate()->first();
+
+                // Fallback jika tidak ditemukan spesifik null rak, cari stok apa pun produk tersebut di gudang asal
+                if (! $sourceStock && ! $item->from_rak_id) {
+                    $sourceStock = InventoryStock::query()
+                        ->where('product_id', $item->product_id)
+                        ->where('warehouse_id', $item->from_warehouse_id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($sourceStock && $sourceStock->rak_id) {
+                        $item->update(['from_rak_id' => $sourceStock->rak_id]);
+                    }
+                }
 
                 if (! $sourceStock) {
                     throw ValidationException::withMessages([
@@ -157,15 +190,15 @@ class StockTransferService
             ]);
         }
 
-        if (! $item->product_id || ! $item->from_warehouse_id || ! $item->to_warehouse_id || ! $item->from_rak_id || ! $item->to_rak_id) {
+        if (! $item->product_id || ! $item->from_warehouse_id || ! $item->to_warehouse_id) {
             throw ValidationException::withMessages([
-                'items' => 'Setiap item transfer harus memiliki produk, gudang asal/tujuan, dan rak asal/tujuan yang lengkap.',
+                'items' => 'Setiap item transfer harus memiliki produk, gudang asal, dan gudang tujuan yang lengkap.',
             ]);
         }
 
         if (
             (int) $item->from_warehouse_id === (int) $item->to_warehouse_id
-            && (int) $item->from_rak_id === (int) $item->to_rak_id
+            && (int) ($item->from_rak_id ?? 0) === (int) ($item->to_rak_id ?? 0)
         ) {
             throw ValidationException::withMessages([
                 'items' => 'Gudang dan rak tujuan harus berbeda dari gudang dan rak asal.',

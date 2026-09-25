@@ -258,9 +258,14 @@ class DeliveryOrderItem extends Model
      */
     protected static function syncStockMovements(DeliveryOrder $deliveryOrder): void
     {
-        // Delete existing stock movements for all items in this delivery order
+        // Delete existing stock movements for all items in this delivery order (fire model events)
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
-            $item->stockMovement()->delete();
+            $movements = StockMovement::where('from_model_type', DeliveryOrderItem::class)
+                ->where('from_model_id', $item->id)
+                ->get();
+            foreach ($movements as $movement) {
+                $movement->delete();
+            }
         }
         
         // Recreate stock movements based on current quantities

@@ -6,6 +6,7 @@ use App\Filament\Resources\ReturnProductResource\Pages;
 use App\Filament\Resources\ReturnProductResource\Pages\ViewReturnProduct;
 use App\Http\Controllers\HelperController;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\Product;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
@@ -15,6 +16,7 @@ use App\Models\SaleOrderItem;
 use App\Services\ReturnProductService;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
 use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -179,7 +181,7 @@ class ReturnProductResource extends Resource
                                 Radio::make('from_item_model_type')
                                     ->label('From Item Model')
                                     ->options([
-                                        'App\Models\DeliveryOrderItem' => 'Sale Order item',
+                                        'App\Models\DeliveryOrderItem' => 'Delivery Order Item',
                                         'App\Models\PurchaseReceiptItem' => 'Purchase Receipt Item'
                                     ])->reactive()
                                     ->inlineLabel()
@@ -198,27 +200,37 @@ class ReturnProductResource extends Resource
                                         'required' => 'Tipe item sumber wajib dipilih.',
                                     ]),
                                 Select::make('from_item_model_id')
-                                    ->label('From Item Model')
+                                    ->label('Item Sumber')
                                     ->preload()
                                     ->searchable()
                                     ->required()
                                     ->reactive()
                                     ->options(function ($set, $get) {
                                         if ($get('from_item_model_type') == 'App\Models\DeliveryOrderItem') {
-                                            $saleOrderId = $get('../../from_model_id');
-                                            $listSaleOrderItem = SaleOrderItem::with(['product'])->where('sale_order_id', $saleOrderId)->select(['id', 'product_id'])->get();
+                                            $deliveryOrderId = $get('../../from_model_id');
+                                            $listDeliveryOrderItem = DeliveryOrderItem::with(['product'])
+                                                ->where('delivery_order_id', $deliveryOrderId)
+                                                ->get();
                                             $items = [];
-                                            foreach ($listSaleOrderItem as $index => $saleOrderItem) {
-                                                $items[$saleOrderItem->id] = "({$saleOrderItem->product->sku}) {$saleOrderItem->product->name}";
+                                            foreach ($listDeliveryOrderItem as $doItem) {
+                                                $sku = $doItem->product?->sku ?? '-';
+                                                $name = $doItem->product?->name ?? 'Produk';
+                                                $qty = rtrim(rtrim((string) $doItem->quantity, '0'), '.');
+                                                $items[$doItem->id] = "({$sku}) {$name} [Terkirim: {$qty}]";
                                             }
 
                                             return $items;
                                         } elseif ($get('from_item_model_type') == 'App\Models\PurchaseReceiptItem') {
                                             $items = [];
                                             $purchaseReceiptId = $get('../../from_model_id');
-                                            $listPurchaseReceiptItem = PurchaseReceiptItem::with(['purchaseReceipt.purchaseOrder'])->where('purchase_receipt_id', $purchaseReceiptId)->get();
+                                            $listPurchaseReceiptItem = PurchaseReceiptItem::with(['purchaseReceipt.purchaseOrder', 'product'])
+                                                ->where('purchase_receipt_id', $purchaseReceiptId)
+                                                ->get();
                                             foreach ($listPurchaseReceiptItem as $purchaseReceiptItem) {
-                                                $items[$purchaseReceiptItem->id] = "({$purchaseReceiptItem->product->sku}) {$purchaseReceiptItem->product->name}";
+                                                $sku = $purchaseReceiptItem->product?->sku ?? '-';
+                                                $name = $purchaseReceiptItem->product?->name ?? 'Produk';
+                                                $qty = rtrim(rtrim((string) $purchaseReceiptItem->quantity, '0'), '.');
+                                                $items[$purchaseReceiptItem->id] = "({$sku}) {$name} [Diterima: {$qty}]";
                                             }
                                             return $items;
                                         }
@@ -228,26 +240,29 @@ class ReturnProductResource extends Resource
                                         $from_item_model_type = $get('from_item_model_type');
                                         $fromModelItem = null;
                                         if ($from_item_model_type == 'App\Models\DeliveryOrderItem') {
-                                            $fromModelItem = SaleOrderItem::find($get('from_item_model_id'));
+                                            $fromModelItem = DeliveryOrderItem::find($get('from_item_model_id'));
                                         } elseif ($from_item_model_type == 'App\Models\PurchaseReceiptItem') {
                                             $fromModelItem = PurchaseReceiptItem::find($get('from_item_model_id'));
                                         }
 
                                         if ($fromModelItem) {
                                             $set('product_id', $fromModelItem->product_id);
-                                            $set('max_quantity', $fromModelItem->quantity);
-                                            $set('quantity', $fromModelItem->quantity);
+                                            $set('max_quantity', (float) $fromModelItem->quantity);
+                                            $set('quantity', (float) $fromModelItem->quantity);
                                         }
                                     })
                                     ->validationMessages([
                                         'required' => 'Item produk yang akan diretur wajib dipilih.',
                                     ]),
+                                Hidden::make('max_quantity')
+                                    ->default(0),
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
                                     ->disabled()
+                                    ->dehydrated()
                                     ->relationship('product', 'id')
                                     ->required()
                                     ->getOptionLabelFromRecordUsing(function (Product $product) {
@@ -257,13 +272,22 @@ class ReturnProductResource extends Resource
                                     ->label('Quantity')
                                     ->numeric()
                                     ->reactive()
+                                    ->default(0)
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        if ($state > $get('max_quantity')) {
-                                            $set('quantity', $get('max_quantity'));
-                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Quantity yang kamu masukkan lebih besar dari sumber order");
+                                        $max = (float) $get('max_quantity');
+                                        if ($max > 0 && (float) $state > $max) {
+                                            $set('quantity', $max);
+                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Quantity yang kamu masukkan lebih besar dari jumlah terkirim ({$max}). Disesuaikan ke batas maksimal.");
                                         }
                                     })
-                                    ->default(0)
+                                    ->rules([
+                                        fn ($get) => function ($attribute, $value, $fail) use ($get) {
+                                            $max = (float) $get('max_quantity');
+                                            if ($max > 0 && (float) $value > $max) {
+                                                $fail("Quantity retur ({$value}) tidak boleh melebihi quantity sumber ({$max}).");
+                                            }
+                                        },
+                                    ])
                                     ->required()
                                     ->minValue(1)
                                     ->validationMessages([
@@ -275,13 +299,12 @@ class ReturnProductResource extends Resource
                                     ->label('Rak')
                                     ->preload()
                                     ->searchable()
+                                    ->nullable()
+                                    ->placeholder('Pilih rak (opsional)')
+                                    ->helperText('Opsional jika gudang tidak memiliki rak.')
                                     ->relationship('rak', 'name', function ($get, Builder $query) {
                                         $query->where('warehouse_id', $get('../../warehouse_id'));
-                                    })
-                                    ->required()
-                                    ->validationMessages([
-                                        'required' => 'Rak penyimpanan wajib dipilih.',
-                                    ]),
+                                    }),
                                 Radio::make('condition')
                                     ->label('Condition')
                                     ->options([

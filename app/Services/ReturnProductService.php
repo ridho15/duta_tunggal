@@ -10,10 +10,14 @@ class ReturnProductService
     public function updateQuantityFromModel($returnProduct)
     {
         foreach ($returnProduct->returnProductItem as $returnProductItem) {
-            $defaultQuantity = $returnProductItem->fromItemModel->quantity;
-            $returnProductItem->fromItemModel()->update([
-                'quantity' => $defaultQuantity - $returnProductItem->quantity
-            ]);
+            $fromItemModel = $returnProductItem->fromItemModel;
+            if ($fromItemModel) {
+                $defaultQuantity = (float) $fromItemModel->quantity;
+                $newQuantity = max(0.0, $defaultQuantity - (float) $returnProductItem->quantity);
+                $fromItemModel->update([
+                    'quantity' => $newQuantity,
+                ]);
+            }
         }
 
         $returnProduct->update([

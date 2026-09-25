@@ -29,6 +29,7 @@ use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -151,6 +152,7 @@ class StockTransferResource extends Resource
                                     ->preload()
                                     ->reactive()
                                     ->searchable()
+                                    ->nullable()
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('from_rak_id'))->first();
@@ -158,15 +160,14 @@ class StockTransferResource extends Resource
                                             return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
 
-                                        return 'Jumlah stok fisik 0';
+                                        return 'Opsional jika gudang tidak memiliki rak.';
                                     })
                                     ->relationship('fromRak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('from_warehouse_id'));
                                     })
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
                                         return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
-                                    })
-                                    ->required(),
+                                    }),
                                 Select::make('to_warehouse_id')
                                     ->label('Ke Gudang')
                                     ->preload()
@@ -187,6 +188,7 @@ class StockTransferResource extends Resource
                                     ->preload()
                                     ->reactive()
                                     ->searchable()
+                                    ->nullable()
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('to_rak_id'))->first();
@@ -194,7 +196,7 @@ class StockTransferResource extends Resource
                                             return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
 
-                                        return 'Jumlah stok fisik 0';
+                                        return 'Opsional jika gudang tidak memiliki rak.';
                                     })
                                     ->relationship('toRak', 'id', function (Builder $query, $get) {
                                         $query->where('warehouse_id', $get('to_warehouse_id'));
@@ -202,7 +204,6 @@ class StockTransferResource extends Resource
                                     ->getOptionLabelFromRecordUsing(function (Rak $rak) {
                                         return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     })
-                                    ->required()
                             ])
                     ])
             ]);
@@ -291,7 +292,7 @@ class StockTransferResource extends Resource
                         ->color('success')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('request stock transfer') && $record->status == 'Draft';
+                            return static::canRequestTransfer() && $record->status == 'Draft';
                         })
                         ->icon('heroicon-o-arrow-down-circle')
                         ->action(function ($record) {
@@ -309,7 +310,7 @@ class StockTransferResource extends Resource
                         ->icon('heroicon-o-check-badge')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response stock transfer') && $record->status == 'Request';
+                            return static::canResponseTransfer() && $record->status == 'Request';
                         })
                         ->action(function ($record) {
                             try {
@@ -326,13 +327,15 @@ class StockTransferResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->requiresConfirmation()
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('response stock transfer') && $record->status == 'Request';
+                            return static::canResponseTransfer() && $record->status == 'Request';
                         })
                         ->action(function ($record) {
-                            $record->update([
-                                'status' => 'Reject'
-                            ]);
-                            HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock ditolak. Proses selanjutnya: Pemohon perlu merevisi permintaan transfer sesuai keterangan penolakan dan mengajukan kembali.");
+                            try {
+                                app(StockTransferService::class)->rejectTransfer($record);
+                                HelperController::sendNotification(isSuccess: true, title: 'Information', message: "Request transfer stock ditolak. Proses selanjutnya: Pemohon perlu merevisi permintaan transfer sesuai keterangan penolakan dan mengajukan kembali.");
+                            } catch (ValidationException $exception) {
+                                HelperController::sendNotification(isSuccess: false, title: 'Validasi Transfer Stok', message: collect($exception->errors())->flatten()->implode("\n"));
+                            }
                         })
                 ])
             ], position: ActionsPosition::BeforeColumns)
@@ -359,11 +362,38 @@ class StockTransferResource extends Resource
             ));
     }
 
+    public static function canEdit(Model $record): bool
+    {
+        return parent::canEdit($record) && in_array($record->status, ['Draft', 'Request'], true);
+    }
+
     public static function getRelations(): array
     {
         return [
             //
         ];
+    }
+
+    public static function canRequestTransfer(): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasRole(['Super Admin', 'Owner', 'Admin', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff'])
+            || $user->hasPermissionTo('request stock transfer');
+    }
+
+    public static function canResponseTransfer(): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasRole(['Super Admin', 'Owner', 'Admin', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff'])
+            || $user->hasPermissionTo('response stock transfer');
     }
 
     public static function getPages(): array
