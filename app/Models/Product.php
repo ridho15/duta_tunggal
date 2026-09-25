@@ -54,6 +54,11 @@ class Product extends Model
         'biaya' => 'decimal:2',
     ];
 
+    public function getCodeAttribute(): ?string
+    {
+        return $this->attributes['code'] ?? $this->attributes['sku'] ?? null;
+    }
+
     public static function productCoaFields(): array
     {
         return [

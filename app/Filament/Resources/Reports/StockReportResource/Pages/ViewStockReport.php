@@ -47,8 +47,27 @@ class ViewStockReport extends Page
                             ->send();
                         return;
                     }
-                    $this->dispatch('open-stock-preview', url: $this->getPreviewUrl());
+                    $url = $this->getPreviewUrl();
+                    $this->dispatch('open-stock-preview', url: $url);
+
+                    Notification::make()
+                        ->title('Laporan Stok')
+                        ->body('Laporan sedang dibuka. Jika popup terblokir oleh browser, klik tombol di bawah:')
+                        ->actions([
+                            \Filament\Notifications\Actions\Action::make('open')
+                                ->label('Buka Laporan')
+                                ->button()
+                                ->url($url, shouldOpenInNewTab: true),
+                        ])
+                        ->success()
+                        ->send();
                 }),
+
+            Action::make('interactive_report')
+                ->label('Laporan Interaktif')
+                ->icon('heroicon-o-chart-bar-square')
+                ->color('primary')
+                ->url(\App\Filament\Pages\InventoryReportPage::getUrl()),
         ];
     }
 
@@ -62,12 +81,14 @@ class ViewStockReport extends Page
                         ->label('Tanggal Mulai')
                         ->displayFormat('d/m/Y')
                         ->required()
+                        ->live()
                         ->default(now()->startOfMonth()),
 
                     DatePicker::make('endDate')
                         ->label('Tanggal Selesai')
                         ->displayFormat('d/m/Y')
                         ->required()
+                        ->live()
                         ->default(now()),
 
                     Select::make('productIds')
@@ -76,6 +97,7 @@ class ViewStockReport extends Page
                         ->multiple()
                         ->searchable()
                         ->preload()
+                        ->live()
                         ->columnSpanFull()
                         ->helperText('Kosongkan untuk menampilkan semua produk'),
 
@@ -85,6 +107,7 @@ class ViewStockReport extends Page
                         ->multiple()
                         ->searchable()
                         ->preload()
+                        ->live()
                         ->columnSpanFull()
                         ->helperText('Kosongkan untuk menampilkan semua gudang'),
                 ]),

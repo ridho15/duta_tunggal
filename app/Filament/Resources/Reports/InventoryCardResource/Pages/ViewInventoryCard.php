@@ -45,8 +45,33 @@ class ViewInventoryCard extends Page
                             ->send();
                         return;
                     }
-                    $this->dispatch('open-inventory-card-preview', url: $this->getPreviewUrl());
+                    $url = $this->getPreviewUrl();
+                    $this->dispatch('open-inventory-card-preview', url: $url);
+
+                    Notification::make()
+                        ->title('Laporan Kartu Persediaan')
+                        ->body('Laporan sedang dibuka. Jika popup terblokir oleh browser, klik tombol di bawah:')
+                        ->actions([
+                            \Filament\Notifications\Actions\Action::make('open')
+                                ->label('Buka Laporan')
+                                ->button()
+                                ->url($url, shouldOpenInNewTab: true),
+                        ])
+                        ->success()
+                        ->send();
                 }),
+
+            Action::make('download_pdf')
+                ->label('Download PDF')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('gray')
+                ->url(fn () => route('inventory-card.pdf', $this->buildQueryParams()), shouldOpenInNewTab: true),
+
+            Action::make('download_excel')
+                ->label('Download Excel')
+                ->icon('heroicon-o-table-cells')
+                ->color('gray')
+                ->url(fn () => route('inventory-card.excel', $this->buildQueryParams()), shouldOpenInNewTab: true),
         ];
     }
 
@@ -80,21 +105,24 @@ class ViewInventoryCard extends Page
                         ->label('Tanggal Mulai')
                         ->displayFormat('d/m/Y')
                         ->required()
+                        ->live()
                         ->default(now()->startOfMonth()),
 
                     DatePicker::make('endDate')
                         ->label('Tanggal Akhir')
                         ->displayFormat('d/m/Y')
                         ->required()
+                        ->live()
                         ->default(now()->endOfMonth()),
 
                     Select::make('productId')
                         ->label('Item (Produk)')
-                        ->options(fn () => Product::query()->orderBy('name')->limit(50)->get()->mapWithKeys(fn ($product) => [
-                            $product->id => $product->name . ($product->sku ? ' (' . $product->sku . ')' : '')
+                        ->options(fn () => Product::query()->orderBy('name')->limit(100)->get()->mapWithKeys(fn ($product) => [
+                            $product->id => ($product->sku ? '[' . $product->sku . '] ' : '') . $product->name
                         ]))
                         ->searchable()
                         ->preload()
+                        ->live()
                         ->placeholder('— Semua Produk —')
                         ->columnSpanFull(),
 
@@ -105,6 +133,7 @@ class ViewInventoryCard extends Page
                         ]))
                         ->searchable()
                         ->preload()
+                        ->live()
                         ->placeholder('— Semua Gudang —')
                         ->columnSpanFull(),
                 ]),

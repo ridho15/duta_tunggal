@@ -43,12 +43,25 @@ class InventoryReportService
     {
         return $this->stockQuery($filters)
             ->get()
+            ->filter(function (InventoryStock $stock) {
+                if ($stock->rak_id === null && (float) ($stock->qty_available ?? 0) === 0.0 && (float) ($stock->qty_reserved ?? 0) === 0.0) {
+                    $hasOtherRakStock = InventoryStock::where('product_id', $stock->product_id)
+                        ->where('warehouse_id', $stock->warehouse_id)
+                        ->whereNotNull('rak_id')
+                        ->exists();
+                    if ($hasOtherRakStock) {
+                        return false;
+                    }
+                }
+                return true;
+            })
+            ->values()
             ->map(function (InventoryStock $stock) {
                 $qtyOnHand = $this->qtyOnHand($stock);
 
                 return [
                     'Gudang' => $stock->warehouse->name ?? '-',
-                    'Kode Produk' => $stock->product->code ?? '-',
+                    'Kode Produk' => $stock->product->code ?? $stock->product->sku ?? '-',
                     'Nama Produk' => $stock->product->name ?? '-',
                     'Rak' => $stock->rak->name ?? '-',
                     'Qty Fisik' => $stock->qty_available,
@@ -67,7 +80,7 @@ class InventoryReportService
             ->map(function (StockMovement $movement) {
                 return [
                     'Tanggal' => $movement->date,
-                    'Kode Produk' => $movement->product->code ?? '-',
+                    'Kode Produk' => $movement->product->code ?? $movement->product->sku ?? '-',
                     'Nama Produk' => $movement->product->name ?? '-',
                     'Gudang' => $movement->warehouse->name ?? '-',
                     'Rak' => $movement->rak->name ?? '-',
@@ -86,6 +99,19 @@ class InventoryReportService
 
         return $this->agingQuery($filters)
             ->get()
+            ->filter(function (InventoryStock $stock) {
+                if ($stock->rak_id === null && (float) ($stock->qty_available ?? 0) === 0.0 && (float) ($stock->qty_reserved ?? 0) === 0.0) {
+                    $hasOtherRakStock = InventoryStock::where('product_id', $stock->product_id)
+                        ->where('warehouse_id', $stock->warehouse_id)
+                        ->whereNotNull('rak_id')
+                        ->exists();
+                    if ($hasOtherRakStock) {
+                        return false;
+                    }
+                }
+                return true;
+            })
+            ->values()
             ->map(function (InventoryStock $stock) use ($asOf) {
                 $qtyOnHand = $this->qtyOnHand($stock);
                 $lastMovement = $this->lastMovement($stock);
@@ -93,7 +119,7 @@ class InventoryReportService
 
                 return [
                     'Gudang' => $stock->warehouse->name ?? '-',
-                    'Kode Produk' => $stock->product->code ?? '-',
+                    'Kode Produk' => $stock->product->code ?? $stock->product->sku ?? '-',
                     'Nama Produk' => $stock->product->name ?? '-',
                     'Rak' => $stock->rak->name ?? '-',
                     'Qty Fisik' => $stock->qty_available,
@@ -138,7 +164,9 @@ class InventoryReportService
 
     public function lastMovementDateForRecord(InventoryStock $stock): ?Carbon
     {
-        return $this->lastMovement($stock)?->date;
+        $date = $this->lastMovement($stock)?->date;
+
+        return $date ? Carbon::parse($date) : null;
     }
 
     public function agingDaysForRecord(InventoryStock $stock, Carbon|string|null $asOfDate = null): ?int

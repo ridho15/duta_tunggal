@@ -94,32 +94,32 @@ class InventoryReportPage extends Page implements HasTable
 
     private function getStockByWarehouseTable(Table $table): Table
     {
-        try {
-            $query = InventoryStock::query()
-                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
-                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
-                ->with(['product', 'warehouse', 'rak'])
-                ->orderBy('warehouse_id')
-                ->orderBy('product_id');
-        } catch (Throwable) {
-            $query = InventoryStock::query()->whereRaw('1 = 0');
-        }
+        $query = InventoryStock::query()
+            ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+            ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+            ->where(function ($q) {
+                $q->whereNotNull('rak_id')
+                    ->orWhere('qty_available', '>', 0)
+                    ->orWhere('qty_reserved', '>', 0);
+            })
+            ->with(['product', 'warehouse', 'rak'])
+            ->orderBy('warehouse_id')
+            ->orderBy('product_id');
 
         return $table
             ->defaultSort('created_at', 'desc')
             ->query($query)
             ->columns([
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
-                TextColumn::make('product.name')->label('Produk')->sortable(),
-                TextColumn::make('product.code')->label('Kode Produk')->sortable(),
-                TextColumn::make('rak.name')->label('Rak')->sortable(),
+                TextColumn::make('product.name')->label('Produk')->sortable()->searchable(),
+                TextColumn::make('product.sku')->label('Kode / SKU')->sortable()->searchable(),
+                TextColumn::make('rak.name')->label('Rak')->default('-')->sortable(),
                 TextColumn::make('qty_available')->label('Qty Fisik')->sortable(),
                 TextColumn::make('qty_reserved')->label('Qty Reserved')->sortable(),
                 TextColumn::make('qty_min')->label('Qty Minimum')->sortable(),
                 TextColumn::make('qty_on_hand')
                     ->label('Qty Tersedia Bebas')
-                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->qtyOnHand($record))
-                    ->sortable(),
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->qtyOnHand($record)),
                 TextColumn::make('status')
                     ->label('Status')
                     ->getStateUsing(fn ($record) => $this->inventoryReportService()->stockStatusForRecord($record))
@@ -128,6 +128,7 @@ class InventoryReportPage extends Page implements HasTable
                         'Habis' => 'danger',
                         'Minimum' => 'warning',
                         'Normal' => 'success',
+                        default => 'gray',
                     }),
             ])
             ->actions([
@@ -150,27 +151,23 @@ class InventoryReportPage extends Page implements HasTable
 
     private function getMovementHistoryTable(Table $table): Table
     {
-        try {
-            $query = StockMovement::query()
-                ->when($this->start_date, fn ($query) => $query->whereDate('date', '>=', $this->start_date))
-                ->when($this->end_date, fn ($query) => $query->whereDate('date', '<=', $this->end_date))
-                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
-                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
-                ->with(['product', 'warehouse', 'rak'])
-                ->orderBy('date', 'desc')
-                ->orderBy('created_at', 'desc');
-        } catch (Throwable) {
-            $query = StockMovement::query()->whereRaw('1 = 0');
-        }
+        $query = StockMovement::query()
+            ->when($this->start_date, fn ($query) => $query->whereDate('date', '>=', $this->start_date))
+            ->when($this->end_date, fn ($query) => $query->whereDate('date', '<=', $this->end_date))
+            ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+            ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+            ->with(['product', 'warehouse', 'rak'])
+            ->orderBy('date', 'desc')
+            ->orderBy('created_at', 'desc');
 
         return $table
             ->query($query)
             ->columns([
                 TextColumn::make('date')->label('Tanggal')->date()->sortable(),
-                TextColumn::make('product.name')->label('Produk')->sortable(),
-                TextColumn::make('product.code')->label('Kode Produk')->sortable(),
+                TextColumn::make('product.name')->label('Produk')->sortable()->searchable(),
+                TextColumn::make('product.sku')->label('Kode / SKU')->sortable()->searchable(),
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
-                TextColumn::make('rak.name')->label('Rak')->sortable(),
+                TextColumn::make('rak.name')->label('Rak')->default('-')->sortable(),
                 TextColumn::make('type')->label('Tipe Movement')->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'in' => 'success',
@@ -200,39 +197,37 @@ class InventoryReportPage extends Page implements HasTable
 
     private function getAgingStockTable(Table $table): Table
     {
-        try {
-            $query = InventoryStock::query()
-                ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
-                ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
-                ->with(['product', 'warehouse', 'rak'])
-                ->orderBy('warehouse_id')
-                ->orderBy('product_id');
-        } catch (Throwable) {
-            $query = InventoryStock::query()->whereRaw('1 = 0');
-        }
+        $query = InventoryStock::query()
+            ->when($this->warehouse_id, fn ($query) => $query->where('warehouse_id', $this->warehouse_id))
+            ->when($this->product_id, fn ($query) => $query->where('product_id', $this->product_id))
+            ->where(function ($q) {
+                $q->whereNotNull('rak_id')
+                    ->orWhere('qty_available', '>', 0)
+                    ->orWhere('qty_reserved', '>', 0);
+            })
+            ->with(['product', 'warehouse', 'rak'])
+            ->orderBy('warehouse_id')
+            ->orderBy('product_id');
 
         return $table
             ->query($query)
             ->columns([
                 TextColumn::make('warehouse.name')->label('Gudang')->sortable(),
-                TextColumn::make('product.name')->label('Produk')->sortable(),
-                TextColumn::make('product.code')->label('Kode Produk')->sortable(),
-                TextColumn::make('rak.name')->label('Rak')->sortable(),
+                TextColumn::make('product.name')->label('Produk')->sortable()->searchable(),
+                TextColumn::make('product.sku')->label('Kode / SKU')->sortable()->searchable(),
+                TextColumn::make('rak.name')->label('Rak')->default('-')->sortable(),
                 TextColumn::make('qty_available')->label('Qty Fisik')->sortable(),
                 TextColumn::make('qty_reserved')->label('Qty Reserved')->sortable(),
                 TextColumn::make('qty_on_hand')
                     ->label('Qty Tersedia Bebas')
-                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->qtyOnHand($record))
-                    ->sortable(),
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->qtyOnHand($record)),
                 TextColumn::make('last_movement_date')
                     ->label('Terakhir Movement')
                     ->getStateUsing(fn ($record) => $this->inventoryReportService()->lastMovementDateForRecord($record))
-                    ->date()
-                    ->sortable(),
+                    ->date(),
                 TextColumn::make('aging_days')
                     ->label('Hari Aging')
-                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->agingDaysForRecord($record) ?? 999)
-                    ->sortable(),
+                    ->getStateUsing(fn ($record) => $this->inventoryReportService()->agingDaysForRecord($record) ?? 999),
                 TextColumn::make('aging_category')
                     ->label('Kategori Aging')
                     ->getStateUsing(fn ($record) => $this->inventoryReportService()->agingCategoryForRecord($record))
@@ -242,7 +237,7 @@ class InventoryReportPage extends Page implements HasTable
                         'Slow Moving' => 'warning',
                         'Stagnan' => 'danger',
                         'Dead Stock' => 'gray',
-                        'Tidak Ada Movement' => 'gray',
+                        default => 'gray',
                     }),
             ])
             ->headerActions([
