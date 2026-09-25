@@ -471,8 +471,25 @@ class RemediateLegacyCorruptedDataCommand extends Command
             $changes++;
         }
 
+        // C. Cek Sales Order Uji Coba Menggantung (SO-00006 & SO-00007)
+        $testSos = SaleOrder::whereIn('so_number', ['SO-00006', 'SO-00007'])
+            ->where('status', 'draft')
+            ->get();
+
+        foreach ($testSos as $tso) {
+            $hasDo = DB::table('delivery_sales_orders')->where('sales_order_id', $tso->id)->exists();
+            if (! $hasDo) {
+                $this->warn("   Ditemukan SO uji coba menggantung (status draft tanpa DO): {$tso->so_number}");
+                $this->line("   - Mengubah status {$tso->so_number} menjadi 'canceled' (Dibatalkan).");
+                if (! $dryRun) {
+                    $tso->update(['status' => 'canceled']);
+                }
+                $changes++;
+            }
+        }
+
         if ($changes === 0) {
-            $this->line('   ✓ Tidak ditemukan dokumen uji coba tersisa (CR-2026-0001 / DO-20260922-0003).');
+            $this->line('   ✓ Tidak ditemukan dokumen uji coba tersisa (CR-2026-0001 / DO-20260922-0003 / SO uji coba).');
         } else {
             $this->info($dryRun ? "   [DRY-RUN] {$changes} dokumen uji coba akan dibersihkan." : "   ✓ {$changes} dokumen uji coba berhasil dibersihkan.");
         }
