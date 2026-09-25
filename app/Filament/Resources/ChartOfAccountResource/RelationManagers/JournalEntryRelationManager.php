@@ -85,12 +85,12 @@ class JournalEntryRelationManager extends RelationManager
                             ->label('Deskripsi'),
                         TextInput::make('debit')
                             ->label('Debit')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->default(0)
                             ->required(),
                         TextInput::make('credit')
                             ->label('Kredit')
-                            ->numeric()
+                            ->indonesianMoney()
                             ->default(0)
                             ->required(),
                         TextInput::make('journal_type')

@@ -180,31 +180,28 @@ class ProductResource extends Resource
                                 'required' => 'Kategori produk harus dipilih'
                             ]),
                         TextInput::make('cost_price')
-                            ->label('Harga Beli Asli (Rp)')
+                            ->label('Harga Beli Asli')
                             ->required()
                             ->indonesianMoney()
                             ->default(0)
                             ->validationMessages([
                                 'required' => 'Harga beli tidak boleh kosong',
-                                'numeric' => 'Harga beli harus berupa angka'
                             ]),
                         TextInput::make('sell_price')
-                            ->label('Harga Jual (Rp)')
+                            ->label('Harga Jual')
                             ->required()
                             ->indonesianMoney()
                             ->default(0)
                             ->validationMessages([
                                 'required' => 'Harga jual tidak boleh kosong',
-                                'numeric' => 'Harga jual harus berupa angka'
                             ]),
                         TextInput::make('biaya')
-                            ->label('Biaya (Rp)')
+                            ->label('Biaya')
                             ->required()
                             ->indonesianMoney()
                             ->default(0)
                             ->validationMessages([
                                 'required' => 'Biaya tidak boleh kosong',
-                                'numeric' => 'Biaya harus berupa angka'
                             ]),
                         TextInput::make('harga_batas')
                             ->label('Harga Batas (%)')
@@ -214,7 +211,7 @@ class ProductResource extends Resource
                                 'numeric' => 'Harga batas harus berupa angka'
                             ]),
                         TextInput::make('item_value')
-                            ->label('Item Value (Rp)')
+                            ->label('Item Value')
                             ->indonesianMoney()
                             ->default(0)
                             ->validationMessages([
@@ -738,31 +735,28 @@ class ProductResource extends Resource
                             Fieldset::make('Update Harga Produk')
                                 ->schema([
                                     TextInput::make('cost_price')
-                                        ->label('Harga Beli Asli (Rp)')
+                                        ->label('Harga Beli Asli')
                                         ->required()
                                         ->indonesianMoney()
                                         ->default(fn ($record) => $record->cost_price)
                                         ->validationMessages([
                                             'required' => 'Harga beli tidak boleh kosong',
-                                            'numeric' => 'Harga beli harus berupa angka'
                                         ]),
                                     TextInput::make('sell_price')
-                                        ->label('Harga Jual (Rp)')
+                                        ->label('Harga Jual')
                                         ->required()
                                         ->indonesianMoney()
                                         ->default(fn ($record) => $record->sell_price)
                                         ->validationMessages([
                                             'required' => 'Harga jual tidak boleh kosong',
-                                            'numeric' => 'Harga jual harus berupa angka'
                                         ]),
                                     TextInput::make('biaya')
-                                        ->label('Biaya (Rp)')
+                                        ->label('Biaya')
                                         ->required()
                                         ->indonesianMoney()
                                         ->default(fn ($record) => $record->biaya)
                                         ->validationMessages([
                                             'required' => 'Biaya tidak boleh kosong',
-                                            'numeric' => 'Biaya harus berupa angka'
                                         ]),
                                     TextInput::make('harga_batas')
                                         ->label('Harga Batas (%)')
@@ -772,7 +766,7 @@ class ProductResource extends Resource
                                             'numeric' => 'Harga batas harus berupa angka'
                                         ]),
                                     TextInput::make('item_value')
-                                        ->label('Item Value (Rp)')
+                                        ->label('Item Value')
                                         ->indonesianMoney()
                                         ->default(fn ($record) => $record->item_value)
                                         ->validationMessages([

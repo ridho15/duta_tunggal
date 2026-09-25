@@ -699,12 +699,11 @@ class QuotationResource extends Resource
                                                 ])
                                                 ->default(0),
                                             TextInput::make('kredit_limit')
-                                                ->label('Kredit Limit (Rp.)')
+                                                ->label('Kredit Limit')
                                                 ->default(0)
                                                 ->required()
                                                 ->validationMessages([
                                                     'required' => 'Kredit limit tidak boleh kosong',
-                                                    'numeric' => 'Kredit limit harus berupa angka'
                                                 ])
                                                 ->indonesianMoney(),
                                             Radio::make('tipe_pembayaran')

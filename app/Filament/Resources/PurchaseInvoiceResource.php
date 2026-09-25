@@ -970,7 +970,7 @@ class PurchaseInvoiceResource extends Resource
                                             ->dehydrated(true),
                                         TextInput::make('price')
                                             ->label('Harga Satuan Faktur')
-                                            ->numeric()
+                                            ->indonesianMoney()
                                             ->required()
                                             ->live(debounce: 500)
                                             ->helperText(function (Get $get) {

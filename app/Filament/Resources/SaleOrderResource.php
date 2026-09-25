@@ -825,11 +825,10 @@ class SaleOrderResource extends Resource
                                             ->required()
                                             ->default(0),
                                         TextInput::make('kredit_limit')
-                                            ->label('Kredit Limit (Rp.)')
+                                            ->label('Kredit Limit')
                                             ->default(0)
                                             ->validationMessages([
                                                 'required' => 'Kredit limit customer tidak boleh kosong',
-                                                'numeric' => 'Kredit limit customer harus berupa angka',
                                             ])
                                             ->required()
                                             ->indonesianMoney(),

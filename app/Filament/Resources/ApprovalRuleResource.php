@@ -66,9 +66,11 @@ class ApprovalRuleResource extends Resource
         return $form->schema([
             Select::make('document_type')->label('Dokumen')->options(ApprovalRule::TYPES)->required(),
             TextInput::make('label')->label('Nama aturan')->required()->maxLength(120),
-            TextInput::make('above_amount')->label('Berlaku bila nilai di atas (Rp)')->numeric()->minValue(0)
+            TextInput::make('above_amount')->label('Berlaku bila nilai di atas')
+                ->indonesianMoney()
                 ->helperText('Kosong = dari 0.'),
-            TextInput::make('up_to_amount')->label('… dan sampai (Rp)')->numeric()->minValue(0)
+            TextInput::make('up_to_amount')->label('… dan sampai')
+                ->indonesianMoney()
                 ->helperText('Kosong = tanpa batas atas.'),
             Select::make('roles')->label('Peran yang boleh menyetujui')->multiple()->required()
                 ->options(fn () => Role::query()->orderBy('name')->pluck('name', 'name')->all()),
