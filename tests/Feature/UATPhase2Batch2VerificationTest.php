@@ -52,13 +52,16 @@ class UATPhase2Batch2VerificationTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create();
+        $this->cabang = Cabang::factory()->create();
+        $this->user = User::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'manage_type' => 'all',
+        ]);
         $this->actingAs($this->user);
 
         UnitOfMeasure::factory()->create();
         Currency::factory()->create();
 
-        $this->cabang = Cabang::factory()->create();
         $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
         $this->product = Product::factory()->create();
 
@@ -67,6 +70,7 @@ class UATPhase2Batch2VerificationTest extends TestCase
             'name' => 'PT Pelanggan Pertama',
             'code' => 'CUST-0001',
             'nik_npwp' => '3171234567890001',
+            'perusahaan' => '',
         ]);
 
         $this->customerB = Customer::factory()->create([
@@ -129,6 +133,7 @@ class UATPhase2Batch2VerificationTest extends TestCase
             'customer_id' => $this->customerA->id,
             'status' => 'approved',
             'so_number' => 'SO-APP-001',
+            'tipe_pengiriman' => 'Kirim Langsung',
         ]);
         SaleOrderItem::factory()->create([
             'sale_order_id' => $soApproved->id,
@@ -142,6 +147,7 @@ class UATPhase2Batch2VerificationTest extends TestCase
             'customer_id' => $this->customerA->id,
             'status' => 'completed',
             'so_number' => 'SO-CMP-002',
+            'tipe_pengiriman' => 'Kirim Langsung',
         ]);
         SaleOrderItem::factory()->create([
             'sale_order_id' => $soCompleted->id,

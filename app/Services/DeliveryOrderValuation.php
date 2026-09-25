@@ -52,17 +52,17 @@ class DeliveryOrderValuation
             }
 
             // Relasi saleOrderItem memakai withDefault(): pastikan cek exists agar model kosong tidak dianggap ada.
-            // Jika item DO belum bertaut langsung, cari dari SO terkait berdasarkan product_id.
+            // Item DO yang tidak bertaut ke baris SO tidak boleh ditebak harganya (nilai 0, ditandai unlinked).
             $saleOrderItem = ($item->saleOrderItem && $item->saleOrderItem->exists) ? $item->saleOrderItem : null;
-            if (! $saleOrderItem && $primarySo) {
-                $saleOrderItem = $primarySo->saleOrderItem->firstWhere('product_id', $item->product_id);
+            if (! $saleOrderItem && $item->sale_order_item_id && $primarySo) {
+                $saleOrderItem = $primarySo->saleOrderItem->firstWhere('id', $item->sale_order_item_id);
             }
 
             if (! $saleOrderItem) {
                 $unlinked[] = (int) $item->id;
             }
 
-            $unitPrice = $saleOrderItem ? (float) $saleOrderItem->unit_price : (float) ($item->product?->sell_price ?? 0);
+            $unitPrice = $saleOrderItem ? (float) $saleOrderItem->unit_price : 0.0;
             $discountPct = $saleOrderItem ? max(0.0, min(100.0, (float) $saleOrderItem->discount)) : 0.0;
 
             // Pajak per baris dari item SO-nya (Eksklusif / Inklusif / Non Pajak); tanpa pajak bila invoice bertipe None.

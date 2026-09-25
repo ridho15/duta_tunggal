@@ -33,7 +33,7 @@ it('pelanggan ke-500 ditemukan lewat nama, kode, perusahaan, dan NIK/NPWP; NIK t
     foreach (['Pelanggan 500', 'C-0500', 'Anggrek', '3201010101010001'] as $term) {
         $found = $service->options('customers', $term);
         $labels = array_values($found);
-        expect($labels)->toContain('(C-0500) Pelanggan 500');
+        expect($labels)->toContain('(C-0500) Pelanggan 500 - PT Anggrek Khusus');
     }
     expect(implode(' ', $service->options('customers', 'Anggrek')))->not->toContain('3201010101010001');
 
@@ -142,9 +142,9 @@ it('form Invoice tidak memuat seluruh tabel customer/produk (kueri berbatas) dan
 
     $field = $component->instance()->getForm('form')->getFlatFields()['selected_customer'];
     $results = $field->getSearchResults('Pelanggan 500');
-    expect(array_values($results))->toContain('(C-0500) Pelanggan 500')->and(count($field->getSearchResults('Pelanggan')))->toBe(50);
+    expect(array_values($results))->toContain('(C-0500) Pelanggan 500 - PT Anggrek Khusus')->and(count($field->getSearchResults('Pelanggan')))->toBe(50);
     $selected = Customer::where('code', 'C-0500')->first();
-    expect(app(RemoteSearch::class)->label('customers', $selected->id))->toBe('(C-0500) Pelanggan 500');
+    expect(app(RemoteSearch::class)->label('customers', $selected->id))->toBe('(C-0500) Pelanggan 500 - PT Anggrek Khusus');
 });
 
 it('pemindai: resource penjualan tidak memakai pola "Model::all() + preload" dan tidak menambah limit(50) statis baru', function () {

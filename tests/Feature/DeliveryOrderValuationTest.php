@@ -84,7 +84,7 @@ function dovSaleOrder(array $ctx, array $item = []): array
 }
 
 /** DO berstatus 'sent' (dibuat langsung, tanpa memicu observer) dengan satu item $qty, terhubung ke SO. */
-function dovDeliveryOrder(array $ctx, SaleOrder $saleOrder, ?SaleOrderItem $saleOrderItem, float $qty, array $do = []): DeliveryOrder
+function dovDeliveryOrder(array $ctx, SaleOrder $saleOrder, ?SaleOrderItem $saleOrderItem, float $qty, array $do = [], ?Product $product = null): DeliveryOrder
 {
     $deliveryOrder = DeliveryOrder::create(array_merge([
         'do_number' => 'DO-DOV-'.strtoupper(substr(uniqid(), -6)), 'delivery_date' => '2026-09-14', 'status' => 'sent',
@@ -94,7 +94,7 @@ function dovDeliveryOrder(array $ctx, SaleOrder $saleOrder, ?SaleOrderItem $sale
 
     DeliveryOrderItem::create([
         'delivery_order_id' => $deliveryOrder->id, 'sale_order_item_id' => $saleOrderItem?->id,
-        'product_id' => $ctx['product']->id, 'quantity' => $qty, 'reason' => 'Uji nilai DO',
+        'product_id' => $product?->id ?? $ctx['product']->id, 'quantity' => $qty, 'reason' => 'Uji nilai DO',
     ]);
 
     return $deliveryOrder->fresh();
@@ -152,9 +152,15 @@ it('SO inklusif dan SO tanpa pajak dinilai sesuai tipenya', function () {
 it('item DO tanpa tautan item SO bernilai 0 (tidak menebak harga), ditandai, dan dicatat peringatan', function () {
     $ctx = dovContext();
     [$so, $soItem] = dovSaleOrder($ctx);
+    $unlinkedProduct = Product::factory()->create([
+        'name' => 'Bonus Unlinked Product',
+        'sell_price' => 9000,
+        'uom_id' => $ctx['product']->uom_id,
+        'sales_coa_id' => $ctx['product']->sales_coa_id,
+    ]);
 
     Log::spy();
-    $do = dovDeliveryOrder($ctx, $so, null, 4);   // sell_price produk 9.000 TIDAK dipakai — sama dengan invoice otomatis
+    $do = dovDeliveryOrder($ctx, $so, null, 4, [], $unlinkedProduct);   // sell_price produk 9.000 TIDAK dipakai — sama dengan invoice otomatis
     $valuation = app(DeliveryOrderValuation::class)->forDeliveryOrder($do);
 
     expect($valuation['total'])->toBe(0.0)

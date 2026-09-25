@@ -127,37 +127,42 @@ class UATUIUXAuditVerificationTest extends TestCase
 
     public function test_quality_control_preselects_first_eligible_item_when_po_has_multiple_items()
     {
+        $cabang = Cabang::factory()->create();
+        $user = \App\Models\User::factory()->create(['cabang_id' => $cabang->id]);
+        $product = Product::factory()->create();
+        $currency = Currency::firstOrCreate(['code' => 'IDR'], ['name' => 'Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
         $supplier = Supplier::factory()->create();
+
         $po = PurchaseOrder::create([
             'po_number' => 'PO-TEST-QC-01',
             'order_date' => now(),
             'status' => 'approved',
             'supplier_id' => $supplier->id,
-            'cabang_id' => 1,
-            'created_by' => 1,
+            'cabang_id' => $cabang->id,
+            'created_by' => $user->id,
             'is_asset' => false,
-            'currency_id' => 1,
+            'currency_id' => $currency->id,
             'total_amount' => 100000,
         ]);
 
         $item1 = PurchaseOrderItem::create([
             'purchase_order_id' => $po->id,
-            'product_id' => 1,
+            'product_id' => $product->id,
             'quantity' => 10,
             'unit_price' => 5000,
             'subtotal' => 50000,
-            'currency_id' => 1,
-            'cabang_id' => 1,
+            'currency_id' => $currency->id,
+            'cabang_id' => $cabang->id,
         ]);
 
         $item2 = PurchaseOrderItem::create([
             'purchase_order_id' => $po->id,
-            'product_id' => 1,
+            'product_id' => $product->id,
             'quantity' => 5,
             'unit_price' => 10000,
             'subtotal' => 50000,
-            'currency_id' => 1,
-            'cabang_id' => 1,
+            'currency_id' => $currency->id,
+            'cabang_id' => $cabang->id,
         ]);
 
         request()->merge(['purchase_order_id' => $po->id]);
@@ -170,37 +175,42 @@ class UATUIUXAuditVerificationTest extends TestCase
 
     public function test_quality_control_preselects_by_specific_item_query_param()
     {
+        $cabang = Cabang::factory()->create();
+        $user = \App\Models\User::factory()->create(['cabang_id' => $cabang->id]);
+        $product = Product::factory()->create();
+        $currency = Currency::firstOrCreate(['code' => 'IDR'], ['name' => 'Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
         $supplier = Supplier::factory()->create();
+
         $po = PurchaseOrder::create([
             'po_number' => 'PO-TEST-QC-02',
             'order_date' => now(),
             'status' => 'approved',
             'supplier_id' => $supplier->id,
-            'cabang_id' => 1,
-            'created_by' => 1,
+            'cabang_id' => $cabang->id,
+            'created_by' => $user->id,
             'is_asset' => false,
-            'currency_id' => 1,
+            'currency_id' => $currency->id,
             'total_amount' => 100000,
         ]);
 
         $item1 = PurchaseOrderItem::create([
             'purchase_order_id' => $po->id,
-            'product_id' => 1,
+            'product_id' => $product->id,
             'quantity' => 10,
             'unit_price' => 5000,
             'subtotal' => 50000,
-            'currency_id' => 1,
-            'cabang_id' => 1,
+            'currency_id' => $currency->id,
+            'cabang_id' => $cabang->id,
         ]);
 
         $item2 = PurchaseOrderItem::create([
             'purchase_order_id' => $po->id,
-            'product_id' => 1,
+            'product_id' => $product->id,
             'quantity' => 5,
             'unit_price' => 10000,
             'subtotal' => 50000,
-            'currency_id' => 1,
-            'cabang_id' => 1,
+            'currency_id' => $currency->id,
+            'cabang_id' => $cabang->id,
         ]);
 
         request()->merge(['purchase_order_item_id' => $item2->id]);

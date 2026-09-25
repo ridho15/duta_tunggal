@@ -25,7 +25,7 @@ class CustomerFactory extends Factory
             'telephone'         => $this->faker->numerify('021#######'),
             'phone'             => $this->faker->numerify('08##########'),
             'email'             => $this->faker->unique()->safeEmail(),
-            'perusahaan'        => $this->faker->company(),
+            'perusahaan'        => '',
             'tipe'              => $this->faker->randomElement(['PKP', 'PRI']),
             'fax'               => $this->faker->numerify('021#######'),
             'tempo_kredit'      => $this->faker->randomElement([0, 15, 30, 45, 60]),
