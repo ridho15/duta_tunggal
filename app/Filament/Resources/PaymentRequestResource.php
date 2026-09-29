@@ -83,7 +83,40 @@ class PaymentRequestResource extends Resource
                                     ->preload() // FIX #13: preload agar supplier langsung muncul tanpa harus ketik dulu
                                     ->required()
                                     ->reactive()
-                                    ->afterStateUpdated(fn ($set) => $set('selected_invoices', [])),
+                                    ->afterStateUpdated(function ($state, $set) {
+                                        $set('selected_invoices', []);
+                                        if ($state) {
+                                            $supplier = Supplier::find($state);
+                                            if ($supplier) {
+                                                $bankName = $supplier->nama_bank ?? $supplier->bank_name ?? '';
+                                                $bankNum = $supplier->nomor_rekening ?? $supplier->rekening_bank ?? '';
+                                                $holder = $supplier->nama_rekening ?? $supplier->atas_nama ?? $supplier->perusahaan ?? '';
+                                                if ($bankNum || $bankName) {
+                                                    $set('supplier_bank_info', trim("{$bankName} - {$bankNum} (a.n. {$holder})", ' -()'));
+                                                }
+                                            }
+                                        }
+                                    }),
+
+                                TextInput::make('supplier_bank_info')
+                                    ->label('Rekening Bank Vendor')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->placeholder('Otomatis dari master vendor')
+                                    ->afterStateHydrated(function ($component, $get, $record) {
+                                        $supplierId = $get('supplier_id') ?: $record?->supplier_id;
+                                        if ($supplierId) {
+                                            $supplier = Supplier::find($supplierId);
+                                            if ($supplier) {
+                                                $bankName = $supplier->nama_bank ?? $supplier->bank_name ?? '';
+                                                $bankNum = $supplier->nomor_rekening ?? $supplier->rekening_bank ?? '';
+                                                $holder = $supplier->nama_rekening ?? $supplier->atas_nama ?? $supplier->perusahaan ?? '';
+                                                if ($bankNum || $bankName) {
+                                                    $component->state(trim("{$bankName} - {$bankNum} (a.n. {$holder})", ' -()'));
+                                                }
+                                            }
+                                        }
+                                    }),
 
                                 DatePicker::make('request_date')
                                     ->label('Tanggal Request')

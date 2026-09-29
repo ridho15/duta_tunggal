@@ -73,6 +73,7 @@ class StockTransferResource extends Resource
                             ->label('Dari Gudang')
                             ->preload()
                             ->searchable()
+                            ->live()
                             ->relationship('fromWarehouse', 'id', function (Builder $query) {
                                 // Show all warehouses across all branches
                                 $query->withoutGlobalScope(\App\Models\Scopes\CabangScope::class);
@@ -85,11 +86,13 @@ class StockTransferResource extends Resource
                             ->label('Ke Gudang')
                             ->preload()
                             ->searchable()
-                            ->reactive()
+                            ->live()
                             ->relationship('toWarehouse', 'id', function (Builder $query, $get) {
-                                // Allow transfer to any warehouse, even from different cabang
-                                $query->withoutGlobalScope(\App\Models\Scopes\CabangScope::class)
-                                      ->where('id', '!=', $get('../../from_warehouse_id'));
+                                $fromId = $get('from_warehouse_id');
+                                $query->withoutGlobalScope(\App\Models\Scopes\CabangScope::class);
+                                if ($fromId) {
+                                    $query->where('id', '!=', $fromId);
+                                }
                             })
                             ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
                                 return "({$warehouse->kode}) {$warehouse->name}";
@@ -97,62 +100,89 @@ class StockTransferResource extends Resource
                             ->required(),
                         Repeater::make('stockTransferItem')
                             ->relationship()
-                            ->reactive()
+                            ->live()
                             ->label('Transfer Items')
                             ->columnSpanFull()
                             ->columns(2)
-                            ->defaultItems(0)
+                            ->minItems(1)
+                            ->defaultItems(1)
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
                                     ->preload()
-                                    ->reactive()
                                     ->searchable()
+                                    ->live()
                                     ->helperText(function ($get) {
-                                        $inventoryStock = InventoryStock::where('warehouse_id', $get('../../from_warehouse_id'))
-                                            ->where('product_id', $get('product_id'))->first();
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        $productId = $get('product_id');
+                                        if (! $whId || ! $productId) {
+                                            return null;
+                                        }
+                                        $inventoryStock = InventoryStock::where('warehouse_id', $whId)
+                                            ->where('product_id', $productId)->first();
                                         if ($inventoryStock && $inventoryStock->rak) {
                                             $codeStr = filled($inventoryStock->rak->code) ? "({$inventoryStock->rak->code}) " : '';
-                                            return "Rak: " . $codeStr . ($inventoryStock->rak->name ?? '-');
+                                            return "Rak Default: " . $codeStr . ($inventoryStock->rak->name ?? '-');
                                         }
 
-                                        return "Rak: -";
+                                        return "Rak Default: -";
                                     })
-                                    ->relationship('product', 'id', function (Builder $query, $get) {
-                                        $query->whereHas('inventoryStock', function (Builder $query) use ($get) {
-                                            $query->where('warehouse_id', $get('../../from_warehouse_id'));
-                                        });
+                                    ->options(function ($get) {
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        $query = Product::query();
+                                        if ($whId) {
+                                            $query->whereHas('inventoryStock', function (Builder $q) use ($whId) {
+                                                $q->where('warehouse_id', $whId);
+                                            });
+                                        }
+                                        return $query->get()->mapWithKeys(fn (Product $p) => [$p->id => "({$p->sku}) {$p->name}"])->toArray();
                                     })
-                                    ->getOptionLabelFromRecordUsing(function (Product $product) {
-                                        return "({$product->sku}) {$product->name}";
-                                    })->required(),
+                                    ->getSearchResultsUsing(function (string $search, $get) {
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        $query = Product::query()
+                                            ->where(function ($q) use ($search) {
+                                                $q->where('name', 'like', "%{$search}%")
+                                                    ->orWhere('sku', 'like', "%{$search}%");
+                                            });
+                                        if ($whId) {
+                                            $query->whereHas('inventoryStock', function (Builder $q) use ($whId) {
+                                                $q->where('warehouse_id', $whId);
+                                            });
+                                        }
+                                        return $query->limit(50)->get()->mapWithKeys(fn (Product $p) => [$p->id => "({$p->sku}) {$p->name}"])->toArray();
+                                    })
+                                    ->required(),
                                 TextInput::make('quantity')
                                     ->label('Quantity')
                                     ->numeric()
-                                    ->default(0)
+                                    ->default(1)
                                     ->minValue(1)
                                     ->required(),
                                 Select::make('from_warehouse_id')
                                     ->label('Dari Gudang')
                                     ->preload()
                                     ->searchable()
-                                    ->reactive()
+                                    ->live()
                                     ->default(function ($get) {
                                         return $get('../../from_warehouse_id');
                                     })
-                                    ->relationship('fromWarehouse', 'id', function (Builder $query, $get) {
-                                        $query->where('id', $get('../../from_warehouse_id'));
-                                    })
-                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                        return "({$warehouse->kode}) {$warehouse->name}";
-                                    })
+                                    ->options(fn () => static::resolveWarehouseOptions())
+                                    ->getSearchResultsUsing(fn (string $search) => static::resolveWarehouseOptions($search))
                                     ->required(),
                                 Select::make('from_rak_id')
                                     ->label('Dari Rak')
                                     ->preload()
-                                    ->reactive()
+                                    ->live()
                                     ->searchable()
                                     ->nullable()
+                                    ->options(function ($get) {
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        return StockAdjustmentResource::resolveRakOptions((int) $whId);
+                                    })
+                                    ->getSearchResultsUsing(function (string $search, $get) {
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        return StockAdjustmentResource::resolveRakOptions((int) $whId, $search);
+                                    })
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('from_rak_id'))->first();
@@ -161,34 +191,32 @@ class StockTransferResource extends Resource
                                         }
 
                                         return 'Opsional jika gudang tidak memiliki rak.';
-                                    })
-                                    ->relationship('fromRak', 'id', function (Builder $query, $get) {
-                                        $query->where('warehouse_id', $get('from_warehouse_id'));
-                                    })
-                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     }),
                                 Select::make('to_warehouse_id')
                                     ->label('Ke Gudang')
                                     ->preload()
                                     ->searchable()
-                                    ->reactive()
-                                    ->relationship('toWarehouse', 'id', function (Builder $query, $get) {
-                                        $query->where('id', $get('../../to_warehouse_id'));
-                                    })
-                                    ->getOptionLabelFromRecordUsing(function (Warehouse $warehouse) {
-                                        return "({$warehouse->kode}) {$warehouse->name}";
-                                    })
+                                    ->live()
                                     ->default(function ($get) {
                                         return $get('../../to_warehouse_id');
                                     })
+                                    ->options(fn () => static::resolveWarehouseOptions())
+                                    ->getSearchResultsUsing(fn (string $search) => static::resolveWarehouseOptions($search))
                                     ->required(),
                                 Select::make('to_rak_id')
                                     ->label('Ke Rak')
                                     ->preload()
-                                    ->reactive()
+                                    ->live()
                                     ->searchable()
                                     ->nullable()
+                                    ->options(function ($get) {
+                                        $whId = $get('to_warehouse_id') ?: $get('../../to_warehouse_id');
+                                        return StockAdjustmentResource::resolveRakOptions((int) $whId);
+                                    })
+                                    ->getSearchResultsUsing(function (string $search, $get) {
+                                        $whId = $get('to_warehouse_id') ?: $get('../../to_warehouse_id');
+                                        return StockAdjustmentResource::resolveRakOptions((int) $whId, $search);
+                                    })
                                     ->helperText(function ($get) {
                                         $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
                                             ->where('rak_id', $get('to_rak_id'))->first();
@@ -197,12 +225,6 @@ class StockTransferResource extends Resource
                                         }
 
                                         return 'Opsional jika gudang tidak memiliki rak.';
-                                    })
-                                    ->relationship('toRak', 'id', function (Builder $query, $get) {
-                                        $query->where('warehouse_id', $get('to_warehouse_id'));
-                                    })
-                                    ->getOptionLabelFromRecordUsing(function (Rak $rak) {
-                                        return filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-');
                                     })
                             ])
                     ])
@@ -394,6 +416,23 @@ class StockTransferResource extends Resource
 
         return $user->hasRole(['Super Admin', 'Owner', 'Admin', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff'])
             || $user->hasPermissionTo('response stock transfer');
+    }
+
+    public static function resolveWarehouseOptions(?string $search = null): array
+    {
+        $query = Warehouse::query()->withoutGlobalScope(\App\Models\Scopes\CabangScope::class);
+
+        if (filled($search)) {
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('kode', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->get()->mapWithKeys(function (Warehouse $w) {
+            $label = filled($w->kode) ? "({$w->kode}) {$w->name}" : $w->name;
+            return [$w->id => $label];
+        })->toArray();
     }
 
     public static function getPages(): array

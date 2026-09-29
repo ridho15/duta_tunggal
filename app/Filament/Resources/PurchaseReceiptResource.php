@@ -589,6 +589,16 @@ class PurchaseReceiptResource extends Resource
                     ->searchable(),
                 TextColumn::make('currency.name')
                     ->label('Currency'),
+                TextColumn::make('total_barang')
+                    ->label('Nilai Barang')
+                    ->rupiah()
+                    ->getStateUsing(function ($record) {
+                        return (float) $record->purchaseReceiptItem->sum(function ($item) {
+                            $qty = (float) ($item->qty_accepted ?? $item->qty_received ?? 0);
+                            $price = (float) ($item->unit_price ?: ($item->purchaseOrderItem?->unit_price ?? 0));
+                            return $qty * $price;
+                        });
+                    }),
                 TextColumn::make('total_biaya')
                     ->label('Total Biaya Lain')
                     ->rupiah()

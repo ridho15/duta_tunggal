@@ -556,7 +556,7 @@ class ReturnProductResource extends Resource
                                 HelperController::sendNotification(
                                     isSuccess: true, 
                                     title: "Return Product Approved", 
-                                    message: "Return product {$record->return_number} berhasil diapprove. Quantity telah diperbarui sesuai aksi retur yang dipilih. Proses selanjutnya: Tim Gudang perlu memproses pengembalian fisik barang dan memperbarui stok inventori."
+                                    message: "Return product {$record->return_number} berhasil diapprove. Stok fisik telah dikembalikan ke inventori gudang dan jurnal pembalik berhasil dicatat."
                                 );
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(

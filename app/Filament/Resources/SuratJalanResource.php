@@ -93,20 +93,33 @@ class SuratJalanResource extends Resource
                             ->required()
                             ->reactive()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get, ?SuratJalan $record) {
-                                // Buat: hanya DO approved yang belum tercantum di Surat Jalan lain yang masih berlaku.
-                                // Ubah (Draft): DO yang sudah tertaut tetap boleh dipilih untuk kompatibilitas.
-                                $isCreatePage = ! $record || ! $record->exists;
-                                if ($isCreatePage) {
-                                    $query->where('status', 'approved');
-                                } else {
-                                    $query->whereIn('status', ['approved', 'sent', 'received']);
-                                }
+                                // Hanya DO approved yang belum tercantum di Surat Jalan lain yang masih berlaku.
+                                $query->where('status', 'approved');
 
                                 $query->whereDoesntHave('suratJalan', function (Builder $q) use ($record) {
                                     $q->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES)
                                         ->when($record?->getKey(), fn (Builder $q, $id) => $q->where('surat_jalans.id', '!=', $id));
                                 });
                             })
+                            ->rules([
+                                fn (?SuratJalan $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
+                                    $ids = is_array($value) ? $value : (empty($value) ? [] : [$value]);
+                                    if (empty($ids)) {
+                                        return;
+                                    }
+                                    $deliveryOrders = DeliveryOrder::whereIn('id', $ids)->get();
+                                    try {
+                                        app(SuratJalanService::class)->assertDeliveryOrdersUsable(
+                                            $deliveryOrders,
+                                            $record?->id,
+                                            $attribute
+                                        );
+                                    } catch (\Illuminate\Validation\ValidationException $e) {
+                                        $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+                                        $fail($msg);
+                                    }
+                                }
+                            ])
                             ->multiple()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $ids = is_array($state) ? $state : (empty($state) ? [] : [$state]);

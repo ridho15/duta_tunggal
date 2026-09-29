@@ -2,32 +2,245 @@
 
 namespace App\Services;
 
+use App\Models\JournalEntry;
 use App\Models\ReturnProduct;
+use App\Models\StockMovement;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ReturnProductService
 {
     public function updateQuantityFromModel($returnProduct)
     {
-        foreach ($returnProduct->returnProductItem as $returnProductItem) {
-            $fromItemModel = $returnProductItem->fromItemModel;
-            if ($fromItemModel) {
-                $defaultQuantity = (float) $fromItemModel->quantity;
-                $newQuantity = max(0.0, $defaultQuantity - (float) $returnProductItem->quantity);
-                $fromItemModel->update([
-                    'quantity' => $newQuantity,
+        return DB::transaction(function () use ($returnProduct) {
+            $returnProduct->loadMissing([
+                'returnProductItem.product.inventoryCoa',
+                'returnProductItem.product.goodsDeliveryCoa',
+                'returnProductItem.product.unbilledPurchaseCoa',
+                'returnProductItem.fromItemModel',
+                'warehouse',
+                'fromModel'
+            ]);
+
+            $isSalesReturn = ($returnProduct->from_model_type === \App\Models\DeliveryOrder::class);
+
+            foreach ($returnProduct->returnProductItem as $returnProductItem) {
+                $fromItemModel = $returnProductItem->fromItemModel;
+                if ($fromItemModel) {
+                    $defaultQuantity = (float) $fromItemModel->quantity;
+                    $newQuantity = max(0.0, $defaultQuantity - (float) $returnProductItem->quantity);
+
+                    // Update without triggering DeliveryOrderItem::updated (which rewrites original DO sales movements)
+                    if ($fromItemModel instanceof \Illuminate\Database\Eloquent\Model) {
+                        $fromItemModel::withoutEvents(function () use ($fromItemModel, $newQuantity) {
+                            $fromItemModel->update([
+                                'quantity' => $newQuantity,
+                            ]);
+                        });
+
+                        if ($fromItemModel instanceof \App\Models\DeliveryOrderItem && $fromItemModel->sale_order_item_id) {
+                            app(\App\Services\SaleOrderDeliveryProgress::class)
+                                ->syncForSaleOrderItems([$fromItemModel->sale_order_item_id]);
+                        }
+                    } else {
+                        $fromItemModel->update([
+                            'quantity' => $newQuantity,
+                        ]);
+                    }
+                }
+
+                // Create stock movement if not already created
+                $existingMovement = StockMovement::where('from_model_type', ReturnProduct::class)
+                    ->where('from_model_id', $returnProduct->id)
+                    ->where('meta->return_product_item_id', $returnProductItem->id)
+                    ->first();
+
+                if (! $existingMovement && (float) $returnProductItem->quantity > 0) {
+                    $warehouseId = $returnProductItem->fromItemModel?->warehouse_id ?? $returnProduct->warehouse_id;
+                    $rakId = $returnProductItem->rak_id ?? $returnProductItem->fromItemModel?->rak_id;
+                    $costPrice = (float) ($returnProductItem->product?->cost_price ?? 0);
+                    $type = $isSalesReturn ? 'customer_return' : 'purchase_return';
+                    $notes = ($isSalesReturn ? 'Retur Penjualan (Customer Return): ' : 'Retur Pembelian (Vendor Return): ') . $returnProduct->return_number;
+
+                    StockMovement::create([
+                        'product_id' => $returnProductItem->product_id,
+                        'warehouse_id' => $warehouseId,
+                        'rak_id' => $rakId,
+                        'quantity' => (float) $returnProductItem->quantity,
+                        'value' => round((float) $returnProductItem->quantity * $costPrice, 2),
+                        'type' => $type,
+                        'reference_id' => $returnProduct->id,
+                        'date' => now()->toDateString(),
+                        'notes' => $notes,
+                        'from_model_type' => ReturnProduct::class,
+                        'from_model_id' => $returnProduct->id,
+                        'meta' => [
+                            'return_product_id' => $returnProduct->id,
+                            'return_product_item_id' => $returnProductItem->id,
+                            'from_model_type' => $returnProduct->from_model_type,
+                            'from_model_id' => $returnProduct->from_model_id,
+                        ],
+                    ]);
+                }
+            }
+
+            // Create reversing journal entries if not already created
+            $this->createReversingJournalEntries($returnProduct);
+
+            $returnProduct->update([
+                'status' => 'approved'
+            ]);
+
+            // Check if all quantities are returned and close SO/DO partial if needed
+            $this->handleReturnAction($returnProduct);
+
+            return $returnProduct;
+        });
+    }
+
+    /**
+     * Create reversing journal entries for approved ReturnProduct
+     */
+    protected function createReversingJournalEntries(ReturnProduct $returnProduct): void
+    {
+        $hasJournals = JournalEntry::where('source_type', ReturnProduct::class)
+            ->where('source_id', $returnProduct->id)
+            ->exists();
+
+        if ($hasJournals) {
+            return;
+        }
+
+        $isSalesReturn = ($returnProduct->from_model_type === \App\Models\DeliveryOrder::class);
+        $isPurchaseReturn = ($returnProduct->from_model_type === \App\Models\PurchaseReceipt::class);
+
+        if (! $isSalesReturn && ! $isPurchaseReturn) {
+            return;
+        }
+
+        $date = now()->toDateString();
+        $cabangId = $returnProduct->warehouse?->cabang_id ?? $returnProduct->fromModel?->cabang_id;
+        $defaultInventoryCoa = app(\App\Services\AccountingSettings::class)->anyOf('inventory');
+        $defaultGoodsDeliveryCoa = app(\App\Services\AccountingSettings::class)->anyOf('goods_in_transit')
+            ?? app(\App\Services\AccountingSettings::class)->anyOf('cogs');
+
+        if ($isSalesReturn) {
+            $debitTotals = [];
+            $creditTotals = [];
+
+            foreach ($returnProduct->returnProductItem as $item) {
+                $qty = max(0, (float) ($item->quantity ?? 0));
+                $product = $item->product;
+                $cost = (float) ($product?->cost_price ?? 0);
+                $lineAmount = round($qty * $cost, 2);
+
+                if ($lineAmount <= 0) {
+                    continue;
+                }
+
+                $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+                $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
+
+                if ($inventoryCoa && $goodsDeliveryCoa) {
+                    $debitTotals[$inventoryCoa->id] = [
+                        'coa' => $inventoryCoa,
+                        'amount' => ($debitTotals[$inventoryCoa->id]['amount'] ?? 0) + $lineAmount,
+                    ];
+                    $creditTotals[$goodsDeliveryCoa->id] = [
+                        'coa' => $goodsDeliveryCoa,
+                        'amount' => ($creditTotals[$goodsDeliveryCoa->id]['amount'] ?? 0) + $lineAmount,
+                    ];
+                }
+            }
+
+            foreach ($debitTotals as $data) {
+                JournalEntry::create([
+                    'coa_id' => $data['coa']->id,
+                    'date' => $date,
+                    'reference' => $returnProduct->return_number,
+                    'description' => 'Product Return - Inventory Restoration for ' . $returnProduct->return_number,
+                    'debit' => round($data['amount'], 2),
+                    'credit' => 0,
+                    'journal_type' => 'sales',
+                    'source_type' => ReturnProduct::class,
+                    'source_id' => $returnProduct->id,
+                    'cabang_id' => $cabangId,
+                ]);
+            }
+
+            foreach ($creditTotals as $data) {
+                JournalEntry::create([
+                    'coa_id' => $data['coa']->id,
+                    'date' => $date,
+                    'reference' => $returnProduct->return_number,
+                    'description' => 'Product Return - Delivery / COGS Reversal for ' . $returnProduct->return_number,
+                    'debit' => 0,
+                    'credit' => round($data['amount'], 2),
+                    'journal_type' => 'sales',
+                    'source_type' => ReturnProduct::class,
+                    'source_id' => $returnProduct->id,
+                    'cabang_id' => $cabangId,
+                ]);
+            }
+        } elseif ($isPurchaseReturn) {
+            $debitTotals = [];
+            $creditTotals = [];
+
+            foreach ($returnProduct->returnProductItem as $item) {
+                $qty = max(0, (float) ($item->quantity ?? 0));
+                $product = $item->product;
+                $cost = (float) ($product?->cost_price ?? 0);
+                $lineAmount = round($qty * $cost, 2);
+
+                if ($lineAmount <= 0) {
+                    continue;
+                }
+
+                $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+                $unbilledCoa = $product?->resolveUnbilledPurchaseCoaOrDefault();
+
+                if ($inventoryCoa && $unbilledCoa) {
+                    $debitTotals[$unbilledCoa->id] = [
+                        'coa' => $unbilledCoa,
+                        'amount' => ($debitTotals[$unbilledCoa->id]['amount'] ?? 0) + $lineAmount,
+                    ];
+                    $creditTotals[$inventoryCoa->id] = [
+                        'coa' => $inventoryCoa,
+                        'amount' => ($creditTotals[$inventoryCoa->id]['amount'] ?? 0) + $lineAmount,
+                    ];
+                }
+            }
+
+            foreach ($debitTotals as $data) {
+                JournalEntry::create([
+                    'coa_id' => $data['coa']->id,
+                    'date' => $date,
+                    'reference' => $returnProduct->return_number,
+                    'description' => 'Product Return - Unbilled Purchase Reversal for ' . $returnProduct->return_number,
+                    'debit' => round($data['amount'], 2),
+                    'credit' => 0,
+                    'journal_type' => 'purchase',
+                    'source_type' => ReturnProduct::class,
+                    'source_id' => $returnProduct->id,
+                    'cabang_id' => $cabangId,
+                ]);
+            }
+
+            foreach ($creditTotals as $data) {
+                JournalEntry::create([
+                    'coa_id' => $data['coa']->id,
+                    'date' => $date,
+                    'reference' => $returnProduct->return_number,
+                    'description' => 'Product Return - Inventory Reduction for ' . $returnProduct->return_number,
+                    'debit' => 0,
+                    'credit' => round($data['amount'], 2),
+                    'journal_type' => 'purchase',
+                    'source_type' => ReturnProduct::class,
+                    'source_id' => $returnProduct->id,
+                    'cabang_id' => $cabangId,
                 ]);
             }
         }
-
-        $returnProduct->update([
-            'status' => 'approved'
-        ]);
-
-        // Check if all quantities are returned and close SO/DO partial if needed
-        $this->handleReturnAction($returnProduct);
-
-        return $returnProduct;
     }
 
     public function createReturnProduct($fromModel, $data)

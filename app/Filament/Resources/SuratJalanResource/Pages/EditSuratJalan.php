@@ -3,9 +3,12 @@
 namespace App\Filament\Resources\SuratJalanResource\Pages;
 
 use App\Filament\Resources\SuratJalanResource;
+use App\Models\DeliveryOrder;
+use App\Services\SuratJalanService;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Validation\ValidationException;
 
 class EditSuratJalan extends EditRecord
 {
@@ -45,5 +48,37 @@ class EditSuratJalan extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         return parent::mutateFormDataBeforeFill($data);
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $deliveryOrderIds = $data['deliveryOrder'] ?? ($this->data['deliveryOrder'] ?? []);
+        $deliveryOrderIds = is_array($deliveryOrderIds) ? $deliveryOrderIds : (empty($deliveryOrderIds) ? [] : [$deliveryOrderIds]);
+
+        $deliveryOrders = DeliveryOrder::whereIn('id', $deliveryOrderIds)->get();
+
+        try {
+            app(SuratJalanService::class)->assertDeliveryOrdersUsable($deliveryOrders, $this->record->id, 'data.deliveryOrder');
+        } catch (ValidationException $e) {
+            $firstMessage = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+            Notification::make()
+                ->title('Gagal Mengubah Surat Jalan')
+                ->body($firstMessage)
+                ->danger()
+                ->persistent()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'data.deliveryOrder' => $firstMessage,
+                'deliveryOrder' => $firstMessage,
+            ]);
+        }
+
+        $sourceCabangIds = $deliveryOrders->pluck('cabang_id')->filter()->unique()->values();
+        if ($sourceCabangIds->isNotEmpty()) {
+            $data['cabang_id'] = (int) $sourceCabangIds->first();
+        }
+
+        return $data;
     }
 }

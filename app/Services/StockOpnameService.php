@@ -243,6 +243,12 @@ class StockOpnameService
                 ]);
             }
 
+            if ($lockedOpname->items()->whereNull('physical_qty')->exists()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Terdapat item opname yang belum diisi kuantitas fisiknya.',
+                ]);
+            }
+
             $lockedOpname->update(['status' => 'completed']);
 
             return $lockedOpname->fresh();

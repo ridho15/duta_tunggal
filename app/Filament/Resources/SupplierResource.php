@@ -161,6 +161,18 @@ class SupplierResource extends Resource
                                 'required' => 'Tempo Hutang tidak boleh kosong',
                                 'numeric' => 'Tempo Hutang tidak valid !'
                             ]),
+                        TextInput::make('nama_bank')
+                            ->label('Nama Bank')
+                            ->placeholder('Contoh: BCA, Mandiri, BRI')
+                            ->maxLength(100),
+                        TextInput::make('nomor_rekening')
+                            ->label('Nomor Rekening')
+                            ->placeholder('Contoh: 1234567890')
+                            ->maxLength(100),
+                        TextInput::make('nama_rekening')
+                            ->label('Atas Nama Rekening')
+                            ->placeholder('Contoh: PT Supplier Makmur')
+                            ->maxLength(150),
                         Textarea::make('keterangan')
                             ->label('Keterangan')
                             ->string()

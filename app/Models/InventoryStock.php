@@ -61,6 +61,10 @@ class InventoryStock extends Model
 
     public function getFreeQtyAttribute()
     {
+        if (array_key_exists('free_qty', $this->attributes)) {
+            return (float) $this->attributes['free_qty'];
+        }
+
         return (float) $this->qty_available - (float) $this->qty_reserved;
     }
 

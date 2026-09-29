@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 
 class OrderRequestQuantityLock
@@ -177,6 +178,22 @@ class OrderRequestQuantityLock
     public static function validatePurchaseReceiptItem(PurchaseReceiptItem $receiptItem): void
     {
         if (! $receiptItem->purchase_order_item_id) {
+            $purchaseReceipt = $receiptItem->purchaseReceipt
+                ?: PurchaseReceipt::withoutGlobalScopes()->find($receiptItem->purchase_receipt_id);
+
+            if ($purchaseReceipt && $purchaseReceipt->purchase_order_id && $receiptItem->product_id) {
+                $poItem = PurchaseOrderItem::withoutGlobalScopes()
+                    ->where('purchase_order_id', $purchaseReceipt->purchase_order_id)
+                    ->where('product_id', $receiptItem->product_id)
+                    ->first();
+
+                if ($poItem) {
+                    $receiptItem->purchase_order_item_id = $poItem->id;
+                }
+            }
+        }
+
+        if (! $receiptItem->purchase_order_item_id) {
             return;
         }
 
@@ -193,11 +210,7 @@ class OrderRequestQuantityLock
         }
 
         $purchaseOrderItem = PurchaseOrderItem::withoutGlobalScopes()->find($receiptItem->purchase_order_item_id);
-        if (
-            ! $purchaseOrderItem
-            || $purchaseOrderItem->refer_item_model_type !== OrderRequestItem::class
-            || ! $purchaseOrderItem->refer_item_model_id
-        ) {
+        if (! $purchaseOrderItem) {
             return;
         }
 
@@ -206,18 +219,25 @@ class OrderRequestQuantityLock
             $receiptItem->exists ? (int) $receiptItem->id : null
         );
 
-        if ($qtyReceived > $limit['remaining_received']) {
-            throw new \InvalidArgumentException("Quantity Received tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_received']}).");
+        $label = ($purchaseOrderItem->refer_item_model_type === OrderRequestItem::class && $purchaseOrderItem->refer_item_model_id)
+            ? 'sisa PO/Order Request'
+            : 'sisa PO';
+
+        $epsilon = 0.0001;
+        if (($qtyReceived - $limit['remaining_received']) > $epsilon) {
+            throw new \InvalidArgumentException("Quantity Received ({$qtyReceived}) tidak boleh melebihi {$label} ({$limit['remaining_received']}).");
         }
 
-        if ($qtyAccepted > $limit['remaining_accepted']) {
-            throw new \InvalidArgumentException("Quantity Accepted tidak boleh melebihi sisa PO/Order Request ({$limit['remaining_accepted']}).");
+        if (($qtyAccepted - $limit['remaining_accepted']) > $epsilon) {
+            throw new \InvalidArgumentException("Quantity Accepted ({$qtyAccepted}) tidak boleh melebihi {$label} ({$limit['remaining_accepted']}).");
         }
     }
 
     protected static function receiptQuantityForPurchaseOrderItem(int $purchaseOrderItemId, string $column, ?int $excludeReceiptItemId = null): float
     {
         return (float) PurchaseReceiptItem::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->whereHas('purchaseReceipt', fn ($query) => $query->whereNull('deleted_at'))
             ->where('purchase_order_item_id', $purchaseOrderItemId)
             ->when($excludeReceiptItemId, fn ($query) => $query->whereKeyNot($excludeReceiptItemId))
             ->sum($column);
@@ -226,6 +246,7 @@ class OrderRequestQuantityLock
     protected static function receiptQuantityForOrderRequestItem(int $orderRequestItemId, string $column, ?int $excludeReceiptItemId = null): float
     {
         $poItemIds = PurchaseOrderItem::withoutGlobalScopes()
+            ->whereNull('deleted_at')
             ->where('refer_item_model_type', OrderRequestItem::class)
             ->where('refer_item_model_id', $orderRequestItemId)
             ->pluck('id');
@@ -235,6 +256,8 @@ class OrderRequestQuantityLock
         }
 
         return (float) PurchaseReceiptItem::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->whereHas('purchaseReceipt', fn ($query) => $query->whereNull('deleted_at'))
             ->whereIn('purchase_order_item_id', $poItemIds)
             ->when($excludeReceiptItemId, fn ($query) => $query->whereKeyNot($excludeReceiptItemId))
             ->sum($column);

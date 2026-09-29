@@ -130,10 +130,13 @@ class StockOpname extends Model
         $date = $this->opname_date;
         $description = 'Penyesuaian inventory hasil stock opname ' . $this->opname_number;
 
-        // Get inventory adjustment account (COA)
+        // Get inventory adjustment account (COA) - inventory variance accounts, NOT COGS (5100)
         $inventoryAdjustmentCoa = $this->findFirstExistingCoa([
-            '5100',
-            '5100.10',
+            config('coa.inventory_variance_loss', '8000.05'),
+            '8000.05',
+            '6280.05',
+            config('coa.inventory_variance_gain', '7000.04'),
+            '7000.04',
             config('coa.general_expense', '6100'),
         ]);
 

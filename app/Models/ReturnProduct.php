@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\CascadesJournalEntries;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ReturnProduct extends Model
 {
-    use SoftDeletes, HasFactory,LogsGlobalActivity;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
     protected $table = 'return_products';
     protected $fillable = [
         'return_number',
@@ -34,6 +35,11 @@ class ReturnProduct extends Model
     public function fromModel()
     {
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
     }
 
     protected static function booted()

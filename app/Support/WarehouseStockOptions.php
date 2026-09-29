@@ -35,11 +35,11 @@ class WarehouseStockOptions
 
         if ($productId) {
             $stockByWarehouse = InventoryStock::query()
-                ->selectRaw('warehouse_id, SUM(qty_available) as total_qty')
+                ->selectRaw('warehouse_id, SUM(GREATEST(0, qty_available - qty_reserved)) as free_qty, SUM(qty_available) as total_qty')
                 ->where('product_id', $productId)
-                ->where('qty_available', '>', 0)
                 ->groupBy('warehouse_id')
-                ->pluck('total_qty', 'warehouse_id');
+                ->get()
+                ->keyBy('warehouse_id');
         }
 
         $query = Warehouse::query()->where('status', 1);
@@ -79,8 +79,14 @@ class WarehouseStockOptions
                 $stockLabel = '';
 
                 if ($includeStockLabel) {
-                    $qty = (float) ($stockByWarehouse[$warehouse->id] ?? 0);
-                    $stockLabel = ' - Stok: ' . number_format($qty, 0, ',', '.');
+                    $stockData = $stockByWarehouse[$warehouse->id] ?? null;
+                    $freeQty = (float) ($stockData?->free_qty ?? 0);
+                    $totalQty = (float) ($stockData?->total_qty ?? 0);
+                    if ($freeQty != $totalQty) {
+                        $stockLabel = ' - Stok Bebas: ' . number_format($freeQty, 0, ',', '.') . ' (Fisik: ' . number_format($totalQty, 0, ',', '.') . ')';
+                    } else {
+                        $stockLabel = ' - Stok Bebas: ' . number_format($freeQty, 0, ',', '.');
+                    }
                 }
 
                 return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}{$stockLabel}"];

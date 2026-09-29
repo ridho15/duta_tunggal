@@ -748,9 +748,15 @@ class DeliveryOrderResource extends Resource
                 // customer info derived from the first linked sale order
                 Section::make('Customer Information')
                     ->schema([
-                        TextEntry::make('salesOrders.0.customer.name')->label('Name'),
-                        TextEntry::make('salesOrders.0.customer.perusahaan')->label('Company'),
-                        TextEntry::make('salesOrders.0.customer.address')->label('Address'),
+                        TextEntry::make('shipping_address')
+                            ->label('Alamat Pengiriman (Shipped To)')
+                            ->getStateUsing(function ($record) {
+                                $firstSo = $record->salesOrders->first();
+                                return filled($firstSo?->shipped_to)
+                                    ? $firstSo->shipped_to
+                                    : ($firstSo?->customer?->address ?? '-');
+                            }),
+                        TextEntry::make('salesOrders.0.customer.address')->label('Alamat Kantor Customer'),
                         TextEntry::make('salesOrders.0.customer.phone')->label('Phone'),
                         TextEntry::make('salesOrders.0.customer.email')->label('Email'),
                     ])->columns(2),

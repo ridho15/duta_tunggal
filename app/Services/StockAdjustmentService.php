@@ -253,9 +253,13 @@ class StockAdjustmentService
         if ($stockAdjustment->adjustment_type === 'increase') {
             // Inventory Increase:
             // Debit: Inventory COA
-            // Credit: Adjustment Income COA
-            $incomeCoa = ChartOfAccount::whereIn('code', ['7000.04', '7000.01', '7000', '4000'])
-                ->first() ?? ChartOfAccount::where('type', 'Revenue')->first();
+            // Credit: Adjustment Income COA (Selisih Persediaan - Pendapatan Luar Usaha)
+            $incomeCoa = $this->findFirstExistingCoa([
+                config('coa.inventory_variance_gain', '7000.04'),
+                '7000.04',
+                '7000.01',
+                '7000',
+            ]);
 
             if (! $incomeCoa) {
                 throw ValidationException::withMessages([
@@ -292,10 +296,16 @@ class StockAdjustmentService
             ]);
         } else {
             // Inventory Decrease:
-            // Debit: Adjustment Expense COA
+            // Debit: Adjustment Expense COA (Selisih Persediaan - Beban Luar Usaha/Umum)
             // Credit: Inventory COA
-            $expenseCoa = ChartOfAccount::whereIn('code', ['6280.05', '8000.05', '6280', '8000', '6100', '6000', '5100'])
-                ->first() ?? ChartOfAccount::where('type', 'Expense')->first();
+            $expenseCoa = $this->findFirstExistingCoa([
+                config('coa.inventory_variance_loss', '8000.05'),
+                '8000.05',
+                '6280.05',
+                '8000',
+                '6280',
+                '6100',
+            ]);
 
             if (! $expenseCoa) {
                 throw ValidationException::withMessages([
@@ -331,5 +341,21 @@ class StockAdjustmentService
                 ]);
             }
         }
+    }
+
+    protected function findFirstExistingCoa(array $codes): ?ChartOfAccount
+    {
+        foreach ($codes as $code) {
+            if (! $code) {
+                continue;
+            }
+
+            $coa = ChartOfAccount::where('code', $code)->first();
+            if ($coa?->id) {
+                return $coa;
+            }
+        }
+
+        return null;
     }
 }

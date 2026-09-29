@@ -998,7 +998,7 @@ class QuotationResource extends Resource
                                                     $currencyId,
                                                     false
                                                 );
-                                                $set('unit_price', static::formatCurrencyInputState($numericUnit, $currencyId));
+                                                $set('unit_price', $numericUnit);
                                                 $set('unit_price_idr', MoneyHelper::parseHighPrecision($product->sell_price ?? 0));
                                                 $set('unit', $product->uom?->abbreviation ?? '-');
                                                 $set('product_name', $product->name);

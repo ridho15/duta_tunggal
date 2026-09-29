@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Enums\PaymentStatus;
+use App\Helpers\MoneyHelper;
 use App\Models\ChartOfAccount;
 use App\Models\Deposit;
 use App\Models\Invoice;
@@ -183,6 +184,8 @@ class VendorPaymentObserver
             // Sync related PaymentRequests
             $this->syncPaymentRequestsForInvoice($accountPayable->invoice_id);
         }
+
+        $this->syncPaymentRequestDirectly($payment);
     }
 
     public function reverseAccountPayableAndInvoiceStatus(VendorPayment $payment)
@@ -226,6 +229,37 @@ class VendorPaymentObserver
 
             // Sync related PaymentRequests
             $this->syncPaymentRequestsForInvoice($accountPayable->invoice_id);
+        }
+
+        $this->syncPaymentRequestDirectly($payment);
+    }
+
+    public function syncPaymentRequestDirectly(VendorPayment $payment): void
+    {
+        $prId = $payment->payment_request_id;
+        if (! $prId) {
+            return;
+        }
+
+        $pr = PaymentRequest::find($prId);
+        if (! $pr || in_array($pr->status, [PaymentRequest::STATUS_REJECTED])) {
+            return;
+        }
+
+        $totalPaid = (float) VendorPayment::where('payment_request_id', $pr->id)
+            ->whereIn('status', ['paid', 'partial', 'approved', 'completed'])
+            ->sum('total_payment');
+
+        $totalAmount = (float) MoneyHelper::safeParse($pr->total_amount ?? 0);
+
+        if ($totalPaid >= ($totalAmount - 0.01) && $totalAmount > 0) {
+            $pr->update(['status' => PaymentRequest::STATUS_PAID]);
+        } elseif ($totalPaid > 0) {
+            $pr->update(['status' => PaymentRequest::STATUS_PARTIAL]);
+        } else {
+            if ($pr->status === PaymentRequest::STATUS_PARTIAL) {
+                $pr->update(['status' => PaymentRequest::STATUS_APPROVED]);
+            }
         }
     }
 

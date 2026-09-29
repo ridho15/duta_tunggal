@@ -81,20 +81,24 @@ class StockAdjustment extends Model
         $date = now()->format('Ymd');
         $prefix = 'ADJ-' . $date . '-';
 
-        // Find the latest adjustment number for today
-        $latest = self::where('adjustment_number', 'like', $prefix . '%')
+        // Find the latest adjustment number for today (including soft-deleted records to prevent unique constraint violations)
+        $latest = self::withTrashed()
+            ->where('adjustment_number', 'like', $prefix . '%')
             ->orderBy('adjustment_number', 'desc')
             ->first();
 
         if ($latest) {
-            // Extract the sequential number and increment
             $lastNumber = (int) substr($latest->adjustment_number, -3);
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
 
-        // Format as 3-digit number with leading zeros
-        return $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+        do {
+            $candidate = $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $nextNumber++;
+        } while (self::withTrashed()->where('adjustment_number', $candidate)->exists());
+
+        return $candidate;
     }
 }

@@ -169,6 +169,25 @@
 </head>
 
 <body>
+    @php
+        $watermark = match ($quotation->status) {
+            'draft' => 'DRAFT',
+            'reject' => 'DITOLAK',
+            'expired' => 'KEDALUWARSA',
+            default => null,
+        };
+        $title = match ($quotation->status) {
+            'approve' => 'SURAT PENAWARAN HARGA',
+            'draft' => 'DRAFT PENAWARAN HARGA',
+            default => 'PENAWARAN HARGA',
+        };
+    @endphp
+
+    @if (!empty($watermark))
+        <div style="position: fixed; top: 38%; left: 0; width: 100%; text-align: center; font-size: 80px; font-weight: bold; letter-spacing: 8px; color: {{ in_array($watermark, ['DITOLAK', 'KEDALUWARSA']) ? '#e9b8b8' : '#e0e0e0' }}; transform: rotate(-28deg); z-index: -1;">
+            {{ $watermark }}
+        </div>
+    @endif
 
     <table class="header-table">
         <tr>
@@ -186,7 +205,7 @@
     </table>
 
     <div class="title-container">
-        <div class="title">QUOTATION</div>
+        <div class="title">{{ $title }}</div>
     </div>
 
     <table class="info-table">

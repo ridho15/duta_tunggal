@@ -48,13 +48,7 @@ class SuratJalanService
         $invalid = $deliveryOrders->where('status', '!=', 'approved');
         if ($invalid->isNotEmpty()) {
             $details = $invalid->map(function ($do) {
-                $statusLabel = match ($do->status) {
-                    'draft' => 'Draft (belum diajukan)',
-                    'request_stock' => 'Permintaan Stok (belum disetujui)',
-                    'sent' => 'Sudah Dikirim',
-                    'received' => 'Sudah Diterima',
-                    default => $do->status,
-                };
+                $statusLabel = DeliveryOrder::statusLabel($do->status);
                 return "{$do->do_number} (Status: {$statusLabel})";
             })->implode(', ');
 

@@ -362,6 +362,11 @@ class Invoice extends Model
         return $this->hasOne(AccountReceivable::class, 'invoice_id')->withDefault();
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     // Accessor to get customer data from related model
     public function getCustomerAttribute()
     {

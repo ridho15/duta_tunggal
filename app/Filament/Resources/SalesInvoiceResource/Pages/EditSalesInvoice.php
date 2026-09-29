@@ -19,10 +19,9 @@ class EditSalesInvoice extends EditRecord
      */
     public function authorizeAccess(): void
     {
-        parent::authorizeAccess();
-
         $record = $this->getRecord();
         $lockedStatuses = [
+            \App\Models\Invoice::STATUS_SENT,
             \App\Models\Invoice::STATUS_PAID,
             \App\Models\Invoice::STATUS_PARTIALLY_PAID,
             \App\Models\Invoice::STATUS_OVERDUE,
@@ -37,17 +36,21 @@ class EditSalesInvoice extends EditRecord
                 ->send();
 
             $this->redirect(SalesInvoiceResource::getUrl('view', ['record' => $record]));
+            return;
         }
+
+        parent::authorizeAccess();
     }
 
     protected function getHeaderActions(): array
     {
         return [
             Actions\ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
-            // FIX #2: Hapus hanya untuk invoice yang belum final
+            // FIX #2: Hapus hanya untuk invoice yang belum final (draft)
             Actions\DeleteAction::make()
                 ->icon('heroicon-o-trash')
                 ->visible(fn () => !in_array($this->record->status, [
+                    \App\Models\Invoice::STATUS_SENT,
                     \App\Models\Invoice::STATUS_PAID,
                     \App\Models\Invoice::STATUS_PARTIALLY_PAID,
                     \App\Models\Invoice::STATUS_OVERDUE,

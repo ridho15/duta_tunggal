@@ -314,7 +314,7 @@ class JournalEntryResource extends Resource
                             ->schema([
                                 Forms\Components\Select::make('coa_id')
                                     ->label('Chart of Account')
-                                    ->relationship('coa', 'name')
+                                    ->relationship('coa', 'name', fn (\Illuminate\Database\Eloquent\Builder $query) => $query->whereDoesntHave('children')->where('is_active', true))
                                     ->searchable()
                                     ->preload()
                                     ->getOptionLabelFromRecordUsing(fn($record) => "{$record->code} - {$record->name}")

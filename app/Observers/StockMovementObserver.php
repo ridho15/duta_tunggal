@@ -22,12 +22,7 @@ class StockMovementObserver
 
         $delta = $this->stockEffectDelta($stockMovement->type, $stockMovement->quantity);
         if ($delta !== 0.0) {
-            $this->adjustAvailableStockByKey(
-                $stockMovement->product_id,
-                $stockMovement->warehouse_id,
-                $stockMovement->rak_id,
-                $delta
-            );
+            $this->adjustAvailableStock($stockMovement, $delta);
         }
     }
 
@@ -155,17 +150,25 @@ class StockMovementObserver
             $stockMovement->product_id,
             $stockMovement->warehouse_id,
             $stockMovement->rak_id,
-            $delta
+            $delta,
+            $stockMovement->type,
+            $stockMovement->meta
         );
     }
 
-    private function adjustAvailableStockByKey(?int $productId, ?int $warehouseId, ?int $rakId, float $delta): void
-    {
+    private function adjustAvailableStockByKey(
+        ?int $productId,
+        ?int $warehouseId,
+        ?int $rakId,
+        float $delta,
+        ?string $type = null,
+        mixed $meta = null
+    ): void {
         if (! $productId || ! $warehouseId || $delta === 0.0) {
             return;
         }
 
-        DB::transaction(function () use ($productId, $warehouseId, $rakId, $delta) {
+        DB::transaction(function () use ($productId, $warehouseId, $rakId, $delta, $type, $meta) {
             $inventoryStock = InventoryStock::where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
                 ->where('rak_id', $rakId)
@@ -182,7 +185,18 @@ class StockMovementObserver
                 ]);
             }
 
-            $inventoryStock->qty_available = (float) $inventoryStock->qty_available + $delta;
+            $newQty = (float) $inventoryStock->qty_available + $delta;
+
+            // Proteksi stok minus untuk pergerakan keluar operasional
+            $allowNegative = (bool) data_get($meta, 'allow_negative_stock', false);
+            if ($delta < 0 && $newQty < -0.0001 && ! $allowNegative && in_array($type, ['sales', 'transfer_out', 'manufacture_out', 'purchase_return', 'return_out', 'purchase_return_out'])) {
+                $productName = \App\Models\Product::find($productId)?->name ?? "Produk #{$productId}";
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'quantity' => "Stok persediaan tidak mencukupi untuk {$productName}. Stok saat ini: {$inventoryStock->qty_available}, diminta: " . abs($delta) . ".",
+                ]);
+            }
+
+            $inventoryStock->qty_available = $newQty;
             $inventoryStock->save();
         });
     }
@@ -192,8 +206,8 @@ class StockMovementObserver
         $normalizedQuantity = abs((float) $quantity);
 
         return match ($type) {
-            'purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in' => $normalizedQuantity,
-            'sales', 'transfer_out', 'manufacture_out', 'adjustment_out' => -1 * $normalizedQuantity,
+            'purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in', 'customer_return', 'return_in', 'sales_return_in' => $normalizedQuantity,
+            'sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'purchase_return', 'return_out', 'purchase_return_out' => -1 * $normalizedQuantity,
             default => 0.0,
         };
     }

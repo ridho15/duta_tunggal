@@ -10,6 +10,19 @@ use Illuminate\Support\Facades\Log;
 class StockTransferItemObserver
 {
     /**
+     * Handle the StockTransferItem "saving" event.
+     */
+    public function saving(StockTransferItem $stockTransferItem): void
+    {
+        if (empty($stockTransferItem->from_rak_id) || $stockTransferItem->from_rak_id === '') {
+            $stockTransferItem->from_rak_id = null;
+        }
+        if (empty($stockTransferItem->to_rak_id) || $stockTransferItem->to_rak_id === '') {
+            $stockTransferItem->to_rak_id = null;
+        }
+    }
+
+    /**
      * Handle the StockTransferItem "created" event.
      */
     public function created(StockTransferItem $stockTransferItem): void

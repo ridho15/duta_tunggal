@@ -25,6 +25,9 @@ class Supplier extends Model
         'tempo_hutang', // hari,
         'kontak_person',
         'keterangan',
+        'nama_bank',
+        'nomor_rekening',
+        'nama_rekening',
         'cabang_id'
     ];
 
@@ -74,5 +77,15 @@ class Supplier extends Model
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    public function getAtasNamaAttribute()
+    {
+        return $this->nama_rekening;
+    }
+
+    public function setAtasNamaAttribute($value)
+    {
+        $this->attributes['nama_rekening'] = $value;
     }
 }

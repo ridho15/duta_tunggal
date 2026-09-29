@@ -55,5 +55,7 @@ return [
     'import_duty'            => '5130',    // Bea Masuk
     'general_expense'        => '6100',    // Beban Umum
     'purchase_price_variance'=> '5160',    // Selisih Pembelian
+    'inventory_variance_gain'=> '7000.04', // Pendapatan Selisih Persediaan (Pendapatan Luar Usaha)
+    'inventory_variance_loss'=> '8000.05', // Beban Selisih Persediaan (Beban Luar Usaha)
 
 ];

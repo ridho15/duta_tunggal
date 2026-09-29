@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\OrderRequestItem;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
@@ -43,6 +44,22 @@ class PurchaseReceiptItemObserver
 
     public function saving(PurchaseReceiptItem $receiptItem): void
     {
+        if (! $receiptItem->purchase_order_item_id && $receiptItem->product_id) {
+            $purchaseReceipt = $receiptItem->purchaseReceipt
+                ?: PurchaseReceipt::withoutGlobalScopes()->find($receiptItem->purchase_receipt_id);
+
+            if ($purchaseReceipt && $purchaseReceipt->purchase_order_id) {
+                $poItem = PurchaseOrderItem::withoutGlobalScopes()
+                    ->where('purchase_order_id', $purchaseReceipt->purchase_order_id)
+                    ->where('product_id', $receiptItem->product_id)
+                    ->first();
+
+                if ($poItem) {
+                    $receiptItem->purchase_order_item_id = $poItem->id;
+                }
+            }
+        }
+
         OrderRequestQuantityLock::validatePurchaseReceiptItem($receiptItem);
     }
 

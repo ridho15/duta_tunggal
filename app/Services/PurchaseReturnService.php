@@ -316,7 +316,8 @@ class PurchaseReturnService
                     '5120',
                 ]);
 
-                $hasAp = $this->findRelatedAccountPayable($purchaseReturn) !== null;
+                $accountPayable = $this->findRelatedAccountPayable($purchaseReturn);
+                $hasAp = $accountPayable !== null;
                 $liabilityCoa = $hasAp
                     ? $this->findFirstExistingCoa([
                         config('coa.accounts_payable'),
@@ -330,6 +331,30 @@ class PurchaseReturnService
                         config('coa.accounts_payable'),
                         '2110',
                     ]);
+
+                // Determine if purchase had VAT (PPN Masukan) to reverse
+                $ppnReturnAmount = 0.0;
+                $ppnMasukanCoa = null;
+
+                if ($hasAp && $accountPayable?->invoice) {
+                    $invoice = $accountPayable->invoice;
+                    $ppnRate = (float) ($invoice->ppn_rate ?? 0);
+                    if ($ppnRate <= 0 && (float) $invoice->subtotal > 0 && (float) $invoice->tax > 0) {
+                        $ppnRate = round(((float) $invoice->tax / (float) $invoice->subtotal) * 100, 2);
+                    }
+
+                    if ($ppnRate > 0) {
+                        $ppnReturnAmount = round($totalReturnAmount * ($ppnRate / 100), 2);
+                        $ppnMasukanCoa = $this->findFirstExistingCoa([
+                            config('coa.ppn_masukan'),
+                            '1170.06',
+                            '1170',
+                            '1500',
+                        ]);
+                    }
+                }
+
+                $grossApDebit = round($totalReturnAmount + $ppnReturnAmount, 2);
 
                 $inventoryCredits = [];
 
@@ -382,7 +407,7 @@ class PurchaseReturnService
                     'date' => $date,
                     'reference' => $reference,
                     'description' => $description . $liabilityDesc,
-                    'debit' => round($totalReturnAmount, 2),
+                    'debit' => round($grossApDebit, 2),
                     'credit' => 0,
                     'journal_type' => 'purchase_return',
                     'source_type' => PurchaseReturn::class,
@@ -398,6 +423,22 @@ class PurchaseReturnService
                         'description' => $description . ' - Reduce inventory value',
                         'debit' => 0,
                         'credit' => round($inventoryCredit['amount'], 2),
+                        'journal_type' => 'purchase_return',
+                        'source_type' => PurchaseReturn::class,
+                        'source_id' => $purchaseReturn->id,
+                        'cabang_id' => $purchaseReturn->cabang_id,
+                    ]);
+                }
+
+                // If invoice had VAT (PPN Masukan), reverse PPN Masukan
+                if ($ppnReturnAmount > 0 && $ppnMasukanCoa) {
+                    $entries[] = JournalEntry::create([
+                        'coa_id' => $ppnMasukanCoa->id,
+                        'date' => $date,
+                        'reference' => $reference,
+                        'description' => $description . ' - Reversal PPN Masukan atas retur beli',
+                        'debit' => 0,
+                        'credit' => round($ppnReturnAmount, 2),
                         'journal_type' => 'purchase_return',
                         'source_type' => PurchaseReturn::class,
                         'source_id' => $purchaseReturn->id,
@@ -624,14 +665,28 @@ class PurchaseReturnService
                 return false;
             }
 
+            // Factor in VAT if invoice had PPN
+            $ppnReturnAmount = 0.0;
+            if ($accountPayable->invoice) {
+                $invoice = $accountPayable->invoice;
+                $ppnRate = (float) ($invoice->ppn_rate ?? 0);
+                if ($ppnRate <= 0 && (float) $invoice->subtotal > 0 && (float) $invoice->tax > 0) {
+                    $ppnRate = round(((float) $invoice->tax / (float) $invoice->subtotal) * 100, 2);
+                }
+                if ($ppnRate > 0) {
+                    $ppnReturnAmount = round($returnAmountIdr * ($ppnRate / 100), 2);
+                }
+            }
+            $returnAmountGrossIdr = round($returnAmountIdr + $ppnReturnAmount, 2);
+
             $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
             $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
-            $returnAmountOriginal = round($returnAmountIdr / $exchangeRate, 2);
+            $returnAmountOriginal = round($returnAmountGrossIdr / $exchangeRate, 2);
 
             $totalIdr = (float) $accountPayable->total;
             $totalOriginal = (float) ($accountPayable->total_original ?? ($totalIdr / $exchangeRate));
 
-            $newPaidIdr = min($totalIdr, (float) $accountPayable->paid + $returnAmountIdr);
+            $newPaidIdr = min($totalIdr, (float) $accountPayable->paid + $returnAmountGrossIdr);
             $newRemainingIdr = max(0.0, $totalIdr - $newPaidIdr);
 
             $newPaidOriginal = min($totalOriginal, (float) ($accountPayable->paid_original ?? 0) + $returnAmountOriginal);

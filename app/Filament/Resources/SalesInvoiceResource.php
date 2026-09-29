@@ -1107,6 +1107,7 @@ class SalesInvoiceResource extends Resource
                     // FIX #2: Edit hanya muncul untuk invoice yang belum final
                     EditAction::make()
                         ->visible(fn ($record) => !in_array($record->status, [
+                            \App\Models\Invoice::STATUS_SENT,
                             \App\Models\Invoice::STATUS_PAID,
                             \App\Models\Invoice::STATUS_PARTIALLY_PAID,
                             \App\Models\Invoice::STATUS_OVERDUE,
@@ -1141,9 +1142,10 @@ class SalesInvoiceResource extends Resource
                                 return redirect()->to("/admin/journal-entries?tableFilters[source_type][value]={$sourceType}&tableFilters[source_id][source_id]={$sourceId}");
                             }
                         }),
-                    // FIX #2: Hapus hanya muncul untuk invoice yang belum final
+                    // FIX #2: Hapus hanya muncul untuk invoice yang belum final (draft)
                     DeleteAction::make()
                         ->visible(fn ($record) => !in_array($record->status, [
+                            \App\Models\Invoice::STATUS_SENT,
                             \App\Models\Invoice::STATUS_PAID,
                             \App\Models\Invoice::STATUS_PARTIALLY_PAID,
                             \App\Models\Invoice::STATUS_OVERDUE,
@@ -1153,7 +1155,21 @@ class SalesInvoiceResource extends Resource
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $deletable = $records->filter(fn ($record) => $record->status === \App\Models\Invoice::STATUS_DRAFT);
+                            $blocked = $records->count() - $deletable->count();
+
+                            $deletable->each->delete();
+
+                            if ($blocked > 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->warning()
+                                    ->title('Sebagian invoice tidak dapat dihapus')
+                                    ->body("{$blocked} invoice berstatus terposting/final dilewati dan tidak dihapus.")
+                                    ->send();
+                            }
+                        }),
                 ]),
             ])
             ->defaultSort('created_at', 'desc')

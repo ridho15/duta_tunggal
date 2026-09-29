@@ -55,7 +55,7 @@ class ViewReturnProduct extends ViewRecord
                         HelperController::sendNotification(
                             isSuccess: true,
                             title: 'Return Product Approved',
-                            message: "Return product {$this->record->return_number} berhasil diapprove. Quantity telah diperbarui."
+                            message: "Return product {$this->record->return_number} berhasil diapprove. Stok fisik telah dikembalikan ke inventori gudang dan jurnal pembalik berhasil dicatat."
                         );
                     } catch (\Throwable $e) {
                         HelperController::sendNotification(

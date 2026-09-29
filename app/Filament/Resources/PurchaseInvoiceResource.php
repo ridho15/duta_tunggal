@@ -1473,7 +1473,7 @@ class PurchaseInvoiceResource extends Resource
                     ->formatStateUsing(function ($state) {
                         return match ($state) {
                             Invoice::STATUS_DRAFT => 'Draft',
-                            Invoice::STATUS_SENT => 'Terkirim',
+                            Invoice::STATUS_SENT => 'Menunggu Pembayaran',
                             Invoice::STATUS_PAID => 'Lunas',
                             Invoice::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
                             Invoice::STATUS_OVERDUE => 'Terlambat',

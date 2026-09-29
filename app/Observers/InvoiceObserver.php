@@ -185,18 +185,19 @@ class InvoiceObserver
                 'changed_fields' => array_intersect_key($invoice->getChanges(), array_flip($financialFields))
             ]);
 
-            // Delete existing journal entries
-            \App\Models\JournalEntry::where('source_type', Invoice::class)
-                ->where('source_id', $invoice->id)
-                ->delete();
-
-            // Re-post journal entries with new amounts
+            // Re-post journal entries atomically: rollback deletion if re-post fails
             try {
-                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
-                    $this->postSalesInvoice($invoice);
-                } else {
-                    $this->ledger->postInvoice($invoice);
-                }
+                \Illuminate\Support\Facades\DB::transaction(function () use ($invoice) {
+                    \App\Models\JournalEntry::where('source_type', Invoice::class)
+                        ->where('source_id', $invoice->id)
+                        ->delete();
+
+                    if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                        $this->postSalesInvoice($invoice);
+                    } else {
+                        $this->ledger->postInvoice($invoice);
+                    }
+                });
             } catch (Throwable $exception) {
                 Log::error('InvoiceObserver: failed to re-post journal on update', [
                     'invoice_id' => $invoice->id,
@@ -206,7 +207,7 @@ class InvoiceObserver
                     ProcurementFailureNotifier::warning(
                         'Gagal Memperbarui Jurnal Invoice',
                         $exception,
-                        'Perubahan invoice berhasil disimpan, tetapi jurnal belum dapat diperbarui.'
+                        'Perubahan invoice berhasil disimpan, tetapi jurnal belum dapat diperbarui karena terjadi inkonsistensi nilai. Jurnal lama tetap dipertahankan.'
                     );
                 }
             }
@@ -286,10 +287,11 @@ class InvoiceObserver
         $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
         $totalIdr = (float) MoneyHelper::safeParse($invoice->total ?? 0);
         $totalOriginal = round($totalIdr / $exchangeRate, 4);
+        $customerId = $fromModel->customer_id ?? $invoice->customer_id;
         $accountReceivable = AccountReceivable::firstOrCreate(
             ['invoice_id' => $invoice->id],
             [
-                'customer_id' => $fromModel->customer_id,
+                'customer_id' => $customerId,
                 'currency_id' => $currencyId,
                 'exchange_rate' => $exchangeRate,
                 'total_original' => $totalOriginal,
@@ -305,7 +307,7 @@ class InvoiceObserver
 
         if ($accountReceivable->wasRecentlyCreated === false) {
             $accountReceivable->forceFill([
-                'customer_id' => $fromModel->customer_id,
+                'customer_id' => $customerId,
                 'currency_id' => $currencyId,
                 'exchange_rate' => $exchangeRate,
                 'total_original' => $totalOriginal,
@@ -492,11 +494,20 @@ class InvoiceObserver
         $totalTaxAmount = (float) $invoiceItems->sum('tax_amount');
         if ($totalTaxAmount <= 0) {
             $ppnRateVal = (float) ($invoice->ppn_rate ?? 0);
-            if ($ppnRateVal > 0) {
+            if ($ppnRateVal > 0 && $ppnRateVal <= 100) {
                 $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ($ppnRateVal / 100));
             } elseif ((float) $invoice->tax > 0) {
-                // Legacy: tax stores percentage rate (e.g. 11 for 11%)
-                $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ((float) $invoice->tax / 100));
+                $taxVal = (float) $invoice->tax;
+                if ($taxVal > 100) {
+                    $totalTaxAmount = $taxVal;
+                } else {
+                    $totalTaxAmount = max(0.0, (float) $invoice->subtotal * ($taxVal / 100));
+                }
+            } elseif ((float) $invoice->total > (float) $invoice->subtotal) {
+                $diff = (float) $invoice->total - (float) $invoice->subtotal - (float) $otherFeeTotal;
+                if ($diff > 0) {
+                    $totalTaxAmount = $diff;
+                }
             }
         }
         $totalTaxAmount = round($totalTaxAmount, 2);

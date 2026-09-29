@@ -184,8 +184,10 @@ class SuratJalanDocumentBuilder
             'do_status' => DeliveryOrder::statusLabel($deliveryOrder->status),
             'sales_orders' => $salesOrders->pluck('so_number')->filter()->unique()->values()->all(),
             'customers' => $this->customerNames($salesOrders),
-            'addresses' => $salesOrders->pluck('shipped_to')
-                ->map(fn ($address) => DeliveryOrderSourceValidator::normalizeAddress($address) === '' ? null : trim((string) $address))
+            'addresses' => $salesOrders->map(function ($so) {
+                    $addr = filled($so->shipped_to) ? $so->shipped_to : ($so->customer?->address ?? null);
+                    return DeliveryOrderSourceValidator::normalizeAddress($addr) === '' ? null : trim((string) $addr);
+                })
                 ->filter()->unique()->values()->all(),
             'items' => $items,
         ];

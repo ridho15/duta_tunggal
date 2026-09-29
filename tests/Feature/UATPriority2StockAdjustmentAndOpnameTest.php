@@ -81,9 +81,9 @@ class UATPriority2StockAdjustmentAndOpnameTest extends TestCase
         );
 
         $this->adjustmentExpenseCoa = ChartOfAccount::firstOrCreate(
-            ['code' => '6280.05'],
+            ['code' => config('coa.inventory_variance_loss', '8000.05')],
             [
-                'name' => 'Biaya Administrasi Umum Lainnya',
+                'name' => 'Beban Selisih Persediaan',
                 'type' => 'Expense',
                 'status' => 1,
             ]
