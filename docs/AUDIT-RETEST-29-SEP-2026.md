@@ -143,18 +143,18 @@ Kondisi guard pada `resources/js/components/QuotationForm/QuotationItemTable.tsx
 
 ## 3. Bug Sedang/Kecil
 
-| # | Bug | Status | Root cause singkat |
+| # | Bug | Status | Root cause & Solusi singkat |
 |---|-----|--------|---------------------|
-| A1 | GRN auto-fill semua item saat dipilih di retur pembelian | **CONFIRMED** | `PurchaseReturnResource.php:95-140` — `afterStateUpdated` men-`$set` SELURUH item GRN sekaligus, tidak ada pemilihan sebagian |
-| A2 | Status "Approved" bisa dipilih saat create retur pembelian | **Sudah diperbaiki** (commit `4c4bf1c9`, 23 Sep — sebelum hari ini) | Field status sudah `->disabled()` + dipaksa `'draft'` saat create; diverifikasi langsung di browser |
-| B | "Stok Bebas" 0 di SO | **PLAUSIBLE** | `SaleOrderApiController.php:124-128` — filter `qty_available > 0` diterapkan PER-BARIS sebelum SUM (bukan di-floor ke 0), bisa membuang baris minus/nol sebelum dijumlah. Form PHP SO (termasuk fix `WarehouseStockOptions` hari ini) adalah **dead code**, tidak pernah dirender — SO pakai form React. |
+| A1 | GRN auto-fill semua item saat dipilih di retur pembelian | **RESOLVED (Tahap 8)** | Auto-fill paksa seluruh item GRN dihapus di `PurchaseReturnResource.php`. User dapat menambah item secara selektif via tombol "Tambah Item Retur" di repeater. |
+| A2 | Status "Approved" bisa dipilih saat create retur pembelian | **Sudah diperbaiki** (commit `4c4bf1c9`) | Field status sudah `->disabled()` + dipaksa `'draft'` saat create; diverifikasi langsung di browser |
+| B | "Stok Bebas" 0 di SO | **RESOLVED (Tahap 8)** | Filter per-baris `qty_available > 0` dihapus dari `SaleOrderApiController.php`; diganti formula agregasi `GREATEST(0, SUM(qty_available - qty_reserved))` dan pemetaan non-negatif. |
 | — | SO-00006/07 "Terkirim 0" | **DATA ISSUE**, bukan bug | Kedua SO berstatus `canceled` dan memang tidak pernah punya Delivery Order |
-| C | Akun induk bank/deposito masih bisa dipilih di bayar vendor | **CONFIRMED** | `VendorPaymentResource.php:639-680` reimplementasi filter COA sendiri (`whereDoesntHave('children')` saja), tidak memakai `ChartOfAccount::scopeCashBankCandidates()` yang sudah benar & sudah exclude nama deposito/investasi |
+| C | Akun induk bank/deposito masih bisa dipilih di bayar vendor | **RESOLVED (Tahap 8)** | Dibuat helper sentral `VendorPaymentAccounts` berbasis `ChartOfAccount::scopeCashBank()` yang otomatis menyaring akun induk & deposito/investasi pada `VendorPaymentResource.php`. |
 | D | Supplier Abdi Karya belum ada rekening bank | **DATA ISSUE** | Field bank baru ditambahkan hari ini, optional by design, semua 25 supplier lokal masih NULL — tinggal diisi |
-| E | Status invoice pembelian posted tertulis "Terkirim" | **CONFIRMED — fix hari ini tidak lengkap** | Hanya 1 dari 4+ tempat yang memakai `Invoice::STATUS_LABELS[STATUS_SENT]` diperbaiki (`PurchaseInvoiceResource.php:1476`); constant sumbernya sendiri (`Invoice.php:28`) tidak diubah dan masih dipakai form/cetak/notifikasi lain |
-| F | Alasan reject header QC kosong | **CONFIRMED** | Header `reason_reject` (`QualityControlPurchaseResource.php:1664`) baca kolom header yang tidak pernah diisi lagi di jalur QC multi-item modern; alasan sebenarnya tersimpan per-item |
+| E | Status invoice pembelian posted tertulis "Terkirim" | **RESOLVED (Tahap 8)** | Konstanta inti `Invoice::STATUS_LABELS[STATUS_SENT]` diseragamkan menjadi `'Menunggu Pembayaran'`; closure duplikat dihapus di `PurchaseInvoiceResource.php`. |
+| F | Alasan reject header QC kosong | **RESOLVED (Tahap 8)** | Alasan reject per-item diagregasikan ke kolom header saat create & complete QC (`CreateQualityControlPurchase.php` & `QualityControlService.php`), dan infolist view diberi fallback resolver. |
 | G | Satuan "BH]" | **DATA ISSUE** | Sudah ada command `CleanUatMasterDataCommand` khusus untuk ini; tidak ada kode yang menghasilkan pola ini |
-| H | Draft adjustment qty minus tersimpan | **CONFIRMED** | `StockAdjustmentResource.php:204-215` field `adjusted_qty` tidak punya `->minValue(0)`; validasi non-negatif hanya ada di service saat approve |
+| H | Draft adjustment qty minus tersimpan | **RESOLVED (Tahap 8)** | Ditambahkan `->minValue(0)` pada field `adjusted_qty` di form utama `StockAdjustmentResource.php` dan `StockAdjustmentItemsRelationManager.php`. |
 
 ---
 

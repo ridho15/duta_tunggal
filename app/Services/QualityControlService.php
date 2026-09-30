@@ -1152,6 +1152,20 @@ class QualityControlService
             $qualityControl->update(['purchase_return_processed' => now()]);
         }
 
+        // Agregasikan reason_reject item ke header jika header masih kosong
+        if (empty($qualityControl->reason_reject) && $qualityControl->items()->exists()) {
+            $itemReasons = $qualityControl->items
+                ->where('rejected_quantity', '>', 0)
+                ->pluck('reason_reject')
+                ->filter()
+                ->unique()
+                ->implode('; ');
+
+            if ($itemReasons !== '') {
+                $qualityControl->update(['reason_reject' => $itemReasons]);
+            }
+        }
+
         // 3. Copy biaya and post receipt
         $purchaseReceiptService = app(\App\Services\PurchaseReceiptService::class);
         $purchaseReceiptService->copyBiayaFromPurchaseOrderToReceipt($purchaseOrder, $purchaseReceipt);

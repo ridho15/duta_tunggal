@@ -93,54 +93,16 @@ class PurchaseReturnResource extends Resource
                                     });
                             })
                             ->afterStateUpdated(function ($set, $state) {
+                                $set('purchaseReturnItem', []);
+
                                 if ($state) {
-                                    $purchaseReceipt = \App\Models\PurchaseReceipt::with([
-                                        'purchaseReceiptItem.purchaseOrderItem',
-                                        'purchaseReceiptItem.product',
-                                        'purchaseOrder.purchaseOrderItem',
-                                    ])->find($state);
+                                    $purchaseReceipt = \App\Models\PurchaseReceipt::find($state);
 
                                     if ($purchaseReceipt) {
                                         if (!in_array('all', Auth::user()?->manage_type ?? [])) {
                                             $set('cabang_id', $purchaseReceipt->cabang_id);
                                         }
-
-                                        $items = [];
-                                        foreach ($purchaseReceipt->purchaseReceiptItem as $receiptItem) {
-                                            $alreadyReturned = (float) \App\Models\PurchaseReturnItem::where('purchase_receipt_item_id', $receiptItem->id)
-                                                ->whereHas('purchaseReturn', fn ($q) => $q->whereNotIn('status', ['rejected']))
-                                                ->sum('qty_returned');
-
-                                            $acceptedQty = (float) ($receiptItem->qty_accepted ?? $receiptItem->qty_received ?? 0);
-                                            $availableQty = max(0, $acceptedQty - $alreadyReturned);
-
-                                            if ($availableQty > 0) {
-                                                $poItem = $receiptItem->purchaseOrderItem
-                                                    ?? $purchaseReceipt->purchaseOrder?->purchaseOrderItem?->firstWhere('product_id', $receiptItem->product_id);
-
-                                                $unitPrice = (float) (
-                                                    $poItem?->unit_price
-                                                    ?? $receiptItem->product?->cost_price
-                                                    ?? $receiptItem->product?->purchase_price
-                                                    ?? 0
-                                                );
-
-                                                $items[] = [
-                                                    'purchase_receipt_item_id' => $receiptItem->id,
-                                                    'product_id' => $receiptItem->product_id,
-                                                    'qty_returned' => $availableQty,
-                                                    'unit_price' => $unitPrice,
-                                                    'reason' => null,
-                                                ];
-                                            }
-                                        }
-
-                                        if (!empty($items)) {
-                                            $set('purchaseReturnItem', $items);
-                                        }
                                     }
-                                } else {
-                                    $set('purchaseReturnItem', []);
                                 }
                             })
                             ->validationMessages([
@@ -195,6 +157,7 @@ class PurchaseReturnResource extends Resource
                         Repeater::make('purchaseReturnItem')
                             ->relationship()
                             ->label('Return Item')
+                            ->addActionLabel('Tambah Item Retur')
                             ->columnSpanFull()
                             ->columns(2)
                             ->reactive()

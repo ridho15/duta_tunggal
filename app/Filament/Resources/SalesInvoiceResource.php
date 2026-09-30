@@ -1051,14 +1051,7 @@ class SalesInvoiceResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'draft' => 'Draft',
-                        'sent' => 'Terkirim',
-                        'paid' => 'Lunas',
-                        'partially_paid' => 'Dibayar Sebagian',
-                        'overdue' => 'Terlambat',
-                        'cancelled' => 'Dibatalkan',
-                    ]),
+                    ->options(Invoice::STATUS_LABELS),
                 SelectFilter::make('tax_invoice_state')
                     ->label('Faktur Pajak')
                     ->options([

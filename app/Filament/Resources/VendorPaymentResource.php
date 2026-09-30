@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\VendorPaymentResource\Pages;
 use App\Helpers\MoneyHelper;
 use App\Support\ProcurementFailureNotifier;
+use App\Support\VendorPaymentAccounts;
 use App\Models\ChartOfAccount;
 use App\Models\Invoice;
 use App\Models\PaymentRequest;
@@ -523,39 +524,7 @@ class VendorPaymentResource extends Resource
                                     ->required()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
-                                        // Auto-select appropriate COA based on payment method
-                                        $firstCoa = null;
-
-                                        switch ($state) {
-                                            case 'Cash':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1111%')
-                                                    ->whereDoesntHave('children')
-                                                    ->where('code', '!=', '1110')
-                                                    ->first();
-                                                break;
-                                            case 'Bank Transfer':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1112%')
-                                                    ->whereDoesntHave('children')
-                                                    ->where('code', '!=', '1110')
-                                                    ->first();
-                                                break;
-                                            case 'Credit':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1120%')
-                                                    ->whereDoesntHave('children')
-                                                    ->first();
-                                                break;
-                                            case 'Deposit':
-                                                $firstCoa = ChartOfAccount::where('code', 'LIKE', '1113%')
-                                                    ->whereDoesntHave('children')
-                                                    ->first();
-                                                break;
-                                        }
-
-                                        if ($firstCoa) {
-                                            $set('coa_id', $firstCoa->id);
-                                        } else {
-                                            $set('coa_id', null);
-                                        }
+                                        $set('coa_id', VendorPaymentAccounts::defaultId($state));
                                     })
                                     ->options([
                                         'Cash' => 'Cash',
@@ -638,46 +607,7 @@ class VendorPaymentResource extends Resource
 
                                 Select::make('coa_id')
                                     ->label('COA')
-                                    ->options(function ($get) {
-                                        $paymentMethod = $get('payment_method');
-
-                                        try {
-                                            $coas = match ($paymentMethod) {
-                                                'Cash' => ChartOfAccount::where('code', 'LIKE', '1111%')
-                                                    ->whereDoesntHave('children')
-                                                    ->where('code', '!=', '1110')
-                                                    ->orderBy('code')
-                                                    ->get(),
-                                                'Bank Transfer' => ChartOfAccount::where('code', 'LIKE', '1112%')
-                                                    ->whereDoesntHave('children')
-                                                    ->where('code', '!=', '1110')
-                                                    ->orderBy('code')
-                                                    ->get(),
-                                                'Credit' => ChartOfAccount::where('code', 'LIKE', '1120%')
-                                                    ->whereDoesntHave('children')
-                                                    ->orderBy('code')
-                                                    ->get(),
-                                                'Deposit' => ChartOfAccount::where('code', 'LIKE', '1113%')
-                                                    ->whereDoesntHave('children')
-                                                    ->orderBy('code')
-                                                    ->get(),
-                                                default => ChartOfAccount::where('code', 'LIKE', '111%')
-                                                    ->whereDoesntHave('children')
-                                                    ->where('code', '!=', '1110')
-                                                    ->orderBy('code')
-                                                    ->get()
-                                            };
-
-                                            $options = [];
-                                            foreach ($coas as $coa) {
-                                                $options[$coa->id] = "({$coa->code}) {$coa->name}";
-                                            }
-
-                                            return $options;
-                                        } catch (\Throwable $exception) {
-                                            return [];
-                                        }
-                                    })
+                                    ->options(fn ($get) => VendorPaymentAccounts::options($get('payment_method')))
                                     ->preload()
                                     ->searchable()
                                     ->reactive()

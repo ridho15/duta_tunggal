@@ -122,8 +122,7 @@ class SaleOrderApiController extends Controller
 
         // Products query with free inventory stock aggregation (active products only)
         $freeStockByProduct = InventoryStock::query()
-            ->selectRaw('product_id, SUM(qty_available - qty_reserved) as free_stock')
-            ->where('qty_available', '>', 0)
+            ->selectRaw('product_id, GREATEST(0, SUM(qty_available - qty_reserved)) as free_stock')
             ->groupBy('product_id')
             ->pluck('free_stock', 'product_id');
 
@@ -150,7 +149,7 @@ class SaleOrderApiController extends Controller
                     'sku' => (string) ($p->sku ?? ''),
                     'name' => (string) ($p->name ?? ''),
                     'sell_price' => (float) $p->sell_price,
-                    'free_stock' => (float) ($freeStockByProduct[$p->id] ?? 0),
+                    'free_stock' => max(0.0, (float) ($freeStockByProduct[$p->id] ?? 0)),
                     'uom' => $p->uom_id ? [
                         'id' => (int) $p->uom_id,
                         'name' => (string) $p->uom_name,

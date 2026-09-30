@@ -1661,7 +1661,23 @@ class QualityControlPurchaseResource extends Resource
                         TextEntry::make('quantity_received')->label('Qty Received'),
                         TextEntry::make('passed_quantity')->label('Qty Accepted')->color('success'),
                         TextEntry::make('rejected_quantity')->label('Qty Rejected')->color('danger'),
-                        TextEntry::make('reason_reject')->label('Rejection Reason'),
+                        TextEntry::make('reason_reject')
+                            ->label('Rejection Reason')
+                            ->getStateUsing(function (QualityControl $record) {
+                                if (!empty($record->reason_reject)) {
+                                    return $record->reason_reject;
+                                }
+                                if ($record->items()->exists()) {
+                                    $itemReasons = $record->items
+                                        ->where('rejected_quantity', '>', 0)
+                                        ->pluck('reason_reject')
+                                        ->filter()
+                                        ->unique()
+                                        ->implode('; ');
+                                    return $itemReasons ?: '-';
+                                }
+                                return '-';
+                            }),
                         TextEntry::make('date_send_stock')->date()->label('Date Send to Stock'),
                     ])->columns(3),
                 InfolistSection::make('Item Hasil Pemeriksaan (Multi-Item QC)')

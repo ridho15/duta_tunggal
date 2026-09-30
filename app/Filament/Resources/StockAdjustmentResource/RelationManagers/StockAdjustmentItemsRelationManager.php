@@ -78,6 +78,7 @@ class StockAdjustmentItemsRelationManager extends RelationManager
                 TextInput::make('adjusted_qty')
                     ->label('Qty Setelah Adjustment')
                     ->numeric()
+                    ->minValue(0)
                     ->default(0)
                     ->required()
                     ->live()

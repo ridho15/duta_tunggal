@@ -223,6 +223,20 @@ class CreateQualityControlPurchase extends CreateRecord
 
                     $data['status'] = 0; // Draft initially
 
+                    // Agregasikan alasan reject dari item ke kolom header jika belum ada
+                    if (empty($data['reason_reject'])) {
+                        $reasons = collect($itemsData)
+                            ->where('rejected_quantity', '>', 0)
+                            ->pluck('reason_reject')
+                            ->filter()
+                            ->unique()
+                            ->implode('; ');
+
+                        if ($reasons !== '') {
+                            $data['reason_reject'] = $reasons;
+                        }
+                    }
+
                     /** @var QualityControl $qc */
                     $qc = QualityControl::create($data);
 

@@ -1470,17 +1470,7 @@ class PurchaseInvoiceResource extends Resource
 
                 BadgeColumn::make('status')
                     ->label('Status')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            Invoice::STATUS_DRAFT => 'Draft',
-                            Invoice::STATUS_SENT => 'Menunggu Pembayaran',
-                            Invoice::STATUS_PAID => 'Lunas',
-                            Invoice::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
-                            Invoice::STATUS_OVERDUE => 'Terlambat',
-                            Invoice::STATUS_CANCELLED => 'Dibatalkan',
-                            default => $state,
-                        };
-                    })
+                    ->formatStateUsing(fn ($state) => Invoice::STATUS_LABELS[$state] ?? $state)
                     ->colors([
                         'secondary' => Invoice::STATUS_DRAFT,
                         'warning' => Invoice::STATUS_SENT,

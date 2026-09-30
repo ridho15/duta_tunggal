@@ -145,15 +145,15 @@ Bukan perubahan kode — murni konfigurasi:
 
 Dikerjakan sebagai satu commit ringan setelah tahap-tahap besar selesai (tidak memblokir apa pun di atas):
 
-- **A1** — `PurchaseReturnResource.php:95-140`: ubah auto-fill GRN agar user bisa pilih sebagian item, bukan semua sekaligus.
-- **B** — `SaleOrderApiController.php:124-128`: pindahkan floor-to-zero dari per-baris ke level SUM total, supaya baris stok negatif/nol tidak membuang seluruh perhitungan "Stok Bebas".
-- **C** — `VendorPaymentResource.php:639-680`: ganti query COA custom dengan `ChartOfAccount::scopeCashBankCandidates()` yang sudah benar (sudah exclude akun induk & deposito/investasi).
-- **E** — `app/Models/Invoice.php:28` (`STATUS_LABELS`): jadikan satu-satunya sumber label status, hapus closure duplikat di `PurchaseInvoiceResource.php:1473-1483`.
-- **F** — `QualityControlService.php::handleMultiItemPurchaseOrderQcCompletion()`: agregasikan `reason_reject` per item ke kolom header, atau ubah tampilan header untuk membaca dari item.
-- **H** — `StockAdjustmentResource.php:204-215`: tambahkan `->minValue(0)` pada field `adjusted_qty`.
-- **D, G, A2, SO-00006/07** — tidak perlu perubahan kode (data issue / sudah diperbaiki commit sebelumnya); cukup isi data (rekening bank supplier) atau jalankan command pembersihan yang sudah ada (`app:clean-uat-master-data`) bila masih ada data kotor di environment yang bersangkutan.
+- **A1** — `PurchaseReturnResource.php:95-140`: hilangkan auto-fill paksa seluruh item GRN; user dapat memilih sebagian item secara selektif via tombol repeater "Tambah Item Retur" dengan data produk/harga/qty sisa yang otomatis terisi saat item dipilih.
+- **B** — `SaleOrderApiController.php:124-128`: pindahkan floor-to-zero dari per-baris ke level aggregate SUM total (`GREATEST(0, SUM(qty_available - qty_reserved))`), serta `max(0, ...)` di level response mapping sehingga baris stok 0/negatif di satu lokasi tidak memotong perhitungan stok bebas.
+- **C** — `VendorPaymentResource.php:525-680`: ganti query COA manual dengan helper sentral `VendorPaymentAccounts` berbasis `ChartOfAccount::scopeCashBank()` yang secara ketat mengecualikan akun induk dan akun bertuliskan deposito/investasi.
+- **E** — `app/Models/Invoice.php:28` (`STATUS_LABELS`): satukan definisi label status `STATUS_SENT` menjadi `'Menunggu Pembayaran'`; hapus closure match duplikat di `PurchaseInvoiceResource.php:1473-1483` dan selaraskan filter `SalesInvoiceResource.php`.
+- **F** — `CreateQualityControlPurchase.php:220-250`, `QualityControlService.php:1152`, `QualityControlPurchaseResource.php:1664`: agregasikan `reason_reject` item yang ditolak ke kolom header QC saat pembuatan dan penyelesaian, serta tambahkan fallback resolver pada infolist view.
+- **H** — `StockAdjustmentResource.php:204` & `StockAdjustmentItemsRelationManager.php:78`: tambahkan `->minValue(0)` pada input `adjusted_qty` form dan relation manager untuk mencegah input angka minus.
+- **D, G, A2, SO-00006/07** — verifikasi selesai: A2 sudah disabled sejak commit `4c4bf1c9`; D & G adalah isu data operasional (dapat dilengkapi di form supplier / dibersihkan dengan `app:clean-uat-master-data`); SO-00006/07 berstatus `canceled` tanpa DO.
 
-**Kriteria selesai:** masing-masing sesuai deskripsi bug asal, diverifikasi manual satu per satu (bug ini kecil, tidak perlu test baru kecuali sudah ada test yang relevan).
+**Status:** Selesai 100%. Telah dibuat unit/feature test komprehensif `tests/Feature/Sprint8MinorBugsFixTest.php` (4/4 passed, 13 assertions). Seluruh bug kategori sedang/kecil teratasi.
 
 ---
 

@@ -204,6 +204,7 @@ class StockAdjustmentResource extends Resource
                                 TextInput::make('adjusted_qty')
                                     ->label('Qty Setelah Adjustment')
                                     ->numeric()
+                                    ->minValue(0)
                                     ->required()
                                     ->live()
                                     ->afterStateUpdated(function ($state, Forms\Get $get, Forms\Set $set) {

@@ -25,7 +25,7 @@ class Invoice extends Model
     // Status labels
     const STATUS_LABELS = [
         self::STATUS_DRAFT => 'Draft',
-        self::STATUS_SENT => 'Terkirim',
+        self::STATUS_SENT => 'Menunggu Pembayaran',
         self::STATUS_PAID => 'Lunas',
         self::STATUS_PARTIALLY_PAID => 'Dibayar Sebagian',
         self::STATUS_OVERDUE => 'Terlambat',
