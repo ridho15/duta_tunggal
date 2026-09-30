@@ -54,14 +54,17 @@ Temuan sampingan (dicatat, di luar cakupan Tahap 2, sudah di-flag sebagai tugas 
 
 ---
 
-## Tahap 3 — Matikan mode debug (Bug 5)
+## Tahap 3 — Matikan mode debug (Bug 5) — ✅ SELESAI (30 Sep 2026)
 
 Bukan perubahan kode — murni konfigurasi:
-1. Set `APP_DEBUG=false`, `APP_ENV=production` (atau `staging`) di `.env` server yang dipakai untuk UAT/produksi, lalu `php artisan config:cache`.
-2. Perbaiki default di `.env.example` → `APP_DEBUG=false`.
-3. (Opsional, boleh ditunda) tambahkan gerbang di pipeline deploy yang menolak deploy bila `APP_DEBUG=true` terdeteksi di environment target.
+1. ~~Set `APP_DEBUG=false`, `APP_ENV=production` (atau `staging`) di `.env` server yang dipakai untuk UAT/produksi~~ → **Keputusan:** `APP_ENV` tetap `local` (mesin ini memang dev/UAT lokal Anda, bukan server produksi/staging sungguhan; mengganti `APP_ENV` berisiko mengubah perilaku lain yang tidak terkait bug ini). Hanya `APP_DEBUG` diubah ke `false` di `.env` lokal — dikonfirmasi Anda, dengan konsekuensi: halaman error jadi generik untuk sisa sesi ini, error tetap lengkap tercatat di `storage/logs/laravel-<tanggal>.log`.
+2. Perbaiki default di `.env.example` → `APP_DEBUG=false` (selesai, sudah di-commit).
+3. `php artisan config:clear` dijalankan agar perubahan langsung berlaku (dikonfirmasi via tinker: `config('app.debug')` = false).
+4. (Opsional, boleh ditunda) tambahkan gerbang di pipeline deploy yang menolak deploy bila `APP_DEBUG=true` terdeteksi di environment target — belum ada `deploy.yml`/script serupa di repo ini saat ini.
 
-**Kriteria selesai:** request yang sengaja error menampilkan halaman generik, bukan stack trace/query/cookie.
+**Verifikasi:** direproduksi ulang skenario 500 yang sama (`/reports/stock-report/preview?start_date=not-a-date&end_date=also-bad`) di browser — sebelumnya menampilkan stack trace lengkap + query SQL + cookie sesi mentah, sekarang menampilkan halaman generik "500 Server Error" saja. Log tetap lengkap di server.
+
+**Penting untuk server UAT/produksi Anda yang sesungguhnya (di luar mesin ini):** pastikan `APP_DEBUG=false` juga disetel di sana secara terpisah — perubahan ini hanya berlaku untuk `.env` di mesin lokal yang dipakai sesi ini.
 
 ---
 
