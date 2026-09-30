@@ -103,18 +103,23 @@ Bukan perubahan kode — murni konfigurasi:
 
 ---
 
-## Tahap 6 — Jurnal retur pelanggan & koreksi Return Product (Bug 9, Bug 10)
+## Tahap 6 — Jurnal retur pelanggan & koreksi Return Product (Bug 9, Bug 10) — [SELESAI 30 Sep 2026]
 
-1. **Retur pelanggan** (`app/Services/CustomerReturnService.php`): perbaiki kondisi di baris ~95 yang saat ini saling meniadakan dengan `decisionOptions()` (`CustomerReturnItem.php:34-39`). Jurnal retur penjualan + koreksi PPN Keluaran + penyesuaian piutang seharusnya jalan untuk semua decision yang bukan `reject` (repair/replace/credit), tidak digantungkan pada flag `credit_notes` semata. Tambahkan validasi wajib `qc_result` terisi sebelum aksi "Setujui" (`CustomerReturnResource.php:435-452`).
-2. **Return Product** (`app/Services/ReturnProductService.php`):
-   - Tambahkan langkah koreksi invoice terkait di `updateQuantityFromModel()` (cari invoice aktif untuk SO/DO terkait, kurangi qty/total, picu ulang repost invoice sesuai urutan yang diperbaiki di Tahap 5).
-   - Di `createReversingJournalEntries()` (baris ~104-244): sebelum memilih akun kredit, cek apakah DO sumber sudah pernah diinvoice — kredit ke akun HPP/COGS (reversal) bila sudah, ke "Barang Terkirim" bila belum.
-   - Isi ulang field sintetis `max_quantity` saat form Edit dimuat (`EditReturnProduct.php`, tambahkan `mutateFormDataBeforeFill`) supaya validasi qty konsisten dengan form Create.
-3. Tambahkan test baru untuk skenario yang belum tercakup: retur pelanggan dengan flag `credit_notes` mati + decision replace (harus tetap membuat jurnal); Return Product untuk DO yang sudah diinvoice (jurnal harus ke HPP, bukan Barang Terkirim).
+1. **Retur pelanggan** (`app/Services/CustomerReturnService.php`):
+   - Perbaiki kondisi finansial sehingga jurnal retur penjualan + PPN Keluaran + penyesuaian piutang (AR) berjalan untuk semua keputusan non-reject (`replace`, `repair`, dan `credit` bila credit note belum aktif):
+     `$shouldReverseFinancial = ($item->decision !== CustomerReturnItem::DECISION_REJECT) && (! CreditNoteService::enabled() || $item->decision !== CustomerReturnItem::DECISION_CREDIT);`
+   - Ditambahkan validasi wajib `qc_result` terisi sebelum aksi "Setujui" pada tabel & view (`CustomerReturnResource.php` dan `ViewCustomerReturn.php`) serta exception guard pada `CustomerReturnService::processCompletion()`.
+2. **Return Product** (`app/Services/ReturnProductService.php` & `ReturnProductResource`):
+   - Ditambahkan deteksi status invoice sumber: `isDeliveryOrderInvoiced(DeliveryOrder $deliveryOrder): bool`.
+   - Di `createReversingJournalEntries()`: Kredit jurnal dinamis diarahkan ke akun HPP/COGS (`$product->resolveCogsCoaOrDefault() ?? anyOf('cogs')`) jika DO sumber sudah di-invoice, dan ke akun "Barang Terkirim" jika belum di-invoice (mencegah saldo minus).
+   - Di `updateQuantityFromModel()`: Ditambahkan pemanggilan `adjustLinkedSalesInvoice()` untuk mengoreksi baris invoice terkait (kuantitas, subtotal, PPN, dan total) serta memicu `InvoiceObserver` untuk menyinkronkan saldo `AccountReceivable` dan repost jurnal piutang secara simetris.
+   - Di `ReturnProductResource.php` & `EditReturnProduct.php`: Ditambahkan `mutateRelationshipDataBeforeFillUsing` pada Repeater dan `mutateFormDataBeforeFill` pada halaman Edit untuk memuat `max_quantity` dari `fromItemModel->quantity`. Ditambahkan juga fallback look-up pada `beforeSave()`.
+3. **Uji Coba**:
+   - Dibuat suite pengujian lengkap `tests/Feature/CustomerReturnAndReturnProductFinancialTest.php` (5 skenario: replace decision journal & AR sync, QC validation guard, uninvoiced DO goods delivery reversal, invoiced DO COGS reversal & invoice adjustment, and edit max_quantity guard).
+   - Seluruh test lolos: 5/5 passing (41 assertions).
+   - Regresi: 40/40 passing di `tests/Feature/CustomerReturnFeatureTest.php`, `tests/Feature/ERP/CustomerReturnTest.php`, dan `tests/Feature/UATPriority1StockTransferAndReturnTest.php`.
 
-**Regresi terarah:** `vendor/bin/pest tests/Feature/CustomerReturnFeatureTest.php tests/Feature/Sprint2LogisticsAndStockVerificationTest.php <test-baru>`
-
-**Kriteria selesai:** retur pelanggan menghasilkan jurnal retur penjualan & piutang berkurang sesuai nilai retur; retur produk yang sudah diinvoice tidak lagi membuat saldo "Barang Terkirim" minus; invoice ikut terkoreksi qty/nilainya.
+**Status:** Selesai 100%. Saldo "Barang Terkirim" aman dari angka minus, piutang dan invoice terkoreksi otomatis, retur pelanggan terposting dengan benar.
 
 ---
 

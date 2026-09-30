@@ -80,6 +80,16 @@ class ViewCustomerReturn extends ViewRecord
                 ->modalHeading('Setujui Customer Return')
                 ->visible(fn () => $this->record->status === CustomerReturn::STATUS_QC_INSPECTION)
                 ->action(function () {
+                    $this->record->loadMissing('customerReturnItems');
+                    if ($this->record->customerReturnItems->isEmpty() || $this->record->customerReturnItems->contains(fn ($item) => empty($item->qc_result))) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('Persetujuan Ditolak')
+                            ->body('Semua item retur wajib memiliki hasil pemeriksaan QC (Pass / Fail) sebelum retur dapat disetujui.')
+                            ->danger()
+                            ->send();
+                        return;
+                    }
+
                     $this->record->update([
                         'status'      => CustomerReturn::STATUS_APPROVED,
                         'approved_by' => Auth::id(),

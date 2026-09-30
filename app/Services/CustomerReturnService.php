@@ -73,6 +73,11 @@ class CustomerReturnService
                     }
                 }
 
+                if (empty($item->qc_result)) {
+                    $productName = $item->product?->name ?? 'Produk';
+                    throw new \Exception("Item {$productName} belum memiliki hasil pemeriksaan QC. Harap lengkapi hasil QC sebelum menyelesaikan retur.");
+                }
+
                 if ($item->decision === CustomerReturnItem::DECISION_REJECT) {
                     continue;
                 }
@@ -90,9 +95,12 @@ class CustomerReturnService
                 $itemCostTotal = round($qty * $unitCost, 2);
 
                 // ── Selling price & VAT for financial reversal ────────────────────
-                // Hanya dihitung untuk item dengan keputusan 'credit' (refund / nota kredit)
-                // dan hanya jika CreditNoteService TIDAK aktif (karena jika CreditNote aktif, Nota Kredit yang menjurnal finansial)
-                if ($item->decision === CustomerReturnItem::DECISION_CREDIT && ! CreditNoteService::enabled()) {
+                // Dihitung untuk semua item retur non-reject (replace, repair, atau credit).
+                // Jika CreditNoteService aktif dan keputusan adalah credit, Nota Kredit yang akan menjurnal sisi uang.
+                $shouldReverseFinancial = ($item->decision !== CustomerReturnItem::DECISION_REJECT)
+                    && (! CreditNoteService::enabled() || $item->decision !== CustomerReturnItem::DECISION_CREDIT);
+
+                if ($shouldReverseFinancial) {
                     $invItem = $item->invoiceItem;
                     if ($invItem) {
                         $invQty = max(0.0001, (float) $invItem->quantity);

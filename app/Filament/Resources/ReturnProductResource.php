@@ -170,6 +170,17 @@ class ReturnProductResource extends Resource
                             ->columnSpanFull()
                             ->defaultItems(0)
                             ->columns(2)
+                            ->mutateRelationshipDataBeforeFillUsing(function (array $data): array {
+                                $modelType = $data['from_item_model_type'] ?? null;
+                                $modelId = $data['from_item_model_id'] ?? null;
+                                if ($modelType && $modelId && class_exists($modelType)) {
+                                    $model = $modelType::find($modelId);
+                                    if ($model) {
+                                        $data['max_quantity'] = (float) $model->quantity;
+                                    }
+                                }
+                                return $data;
+                            })
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data) {
                                 return $data;
                             })

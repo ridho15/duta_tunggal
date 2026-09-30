@@ -23,6 +23,23 @@ class EditReturnProduct extends EditRecord
         ];
     }
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $this->record->loadMissing('returnProductItem.fromItemModel');
+
+        if (isset($data['returnProductItem']) && is_array($data['returnProductItem'])) {
+            foreach ($data['returnProductItem'] as &$itemData) {
+                $returnProductItem = $this->record->returnProductItem->firstWhere('id', $itemData['id'] ?? null);
+                $fromItemModel = $returnProductItem?->fromItemModel;
+                if ($fromItemModel) {
+                    $itemData['max_quantity'] = (float) $fromItemModel->quantity;
+                }
+            }
+        }
+
+        return $data;
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         return $data;
@@ -60,8 +77,19 @@ class EditReturnProduct extends EditRecord
         // Custom validation: Check quantity doesn't exceed max_quantity
         $items = $data['returnProductItem'] ?? [];
         foreach ($items as $index => $item) {
-            $quantity = $item['quantity'] ?? 0;
-            $maxQuantity = $item['max_quantity'] ?? 0;
+            $quantity = (float) ($item['quantity'] ?? 0);
+            $maxQuantity = (float) ($item['max_quantity'] ?? 0);
+
+            // Fallback: resolve from source item model if state was zero
+            if ($maxQuantity <= 0 && ! empty($item['from_item_model_type']) && ! empty($item['from_item_model_id'])) {
+                $modelClass = $item['from_item_model_type'];
+                if (class_exists($modelClass)) {
+                    $sourceItem = $modelClass::find($item['from_item_model_id']);
+                    if ($sourceItem) {
+                        $maxQuantity = (float) $sourceItem->quantity;
+                    }
+                }
+            }
 
             if ($quantity > $maxQuantity && $maxQuantity > 0) {
                 HelperController::sendNotification(

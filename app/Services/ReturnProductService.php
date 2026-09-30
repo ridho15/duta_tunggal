@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\DeliveryOrder;
+use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\ReturnProduct;
 use App\Models\StockMovement;
+use App\Support\LineAmounts;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -87,6 +90,11 @@ class ReturnProductService
             // Create reversing journal entries if not already created
             $this->createReversingJournalEntries($returnProduct);
 
+            // If this is a sales return from a delivery order, adjust linked invoice if present
+            if ($isSalesReturn && $returnProduct->fromModel instanceof DeliveryOrder) {
+                $this->adjustLinkedSalesInvoice($returnProduct, $returnProduct->fromModel);
+            }
+
             $returnProduct->update([
                 'status' => 'approved'
             ]);
@@ -127,6 +135,8 @@ class ReturnProductService
         if ($isSalesReturn) {
             $debitTotals = [];
             $creditTotals = [];
+            $deliveryOrder = $returnProduct->fromModel;
+            $isInvoiced = ($deliveryOrder instanceof DeliveryOrder) && $this->isDeliveryOrderInvoiced($deliveryOrder);
 
             foreach ($returnProduct->returnProductItem as $item) {
                 $qty = max(0, (float) ($item->quantity ?? 0));
@@ -139,16 +149,19 @@ class ReturnProductService
                 }
 
                 $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
-                $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
+                $creditCoa = $isInvoiced
+                    ? ($product?->resolveCogsCoaOrDefault() ?? app(\App\Services\AccountingSettings::class)->anyOf('cogs'))
+                    : ($product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa);
 
-                if ($inventoryCoa && $goodsDeliveryCoa) {
+                if ($inventoryCoa && $creditCoa) {
                     $debitTotals[$inventoryCoa->id] = [
                         'coa' => $inventoryCoa,
                         'amount' => ($debitTotals[$inventoryCoa->id]['amount'] ?? 0) + $lineAmount,
                     ];
-                    $creditTotals[$goodsDeliveryCoa->id] = [
-                        'coa' => $goodsDeliveryCoa,
-                        'amount' => ($creditTotals[$goodsDeliveryCoa->id]['amount'] ?? 0) + $lineAmount,
+                    $creditTotals[$creditCoa->id] = [
+                        'coa' => $creditCoa,
+                        'amount' => ($creditTotals[$creditCoa->id]['amount'] ?? 0) + $lineAmount,
+                        'is_cogs' => $isInvoiced,
                     ];
                 }
             }
@@ -169,11 +182,15 @@ class ReturnProductService
             }
 
             foreach ($creditTotals as $data) {
+                $desc = !empty($data['is_cogs'])
+                    ? 'Product Return - COGS Reversal for ' . $returnProduct->return_number
+                    : 'Product Return - Delivery Reversal for ' . $returnProduct->return_number;
+
                 JournalEntry::create([
                     'coa_id' => $data['coa']->id,
                     'date' => $date,
                     'reference' => $returnProduct->return_number,
-                    'description' => 'Product Return - Delivery / COGS Reversal for ' . $returnProduct->return_number,
+                    'description' => $desc,
                     'debit' => 0,
                     'credit' => round($data['amount'], 2),
                     'journal_type' => 'sales',
@@ -404,5 +421,117 @@ class ReturnProductService
     {
         // Implement logic for purchase receipt if needed
         // Similar to delivery order logic but for purchase receipts
+    }
+
+    /**
+     * Memeriksa apakah Delivery Order sudah diterbitkan Invoice Penjualan aktif.
+     */
+    public function isDeliveryOrderInvoiced(DeliveryOrder $deliveryOrder): bool
+    {
+        // 1. Direct match on delivery_orders JSON column in non-cancelled invoices
+        $invoicedViaDoList = Invoice::where('from_model_type', \App\Models\SaleOrder::class)
+            ->whereNotIn('status', [Invoice::STATUS_CANCELLED])
+            ->where(function ($q) use ($deliveryOrder) {
+                $q->whereJsonContains('delivery_orders', (int) $deliveryOrder->id)
+                  ->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id);
+            })
+            ->exists();
+
+        if ($invoicedViaDoList) {
+            return true;
+        }
+
+        // 2. Or check if the linked SO has an active posted invoice without explicit DOs list
+        if ($deliveryOrder->sale_order_id) {
+            $hasPostedSoInvoice = Invoice::where('from_model_type', \App\Models\SaleOrder::class)
+                ->where('from_model_id', $deliveryOrder->sale_order_id)
+                ->whereNotIn('status', [Invoice::STATUS_DRAFT, Invoice::STATUS_CANCELLED])
+                ->where(function ($q) use ($deliveryOrder) {
+                    $q->whereNull('delivery_orders')
+                      ->orWhereJsonContains('delivery_orders', (int) $deliveryOrder->id)
+                      ->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id);
+                })
+                ->exists();
+
+            if ($hasPostedSoInvoice) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Menyesuaikan kuantitas dan total pada Invoice Penjualan yang terhubung saat DO diretur.
+     */
+    public function adjustLinkedSalesInvoice(ReturnProduct $returnProduct, DeliveryOrder $deliveryOrder): ?Invoice
+    {
+        $invoice = Invoice::where('from_model_type', \App\Models\SaleOrder::class)
+            ->whereNotIn('status', [Invoice::STATUS_CANCELLED])
+            ->where(function ($q) use ($deliveryOrder) {
+                $q->whereJsonContains('delivery_orders', (int) $deliveryOrder->id)
+                  ->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id);
+                if ($deliveryOrder->sale_order_id) {
+                    $q->orWhere(function ($soQ) use ($deliveryOrder) {
+                        $soQ->where('from_model_id', $deliveryOrder->sale_order_id)
+                            ->whereNull('delivery_orders');
+                    });
+                }
+            })
+            ->first();
+
+        if (! $invoice) {
+            return null;
+        }
+
+        $invoice->loadMissing('invoiceItem');
+        $invoiceChanged = false;
+
+        foreach ($returnProduct->returnProductItem as $retItem) {
+            $retQty = (float) $retItem->quantity;
+            if ($retQty <= 0) {
+                continue;
+            }
+
+            // Match invoice item by product_id
+            $invItem = $invoice->invoiceItem->firstWhere('product_id', $retItem->product_id);
+            if ($invItem) {
+                $newQty = max(0.0, (float) $invItem->quantity - $retQty);
+                $rate = (float) ($invoice->ppn_rate ?? 0);
+                $type = ($invoice->tipe_pajak ?? 'None') === 'None' ? 'Non Pajak' : $invoice->tipe_pajak;
+                $amounts = LineAmounts::calculate($newQty, (float) $invItem->price, (float) $invItem->discount, $rate, $type);
+
+                $invItem->update([
+                    'quantity' => $newQty,
+                    'subtotal' => $amounts['dpp'],
+                    'tax_amount' => $amounts['ppn'],
+                    'total' => $amounts['total'],
+                ]);
+                $invoiceChanged = true;
+            }
+        }
+
+        if ($invoiceChanged) {
+            $newSubtotal = round((float) $invoice->invoiceItem()->sum('subtotal'), 2);
+            $otherFee = (float) $invoice->getOtherFeeTotalAttribute();
+            $newTotal = round((float) $invoice->invoiceItem()->sum('total') + $otherFee, 2);
+
+            $updatePayload = [
+                'subtotal' => $newSubtotal,
+                'dpp' => $newSubtotal,
+                'total' => $newTotal,
+            ];
+
+            if ($newTotal <= 0.05) {
+                $updatePayload['status'] = Invoice::STATUS_CANCELLED;
+            }
+
+            // Updating header triggers InvoiceObserver::updated (financialChanged)
+            // which automatically deletes old journals, updates AccountReceivable,
+            // and reposts new balanced journals!
+            $invoice->update($updatePayload);
+        }
+
+        return $invoice;
     }
 }

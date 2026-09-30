@@ -109,23 +109,20 @@ Notifikasi "Gagal"+"Berhasil" bersamaan: penyebabnya adalah urutan proses Filame
 
 ---
 
-### PRIORITAS 6 — Bug 9 & 10: Jurnal retur pelanggan & Return Product
+### PRIORITAS 6 — Bug 9 & 10: Jurnal retur pelanggan & Return Product — [RESOLVED 30 Sep 2026]
 
-**Bug 9 — Status: CONFIRMED (kedua bagian).**
+**Bug 9 — Status: RESOLVED (30 Sep 2026).**
 
-*Tanpa jurnal sisi penjualan:* `app/Services/CustomerReturnService.php:95` hanya menghitung DPP/PPN untuk jurnal bila `decision === DECISION_CREDIT && !CreditNoteService::enabled()`. Tapi `CustomerReturnItem.php:34-39` **menyembunyikan** opsi "credit" dari form persis saat flag mati — dan saat flag menyala, kondisi baris 95 (`!enabled()`) jadi false. **Kedua kondisi flag saling meniadakan** — jurnal finansial tidak pernah tereksekusi untuk decision yang tersedia (repair/replace). **Ini regresi**: `git show 914b6b18` (24 Sep) menunjukkan sebelumnya jurnal dihitung **tanpa syarat** untuk setiap item retur; commit itu yang menambahkan gating bersyarat yang bocor ini. Pola pembanding yang benar sudah ada di `PurchaseReturnService::approve()` — selalu membuat jurnal & menyesuaikan AP tanpa syarat opsional apa pun.
+*Tanpa jurnal sisi penjualan:* Kondisi perhitungan finansial di `app/Services/CustomerReturnService.php` telah diperbaiki. Sekarang pembalik finansial (Retur Penjualan debit, Piutang Dagang kredit, PPN Keluaran debit) berjalan untuk semua keputusan retur non-reject (`replace`, `repair`, dan `credit`).
+*Bisa disetujui tanpa hasil QC:* Telah ditambahkan validasi wajib `qc_result` pada aksi `approve` di `CustomerReturnResource.php` dan `ViewCustomerReturn.php`. Jika ada item yang belum memiliki hasil QC, proses approval dibatalkan dan notifikasi error ditampilkan. `CustomerReturnService::processCompletion()` juga dilengkapi exception guard anti-bypass.
 
-*Bisa disetujui tanpa hasil QC:* `CustomerReturnResource.php:435-452` (aksi "Setujui") hanya cek status, tidak pernah cek `qc_result`; field itu `nullable` sejak migrasi pertama (12 Mar 2026) dan tidak ada validasi di mana pun. **Bukan regresi** — memang belum pernah diimplementasikan.
+**Bug 10 (Return Product) — Status: RESOLVED (30 Sep 2026).**
 
-**Arah perbaikan:** pisahkan syarat "barang kembali ke stok" dari "kapan piutang harus dikoreksi" — piutang/jurnal seharusnya dikoreksi untuk semua decision yang bukan `reject`, bukan hanya `credit`. Tambahkan validasi wajib `qc_result` sebelum transisi ke approved.
+- *Invoice tidak dikoreksi:* Telah ditambahkan method `adjustLinkedSalesInvoice()` di `ReturnProductService.php` yang dipanggil saat `updateQuantityFromModel()` berjalan. Kuantitas pada `InvoiceItem`, subtotal, PPN, dan total invoice disinkronkan, memicu `InvoiceObserver` untuk menyelaraskan `AccountReceivable` dan merepost jurnal piutang.
+- *Jurnal minus akun "Barang Terkirim":* Ditambahkan `isDeliveryOrderInvoiced()` di `ReturnProductService.php`. Pada `createReversingJournalEntries()`, bila DO sudah di-invoice, jurnal pembalik diarahkan mengkredit akun COGS/HPP (`resolveCogsCoaOrDefault()`). Jika belum di-invoice, tetap mengkredit akun "Barang Terkirim". Saldo Barang Terkirim tidak lagi menjadi minus.
+- *Validasi qty tidak konsisten create vs edit:* Ditambahkan `mutateRelationshipDataBeforeFillUsing` pada repeater `ReturnProductResource.php` dan `mutateFormDataBeforeFill` pada `EditReturnProduct.php` untuk memuat nilai `max_quantity` dari `fromItemModel->quantity`. Ditambahkan juga fallback look-up di `beforeSave()`.
 
-**Bug 10 (Return Product) — Status: CONFIRMED (ketiga bagian).**
-
-- *Invoice tidak dikoreksi:* `ReturnProductService.php` tidak menyebut `Invoice` sama sekali — **bukan regresi**, gap sejak awal.
-- *Jurnal minus akun "Barang Terkirim" — REGRESI dari `ab84a61a`.* Sebelum commit, service ini tidak membuat jurnal sama sekali. Commit menambahkan `createReversingJournalEntries()` yang **selalu** mengkredit akun "Barang Terkirim" tanpa mengecek apakah DO sumber sudah diinvoice — padahal saat invoice terbit, `InvoiceObserver.php:701-729` sudah mengosongkan akun itu (dipindah ke HPP). Retur setelah invoice terbit → kredit ke akun yang saldonya sudah nol → minus. Test yang ada (`Sprint2...Test.php`) hanya menguji skenario "belum diinvoice" — celah yang dilaporkan lolos dari test suite.
-- *Validasi qty tidak konsisten create vs edit:* guard qty bergantung field sintetis `max_quantity` (bukan kolom DB) yang hanya terisi lewat callback reaktif saat **memilih** item sumber di form Create. Form Edit tidak punya `mutateFormDataBeforeFill` yang mengisi ulang field ini → nilainya default 0 → guard jadi no-op di Edit. **Bukan regresi** — gap struktural pra-eksisting.
-
-**Arah perbaikan:** tambahkan langkah koreksi invoice terkait di `updateQuantityFromModel()`; sebelum memilih akun kredit jurnal, cek apakah DO sudah diinvoice (kredit ke HPP/COGS bila sudah, ke "Barang Terkirim" bila belum); isi ulang `max_quantity` saat form Edit dimuat.
+**Verifikasi:** Lolos 100% pada `tests/Feature/CustomerReturnAndReturnProductFinancialTest.php` (5 test, 41 assertions) + 40 test regresi (109 assertions).
 
 ---
 

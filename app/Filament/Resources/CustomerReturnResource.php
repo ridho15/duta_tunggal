@@ -440,6 +440,16 @@ class CustomerReturnResource extends Resource
                     ->modalHeading('Setujui Customer Return')
                     ->visible(fn (CustomerReturn $record) => $record->status === CustomerReturn::STATUS_QC_INSPECTION)
                     ->action(function (CustomerReturn $record) {
+                        $record->loadMissing('customerReturnItems');
+                        if ($record->customerReturnItems->isEmpty() || $record->customerReturnItems->contains(fn ($item) => empty($item->qc_result))) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Persetujuan Ditolak')
+                                ->body('Semua item retur wajib memiliki hasil pemeriksaan QC (Pass / Fail) sebelum retur dapat disetujui.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
                         $record->update([
                             'status'      => CustomerReturn::STATUS_APPROVED,
                             'approved_by' => Auth::id(),
