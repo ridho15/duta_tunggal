@@ -201,8 +201,11 @@ class CustomerReturnResource extends Resource
                                                 ]))
                                                 ->sum('quantity');
                                             $returnable = max(0, (float) $item->quantity - (float) $alreadyReturned);
+                                            $labelSuffix = $returnable <= 0 
+                                                ? ' — [SUDAH DIRETUR PENUH (0 pcs)]' 
+                                                : ' (Bisa diretur: ' . $returnable . ' / ' . $item->quantity . ' pcs)';
                                             return [
-                                                $item->id => ($item->product?->name ?? '-') . ' (Bisa diretur: ' . $returnable . ' / ' . $item->quantity . ' pcs)',
+                                                $item->id => ($item->product?->name ?? '-') . $labelSuffix,
                                             ];
                                         });
                                 })
@@ -227,6 +230,7 @@ class CustomerReturnResource extends Resource
                                 ->required()
                                 ->default(1)
                                 ->minValue(0.01)
+                                ->live(onBlur: true)
                                 ->maxValue(function (Forms\Get $get) {
                                     $invoiceItemId = $get('invoice_item_id');
                                     if (! $invoiceItemId) {
@@ -249,6 +253,10 @@ class CustomerReturnResource extends Resource
                                         ->sum('quantity');
                                     return max(0, (float) $item->quantity - (float) $alreadyReturned);
                                 })
+                                ->validationMessages([
+                                    'max' => 'Kuantitas retur melebihi batas maksimal sisa faktur.',
+                                    'min' => 'Kuantitas retur minimal 0.01 pcs.',
+                                ])
                                 ->helperText(function (Forms\Get $get) {
                                     $invoiceItemId = $get('invoice_item_id');
                                     if (! $invoiceItemId) {
@@ -270,6 +278,9 @@ class CustomerReturnResource extends Resource
                                         ]))
                                         ->sum('quantity');
                                     $max = max(0, (float) $item->quantity - (float) $alreadyReturned);
+                                    if ($max <= 0) {
+                                        return 'Perhatian: Barang ini telah diretur penuh pada dokumen lain (sisa 0 pcs).';
+                                    }
                                     return "Maksimal dapat diretur: {$max} pcs";
                                 })
                                 ->step(0.01)

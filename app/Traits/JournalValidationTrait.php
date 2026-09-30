@@ -2,13 +2,19 @@
 
 namespace App\Traits;
 
+use App\Models\ChartOfAccount;
+use App\Models\JournalEntry;
+use InvalidArgumentException;
+
 trait JournalValidationTrait
 {
     /**
      * Validate that journal entries are balanced (total debit = total credit)
+     * and do not use parent/header accounts.
      * 
      * @param array $entries Array of JournalEntry instances or arrays with 'debit' and 'credit' keys
      * @throws \Exception If entries are not balanced
+     * @throws InvalidArgumentException If any entry uses a parent account
      */
     protected function validateJournalEntries(array $entries): void
     {
@@ -16,14 +22,21 @@ trait JournalValidationTrait
         $totalCredit = 0;
 
         foreach ($entries as $entry) {
-            if ($entry instanceof \App\Models\JournalEntry) {
+            $coaId = null;
+            if ($entry instanceof JournalEntry) {
                 $totalDebit += (float) $entry->debit;
                 $totalCredit += (float) $entry->credit;
+                $coaId = $entry->coa_id;
             } elseif (is_array($entry)) {
                 $totalDebit += (float) ($entry['debit'] ?? 0);
                 $totalCredit += (float) ($entry['credit'] ?? 0);
+                $coaId = $entry['coa_id'] ?? null;
             } else {
                 throw new \Exception('Invalid entry format for validation');
+            }
+
+            if ($coaId) {
+                $this->validateNonParentCoa($coaId);
             }
         }
 
@@ -35,6 +48,26 @@ trait JournalValidationTrait
                     $totalCredit,
                     $totalDebit - $totalCredit
                 )
+            );
+        }
+    }
+
+    /**
+     * Ensure the COA is a leaf/transactable account, not a parent account.
+     *
+     * @param int|string|null $coaId
+     * @throws InvalidArgumentException
+     */
+    protected function validateNonParentCoa(int|string|null $coaId): void
+    {
+        if (! $coaId) {
+            return;
+        }
+
+        $coa = ChartOfAccount::find($coaId);
+        if ($coa && $coa->children()->where('id', '!=', $coa->id)->exists()) {
+            throw new InvalidArgumentException(
+                "Akun '{$coa->code} - {$coa->name}' merupakan akun induk dan tidak dapat digunakan untuk transaksi jurnal."
             );
         }
     }

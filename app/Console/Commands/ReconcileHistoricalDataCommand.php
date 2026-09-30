@@ -31,7 +31,7 @@ class ReconcileHistoricalDataCommand extends Command
      */
     protected $signature = 'system:reconcile-data 
                             {--dry-run : Jalankan simulasi pengecekan tanpa melakukan perubahan ke basis data}
-                            {--task=all : Pilihan tugas spesifik: all, journals, adjustments, transfers, reserved-stock, units, customers}
+                            {--task=all : Pilihan tugas spesifik: all, journals, adjustments, transfers, reserved-stock, units, customers, gl-legacy}
                             {--force : Lewati konfirmasi interaktif untuk eksekusi}';
 
     /**
@@ -39,7 +39,7 @@ class ReconcileHistoricalDataCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Pembersihan data anomali dan rekonsiliasi data historis (Sprint 4 Data Maintenance)';
+    protected $description = 'Pembersihan data anomali dan rekonsiliasi data historis (Sprint 4 & 10 Data Maintenance)';
 
     /**
      * Execute the console command.
@@ -54,7 +54,7 @@ class ReconcileHistoricalDataCommand extends Command
         $force = (bool) $this->option('force');
 
         $this->info('===============================================================');
-        $this->info('    SPRINT 4: REKONSILIASI HISTORIS & PEMBERSIHAN DATA ERP     ');
+        $this->info('    SPRINT 4 & 10: REKONSILIASI HISTORIS & PEMBERSIHAN DATA ERP');
         $this->info('===============================================================');
 
         if ($dryRun) {
@@ -75,6 +75,8 @@ class ReconcileHistoricalDataCommand extends Command
             'reserved_stock_resets' => 0,
             'sanitized_units' => 0,
             'merged_customers' => 0,
+            'reclassified_parent_coas' => 0,
+            'transit_reconciled' => 0,
         ];
 
         DB::beginTransaction();
@@ -110,6 +112,12 @@ class ReconcileHistoricalDataCommand extends Command
             // Task 6: Customer Duplicates Merge
             if ($task === 'all' || $task === 'customers') {
                 $summary['merged_customers'] = $this->consolidateDuplicateCustomers($customerMerger, $dryRun);
+            }
+
+            // Task 7 & 8: Historical GL & Transit Reconciliation (Sprint 10)
+            if ($task === 'all' || $task === 'gl-legacy') {
+                $summary['reclassified_parent_coas'] = $this->reconcileLegacyParentCoaEntries($dryRun);
+                $summary['transit_reconciled'] = $this->reconcileGoodsDeliveryTransitBalance($dryRun);
             }
 
             if ($dryRun) {
@@ -473,6 +481,155 @@ class ReconcileHistoricalDataCommand extends Command
     }
 
     /**
+     * Task 7: Reclassify legacy journal entries that directly use parent COAs.
+     */
+    protected function reconcileLegacyParentCoaEntries(bool $dryRun): int
+    {
+        $this->info("\n--- [7/8] Memeriksa Entri Jurnal Menggunakan Akun Induk (Parent COA) ---");
+
+        // Clean up self-referencing parent_id = id where an account points to itself
+        $selfReferencingAccounts = \App\Models\ChartOfAccount::whereColumn('parent_id', 'id')->get();
+        if ($selfReferencingAccounts->isNotEmpty()) {
+            $this->warn("Ditemukan {$selfReferencingAccounts->count()} akun dengan parent_id self-referencing (parent_id = id).");
+            if (! $dryRun) {
+                foreach ($selfReferencingAccounts as $sAcc) {
+                    $sAcc->forceFill(['parent_id' => null])->saveQuietly();
+                }
+            }
+        }
+
+        // Find journal entries that use accounts that have distinct child accounts
+        $parentEntries = JournalEntry::whereNull('deleted_at')
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('chart_of_accounts as c')
+                    ->whereColumn('c.parent_id', 'journal_entries.coa_id')
+                    ->whereColumn('c.id', '!=', 'journal_entries.coa_id');
+            })
+            ->get();
+
+        if ($parentEntries->isEmpty()) {
+            $this->line('✓ Tidak ditemukan entri jurnal yang menggunakan Akun Induk.');
+            return 0;
+        }
+
+        $this->warn("Ditemukan {$parentEntries->count()} entri jurnal yang mencatat langsung ke Akun Induk.");
+
+        $reclassified = 0;
+        $tableData = [];
+
+        foreach ($parentEntries as $entry) {
+            $parentCoa = \App\Models\ChartOfAccount::find($entry->coa_id);
+            if (! $parentCoa) {
+                continue;
+            }
+
+            // Find first active child leaf account
+            $childCoa = \App\Models\ChartOfAccount::where('parent_id', $parentCoa->id)
+                ->where('id', '!=', $parentCoa->id)
+                ->where('is_active', true)
+                ->orderBy('code', 'asc')
+                ->first();
+
+            if (! $childCoa) {
+                $this->warn("Akun {$parentCoa->code} tidak memiliki sub-akun aktif turunan.");
+                continue;
+            }
+
+            $tableData[] = [
+                $entry->id,
+                $entry->reference ?? '-',
+                "{$parentCoa->code} - {$parentCoa->name}",
+                "{$childCoa->code} - {$childCoa->name}",
+                $dryRun ? 'Akan Direklasifikasi' : 'Direklasifikasi',
+            ];
+
+            if (! $dryRun) {
+                $entry->update(['coa_id' => $childCoa->id]);
+            }
+
+            $reclassified++;
+        }
+
+        if (! empty($tableData)) {
+            $this->table(['ID JE', 'Referensi', 'Akun Induk Lama', 'Sub-Akun Baru', 'Tindakan'], $tableData);
+        }
+
+        return $reclassified;
+    }
+
+    /**
+     * Task 8: Reconcile Goods Delivery transit account (1140.20) if negative.
+     */
+    protected function reconcileGoodsDeliveryTransitBalance(bool $dryRun): int
+    {
+        $this->info("\n--- [8/8] Memeriksa Saldo Akun Transit 1140.20 (Barang Terkirim) ---");
+
+        $transitCoa = \App\Models\ChartOfAccount::where('code', '1140.20')->first();
+        if (! $transitCoa) {
+            $this->line('✓ Akun 1140.20 tidak ditemukan dalam master COA.');
+            return 0;
+        }
+
+        $balance = (float) DB::table('journal_entries')
+            ->whereNull('deleted_at')
+            ->where('coa_id', $transitCoa->id)
+            ->selectRaw('SUM(debit) - SUM(credit) as balance')
+            ->value('balance');
+
+        if ($balance >= -0.01) {
+            $this->line("✓ Saldo akun transit 1140.20 normal (Rp " . number_format($balance, 2, ',', '.') . ").");
+            return 0;
+        }
+
+        $deficit = abs($balance);
+        $this->warn("Terdeteksi saldo minus pada akun transit 1140.20: Rp -" . number_format($deficit, 2, ',', '.'));
+
+        $cogsCoa = \App\Models\ChartOfAccount::where('code', '5200')->whereDoesntHave('children')->first()
+            ?? \App\Models\ChartOfAccount::where('code', '5100.10')->whereDoesntHave('children')->first()
+            ?? \App\Models\ChartOfAccount::where('code', '5000')->first()
+            ?? \App\Models\ChartOfAccount::where('type', 'Expense')->whereDoesntHave('children')->first();
+
+        if (! $cogsCoa) {
+            $this->error('COA HPP tidak ditemukan untuk menyeimbangkan akun transit.');
+            return 0;
+        }
+
+        $this->line("Penyesuaian: Debit 1140.20 ({$transitCoa->name}) Rp " . number_format($deficit, 2, ',', '.') .
+            " | Kredit {$cogsCoa->code} ({$cogsCoa->name}) Rp " . number_format($deficit, 2, ',', '.'));
+
+        if (! $dryRun) {
+            $cabangId = \App\Models\Cabang::first()->id ?? 1;
+            $date = now()->toDateString();
+            $ref = 'ADJ-RECON-TRANSIT-1140';
+
+            JournalEntry::create([
+                'coa_id' => $transitCoa->id,
+                'reference' => $ref,
+                'date' => $date,
+                'debit' => $deficit,
+                'credit' => 0,
+                'description' => 'Rekonsiliasi Jurnal Historis: Penyeimbang Saldo Minus Akun Transit Barang Terkirim',
+                'journal_type' => 'adjustment',
+                'cabang_id' => $cabangId,
+            ]);
+
+            JournalEntry::create([
+                'coa_id' => $cogsCoa->id,
+                'reference' => $ref,
+                'date' => $date,
+                'debit' => 0,
+                'credit' => $deficit,
+                'description' => 'Rekonsiliasi Jurnal Historis: Penyeimbang Saldo Minus Akun Transit Barang Terkirim ke HPP',
+                'journal_type' => 'adjustment',
+                'cabang_id' => $cabangId,
+            ]);
+        }
+
+        return 1;
+    }
+
+    /**
      * Display execution summary table.
      *
      * @param  array<string, int>  $summary
@@ -496,6 +653,8 @@ class ReconcileHistoricalDataCommand extends Command
                 ['Reserved Stock Discrepancies (Reset Cadangan)', $summary['reserved_stock_resets'], $statusLabel],
                 ['Sanitized Unit of Measures (Sanitasi Satuan)', $summary['sanitized_units'], $statusLabel],
                 ['Merged Duplicate Customers (Konsolidasi Pelanggan)', $summary['merged_customers'], $statusLabel],
+                ['Parent COA JEs (Reklasifikasi Akun Induk)', $summary['reclassified_parent_coas'] ?? 0, $statusLabel],
+                ['Goods Delivery Transit Balance (Saldo 1140.20)', $summary['transit_reconciled'] ?? 0, $statusLabel],
             ]
         );
     }

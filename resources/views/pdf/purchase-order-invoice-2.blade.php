@@ -189,15 +189,15 @@
     <div class="invoice-details clearfix">
         <div class="customer-info">
             <h3>Supplier:</h3>
-            <p><strong>{{ $invoice->supplier_name ?? $supplier->perusahaan ?? 'N/A' }}</strong><br>
-                @if($supplier->perusahaan)
+            <p><strong>{{ $invoice->supplier_name ?? $supplier?->perusahaan ?? 'N/A' }}</strong><br>
+                @if($supplier?->perusahaan)
                 {{ $supplier->perusahaan }}<br>
                 @endif
-                {{ $supplier->address ?? '' }}<br>
-                @if($supplier->phone)
+                {{ $supplier?->address ?? '' }}<br>
+                @if($supplier?->phone)
                 Telp: {{ $supplier->phone }}<br>
                 @endif
-                @if($supplier->email)
+                @if($supplier?->email)
                 Email: {{ $supplier->email }}
                 @endif
             </p>
@@ -218,7 +218,7 @@
                 </tr>
                 <tr>
                     <td><strong>Status:</strong></td>
-                    <td>{{ ucfirst($invoice->status) }}</td>
+                    <td>{{ \App\Models\Invoice::STATUS_LABELS[$invoice->status] ?? ucfirst($invoice->status) }}</td>
                 </tr>
             </table>
         </div>
