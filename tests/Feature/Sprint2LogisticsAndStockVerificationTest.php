@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\StockTransferResource\Pages\CreateStockTransfer;
-use App\Filament\Resources\StockTransferResource\Pages\EditStockTransfer;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
@@ -34,6 +33,7 @@ use App\Services\SuratJalanService;
 use App\Support\OrderRequestQuantityLock;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -86,6 +86,14 @@ class Sprint2LogisticsAndStockVerificationTest extends TestCase
             'manage_type' => 'all',
         ]);
         Auth::login($this->user);
+
+        // Permissions needed to open the Stock Transfer Filament pages via Livewire tests
+        // (StockTransferPolicy checks these explicitly; 'manage_type' alone does not bypass it).
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        foreach (['view any stock transfer', 'view stock transfer', 'create stock transfer'] as $permission) {
+            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+        $this->user->givePermissionTo(['view any stock transfer', 'view stock transfer', 'create stock transfer']);
 
         $this->customer = Customer::factory()->create([
             'name' => 'Customer Verif S2',
@@ -253,41 +261,85 @@ class Sprint2LogisticsAndStockVerificationTest extends TestCase
 
     /**
      * BUG 2 (KRITIS - P0):
-     * Form transfer stok menolak penyimpanan transfer kosong (0 items) pada Create & Edit page,
-     * serta service menolak request transfer tanpa item.
+     * Form Buat Transfer Stok menolak penyimpanan transfer kosong (0 items) lewat validasi
+     * Repeater::minItems(1) bawaan Filament — bukan lagi lewat pengecekan custom di
+     * mutateFormDataBeforeCreate(), karena Repeater dengan ->relationship() tidak pernah
+     * mengirim key 'stockTransferItem' ke $data yang diterima method itu (item disimpan lewat
+     * jalur relasi Filament sendiri, setelah mutateFormDataBeforeCreate dipanggil). Pengecekan
+     * custom yang lama SELALU throw apa pun isian user — itulah sebab "transfer baru tidak bisa
+     * dibuat sama sekali" (Bug 2). Lihat docs/AUDIT-RETEST-29-SEP-2026.md Bug 2.
      */
-    public function test_bug_2_stock_transfer_rejects_empty_items_on_form_and_service(): void
+    public function test_bug_2_stock_transfer_form_rejects_empty_items(): void
     {
-        // 1. Test CreateStockTransfer mutation validation with empty items
-        $createPage = new class extends CreateStockTransfer {
-            public function invokeMutate(array $data): array {
-                return $this->mutateFormDataBeforeCreate($data);
-            }
-        };
+        Livewire::actingAs($this->user)
+            ->test(CreateStockTransfer::class)
+            ->fillForm([
+                'transfer_number' => StockTransfer::generateTransferNumber(),
+                'transfer_date' => now()->toDateString(),
+                'from_warehouse_id' => $this->warehouseSource->id,
+                'to_warehouse_id' => $this->warehouseDest->id,
+                'stockTransferItem' => [],
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['stockTransferItem']);
 
-        $this->expectException(ValidationException::class);
-        $createPage->invokeMutate([
-            'transfer_number' => 'TRF-EMPTY',
-            'stockTransferItem' => [],
+        $this->assertDatabaseMissing('stock_transfers', [
+            'from_warehouse_id' => $this->warehouseSource->id,
+            'to_warehouse_id' => $this->warehouseDest->id,
         ]);
     }
 
     /**
-     * BUG 2 (KRITIS - P0) lanjutan:
-     * EditStockTransfer mutation juga menolak transfer tanpa item.
+     * BUG 2 (KRITIS - P0) lanjutan, sekaligus regresi Bug 4:
+     * Transfer baru harus benar-benar bisa dibuat lewat form Livewire sungguhan (bukan lewat
+     * Eloquent langsung) dengan item yang gudang asal/tujuannya TIDAK memiliki Rak — mereproduksi
+     * persis skenario yang dilaporkan user.
      */
-    public function test_bug_2_edit_stock_transfer_rejects_empty_items(): void
+    public function test_bug_2_create_stock_transfer_via_form_without_rak_succeeds(): void
     {
-        $editPage = new class extends EditStockTransfer {
-            public function invokeMutate(array $data): array {
-                return $this->mutateFormDataBeforeSave($data);
-            }
-        };
+        $transferNumber = StockTransfer::generateTransferNumber();
 
-        $this->expectException(ValidationException::class);
-        $editPage->invokeMutate([
-            'transfer_number' => 'TRF-EMPTY-EDIT',
-            'stockTransferItem' => [],
+        // Two fillForm() calls on purpose: Repeater::defaultItems(1) already seeds one
+        // UUID-keyed item on mount. Filling 'stockTransferItem' with a plain 0-indexed array
+        // in the SAME call as the other fields would just add a sibling '0' key next to that
+        // UUID key (data_set() on dotted paths doesn't replace by position), leaving the
+        // original empty item to fail validation. Clearing it to [] first, then filling it in
+        // a second call, replaces the whole field cleanly before the 0-indexed item is set.
+        $component = Livewire::actingAs($this->user)
+            ->test(CreateStockTransfer::class)
+            ->fillForm([
+                'transfer_number' => $transferNumber,
+                'transfer_date' => now()->toDateString(),
+                'from_warehouse_id' => $this->warehouseSource->id,
+                'to_warehouse_id' => $this->warehouseDest->id,
+                'stockTransferItem' => [],
+            ]);
+
+        $component->fillForm([
+            'stockTransferItem' => [
+                [
+                    'product_id' => $this->product->id,
+                    'quantity' => 5,
+                    'from_warehouse_id' => $this->warehouseSource->id,
+                    'from_rak_id' => null,
+                    'to_warehouse_id' => $this->warehouseDest->id,
+                    'to_rak_id' => null,
+                ],
+            ],
+        ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $transfer = StockTransfer::where('transfer_number', $transferNumber)->firstOrFail();
+
+        $this->assertDatabaseHas('stock_transfer_items', [
+            'stock_transfer_id' => $transfer->id,
+            'product_id' => $this->product->id,
+            'from_warehouse_id' => $this->warehouseSource->id,
+            'from_rak_id' => null,
+            'to_warehouse_id' => $this->warehouseDest->id,
+            'to_rak_id' => null,
+            'quantity' => 5,
         ]);
     }
 

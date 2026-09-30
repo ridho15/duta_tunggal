@@ -38,7 +38,11 @@ Urutan tahap mengikuti prioritas yang sudah Anda tetapkan. Bug kecil (A–H) dis
 
 ---
 
-## Tahap 2 — Transfer Stok (Bug 2, Bug 4)
+## Tahap 2 — Transfer Stok (Bug 2, Bug 4) — ✅ SELESAI (30 Sep 2026)
+
+**Status: selesai & terverifikasi.** Root cause persis sesuai dugaan: `Repeater::make('stockTransferItem')->relationship()` tidak pernah mengisi `$data['stockTransferItem']` yang diterima `mutateFormDataBeforeCreate`/`mutateFormDataBeforeSave` (Filament men-dehydrate=false field itu, item disimpan lewat jalur relasi terpisah setelah method itu dipanggil) — sehingga pengecekan `isset($data['stockTransferItem'])` SELALU throw, apa pun isian user. Dihapus seluruhnya (bukan diperbaiki jadi kondisional), karena validasi "minimal 1 item" sudah ditangani `Repeater::minItems(1)` yang sudah ada di form, dan normalisasi rak kosong→null sudah ditangani `StockTransferItemObserver::saving()` di level model — kedua mekanisme itu bekerja terlepas dari jalur mana item disimpan. Dibuktikan lewat test Livewire yang benar-benar submit form (bukan panggil method langsung): transfer baru berhasil dibuat dengan DAN tanpa rak asal/tujuan. 2 test lama yang menguji perilaku (rusak) yang dihapus diganti dengan test form Livewire sungguhan. 49/49 test regresi terarah lolos.
+
+Temuan sampingan (dicatat, di luar cakupan Tahap 2, sudah di-flag sebagai tugas terpisah): `database/factories/StockTransferFactory.php` memakai `status` acak yang kadang bernilai 'Approved', memicu validasi stok minus baru (dari commit pagi ini) pada test yang tidak meng-seed `InventoryStock` — menyebabkan `StockTransferTest`, `WarehouseAuditTest`, `ResourceSortingTest` flaky ~20% kemunculan. Tidak terkait Bug 2/4.
 
 1. `app/Filament/Resources/StockTransferResource/Pages/CreateStockTransfer.php` (baris 18-22) dan `EditStockTransfer.php` (baris 22-26): hapus pengecekan `isset($data['stockTransferItem'])` yang salah asumsi (field ini memang tidak pernah ada di `$data` untuk Repeater `->relationship()`). Andalkan `Repeater::minItems(1)` yang sudah ada di `StockTransferResource.php:107`, atau baca raw Livewire state bila validasi custom tetap diperlukan.
 2. Rak asal/tujuan tidak perlu perubahan tambahan — kolom DB sudah nullable, observer & service sudah menangani `null` dengan benar (dikonfirmasi via test yang sudah ada).
