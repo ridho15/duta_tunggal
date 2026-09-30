@@ -193,6 +193,7 @@ class InvoiceObserver
                         ->delete();
 
                     if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                        $this->createSalesInvoiceAr($invoice);
                         $this->postSalesInvoice($invoice);
                     } else {
                         $this->ledger->postInvoice($invoice);

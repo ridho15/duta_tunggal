@@ -146,6 +146,20 @@ class SalesInvoiceResource extends Resource
         };
     }
 
+    /**
+     * Memeriksa apakah field invoice harus dikunci (status non-draft).
+     * Super Admin diizinkan mengedit untuk keperluan koreksi darurat.
+     */
+    public static function isInvoiceFieldLocked(?Invoice $record): bool
+    {
+        if (! $record || ! $record->exists) {
+            return false;
+        }
+
+        return strtolower((string) $record->status) !== Invoice::STATUS_DRAFT
+            && ! (bool) Auth::user()?->hasRole('Super Admin');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -160,6 +174,7 @@ class SalesInvoiceResource extends Resource
                                 Select::make('selected_customer')
                                     ->label('Customer')
                                     ->remoteSearch('customers')   // T7.2: pencarian sisi-server (tanpa memuat seluruh customer)
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->reactive()
                                     ->required()
                                     ->validationMessages([
@@ -177,6 +192,7 @@ class SalesInvoiceResource extends Resource
 
                                 Select::make('cabang_id')
                                     ->label('Cabang')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->options(Cabang::all()->mapWithKeys(function ($cabang) {
                                         return [$cabang->id => "({$cabang->kode}) {$cabang->nama}"];
                                     }))
@@ -191,6 +207,7 @@ class SalesInvoiceResource extends Resource
 
                                 Select::make('selected_sale_order')
                                     ->label('SO (Sales Order)')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->options(function ($get, $livewire) {
                                         $customerId = $get('selected_customer');
                                         if (!$customerId) return [];
@@ -311,6 +328,7 @@ class SalesInvoiceResource extends Resource
 
                                 DatePicker::make('invoice_date')
                                     ->label('Tanggal Invoice')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->required()
                                     ->reactive()
                                     ->validationMessages([
@@ -328,6 +346,7 @@ class SalesInvoiceResource extends Resource
 
                                 DatePicker::make('due_date')
                                     ->label('Tanggal Jatuh Tempo')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->required()
                                     ->reactive()
                                     ->validationMessages([
@@ -348,6 +367,7 @@ class SalesInvoiceResource extends Resource
                             ->schema([
                                 Forms\Components\CheckboxList::make('selected_delivery_orders')
                                     ->label('')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->options(function ($get) {
                                         $saleOrderId = $get('selected_sale_order');
                                         if (!$saleOrderId) return [];
@@ -814,6 +834,7 @@ class SalesInvoiceResource extends Resource
 
                                 Select::make('tipe_pajak')
                                     ->label('Tipe Pajak')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->options([
                                         'None'     => 'Tidak Kena Pajak (None)',
                                         'Inklusif' => 'PPN Inklusif (sudah termasuk harga)',
@@ -843,6 +864,7 @@ class SalesInvoiceResource extends Resource
 
                                 TextInput::make('ppn_rate')
                                     ->label('PPN Rate (%)')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
                                     ->numeric()
                                     ->validationMessages([
                                         'numeric' => 'PPN rate harus berupa angka'
@@ -1104,15 +1126,8 @@ class SalesInvoiceResource extends Resource
             ->actions([
                 ActionGroup::make([
                     ViewAction::make(),
-                    // FIX #2: Edit hanya muncul untuk invoice yang belum final
                     EditAction::make()
-                        ->visible(fn ($record) => !in_array($record->status, [
-                            \App\Models\Invoice::STATUS_SENT,
-                            \App\Models\Invoice::STATUS_PAID,
-                            \App\Models\Invoice::STATUS_PARTIALLY_PAID,
-                            \App\Models\Invoice::STATUS_OVERDUE,
-                            \App\Models\Invoice::STATUS_CANCELLED,
-                        ])),
+                        ->visible(fn ($record) => strtolower((string) $record->status) === \App\Models\Invoice::STATUS_DRAFT || (bool) Auth::user()?->hasRole('Super Admin')),
                     Tables\Actions\Action::make('print_invoice')
                         ->label('Preview Invoice')
                         ->icon('heroicon-o-document-text')

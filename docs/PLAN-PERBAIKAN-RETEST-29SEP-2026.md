@@ -84,9 +84,11 @@ Bukan perubahan kode — murni konfigurasi:
 
 ---
 
-## Tahap 5 — Kunci invoice penjualan yang sudah diposting (Bug 8)
+## Tahap 5 — Kunci invoice penjualan yang sudah diposting (Bug 8) — ✅ SELESAI (30 Sep 2026)
 
 **Keputusan (dikonfirmasi Anda): Super Admin tetap boleh membuka & mengedit invoice yang sudah diposting untuk koreksi darurat.** Jadi kuncinya bukan "tanpa kecuali", melainkan: **default terkunci untuk semua role, kecuali Super Admin** — dan karena ini jalur override finansial, override itu perlu tercatat (audit trail), bukan diam-diam.
+
+**Status: selesai & terverifikasi.** Semua 6 poin di bawah diimplementasikan persis sesuai rencana. Audit trail dibuat lewat pemanggilan `activity('emergency_invoice_override')->performedOn($record)->causedBy(...)->log(...)` langsung di `EditSalesInvoice::handleRecordUpdate()` (bukan trait `LogsActivity` di model, karena ini hanya perlu dicatat utuk jalur override darurat, bukan setiap perubahan invoice). Test baru `tests/Feature/SalesInvoicePostingLockTest.php` (4 test) membuktikan end-to-end: role biasa ditolak pada status non-draft, Super Admin lolos, dan skenario penuh (Super Admin ubah PPN invoice ter-posting → total invoice, AR, dan jurnal semuanya sinkron ke nilai baru + tercatat di activity log). Regresi lebih luas (`InvoiceArFeatureTest` yang dikenal flaky, `SalesInvoiceResourceTest`, `InvoiceServiceFeatureTest`, dll — 42 test) semuanya lolos.
 
 1. `app/Filament/Resources/SalesInvoiceResource/Pages/EditSalesInvoice.php`: ganti pendekatan denylist → **allowlist eksplisit dengan bypass Super Admin** — field kunci (customer, SO, cabang, tipe pajak, PPN) terkunci untuk semua status selain `draft`, KECUALI `Auth::user()->hasRole('Super Admin')`. Ini ditulis eksplisit di titik pengecekan (bukan mengandalkan `Gate::before()` yang implisit), supaya niatnya jelas dibaca ulang nanti. Ini otomatis menutup celah `'unpaid'` yang selama ini lolos untuk role selain Super Admin.
 2. Tambahkan guard **server-side** di `mutateFormDataBeforeSave()`/`beforeSave()` dengan logika bypass yang sama (Super Admin lolos, role lain ditolak bila status ≠ draft) — jangan andalkan `->disabled()` UI saja (bisa dilewati lewat manipulasi request langsung).

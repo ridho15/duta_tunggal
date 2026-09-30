@@ -14,24 +14,19 @@ class EditSalesInvoice extends EditRecord
     protected static string $resource = SalesInvoiceResource::class;
 
     /**
-     * FIX #2: Blokir akses halaman edit jika invoice sudah final.
+     * Izinkan akses edit hanya untuk status draft, ATAU Super Admin untuk koreksi darurat.
      * Mencegah bypass via URL langsung (mis. /admin/sales-invoices/1/edit).
      */
     public function authorizeAccess(): void
     {
         $record = $this->getRecord();
-        $lockedStatuses = [
-            \App\Models\Invoice::STATUS_SENT,
-            \App\Models\Invoice::STATUS_PAID,
-            \App\Models\Invoice::STATUS_PARTIALLY_PAID,
-            \App\Models\Invoice::STATUS_OVERDUE,
-            \App\Models\Invoice::STATUS_CANCELLED,
-        ];
+        $isDraft = strtolower((string) $record->status) === \App\Models\Invoice::STATUS_DRAFT;
+        $isSuperAdmin = (bool) auth()->user()?->hasRole('Super Admin');
 
-        if (in_array($record->status, $lockedStatuses)) {
+        if (! $isDraft && ! $isSuperAdmin) {
             \Filament\Notifications\Notification::make()
                 ->title('Invoice tidak dapat diedit')
-                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$record->status] ?? $record->status) . '" tidak dapat diubah. Gunakan Nota Kredit atau Pembatalan.')
+                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$record->status] ?? $record->status) . '" telah diposting dan terkunci. Hanya Super Admin yang berhak melakukan koreksi darurat.')
                 ->danger()
                 ->send();
 
@@ -46,16 +41,9 @@ class EditSalesInvoice extends EditRecord
     {
         return [
             Actions\ViewAction::make()->icon('heroicon-o-eye')->color('primary'),
-            // FIX #2: Hapus hanya untuk invoice yang belum final (draft)
             Actions\DeleteAction::make()
                 ->icon('heroicon-o-trash')
-                ->visible(fn () => !in_array($this->record->status, [
-                    \App\Models\Invoice::STATUS_SENT,
-                    \App\Models\Invoice::STATUS_PAID,
-                    \App\Models\Invoice::STATUS_PARTIALLY_PAID,
-                    \App\Models\Invoice::STATUS_OVERDUE,
-                    \App\Models\Invoice::STATUS_CANCELLED,
-                ])),
+                ->visible(fn () => strtolower((string) $this->record->status) === \App\Models\Invoice::STATUS_DRAFT),
         ];
     }
 
@@ -136,6 +124,13 @@ class EditSalesInvoice extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $isDraft = strtolower((string) $this->record->status) === \App\Models\Invoice::STATUS_DRAFT;
+        $isSuperAdmin = (bool) auth()->user()?->hasRole('Super Admin');
+
+        if (! $isDraft && ! $isSuperAdmin) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('Invoice yang sudah diposting hanya dapat diedit oleh Super Admin.');
+        }
+
         $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
 
         // Remove temporary fields
@@ -150,28 +145,52 @@ class EditSalesInvoice extends EditRecord
         return $data;
     }
 
-    protected function afterSave(): void
+    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
-        // Sync invoice items
-        if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
-            // Soft-delete existing items before recreating
-            $this->record->invoiceItem()->delete();
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data) {
+            $isNonDraft = strtolower((string) $record->status) !== \App\Models\Invoice::STATUS_DRAFT;
+            $oldOriginal = $record->getOriginal();
 
-            // Rincian baku (harga gross, diskon, DPP, PPN, total) — sama dengan jalur otomatis.
-            $built = app(\App\Services\SalesInvoiceLineBuilder::class)->fromFormItems($this->record, $this->data['invoiceItem']);
+            // Rebuild item baris lebih dulu sebelum header disimpan agar saat observer update terpicu,
+            // baris item di DB sudah selaras dengan header dan balance check jurnal langsung valid
+            if (isset($this->data['invoiceItem']) && is_array($this->data['invoiceItem'])) {
+                $record->invoiceItem()->delete();
 
-            foreach ($built['items'] as $itemData) {
-                $this->record->invoiceItem()->create($itemData);
+                // Set atribut form sementara di model memory agar builder menggunakan tax_rate & tipe terbaru
+                $record->fill($data);
+
+                $built = app(\App\Services\SalesInvoiceLineBuilder::class)->fromFormItems($record, $this->data['invoiceItem']);
+                foreach ($built['items'] as $itemData) {
+                    $record->invoiceItem()->create($itemData);
+                }
+
+                if ($built['matched'] && $built['items'] !== []) {
+                    $items = collect($built['items']);
+                    $calculatedSubtotal = round((float) $items->sum('subtotal'), 2);
+                    $data['subtotal'] = $calculatedSubtotal;
+                    $data['dpp'] = $calculatedSubtotal;
+                    $data['total'] = round((float) $items->sum('total') + app(\App\Services\SalesInvoiceLineBuilder::class)->otherFeeTotal($record), 2);
+                }
             }
 
-            if ($built['matched'] && $built['items'] !== []) {
-                $items = collect($built['items']);
-                $this->record->update([
-                    'subtotal' => round((float) $items->sum('subtotal'), 2),
-                    'dpp' => round((float) $items->sum('subtotal'), 2),
-                    'total' => round((float) $items->sum('total') + app(\App\Services\SalesInvoiceLineBuilder::class)->otherFeeTotal($this->record), 2),
-                ]);
+            // Simpan header dengan nilai total & PPN yang sudah seimbang dengan line items
+            $record->update($data);
+
+            // Audit trail darurat untuk Super Admin saat mengedit invoice non-draft
+            if ($isNonDraft && auth()->user()?->hasRole('Super Admin')) {
+                activity('emergency_invoice_override')
+                    ->performedOn($record)
+                    ->causedBy(auth()->user())
+                    ->withProperties([
+                        'invoice_number' => $record->invoice_number,
+                        'status' => $record->status,
+                        'old' => array_intersect_key($oldOriginal, $record->getChanges()),
+                        'attributes' => $record->getChanges(),
+                    ])
+                    ->log('Super Admin melakukan koreksi darurat pada invoice terposting ' . $record->invoice_number);
             }
-        }
+
+            return $record;
+        });
     }
 }
