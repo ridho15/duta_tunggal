@@ -7,7 +7,6 @@ use App\Models\AccountReceivable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
-use App\Models\DeliveryOrder;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\JournalEntry;
@@ -25,6 +24,8 @@ use Tests\TestCase;
 
 class SalesInvoicePostingLockTest extends TestCase
 {
+    use RefreshDatabase;
+
     private User $superAdmin;
     private User $staffUser;
     private Cabang $cabang;
@@ -71,11 +72,10 @@ class SalesInvoicePostingLockTest extends TestCase
             'email' => 'staff_' . uniqid() . '@example.com',
             'kode_user' => 'ST' . strtoupper(substr(uniqid(), -4)),
             'cabang_id' => $this->cabang->id,
-            'manage_type' => 'all',
+            'manage_type' => (string) $this->cabang->id,
         ]);
         $this->staffUser->assignRole($staffRole);
 
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
         $this->staffUser->givePermissionTo('view any invoice');
         $this->staffUser->givePermissionTo('view invoice');
         $this->staffUser->givePermissionTo('update invoice');
@@ -84,30 +84,24 @@ class SalesInvoicePostingLockTest extends TestCase
             'cabang_id' => $this->cabang->id,
         ]);
 
-        $this->arCoa = ChartOfAccount::firstOrCreate(
-            ['code' => '1120'],
-            ['name' => 'Piutang Dagang', 'type' => 'Asset', 'is_active' => true]
-        );
+        foreach ([
+            ['code' => '1120', 'name' => 'Piutang Dagang', 'type' => 'Asset'],
+            ['code' => '4000', 'name' => 'Penjualan', 'type' => 'Revenue'],
+            ['code' => '2120.06', 'name' => 'PPN Keluaran', 'type' => 'Liability'],
+            ['code' => '1140.20', 'name' => 'Barang Terkirim', 'type' => 'Asset'],
+            ['code' => '5100.10', 'name' => 'HPP Barang', 'type' => 'Expense'],
+            ['code' => '6100.02', 'name' => 'Biaya Pengiriman', 'type' => 'Expense'],
+            ['code' => '4100.01', 'name' => 'Diskon Penjualan', 'type' => 'Expense'],
+        ] as $coa) {
+            ChartOfAccount::firstOrCreate(
+                ['code' => $coa['code']],
+                ['name' => $coa['name'], 'type' => $coa['type'], 'is_active' => true]
+            );
+        }
 
-        $this->salesCoa = ChartOfAccount::firstOrCreate(
-            ['code' => '4000'],
-            ['name' => 'Penjualan', 'type' => 'Revenue', 'is_active' => true]
-        );
-
-        $this->ppnCoa = ChartOfAccount::firstOrCreate(
-            ['code' => '2120.06'],
-            ['name' => 'PPN Keluaran', 'type' => 'Liability', 'is_active' => true]
-        );
-
-        $cogsCoa = ChartOfAccount::firstOrCreate(
-            ['code' => '5100.10'],
-            ['name' => 'Harga Pokok Penjualan', 'type' => 'Expense', 'is_active' => true]
-        );
-
-        $goodsDeliveryCoa = ChartOfAccount::firstOrCreate(
-            ['code' => '1140.20'],
-            ['name' => 'Barang Terkirim (In Transit) Lock Test', 'type' => 'Asset', 'is_active' => true]
-        );
+        $this->arCoa = ChartOfAccount::where('code', '1120')->first();
+        $this->salesCoa = ChartOfAccount::where('code', '4000')->first();
+        $this->ppnCoa = ChartOfAccount::where('code', '2120.06')->first();
 
         $this->warehouse = Warehouse::create([
             'cabang_id' => $this->cabang->id,
@@ -120,70 +114,92 @@ class SalesInvoicePostingLockTest extends TestCase
         $this->product = Product::factory()->create([
             'cabang_id' => $this->cabang->id,
             'sales_coa_id' => $this->salesCoa->id,
-            'cogs_coa_id' => $cogsCoa->id,
-            'goods_delivery_coa_id' => $goodsDeliveryCoa->id,
             'cost_price' => 50000,
             'sell_price' => 100000,
         ]);
     }
 
-    /**
-     * InvoiceObserver::createSalesInvoiceAr() resolves customer_id from the linked SaleOrder
-     * (Invoice itself has no customer_id column) — a fake from_model_id leaves it null and
-     * violates the account_receivables.customer_id NOT NULL constraint on invoice creation.
-     */
-    private function createLinkedSaleOrder(): SaleOrder
+    private function createTestSaleOrder(int $quantity = 1, float $price = 100000): SaleOrder
     {
-        return SaleOrder::create([
-            'so_number' => 'SO-LOCK-' . uniqid(),
+        $so = SaleOrder::create([
+            'so_number' => 'SO-' . uniqid(),
             'customer_id' => $this->customer->id,
             'cabang_id' => $this->cabang->id,
             'order_date' => now(),
             'status' => 'approved',
-            'total_amount' => 111000,
+            'tipe_pengiriman' => 'Ambil Sendiri',
+            'total_amount' => $quantity * $price,
         ]);
+
+        SaleOrderItem::create([
+            'sale_order_id' => $so->id,
+            'product_id' => $this->product->id,
+            'quantity' => $quantity,
+            'unit_price' => $price,
+            'discount' => 0,
+            'total_price' => $quantity * $price,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
+
+        return $so;
+    }
+
+    private function createTestInvoice(
+        SaleOrder $so,
+        string $status = 'unpaid',
+        float $subtotal = 100000,
+        float $total = 100000,
+        string $taxType = 'None',
+        float $taxRate = 0
+    ): Invoice {
+        $invoice = Invoice::create([
+            'invoice_number' => 'INV-TEST-' . uniqid(),
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $so->id,
+            'cabang_id' => $this->cabang->id,
+            'customer_name' => $this->customer->name,
+            'customer_phone' => $this->customer->phone,
+            'invoice_date' => now(),
+            'due_date' => now()->addDays(30),
+            'status' => $status,
+            'subtotal' => $subtotal,
+            'dpp' => $subtotal,
+            'total' => $total,
+            'ppn_rate' => $taxRate,
+            'tipe_pajak' => $taxType,
+        ]);
+
+        InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+            'price' => $subtotal,
+            'subtotal' => $subtotal,
+            'total' => $total,
+            'tax_rate' => $taxRate,
+            'tax_amount' => $total - $subtotal,
+            'coa_id' => $this->salesCoa->id,
+        ]);
+
+        return $invoice;
     }
 
     public function test_non_super_admin_cannot_access_edit_page_for_unpaid_sales_invoice(): void
     {
-        $so = $this->createLinkedSaleOrder();
-
-        $invoice = Invoice::create([
-            'invoice_number' => 'INV-TEST-UNPAID-' . uniqid(),
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => $so->id,
-            'cabang_id' => $this->cabang->id,
-            'invoice_date' => now(),
-            'due_date' => now()->addDays(30),
-            'status' => 'unpaid',
-            'subtotal' => 100000,
-            'total' => 111000,
-            'ppn_rate' => 11,
-            'tipe_pajak' => 'Eksklusif',
-        ]);
+        $so = $this->createTestSaleOrder(1, 100000);
+        $invoice = $this->createTestInvoice($so, 'unpaid', 100000, 111000, 'Eksklusif', 11);
 
         $this->actingAs($this->staffUser);
 
-        // Edit page must redirect away with an error notification for non-draft invoices
+        // Edit page must redirect away for non-draft invoices when accessed by non-Super Admin
         Livewire::test(EditSalesInvoice::class, ['record' => $invoice->getKey()])
             ->assertRedirect();
     }
 
     public function test_non_super_admin_can_access_edit_page_for_draft_sales_invoice(): void
     {
-        $invoice = Invoice::create([
-            'invoice_number' => 'INV-TEST-DRAFT-' . uniqid(),
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => 9999,
-            'cabang_id' => $this->cabang->id,
-            'invoice_date' => now(),
-            'due_date' => now()->addDays(30),
-            'status' => 'draft',
-            'subtotal' => 100000,
-            'total' => 100000,
-            'ppn_rate' => 0,
-            'tipe_pajak' => 'None',
-        ]);
+        $so = $this->createTestSaleOrder(1, 100000);
+        $invoice = $this->createTestInvoice($so, 'draft', 100000, 100000, 'None', 0);
 
         $this->actingAs($this->staffUser);
 
@@ -193,21 +209,8 @@ class SalesInvoicePostingLockTest extends TestCase
 
     public function test_super_admin_can_access_edit_page_for_unpaid_sales_invoice(): void
     {
-        $so = $this->createLinkedSaleOrder();
-
-        $invoice = Invoice::create([
-            'invoice_number' => 'INV-TEST-UNPAID-SA-' . uniqid(),
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => $so->id,
-            'cabang_id' => $this->cabang->id,
-            'invoice_date' => now(),
-            'due_date' => now()->addDays(30),
-            'status' => 'unpaid',
-            'subtotal' => 100000,
-            'total' => 111000,
-            'ppn_rate' => 11,
-            'tipe_pajak' => 'Eksklusif',
-        ]);
+        $so = $this->createTestSaleOrder(1, 100000);
+        $invoice = $this->createTestInvoice($so, 'unpaid', 100000, 111000, 'Eksklusif', 11);
 
         $this->actingAs($this->superAdmin);
 
@@ -217,27 +220,10 @@ class SalesInvoicePostingLockTest extends TestCase
 
     public function test_super_admin_emergency_override_updates_ar_reposts_journals_and_logs_activity(): void
     {
-        // 1. Create Sale Order with 1 item
-        $so = SaleOrder::create([
-            'so_number' => 'SO-EMERGENCY-' . uniqid(),
-            'customer_id' => $this->customer->id,
-            'cabang_id' => $this->cabang->id,
-            'order_date' => now(),
-            'status' => 'approved',
-            'total_amount' => 100000,
-        ]);
+        // 1. Create Sale Order with 2 items @ 100,000 = 200,000
+        $so = $this->createTestSaleOrder(2, 100000);
 
-        $soItem = SaleOrderItem::create([
-            'sale_order_id' => $so->id,
-            'product_id' => $this->product->id,
-            'quantity' => 2,
-            'unit_price' => 100000,
-            'discount' => 0,
-            'total_price' => 200000,
-            'warehouse_id' => $this->warehouse->id,
-        ]);
-
-        // 2. Create Invoice in posted/unpaid status
+        // 2. Create Invoice in posted/unpaid status with None tax (total = 200,000)
         $invoice = Invoice::create([
             'invoice_number' => 'INV-OVERRIDE-' . uniqid(),
             'from_model_type' => SaleOrder::class,
@@ -267,10 +253,12 @@ class SalesInvoicePostingLockTest extends TestCase
             'coa_id' => $this->salesCoa->id,
         ]);
 
-        // Initial AR is created automatically by InvoiceObserver::created() (from_model_id
-        // points to a real SaleOrder above, so customer_id resolves) — no manual insert needed.
+        // Verify initial AR was created by InvoiceObserver
+        $initialAr = AccountReceivable::where('invoice_id', $invoice->id)->first();
+        $this->assertNotNull($initialAr);
+        $this->assertEquals(200000.0, (float) $initialAr->total);
 
-        // Post initial journal
+        // Post initial journal (Debit AR 200,000, Credit Sales 200,000)
         JournalEntry::create([
             'coa_id' => $this->arCoa->id,
             'date' => now(),
@@ -278,6 +266,17 @@ class SalesInvoicePostingLockTest extends TestCase
             'description' => 'Initial AR',
             'debit' => 200000,
             'credit' => 0,
+            'source_type' => Invoice::class,
+            'source_id' => $invoice->id,
+            'cabang_id' => $this->cabang->id,
+        ]);
+        JournalEntry::create([
+            'coa_id' => $this->salesCoa->id,
+            'date' => now(),
+            'reference' => $invoice->invoice_number,
+            'description' => 'Initial Sales Revenue',
+            'debit' => 0,
+            'credit' => 200000,
             'source_type' => Invoice::class,
             'source_id' => $invoice->id,
             'cabang_id' => $this->cabang->id,
@@ -306,9 +305,7 @@ class SalesInvoicePostingLockTest extends TestCase
         $this->assertEquals(222000.0, (float) $ar->total);
         $this->assertEquals(222000.0, (float) $ar->remaining);
 
-        // Journal Entries should be reposted and balanced. postSalesInvoice() posts two legs:
-        // AR/Revenue/PPN (222,000) and a separate COGS/goods-delivery-release leg (2 x 50,000
-        // cost_price = 100,000) — so the grand total is 322,000, not the invoice total alone.
+        // Journal Entries should be reposted with debit = credit = 222,000
         $journals = JournalEntry::where('source_type', Invoice::class)
             ->where('source_id', $invoice->id)
             ->get();
@@ -317,11 +314,9 @@ class SalesInvoicePostingLockTest extends TestCase
         $totalDebit = (float) $journals->sum('debit');
         $totalCredit = (float) $journals->sum('credit');
         $this->assertEquals($totalDebit, $totalCredit, 'Jurnal hasil repost harus seimbang');
-
-        // The AR leg specifically must reflect the new invoice total (222,000), proving the
-        // repost picked up the new tipe_pajak/ppn_rate rather than stale item amounts.
-        $arDebit = (float) $journals->where('coa_id', $this->arCoa->id)->sum('debit');
-        $this->assertEquals(222000.0, $arDebit, 'Debit akun Piutang Dagang harus sesuai total baru invoice');
+        $arJournal = $journals->firstWhere('coa_id', $this->arCoa->id);
+        $this->assertNotNull($arJournal, 'Jurnal Piutang Dagang harus ada');
+        $this->assertEquals(222000.0, (float) $arJournal->debit, 'Jurnal Piutang Dagang debit harus sesuai total baru invoice');
 
         // Activity log for emergency override must exist
         $overrideActivity = Activity::where('log_name', 'emergency_invoice_override')

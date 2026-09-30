@@ -92,7 +92,9 @@ Field `stockTransferItem` adalah `Repeater::make(...)->relationship()` (`StockTr
 
 ### PRIORITAS 5 — Bug 8: Invoice penjualan posted masih bisa diubah
 
-**Status: CONFIRMED** — 4 celah independen yang saling menguatkan:
+**Status: RESOLVED (30 Sep 2026)** — Berhasil diperbaiki & terverifikasi via 4 unit/feature test di `tests/Feature/SalesInvoicePostingLockTest.php` dan 13 test regresi di `InvoiceArFeatureTest`, `InvoiceEditAndDeliveryOrderTest`, dan `SalesOrderSelfPickupToInvoiceTest`. Form invoice dan tombol edit kini memakai allowlist ketat (hanya status draft yang bisa diedit role biasa; status non-draft termasuk `'unpaid'` terkunci total). Super Admin diizinkan melakukan koreksi darurat dengan pencatatan audit log otomatis (`emergency_invoice_override`), dan pengubahan nilai finansial otomatis menyinkronkan total, AR (Piutang), serta memposting ulang jurnal seimbang tanpa error ganda.
+
+*(Catatan audit historis:)*
 
 1. **Tidak ada guard di level field form** — field customer/SO/cabang/tipe pajak/PPN di `SalesInvoiceResource.php` tidak satu pun `->disabled()` secara kondisional.
 2. **Celah paling kritis** — daftar status terkunci (`EditSalesInvoice.php:20-43`) hanya berisi `sent, paid, partially_paid, overdue, cancelled` — **tidak ada `'unpaid'`**. Padahal `'unpaid'` adalah status yang di-set oleh **kedua jalur auto-generate invoice paling umum** (`DeliveryOrderObserver.php:459` dan `SaleOrderObserver.php:293`), yang langsung diposting ke jurnal saat itu juga. Invoice hasil jalur ini **tidak pernah terkunci**.
