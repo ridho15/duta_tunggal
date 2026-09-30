@@ -22,6 +22,7 @@ use App\Services\StockAdjustmentService;
 use App\Services\StockOpnameService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class UATPriority2StockAdjustmentAndOpnameTest extends TestCase
@@ -375,9 +376,80 @@ class UATPriority2StockAdjustmentAndOpnameTest extends TestCase
 
         $this->assertNotNull($item);
         $this->assertEquals(77.0, (float) $item->system_qty);
-        $this->assertEquals(77.0, (float) $item->physical_qty);
-        $this->assertEquals(0.0, (float) $item->difference_qty);
+        // physical_qty must stay NULL ("belum dihitung") — Bug 6: it used to default to system_qty,
+        // which let an opname reach "Setujui" without a single real count ever being entered.
+        $this->assertNull($item->physical_qty);
+        $this->assertNull($item->difference_qty);
         $this->assertEquals(25000.0, (float) $item->unit_cost);
+    }
+
+    public function test_stock_opname_cannot_be_completed_when_items_are_not_counted(): void
+    {
+        $service = app(StockOpnameService::class);
+
+        InventoryStock::updateOrCreate([
+            'warehouse_id' => $this->warehouseNoRaks->id,
+            'product_id' => $this->product->id,
+            'rak_id' => null,
+        ], [
+            'qty_available' => 77,
+            'qty_reserved' => 0,
+        ]);
+
+        $opname = StockOpname::create([
+            'opname_number' => StockOpname::generateOpnameNumber(),
+            'opname_date' => now(),
+            'warehouse_id' => $this->warehouseNoRaks->id,
+            'status' => 'draft',
+            'created_by' => $this->user->id,
+        ]);
+
+        $service->startPhysicalCount($opname);
+
+        // Bug 6: previously physical_qty was auto-filled to system_qty on start, so completing
+        // right away (without a human ever entering a real count) always succeeded.
+        $this->expectException(ValidationException::class);
+        $service->completePhysicalCount($opname->fresh());
+    }
+
+    public function test_stock_opname_can_be_completed_after_all_items_are_counted(): void
+    {
+        $service = app(StockOpnameService::class);
+
+        InventoryStock::updateOrCreate([
+            'warehouse_id' => $this->warehouseNoRaks->id,
+            'product_id' => $this->product->id,
+            'rak_id' => null,
+        ], [
+            'qty_available' => 77,
+            'qty_reserved' => 0,
+        ]);
+
+        $opname = StockOpname::create([
+            'opname_number' => StockOpname::generateOpnameNumber(),
+            'opname_date' => now(),
+            'warehouse_id' => $this->warehouseNoRaks->id,
+            'status' => 'draft',
+            'created_by' => $this->user->id,
+        ]);
+
+        $service->startPhysicalCount($opname);
+
+        StockOpnameItem::where('stock_opname_id', $opname->id)
+            ->where('product_id', $this->product->id)
+            ->firstOrFail()
+            ->update(['physical_qty' => 75]);
+
+        $completed = $service->completePhysicalCount($opname->fresh());
+
+        $this->assertEquals('completed', $completed->status);
+
+        $item = StockOpnameItem::where('stock_opname_id', $opname->id)
+            ->where('product_id', $this->product->id)
+            ->first();
+
+        $this->assertEquals(75.0, (float) $item->physical_qty);
+        $this->assertEquals(-2.0, (float) $item->difference_qty);
     }
 
     public function test_stock_opname_approval_generates_stock_movements_and_updates_inventory(): void

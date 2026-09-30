@@ -38,8 +38,18 @@ class StockOpnameItem extends Model
     protected static function booted()
     {
         static::saving(function (StockOpnameItem $item) {
+            // physical_qty === null means "belum dihitung fisik" — leave the variance columns
+            // null too, instead of computing them as if a real count of 0 had been entered.
+            if (is_null($item->physical_qty)) {
+                $item->difference_qty = null;
+                $item->difference_value = null;
+                $item->total_value = null;
+
+                return;
+            }
+
             $systemQty = (float) ($item->system_qty ?? 0);
-            $physicalQty = (float) ($item->physical_qty ?? 0);
+            $physicalQty = (float) $item->physical_qty;
             $item->difference_qty = $physicalQty - $systemQty;
 
             $unitCost = (float) ($item->unit_cost ?: ($item->average_cost ?: 0));

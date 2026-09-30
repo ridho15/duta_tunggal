@@ -159,21 +159,29 @@ class StockOpnameService
                         ->first();
 
                     if (! $existingItem) {
+                        // physical_qty starts NULL — "belum dihitung fisik", not a count of 0/system qty.
+                        // difference_qty/value and total_value stay null too (StockOpnameItem::booted()
+                        // recomputes them once physical_qty is actually entered).
                         StockOpnameItem::create([
                             'stock_opname_id' => $lockedOpname->id,
                             'product_id' => $stock->product_id,
                             'rak_id' => $stock->rak_id,
                             'system_qty' => $systemQty,
-                            'physical_qty' => $systemQty,
-                            'difference_qty' => 0.0,
+                            'physical_qty' => null,
                             'unit_cost' => $avgCost,
                             'average_cost' => $avgCost,
-                            'difference_value' => 0.0,
-                            'total_value' => $systemQty * $avgCost,
+                        ]);
+                        $count++;
+                    } elseif (is_null($existingItem->physical_qty)) {
+                        // Not counted yet — only refresh the system-known figures, don't fabricate a variance.
+                        $existingItem->update([
+                            'system_qty' => $systemQty,
+                            'unit_cost' => (float) ($existingItem->unit_cost ?: $avgCost),
+                            'average_cost' => $avgCost,
                         ]);
                         $count++;
                     } else {
-                        // Sync system qty with current stock
+                        // Already counted once — sync system qty with current stock and recompute variance.
                         $physicalQty = (float) $existingItem->physical_qty;
                         $diffQty = $physicalQty - $systemQty;
                         $unitCost = (float) ($existingItem->unit_cost ?: $avgCost);
@@ -200,12 +208,9 @@ class StockOpnameService
                         'rak_id' => null,
                     ], [
                         'system_qty' => 0,
-                        'physical_qty' => 0,
-                        'difference_qty' => 0,
+                        'physical_qty' => null,
                         'unit_cost' => $avgCost,
                         'average_cost' => $avgCost,
-                        'difference_value' => 0,
-                        'total_value' => 0,
                     ]);
                     $count++;
                 }
