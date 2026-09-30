@@ -115,6 +115,7 @@ class FinanceSalesSeeder extends Seeder
                     'order_date' => $sale['order_date'],
                     'delivery_date' => $sale['delivery_date'],
                     'status' => $sale['status'],
+                    'cabang_id' => 1,
                     'total_amount' => 0,
                     'created_by' => $userId,
                 ]
@@ -157,6 +158,7 @@ class FinanceSalesSeeder extends Seeder
                     'other_fee' => 0,
                     'total' => $total,
                     'status' => $sale['invoice']['status'],
+                    'cabang_id' => 1,
                     'customer_name' => $customer->name,
                     'customer_phone' => $customer->phone,
                 ]
@@ -184,6 +186,7 @@ class FinanceSalesSeeder extends Seeder
                         'ntpn' => $receiptData['number'],
                         'invoice_id' => $invoice->id,
                         'customer_id' => $customer->id,
+                        'cabang_id' => 1,
                         'payment_date' => $receiptData['date']->toDateString(),
                         'total_payment' => $receiptData['amount'],
                         'notes' => 'Pelunasan atas ' . $invoice->invoice_number,
@@ -229,6 +232,7 @@ class FinanceSalesSeeder extends Seeder
                 ['invoice_id' => $invoice->id],
                 [
                     'customer_id' => $customer->id,
+                    'cabang_id' => 1,
                     'total' => $total,
                     'paid' => $paid,
                     'remaining' => $remaining,

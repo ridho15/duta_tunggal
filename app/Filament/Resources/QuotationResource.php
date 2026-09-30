@@ -1927,7 +1927,11 @@ class QuotationResource extends Resource
                         ->label('Approve')
                         ->icon('heroicon-o-check-badge')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('approve quotation') && ($record->status == 'request_approve')
+                            // NEG-3.3 fix: always enforce role-based check regardless of approval_rules flag.
+                            // Sales staff have 'approve quotation' permission but are NOT in SALES_TIER_1_ROLES.
+                            return Auth::user()->hasPermissionTo('approve quotation')
+                                && ($record->status == 'request_approve')
+                                && Auth::user()->hasRole(\App\Services\ApprovalControlService::SALES_TIER_1_ROLES)
                                 && \App\Filament\Support\ApprovalActions::canApprove($record);
                         })
                         ->form(fn ($record) => \App\Filament\Support\ApprovalActions::overrideForm($record))
@@ -1962,7 +1966,10 @@ class QuotationResource extends Resource
                         ->label('Reject')
                         ->icon('heroicon-o-x-circle')
                         ->visible(function ($record) {
-                            return Auth::user()->hasPermissionTo('reject quotation') && ($record->status == 'request_approve');
+                            // Only Sales Manager and above may reject a quotation pending their review.
+                            return Auth::user()->hasPermissionTo('reject quotation')
+                                && ($record->status == 'request_approve')
+                                && Auth::user()->hasRole(\App\Services\ApprovalControlService::SALES_TIER_1_ROLES);
                         })
                         ->color('danger')
                         ->requiresConfirmation()

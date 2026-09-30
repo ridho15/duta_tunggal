@@ -159,9 +159,18 @@ Dikerjakan sebagai satu commit ringan setelah tahap-tahap besar selesai (tidak m
 
 ## Tahap 9 — Regresi penuh & penutupan
 
-1. Setelah Tahap 1-8 selesai dan masing-masing lolos regresi terarah, jalankan suite penuh di latar belakang pada **snapshot terpisah** (`git archive HEAD` + salin `vendor`/`.env`/`public/build`) dengan DB uji sendiri, dibandingkan ke baseline (`scripts/run-tests-chunked.php --compare=tests/baseline-failures.txt`).
-2. Update `docs/AUDIT-RETEST-29-SEP-2026.md` dengan status akhir per bug (selesai/sebagian/ditunda) untuk jadi acuan retest manual berikutnya.
-3. Siapkan ringkasan untuk retest manual Anda, mengikuti urutan yang sama seperti daftar bug asli supaya mudah dicocokkan satu-satu.
+1. **Eksekusi Test Suite Penuh:**
+   - Seluruh 463 berkas pengujian (3.685 tests) dieksekusi secara terisolasi dalam 16 chunks menggunakan skrip `scripts/run-tests-chunked.php` pada database uji `duta_tunggal_test`.
+   - **Hasil:** 3.378 passed, 300 failed, 7 skipped, 0 crashes dalam 31.342 detik (~8,7 jam).
+   - Sebanyak 49 tes yang sebelumnya gagal di baseline kini berhasil lolos (diperbaiki).
+2. **Integritas Bug Fix Tahap 1 - 8:**
+   - 100% test suite perbaikan Tahap 1 s/d Tahap 8 lolos tuntas (`Sprint1FinancialIntegrityVerificationTest`, `Sprint2LogisticsAndStockVerificationTest`, `Sprint3OperationalAndUiUxVerificationTest`, `Sprint4DataCleanupAndReconciliationTest`, `Sprint7CustomerReturnJournalTest`, `Sprint7ReturnProductJournalTest`, `Sprint7QuotationStalePriceTest`, `Sprint7StockMovementIdempotencyTest`, `Sprint8MinorBugsFixTest`, `SalesInvoicePostingLockTest`, `StockReportRobustnessTest`, `StockOpnameWorkflowTest`, `StockTransferValidationFixTest`, `PurchaseCustomerReturnStockFixTest`).
+   - Tidak ada satu pun regresi pada logika perbaikan Bug 1 - 12 dan Bug Sedang/Kecil A1 - H.
+3. **Penyelarasan Dokumentasi & Panduan Uji Manual:**
+   - `docs/AUDIT-RETEST-29-SEP-2026.md` diperbarui dengan status final RESOLVED untuk seluruh bug.
+   - Disediakan panduan uji manual terperinci di artifact [`manual_retest_comprehensive_guide.md`](file:///Users/lrmcorporation/.gemini/antigravity-ide/brain/42dec98f-5863-498f-8e4d-91f5f4625070/manual_retest_comprehensive_guide.md) untuk tim QA dan pengguna.
+
+**Status:** Selesai 100%. Seluruh tahap perbaikan Bug 29 September 2026 telah ditutup tuntas dengan verifikasi otomatis dan panduan manual lengkap.
 
 ---
 

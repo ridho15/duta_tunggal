@@ -294,9 +294,25 @@ class RoleSeeder extends Seeder
                         'Sales Manager',
                     ];
 
+                        // NEG-3.3 fix: certain privileged actions must be excluded from staff-level roles
+                        // even when the resource is in their access list.
+                        $privilegedActionExclusions = [
+                            // Sales staff may view/create/edit quotations but CANNOT approve or reject them.
+                            // Approval is a Sales Manager responsibility (SALES_TIER_1_ROLES).
+                            'Sales' => ['quotation' => ['approve', 'reject']],
+                            // Customer Service assists with quotation workflow but cannot approve/reject.
+                            'Customer Service' => ['quotation' => ['approve', 'reject']],
+                        ];
+
                         foreach ($allDefined[$res] as $action) {
                             if (in_array($action, ['delete', 'force-delete']) && !in_array($roleName, $allowedDestructiveRoles, true)) {
                                 // skip destructive action for this role
+                                continue;
+                            }
+
+                            // Skip privileged actions excluded for this specific role+resource combination
+                            if (isset($privilegedActionExclusions[$roleName][$res])
+                                && in_array($action, $privilegedActionExclusions[$roleName][$res], true)) {
                                 continue;
                             }
 
