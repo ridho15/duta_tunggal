@@ -56,9 +56,7 @@ export const QuotationItemTable: React.FC<Props> = ({
         updatedFields.product_sku = prod.sku;
         updatedFields.product_name = prod.name;
         updatedFields.unit = prod.uom?.abbreviation || 'PCS';
-        if (current.unit_price === 0 || !current.unit_price) {
-          updatedFields.unit_price = prod.sell_price || 0;
-        }
+        updatedFields.unit_price = prod.sell_price || 0;
       }
     }
 

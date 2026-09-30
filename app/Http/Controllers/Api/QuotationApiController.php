@@ -249,7 +249,12 @@ class QuotationApiController extends Controller
 
             // Create Items
             foreach ($itemsData as $item) {
-                $unitPrice = (float) $item['unit_price'];
+                $unitPrice = (float) ($item['unit_price'] ?? 0);
+                $product = Product::find((int) $item['product_id']);
+                if ($unitPrice <= 0 && $product && (float) $product->sell_price > 0) {
+                    $unitPrice = (float) $product->sell_price;
+                }
+
                 $unitPriceIdr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
                     (string) $unitPrice,
                     $currencyId
@@ -486,7 +491,12 @@ class QuotationApiController extends Controller
 
             // Re-insert current items
             foreach ($itemsData as $item) {
-                $unitPrice = (float) $item['unit_price'];
+                $unitPrice = (float) ($item['unit_price'] ?? 0);
+                $product = Product::find((int) $item['product_id']);
+                if ($unitPrice <= 0 && $product && (float) $product->sell_price > 0) {
+                    $unitPrice = (float) $product->sell_price;
+                }
+
                 $unitPriceIdr = (float) CurrencyConversionResolver::convertToIdrHighPrecision(
                     (string) $unitPrice,
                     $currencyId

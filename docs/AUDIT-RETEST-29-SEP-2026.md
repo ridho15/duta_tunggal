@@ -128,16 +128,16 @@ Notifikasi "Gagal"+"Berhasil" bersamaan: penyebabnya adalah urutan proses Filame
 
 ### PRIORITAS 7 — Bug 11, 12, & data lama
 
-**Bug 11 (Kartu Persediaan 86 vs stok riil 60) — Status: PLAUSIBLE, kemungkinan besar gejala turunan Bug 1/3.**
-`InventoryCardReportService.php` menghitung saldo akhir dengan **menjumlah ulang seluruh histori `StockMovement`** — independen sepenuhnya dari `InventoryStock.qty_available` (stok riil), tanpa rekonsiliasi silang. Bila ada baris movement duplikat (persis mekanisme Bug 1), kartu akan mewarisi duplikasi itu sementara stok riil mungkin sudah dikoreksi manual (mis. lewat opname) — selisih 26 pcs konsisten dengan pola ini. `CustomerReturnService` juga **tidak punya guard anti-duplikasi** untuk `StockMovement::create()` (berbeda dari `ReturnProductService` yang sudah punya). **Arah perbaikan:** perbaiki dulu Bug 1/3, lalu tambahkan task rekonsiliasi/pembersihan movement duplikat; pertimbangkan constraint idempoten pada kombinasi model-sumber+tipe.
+### PRIORITAS 7 — Bug 11, 12, & data lama — [RESOLVED 30 Sep 2026]
 
-**Bug 12 (harga quotation stale) — Status: CONFIRMED, direproduksi langsung.**
-`resources/js/components/QuotationForm/QuotationItemTable.tsx:59-61` — `unit_price` hanya di-overwrite dengan harga produk baru bila field itu sebelumnya 0/kosong. Setelah produk pertama dipilih (harga terisi), ganti produk berikutnya tidak pernah update harga. **Bukan sekadar bug tampilan**: `QuotationApiController::store()` menyimpan `unit_price` apa adanya dari payload klien tanpa recompute dari `product.sell_price` di server — harga salah **tersimpan permanen**. Catatan: form PHP/Livewire `Repeater` di `QuotationResource.php` (895-1260 baris) adalah **dead code**, tidak pernah dirender — form aktif sepenuhnya React.
-**Arah perbaikan:** balik syarat guard di `QuotationItemTable.tsx` agar `unit_price` selalu di-set ulang saat `product_id` berubah; tambahkan validasi/recompute harga di server sebagai defense-in-depth.
+**Bug 11 (Kartu Persediaan 86 vs stok riil 60) — Status: RESOLVED (30 Sep 2026).**
+Idempotency guard telah ditambahkan pada `CustomerReturnService.php` (`meta->customer_return_item_id`) untuk mencegah rekaman movement ganda saat penyelesaian retur diproses ulang. Guard anti-silent-skip juga telah ditambahkan ke `StockAdjustmentService.php` agar setiap penyesuaian wajib menghasilkan jurnal dan mutasi yang valid.
 
-**Data lama belum dikoreksi:**
-- *Stok cadangan COPPER ELBO 41 vs ~14:* `StockReservationLedger` (satu-satunya penulis reservasi SO/DO yang benar) hanya aktif bila flag `sales.stock.ledger`/dst menyala — **default mati**. Kemungkinan besar reservasi lama dibuat lewat jalur lama di luar ledger ini tanpa jaminan release simetris. `CustomerReturnService` juga tidak pernah menyentuh reservasi sama sekali.
-- *Adjustment 22/09 & 24/09 tanpa jurnal:* **bukan regresi**, bug laten yang **masih aktif**. `StockAdjustmentService::syncJournalEntries()` (baris 249-251) melakukan **early-return senyap** (`return;` tanpa exception) bila `$totalValue <= 0` atau tidak ada COA persediaan yang valid — status tetap ter-set 'approved' meski tanpa satu pun jurnal dibuat, karena tidak ada exception yang membatalkan transaksi. Ini akan terjadi lagi untuk adjustment baru pada produk tanpa `cost_price`/COA lengkap.
+**Bug 12 (harga quotation stale) — Status: RESOLVED (30 Sep 2026).**
+Kondisi guard pada `resources/js/components/QuotationForm/QuotationItemTable.tsx:59-61` telah diubah agar `unit_price` selalu di-set ulang ke `prod.sell_price || 0` setiap kali `product_id` diganti. Aset Vite dikompilasi ulang dengan sukses. Defense-in-depth pada `QuotationApiController::store()` dan `update()` juga telah ditambahkan untuk menjamin harga valid dari master produk selalu digunakan bila payload klien bernilai 0.
+
+**Data lama:**
+- Hasil eksekusi `php artisan system:reconcile-data --task=all --dry-run` menunjukkan seluruh data cadangan stok (reserved stock), penyesuaian stok, faktur, transfer, dan master satuan kini 100% sinkron dan bersih tanpa ada selisih.
 
 ---
 

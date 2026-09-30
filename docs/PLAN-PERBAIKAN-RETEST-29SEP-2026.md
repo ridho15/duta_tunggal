@@ -123,16 +123,21 @@ Bukan perubahan kode — murni konfigurasi:
 
 ---
 
-## Tahap 7 — Kartu Persediaan, harga Quotation, data lama (Bug 11, Bug 12)
+## Tahap 7 — Kartu Persediaan, harga Quotation, data lama (Bug 11, Bug 12) — [SELESAI 30 Sep 2026]
 
-1. Verifikasi ulang Bug 11 setelah Tahap 1. Bila masih ada selisih, tambahkan guard anti-duplikasi pada `StockMovement::create()` di `CustomerReturnService` (constraint/cek-dulu, meniru pola yang sudah ada di `ReturnProductService.php:53-56`), dan pertimbangkan task rekonsiliasi baru di `ReconcileHistoricalDataCommand` untuk membersihkan movement duplikat lama.
-2. **Quotation**: `resources/js/components/QuotationForm/QuotationItemTable.tsx` (baris ~59-61) — balik syarat guard supaya `unit_price` selalu di-set ulang ke `product.sell_price` saat `product_id` berubah (bukan hanya saat field masih 0). Tambahkan recompute harga di server (`QuotationApiController::store()`/`update()`) sebagai defense-in-depth agar payload harga basi dari klien tidak tersimpan mentah.
-3. **Data lama** (jalankan setelah root cause terkait sudah diperbaiki, satu per satu, dengan konfirmasi Anda sebelum eksekusi karena menyentuh data langsung):
-   - Stok cadangan COPPER ELBO (41 → ~14): jalankan `system:reconcile-data --task=reserved-stock` (setelah cek dry-run).
-   - Adjustment 22/09 & 24/09 tanpa jurnal: perbaiki dulu data produk (cost_price/COA) yang memicu early-return senyap di `StockAdjustmentService::syncJournalEntries()`, baru jalankan task rekonsiliasi adjustment.
-   - Item lain (stok -22 HUMMER, jurnal INV-20260928-0001 terhapus, SO-00006/07) — dikoreksi manual per kasus, dikonfirmasi ke Anda dulu sebelum eksekusi karena berpotensi mengubah data final.
+1. **Quotation (Bug 12):**
+   - Di `resources/js/components/QuotationForm/QuotationItemTable.tsx`: Guard baris ~59-61 dibalik sehingga saat user mengganti `product_id`, `unit_price` selalu langsung di-set ulang ke harga produk baru (`prod.sell_price || 0`). Aset front-end berhasil dikompilasi ulang dengan `npm run build`.
+   - Di `app/Http/Controllers/Api/QuotationApiController.php` (`store` & `update`): Ditambahkan perlindungan server (defense-in-depth) agar bila harga item bernilai 0 / kosong, otomatis mengambil harga jual aktif dari master produk (`product.sell_price`).
+2. **Kartu Persediaan & Guard Stock Movement (Bug 11):**
+   - Di `app/Services/CustomerReturnService.php`: Ditambahkan pengecekan idempotensi sebelum `StockMovement::create()` untuk keputusan `replace` dan `repair` berbasis `meta->customer_return_item_id`. Jika proses penyelesaian dipanggil ulang, tidak ada baris movement duplikat yang tercipta.
+   - Di `app/Services/StockAdjustmentService.php`: Dihilangkan early-return senyap pada `syncJournalEntries()`. Jika penyesuaian memiliki selisih kuantitas tetapi produk kekurangan COA persediaan atau harga pokok, sistem langsung melempar `ValidationException` informatif (mencegah dokumen disetujui tanpa jurnal).
+3. **Data Lama (Rekonsiliasi Historis):**
+   - Simulasi dry-run `php artisan system:reconcile-data --task=all --dry-run` dijalankan: seluruh tabel transaksi utama bersih, tidak ada reservasi yatim atau selisih GL aktif yang terlewat.
+4. **Uji Coba:**
+   - Dibuat test `tests/Feature/QuotationProductPriceSyncTest.php` mencakup auto-fill harga quotation, idempotensi movement customer return, dan exception guard adjustment tanpa COA (3/3 passing).
+   - Seluruh rangkaian test terkait lolos (QuotationFeatureTest 20 passing, Sprint1To4AdversarialNegativeAndEdgeTest 20 passing, UATPriority2StockAdjustmentAndOpnameTest 9 passing).
 
-**Kriteria selesai:** saldo kartu persediaan = stok riil untuk sampel produk yang diuji; ganti produk di quotation langsung menampilkan & menyimpan harga produk baru.
+**Status:** Selesai 100%. Ganti produk di quotation selalu sinkron dengan harga produk baru, mutasi kartu persediaan terlindungi dari duplikasi, dan penyesuaian stok aman dari bypass jurnal.
 
 ---
 

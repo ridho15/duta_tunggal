@@ -102,6 +102,10 @@ class Sprint1To4AdversarialNegativeAndEdgeTest extends TestCase
         ]);
         Auth::login($this->user);
 
+        $this->customer = Customer::factory()->create([
+            'cabang_id' => $this->cabang1->id,
+        ]);
+
         $this->warehouse1 = Warehouse::firstOrCreate(
             ['name' => 'Gudang Adversarial 1'],
             ['kode' => 'WH-ADV-1', 'cabang_id' => $this->cabang1->id, 'location' => 'Lokasi 1', 'status' => 1]
@@ -181,10 +185,19 @@ class Sprint1To4AdversarialNegativeAndEdgeTest extends TestCase
      */
     public function test_negative_finalized_sales_invoice_edit_is_blocked(): void
     {
+        $so = SaleOrder::create([
+            'so_number' => 'SO-ADV-' . uniqid(),
+            'customer_id' => $this->customer->id,
+            'cabang_id' => $this->cabang1->id,
+            'order_date' => now(),
+            'status' => 'approved',
+            'total_amount' => 100000,
+        ]);
+
         $invoice = Invoice::create([
             'invoice_number' => 'INV-LOCKED-' . uniqid(),
             'from_model_type' => SaleOrder::class,
-            'from_model_id' => 1,
+            'from_model_id' => $so->id,
             'status' => Invoice::STATUS_SENT,
             'cabang_id' => $this->cabang1->id,
             'invoice_date' => now()->toDateString(),
@@ -237,10 +250,19 @@ class Sprint1To4AdversarialNegativeAndEdgeTest extends TestCase
     {
         $customer = Customer::factory()->create(['cabang_id' => $this->cabang1->id]);
 
+        $so = SaleOrder::create([
+            'so_number' => 'SO-IDEM-' . uniqid(),
+            'customer_id' => $customer->id,
+            'cabang_id' => $this->cabang1->id,
+            'order_date' => now(),
+            'status' => 'approved',
+            'total_amount' => 80000,
+        ]);
+
         $invoice = Invoice::create([
             'invoice_number' => 'INV-IDEM-' . uniqid(),
             'from_model_type' => SaleOrder::class,
-            'from_model_id' => 1,
+            'from_model_id' => $so->id,
             'status' => Invoice::STATUS_SENT,
             'cabang_id' => $this->cabang1->id,
             'customer_name' => $customer->name,

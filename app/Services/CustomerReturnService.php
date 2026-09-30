@@ -118,23 +118,30 @@ class CustomerReturnService
                     $totalRestoredCost += $itemCostTotal;
 
                     if ($warehouseId) {
-                        StockMovement::create([
-                            'product_id'      => $item->product_id,
-                            'warehouse_id'    => $warehouseId,
-                            'quantity'        => $qty,
-                            'value'           => $itemCostTotal,
-                            'type'            => 'customer_return',
-                            'reference_id'    => $customerReturn->id,
-                            'date'            => $customerReturn->return_date ?? now()->toDateString(),
-                            'notes'           => "Retur dari customer (perbaikan): {$customerReturn->return_number}",
-                            'from_model_type' => CustomerReturn::class,
-                            'from_model_id'   => $customerReturn->id,
-                            'meta'            => [
-                                // Repair items are NOT back in saleable stock yet — record the
-                                // movement for history only, never let the observer add qty_available.
-                                'skip_stock_update' => true,
-                            ],
-                        ]);
+                        $existingMovement = StockMovement::where('from_model_type', CustomerReturn::class)
+                            ->where('from_model_id', $customerReturn->id)
+                            ->where('product_id', $item->product_id)
+                            ->where('meta->customer_return_item_id', $item->id)
+                            ->first();
+
+                        if (! $existingMovement) {
+                            StockMovement::create([
+                                'product_id'      => $item->product_id,
+                                'warehouse_id'    => $warehouseId,
+                                'quantity'        => $qty,
+                                'value'           => $itemCostTotal,
+                                'type'            => 'customer_return',
+                                'reference_id'    => $customerReturn->id,
+                                'date'            => $customerReturn->return_date ?? now()->toDateString(),
+                                'notes'           => "Retur dari customer (perbaikan): {$customerReturn->return_number}",
+                                'from_model_type' => CustomerReturn::class,
+                                'from_model_id'   => $customerReturn->id,
+                                'meta'            => [
+                                    'customer_return_item_id' => $item->id,
+                                    'skip_stock_update' => true,
+                                ],
+                            ]);
+                        }
                     } else {
                         Log::warning('CustomerReturnService: warehouse_id null, repair stock movement skipped', [
                             'return_id'  => $customerReturn->id,
@@ -160,22 +167,30 @@ class CustomerReturnService
                         $stock->save();
                     }
 
-                    StockMovement::create([
-                        'product_id'      => $item->product_id,
-                        'warehouse_id'    => $warehouseId,
-                        'quantity'        => $qty,
-                        'value'           => $itemCostTotal,
-                        'type'            => 'customer_return',
-                        'reference_id'    => $customerReturn->id,
-                        'date'            => $customerReturn->return_date ?? now()->toDateString(),
-                        'notes'           => "Retur dari customer (penggantian): {$customerReturn->return_number}",
-                        'from_model_type' => CustomerReturn::class,
-                        'from_model_id'   => $customerReturn->id,
-                        'meta'            => [
-                            // qty_available already incremented above — StockMovementObserver must not apply this again.
-                            'skip_stock_update' => true,
-                        ],
-                    ]);
+                    $existingMovement = StockMovement::where('from_model_type', CustomerReturn::class)
+                        ->where('from_model_id', $customerReturn->id)
+                        ->where('product_id', $item->product_id)
+                        ->where('meta->customer_return_item_id', $item->id)
+                        ->first();
+
+                    if (! $existingMovement) {
+                        StockMovement::create([
+                            'product_id'      => $item->product_id,
+                            'warehouse_id'    => $warehouseId,
+                            'quantity'        => $qty,
+                            'value'           => $itemCostTotal,
+                            'type'            => 'customer_return',
+                            'reference_id'    => $customerReturn->id,
+                            'date'            => $customerReturn->return_date ?? now()->toDateString(),
+                            'notes'           => "Retur dari customer (penggantian): {$customerReturn->return_number}",
+                            'from_model_type' => CustomerReturn::class,
+                            'from_model_id'   => $customerReturn->id,
+                            'meta'            => [
+                                'customer_return_item_id' => $item->id,
+                                'skip_stock_update' => true,
+                            ],
+                        ]);
+                    }
                 } else {
                     Log::warning('CustomerReturnService: warehouse_id null, replace stock movement skipped', [
                         'return_id'  => $customerReturn->id,

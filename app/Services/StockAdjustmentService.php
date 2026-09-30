@@ -226,19 +226,25 @@ class StockAdjustmentService
 
             $itemVal = abs((float) $item->difference_value);
             if ($itemVal <= 0) {
-                $unitCost = (float) ($item->unit_cost ?: ($item->product?->cost_price ?? 0));
+                $unitCost = (float) ($item->unit_cost ?: ($item->product?->cost_price ?? $item->product?->sell_price ?? 0));
                 $itemVal = $qtyDiff * $unitCost;
-            }
-
-            if ($itemVal <= 0) {
-                continue;
             }
 
             $inventoryCoa = $item->product?->resolveInventoryCoaOrDefault()
                 ?? ChartOfAccount::whereIn('code', ['1140.10', '1140.01', '1140', '1100'])->first();
 
             if (! $inventoryCoa) {
-                continue;
+                $prodName = $item->product?->name ?? 'Produk ID ' . $item->product_id;
+                throw ValidationException::withMessages([
+                    'accounting' => "Akun persediaan (COA) untuk produk '{$prodName}' tidak ditemukan. Penyesuaian stok tidak dapat disetujui tanpa akun akuntansi yang valid.",
+                ]);
+            }
+
+            if ($itemVal <= 0) {
+                $prodName = $item->product?->name ?? 'Produk ID ' . $item->product_id;
+                throw ValidationException::withMessages([
+                    'accounting' => "Produk '{$prodName}' tidak memiliki harga pokok (cost_price) atau nilai penyesuaian yang valid untuk penjurnalan persediaan.",
+                ]);
             }
 
             $coaId = $inventoryCoa->id;
