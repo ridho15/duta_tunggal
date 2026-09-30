@@ -589,6 +589,8 @@ class PurchaseReturnService
                             'exchange_rate' => $resolvedLine['exchange_rate'],
                             'amount_original_currency' => $resolvedLine['amount_original_currency'],
                             'reason' => $item->reason,
+                            // qty_available already decremented above — StockMovementObserver must not apply this again.
+                            'skip_stock_update' => true,
                         ],
                         'from_model_type' => PurchaseReturn::class,
                         'from_model_id' => $purchaseReturn->id,

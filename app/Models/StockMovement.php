@@ -11,6 +11,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class StockMovement extends Model
 {
     use SoftDeletes, HasFactory, LogsGlobalActivity;
+
+    /**
+     * Movement types that increase InventoryStock.qty_available.
+     * Single source of truth for StockMovementObserver and every stock
+     * recompute/reconciliation path — keep these in sync or recomputes
+     * will silently erase movements the observer already applied.
+     */
+    public const IN_TYPES = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in', 'customer_return', 'return_in', 'sales_return_in'];
+
+    /**
+     * Movement types that decrease InventoryStock.qty_available.
+     */
+    public const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'purchase_return', 'return_out', 'purchase_return_out'];
+
     protected $table = 'stock_movements';
     protected $fillable = [
         'product_id',

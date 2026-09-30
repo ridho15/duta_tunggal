@@ -145,8 +145,8 @@ class ReconcilePurchaseReceiptStock extends Command
             ->where('warehouse_id', $item->warehouse_id)
             ->when($item->rak_id !== null, fn ($builder) => $builder->where('rak_id', $item->rak_id), fn ($builder) => $builder->whereNull('rak_id'));
 
-        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+        $inTypes = StockMovement::IN_TYPES;
+        $outTypes = StockMovement::OUT_TYPES;
 
         $qtyIn = (float) (clone $query)->whereIn('type', $inTypes)->sum('quantity');
         $qtyOut = (float) (clone $query)->whereIn('type', $outTypes)->sum('quantity');

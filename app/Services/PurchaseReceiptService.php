@@ -476,8 +476,8 @@ class PurchaseReceiptService
     protected function syncInventoryStockFromMovements(PurchaseReceiptItem $item): ?InventoryStock
     {
         $rakId = $item->rak_id ?? null;
-        $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-        $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+        $inTypes = StockMovement::IN_TYPES;
+        $outTypes = StockMovement::OUT_TYPES;
 
         $movementQuery = StockMovement::query()
             ->where('product_id', $item->product_id)

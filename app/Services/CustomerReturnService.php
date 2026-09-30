@@ -121,6 +121,11 @@ class CustomerReturnService
                             'notes'           => "Retur dari customer (perbaikan): {$customerReturn->return_number}",
                             'from_model_type' => CustomerReturn::class,
                             'from_model_id'   => $customerReturn->id,
+                            'meta'            => [
+                                // Repair items are NOT back in saleable stock yet — record the
+                                // movement for history only, never let the observer add qty_available.
+                                'skip_stock_update' => true,
+                            ],
                         ]);
                     } else {
                         Log::warning('CustomerReturnService: warehouse_id null, repair stock movement skipped', [
@@ -158,6 +163,10 @@ class CustomerReturnService
                         'notes'           => "Retur dari customer (penggantian): {$customerReturn->return_number}",
                         'from_model_type' => CustomerReturn::class,
                         'from_model_id'   => $customerReturn->id,
+                        'meta'            => [
+                            // qty_available already incremented above — StockMovementObserver must not apply this again.
+                            'skip_stock_update' => true,
+                        ],
                     ]);
                 } else {
                     Log::warning('CustomerReturnService: warehouse_id null, replace stock movement skipped', [

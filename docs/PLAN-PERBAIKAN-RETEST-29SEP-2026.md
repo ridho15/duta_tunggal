@@ -1,0 +1,159 @@
+# RENCANA PERBAIKAN: RETEST BUG 29 SEPTEMBER 2026
+
+**Dasar:** [`docs/AUDIT-RETEST-29-SEP-2026.md`](./AUDIT-RETEST-29-SEP-2026.md) — audit teknis lengkap, semua root cause & file:line sudah diverifikasi di sana.
+**Status:** Perencanaan. Belum ada kode yang diubah.
+**Prinsip kerja** (mengikuti kebiasaan proyek ini): tiap tahap = 1 commit, dengan test regresi **terarah** (bukan suite penuh) sebagai gerbang sebelum lanjut ke tahap berikutnya. Suite penuh dijalankan di latar belakang di akhir, pada snapshot + DB uji terpisah.
+
+Urutan tahap mengikuti prioritas yang sudah Anda tetapkan. Bug kecil (A–H) disisipkan ke tahap yang paling relevan agar tidak menyentuh file yang sama dua kali di commit berbeda.
+
+---
+
+## Tahap 0 — Persiapan
+
+- Buat branch kerja: `fix/retest-29sep-2026` dari `main`.
+- Catatan: working tree saat ini punya perubahan tak terkait milik proses lain (`QuotationResource.php`, `RoleSeeder.php` — fix NEG-3.3 permission approve/reject quotation; `FinanceSalesSeeder.php` — tambah `cabang_id`) dan beberapa skrip `.cjs` UAT di root/`scratch/`. **Tidak disentuh/di-stage**, sesuai praktik proyek ini untuk WIP pihak lain.
+- Siapkan DB uji terpisah untuk regresi tiap tahap (bukan DB dev yang dipakai UAT manual).
+
+---
+
+## Tahap 1 — Stok: hentikan penggandaan efek (Bug 1, Bug 3, andil ke Bug 11) — ✅ SELESAI (30 Sep 2026)
+
+**Prioritas #1 di daftar Anda — paling kritis, banyak bug lain bergantung padanya.**
+
+**Status: selesai & terverifikasi.** Regresi terarah 45/45 lolos (`CustomerReturnFeatureTest`, `PurchaseReturnFeatureTest`, `Sprint2LogisticsAndStockVerificationTest`), termasuk 2 test baru yang mengunci perilaku ini ke depan. Regresi lebih luas (14 file terkait alur penerimaan/QC/akuntansi) juga dijalankan — ditemukan klaster test yang sudah flaky sejak sebelum perubahan ini (lolos sendirian, gagal acak saat digabung banyak file); dicatat di memori proyek, bukan disebabkan perubahan Tahap 1 (dibuktikan lewat perbandingan baseline dan re-run terisolasi).
+
+1. Tambahkan `'skip_stock_update' => true` ke `meta` pada `StockMovement::create()`:
+   - `app/Services/PurchaseReturnService.php` (blok ~baris 571-595)
+   - `app/Services/CustomerReturnService.php` (blok ~baris 113-124 dan 150-161)
+   — karena kedua service ini sudah menerapkan efek stok manual (`decrement`/`increment`), dan `StockMovementObserver` sekarang juga menerapkannya untuk tipe `purchase_return`/`customer_return`.
+2. Untuk cabang "repair" di `CustomerReturnService` (barang belum boleh masuk stok jual): pastikan movement-nya memakai tipe yang **tidak** termasuk daftar efek `StockMovementObserver::stockEffectDelta()`, atau tetap disertai `skip_stock_update`.
+3. Bug 3 — `app/Services/PurchaseReceiptService.php::syncInventoryStockFromMovements()` (baris ~479-480): tambahkan tipe retur (`purchase_return`, `return_out`, `customer_return`, `return_in`, dst.) ke daftar `$inTypes`/`$outTypes`, supaya recompute stok saat penerimaan barang tidak "menghapus" efek retur yang sudah tercatat. Satukan daftar tipe ini dengan yang dipakai `StockMovementObserver` (satu sumber, misal constant/config bersama) — dan terapkan perbaikan yang sama di `app/Console/Commands/ReconcilePurchaseReceiptStock.php` (baris ~148-149) dan `app/Console/Commands/AuditInventoryConsistency.php` (baris ~32-33) yang punya daftar basi serupa.
+4. Perbaiki test yang sudah **FAIL** sebagai bukti bug: `tests/Feature/CustomerReturnFeatureTest.php` ("restores inventory stock for replace decision"). Tambahkan assertion qty (bukan cuma `toBeTrue()`) di `tests/Feature/PurchaseReturnFeatureTest.php` ("stock adjustment on approval") supaya double-decrement pembelian juga tertangkap ke depannya.
+
+**Regresi terarah:** `vendor/bin/pest tests/Feature/CustomerReturnFeatureTest.php tests/Feature/PurchaseReturnFeatureTest.php tests/Feature/Sprint2LogisticsAndStockVerificationTest.php`
+
+**Kriteria selesai:** retur pembelian 2 pcs → stok berkurang tepat 2 (bukan 4); retur pelanggan 1 pcs → stok bertambah tepat 1; setiap perubahan stok punya tepat 1 baris mutasi.
+
+**Setelah tahap ini**, retest manual Bug 11 (Kartu Persediaan) — kemungkinan besar otomatis membaik karena akar dugaannya (movement dobel) sudah hilang. Kalau masih ada selisih, baru masuk pekerjaan tambahan di Tahap 7.
+
+---
+
+## Tahap 2 — Transfer Stok (Bug 2, Bug 4)
+
+1. `app/Filament/Resources/StockTransferResource/Pages/CreateStockTransfer.php` (baris 18-22) dan `EditStockTransfer.php` (baris 22-26): hapus pengecekan `isset($data['stockTransferItem'])` yang salah asumsi (field ini memang tidak pernah ada di `$data` untuk Repeater `->relationship()`). Andalkan `Repeater::minItems(1)` yang sudah ada di `StockTransferResource.php:107`, atau baca raw Livewire state bila validasi custom tetap diperlukan.
+2. Rak asal/tujuan tidak perlu perubahan tambahan — kolom DB sudah nullable, observer & service sudah menangani `null` dengan benar (dikonfirmasi via test yang sudah ada).
+3. Tambahkan test Livewire baru (promosikan dari test sekali-pakai yang sudah dibuat auditor di scratchpad) ke `tests/Feature/` untuk mengunci skenario "create transfer via form lengkap, dengan dan tanpa rak" — supaya regresi Repeater seperti ini tertangkap otomatis ke depan.
+
+**Regresi terarah:** `vendor/bin/pest tests/Feature/Sprint2LogisticsAndStockVerificationTest.php <test-baru>`
+
+**Kriteria selesai:** transfer baru berhasil dibuat lewat UI, baik dengan rak maupun tanpa rak asal/tujuan.
+
+---
+
+## Tahap 3 — Matikan mode debug (Bug 5)
+
+Bukan perubahan kode — murni konfigurasi:
+1. Set `APP_DEBUG=false`, `APP_ENV=production` (atau `staging`) di `.env` server yang dipakai untuk UAT/produksi, lalu `php artisan config:cache`.
+2. Perbaiki default di `.env.example` → `APP_DEBUG=false`.
+3. (Opsional, boleh ditunda) tambahkan gerbang di pipeline deploy yang menolak deploy bila `APP_DEBUG=true` terdeteksi di environment target.
+
+**Kriteria selesai:** request yang sengaja error menampilkan halaman generik, bukan stack trace/query/cookie.
+
+---
+
+## Tahap 4 — Stock Opname & Laporan Stok (Bug 6, Bug 7)
+
+1. **Opname**: `app/Services/StockOpnameService.php::startPhysicalCount()` (baris ~161-174 & ~202-203) — isi `physical_qty` dengan `null` (bukan qty sistem/0) saat item dibuat. Validasi `whereNull('physical_qty')->exists()` yang sudah ada (baris ~246-250) akan otomatis jadi efektif. Sesuaikan test yang sudah ada (`UATPriority2StockAdjustmentAndOpnameTest.php`) yang saat ini justru meng-assert perilaku lama (`physical_qty == system_qty` tepat setelah start). Tambahkan test baru: start → langsung complete tanpa edit apa pun → harus gagal.
+2. **Laporan Stok**: tambahkan `$request->validate(['start_date'=>'nullable|date','end_date'=>'nullable|date|after_or_equal:start_date'])` di `app/Http/Controllers/Reports/StockReportController.php`; bungkus `Carbon::parse()` di `app/Services/Reports/StockReportService.php` (baris 21-27) dengan penanganan format tidak valid. Perbaiki `wire:click` ganda (`$set` dobel dalam satu atribut) di `resources/views/filament/pages/inventory-report-page.blade.php` (baris ~563, 570, 576-577) yang membuat tab macet.
+3. **Keputusan (dikonfirmasi Anda): pertahankan keduanya.** `StockReportResource` (label nav "Laporan Stok", saat ini `$shouldRegisterNavigation = false`) akan dihubungkan ke navigasi supaya benar-benar bisa diakses, berdampingan dengan `InventoryReportPage` (label nav "Laporan Inventori", sudah aktif) — label keduanya sudah cukup berbeda sehingga tidak akan membingungkan user begitu keduanya tampil. Perbaikan validasi tanggal di poin 2 berlaku untuk jalur `StockReportResource`/`StockReportController`. Perbaikan `wire:click` ganda berlaku untuk `InventoryReportPage`. Kedua jalur diperbaiki dan diverifikasi terpisah di tahap ini.
+
+**Regresi terarah:** `vendor/bin/pest tests/Feature/UATPriority2StockAdjustmentAndOpnameTest.php tests/Feature/Sprint3OperationalAndUiUxVerificationTest.php tests/Feature/UATPriority3ReportsAndUxTest.php`
+
+**Kriteria selesai:** opname tidak bisa "Setujui" bila ada item belum dihitung; Laporan Stok tidak 500 baik untuk tanggal valid maupun input yang salah format (tampil pesan ramah).
+
+---
+
+## Tahap 5 — Kunci invoice penjualan yang sudah diposting (Bug 8)
+
+**Keputusan (dikonfirmasi Anda): Super Admin tetap boleh membuka & mengedit invoice yang sudah diposting untuk koreksi darurat.** Jadi kuncinya bukan "tanpa kecuali", melainkan: **default terkunci untuk semua role, kecuali Super Admin** — dan karena ini jalur override finansial, override itu perlu tercatat (audit trail), bukan diam-diam.
+
+1. `app/Filament/Resources/SalesInvoiceResource/Pages/EditSalesInvoice.php`: ganti pendekatan denylist → **allowlist eksplisit dengan bypass Super Admin** — field kunci (customer, SO, cabang, tipe pajak, PPN) terkunci untuk semua status selain `draft`, KECUALI `Auth::user()->hasRole('Super Admin')`. Ini ditulis eksplisit di titik pengecekan (bukan mengandalkan `Gate::before()` yang implisit), supaya niatnya jelas dibaca ulang nanti. Ini otomatis menutup celah `'unpaid'` yang selama ini lolos untuk role selain Super Admin.
+2. Tambahkan guard **server-side** di `mutateFormDataBeforeSave()`/`beforeSave()` dengan logika bypass yang sama (Super Admin lolos, role lain ditolak bila status ≠ draft) — jangan andalkan `->disabled()` UI saja (bisa dilewati lewat manipulasi request langsung).
+3. Tambahkan `->disabled()` kondisional (dengan bypass yang sama) di `SalesInvoiceResource.php` pada field terkait, sebagai lapisan UX.
+4. **Audit trail untuk override darurat**: begitu Super Admin menyimpan perubahan pada invoice non-draft, catat lewat `spatie/laravel-activitylog` (paket ini sudah ada di `composer.json` dan sudah dipakai dengan pola `LogsActivity` trait + `getActivitylogOptions()` di `app/Models/VoucherRequest.php` — ikuti pola yang sama pada `Invoice`), minimal berisi: siapa, kapan, field apa yang diubah, nilai lama/baru. Ini murni pencatatan, tidak menghalangi override-nya.
+5. Di `app/Observers/InvoiceObserver.php` blok `financialChanged` (baris ~181-214): panggil ulang `createSalesInvoiceAr()` setelah repost jurnal berhasil, supaya piutang ikut sinkron — berlaku untuk semua kasus (Super Admin maupun bukan), karena ini soal konsistensi data, bukan soal izin.
+6. Perbaiki urutan: rebuild `invoiceItem`/tax breakdown (lewat `SalesInvoiceLineBuilder`) **sebelum** header `total`/`ppn_rate` disimpan, supaya balance-check jurnal tidak membandingkan header baru vs item lama (ini juga penyebab notifikasi "Gagal"+"Berhasil" bersamaan — begitu balance-check tidak pernah gagal palsu, notifikasi ganda ikut hilang).
+
+**Regresi terarah:** test invoice terkait (`InvoiceArFeatureTest` — catatan: ini termasuk test yang dikenal flaky, jalankan 2× bila gagal sekali) + test baru untuk skenario status `unpaid` (role biasa ditolak, Super Admin lolos + tercatat di activity log) & sinkronisasi AR.
+
+**Kriteria selesai:** invoice status apa pun selain draft tidak bisa diubah field kuncinya oleh role biasa (dicoba lewat UI maupun manipulasi request langsung); Super Admin tetap bisa mengedit invoice terposting dan perubahannya tercatat di activity log; mengubah PPN pada invoice draft (role mana pun) maupun override Super Admin pada invoice non-draft sama-sama menyinkronkan total, piutang, dan jurnal dengan benar.
+
+---
+
+## Tahap 6 — Jurnal retur pelanggan & koreksi Return Product (Bug 9, Bug 10)
+
+1. **Retur pelanggan** (`app/Services/CustomerReturnService.php`): perbaiki kondisi di baris ~95 yang saat ini saling meniadakan dengan `decisionOptions()` (`CustomerReturnItem.php:34-39`). Jurnal retur penjualan + koreksi PPN Keluaran + penyesuaian piutang seharusnya jalan untuk semua decision yang bukan `reject` (repair/replace/credit), tidak digantungkan pada flag `credit_notes` semata. Tambahkan validasi wajib `qc_result` terisi sebelum aksi "Setujui" (`CustomerReturnResource.php:435-452`).
+2. **Return Product** (`app/Services/ReturnProductService.php`):
+   - Tambahkan langkah koreksi invoice terkait di `updateQuantityFromModel()` (cari invoice aktif untuk SO/DO terkait, kurangi qty/total, picu ulang repost invoice sesuai urutan yang diperbaiki di Tahap 5).
+   - Di `createReversingJournalEntries()` (baris ~104-244): sebelum memilih akun kredit, cek apakah DO sumber sudah pernah diinvoice — kredit ke akun HPP/COGS (reversal) bila sudah, ke "Barang Terkirim" bila belum.
+   - Isi ulang field sintetis `max_quantity` saat form Edit dimuat (`EditReturnProduct.php`, tambahkan `mutateFormDataBeforeFill`) supaya validasi qty konsisten dengan form Create.
+3. Tambahkan test baru untuk skenario yang belum tercakup: retur pelanggan dengan flag `credit_notes` mati + decision replace (harus tetap membuat jurnal); Return Product untuk DO yang sudah diinvoice (jurnal harus ke HPP, bukan Barang Terkirim).
+
+**Regresi terarah:** `vendor/bin/pest tests/Feature/CustomerReturnFeatureTest.php tests/Feature/Sprint2LogisticsAndStockVerificationTest.php <test-baru>`
+
+**Kriteria selesai:** retur pelanggan menghasilkan jurnal retur penjualan & piutang berkurang sesuai nilai retur; retur produk yang sudah diinvoice tidak lagi membuat saldo "Barang Terkirim" minus; invoice ikut terkoreksi qty/nilainya.
+
+---
+
+## Tahap 7 — Kartu Persediaan, harga Quotation, data lama (Bug 11, Bug 12)
+
+1. Verifikasi ulang Bug 11 setelah Tahap 1. Bila masih ada selisih, tambahkan guard anti-duplikasi pada `StockMovement::create()` di `CustomerReturnService` (constraint/cek-dulu, meniru pola yang sudah ada di `ReturnProductService.php:53-56`), dan pertimbangkan task rekonsiliasi baru di `ReconcileHistoricalDataCommand` untuk membersihkan movement duplikat lama.
+2. **Quotation**: `resources/js/components/QuotationForm/QuotationItemTable.tsx` (baris ~59-61) — balik syarat guard supaya `unit_price` selalu di-set ulang ke `product.sell_price` saat `product_id` berubah (bukan hanya saat field masih 0). Tambahkan recompute harga di server (`QuotationApiController::store()`/`update()`) sebagai defense-in-depth agar payload harga basi dari klien tidak tersimpan mentah.
+3. **Data lama** (jalankan setelah root cause terkait sudah diperbaiki, satu per satu, dengan konfirmasi Anda sebelum eksekusi karena menyentuh data langsung):
+   - Stok cadangan COPPER ELBO (41 → ~14): jalankan `system:reconcile-data --task=reserved-stock` (setelah cek dry-run).
+   - Adjustment 22/09 & 24/09 tanpa jurnal: perbaiki dulu data produk (cost_price/COA) yang memicu early-return senyap di `StockAdjustmentService::syncJournalEntries()`, baru jalankan task rekonsiliasi adjustment.
+   - Item lain (stok -22 HUMMER, jurnal INV-20260928-0001 terhapus, SO-00006/07) — dikoreksi manual per kasus, dikonfirmasi ke Anda dulu sebelum eksekusi karena berpotensi mengubah data final.
+
+**Kriteria selesai:** saldo kartu persediaan = stok riil untuk sampel produk yang diuji; ganti produk di quotation langsung menampilkan & menyimpan harga produk baru.
+
+---
+
+## Tahap 8 — Bug kecil (sisa dari kategori Sedang/Kecil)
+
+Dikerjakan sebagai satu commit ringan setelah tahap-tahap besar selesai (tidak memblokir apa pun di atas):
+
+- **A1** — `PurchaseReturnResource.php:95-140`: ubah auto-fill GRN agar user bisa pilih sebagian item, bukan semua sekaligus.
+- **B** — `SaleOrderApiController.php:124-128`: pindahkan floor-to-zero dari per-baris ke level SUM total, supaya baris stok negatif/nol tidak membuang seluruh perhitungan "Stok Bebas".
+- **C** — `VendorPaymentResource.php:639-680`: ganti query COA custom dengan `ChartOfAccount::scopeCashBankCandidates()` yang sudah benar (sudah exclude akun induk & deposito/investasi).
+- **E** — `app/Models/Invoice.php:28` (`STATUS_LABELS`): jadikan satu-satunya sumber label status, hapus closure duplikat di `PurchaseInvoiceResource.php:1473-1483`.
+- **F** — `QualityControlService.php::handleMultiItemPurchaseOrderQcCompletion()`: agregasikan `reason_reject` per item ke kolom header, atau ubah tampilan header untuk membaca dari item.
+- **H** — `StockAdjustmentResource.php:204-215`: tambahkan `->minValue(0)` pada field `adjusted_qty`.
+- **D, G, A2, SO-00006/07** — tidak perlu perubahan kode (data issue / sudah diperbaiki commit sebelumnya); cukup isi data (rekening bank supplier) atau jalankan command pembersihan yang sudah ada (`app:clean-uat-master-data`) bila masih ada data kotor di environment yang bersangkutan.
+
+**Kriteria selesai:** masing-masing sesuai deskripsi bug asal, diverifikasi manual satu per satu (bug ini kecil, tidak perlu test baru kecuali sudah ada test yang relevan).
+
+---
+
+## Tahap 9 — Regresi penuh & penutupan
+
+1. Setelah Tahap 1-8 selesai dan masing-masing lolos regresi terarah, jalankan suite penuh di latar belakang pada **snapshot terpisah** (`git archive HEAD` + salin `vendor`/`.env`/`public/build`) dengan DB uji sendiri, dibandingkan ke baseline (`scripts/run-tests-chunked.php --compare=tests/baseline-failures.txt`).
+2. Update `docs/AUDIT-RETEST-29-SEP-2026.md` dengan status akhir per bug (selesai/sebagian/ditunda) untuk jadi acuan retest manual berikutnya.
+3. Siapkan ringkasan untuk retest manual Anda, mengikuti urutan yang sama seperti daftar bug asli supaya mudah dicocokkan satu-satu.
+
+---
+
+## Ringkasan urutan commit
+
+| Tahap | Bug yang diselesaikan | Ketergantungan |
+|---|---|---|
+| 1 | 1, 3, (andil 11) | — |
+| 2 | 2, 4 | — |
+| 3 | 5 | — (config, bisa paralel kapan saja) |
+| 4 | 6, 7 | — |
+| 5 | 8 | — |
+| 6 | 9, 10 | Sebaiknya setelah Tahap 5 (pola repost invoice yang diperbaiki di sana dipakai ulang untuk koreksi invoice di Return Product) |
+| 7 | 11 (verifikasi), 12, data lama | Setelah Tahap 1 (untuk Bug 11) |
+| 8 | A1, B, C, E, F, H | — (independen, bisa dikerjakan kapan saja) |
+| 9 | Regresi & penutupan | Setelah semua tahap |
+
+**Keputusan sudah dikonfirmasi:** Tahap 4 mempertahankan kedua implementasi Laporan Stok/Laporan Inventori; Tahap 5 mengunci invoice posted untuk semua role kecuali Super Admin (dengan audit trail untuk overridenya). Siap dieksekusi mulai Tahap 1.

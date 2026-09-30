@@ -685,6 +685,33 @@ test('processCompletion creates a stock_movement of type customer_return', funct
         ->and($movement->product_id)->toBe($data['product']->id);
 });
 
+test('processCompletion does NOT add repair items to saleable stock', function () {
+    $data   = setupCustomerReturnPrerequisites();
+    $result = buildApprovedReturn($data, CustomerReturnItem::DECISION_REPAIR);
+
+    $warehouse      = $result['warehouse'];
+    $customerReturn = $result['customerReturn'];
+
+    // Seed an existing stock entry with 10 units
+    InventoryStock::create([
+        'product_id'   => $data['product']->id,
+        'warehouse_id' => $warehouse->id,
+        'qty_available' => 10,
+        'qty_reserved'  => 0,
+        'qty_min'       => 0,
+    ]);
+
+    app(CustomerReturnService::class)->processCompletion($customerReturn);
+
+    // Repair items are held in WIP/in-repair, NOT back in saleable stock yet —
+    // qty_available must stay at 10, regardless of the StockMovement recorded for history.
+    $stock = InventoryStock::where('product_id', $data['product']->id)
+        ->where('warehouse_id', $warehouse->id)
+        ->first();
+
+    expect((float) $stock->qty_available)->toBe(10.0);
+});
+
 test('processCompletion does NOT restore stock for reject decision', function () {
     $data   = setupCustomerReturnPrerequisites();
     $result = buildApprovedReturn($data, CustomerReturnItem::DECISION_REJECT);

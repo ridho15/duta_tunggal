@@ -10,6 +10,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReturnItem;
 use App\Models\Product;
+use App\Models\InventoryStock;
 use App\Models\StockMovement;
 use App\Models\JournalEntry;
 use App\Models\Cabang;
@@ -644,6 +645,8 @@ test('stock adjustment on approval', function () {
         'ppn_option' => 'eklusif',
     ]);
 
+    $warehouse = Warehouse::withoutGlobalScopes()->first();
+
     // Create purchase receipt
     $purchaseReceipt = PurchaseReceipt::create([
         'purchase_order_id' => $purchaseOrder->id,
@@ -664,9 +667,59 @@ test('stock adjustment on approval', function () {
         'status' => 'approved',
     ]);
 
+    $product = Product::factory()->create([
+        'sku' => 'TEST-SKU-' . Str::random(8),
+        'cabang_id' => Cabang::query()->value('id'),
+        'supplier_id' => Supplier::query()->value('id'),
+    ]);
+
+    // PurchaseReceipt::warehouse_id is not mass-assignable — link via a receipt item instead,
+    // which is how adjustStock() actually resolves the warehouse (item->purchaseReceiptItem->warehouse_id).
+    $receiptItem = PurchaseReceiptItem::create([
+        'purchase_receipt_id' => $purchaseReceipt->id,
+        'product_id' => $product->id,
+        'qty_received' => 2,
+        'qty_accepted' => 2,
+        'qty_rejected' => 0,
+        'warehouse_id' => $warehouse->id,
+        'status' => 'completed',
+    ]);
+
+    InventoryStock::create([
+        'product_id' => $product->id,
+        'warehouse_id' => $warehouse->id,
+        'qty_available' => 20,
+        'qty_reserved' => 0,
+    ]);
+
+    PurchaseReturnItem::create([
+        'purchase_return_id' => $purchaseReturn->id,
+        'purchase_receipt_item_id' => $receiptItem->id,
+        'product_id' => $product->id,
+        'qty_returned' => 2,
+        'unit_price' => 50000,
+        'reason' => 'Barang rusak',
+    ]);
+
     $result = $service->adjustStock($purchaseReturn);
 
     expect($result)->toBeTrue();
+
+    // Regression guard: retur 2 pcs harus mengurangi stok tepat 2 (18), bukan dobel (16),
+    // dan hanya tercatat 1 baris mutasi — lihat docs/AUDIT-RETEST-29-SEP-2026.md Bug 1.
+    $stock = InventoryStock::where('product_id', $product->id)
+        ->where('warehouse_id', $warehouse->id)
+        ->first();
+
+    expect((float) $stock->qty_available)->toBe(18.0);
+
+    $movements = StockMovement::where('from_model_type', PurchaseReturn::class)
+        ->where('from_model_id', $purchaseReturn->id)
+        ->get();
+
+    expect($movements)->toHaveCount(1)
+        ->and($movements->first()->type)->toBe('purchase_return')
+        ->and((float) $movements->first()->quantity)->toBe(2.0);
 });
 
 test('journal entry creation on approval', function () {

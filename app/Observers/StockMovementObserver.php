@@ -205,11 +205,15 @@ class StockMovementObserver
     {
         $normalizedQuantity = abs((float) $quantity);
 
-        return match ($type) {
-            'purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in', 'customer_return', 'return_in', 'sales_return_in' => $normalizedQuantity,
-            'sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'purchase_return', 'return_out', 'purchase_return_out' => -1 * $normalizedQuantity,
-            default => 0.0,
-        };
+        if (in_array($type, StockMovement::IN_TYPES, true)) {
+            return $normalizedQuantity;
+        }
+
+        if (in_array($type, StockMovement::OUT_TYPES, true)) {
+            return -1 * $normalizedQuantity;
+        }
+
+        return 0.0;
     }
 
     private function shouldSkipStockUpdate(mixed $meta): bool

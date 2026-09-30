@@ -29,8 +29,8 @@ class AuditInventoryConsistency extends Command
         $issues = 0;
 
         foreach ($stocks as $s) {
-            $inTypes = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in'];
-            $outTypes = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out'];
+            $inTypes = StockMovement::IN_TYPES;
+            $outTypes = StockMovement::OUT_TYPES;
 
             $in = StockMovement::where('product_id', $s->product_id)
                 ->where('warehouse_id', $s->warehouse_id)
