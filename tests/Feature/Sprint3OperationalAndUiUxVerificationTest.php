@@ -64,35 +64,20 @@ class Sprint3OperationalAndUiUxVerificationTest extends TestCase
         ]);
         Auth::login($this->user);
 
-        $this->customer = Customer::withTrashed()->firstOrCreate(
-            ['perusahaan' => 'PT Customer Pusat Sprint 3'],
-            [
-                'name' => 'PT Customer Pusat Sprint 3',
-                'address' => 'Jl. Kantor Pusat Jakarta No. 1',
-                'phone' => '021-5551234',
-                'email' => 'customer_s3@example.com',
-                'cabang_id' => $this->cabang->id,
-            ]
-        );
-        if ($this->customer->trashed()) {
-            $this->customer->restore();
-        }
+        $this->customer = Customer::factory()->create([
+            'perusahaan' => 'PT Customer Pusat Sprint 3',
+            'name' => 'PT Customer Pusat Sprint 3',
+            'address' => 'Jl. Kantor Pusat Jakarta No. 1',
+            'phone' => '021-5551234',
+            'email' => 'customer_s3_' . uniqid() . '@example.com',
+            'cabang_id' => $this->cabang->id,
+        ]);
 
-        $this->supplier = Supplier::withTrashed()->firstOrCreate(
-            ['code' => 'SUP-S3-01'],
-            [
-                'perusahaan' => 'PT Supplier Utama Sprint 3',
-                'address' => 'Jl. Industri Supplier No. 8',
-                'cabang_id' => $this->cabang->id,
-                'nama_bank' => 'BCA',
-                'nomor_rekening' => '8880011223',
-                'nama_rekening' => 'PT Supplier Utama Sprint 3',
-            ]
-        );
-        if ($this->supplier->trashed()) {
-            $this->supplier->restore();
-        }
-        $this->supplier->update([
+        $this->supplier = Supplier::factory()->create([
+            'code' => 'SUP-S3-' . strtoupper(substr(uniqid(), -4)),
+            'perusahaan' => 'PT Supplier Utama Sprint 3',
+            'address' => 'Jl. Industri Supplier No. 8',
+            'cabang_id' => $this->cabang->id,
             'nama_bank' => 'BCA',
             'nomor_rekening' => '8880011223',
             'nama_rekening' => 'PT Supplier Utama Sprint 3',

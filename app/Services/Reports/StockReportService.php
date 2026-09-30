@@ -18,13 +18,11 @@ class StockReportService
 
     public function generate(array $filters = []): array
     {
-        $startDate = !empty($filters['start_date'])
-            ? Carbon::parse($filters['start_date'])->startOfDay()
-            : now()->startOfMonth()->startOfDay();
+        $startDate = $this->parseDate($filters['start_date'] ?? null)?->startOfDay()
+            ?? now()->startOfMonth()->startOfDay();
 
-        $endDate = !empty($filters['end_date'])
-            ? Carbon::parse($filters['end_date'])->endOfDay()
-            : now()->endOfDay();
+        $endDate = $this->parseDate($filters['end_date'] ?? null)?->endOfDay()
+            ?? now()->endOfDay();
 
         $productIds = array_values(array_filter((array) ($filters['product_ids'] ?? [])));
         $warehouseIds = array_values(array_filter((array) ($filters['warehouse_ids'] ?? [])));
@@ -193,6 +191,24 @@ class StockReportService
                     ],
                 ];
             });
+    }
+
+    /**
+     * Safely parse a user-supplied date filter. An unparsable string (bad format, garbage
+     * input) must fall back to null — same as an empty filter — rather than let
+     * Carbon\Exceptions\InvalidFormatException bubble up into a 500.
+     */
+    private function parseDate(mixed $value): ?Carbon
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function movementKey(?int $productId, ?int $warehouseId, ?int $rakId): string

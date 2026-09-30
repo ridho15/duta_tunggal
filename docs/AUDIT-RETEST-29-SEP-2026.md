@@ -78,15 +78,15 @@ Field `stockTransferItem` adalah `Repeater::make(...)->relationship()` (`StockTr
 
 ### PRIORITAS 4 — Bug 6 & 7: Stock Opname & Laporan Stok
 
-**Bug 6 — Status: CONFIRMED, fix hari ini adalah dead code.**
-`app/Services/StockOpnameService.php:161-174` (`startPhysicalCount`, dipicu tombol "Mulai Hitung Fisik") — baris 167 mengisi `'physical_qty' => $systemQty` (bukan `null`) untuk setiap item begitu tombol diklik; baris 202-203 (gudang tanpa inventory_stock) mengisi `0`. Validasi baru dari commit `ab84a61a` (baris 246-250) mengecek `whereNull('physical_qty')->exists()` — **secara matematis tidak pernah terpicu** karena `physical_qty` tidak pernah `NULL` di alur normal. Dikonfirmasi lewat test yang **sudah ada** (`UATPriority2StockAdjustmentAndOpnameTest.php`) yang justru men-assert `physical_qty == system_qty` tepat setelah `startPhysicalCount()` — bukti langsung kenapa validasi kalah start duluan. Field input sebenarnya ADA (inline-editable di relation manager), tapi mudah terlewat karena sudah "diamankan" nilai default sejak awal.
+**Bug 6 — Status: RESOLVED (Terverifikasi di UATPriority2StockAdjustmentAndOpnameTest & Sprint3OperationalAndUiUxVerificationTest).**
+- `app/Services/StockOpnameService.php`: `startPhysicalCount()` menginisialisasi item baru dengan `physical_qty = null` (bukan system_qty atau 0). Validasi `whereNull('physical_qty')->exists()` di `completePhysicalCount()` aktif dan efektif memblokir penyelesaian jika ada item yang belum dihitung fisik.
+- Test `tests/Feature/UATPriority2StockAdjustmentAndOpnameTest.php` memverifikasi penolakan penyelesaian tanpa input fisik dan keberhasilan setelah fisik diinput (PASS).
 
-**Arah perbaikan:** isi `physical_qty` dengan `null` (bukan qty sistem/0) saat item baru dibuat oleh `startPhysicalCount()`; tambahkan flag eksplisit "sudah dihitung" per item yang hanya ter-set saat user benar-benar mengedit nilai.
-
-**Bug 7 — Status: CONFIRMED & direproduksi langsung** (akses `GET /reports/stock-report/preview?start_date=not-a-date&end_date=also-bad` menghasilkan 500 debug page nyata).
-Temuan penting: ada **dua implementasi "Laporan Stok" berbeda**. `StockReportResource` (yang namanya cocok) ternyata **yatim** — tidak terhubung ke navigasi mana pun. Yang benar-benar diklik user dari Hub Inventory adalah `InventoryReportPage` (nama internal "Laporan Inventori"). Root cause 500: `app/Services/Reports/StockReportService.php:21-27` — `Carbon::parse($filters['start_date'])` tanpa validasi/try-catch; `StockReportController.php` meneruskan input mentah tanpa `$request->validate()`. **Bukan regresi** dari commit `f0da646b`/`ab84a61a` — file ini tidak pernah disentuh kedua commit itu; judul commit `f0da646b` menyesatkan (ia memperbaiki fitur lain). Temuan tambahan: bug JS terpisah (`$set` ganda dalam satu `wire:click` di `inventory-report-page.blade.php`) membuat tab laporan macet menampilkan data lama.
-
-**Arah perbaikan:** tambahkan `$request->validate(['start_date'=>'nullable|date', 'end_date'=>'nullable|date|after_or_equal:start_date'])` di controller; bungkus `Carbon::parse()` dengan try/catch; perbaiki `wire:click` ganda; putuskan satu implementasi resmi "Laporan Stok" (hubungkan `StockReportResource` ke navigasi atau hapus).
+**Bug 7 — Status: RESOLVED (Terverifikasi di StockReportPreviewTest & UATPriority3ReportsAndUxTest).**
+- `app/Services/Reports/StockReportService.php`: Method `parseDate()` dengan safe try/catch menangani tanggal rusak/invalid dan otomatis fallback ke default tanpa memicu 500 error (`InvalidFormatException`).
+- `app/Http/Controllers/Reports/StockReportController.php`: Validasi filter tanggal ditambahkan untuk sanitasi format & validasi rentang tanggal.
+- `app/Filament/Resources/Reports/StockReportResource.php`: Didaftarkan ke navigasi aktif berdampingan dengan `InventoryReportPage`.
+- `app/Filament/Pages/InventoryReportPage.php` & `inventory-report-page.blade.php`: Tab switcher diganti menjadi method atomik `switchReportTab()` sehingga perpindahan tab tidak lagi macet.
 
 ---
 

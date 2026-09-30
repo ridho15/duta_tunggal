@@ -193,6 +193,26 @@ class StockReportPreviewTest extends TestCase
     }
 
     #[Test]
+    public function it_does_not_500_when_dates_are_unparsable(): void
+    {
+        // Bug 7 (docs/AUDIT-RETEST-29-SEP-2026.md): Carbon::parse() on a garbage date string
+        // used to throw InvalidFormatException straight into a 500 page. An unparsable date
+        // must be treated the same as an empty one — fall back to the default range.
+        $this->seed(\Database\Seeders\PermissionSeeder::class);
+
+        $user = User::factory()->create();
+        $user->givePermissionTo('view any inventory stock');
+        $this->actingAs($user);
+
+        $response = $this->get(route('reports.stock-report.preview', [
+            'start_date' => 'not-a-date',
+            'end_date' => 'also-bad',
+        ]));
+
+        $response->assertOk();
+    }
+
+    #[Test]
     public function it_can_render_the_filament_stock_report_page(): void
     {
         $this->seed(\Database\Seeders\PermissionSeeder::class);

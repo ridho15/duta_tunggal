@@ -560,20 +560,20 @@
          ═══════════════════════════════════════════════ --}}
         <div class="premium-tab-bar no-print">
             {{-- Stok per Gudang --}}
-            <button wire:click="$set('show_movement_history', false); $set('show_aging_stock', false)"
+            <button wire:click="switchReportTab('stock')"
                 class="premium-tab-btn {{ !$show_movement_history && !$show_aging_stock ? 'active' : '' }}"
                 id="tab-stock">
                 <x-heroicon-o-archive-box class="w-4 h-4" />
                 Stok per Gudang
             </button>
             {{-- History Movement --}}
-            <button wire:click="$set('show_movement_history', true); $set('show_aging_stock', false)"
+            <button wire:click="switchReportTab('movement')"
                 class="premium-tab-btn {{ $show_movement_history ? 'active' : '' }}" id="tab-movement">
                 <x-heroicon-o-arrow-trending-up class="w-4 h-4" />
                 History Movement
             </button>
             {{-- Aging Stock --}}
-            <button wire:click="$set('show_aging_stock', true); $set('show_movement_history', false)"
+            <button wire:click="switchReportTab('aging')"
                 class="premium-tab-btn {{ $show_aging_stock ? 'active' : '' }}" id="tab-aging">
                 <x-heroicon-o-clock class="w-4 h-4" />
                 Aging Stock

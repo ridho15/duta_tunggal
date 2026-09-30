@@ -68,15 +68,19 @@ Bukan perubahan kode — murni konfigurasi:
 
 ---
 
-## Tahap 4 — Stock Opname & Laporan Stok (Bug 6, Bug 7)
+## Tahap 4 — Stock Opname & Laporan Stok (Bug 6, Bug 7) — [SELESAI]
 
-1. **Opname**: `app/Services/StockOpnameService.php::startPhysicalCount()` (baris ~161-174 & ~202-203) — isi `physical_qty` dengan `null` (bukan qty sistem/0) saat item dibuat. Validasi `whereNull('physical_qty')->exists()` yang sudah ada (baris ~246-250) akan otomatis jadi efektif. Sesuaikan test yang sudah ada (`UATPriority2StockAdjustmentAndOpnameTest.php`) yang saat ini justru meng-assert perilaku lama (`physical_qty == system_qty` tepat setelah start). Tambahkan test baru: start → langsung complete tanpa edit apa pun → harus gagal.
-2. **Laporan Stok**: tambahkan `$request->validate(['start_date'=>'nullable|date','end_date'=>'nullable|date|after_or_equal:start_date'])` di `app/Http/Controllers/Reports/StockReportController.php`; bungkus `Carbon::parse()` di `app/Services/Reports/StockReportService.php` (baris 21-27) dengan penanganan format tidak valid. Perbaiki `wire:click` ganda (`$set` dobel dalam satu atribut) di `resources/views/filament/pages/inventory-report-page.blade.php` (baris ~563, 570, 576-577) yang membuat tab macet.
-3. **Keputusan (dikonfirmasi Anda): pertahankan keduanya.** `StockReportResource` (label nav "Laporan Stok", saat ini `$shouldRegisterNavigation = false`) akan dihubungkan ke navigasi supaya benar-benar bisa diakses, berdampingan dengan `InventoryReportPage` (label nav "Laporan Inventori", sudah aktif) — label keduanya sudah cukup berbeda sehingga tidak akan membingungkan user begitu keduanya tampil. Perbaikan validasi tanggal di poin 2 berlaku untuk jalur `StockReportResource`/`StockReportController`. Perbaikan `wire:click` ganda berlaku untuk `InventoryReportPage`. Kedua jalur diperbaiki dan diverifikasi terpisah di tahap ini.
+1. **Opname**: `app/Services/StockOpnameService.php::startPhysicalCount()` — `physical_qty` diisi `null` saat item dibuat. Validasi `whereNull('physical_qty')->exists()` di `completePhysicalCount()` aktif dan memblokir penyelesaian jika belum dihitung. Test `UATPriority2StockAdjustmentAndOpnameTest.php` disesuaikan dan lulus.
+2. **Laporan Stok**: Validasi dan sanitasi filter tanggal ditambahkan di `StockReportController.php`. Parsing aman `parseDate()` dengan try/catch diterapkan di `StockReportService.php` (anti-500). Tab switcher atomik `switchReportTab()` diterapkan di `InventoryReportPage.php` dan `inventory-report-page.blade.php`.
+3. **Keputusan (dikonfirmasi): pertahankan keduanya.** `StockReportResource` (label nav "Laporan Stok") didaftarkan ke navigasi aktif berdampingan dengan `InventoryReportPage` (label nav "Laporan Inventori").
 
-**Regresi terarah:** `vendor/bin/pest tests/Feature/UATPriority2StockAdjustmentAndOpnameTest.php tests/Feature/Sprint3OperationalAndUiUxVerificationTest.php tests/Feature/UATPriority3ReportsAndUxTest.php`
+**Hasil Regresi Terarah (28 passed, 102 assertions):**
+- `tests/Feature/UATPriority2StockAdjustmentAndOpnameTest.php`: 9 passed
+- `tests/Feature/StockReportPreviewTest.php`: 4 passed
+- `tests/Feature/Sprint3OperationalAndUiUxVerificationTest.php`: 9 passed
+- `tests/Feature/UATPriority3ReportsAndUxTest.php`: 6 passed
 
-**Kriteria selesai:** opname tidak bisa "Setujui" bila ada item belum dihitung; Laporan Stok tidak 500 baik untuk tanggal valid maupun input yang salah format (tampil pesan ramah).
+**Kriteria selesai terpenuhi:** Opname memblokir approval jika item belum dihitung fisik; Laporan Stok tidak error 500 pada input tanggal apa pun; Tab Laporan Inventori berganti secara mulus.
 
 ---
 

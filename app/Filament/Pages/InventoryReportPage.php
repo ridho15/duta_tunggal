@@ -54,6 +54,17 @@ class InventoryReportPage extends Page implements HasTable
         $this->end_date = now()->format('Y-m-d');
     }
 
+    /**
+     * Switch the active report tab. show_movement_history/show_aging_stock must be set
+     * together, atomically — two chained `$set(...)` calls in one wire:click only lets
+     * Livewire's magic action syntax recognize the first one, leaving the tabs stuck.
+     */
+    public function switchReportTab(string $tab): void
+    {
+        $this->show_movement_history = $tab === 'movement';
+        $this->show_aging_stock = $tab === 'aging';
+    }
+
     public function exportExcel()
     {
         $type = $this->show_movement_history ? 'movement' : ($this->show_aging_stock ? 'aging' : 'stock');
