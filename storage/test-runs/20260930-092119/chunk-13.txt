@@ -1,0 +1,994 @@
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_7_account_payable_list_title_is_clean_and_formatted(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_7_account_payable_resource_has_date_columns(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_8_invoice_is_overdue_helper_correctly_detects(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_8_check_overdue_command_updates_invoice_status(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_8_check_overdue_command_is_registered(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_10_vendor_payments_table_has_required_columns(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_10_vendor_payment_generates_payment_number_on_create(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_10_vendor_payment_resource_form_has_bank_info_fields(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_10_ledger_posting_uses_payment_number_as_reference(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_15_default_inventory_coa_is_now_barang_dagangan(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_15_new_standard_product_gets_1140_10_inventory_coa(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_15_sync_command_remaps_standard_products_from_1140_01_to_1140_10(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch3VerificationTest::test_issue_15_sync_command_dry_run_does_not_modify_database(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_sequential_number_generator_produces_ordered_codes(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_order_request_number_is_sequential_and_prefixed_or(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_payment_request_prefix_standardization_pay_req(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_quality_control_number_is_sequential(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_qc_auto_receipt_uses_grn_prefix(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_purchase_receipt_service_generates_sequential_grn_number(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_qc_and_manual_receipt_share_one_grn_sequence(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_9_order_request_form_has_default_request_number(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_12_delivery_order_get_eloquent_query_eager_loads_relations(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\UATPhase2Batch4VerificationTest::test_issue_12_approval_action_buttons_have_loading_disabled_protection(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   PASS  Tests\Feature\StockReportPreviewTest
+  ✓ it uses stock movements for preview rows and outbound totals         5.01s  
+  ✓ it prefers inventory snapshot for qty on hand and computes status a… 0.86s  
+  ✓ it does not 500 when dates are unparsable                            0.62s  
+  ✓ it can render the filament stock report page                         0.78s  
+
+   PASS  Tests\Feature\StockReservationServiceTest
+  ✓ tc sr 001 reserve stock increases reserved and decreases available   0.51s  
+  ✓ tc sr 002 release reservation decreases reserved and restores avail… 0.48s  
+  ✓ tc sr 006 consume reservation decreases reserved and leaves availab… 0.50s  
+
+   FAIL  Tests\Feature\StockTransferTest
+  ✓ it can create stock transfer between warehouses                      0.55s  
+  ✓ it can create stock transfer between racks                           0.65s  
+  ✓ it can request stock transfer                                        0.63s  
+  ✓ it can approve stock transfer and create stock movements             0.56s  
+  ✓ it does not move stock before transfer is approved                   0.55s  
+  ✓ it blocks approval when source stock is insufficient                 0.55s  
+  ✓ it can reject stock transfer                                         0.55s  
+  ✓ it validates stock transfer status enum                              0.55s  
+  ✓ it generates unique transfer number                                  0.54s  
+  ✓ it can soft delete stock transfer and items                          0.55s  
+  ⨯ it can restore stock transfer and items                              0.55s  
+  ✓ it validates transfer quantity is positive                           0.54s  
+  ✓ it maintains relationships correctly                                 0.55s  
+
+   PASS  Tests\Feature\SuperAdminPermissionsTest
+  ✓ super admin role has all defined permissions                         0.86s  
+
+   PASS  Tests\Feature\SupplierProductResourceTest
+  ✓ Supplier Model Relationships → it has many purchase orders           0.54s  
+  ✓ Supplier Model Relationships → it has many products via legacy supp… 0.54s  
+  ✓ Supplier Model Relationships → it belongs to many products via prod… 0.57s  
+  ✓ Supplier Model Relationships → it pivot table product_supplier reco… 0.55s  
+  ✓ Supplier Model Relationships → it belongs to cabang                  0.53s  
+  ✓ Supplier Model Relationships → it soft-deletes correctly             0.59s  
+  ✓ Product Model Relationships → it belongs to many suppliers           0.67s  
+  ✓ Product Model Relationships → it can attach a supplier with price    0.53s  
+  ✓ Product Model Relationships → it belongs to uom                      0.53s  
+  ✓ Product Model Relationships → it belongs to product category         0.53s  
+  ✓ Product Model Relationships → it has many inventory stocks           0.53s  
+  ✓ Product Model Relationships → it has many stock movements            0.53s  
+  ✓ Product Model Relationships → it casts is_active, is_manufacture, i… 0.54s  
+  ✓ SupplierResource Form Validation → it requires sku (code), perusaha… 0.68s  
+  ✓ SupplierResource Form Validation → it rejects invalid email on supp… 0.69s  
+  ✓ SupplierResource Form Validation → it accepts international phone n… 0.69s  
+  ✓ SupplierResource Form Validation → it rejects phone numbers with on… 0.68s  
+  ✓ SupplierResource Form Validation → it enforces unique supplier code  0.68s  
+  ✓ SupplierResource CRUD → it list page renders                         0.63s  
+  ✓ SupplierResource CRUD → it can create a supplier                     0.67s  
+  ✓ SupplierResource CRUD → it can edit a supplier and update tempo hut… 0.72s  
+  ✓ SupplierResource CRUD → it can soft-delete a supplier from list      0.80s  
+  ✓ ProductResource Form Validation → it requires sku, name, product_ca… 1.14s  
+  ✓ ProductResource Form Validation → it enforces unique sku             0.83s  
+  ✓ ProductResource CRUD → it list page renders                          0.79s  
+  ✓ ProductResource CRUD → it can create a global product without caban… 1.52s  
+  ✓ ProductResource CRUD → it can create a product without suppliers (o… 0.88s  
+  ✓ ProductResource CRUD → it shows global products to branch users      0.56s  
+  ✓ ProductResource CRUD → it can create a product then attach supplier… 0.83s  
+  ✓ ProductResource CRUD → it can edit a product name and sell price     1.11s  
+  ✓ ProductResource CRUD → it can soft-delete a product from list        0.78s  
+  ✓ ProductsRelationManager on Supplier → it renders the relation manag… 0.57s  
+  ✓ ProductsRelationManager on Supplier → it shows the associate produc… 0.56s  
+  ✓ ProductsRelationManager on Supplier → it can associate a product to… 0.72s  
+  ✓ ProductsRelationManager on Supplier → it can dissociate a product f… 0.56s  
+  ✓ ProductsRelationManager on Supplier → it shows associated products…  0.56s  
+  ✓ PurchaseOrderRelationManager on Supplier → it renders the relation…  0.60s  
+  ✓ PurchaseOrderRelationManager on Supplier → it shows purchase orders… 0.61s  
+  ✓ PurchaseOrderRelationManager on Supplier → it does not show purchas… 0.68s  
+  ✓ InventoryStockRelationManager on Product → it renders the relation…  0.55s  
+  ✓ InventoryStockRelationManager on Product → it shows inventory stock… 0.55s  
+  ✓ StockMovementRelationManager on Product → it renders the relation m… 0.55s  
+  ✓ StockMovementRelationManager on Product → it shows stock movements…  0.56s  
+  ✓ SupplierResource structure → it declares correct relation managers   0.68s  
+  ✓ SupplierResource structure → it registers all expected pages         0.54s  
+  ✓ ProductResource structure → it declares correct relation managers    0.54s  
+  ✓ ProductResource structure → it registers all expected pages          0.55s  
+
+   PASS  Tests\Feature\SuratJalanRecapTest
+  ✓ it filters rekap surat jalan by date range and status                0.48s  
+  ✓ it streams a rekap surat jalan pdf download                          0.47s  
+
+   FAIL  Tests\Feature\SuratJalanScheduleReadinessPhase4Test
+  ✓ it Isu 6: endpoint PDF Surat Jalan ber-DO tunggal dan jamak berhasi… 0.66s  
+  ✓ it Isu 6: data cetak memuat nomor DO/SO, customer unik, alamat, dri… 0.70s  
+  ✓ it Isu 6: Surat Jalan yang belum dijadwalkan dicetak "Belum dijadwa… 0.58s  
+  ✓ it Isu 6: ekspedisi menampilkan nama ekspedisi dan nomor resi        0.54s  
+  ✓ it Isu 6: template memuat blok tanda tangan, tanpa harga, tanpa ala… 0.55s  
+  ✓ it Isu 6: alamat/telepon cabang kosong dikosongkan, bukan diisi pla… 0.55s  
+  ✓ it Isu 6: Surat Jalan dibatalkan dicetak dengan banner DIBATALKAN d… 0.54s  
+  ✓ it Isu 6: policy — hanya Draft yang boleh diubah/dihapus; kemampuan… 0.63s  
+  ✓ it Isu 6: halaman Edit Surat Jalan terbit diarahkan ke halaman Liha… 0.58s  
+  ✓ it Isu 6: tabel — Ubah/Hapus hanya untuk Draft; Batalkan untuk Terb… 0.69s  
+  ✓ it Isu 6: halaman Lihat menyembunyikan Ubah/Hapus dan menampilkan B… 0.61s  
+  ✓ it Isu 6: hapus massal hanya menghapus Draft                         0.84s  
+  ✓ it Isu 6: Batalkan — alasan wajib (min 5 karakter), tercatat siapa/… 0.56s  
+  ✓ it Isu 6: Draft tidak dapat dibatalkan (cukup dihapus)               0.62s  
+  ✓ it Isu 6: Batalkan ditolak selama Surat Jalan masih dipakai jadwal…  0.55s  
+  ✓ it Isu 6: aksi Batalkan dari tabel dan halaman Lihat mewajibkan ala… 1.33s  
+  ✓ it Isu 6: hanya dokumen bertanda tangan yang dapat diunggah pada Su… 0.75s  
+  ✓ it Isu 6: Terbitkan Draft — DO harus approved dan belum di Surat Ja… 0.59s  
+  ✓ it Isu 6: satu DO tidak boleh tercantum di dua Surat Jalan yang ber… 0.55s  
+  ✓ it Isu 6: validasi DO — hanya approved, satu cabang, minimal satu    0.55s  
+  ✓ it Isu 6: Terbitkan Ulang membuat Surat Jalan baru (nomor baru, ter… 0.81s  
+  ⨯ it Isu 6: Terbitkan Ulang ditolak bila DO sudah tidak approved       0.72s  
+  ✓ it Isu 6: aksi Terbitkan Ulang dari tabel                            0.72s  
+  ✓ it Isu 6: nomor Surat Jalan berurutan per hari, melanjutkan dari no… 0.58s  
+  ✓ it Isu 6: halaman Lihat menampilkan status, pengiriman dari jadwal,… 0.71s  
+  ✓ it Isu 6: halaman Lihat Surat Jalan dibatalkan menampilkan bagian P… 0.70s  
+  ✓ it Isu 6: daftar menampilkan driver dari jadwal / "Belum dijadwalka… 0.75s  
+  ✓ it Isu 6: rekap Surat Jalan memakai label status Draft/Terbit/Dibat… 0.56s  
+  ✓ it Isu 8: validasi server — internal butuh driver & kendaraan maste… 0.53s  
+  ✓ it Isu 8: master kosong → default metode Ekspedisi dan terdeteksi d… 0.54s  
+  ✓ it Isu 8: form Jadwal dengan master kosong menampilkan penjelasan d… 0.69s  
+  ✓ it Isu 8: jadwal internal tanpa driver/kendaraan ditolak dengan pes… 0.88s  
+  ✓ it Isu 8: tautan tambah master hanya untuk pengguna berizin; lainny… 0.64s  
+  ✓ it Isu 8: banner tidak tampil dan default Internal bila master leng… 0.57s  
+  ✓ it Isu 8: status "Sebagian Terkirim" tersedia dan berlabel; DO ikut… 0.56s  
+  ✓ it Isu 8: master:readiness melaporkan master kosong dan exit 1 bila… 0.48s  
+  ✓ it Isu 8: readiness — status siap/sebagian/kosong dan hanya kosong…  0.46s  
+  ✓ it Isu 8: readiness --json memuat pemeriksaan dan kesiapan           0.48s  
+
+   FAIL  Tests\Feature\SuratJalanValidationFeedbackTest
+  ⨯ create surat jalan with unapproved do shows danger notification and… 0.79s  
+  ✓ create surat jalan with approved do succeeds                         0.40s  
+
+   PASS  Tests\Feature\SyncArApCommandTest
+  ✓ ar-ap sync recalculates receivable paid from receipt items per invo… 0.27s  
+  ✓ ar-ap sync recalculates payable balances from vendor payment detail… 0.26s  
+
+   PASS  Tests\Feature\TaxDefaultResolverTest
+  ✓ tax resolver prioritizes active setting over product tax             0.27s  
+  ✓ tax resolver falls back to product tax when no active setting exist… 0.26s  
+  ✓ tax resolver returns zero for non tax type                           0.25s  
+
+   PASS  Tests\Feature\TrialBalancePreviewControllerTest
+  ✓ trial balance preview matches trial balance service                  0.32s  
+
+   PASS  Tests\Feature\TrialBalanceServiceTest
+  ✓ TC-TB-001 basic period debit credit are computed correctly           0.27s  
+  ✓ TC-TB-002 beginning balance includes pre-period journal entries      0.27s  
+  ✓ TC-TB-003 opening balance on COA is included in beginning balance    0.26s  
+  ✓ TC-TB-004 liability credit-normal balance computed correctly         0.26s  
+  ✓ TC-TB-005 branch filter excludes entries from other branches         0.27s  
+  ✓ TC-TB-006 show_zero_balance=false hides accounts with all-zero valu… 0.25s  
+  ✓ TC-TB-006b show_zero_balance=true includes zero-balance accounts     0.24s  
+  ✓ TC-TB-007 grand totals match sum of individual rows                  0.26s  
+  ✓ TC-TB-008 normal balance flag is D for asset and expense, C for oth… 0.24s  
+  ✓ TC-TB-009 parent account appears before its children in ordered row… 0.25s  
+
+   PASS  Tests\Feature\UATPhase1VerificationTest
+  ✓ issue 4 draft invoice does not create ap and does not post journal   0.26s  
+  ✓ issue 4 posting draft invoice creates ap and posts journal           0.29s  
+  ✓ issue 4 invoice policy restricts edit and delete to draft only       0.32s  
+  ✓ issue 6 purchase order policy locks approved and completed po        0.31s  
+  ✓ issue 6 sales order policy locks approved and completed so           0.32s  
+  ✓ issue 6 order request policy locks when po exists or status locked   0.33s  
+  ✓ issue 6 vendor payment policy locks non draft payments               0.35s  
+  ✓ issue 7 purchase receipt table status column is not editable select… 0.25s  
+  ✓ issue 5 payment request calculates real remaining debt minus active… 0.27s  
+  ✓ issue 5 vendor payment settlement auto closes related payment reque… 0.29s  
+
+   PASS  Tests\Feature\UATPhase2Batch1VerificationTest
+  ✓ order request can be rejected with reason                            0.26s  
+  ✓ order request approval updates item approval status                  0.26s  
+  ✓ purchase order top formatting and idr currency rate                  0.24s  
+  ✓ ui labels and tax types have no typos                                0.24s  
+
+   PASS  Tests\Feature\UATPhase2Batch2VerificationTest
+  ✓ issue 3 rejected item excluded from remaining and or becomes comple… 0.30s  
+  ✓ issue 11 delivery order so selection and multi customer rule         0.26s  
+  ✓ issue 13 so approval validates free stock                            0.26s  
+  ✓ issue 14 sales invoice repeater is locked                            0.25s  
+  ✓ issue 16 customer nik protection and display code                    0.25s  
+
+   PASS  Tests\Feature\UATPhase2Batch3VerificationTest
+  ✓ issue 7 account payable list title is clean and formatted            0.39s  
+  ✓ issue 7 account payable resource has date columns                    0.38s  
+  ✓ issue 8 invoice is overdue helper correctly detects                  0.39s  
+  ✓ issue 8 check overdue command updates invoice status                 0.39s  
+  ✓ issue 8 check overdue command is registered                          0.39s  
+  ✓ issue 10 vendor payments table has required columns                  0.39s  
+  ✓ issue 10 vendor payment generates payment number on create           0.41s  
+  ✓ issue 10 vendor payment resource form has bank info fields           0.40s  
+  ✓ issue 10 ledger posting uses payment number as reference             0.41s  
+  ✓ issue 15 default inventory coa is now barang dagangan                0.40s  
+  ✓ issue 15 new standard product gets 1140 10 inventory coa             0.41s  
+  ✓ issue 15 sync command remaps standard products from 1140 01 to 1140… 0.41s  
+  ✓ issue 15 sync command dry run does not modify database               0.39s  
+
+   PASS  Tests\Feature\UATPhase2Batch4VerificationTest
+  ✓ issue 9 sequential number generator produces ordered codes           0.39s  
+  ✓ issue 9 order request number is sequential and prefixed or           0.39s  
+  ✓ issue 9 payment request prefix standardization pay req               0.39s  
+  ✓ issue 9 quality control number is sequential                         0.39s  
+  ✓ issue 9 qc auto receipt uses grn prefix                              0.39s  
+  ✓ issue 9 purchase receipt service generates sequential grn number     0.39s  
+  ✓ issue 9 qc and manual receipt share one grn sequence                 0.39s  
+  ✓ issue 9 order request form has default request number                0.41s  
+  ✓ issue 12 delivery order get eloquent query eager loads relations     0.42s  
+  ✓ issue 12 approval action buttons have loading disabled protection    0.41s  
+
+   PASS  Tests\Feature\UATPhase2ChainIntegrityTest
+  ✓ it Poin 2: Purchase return approval decrements stock, decrements AP… 1.15s  
+  ✓ it Poin 4: Delivery Order allows transition to completed and Surat…  1.18s  
+  ✓ it Poin 5: Fully delivered SO is excluded from DO options, and full… 1.19s  
+  ✓ it Poin 6: Sales invoice unit price is disabled and dehydrated       1.11s  
+
+   PASS  Tests\Feature\UATPhase3PrecisionAndUXTest
+  ✓ it Poin 7: CustomerReceiptAllocator accepts payments within Rp 1.00… 0.24s  
+  ✓ it Poin 7: CustomerReceiptAllocator correctly rejects genuine overp… 0.25s  
+  ✓ it Poin 7: CustomerReceiptObserver auto-closes invoice and AR to pa… 0.27s  
+  ✓ it Poin 7: AccountReceivable model hook automatically reconciles re… 0.26s  
+  ✓ it Poin 7: AccountPayable model hook automatically reconciles remai… 0.28s  
+  ✓ it Poin 7: VendorPaymentObserver allows payment within Rp 1.00 tole… 0.26s  
+  ✓ it Poin 8: Anti-double-click Blade component exists and is register… 0.25s  
+
+   PASS  Tests\Feature\UATPriority1StockTransferAndReturnTest
+  ✓ it can transfer stock between warehouses without raks and moves inv… 0.26s  
+  ✓ it allows operational roles to request and response stock transfers  0.26s  
+  ✓ it can return product from delivery order item with null rak and re… 0.27s  
+  ✓ it validates that return product options use delivered quantity not… 0.30s  
+
+   PASS  Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest
+  ✓ stock adjustment creates balanced journal entries on approval for i… 0.34s  
+  ✓ stock adjustment creates balanced journal entries on approval for d… 0.28s  
+  ✓ stock adjustment works with null rak for warehouses without raks     0.27s  
+  ✓ stock opname works with null rak for warehouses without raks         0.27s  
+  ✓ stock opname start physical count populates warehouse products       0.26s  
+  ✓ stock opname cannot be completed when items are not counted          0.26s  
+  ✓ stock opname can be completed after all items are counted            0.27s  
+  ✓ stock opname approval generates stock movements and updates invento… 0.28s  
+  ✓ cascading deletes delete stock adjustment journal entries            0.28s  
+
+   PASS  Tests\Feature\UATPriority3ReportsAndUxTest
+  ✓ product model code attribute aliases sku                             0.43s  
+  ✓ view inventory card page renders and dispatches preview event        0.53s  
+  ✓ inventory card print and export routes respond ok                    0.49s  
+  ✓ view stock report page renders and dispatches preview                0.49s  
+  ✓ inventory report page renders successfully without sql errors        1.06s  
+  ✓ inventory report export service and excel generation                 0.45s  
+
+   PASS  Tests\Feature\UATUIUXAuditVerificationTest
+  ✓ po item refer item label displays order request number               0.30s  
+  ✓ indonesian money macro placeholder is zero                           0.29s  
+  ✓ sales invoice due date is deduplicated                               0.28s  
+  ✓ hub menu customer receipt is in sales hub not purchase hub           0.27s  
+  ✓ sale order redirects to view page on save                            0.34s  
+  ✓ sale order table legend corrected                                    0.27s  
+  ✓ order request infolist has note                                      0.27s  
+  ✓ quality control preselects first eligible item when po has multiple… 0.30s  
+  ✓ quality control preselects by specific item query param              0.31s  
+  ✓ empty parenthesis rak bug is eliminated                              0.28s  
+  ✓ order request unit price is not required                             0.27s  
+  ✓ order request table styling is responsive and sticky                 0.26s  
+
+   PASS  Tests\Feature\UserResourceListPageTest
+  ✓ user list page renders friendly manage type labels                   0.45s  
+
+   PASS  Tests\Feature\UserResourceTest
+  ✓ user list page can be rendered                                       0.50s  
+  ✓ user create page can be rendered without TypeError                   0.37s  
+  ✓ user creation validates password and konfirmasi_password mismatch    0.53s  
+  ✓ user can be created successfully with correct properties             0.51s  
+  ✓ user can be created with an international phone number               0.49s  
+  ✓ user creation handles null last_name safely                          0.51s  
+  ✓ user edit page can be rendered                                       0.36s  
+  ✓ user edit does not overwrite password when left empty                0.55s  
+
+   PASS  Tests\Feature\UserViewPageTest
+  ✓ user view page shows permission actions and descriptions             0.61s  
+
+   FAIL  Tests\Feature\VendorPaymentFlowAdjustmentTest
+  ⨯ vendor payment observer keeps adjustment amount in account payable…  0.28s  
+  ⨯ manual mode creates details and updates ap with adjustment           0.27s  
+
+   PASS  Tests\Feature\VendorPaymentFromPaymentRequestTest
+  ✓ create page prefills from payment request query with remaining amou… 0.44s  
+  ✓ helpers used by the create page are publicly callable                0.24s  
+  ✓ create from payment request saves without the not null column crash  0.68s  
+
+   FAIL  Tests\Feature\VendorPaymentResourceTest
+  ⨯ vendor payment resource can render list page
+  ⨯ vendor payment resource can render create page
+  ⨯ vendor payment form has required fields
+  ⨯ supplier selection is required
+  ⨯ payment date is required
+  ⨯ ntpn is optional
+  ⨯ coa selection is required
+  ⨯ payment method is required
+  ⨯ payment method options available
+  ⨯ supplier selection filters available invoices
+  ⨯ selected invoices use fallback remaining when account payable is missing
+  ⨯ form can be filled with basic data
+  ⨯ cash payment method selection
+  ⨯ bank transfer payment method selection
+  ⨯ credit payment method selection
+  ⨯ deposit payment method selection
+  ⨯ total payment field exists for auto calculation
+  ⨯ ntpn field has max length validation
+  ⨯ coa options are available
+  ⨯ supplier options are available
+  ⨯ form has hidden fields for backward compatibility
+  ⨯ vendor payment resource can render edit page
+  ⨯ vendor payment resource can render view page
+  ⨯ form validation messages are customized
+  ⨯ payment date defaults to today
+  ⨯ status field defaults to draft
+  ⨯ payment adjustment defaults to zero
+  ⨯ diskon defaults to zero
+  ⨯ vendor payment infolist debugging
+
+   PASS  Tests\Feature\VendorPaymentTest
+  ✓ vendor payment creation with proper relationships                    0.31s  
+  ✓ payment details mapping includes extra fields                        0.28s  
+  ✓ payment methods cash bank transfer cheque                            1.08s  
+  ✓ deposit usage for payment                                            0.36s  
+  ✓ deposit not used for cash payment                                    0.31s  
+  ✓ multiple payment methods split payment                               0.32s  
+  ✓ invoice allocation and account payable updates                       0.34s  
+  ✓ journal entry creation for payments                                  0.32s  
+  ✓ payment with deposit journal entries                                 0.33s  
+  ✓ payment reconciliation and status updates                            0.33s  
+  ✓ vendor payment detail without selected invoices posts foreign curre… 0.31s  
+  ✓ account payable status is normalized from legacy values              0.28s  
+  ✓ recalculate total payment method                                     0.32s  
+  ✓ payment soft delete cascades                                         0.31s  
+  ✓ invoice status is normalized to canonical lowercase value            0.35s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StockTransferTest > it can res…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk placeat. Stok saat ini: 0, diminta: 78.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SuratJalanScheduleReadinessPha…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis Fase 4. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SuratJalanValidationFeedbackTest > create surat jal…   
+  A notification was not sent
+Failed asserting that null is not null.
+
+  at vendor/filament/notifications/src/Notification.php:251
+    247▕         if (blank($notification)) {
+    248▕             return;
+    249▕         }
+    250▕ 
+  ➜ 251▕         Assert::assertNotNull($expectedNotification, 'A notification was not sent');
+    252▕ 
+    253▕         if ($notification instanceof Notification) {
+    254▕             Assert::assertSame(
+    255▕                 collect($expectedNotification)->except(['id'])->toArray(),
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/SuratJalanValidationFeedbackTest.php:74
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentFlowAdjustmentTest > vendor payment ob…   
+  Failed asserting that 819815.0 matches expected 75000.0.
+
+  at tests/Feature/VendorPaymentFlowAdjustmentTest.php:83
+     79▕ 
+     80▕         $ap->refresh();
+     81▕ 
+     82▕         $this->assertEquals(120000.00, $ap->paid);
+  ➜  83▕         $this->assertEquals(75000.00, $ap->remaining);
+     84▕         $this->assertEquals('Belum Lunas', $ap->status);
+     85▕     }
+     86▕ 
+     87▕     #[Test]
+
+  1   tests/Feature/VendorPaymentFlowAdjustmentTest.php:83
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentFlowAdjustmentTest > manual mode creat…   
+  Failed asserting that 75792.0 matches expected 75000.0.
+
+  at tests/Feature/VendorPaymentFlowAdjustmentTest.php:230
+    226▕ 
+    227▕         $ap1->refresh();
+    228▕         $ap2->refresh();
+    229▕         $this->assertEquals(120000.00, $ap1->paid);
+  ➜ 230▕         $this->assertEquals(75000.00, $ap1->remaining);
+    231▕         $this->assertEquals('Belum Lunas', $ap1->status);
+    232▕ 
+    233▕         $this->assertEquals(150000.00, $ap2->paid);
+    234▕         $this->assertEquals(0.00, $ap2->remaining);
+
+  1   tests/Feature/VendorPaymentFlowAdjustmentTest.php:230
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:00, 2026-10-01 01:01:00))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:01, 2026-10-01 01:01:01))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:01, 2026-10-01 01:01:01))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:02, 2026-10-01 01:01:02))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:02, 2026-10-01 01:01:02))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:03, 2026-10-01 01:01:03))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:03, 2026-10-01 01:01:03))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:03, 2026-10-01 01:01:03))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:04, 2026-10-01 01:01:04))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:04, 2026-10-01 01:01:04))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:05, 2026-10-01 01:01:05))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:05, 2026-10-01 01:01:05))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:05, 2026-10-01 01:01:05))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:06, 2026-10-01 01:01:06))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:06, 2026-10-01 01:01:06))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:07, 2026-10-01 01:01:07))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:07, 2026-10-01 01:01:07))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:08, 2026-10-01 01:01:08))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:08, 2026-10-01 01:01:08))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:08, 2026-10-01 01:01:08))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:09, 2026-10-01 01:01:09))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:09, 2026-10-01 01:01:09))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:10, 2026-10-01 01:01:10))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:10, 2026-10-01 01:01:10))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:10, 2026-10-01 01:01:10))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:11, 2026-10-01 01:01:11))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:11, 2026-10-01 01:01:11))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:12, 2026-10-01 01:01:12))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\VendorPaymentRe…  UniqueConstraintViolationException   
+  SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:12, 2026-10-01 01:01:12))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+15 vendor frames [22m
+  16  tests/Feature/VendorPaymentResourceTest.php:125
+
+
+  Tests:    34 failed, 235 passed (1617 assertions)
+  Duration: 134.77s
+

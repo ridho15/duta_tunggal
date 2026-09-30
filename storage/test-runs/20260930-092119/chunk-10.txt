@@ -1,0 +1,1391 @@
+
+   PASS  Tests\Feature\PurchaseOrderTaxBreakdownTest
+  ✓ non pajak no tax no rounding issue                                   1.34s  
+  ✓ non pajak with discount                                              0.32s  
+  ✓ non pajak tax rate zero                                              0.32s  
+  ✓ eklusif basic calculation                                            0.34s  
+  ✓ eksklusif spelling normalized                                        0.36s  
+  ✓ eksklusif with discount                                              0.39s  
+  ✓ eksklusif high tax rate                                              0.39s  
+  ✓ inklusif basic calculation                                           0.40s  
+  ✓ inklusif with discount                                               0.39s  
+  ✓ inklusif ppn included synonym                                        0.38s  
+  ✓ all three types consistent with hitung subtotal                      0.38s  
+  ✓ non ppn option sets zero ppn                                         0.38s  
+  ✓ order request ppn included maps to inklusif                          0.38s  
+  ✓ order request ppn excluded maps to eklusif                           0.38s  
+  ✓ order request none maps to non pajak                                 0.38s  
+  ✓ subtotal consistent after mapping from order request                 0.35s  
+  ✓ rupiah format non negative                                           0.39s  
+  ✓ rupiah formats zero                                                  0.39s  
+
+   PASS  Tests\Feature\PurchaseOrderTotalCalculationTest
+  ✓ calculates total amount correctly with items and biayas              4.32s  
+  ✓ handles decimal values in biaya correctly                            0.82s  
+  ✓ handles missing currency gracefully                                  0.76s  
+  ✓ handles empty data gracefully                                        0.72s  
+  ✓ calculates total with given subtotal and biaya values                0.73s  
+
+   PASS  Tests\Feature\PurchaseOrderWorkflowTest
+  ✓ it completes full purchase order workflow                            0.98s  
+  ✓ it creates PO with single product                                    0.59s  
+  ✓ it creates PO with multiple products                                 0.74s  
+  ✓ it creates PO with multi-currency                                    0.77s  
+  ✓ it creates PO with additional costs                                  0.74s  
+  ✓ it tests PO approval workflow                                        0.69s  
+  ✓ it tests PO status transitions                                       0.77s  
+
+   FAIL  Tests\Feature\PurchaseReceiptFlowTest
+  ✓ complete purchase receipt flow                                       0.69s  
+  ✓ purchase receipt with damaged goods                                  0.62s  
+  ✓ purchase receipt item warehouse selection is active and branch scop… 1.04s  
+  ⨯ purchase receipt over delivery handling                              0.86s  
+  ✓ purchase receipt creates journal entries                             0.83s  
+  ✓ purchase receipt item qc approved creates inventory and closes temp… 0.74s  
+  ✓ end to end purchase order to qc without automatic receipt creation   0.89s  
+
+   PASS  Tests\Feature\PurchaseReceiptInvoiceIdrNormalizationTest
+  ✓ it normalizes purchase receipt invoice amounts to idr when po item…  0.68s  
+
+   PASS  Tests\Feature\PurchaseReceiptInvoiceTaxTest
+  ✓ automatic invoice calculates dpp and ppn per item type (non, inklus… 0.76s  
+
+   PASS  Tests\Feature\PurchaseReceiptStockReconciliationTest
+  ✓ purchase receipt item stock posting recreates missing stock movemen… 1.48s  
+  ✓ purchase receipt reconcile stock command backfills a missing stock…  2.49s  
+
+   PASS  Tests\Feature\PurchaseReceiptViewJournalEntriesTest
+  ✓ purchase receipt view shows related journal entries from receipt an… 2.12s  
+  ✓ purchase receipt view falls back to purchase order item qc when rec… 1.22s  
+
+   PASS  Tests\Feature\PurchaseReportPageTest
+  ✓ purchase report page can be rendered                                 0.95s  
+  ✓ purchase report displays data correctly                              0.98s  
+  ✓ purchase report filters work                                         1.14s  
+
+   PASS  Tests\Feature\PurchaseReturnFeatureTest
+  ✓ can create purchase return with auto generated number                2.20s  
+  ✓ purchase return journal converts usd receipt item amount to idr and… 1.98s  
+  ✓ can submit purchase return for approval                              2.03s  
+  ✓ cannot submit non-draft purchase return                              2.31s  
+  ✓ can approve pending purchase return                                  2.00s  
+  ✓ can reject pending purchase return                                   2.04s  
+  ✓ stock adjustment on approval                                         2.62s  
+  ✓ journal entry creation on approval                                   2.12s  
+  ✓ purchase return auto created for rejected items in receipt           1.90s  
+  ✓ purchase return not created when no rejected items                   1.93s  
+  ✓ submit action shows friendly notification when purchase return subm… 2.31s  
+  ✓ approve action shows friendly notification when purchase return app… 2.48s  
+  ✓ reject action shows friendly notification when purchase return reje… 2.33s  
+  ✓ purchase receipt rejected item sync failure sends friendly warning…  1.75s  
+=== STOCK MOVEMENT ===
+ID: 11
+Type: purchase_in
+Quantity: 5
+Product ID: 725
+Warehouse ID: 306
+From Model: App\Models\QualityControl::7
+
+=== INVENTORY STOCK ===
+ID: 14045
+Product ID: 725
+Warehouse ID: 306
+Qty Available: 5
+Qty Reserved: 0
+
+=== JOURNAL ENTRIES ===
+No journal entries found!
+
+   PASS  Tests\Feature\QCTest
+  ✓ qc purchase complete creates data                                    0.71s  
+
+   FAIL  Tests\Feature\QcBeforeReceiptTest
+  ✓ qc from po item creates receipt and posts journals                   1.04s  
+  ✓ purchase receipt inventory journal uses idr amount for usd po item   0.73s  
+  ✓ qc complete auto receipt posts usd inventory journal in idr          0.65s  
+  ✓ qc purchase money summary displays original currency and idr equiva… 0.76s  
+  ⨯ repair qc receipt currencies command dry runs and applies mismatche… 0.63s  
+  ✓ temporary procurement and return product journals use idr for usd r… 0.65s  
+  ✓ qc from po item copies purchase order biaya to receipt               0.68s  
+  ✓ qc handles rejected quantities correctly                             0.76s  
+  ✓ qc approval updates inventory stock                                  1.68s  
+  ✓ qc rejection prevents inventory update                               2.19s  
+  ✓ qc with missing coa accounts skips journals                          1.29s  
+
+   PASS  Tests\Feature\QualityControlCompleteTest
+  ✓ qc purchase complete auto creates purchase receipt from po item      1.01s  
+  ✓ qc complete with rejected products creates return product            0.93s  
+  ✓ qc inventory posting throws when required coa is missing and create… 1.02s  
+
+   FAIL  Tests\Feature\QualityControlInspectorDefaultTest
+  ✓ quality control purchase create defaults inspector to current user…  1.13s  
+  ✓ quality control purchase warehouse options only show warehouses fro… 0.87s  
+  ⨯ quality control purchase create rejects warehouse from another caba… 1.44s  
+  ⨯ quality control purchase create query preselects one eligible purch… 1.43s  
+  ⨯ quality control purchase create query submits default remaining qua… 1.35s  
+  ⨯ quality control purchase create query returns form errors when quan… 1.15s  
+  ⨯ quality control purchase create query filters multiple eligible ite… 1.33s  
+  ✓ quality control purchase create query does not auto select purchase… 1.25s  
+  ✓ quality control purchase returns no warehouse options when cabang c… 1.41s  
+  ✓ quality control purchase batch action rejects warehouse outside sel… 1.98s  
+  ✓ quality control purchase batch action rejects items from different…  1.68s  
+  ✓ quality control purchase create strictly locks inspector to authent… 1.00s  
+  ⨯ quality control purchase create form validates passed quantity agai… 1.04s  
+  ✓ purchase order item qc action forces current user as inspector for…  1.59s  
+  ✓ purchase order item qc action validates passed quantity against rec… 1.61s  
+  ✓ quality control purchase rejects passed quantity greater than recei… 0.96s  
+  ✓ quality control purchase rejects total inspected greater than recei… 0.93s  
+  ✓ quality control purchase accepts total inspected equal to received…  0.94s  
+  ✓ quality control complete rejects updates that exceed received quant… 0.90s  
+
+   PASS  Tests\Feature\QualityControlManufactureResourceTest
+  ✓ quality control manufacture view page shows from production informa… 0.90s  
+  ✓ quality control manufacture edit page keeps the linked production v… 0.89s  
+  ✓ quality control manufacture create page lists finished productions…  0.86s  
+  ✓ quality control manufacture create defaults inspector to current us… 1.05s  
+  ✓ quality control manufacture create allows super admin to choose ins… 1.11s  
+  ✓ quality control manufacture edit keeps existing inspector for regul… 1.08s  
+
+   FAIL  Tests\Feature\QualityControlMultiItemDisplayTest
+  ⨯ list shows multi item and item level qc with po and supplier         1.02s  
+  ✓ list search and supplier filter find multi item qc                   1.17s  
+  ✓ view page renders multi item qc with po supplier and items           0.73s  
+  ✓ view page still renders item level qc with price summary             0.68s  
+  ✓ resolver and ordered quantity cover all qc shapes                    0.90s  
+
+   PASS  QualityControlPageTest
+  ✓ quality control page loads without errors                            0.74s  
+  ✓ quality control view page loads without errors                       0.88s  
+  ✓ index shows supplier and po and filters exist                        0.71s  
+
+   FAIL  Tests\Feature\QualityControlPartialTest
+  ✓ purchase order item has quality controls morph many                  0.49s  
+  ✓ quality controls returns empty collection when no qc                 0.47s  
+  ✓ quality controls returns all qc records                              0.49s  
+  ✓ morphone still returns first qc                                      0.48s  
+  ✓ remaining qty is full qty when no qc                                 0.52s  
+  ✓ helper remaining qty ignores pending qc until processed              0.64s  
+  ✓ helper remaining qty counts processed qc                             1.10s  
+  ⨯ helper progress summary marks pending partial and completed states   1.20s  
+  ✓ remaining qty decreases after partial qc                             1.22s  
+  ✓ remaining qty is zero after full inspection                          0.80s  
+  ✓ remaining qty sums multiple qc records                               0.72s  
+  ✓ remaining never goes negative                                        0.67s  
+  ✓ can create multiple qc for same po item                              0.71s  
+  ✓ second qc for same item reduces remaining                            0.71s  
+  ✓ item with no qc needs inspection                                     0.82s  
+  ✓ item with partial qc still needs inspection                          0.89s  
+  ✓ item fully inspected does not need qc                                0.92s  
+  ✓ collection filter separates needs qc from fully inspected            0.92s  
+  ✓ batch create clamps passed qty to remaining                          0.98s  
+  ✓ batch create skips fully inspected items                             0.74s  
+
+   FAIL  Tests\Feature\QualityControlWorkflowTest
+  ✓ purchase order stays partially received when qc acceptance is less…  1.03s  
+  ⨯ partially received purchase order still appears in qc create option… 0.96s  
+  ✓ edit pending purchase qc allows existing passed quantity when globa… 1.04s  
+  ✓ edit pending purchase qc still rejects passed quantity above curren… 1.34s  
+  ✓ rejected partial qc keeps purchase order selectable for remaining q… 1.22s  
+  ⨯ rejected partial qc is labelled as qc partial in selector options    1.04s  
+  ✓ completed purchase order is excluded from qc create options          0.95s  
+  ✓ quality control assignment creates pending record                    0.98s  
+  ✓ pending qc passed quantity is not counted until processed            1.01s  
+  ✓ complete qc skips journal when coa missing                           1.30s  
+  ✓ quality control completion creates stock movement and marks process… 1.26s  
+  ✓ quality control rejection creates return and updates quantities      1.25s  
+  ✓ quality control rejection sends notification to supplier             1.08s  
+  ✓ supplier option replace items creates new delivery schedule          1.03s  
+  ✓ supplier option credit note reduces invoice amount and updates ap    0.97s  
+  ✓ supplier option return for refund creates purchase return and rever… 0.99s  
+  ✓ purchase return creation for qc rejection                            1.02s  
+  ✓ stock movement reversal for purchase return                          1.17s  
+
+   FAIL  Tests\Feature\QuotationFeatureTest
+  ✓ quotation resource exposes requested form layout and locked calcula… 0.70s  
+  ⨯ quotation tax type options follow purchase request radio values      0.68s  
+  ✓ quotation item calculated display values follow quantity price disc… 0.68s  
+  ⨯ quotation header currency converts item prices and persists exchang… 0.87s  
+  ✓ can create quotation with customer selection and auto-number genera… 0.68s  
+  ✓ can add product items to quotation with quantity and price           0.84s  
+  ✓ can calculate quotation totals with subtotal discount and tax        0.96s  
+  ✓ can send quotation to customer and change status to sent             1.05s  
+  ✓ can handle customer acceptance and convert to sales order            0.67s  
+  ✓ can handle customer rejection and close quotation                    0.45s  
+  ✓ can auto-close expired quotations                                    0.45s  
+  ✓ quotation service can generate auto-number correctly                 0.45s  
+  ✓ quotation approval workflow works correctly                          0.94s  
+  ✓ quotation item stores tax_type None by default                       0.57s  
+  ✓ quotation item stores tax_type PPN Included when explicitly set      0.47s  
+  ✓ quotation item forces tax to zero when tax type is non tax           0.56s  
+  ✓ QuotationService updateTotalAmount uses PPN Excluded tax_type corre… 0.53s  
+  ✓ QuotationService updateTotalAmount uses PPN Included tax_type corre… 0.48s  
+  ✓ quotation item tax_type persists through update                      0.44s  
+  ✓ quotation form prefers active setting, then product tax, then zero   0.65s  
+  ✓ view quotation renders expandable quotation item infolist            0.73s  
+  ✓ quotation total amount stays formatted as rupiah on live updates an… 0.72s  
+
+   PASS  Tests\Feature\QuotationItemHeaderCurrencyTest
+  ✓ quotation items inherit header currency and store idr anchor         1.64s  
+
+   PASS  Tests\Feature\QuotationLifecyclePhase3Test
+  ✓ it Isu 4: policy — hanya Draft dan Ditolak yang boleh diubah dan di… 1.54s  
+  ✓ it Isu 4: policy — hanya Draft dan Ditolak yang boleh diubah dan di… 1.39s  
+  ✓ it Isu 4: policy — hanya Draft dan Ditolak yang boleh diubah dan di… 0.79s  
+  ✓ it Isu 4: policy — hanya Draft dan Ditolak yang boleh diubah dan di… 0.71s  
+  ✓ it Isu 4: policy — hanya Draft dan Ditolak yang boleh diubah dan di… 0.68s  
+  ✓ it Isu 4: policy — izin peran tetap dibutuhkan walau status masih D… 0.72s  
+  ✓ it Isu 4: policy revise — hanya Approved/Expired yang belum diganti… 0.82s  
+  ✓ it Isu 4: halaman Edit quotation terkunci diarahkan ke halaman Liha… 0.88s  
+  ✓ it Isu 4: halaman Lihat menyembunyikan Ubah/Hapus dan menampilkan B… 0.92s  
+  ✓ it Isu 4: halaman Lihat quotation Draft menampilkan Ubah/Hapus dan…  0.97s  
+  ✓ it Isu 4: tabel — Ubah/Hapus hanya tampil untuk Draft/Ditolak, Buat… 1.05s  
+  ✓ it Isu 4: hapus massal hanya menghapus quotation yang masih dapat d… 1.14s  
+  ✓ it Isu 4: batas kedaluwarsa — valid_until hari ini masih berlaku, k… 0.82s  
+  ✓ it Isu 4: label status Kedaluwarsa dan status lain memakai satu pet… 0.66s  
+  ✓ it Isu 4: scope usable — hanya Approved, belum digantikan, dan belu… 0.84s  
+  ✓ it Isu 4: quotations:expire — dry-run tidak mengubah, tanpa dry-run… 0.85s  
+  ✓ it Isu 4: quotations:expire tidak menyentuh quotation yang sudah di… 1.34s  
+  ✓ it Isu 4: job quotations:expire terdaftar di scheduler harian (rout… 1.22s  
+  ✓ it Isu 4: quotation kedaluwarsa tidak dapat dijadikan SO — tombol,…  1.06s  
+  ✓ it Isu 4: aksi "Buat Sales Order" di tabel tidak tampil untuk quota… 1.15s  
+  ✓ it Isu 4: approve quotation yang sudah lewat masa berlaku ditolak    0.78s  
+  ✓ it Isu 4: API SO — getQuotation dan store menolak quotation kedaluw… 0.75s  
+  ✓ it T1: API quotation — update quotation Approved/Menunggu/Kedaluwar… 0.79s  
+  ✓ it T1: API quotation — update quotation Approved/Menunggu/Kedaluwar… 1.03s  
+  ✓ it T1: API quotation — update quotation Approved/Menunggu/Kedaluwar… 1.13s  
+  ✓ it T1: API quotation — update tanpa izin update quotation ditolak 4… 1.05s  
+  ✓ it T1: API quotation — status "approve"/"reject" dari klien ditolak… 0.84s  
+  ✓ it T1: API quotation — status "approve"/"reject" dari klien ditolak… 0.76s  
+  ✓ it T1: API quotation — store tanpa izin create quotation ditolak 40… 0.74s  
+  ✓ it T1: API quotation — request_approve butuh izin request-approve;…  0.81s  
+  ✓ it T1: API quotation — simpan tanpa status menghasilkan Draft; Dito… 0.93s  
+  ✓ it T1: API sales order — status "approved" dari klien ditolak; upda… 0.90s  
+  ✓ it T1: API sales order — store tanpa izin create sales order ditola… 0.85s  
+  ✓ it Isu 4: revisi menyalin header + item menjadi Draft baru bernomor… 0.87s  
+  ✓ it Isu 4: revisi dari quotation Kedaluwarsa diperbolehkan; dari Dra… 0.92s  
+  ✓ it Isu 4: tidak boleh ada dua revisi terbuka; setelah revisi ditola… 0.99s  
+  ✓ it Isu 4: revisi yang DISETUJUI menggantikan versi lama; versi lama… 1.46s  
+  ✓ it Isu 4: aksi Buat Revisi dari halaman Lihat membuat Draft dan men… 1.78s  
+  ✓ it Isu 4: created_by terisi otomatis dari pengguna login pada jalur… 1.13s  
+  ✓ it Isu 4: created_by yang diberikan eksplisit tidak ditimpa          0.58s  
+  ✓ it Isu 4: backfill created_by — dry-run tidak mengubah; --apply han… 0.55s  
+
+   PASS  Tests\Feature\QuotationProductPriceSyncTest
+  ✓ quotation api auto fills product sell price when unit price is zero  1.28s  
+  ✓ customer return stock movement is idempotent and prevents duplicate… 0.60s  
+  ✓ stock adjustment approval fails with validation exception if produc… 0.74s  
+
+   PASS  Tests\Feature\QuotationToSaleOrderPhase1Test
+  ✓ it Isu 1: pemetaan menyalin tempo, mata uang, kurs, alamat, dan cat… 0.66s  
+  ✓ it Isu 1: tempo 0 (tunai) pada quotation TIDAK dianggap kosong       0.67s  
+  ✓ it Isu 1: tempo kosong jatuh ke tempo customer, lalu ke default 30   0.58s  
+  ✓ it Isu 1: mata uang NULL pada quotation lama jatuh ke IDR, bukan ko… 0.56s  
+  ✓ it Isu 1: alamat kirim = alamat quotation, lalu alamat customer, la… 0.59s  
+  ✓ it Isu 1: API getQuotation memakai pemetaan yang sama                0.84s  
+  ✓ it Isu 1: API store menyimpan catatan dan menghormati tempo 0 ekspl… 1.44s  
+  ✓ it Isu 1: API store tanpa tempo memakai tempo quotation dan menyimp… 1.44s  
+  ✓ it Isu 1: API show untuk SO lama tanpa mata uang/tempo tidak mengem… 1.18s  
+  ✓ it Isu 1: API update tidak menghapus catatan bila klien tidak mengi… 1.08s  
+  ✓ it Isu 2: format angka preview memakai 2 desimal dan bukan mask (co… 0.70s  
+  ✓ it Isu 2: state awal modal di halaman View menampilkan PPN 18.155,8… 1.21s  
+  ✓ it Isu 2: state awal modal aksi tabel sama persis dengan halaman Vi… 1.32s  
+  ✓ it Isu 1: SO dari halaman View — tempo, mata uang, alamat, catatan…  1.52s  
+  ✓ it Isu 1: SO dari aksi tabel — data identik dengan halaman View; st… 1.65s  
+  ✓ it Isu 1: SO dari aksi tabel langsung Approved bila flag config sal… 1.64s  
+  ✓ it Isu 1: alamat kirim wajib diisi di modal (tidak boleh kosong / p… 1.61s  
+  ✓ it Backfill: dry-run tidak mengubah apa pun; --apply hanya mengisi…  0.95s  
+  ✓ it Isu 1: handler bersama menyalin item dari quotation bila data re… 0.96s  
+  ✓ it Isu 1: pembuatan SO atomik — bila item gagal, SO tidak tersisa s… 0.95s  
+
+   FAIL  Tests\Feature\RekonsiliasiBankPageFrontendTest
+  ⨯ RekonsiliasiBankPage Frontend Tests → it renders the rekonsiliasi p… 0.88s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays filter section wi… 0.87s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays COA select dropdo… 0.87s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays date inputs with…  0.75s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays toggle button for… 0.67s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it updates toggle button text… 0.66s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays table headers cor… 0.66s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays empty state when…  0.66s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays journal entries i… 0.73s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays checkbox for each… 0.70s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it shows checked checkbox for… 0.70s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it applies red highlight clas… 0.73s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it applies green highlight cl… 0.69s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays status badges cor… 0.72s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it formats debit amount with…  0.73s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it formats credit amount with… 0.69s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it formats date in dd/mm/yyyy… 0.70s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it hides confirmed entries wh… 0.68s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it shows all entries when sho… 0.72s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays modern gradient s… 0.69s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it displays table with proper… 0.70s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it shows proper empty icon an… 0.70s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it updates entries when date…  0.70s  
+  ⨯ RekonsiliasiBankPage Frontend Tests → it includes responsive stylin… 0.70s  
+
+   FAIL  Tests\Feature\RekonsiliasiBankPageTest
+  ⨯ RekonsiliasiBankPage Backend Tests → it can mount the page with def… 0.67s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it loads COA options for bank…  0.73s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it loads journal entries when…  0.80s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it filters out confirmed entri… 0.88s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it can toggle confirmation sta… 0.69s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it can toggle confirmation sta… 0.59s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it toggles showConfirmed state… 0.45s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it auto loads entries when sel… 0.45s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it auto loads entries when dat… 0.46s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it returns empty array when no… 0.87s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it includes both debit and cre… 0.47s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it sends success notification…  0.52s  
+  ⨯ RekonsiliasiBankPage Backend Tests → it orders entries by date desc… 0.68s  
+
+   PASS  Tests\Feature\ReportNavigationGroupingTest
+  ✓ finance report hub page is configured as the parent menu             0.55s  
+  ✓ finance report navigation items are nested under the finance hub     0.48s  
+  ✓ detailed finance reports are hidden from sidebar and only exposed t… 0.54s  
+  ✓ legacy duplicate report navigation entries are hidden from sidebar   0.53s  
+
+   PASS  Tests\Feature\ResourceSortingTest
+  ✓ sale orders sort newest first                                        0.73s  
+  ✓ purchase orders sort newest first                                    1.17s  
+  ✓ order requests sort newest first                                     1.21s  
+  ✓ deposits sort newest first                                           1.95s  
+  ✓ delivery orders sort newest first                                    1.52s  
+  ✓ purchase receipts sort newest first                                  0.94s  
+  ✓ quotations sort newest first                                         0.69s  
+  ✓ journal entries sort newest first                                    0.77s  
+  ✓ payment requests sort newest first                                   0.72s  
+  ✓ voucher requests sort newest first                                   0.71s  
+  ✓ stock adjustments sort newest first                                  0.74s  
+  ✓ stock transfers sort newest first                                    0.73s  
+  ✓ manufacturing orders sort newest first                               0.78s  
+  ✓ surat jalans sort newest first                                       0.71s  
+  ✓ vendor payments sort newest first                                    0.74s  
+  ✓ warehouse confirmations sort newest first                            0.74s  
+  ✓ invoices sort by invoice date newest first                           0.73s  
+  ✓ stock movements sort by date newest first                            0.75s  
+  ✓ inventory stocks sort by updated at newest first                     0.77s  
+  ✓ identical created at timestamps fall back to id desc                 0.70s  
+  ✓ identical invoice dates fall back to id desc                         0.71s  
+  ✓ identical stock movement dates fall back to id desc                  0.78s  
+  ✓ newest sale order appears on first page                              0.76s  
+  ✓ oldest sale order does not appear on first page                      0.74s  
+
+   PASS  Tests\Feature\RoleViewPageTest
+  ✓ role view page shows permission list and descriptions                1.21s  
+
+   PASS  Tests\Feature\SaleOrderCurrencyLifecycleTest
+  ✓ saleorder amount not converted on currency switch                    0.89s  
+  ✓ completed sale order invoice and journal use item currency idr amou… 1.03s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseReceiptFlowTest >…  InvalidArgumentException   
+  Quantity Received (12) tidak boleh melebihi sisa PO (10).
+
+  at app/Support/OrderRequestQuantityLock.php:228
+    224▕             : 'sisa PO';
+    225▕ 
+    226▕         $epsilon = 0.0001;
+    227▕         if (($qtyReceived - $limit['remaining_received']) > $epsilon) {
+  ➜ 228▕             throw new \InvalidArgumentException("Quantity Received ({$qtyReceived}) tidak boleh melebihi {$label} ({$limit['remaining_received']}).");
+    229▕         }
+    230▕ 
+    231▕         if (($qtyAccepted - $limit['remaining_accepted']) > $epsilon) {
+    232▕             throw new \InvalidArgumentException("Quantity Accepted ({$qtyAccepted}) tidak boleh melebihi {$label} ({$limit['remaining_accepted']}).");
+
+  1   app/Support/OrderRequestQuantityLock.php:228
+  2   app/Observers/PurchaseReceiptItemObserver.php:63
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QcBeforeReceiptTest > rep…  InvalidArgumentException   
+  Quantity Received (1) tidak boleh melebihi sisa PO (0).
+
+  at app/Support/OrderRequestQuantityLock.php:228
+    224▕             : 'sisa PO';
+    225▕ 
+    226▕         $epsilon = 0.0001;
+    227▕         if (($qtyReceived - $limit['remaining_received']) > $epsilon) {
+  ➜ 228▕             throw new \InvalidArgumentException("Quantity Received ({$qtyReceived}) tidak boleh melebihi {$label} ({$limit['remaining_received']}).");
+    229▕         }
+    230▕ 
+    231▕         if (($qtyAccepted - $limit['remaining_accepted']) > $epsilon) {
+    232▕             throw new \InvalidArgumentException("Quantity Accepted ({$qtyAccepted}) tidak boleh melebihi {$label} ({$limit['remaining_accepted']}).");
+
+  1   app/Support/OrderRequestQuantityLock.php:228
+  2   app/Observers/PurchaseReceiptItemObserver.php:63
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlInspectorDefaultTest > quality contro…   
+  Component has no errors.
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:40
+     36▕     public function assertHasErrors($keys = [])
+     37▕     {
+     38▕         $errors = $this->errors();
+     39▕ 
+  ➜  40▕         PHPUnit::assertTrue($errors->isNotEmpty(), 'Component has no errors.');
+     41▕ 
+     42▕         $keys = (array) $keys;
+     43▕ 
+     44▕         foreach ($keys as $key => $value) {
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/QualityControlInspectorDefaultTest.php:228
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlInspectorDefaultTest > quality contro…   
+  Failed asserting that null matches expected 46.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/QualityControlInspectorDefaultTest.php:237
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlInspectorDefaultTest > quality contro…   
+  Failed asserting that two strings are identical.
+  -'App\Models\PurchaseOrderItem'
+  +'App\Models\PurchaseOrder'
+  
+
+  at tests/Feature/QualityControlInspectorDefaultTest.php:266
+    262▕         ->assertHasNoFormErrors();
+    263▕ 
+    264▕     $qualityControl = QualityControl::where('qc_number', 'QC-P-QUERY-PREFILL-001')->firstOrFail();
+    265▕ 
+  ➜ 266▕     expect($qualityControl->from_model_type)->toBe(PurchaseOrderItem::class)
+    267▕         ->and($qualityControl->from_model_id)->toBe($context['purchaseOrderItem']->id)
+    268▕         ->and((float) $qualityControl->quantity_received)->toBe(10.0)
+    269▕         ->and((float) $qualityControl->passed_quantity)->toBe(10.0)
+    270▕         ->and((float) $qualityControl->rejected_quantity)->toBe(0.0);
+
+  1   tests/Feature/QualityControlInspectorDefaultTest.php:266
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlInspectorDefaultTest > quality contro…   
+  Component has no errors.
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:40
+     36▕     public function assertHasErrors($keys = [])
+     37▕     {
+     38▕         $errors = $this->errors();
+     39▕ 
+  ➜  40▕         PHPUnit::assertTrue($errors->isNotEmpty(), 'Component has no errors.');
+     41▕ 
+     42▕         $keys = (array) $keys;
+     43▕ 
+     44▕         foreach ($keys as $key => $value) {
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/QualityControlInspectorDefaultTest.php:287
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlInspectorDefaultTest > quality contro…   
+  Failed asserting that null matches expected 49.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/QualityControlInspectorDefaultTest.php:319
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlInspectorDefaultTest > quality contro…   
+  Failed asserting that 0.0 is identical to 1000.0.
+
+  at tests/Feature/QualityControlInspectorDefaultTest.php:465
+    461▕         ->assertHasNoFormErrors();
+    462▕ 
+    463▕     // Expect that the passed_quantity was auto-corrected to 1000 (which is the quantity_received)
+    464▕     expect((float) QualityControl::where('qc_number', 'QC-P-RECEIVED-LOCK-001')->value('passed_quantity'))
+  ➜ 465▕         ->toBe(1000.0);
+    466▕ });
+    467▕ 
+    468▕ test('purchase order item qc action forces current user as inspector for regular user', function () {
+    469▕     $context = createQualityControlPurchaseContext();
+
+  1   tests/Feature/QualityControlInspectorDefaultTest.php:465
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlMultiItemDisplayTest > list shows mul…   
+  Failed asserting that a table column with name [product.name] has value of [Multi-item (2 produk)] for record [51] on the [App\Filament\Resources\QualityControlPurchaseResource\Pages\ListQualityControlPurchases] component.
+Failed asserting that two strings are equal.
+  -'Multi-item (2 produk)'
+  +'Multi-item (2 produk): Produk iste, Produk vero'
+  
+
+  at vendor/filament/tables/src/Testing/TestsColumns.php:193
+    189▕             if (is_array($value)) {
+    190▕                 $value = json_encode($value);
+    191▕             }
+    192▕ 
+  ➜ 193▕             Assert::assertEquals(
+    194▕                 $value,
+    195▕                 $state,
+    196▕                 message: "Failed asserting that a table column with name [{$name}] has value of [{$value}] for record [{$record->getKey()}] on the [{$livewireClass}] component.",
+    197▕             );
+
+      [2m+3 vendor frames [22m
+  4   tests/Feature/QualityControlMultiItemDisplayTest.php:149
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlPartialTest > helper progress summary…   
+  Failed asserting that two strings are identical.
+  -'QC Pending'
+  +'Belum ada QC'
+  
+
+  at tests/Feature/QualityControlPartialTest.php:181
+    177▕ 
+    178▕         $pendingSummary = QualityControlPurchaseResource::purchaseOrderItemQcProgressSummary($poItemPending->fresh());
+    179▕         $pendingLabel = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+    180▕ 
+  ➜ 181▕         $this->assertSame('QC Pending', $pendingSummary['status_label']);
+    182▕         $this->assertSame(0, $pendingSummary['processed_count']);
+    183▕         $this->assertSame(1, $pendingSummary['pending_count']);
+    184▕         $this->assertSame(20.0, (float) $pendingSummary['remaining']);
+    185▕
+
+  1   tests/Feature/QualityControlPartialTest.php:181
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlWorkflowTest > partially received pur…   
+  Expected: PO: PO-QC-PARTIAL-SELECT-001 | PJ Nugroho (Persero) Tbk | Gudang: Gudang unde | Status QC: Belum ada QC
+
+  To contain: Status QC: QC Partial
+
+  at tests/Feature/QualityControlWorkflowTest.php:260
+    256▕         $this->assertSame('partially_received', $purchaseOrder->status);
+    257▕ 
+    258▕         $options = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+    259▕         $this->assertArrayHasKey($purchaseOrder->id, $options);
+  ➜ 260▕         $this->assertStringContainsString('Status QC: QC Partial', $options[$purchaseOrder->id]);
+    261▕ 
+    262▕         $remaining = QualityControlPurchaseResource::purchaseOrderItemQcRemaining($purchaseOrderItem->fresh());
+    263▕         $this->assertSame(500.0, (float) $remaining['remaining']);
+    264▕     }
+
+  1   tests/Feature/QualityControlWorkflowTest.php:260
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QualityControlWorkflowTest > rejected partial qc is…   
+  Expected: PO: PO-QC-REJECT-LABEL-001 | PT Hardiansyah Tbk | Gudang: Gudang est | Status QC: Belum ada QC
+
+  To contain: Status QC: QC Partial
+
+  at tests/Feature/QualityControlWorkflowTest.php:507
+    503▕ 
+    504▕         $options = QualityControlPurchaseResource::getQcPurchasePurchaseOrderOptions();
+    505▕ 
+    506▕         $this->assertArrayHasKey($purchaseOrder->id, $options);
+  ➜ 507▕         $this->assertStringContainsString('Status QC: QC Partial', $options[$purchaseOrder->id]);
+    508▕     }
+    509▕ 
+    510▕     public function test_completed_purchase_order_is_excluded_from_qc_create_options(): void
+    511▕     {
+
+  1   tests/Feature/QualityControlWorkflowTest.php:507
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QuotationFeatureTest > quotation tax type options f…   
+  Failed asserting that two arrays are identical.
+   Array &0 [
+       'none' => 'Non Pajak',
+       'inklusif' => 'Inklusif',
+  -    'eklusif' => 'Eklusif',
+  +    'eklusif' => 'Eksklusif',
+   ]
+  
+
+  at tests/Feature/QuotationFeatureTest.php:114
+    110▕     expect(strpos($resource, "TextInput::make('tax_nominal')"))->toBeLessThan(strpos($resource, "TextInput::make('subtotal')"));
+    111▕ });
+    112▕ 
+    113▕ test('quotation tax type options follow purchase request radio values', function () {
+  ➜ 114▕     expect(TaxTypeHelper::options())->toBe([
+    115▕         'none' => 'Non Pajak',
+    116▕         'inklusif' => 'Inklusif',
+    117▕         'eklusif' => 'Eklusif',
+    118▕     ]);
+
+  1   tests/Feature/QuotationFeatureTest.php:114
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\QuotationFeatureTest > quotation header currency co…   
+  Failed asserting that 160000.0 matches expected '160.000,00'.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/QuotationFeatureTest.php:196
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:62
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:71
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:77
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:83
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:89
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:95
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:102
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:114
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:120
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:131
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:140
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:148
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:156
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:164
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:173
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:181
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:189
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:197
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:214
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:224
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:229
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:235
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:241
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageFro…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageFrontendTest.php:254
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:67
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:75
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:88
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:101
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:116
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:129
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:142
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:151
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:161
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:183
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:199
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\RekonsiliasiBankPageTes…  ComponentNotFoundException   
+  Unable to find component: [App\Filament\Pages\RekonsiliasiBankPage]
+
+  at vendor/livewire/livewire/src/Mechanisms/ComponentRegistry.php:116
+    112▕         }
+    113▕ 
+    114▕         // Now that we have a class, we can check that it's actually a Livewire component...
+    115▕         if (! is_subclass_of($class, Component::class)) {
+  ➜ 116▕             throw new ComponentNotFoundException(
+    117▕                 "Unable to find component: [{$nameOrClass}]"
+    118▕             );
+    119▕         }
+    120▕
+
+      [2m+6 vendor frames [22m
+  7   storage/framework/views/c256cb1e9aecddcdd80213b138d03120.php:11
+      [2m+36 vendor frames [22m
+  44  tests/Feature/RekonsiliasiBankPageTest.php:219
+
+
+  Tests:    51 failed, 250 passed (1254 assertions)
+  Duration: 285.77s
+

@@ -1,0 +1,82 @@
+{
+  "alur": 3,
+  "title": "Penjualan & Logistik Keluar",
+  "timestamp": "2026-09-29T15:32:10.969Z",
+  "total": 12,
+  "passed": 11,
+  "failed": 1,
+  "results": [
+    {
+      "id": "NEG-3.1",
+      "status": "PASS",
+      "desc": "Quotation form create tidak bisa diakses / tidak ada tombol simpan (role Sales mungkin terbatas)",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.2",
+      "status": "PASS",
+      "desc": "Edit Quotation request_approve diblokir — redirect / 403 / notifikasi",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.3",
+      "status": "FAIL",
+      "desc": "Role Sales tidak bisa approve",
+      "detail": "Tombol Approve tampil dan aktif untuk role Sales — guard gagal!"
+    },
+    {
+      "id": "NEG-3.4",
+      "status": "PASS",
+      "desc": "Buat SO dari Quotation non-approved diblokir — tombol tidak muncul",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.5",
+      "status": "PASS",
+      "desc": "SO dari Quotation expired diblokir — tombol tidak muncul",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.6",
+      "status": "PASS",
+      "desc": "Double SO guard — SO resource loaded, tidak ada tombol buat SO duplicate",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.7",
+      "status": "PASS",
+      "desc": "Surat Jalan form diakses — SO field tidak ditemukan, perlu manual inspection",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.8",
+      "status": "PASS",
+      "desc": "Sales Invoice dari SO draft diblokir — tombol Buat Invoice tidak muncul",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.9",
+      "status": "PASS",
+      "desc": "Customer Receipt — tidak ada tombol simpan yang visible, form terlindungi",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.10",
+      "status": "PASS",
+      "desc": "Customer Receipt form — tidak ada tombol simpan visible (role restriction active)",
+      "detail": ""
+    },
+    {
+      "id": "NEG-3.11",
+      "status": "PASS",
+      "desc": "Role Isolation Delivery Driver — tidak bisa akses Quotation & Sale Order",
+      "detail": ""
+    },
+    {
+      "id": "EDG-3.12",
+      "status": "PASS",
+      "desc": "Integritas AR Journal — Invoice FIN-INV-AR-002 balanced: Debit=Credit=214,784,000, AR remaining=66,984,000 (paid=60jt)",
+      "detail": ""
+    }
+  ]
+}

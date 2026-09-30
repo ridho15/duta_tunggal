@@ -1,0 +1,300 @@
+AssetPurchaseWorkflowTest :: Asset purchase flow with pre set signature
+DeliveryOrderJournalIntegrationTest :: Starting delivery schedule for direct linked delivery order releases reservations and creates journals on completion
+QualityControlWorkflowTest :: Journal posting is skipped when coa accounts are missing
+Tests\Feature\AccountPayableFilamentFlowTest :: Account payable remaining field calculates correctly when paid is updated
+Tests\Feature\AccountPayableFilamentFlowTest :: Complete purchase invoice to vendor payment flow with form simulation
+Tests\Feature\BalanceSheetConsistencyTest :: balance sheet remains balanced after multiple purchase and sales transactions
+Tests\Feature\BillOfMaterialResourceReactivePriceTest :: bom item price refreshes when material changes
+Tests\Feature\BranchInheritanceFlowTest :: purchase invoice inherits cabang from selected purchase order source
+Tests\Feature\CompleteDeliveryOrderFlowTest :: Complete delivery order flow with journal entries and stock movements
+Tests\Feature\Controls\AccountingSettingsTest :: it pemindai: tidak ada kode akun hard-code pada berkas alur penjualan (semua lewat AccountingSettings)
+Tests\Feature\CurrencyFlowTraceTest :: trace $1255.5 USD sale order through delivery, invoice and payment to financial reports
+Tests\Feature\CustomerSupplierTest :: it can update customer credit limit
+Tests\Feature\DataMasterCrudTest :: `Data Master Factory Tests` → it can create customer via factory
+Tests\Feature\DeliveryOrderFeatureTest :: It manages stock correctly through delivery order lifecycle
+Tests\Feature\DeliveryOrderFeatureTest :: It updates stock on delivery
+Tests\Feature\DeliveryScheduleInventoryFixTest :: No duplicate stock movement on completed
+Tests\Feature\DeliveryScheduleInventoryFixTest :: Qty available decreases after stock movement created
+Tests\Feature\DeliveryScheduleInventoryFixTest :: Stock movement created when do sent
+Tests\Feature\FinanceSeederBalanceAuditTest :: finance seeder produces a balanced balance sheet
+Tests\Feature\IncomeStatementServiceTest :: service detects missing expense accounts
+Tests\Feature\IndonesianMoneyValidationTest :: `Manual money inputs without live calculations stay on blur` → it updates app/Filament/Resources/PurchaseInvoiceResource.php total money input on blur
+Tests\Feature\IndonesianMoneyValidationTest :: `OrderRequestResource price field validation` → it updates manual override price fields with debounce to keep live calculations stable
+Tests\Feature\InventoryFlowTest :: it covers the inventory management flow through finance posting
+Tests\Feature\InventoryFlowTest :: it edits inventory stock through Filament
+Tests\Feature\InventoryFlowTest :: it initializes inventory stock through Filament
+Tests\Feature\Inventory\Adversarial\InventoryThreeWayReconciliationTest :: INV-RC-01: rekonsiliasi tiga arah stok fisik, pergerakan stock movement, dan mutasi transfer/adjustment
+Tests\Feature\Inventory\Adversarial\StockOpnameDiscrepancyAndJournalTest :: OPN-GL-01: surplus fisik menerbitkan jurnal Dr Persediaan dan Cr Penyesuaian Persediaan secara seimbang
+Tests\Feature\Inventory\Adversarial\StockOpnameDiscrepancyAndJournalTest :: OPN-GL-02: defisit fisik (shrinkage) menerbitkan jurnal Dr Penyesuaian Persediaan dan Cr Persediaan secara seimbang
+Tests\Feature\Inventory\Adversarial\StockTransferSameWarehouseAndRollbackTest :: TRF-BV-02: menolak transfer jika kuantitas non-positif atau spesifikasi rak tidak lengkap
+Tests\Feature\Inventory\Adversarial\StockTransferStateAndSourceStockTest :: TRF-ST-01: requestTransfer hanya menerima transfer berstatus Draft dan mengubah ke Request
+Tests\Feature\Inventory\Adversarial\StockTransferStateAndSourceStockTest :: TRF-ST-02: approveStockTransfer menolak transfer yang bukan berstatus Request
+Tests\Feature\InvoiceLineBreakdownPhase5BTest :: it Isu 10: SO inklusif pada jalur Delivery Order tidak lagi ditambah PPN kedua kali
+Tests\Feature\InvoiceLineBreakdownPhase5BTest :: it Isu 10: invoice dari jalur Delivery Order — price GROSS (dulu NET), rincian identik dengan jalur Sales Order
+Tests\Feature\InvoiceLineBreakdownPhase5BTest :: it Isu 10: invoice per DO untuk pengiriman sebagian — baris memakai kuantitas DO dengan rincian yang sama
+Tests\Feature\JournalEntryTest :: journal entries can be filtered by date range
+Tests\Feature\JournalEntryTest :: journal entries can be filtered by journal type
+Tests\Feature\LargePurchaseFlowDemoSeederTest :: large purchase item UX keeps repeaters safe and relation manager review paginated
+Tests\Feature\LargePurchaseFlowDemoSeederTest :: order request index uses limited summaries for large item records
+Tests\Feature\ManufacturingFlowTest :: it runs the manufacturing to finance flow and balances ledgers and stock
+Tests\Feature\ManufacturingJournalLateIssueTest :: qc completion uses refreshed wip when material issue completes after production creation
+Tests\Feature\MaterialIssueAutoJournalTest :: auto journal generates once for material issue completion (idempotent)
+Tests\Feature\MaterialIssueViewPageTest :: material issue view shows selected warehouse product requirement and stock availability
+Tests\Feature\MaterialIssueWorkflowTest :: confirmed manufacturing warehouse confirmation consumes stock and resolves stock movement source
+Tests\Feature\MaterialIssueWorkflowTest :: material issue stock metrics include own reservation in effective stock
+Tests\Feature\OrderRequestFrontendLogicTest :: order request fillable attributes
+Tests\Feature\OrderRequestQuantityLockTest :: Creating multiple partial pos via filament action works
+Tests\Feature\OrderRequestQuantityLockTest :: Creating multiple partial pos with receiving and status changes works
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the list table action and creates a single purchase order
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the list table action and creates grouped purchase orders
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the list table action without creating purchase order
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the view page action and auto-generates a purchase order number
+Tests\Feature\OrderRequestResourceTest :: it approves an order request from the view page action and updates status
+Tests\Feature\OrderRequestResourceTest :: it approves from the view action without automatic purchase order when item decisions are provided
+Tests\Feature\OrderRequestResourceTest :: it approves from the view action without purchase order when approved item is not included
+Tests\Feature\OrderRequestResourceTest :: it blocks approval from the view action when any item is still draft
+Tests\Feature\OrderRequestResourceTest :: it does not remove an inline order request item that is already referenced by purchase order
+Tests\Feature\OrderRequestResourceTest :: it loads item approval decisions from current item status in the approve modal
+Tests\Feature\OrderRequestResourceTest :: it loads item approval decisions from current item status in the create purchase order modal
+Tests\Feature\OrderRequestResourceTest :: it order request create PO modals expose cabang and localized date labels
+Tests\Feature\OrderRequestResourceTest :: it persists and shows granular plastic USD values without rounding to whole dollars
+Tests\Feature\OrderRequestResourceTest :: it rejects an order request from the view action when all items are rejected
+Tests\Feature\OrderRequestResourceTest :: it shows create purchase order action when an approved item has remaining quantity
+Tests\Feature\OrderRequestResourceTest :: it shows decimal unit price on the Filament view page
+Tests\Feature\OrderRequestResourceTest :: it shows localized item validation messages and opens the first invalid inline item
+Tests\Feature\OrderRequestResourceTest :: it views order request details on the Filament view page
+Tests\Feature\OrderRequestServiceTest :: approval rejects partial decision while any item remains draft
+Tests\Feature\OrderRequestServiceTest :: approval without approved item keeps header from becoming approved
+Tests\Feature\OrderRequestServiceTest :: approval without selected item decisions is rejected
+Tests\Feature\OrderRequestServiceTest :: createPurchaseOrder with selected_items only converts approved order request items
+Tests\Feature\OrderRequestServiceTest :: createPurchaseOrder without selected_items only converts approved order request items
+Tests\Feature\PaymentLedgerPostingTest :: Import purchase invoice does not post ppn masukan
+Tests\Feature\PaymentRequestVendorPaymentFlowTest :: Payment request total amount is formatted as rupiah in the create form
+Tests\Feature\PermissionRoleBranchTaxAuditTest :: Sale Order total reflects inherited Inclusive tax correctly
+Tests\Feature\PermissionRoleBranchTaxAuditTest :: SaleOrderItem tipe_pajak can be set to Inclusive
+Tests\Feature\PermissionRoleBranchTaxAuditTest :: SaleOrderItem tipe_pajak column defaults to None
+Tests\Feature\ProcurementAuditTest :: Delivery order generation from purchase
+Tests\Feature\ProcurementAuditTest :: End to end procurement workflow
+Tests\Feature\ProductAccountUiTest :: `Product account mapping form defaults` → it applies default coa values and persists manual overrides through the create form
+Tests\Feature\ProductCrudUiTest :: it edits a product through the Filament edit page
+Tests\Feature\PurchaseInvoiceResourceTest :: Mark as sent action shows friendly notification when update fails
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice form does not render duplicate source amount fields
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice live preview uses service totals without money mask distortion
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice manual money fields update on blur to keep mask stable
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase invoice total recalculation uses full formatted money values
+Tests\Feature\PurchaseInvoiceResourceTest :: Purchase receipt checkbox labels use rupiah format
+Tests\Feature\PurchaseOrderFrontendTest :: purchase order form uses collapsed product item repeater and disabled field styling
+Tests\Feature\PurchaseOrderFrontendTest :: purchase order list shows cabang from order request item and omits warehouse column
+Tests\Feature\PurchaseOrderFrontendTest :: purchase order resource no longer exposes cabang item or warehouse list labels
+Tests\Feature\PurchaseOrderLivewireTest :: existing order request backed purchase order item can be saved again at allocated quantity
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval auto approves purchase order when it consumes remaining quantity after draft allocation
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval auto approves purchase order when item quantity consumes full order request quantity
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval keeps multi item purchase order draft when one item is partial
+Tests\Feature\PurchaseOrderLivewireTest :: order request approval keeps purchase order draft when item quantity is partial
+Tests\Feature\PurchaseOrderLivewireTest :: order request backed purchase order item over allocation shows visible validation feedback
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order can be created through livewire create page
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order create form preserves inclusive tax type from order request item even when disabled state is wrong
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order edit and view pages show supplier code and name
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order subtotal and total amount stay formatted after reactive updates and hydration
+Tests\Feature\PurchaseOrderLivewireTest :: purchase order total amount includes formatted other fee values correctly
+Tests\Feature\PurchaseOrderMixedCurrencyTest :: Purchase order pdf separates expected date from top due date and respects item currency
+Tests\Feature\PurchaseReceiptFlowTest :: Purchase receipt over delivery handling
+Tests\Feature\QcBeforeReceiptTest :: Repair qc receipt currencies command dry runs and applies mismatches
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create form validates passed quantity against received quantity via auto-correction
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query filters multiple eligible items to selected purchase order
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query preselects one eligible purchase order item and fills remaining quantity
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query returns form errors when quantity exceeds remaining purchase order item quantity
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create query submits default remaining quantity successfully
+Tests\Feature\QualityControlInspectorDefaultTest :: quality control purchase create rejects warehouse from another cabang
+Tests\Feature\QualityControlMultiItemDisplayTest :: List shows multi item and item level qc with po and supplier
+Tests\Feature\QualityControlPartialTest :: Helper progress summary marks pending partial and completed states
+Tests\Feature\QualityControlWorkflowTest :: Partially received purchase order still appears in qc create options
+Tests\Feature\QualityControlWorkflowTest :: Rejected partial qc is labelled as qc partial in selector options
+Tests\Feature\QuotationFeatureTest :: quotation header currency converts item prices and persists exchange rate
+Tests\Feature\QuotationFeatureTest :: quotation tax type options follow purchase request radio values
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it applies green highlight class for confirmed entries
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it applies red highlight class for unconfirmed entries
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays COA select dropdown
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays checkbox for each entry
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays date inputs with wire:model.live
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays empty state when no COA selected
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays filter section with proper styling
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays journal entries in table when COA selected
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays modern gradient styling on filters
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays status badges correctly
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays table headers correctly
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays table with proper container styling
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it displays toggle button for show/hide confirmed
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it formats credit amount with thousand separator
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it formats date in dd/mm/yyyy format
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it formats debit amount with thousand separator
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it hides confirmed entries when showConfirmed is false
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it includes responsive styling for mobile
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it renders the rekonsiliasi page correctly
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it shows all entries when showConfirmed is true
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it shows checked checkbox for confirmed entries
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it shows proper empty icon and text
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it updates entries when date range changes
+Tests\Feature\RekonsiliasiBankPageFrontendTest :: `RekonsiliasiBankPage Frontend Tests` → it updates toggle button text when clicked
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it auto loads entries when date range changes
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it auto loads entries when selectedCoaId changes
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it can mount the page with default values
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it can toggle confirmation status from confirmed to unconfirmed
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it can toggle confirmation status from unconfirmed to confirmed
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it filters out confirmed entries when showConfirmed is false
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it includes both debit and credit entries
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it loads COA options for bank and cash accounts
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it loads journal entries when COA is selected
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it orders entries by date descending
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it returns empty array when no COA is selected
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it sends success notification when toggling confirmation
+Tests\Feature\RekonsiliasiBankPageTest :: `RekonsiliasiBankPage Backend Tests` → it toggles showConfirmed state correctly
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 3: DO dihapus mengembalikan progres dan status SO
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 3: DO tanpa pivot ke SO tidak mengubah status SO (perilaku lama), namun cache terisi
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 3: contoh UAT — 12 dari 20 pcs terkirim => terkirim 12, sisa 8, status "Dikirim Sebagian" (bukan completed)
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 3: pengiriman gagal mengembalikan terkirim ke 0 dan status SO mundur ke approved
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 3: ringkasan di halaman SO memperlihatkan Terkirim, Dalam Proses DO, dan status Dikirim Sebagian
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 3: status berubah ke completed hanya setelah SEMUA kuantitas terkirim
+Tests\Feature\SaleOrderDeliveryProgressPhase2Test :: it Isu 5: halaman Create DO menerima SO Dikirim Sebagian untuk sisanya, dan menolak melebihi sisa
+Tests\Feature\SalesFlowEndToEndFase1to6Test :: it Alur lengkap fase 1-6: Quotation → SO → 2 pengiriman → 2 invoice → penerimaan (kelebihan→deposit) → laporan, semua angka konsisten
+Tests\Feature\SalesInvoiceFormHintsTest :: it bila customer belum punya SO Selesai, teks bantu menyatakannya secara eksplisit
+Tests\Feature\SalesInvoiceFormHintsTest :: it pilihan SO menjelaskan bahwa hanya SO Selesai yang muncul dan invoice bertahap terbit otomatis per DO
+Tests\Feature\SalesOrderToDeliveryOrderCompleteTest :: Complete flow from sales order to delivery order complete with stock movements
+Tests\Feature\SalesReportPageTest :: Sales report filters work
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: HPP laporan tidak berubah walau cost_price master berubah kemudian
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: PDF laporan invoice memuat kolom baru, ringkasan HPP/margin, rekonsiliasi, dan catatan estimasi
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: backfill memakai nilai stok DO untuk invoice multi-baris dan tidak menyentuh kolom lain
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: baris laporan invoice memuat DPP, PPN, total, HPP, margin, margin %, SO, DO, customer, cabang
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: default laporan = Invoice; tanggal mengikuti invoice_date (bukan created_at); draft tidak dihitung
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: ekspor Excel mode invoice — kolom sesuai rencana, satu baris per baris invoice, TOTAL = ringkasan
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: ekspor Excel mode pengiriman dan pesanan tetap dapat dibuat dan memakai kolomnya sendiri
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: halaman laporan — default Invoice, menampilkan HPP/margin/pembayaran, dan ringkasan periode
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: invoice lama tanpa snapshot dihitung ESTIMASI dan ditandai; selisih terhadap jurnal terlihat lalu hilang setelah backfill
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: mode Pengiriman di halaman menampilkan DO, HPP stok, dan margin
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: mode Pesanan memakai order_date; mode Pengiriman memakai delivery_date dan hanya DO yang sudah keluar gudang
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: rekonsiliasi — total HPP laporan = total jurnal HPP pada periode yang sama
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: ringkasan invoice — total DPP/PPN/HPP/margin dan rincian per mata uang
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: snapshot HPP per baris ditulis saat jurnal HPP diposting, dengan angka yang sama dengan jurnal
+Tests\Feature\SalesReportPhase6Test :: it Isu 9: status pembayaran turunan dari AR — Belum Bayar / Sebagian / Lunas / Jatuh Tempo, dan filternya sesuai
+Tests\Feature\SalesUatCriticalBugVerificationTest :: it Bug 1 & 5: partial delivery of 12 pcs from 20 pcs keeps SO partially_delivered, bills 12 pcs, and matches HPP
+Tests\Feature\SalesUatCriticalBugVerificationTest :: it Bug 6: warehouse stock options shows 0 stock warehouse instead of empty array and DO warehouse confirmation preserves product details
+Tests\Feature\SalesWorkflowAuditTest :: `Account Receivable — creation and branch scope` → it AccountReceivable carries the correct cabang_id for branch scope
+Tests\Feature\SalesWorkflowAuditTest :: `Account Receivable — creation and branch scope` → it AccountReceivable total equals invoice grand total
+Tests\Feature\SalesWorkflowAuditTest :: `Account Receivable — creation and branch scope` → it ar-ap:sync command respects uniqueness and updates existing AR
+Tests\Feature\SalesWorkflowAuditTest :: `Account Receivable — creation and branch scope` → it creates exactly one AccountReceivable per invoice
+Tests\Feature\SalesWorkflowAuditTest :: `Delivery Order view page shows customer information` → it includes the linked customer name and address from the first sale order
+Tests\Feature\SalesWorkflowAuditTest :: `Inclusive tax invoice workflow` → it inclusive tax: total stays at gross price, DPP extracted correctly
+Tests\Feature\SalesWorkflowAuditTest :: `Invoice Auto-Creation from Completed Sale Order` → it creates exactly one invoice when SO status becomes completed
+Tests\Feature\SalesWorkflowAuditTest :: `Invoice Auto-Creation from Completed Sale Order` → it does not create a second invoice on repeated completion event
+Tests\Feature\SalesWorkflowAuditTest :: `Invoice Auto-Creation from Completed Sale Order` → it invoice number follows standard INV-YYYYMMDD-NNNN format
+Tests\Feature\SalesWorkflowAuditTest :: `PDF generators include required item columns and totals` → it surat jalan PDF includes all columns
+Tests\Feature\SalesWorkflowAuditTest :: `PPN Keluaran journal entry — correct monetary amount` → it posts PPN credit of 110_000 (not 11_000_000_000) for 1_000_000 @ 11%
+Tests\Feature\Sales\Adversarial\CustomerReturnAdversarialTest :: it RET-BV-03: pemrosesan retur pelanggan dengan keputusan credit memotong saldo piutang secara akurat
+Tests\Feature\Sales\Adversarial\SalesThreeWayReconciliationTest :: it SALES-RC-03: rekonsiliasi tiga arah sub-ledger AR bernilai tepat terhadap agregat invoice, payment, dan return
+Tests\Feature\StatusRowClassesTest :: sale order index renders status row classes and legend
+Tests\Feature\StockMovementTest :: It can track outbound stock movement
+Tests\Feature\StockMovementTest :: It generates stock movement report
+Tests\Feature\StockMovementTest :: It handles return movements
+Tests\Feature\StockMovementTest :: It tracks production movements
+Tests\Feature\StockMovementTest :: It tracks stock transfers between warehouses
+Tests\Feature\StockTransferTest :: It can restore stock transfer and items
+Tests\Feature\Stock\Adversarial\StockConcurrencyAdversarialTest :: it CC-03: stok hasil retur pelanggan langsung tersedia aman untuk pengiriman DO berikutnya
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D15 berlaku di semua pintu: update model langsung juga ditolak
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D15 di jadwal: Mulai ditolak bila stok fisik kurang; jadwal tetap pending dan DO tidak berubah
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D15: SO "Ambil Sendiri" tidak dapat diselesaikan bila stok fisik kurang
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D15: pengecualian butuh Owner/Super Admin dan alasan; tercatat di log
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D15: stok fisik kurang menolak Kirim dengan rincian; stok, status dan gerakan tidak berubah
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D18: gagal kirim setelah Dikirim mengembalikan stok TEPAT SEKALI, reservasi dibuat ulang, kirim ulang memotong sekali
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D23: Diterima mencatat tanggal dan nama penerima; Selesaikan menerbitkan jurnal & invoice dan item "received"
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it D5: jadwal tidak dapat ditandai selesai dari pending — di model (tombol maupun form status)
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it DeliveryOrderService::updateStatus mengikuti matriks dan menyimpan komentar di log
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it Kirim dua kali (klik ganda) = satu efek
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it Kirim: stok fisik keluar sekali, reservasi DO dikonsumsi, item DO "sent", log tercatat
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it delivery-orders:resync-item-status melaporkan lalu memperbaiki status item yang tertinggal
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it gagal kirim dari Siap Kirim (stok belum keluar) tidak menyentuh stok
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it jadwal Mulai → DO Dikirim (stok keluar); Tandai Selesai → DO Selesai lewat Diterima otomatis
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it matriks: transisi sah diterima dan yang di luar matriks ditolak with data set "('approved', 'completed', false)"
+Tests\Feature\Stock\DeliveryOrderTransitionsTest :: it transisi di luar matriks ditolak dengan pesan berbahasa Indonesia dan status tidak berubah
+Tests\Feature\Stock\DeliveryOrderWarehouseConfirmationFlowTest :: it Ambil Sendiri tidak memerlukan DO: stok fisik keluar saat SO diselesaikan (bukti keluar = gerakan stok SO)
+Tests\Feature\Stock\SaleOrderReservationTest :: it SO→DO tanpa selisih: DO 12 disetujui → total tertahan tetap 20 (DO 12 + SO 8); Dikirim → tertahan 8, fisik 18, bebas 10
+Tests\Feature\Stock\SaleOrderReservationTest :: it [flag mati] approve SO tidak menahan stok dan DO memakai jalur reservasi lama
+Tests\Feature\Stock\SaleOrderReservationTest :: it sales:backfill-so-reservations: dry-run tidak mengubah apa pun; --apply menahan FIFO menurut waktu approve dan menulis CSV
+Tests\Feature\Stock\StockAvailabilityTest :: it D3: gudang yang boleh dipakai = gudang aktif cabang SO; + cabang lain hanya bila lihat_stok_cabang_lain; gudang nonaktif/terhapus tidak
+Tests\Feature\Stock\StockE2ETest :: it E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, reservasi, status item, log, invoice konsisten; 0 yatim
+Tests\Feature\Stock\StockReconcileCommandTest :: it --apply menghapus HANYA yatim, menurunkan qty_reserved tepat sebesar itu, menulis cadangan dan event; SAH + Material Issue utuh
+Tests\Feature\Stock\StockReconcileCommandTest :: it --sale-order membatasi pembersihan yatim ke satu SO
+Tests\Feature\Stock\StockReconcileCommandTest :: it dry-run melaporkan yatim (12 + 3) tanpa mengubah apa pun
+Tests\Feature\Stock\StockReservationLedgerTest :: it [flag mati] reservasi DO/edit kuantitas berperilaku lama: tidak ada event, tidak ada konsumsi
+Tests\Feature\Stock\StockReservationLedgerTest :: it [ledger] gerakan pengiriman IDEMPOTEN: DO gagal lalu dikirim ulang tidak memotong stok dua kali
+Tests\Feature\Stock\StockReservationLedgerTest :: it adjust ke 0 melepas reservasi; release dan consume menghapus baris dan menurunkan qty_reserved; event berbeda
+Tests\Feature\Stock\StockReservationLedgerTest :: it baris stok dipilih deterministik: rak cocok → rak null; pelepasan menguras baris yang sama; jumlah produk×gudang benar
+Tests\Feature\Stock\StockReservationLedgerTest :: it reserve menaikkan qty_reserved dan mencatat event; stok fisik tidak berubah
+Tests\Feature\Stock\StockReservationSpecTest :: it spec: tidak ada double reservasi — DO Siap Kirim memindahkan reservasi SO, total tertahan tetap sama
+Tests\Feature\Stock\StockScenarioProbeTest :: it [flag mati] DO yang gagal setelah Dikirim tidak mengembalikan stok, dan dikirim ulang memotong stok DUA kali (F6)
+Tests\Feature\Stock\StockScenarioProbeTest :: it [flag mati] jadwal "Tandai Selesai" dari pending menyelesaikan DO dalam satu klik; item DO tetap requested; reservasi yatim (X1)
+Tests\Feature\SuratJalanScheduleReadinessPhase4Test :: it Isu 6: Terbitkan Ulang ditolak bila DO sudah tidak approved
+Tests\Feature\SuratJalanValidationFeedbackTest :: Create surat jalan with unapproved do shows danger notification and error
+Tests\Feature\VendorPaymentFlowAdjustmentTest :: Manual mode creates details and updates ap with adjustment
+Tests\Feature\VendorPaymentFlowAdjustmentTest :: Vendor payment observer keeps adjustment amount in account payable remaining
+Tests\Feature\VendorPaymentResourceTest :: Bank transfer payment method selection
+Tests\Feature\VendorPaymentResourceTest :: Cash payment method selection
+Tests\Feature\VendorPaymentResourceTest :: Coa options are available
+Tests\Feature\VendorPaymentResourceTest :: Coa selection is required
+Tests\Feature\VendorPaymentResourceTest :: Credit payment method selection
+Tests\Feature\VendorPaymentResourceTest :: Deposit payment method selection
+Tests\Feature\VendorPaymentResourceTest :: Diskon defaults to zero
+Tests\Feature\VendorPaymentResourceTest :: Form can be filled with basic data
+Tests\Feature\VendorPaymentResourceTest :: Form has hidden fields for backward compatibility
+Tests\Feature\VendorPaymentResourceTest :: Form validation messages are customized
+Tests\Feature\VendorPaymentResourceTest :: Ntpn field has max length validation
+Tests\Feature\VendorPaymentResourceTest :: Ntpn is optional
+Tests\Feature\VendorPaymentResourceTest :: Payment adjustment defaults to zero
+Tests\Feature\VendorPaymentResourceTest :: Payment date defaults to today
+Tests\Feature\VendorPaymentResourceTest :: Payment date is required
+Tests\Feature\VendorPaymentResourceTest :: Payment method is required
+Tests\Feature\VendorPaymentResourceTest :: Payment method options available
+Tests\Feature\VendorPaymentResourceTest :: Selected invoices use fallback remaining when account payable is missing
+Tests\Feature\VendorPaymentResourceTest :: Status field defaults to draft
+Tests\Feature\VendorPaymentResourceTest :: Supplier options are available
+Tests\Feature\VendorPaymentResourceTest :: Supplier selection filters available invoices
+Tests\Feature\VendorPaymentResourceTest :: Supplier selection is required
+Tests\Feature\VendorPaymentResourceTest :: Total payment field exists for auto calculation
+Tests\Feature\VendorPaymentResourceTest :: Vendor payment form has required fields
+Tests\Feature\VendorPaymentResourceTest :: Vendor payment infolist debugging
+Tests\Feature\VendorPaymentResourceTest :: Vendor payment resource can render create page
+Tests\Feature\VendorPaymentResourceTest :: Vendor payment resource can render edit page
+Tests\Feature\VendorPaymentResourceTest :: Vendor payment resource can render list page
+Tests\Feature\VendorPaymentResourceTest :: Vendor payment resource can render view page
+Tests\Feature\WarehouseAuditTest :: `Warehouse Audit Test Suite` → `Inventory Alerts and Monitoring` → it detects low stock conditions
+Tests\Feature\WarehouseAuditTest :: `Warehouse Audit Test Suite` → `Inventory Stock Management` → it detects low stock alerts
+Tests\Feature\WarehouseAuditTest :: `Warehouse Audit Test Suite` → `Warehouse Performance Metrics` → it tracks stock turnover rate
+Tests\Unit\LargeOrderRequestNavigatorTest :: large order request navigator keeps server pagination and single editor controls
+Tests\Unit\LedgerPostingServiceTest :: Post invoice without receipt debits inventory
+Tests\Unit\MaterialIssueTest :: It can complete material issue and update inventory
+Tests\Unit\MaterialIssueTest :: It handles stock reservation during material issue
+Tests\Unit\Models\StockOpnameItemTest :: It calculates average cost only from past receipts
+Tests\Unit\Models\StockOpnameItemTest :: It calculates difference value correctly
+Tests\Unit\Models\StockOpnameItemTest :: It calculates weighted average cost correctly
+Tests\Unit\Models\StockOpnameItemTest :: It handles negative difference value
+Tests\Unit\Models\StockOpnameItemTest :: It handles zero difference value
+Tests\Unit\Models\StockOpnameTest :: It creates journal entries when approved with inventory decrease
+Tests\Unit\Models\StockOpnameTest :: It creates journal entries when approved with inventory increase
+Tests\Unit\Models\StockOpnameTest :: It does not create journal entries when no adjustment needed
+Tests\Unit\Models\StockOpnameTest :: It handles multiple items correctly
+Tests\Unit\Models\StockOpnameTest :: Stock opname item can calculate difference value
+Tests\Unit\Models\StockTransferTest :: It handles deleting event with cascading stock movement deletion
+Tests\Unit\Models\StockTransferTest :: It handles force deleting event with force cascading deletion
+Tests\Unit\Models\StockTransferTest :: It handles restoring event with cascading restoration
+Tests\Unit\Observers\StockTransferItemObserverTest :: It does not create movements for draft transfer items
+Tests\Unit\OrderRequestIndexSummaryLayoutTest :: it bounds order request index supplier and item summaries to prevent overlap
+Tests\Unit\OrderRequestInlineNavigatorMoneyMaskTest :: it masks inline navigator override price as live money input
+Tests\Unit\OrderRequestItemApprovalStatusStaticTest :: it only allows approved order request items to feed purchase orders
+Tests\Unit\OrderRequestItemApprovalStatusStaticTest :: it wires item approval decisions into order request approval service
+Tests\Unit\OrderRequestStatusTest :: `OrderRequest::syncFulfillmentStatus()` → it transitions approved → complete when all items fully fulfilled
+Tests\Unit\OrderRequestStatusTest :: `OrderRequest::syncFulfillmentStatus()` → it transitions approved → partial when some items partially fulfilled
+Tests\Unit\OrderRequestStatusTest :: `OrderRequest::syncFulfillmentStatus()` → it transitions partial → complete once last item is fulfilled
+Tests\Unit\PurchaseFlowComprehensiveTest :: `Complete Purchase Flow Integration` → it runs complete flow: PO -> Receipt -> Invoice -> Payment
+Tests\Unit\PurchaseOrderResourceCreateTest :: it creates purchase order with complete data through service
+Tests\Unit\RolePermissionMappingTest :: Roles have expected permissions based on mapping
+Tests\Unit\Smoke\DestructivePermissionSmokeTest :: Only allowed roles have destructive permissions
+Tests\Unit\StockMovementComprehensiveTest :: It creates comprehensive stock movement test data

@@ -1,0 +1,153 @@
+{
+  "suite": "UAT Alur 9 - Manajemen Retur & Pengembalian Barang (Returns Management)",
+  "executed_at": "2026-09-30T02:27:02.120Z",
+  "total": 18,
+  "passed": 18,
+  "failed": 0,
+  "results": [
+    {
+      "id": "NEG-9.1",
+      "module": "Customer Return",
+      "scenario": "Submit formulir customer return kosong tanpa pelanggan, invoice, alasan, dan item",
+      "expected": "Form menolak penyimpanan, menandai required fields, tetap tertahan di /create",
+      "status": "PASS",
+      "url": "http://127.0.0.1:8009/admin/customer-returns/create"
+    },
+    {
+      "id": "NEG-9.2",
+      "module": "Customer Return",
+      "scenario": "Input kuantitas retur melebihi sisa kuantitas barang yang dapat diretur pada invoice (mis. 99 pcs)",
+      "expected": "Sistem membatasi kuantitas retur maksimal sebesar sisa barang faktur (CustomerReturnResource baris 250 maxValue & CustomerReturnService baris 71)",
+      "status": "PASS",
+      "details": "MaxReturnable: 10 | InvoiceQty: 10"
+    },
+    {
+      "id": "NEG-9.3",
+      "module": "Customer Return",
+      "scenario": "Validasi tahapan status dokumen: Pending -> Received -> QC Inspection. Aksi Selesaikan dilarang pada status awal",
+      "expected": "Dokumen wajib melalui tahapan berjenjang; tombol aksi menyesuaikan status aktif",
+      "status": "PASS",
+      "details": "Created Customer Return ID 2, status advanced to qc_inspection"
+    },
+    {
+      "id": "NEG-9.4",
+      "module": "Customer Return",
+      "scenario": "Inspeksi QC memutuskan klaim retur ditolak (Decision: Reject)",
+      "expected": "Stok inventory fisik tidak bertambah (Diff: 0) dan tidak memotong piutang dagang",
+      "status": "PASS",
+      "details": "StockBefore:3|StockAfter:3|Diff:0"
+    },
+    {
+      "id": "NEG-9.5",
+      "module": "Customer Return",
+      "scenario": "Eksekusi berulang pada Customer Return yang sudah diproses (stock_restored_at terisi)",
+      "expected": "Sistem melempar Exception pencegah duplikasi stok/jurnal dan DocumentLock mengunci dokumen",
+      "status": "PASS",
+      "details": "SUCCESS_GUARD: Customer return #CR-UAT-1790735169 has already been processed. | BlocksDelete:NO|BlocksUpdate:NO"
+    },
+    {
+      "id": "NEG-9.6",
+      "module": "Purchase Return",
+      "scenario": "Submit formulir purchase return kosong tanpa nota retur, cabang, purchase receipt, dan item",
+      "expected": "Form menolak penyimpanan, validasi wajib diisi aktif, tetap tertahan di /create",
+      "status": "PASS",
+      "url": "http://127.0.0.1:8009/admin/purchase-returns/create"
+    },
+    {
+      "id": "NEG-9.7",
+      "module": "Purchase Return",
+      "scenario": "Input kuantitas retur melebihi barang yang diterima pada Purchase Receipt (mis. 999 pcs atau nilai negatif)",
+      "expected": "Sistem menolak nilai retur melebihi batas penerimaan barang (PurchaseReturnResource baris 268-280)",
+      "status": "PASS",
+      "details": "Accepted Qty for Receipt Item 4: 10"
+    },
+    {
+      "id": "NEG-9.8",
+      "module": "Purchase Return",
+      "scenario": "Pemeriksaan status field unit_price pada item retur pembelian",
+      "expected": "Field unit_price terkunci (disabled) dan diambil otomatis dari PO/Receipt asli, mencegah manipulasi nilai retur",
+      "status": "PASS",
+      "details": "PurchaseReturnResource line 303: ->disabled()->dehydrated(true)->helperText(\"Harga satuan terkunci sesuai harga pesanan/penerimaan asli\")"
+    },
+    {
+      "id": "NEG-9.9",
+      "module": "Purchase Return",
+      "scenario": "Pengajuan approval retur pembelian dan kewajiban pengisian catatan penolakan (rejection notes)",
+      "expected": "Aksi penolakan mewajibkan rejection_notes (PurchaseReturnResource baris 535-538 ->required())",
+      "status": "PASS",
+      "details": "Purchase Return ID 2 tested with status transitions"
+    },
+    {
+      "id": "NEG-9.10",
+      "module": "Purchase Return",
+      "scenario": "Pemeriksaan hak edit dan hapus pada Purchase Return yang telah disetujui (Approved)",
+      "expected": "Aksi Edit dan Delete disembunyikan permanen (PurchaseReturnResource baris 466 & 564)",
+      "status": "PASS",
+      "details": "Approved Purchase Return ID 3 editVisible: false"
+    },
+    {
+      "id": "NEG-9.11",
+      "module": "Return Product",
+      "scenario": "Submit formulir return product kosong tanpa nomor return, tipe order, gudang, dan item",
+      "expected": "Form menolak penyimpanan, validasi wajib diisi aktif, tetap tertahan di /create",
+      "status": "PASS",
+      "url": "http://127.0.0.1:8009/admin/return-products/create"
+    },
+    {
+      "id": "NEG-9.12",
+      "module": "Return Product",
+      "scenario": "Input kuantitas retur melebihi kuantitas yang terkirim pada Delivery Order sumber",
+      "expected": "Sistem menolak dan menampilkan pesan: \"Quantity retur tidak boleh melebihi quantity sumber\" (ReturnProductResource baris 283-290)",
+      "status": "PASS",
+      "details": "DO Item 1 Quantity: 8"
+    },
+    {
+      "id": "NEG-9.13",
+      "module": "Return Product",
+      "scenario": "Percobaan melakukan aksi approve pada Return Product yang tidak memiliki baris item retur",
+      "expected": "Aksi diblokir oleh validasi: \"Tidak dapat approve return product tanpa item\" (ReturnProductResource baris 532-539)",
+      "status": "PASS",
+      "details": "Draft Return Product ID 22 without items blocked from approval"
+    },
+    {
+      "id": "NEG-9.14",
+      "module": "Return Product",
+      "scenario": "Approval Return Product dengan aksi reduce_quantity_only",
+      "expected": "Stok fisik kembali ke rak/gudang, kuantitas DO disesuaikan, dan status menjadi approved",
+      "status": "PASS",
+      "details": "RP_VALID_ID:23|Status:approved|DOItemBefore:8|DOItemAfter:7"
+    },
+    {
+      "id": "NEG-9.15",
+      "module": "RBAC Security",
+      "scenario": "Pengguna dengan role Sales (sales@example.com) mencoba mengakses /admin/purchase-returns",
+      "expected": "Akses ditolak dengan HTTP 403 Forbidden atau redirection otorisasi ketat",
+      "status": "PASS",
+      "details": "Response status: 403, isForbidden: true"
+    },
+    {
+      "id": "EDG-9.16",
+      "module": "Financial Integrity",
+      "scenario": "Audit keseimbangan debit-kredit jurnal akuntansi hasil approval Purchase Return",
+      "expected": "Total Debit sama persis dengan Total Kredit (Dr Hutang Dagang / Cr Persediaan & PPN), selisih 0",
+      "status": "PASS",
+      "details": "EntriesCount:3|TotalDebit:11100|TotalCredit:11100|Diff:0"
+    },
+    {
+      "id": "EDG-9.17",
+      "module": "Financial Integrity",
+      "scenario": "Audit keseimbangan debit-kredit jurnal akuntansi pembalik hasil retur penjualan",
+      "expected": "Total Debit sama persis dengan Total Kredit (Dr Persediaan / Cr Barang Terkirim/HPP), selisih 0",
+      "status": "PASS",
+      "details": "EntriesCount:2|TotalDebit:8500000|TotalCredit:8500000|Diff:0"
+    },
+    {
+      "id": "EDG-9.18",
+      "module": "Financial AP",
+      "scenario": "Audit nilai sisa hutang dagang (account_payables) setelah Purchase Return disetujui",
+      "expected": "Nilai remaining berkurang sesuai nilai retur dan tidak pernah menjadi negatif (remaining >= 0)",
+      "status": "PASS",
+      "details": "AP_ID:5|Total:111000|Paid:11100|Remaining:99900|Status:Belum Lunas"
+    }
+  ]
+}

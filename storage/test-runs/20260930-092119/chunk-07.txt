@@ -1,0 +1,325 @@
+
+   PASS  Tests\Feature\JournalEntryAggregationServiceTest
+  ✓ service can group journal entries by parent COA                      3.81s  
+  ✓ service correctly accumulates debit and credit to parent             0.47s  
+  ✓ service calculates balance correctly for asset accounts              0.45s  
+  ✓ service calculates balance correctly for liability accounts          0.45s  
+  ✓ service filters journal entries by date range                        0.45s  
+  ✓ service filters journal entries by journal type                      0.45s  
+  ✓ service handles parent COA with direct entries                       0.45s  
+  ✓ service provides summary statistics                                  0.45s  
+  ✓ service detects unbalanced entries                                   0.45s  
+  ✓ service returns parent COAs with entry counts                        0.45s  
+  ✓ service handles multiple children under same parent                  0.46s  
+  ✓ service handles nested entries correctly                             0.46s  
+  ✓ service returns empty collection when no entries exist               0.44s  
+  ✓ service filters by cabang correctly                                  0.45s  
+
+   PASS  Tests\Feature\JournalEntryBalanceValidationTest
+  ✓ unbalanced journal entries cannot be created                         0.46s  
+  ✓ balanced journal entries can be created                              0.45s  
+
+   PASS  Tests\Feature\JournalEntryCascadeDeletionTest
+  ✓ it soft deletes journal entries when a purchase receipt item source… 0.50s  
+  ✓ it force deletes journal entries when a purchase receipt item sourc… 0.48s  
+
+   FAIL  Tests\Feature\JournalEntryTest
+  ✓ can create manual journal entry                                      0.68s  
+  ✓ journal entry belongs to chart of account                            0.61s  
+  ✓ journal entry belongs to cabang                                      0.68s  
+  ✓ journal entry can be soft deleted                                    0.62s  
+  ✓ journal entry validates debit credit balance                         0.64s  
+  ✓ journal entry detects unbalanced transactions                        0.62s  
+  ⨯ journal entries can be filtered by date range                        0.63s  
+  ⨯ journal entries can be filtered by journal type                      0.63s  
+  ✓ journal entries can be grouped by parent COA                         0.62s  
+  ✓ journal entry auto posting from transactions                         0.63s  
+  ✓ journal entry reference is unique within scope                       0.61s  
+  ✓ journal entry polymorphic relationships work                         0.62s  
+  ✓ journal entry source urls resolve to the correct view routes         0.63s  
+  ✓ journal entry aggregation service calculates balances correctly      0.63s  
+
+   PASS  Tests\Feature\LangIndonesianAppTest
+  ✓ it locale aplikasi id dan pesan validasi/otentikasi tidak lagi beru… 0.85s  
+  ✓ it Validator facade memakai atribut Indonesia untuk field penjualan  0.60s  
+  ✓ it pesan kustom pada form tetap menimpa terjemahan bawaan            0.45s  
+
+   FAIL  Tests\Feature\LargePurchaseFlowDemoSeederTest
+  ✓ large purchase flow demo seeder creates one OR with two large PO re… 2.26s  
+  ⨯ large purchase item UX keeps repeaters safe and relation manager re… 0.47s  
+  ✓ order request navigator activates for create and edit operations wi… 0.45s  
+  ✓ large OR navigator renders only the selected page without discardin… 0.48s  
+  ⨯ order request index uses limited summaries for large item records    0.56s  
+  ✓ order request detail uses paginated item table for large item recor… 0.86s  
+
+   PASS  Tests\Feature\LegacyRemediationCommandTest
+  ✓ it runs legacy:remediate-data successfully in dry-run mode without…  1.32s  
+  ✓ it cancels hanging draft test SO in apply mode                       1.13s  
+
+   PASS  Tests\Feature\LoginRedirectTest
+  ✓ login posts redirects to filament dashboard                          1.00s  
+
+   PASS  Tests\Feature\Manufacturing\Adversarial\BillOfMaterialBoundaryAdversarialTest
+  ✓ it BOM-BV-01: menolak circular dependency di mana produk jadi dijad… 0.70s  
+  ✓ it BOM-BV-02: validasi boundary menolak kuantitas nol atau negatif…  0.65s  
+  ✓ it BOM-BV-03: proteksi immutabilitas mendeteksi BOM yang sedang dig… 0.68s  
+  ✓ it BOM-BV-04: kalkulasi total biaya BOM (Material + Tenaga Kerja +…  0.72s  
+
+   PASS  Tests\Feature\Manufacturing\Adversarial\ManufacturingCostReconciliationTest
+  ✓ it MFG-RC-01: invarian jurnal pengeluaran bahan baku menjamin kesei… 0.84s  
+  ✓ it MFG-RC-02: invarian jurnal penyelesaian produksi (FG) menjamin k… 0.87s  
+  ✓ it MFG-RC-03: rekonsiliasi kartu persediaan menjamin kesinambungan…  0.83s  
+
+   PASS  Tests\Feature\Manufacturing\Adversarial\ManufacturingOrderExecutionGuardTest
+  ✓ it MO-BV-01: start guard memblokir status in_progress jika material… 0.83s  
+  ✓ it MO-BV-02: isolasi cabang membatasi kepemilikan dokumen MO dan al… 0.89s  
+  ✓ it MO-BV-03: proteksi pesanan selesai (completed) mengunci status d… 0.98s  
+
+   PASS  Tests\Feature\Manufacturing\Adversarial\MaterialIssueConcurrencyAndReturnTest
+  ✓ it MI-CC-01: over-issue boundary menolak pengambilan bahan baku mel… 0.83s  
+  ✓ it MI-CC-02: idempotensi pembaruan material issue mencegah mutasi d… 1.13s  
+  ✓ it MI-CC-03: retur sisa bahan baku (Material Return) mengembalikan…  0.91s  
+
+   PASS  Tests\Feature\Manufacturing\Adversarial\ProductionPlanBoundaryAdversarialTest
+  ✓ it PP-BV-01: validasi boundary menolak pembuatan atau pembaruan ren… 0.78s  
+  ✓ it PP-BV-02: validasi ketersediaan stok mendeteksi kekurangan stok…  0.84s  
+  ✓ it PP-BV-03: generator nomor rencana produksi menjamin kode unik da… 0.85s  
+
+   PASS  Tests\Feature\Manufacturing\Adversarial\QualityControlManufactureAdversarialTest
+  ✓ it QC-MFG-01: kuantitas rejected pada QC Manufaktur tidak menambah…  0.87s  
+  ✓ it QC-MFG-02: sistem menolak keras kuantitas pemeriksaan QC negatif… 0.74s  
+  ✓ it QC-MFG-03: produk yang lolos QC otomatis menambah stok fisik pro… 0.88s  
+
+   FAIL  Tests\Feature\ManufacturingFlowTest
+  ⨯ it runs the manufacturing to finance flow and balances ledgers and…  0.79s  
+  ✓ manufacturing flow keeps balance sheet balanced                      0.92s  
+  ✓ create manufacturing order from production plan                      1.06s  
+  ✓ calculate material requirements from BOM                             1.25s  
+  ✓ manufacturing order status workflow                                  1.10s  
+  ✓ validate stock availability for manufacturing                        0.74s  
+  ✓ material issue creates journal entries                               0.62s  
+  ✓ manufacturing order relationships                                    0.65s  
+
+   FAIL  Tests\Feature\ManufacturingJournalLateIssueTest
+  ✓ completed material issue refreshes existing wip journal              0.76s  
+  ⨯ qc completion uses refreshed wip when material issue completes afte… 1.01s  
+
+   PASS  Tests\Feature\ManufacturingJournalTest
+  ✓ it uses only manufacturing order linked material issues for product… 0.89s  
+
+   PASS  Tests\Feature\ManufacturingManualAllocationTest
+  ✓ manual manufacturing allocation splits labor and overhead into sepa… 0.81s  
+
+   PASS  Tests\Feature\ManufacturingOrderStartGuardTest
+  ✓ manufacturing order start is blocked until material issue and wareh… 0.94s  
+  ✓ manufacturing order start is allowed after completed material issue… 0.94s  
+
+   PASS  Tests\Feature\ManufacturingOrderViewPageTest
+  ✓ manufacturing order view shows product and production information    1.02s  
+
+   PASS  Tests\Feature\ManufacturingQcWorkflowRegressionTest
+  ✓ finishing production creates qc without completing manufacturing or… 0.77s  
+  ✓ quality control completion uses updated quantities and completes mo… 0.83s  
+
+   PASS  Tests\Feature\ManufacturingWarehouseConfirmationWorkflowTest
+  ✓ manufacturing warehouse confirmation is stored with polymorphic man… 0.76s  
+  ✓ manufacturing material issue can move to pending approval before wa… 0.97s  
+  ✓ confirmed manufacturing warehouse confirmation keeps material issue… 0.78s  
+  ✓ material issue observer creates manufacturing order without auto wa… 0.76s  
+
+   PASS  Tests\Feature\MasterDataHubPageTest
+  ✓ master data hub page renders without component errors                0.97s  
+
+   PASS  Tests\Feature\MaterialIssueApprovalTest
+  ✓ material issue can be created with pending approval status           0.53s  
+  ✓ material issue can be approved                                       0.45s  
+  ✓ material issue can be rejected                                       0.45s  
+  ✓ journal entry only created when approved and completed               0.85s  
+
+   FAIL  Tests\Feature\MaterialIssueAutoJournalTest
+  ⨯ auto journal generates once for material issue completion (idempote… 0.55s  
+  - auto journal generates correct reverse entries for material return…  0.55s  
+
+   PASS  Tests\Feature\MaterialIssueSeederPerItemTest
+  ✓ material issue seeder creates and confirms one warehouse confirmati… 0.59s  
+
+   PASS  Tests\Feature\MaterialIssueTest
+  ✓ issue materials to production                                        0.68s  
+  ✓ validate stock deduction                                             0.53s  
+  ✓ test journal entries (Dr WIP, Cr Raw Material)                       0.49s  
+  ✓ handle material returns                                              0.48s  
+  ✓ material issue with insufficient stock allows negative stock         0.48s  
+  ✓ material issue form validation prevents insufficient stock           1.21s  
+
+   FAIL  Tests\Feature\MaterialIssueViewPageTest
+  ⨯ material issue view shows selected warehouse product requirement an… 3.52s  
+
+   PASS  Tests\Feature\MaterialIssueWarehouseConfirmationPerItemTest
+  ✓ material issue warehouse confirmation is created per material item   1.11s  
+  ✓ material issue becomes completed when all confirmation items are ap… 0.67s  
+  ✓ approving parent warehouse confirmation also approves linked materi… 0.60s  
+  ✓ material issue becomes rejected when any confirmation item is rejec… 0.61s  
+
+   PASS  Tests\Feature\MaterialIssueWarehouseFilterTest
+  ✓ material issue warehouse resolver only returns stock-backed warehou… 0.65s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\JournalEntryTest > journal entries can b…  TypeError   
+  App\Services\JournalEntryAggregationService::calculateBalance(): Argument #1 ($type) must be of type string, null given, called in /Users/lrmcorporation/Documents/Website/Duta-Tunggal-ERP/app/Services/JournalEntryAggregationService.php on line 131
+
+  at app/Services/JournalEntryAggregationService.php:160
+    156▕      * @param float $debit
+    157▕      * @param float $credit
+    158▕      * @return float
+    159▕      */
+  ➜ 160▕     protected function calculateBalance(string $type, float $debit, float $credit): float
+    161▕     {
+    162▕         return match ($type) {
+    163▕             'Asset', 'Expense' => $debit - $credit,
+    164▕             'Liability', 'Equity', 'Revenue', 'Contra Asset' => $credit - $debit,
+
+  1   app/Services/JournalEntryAggregationService.php:160
+  2   app/Services/JournalEntryAggregationService.php:131
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\JournalEntryTest > journal entries can b…  TypeError   
+  App\Services\JournalEntryAggregationService::calculateBalance(): Argument #1 ($type) must be of type string, null given, called in /Users/lrmcorporation/Documents/Website/Duta-Tunggal-ERP/app/Services/JournalEntryAggregationService.php on line 131
+
+  at app/Services/JournalEntryAggregationService.php:160
+    156▕      * @param float $debit
+    157▕      * @param float $credit
+    158▕      * @return float
+    159▕      */
+  ➜ 160▕     protected function calculateBalance(string $type, float $debit, float $credit): float
+    161▕     {
+    162▕         return match ($type) {
+    163▕             'Asset', 'Expense' => $debit - $credit,
+    164▕             'Liability', 'Equity', 'Revenue', 'Contra Asset' => $credit - $debit,
+
+  1   app/Services/JournalEntryAggregationService.php:160
+  2   app/Services/JournalEntryAggregationService.php:131
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\LargePurchaseFlowDemoSeederTest > large purchase it…   
+  Expected: <style>\n
+      .dt-item-panel {\n
+          padding: 18px;\n
+  ... (2905 more lines)
+
+  To contain: appearance:none
+
+  at tests/Feature/LargePurchaseFlowDemoSeederTest.php:91
+     87▕     expect($orderRequestNavigator)->toContain('data-dt-inline-quantity');
+     88▕     expect($orderRequestNavigator)->toContain('data-dt-inline-unit-price');
+     89▕     expect($orderRequestNavigator)->toContain('data-dt-inline-tax-type');
+     90▕     expect($orderRequestNavigator)->toContain('dt-item-inline-select');
+  ➜  91▕     expect($orderRequestNavigator)->toContain('appearance:none');
+     92▕     expect($orderRequestNavigator)->toContain('background-repeat:no-repeat');
+     93▕     expect($orderRequestNavigator)->toContain('data-dt-delete-item');
+     94▕     expect($orderRequestNavigator)->toContain('removeInlineItem(@js($row');
+     95▕     expect($orderRequestNavigator)->toContain('updateInlineItem(@js($row');
+
+  1   tests/Feature/LargePurchaseFlowDemoSeederTest.php:91
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\LargePurchaseFlowDemoSeederTest > order request ind…   
+  Expected: <?php\n
+  \n
+  namespace App\Filament\Resources;\n
+  ... (3404 more lines)
+
+  To contain: && (int) ($record->order_request_item_count ?? 0) > 0;
+
+  at tests/Feature/LargePurchaseFlowDemoSeederTest.php:174
+    170▕         ->and($resource)->toContain("TextColumn::make('item_summary')")
+    171▕         ->and($resource)->toContain("SelectFilter::make('cabang_id')")
+    172▕         ->and($resource)->toContain("->withCount('orderRequestItem')")
+    173▕         ->and($resource)->toContain("->withSum('orderRequestItem', 'quantity')")
+  ➜ 174▕         ->and($resource)->toContain("&& (int) (\$record->order_request_item_count ?? 0) > 0;")
+    175▕         ->and($resource)->toContain('+\' . number_format($remaining, 0, \',\', \'.\') . \' item lainnya')
+    176▕         ->and($resource)->not->toContain("TextColumn::make('supplier')\n                    ->label('Supplier')\n                    ->getStateUsing(function (\$record) {\n                        return \$record->orderRequestItem;")
+    177▕         ->and($resource)->not->toContain("TextColumn::make('product')\n                    ->label('Items')\n                    ->getStateUsing(function (\$record) {\n                        return \$record->orderRequestItem;")
+    178▕         ->and($resource)->not->toContain("return \$record->orderRequestItem->contains(\n                                fn(\$item) => OrderRequestQuantityLock::orderRequestItemLimit");
+
+  1   tests/Feature/LargePurchaseFlowDemoSeederTest.php:174
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ManufacturingFlowTest > it runs the manufacturing t…   
+  Failed asserting that 200.0 is identical to 0.0.
+
+  at tests/Feature/ManufacturingFlowTest.php:270
+    266▕     expect((float) $rawMovement->sum('credit'))->toBe($issueValue);
+    267▕     // Pos sementara nets to 0: D from material issue = K from in-progress
+    268▕     expect((float) ($wipMovement->sum('debit') - $wipMovement->sum('credit')))->toBe(0.0);
+    269▕     // WIP inventory nets to 0: D from in-progress = K from QC completion
+  ➜ 270▕     expect((float) ($wipInventoryMovement->sum('debit') - $wipInventoryMovement->sum('credit')))->toBe(0.0);
+    271▕     expect((float) $fgMovement->sum('debit'))->toBe($productionValue);
+    272▕     expect((float) $fgMovement->sum('credit'))->toBe(0.0);
+    273▕ });
+    274▕
+
+  1   tests/Feature/ManufacturingFlowTest.php:270
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ManufacturingJournalLateIssueTest > qc completion u…   
+  Failed asserting that 400.0 is identical to 150.0.
+
+  at tests/Feature/ManufacturingJournalLateIssueTest.php:218
+    214▕         ->where('journal_type', 'manufacturing_completion')
+    215▕         ->get();
+    216▕ 
+    217▕     expect($completionEntries)->toHaveCount(2)
+  ➜ 218▕         ->and((float) $completionEntries->sum('debit'))->toBe(150.0)
+    219▕         ->and((float) $completionEntries->sum('credit'))->toBe(150.0)
+    220▕         ->and($completionEntries->contains(fn ($entry) => (int) $entry->coa_id === (int) $fixture['finishedGoodsCoa']->id && (float) $entry->debit === 150.0))->toBeTrue()
+    221▕         ->and($completionEntries->contains(fn ($entry) => (int) $entry->coa_id === (int) $fixture['wipCoa']->id && (float) $entry->credit === 150.0))->toBeTrue();
+    222▕ });
+
+  1   tests/Feature/ManufacturingJournalLateIssueTest.php:218
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\MaterialIssueAutoJournalTest >…  ValidationException   
+  Pengambilan bahan baku harus melalui konfirmasi gudang per item bahan sebelum dapat di-approve atau diselesaikan.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Models/MaterialIssue.php:369
+      [2m+6 vendor frames [22m
+  9   tests/Feature/MaterialIssueAutoJournalTest.php:83
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\MaterialIssueViewPageTest > material issue view sho…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="iTABDrPVUaD72lwgBxG0"\n
+      class="fi-page"\n
+  >\n
+  ... (1835 more lines)
+
+  To contain: 25,00
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/MaterialIssueViewPageTest.php:180
+
+
+  Tests:    8 failed, 1 skipped, 95 passed (1040 assertions)
+  Duration: 81.19s
+

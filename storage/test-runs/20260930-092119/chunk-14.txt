@@ -1,0 +1,734 @@
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\JournalCabangAndInvoiceDppTest::test_invoice_dpp_auto_populates_from_subtotal_when_null(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   PASS  Tests\Feature\VoucherCashBankIntegrationTest
+  ✓ voucher can be selected in cash bank transaction form                4.15s  
+  ✓ single use voucher validation works                                  0.46s  
+  ✓ multi use voucher validation works                                   0.46s  
+  ✓ cash bank transaction can be created with voucher                    0.47s  
+  ✓ voucher remaining amount calculation works                           0.46s  
+  ✓ voucher cannot be used if fully consumed                             0.46s  
+
+   PASS  Tests\Feature\VoucherRequestFeatureTest
+  ✓ can create voucher request with auto generated number                0.45s  
+  ✓ can submit voucher for approval                                      0.53s  
+  ✓ cannot submit non-draft voucher                                      0.52s  
+  ✓ can approve pending voucher                                          0.53s  
+  ✓ can reject pending voucher                                           0.53s  
+  ✓ can cancel draft voucher                                             0.52s  
+  ✓ cannot cancel approved voucher                                       0.52s  
+  ✓ generates statistics correctly                                       0.47s  
+  ✓ model scopes work correctly                                          0.47s  
+  ✓ helper methods return correct values                                 0.46s  
+
+   PASS  Tests\Feature\VoucherRequestResourceTest
+  ✓ voucher request list query includes computed totals                  0.46s  
+
+   PASS  Tests\Feature\VoucherRequestServiceTest
+  ✓ it generates unique voucher number with correct format               0.45s  
+  ✓ it submits voucher for approval                                      0.53s  
+  ✓ it throws exception when submitting non-draft voucher                0.52s  
+  ✓ it approves voucher successfully                                     0.53s  
+  ✓ it rejects approval with invalid coa references when creating trans… 0.53s  
+  ✓ it throws exception when approving non-pending voucher               0.52s  
+  ✓ it rejects voucher successfully                                      0.53s  
+  ✓ it requires reason when rejecting voucher                            0.53s  
+  ✓ it throws exception when rejecting non-pending voucher               0.52s  
+  ✓ it cancels voucher successfully                                      0.53s  
+  ✓ it throws exception when cancelling approved voucher                 0.52s  
+  ✓ it gets statistics correctly                                         0.51s  
+  ✓ it generates sequential voucher numbers for same date                0.45s  
+
+   PASS  Tests\Feature\VoucherRequestTest
+  ✓ it can create a voucher request                                      0.51s  
+  ✓ it auto generates voucher number on creation                         0.46s  
+  ✓ it sets default status to draft                                      0.47s  
+  ✓ it can check if voucher can be submitted                             0.46s  
+  ✓ it can check if voucher can be approved                              0.46s  
+  ✓ it can check if voucher can be rejected                              0.46s  
+  ✓ it can check if voucher can be cancelled                             0.46s  
+  ✓ it can check if voucher can be edited                                0.46s  
+  ✓ it has correct status colors                                         0.48s  
+  ✓ it has correct status labels                                         0.46s  
+  ✓ it belongs to creator                                                0.46s  
+  ✓ it belongs to approver                                               0.46s  
+  ✓ it has scope for draft status                                        0.46s  
+  ✓ it has scope for pending status                                      0.46s  
+  ✓ it has scope for approved status                                     0.46s  
+  ✓ it casts amount to decimal                                           0.46s  
+  ✓ it soft deletes                                                      0.46s  
+
+   FAIL  Tests\Feature\WarehouseAuditTest
+  ✓ Warehouse Audit Test Suite → Inventory Stock Management → it can cr… 0.49s  
+  ✓ Warehouse Audit Test Suite → Inventory Stock Management → it valida… 0.48s  
+  ✓ Warehouse Audit Test Suite → Inventory Stock Management → it handle… 0.48s  
+  ⨯ Warehouse Audit Test Suite → Inventory Stock Management → it detect… 0.49s  
+  ✓ Warehouse Audit Test Suite → Stock Movement Operations → it records… 0.57s  
+  ✓ Warehouse Audit Test Suite → Stock Movement Operations → it validat… 0.60s  
+  ✓ Warehouse Audit Test Suite → Stock Movement Operations → it tracks…  0.49s  
+  ✓ Warehouse Audit Test Suite → Warehouse Operations → it handles ware… 0.56s  
+  ✓ Warehouse Audit Test Suite → Warehouse Operations → it handles ware… 1.46s  
+  ✓ Warehouse Audit Test Suite → Warehouse Operations → it handles ware… 0.64s  
+  ✓ Warehouse Audit Test Suite → Stock Transfer Management → it creates… 1.22s  
+  ✓ Warehouse Audit Test Suite → Stock Transfer Management → it validat… 0.48s  
+  ✓ Warehouse Audit Test Suite → Stock Transfer Management → it handles… 0.48s  
+  ✓ Warehouse Audit Test Suite → Stock Transfer Management → it process… 0.49s  
+  ✓ Warehouse Audit Test Suite → Rack/Bin Management → it creates and a… 0.47s  
+  ✓ Warehouse Audit Test Suite → Rack/Bin Management → it validates rac… 0.48s  
+  ✓ Warehouse Audit Test Suite → Rack/Bin Management → it assigns inven… 0.51s  
+  ✓ Warehouse Audit Test Suite → Rack/Bin Management → it tracks invent… 0.48s  
+  ⨯ Warehouse Audit Test Suite → Inventory Alerts and Monitoring → it d… 0.51s  
+  ✓ Warehouse Audit Test Suite → Inventory Alerts and Monitoring → it m… 1.40s  
+  ✓ Warehouse Audit Test Suite → Inventory Alerts and Monitoring → it t… 0.75s  
+  ✓ Warehouse Audit Test Suite → Inventory Valuation → it calculates in… 0.51s  
+  ✓ Warehouse Audit Test Suite → Inventory Valuation → it tracks invent… 0.81s  
+  ✓ Warehouse Audit Test Suite → Inventory Valuation → it calculates st… 0.55s  
+  ✓ Warehouse Audit Test Suite → Warehouse Performance Metrics → it cal… 0.48s  
+  ⨯ Warehouse Audit Test Suite → Warehouse Performance Metrics → it tra… 0.48s  
+  ✓ Warehouse Audit Test Suite → Warehouse Performance Metrics → it mon… 0.47s  
+  ✓ Warehouse Audit Test Suite → Data Integrity and Cross-Module Valida… 0.47s  
+  ✓ Warehouse Audit Test Suite → Data Integrity and Cross-Module Valida… 0.47s  
+  ✓ Warehouse Audit Test Suite → Data Integrity and Cross-Module Valida… 0.47s  
+  ✓ Warehouse Audit Test Suite → Data Integrity and Cross-Module Valida… 0.48s  
+
+   PASS  Tests\Feature\WarehouseConfirmationFeatureTest
+  ✓ Warehouse Confirmation Feature → it can fully confirm warehouse for… 0.48s  
+  ✓ Warehouse Confirmation Feature → it can partially confirm warehouse… 0.63s  
+  ✓ Warehouse Confirmation Feature → it can reject warehouse confirmati… 0.47s  
+  ✓ Warehouse Confirmation Feature → it prevents warehouse confirmation… 0.48s  
+  ✓ Warehouse Confirmation Feature → it updates SO status after warehou… 0.47s  
+  ✓ Warehouse Confirmation Feature → it allows proceeding to delivery a… 0.63s  
+  ✓ Warehouse Confirmation Feature → it tracks warehouse confirmation d… 0.51s  
+  ✓ Warehouse Confirmation Feature → it does not mutate sale order item… 1.39s  
+
+   PASS  Tests\Feature\WarehouseConfirmationMaterialIssueViewTest
+  ✓ warehouse confirmation view shows material issue items per bahan     2.08s  
+
+   PASS  Tests\Feature\ZeroBalanceSheetSeederAuditTest
+  ✓ zero balance sheet seeder clears transactional tables and preserves… 3.45s  
+
+   PASS  Tests\Unit\AgeingReportExportTest
+  ✓ excel export uses service backed summary and detail sheets           4.28s  
+  ✓ pdf export prepares service backed receivables payload               0.48s  
+
+   PASS  Tests\Unit\AgeingReportResourceTest
+  ✓ it resolves ageing resource columns using service as of date         0.46s  
+
+   PASS  Tests\Unit\AgeingReportServiceTest
+  ✓ it assigns bucket boundaries from due date against as of date        0.48s  
+  ✓ it resolves payable days outstanding from due date                   0.74s  
+  ✓ it projects cash flow relative to as of date window                  0.58s  
+
+   PASS  Tests\Unit\BalanceSheetExportPresenterTest
+  ✓ it shapes balance sheet rows from existing report payload            0.48s  
+
+   PASS  Tests\Unit\CashFlowReportServiceTest
+  ✓ branch filter limits cash bank outflows                              0.69s  
+
+   PASS  Tests\Unit\CompareTestFailuresTest
+  ✓ it parseJunit membaca status lolos/gagal/error/dilewati
+  ✓ it failedNames hanya memuat gagal dan error, unik dan terurut
+  ✓ it parseJunit mengembalikan kosong untuk XML rusak atau kosong (dianggap crash oleh runner)
+  ✓ it diff memisahkan kegagalan baru, diperbaiki, dan tetap gagal
+  ✓ it berkas baseline: tulis lalu baca kembali, komentar dan baris kosong diabaikan
+  ✓ it chunk membagi berkas per ukuran dan tidak pernah membuat potongan kosong
+  ✓ it compare-test-failures: exit 1 bila ada kegagalan baru, 0 bila ti… 0.13s  
+  ✓ it runner terpotong: menjalankan sebuah berkas uji dan menulis fail… 0.75s  
+  ✓ it runner terpotong: menolak --db yang tidak berakhiran _test        0.05s  
+
+   PASS  Tests\Unit\CurrencyConversionResolverTest
+  ✓ convert to idr and back high precision                               0.50s  
+
+   PASS  Tests\Unit\CustomerDuplicateFinderTest
+  ✓ it normalizeName menyamakan bentuk badan usaha, tanda baca, huruf besar, dan aksen
+  ✓ it phoneKey memadankan 0812…, +62 812…, dan 62812…; nomor pendek diabaikan
+  ✓ it varian nama yang sama dikelompokkan; nama yang hanya sebagian mirip TIDAK ikut
+  ✓ it urutan kata berbeda dikenali sebagai nama mirip; typo kecil juga
+  ✓ it NPWP/NIK yang sama mengelompokkan walau nama berbeda; nilai placeholder diabaikan
+  ✓ it telepon sama mengelompokkan; nomor yang dipakai banyak customer dianggap nomor bersama dan diabaikan
+  ✓ it beberapa alasan pada grup yang sama digabung dan hasil terurut menurut id terkecil
+  ✓ it daftar kosong atau customer tunggal menghasilkan tanpa grup
+
+   PASS  Tests\Unit\FinancialStatementExportTest
+  ✓ all statement type builds summary profit loss and balance sheet she… 0.57s  
+  ✓ profit loss statement type only builds summary and profit loss shee… 0.24s  
+  ✓ balance sheet statement type only builds summary and balance sheet…  0.24s  
+  ✓ cogm statement type only builds summary and cogm sheets              0.24s  
+
+   PASS  Tests\Unit\HppReportServiceProductFilterTest
+  ✓ generate can scope cogm values by product                            0.42s  
+
+   PASS  Tests\Unit\HppReportServiceTest
+  ✓ hpp report calculates values and branch filters                      0.28s  
+  ✓ raw material balance falls back to stock movements                   0.26s  
+  ✓ raw material purchase source warns when falling back to stock movem… 0.28s  
+  ✓ variance analysis calculates correct values                          0.25s  
+  ✓ allocated overhead calculates correctly                              0.27s  
+
+   PASS  Tests\Unit\InventoryCardReportServiceTest
+  ✓ it builds inventory card report and export rows from shared service  0.54s  
+array (
+  0 => 
+  array (
+    0 => 36,
+    1 => '1140',
+    2 => 5000000.0,
+    3 => 0.0,
+    4 => 'purchase_order',
+  ),
+  1 => 
+  array (
+    0 => 37,
+    1 => '2110',
+    2 => 0.0,
+    3 => 5000000.0,
+    4 => 'purchase_order',
+  ),
+)array (
+  0 => 
+  array (
+    'code' => '2000',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  1 => 
+  array (
+    'code' => '2100',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  2 => 
+  array (
+    'code' => '2110',
+    'debit_sum' => 0.0,
+    'credit_sum' => 5000000.0,
+    'opening_balance' => 0.0,
+    'balance' => 5000000.0,
+  ),
+  3 => 
+  array (
+    'code' => '2120',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  4 => 
+  array (
+    'code' => '2130',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  5 => 
+  array (
+    'code' => '2140',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  6 => 
+  array (
+    'code' => '2150',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  7 => 
+  array (
+    'code' => '2160',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  8 => 
+  array (
+    'code' => '2170',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  9 => 
+  array (
+    'code' => '2190',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  10 => 
+  array (
+    'code' => '2200',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  11 => 
+  array (
+    'code' => '2210',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  12 => 
+  array (
+    'code' => '2220',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  13 => 
+  array (
+    'code' => '2100.10',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  14 => 
+  array (
+    'code' => '2120.01',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  15 => 
+  array (
+    'code' => '2120.02',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  16 => 
+  array (
+    'code' => '2120.03',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  17 => 
+  array (
+    'code' => '2120.04',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  18 => 
+  array (
+    'code' => '2120.05',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  19 => 
+  array (
+    'code' => '2120.06',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  20 => 
+  array (
+    'code' => '2160.01',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  21 => 
+  array (
+    'code' => '2160.02',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  22 => 
+  array (
+    'code' => '2160.03',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  23 => 
+  array (
+    'code' => '2160.04',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  24 => 
+  array (
+    'code' => '2170.01',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  25 => 
+  array (
+    'code' => '2170.02',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  26 => 
+  array (
+    'code' => '2170.03',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  27 => 
+  array (
+    'code' => '2170.04',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  28 => 
+  array (
+    'code' => '2170.05',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  29 => 
+  array (
+    'code' => '2170.06',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  30 => 
+  array (
+    'code' => '2170.07',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  31 => 
+  array (
+    'code' => '2170.08',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  32 => 
+  array (
+    'code' => '2170.09',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  33 => 
+  array (
+    'code' => '2170.10',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  34 => 
+  array (
+    'code' => '2170.11',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  35 => 
+  array (
+    'code' => '2170.12',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  36 => 
+  array (
+    'code' => '2170.13',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  37 => 
+  array (
+    'code' => '2170.14',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  38 => 
+  array (
+    'code' => '2170.15',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  39 => 
+  array (
+    'code' => '2170.16',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  40 => 
+  array (
+    'code' => '2170.17',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  41 => 
+  array (
+    'code' => '2170.18',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  42 => 
+  array (
+    'code' => '2170.19',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+  43 => 
+  array (
+    'code' => '2190.10',
+    'debit_sum' => 0.0,
+    'credit_sum' => 0.0,
+    'opening_balance' => 0.0,
+    'balance' => 0.0,
+  ),
+)array (
+  'total_assets' => 5000000.0,
+  'total_liabilities' => 5000000.0,
+  'debug_all_liabilities_sum' => 5000000.0,
+)
+   PASS  Tests\Unit\InventoryFinanceImpactTest
+  ✓ inventory stock does not directly affect balance sheet without jour… 0.95s  
+  ✓ inventory opening balance affects balance sheet when journal entrie… 0.78s  
+  ✓ purchase transaction affects inventory and balance sheet             0.83s  
+  ✓ sales transaction reduces inventory and affects balance sheet        0.73s  
+  ✓ purchase receipt item sent to qc creates temporary procurement jour… 1.05s  
+
+   PASS  Tests\Unit\InventoryReportServiceTest
+  ✓ it builds service backed rows and pdf payload                        0.25s  
+  ✓ it uses last movement per rak for aging                              0.26s  
+
+   PASS  Tests\Unit\InvoiceHitungTotalTest
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses Indonesian-formatted 20.000.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses 1.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses 10.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses 100.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses 1.000.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses 10.000.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses 100.000.000 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses raw DB decimal 20000000.00 correctly
+  ✓ hitungTotal() logic — using MoneyHelper::parse() → it parses null or empty string as zero
+  ✓ hitungTotal() — PPN option variants → it standard (Eksklusif) adds PPN on top
+  ✓ hitungTotal() — PPN option variants → it non_ppn returns subtotal unchanged
+  ✓ hitungTotal() — PPN option variants → it inclusive does NOT add PPN (already included)
+  ✓ hitungTotal() — PPN option variants → it zero ppn_rate returns subtotal unchanged regardless of option
+
+   PASS  Tests\Unit\InvoiceOtherFeeTest
+  ✓ Invoice::other_fee accessor → it returns empty array when DB stores integer 0
+  ✓ Invoice::other_fee accessor → it returns empty array when DB stores null
+  ✓ Invoice::other_fee accessor → it returns empty array when DB stores empty string
+  ✓ Invoice::other_fee accessor → it returns correct array when DB stores valid JSON
+  ✓ Invoice::other_fee accessor → it encodes array as JSON when setting via mutator
+  ✓ Invoice::other_fee accessor → it encodes empty array when setting null via mutator
+  ✓ ValidIndonesianMoney rule → it passes for plain number 100000
+  ✓ ValidIndonesianMoney rule → it passes for formatted Indonesian money 1.000.000
+  ✓ ValidIndonesianMoney rule → it passes for Rp prefixed amount
+  ✓ ValidIndonesianMoney rule → it fails for null
+  ✓ ValidIndonesianMoney rule → it fails for empty string
+  ✓ ValidIndonesianMoney rule → it fails for zero
+  ✓ ValidIndonesianMoney rule → it fails for negative value
+  ✓ ValidIndonesianMoney rule → it returns correct error message
+
+   PASS  Tests\Unit\InvoiceServiceTest
+  ✓ TC-INV-001: generateInvoiceNumber returns INV-YYYYMMDD-0001 when no… 0.27s  
+  ✓ TC-INV-001b: generateInvoiceNumber increments correctly when previo… 0.67s  
+  ✓ TC-INV-002: generatePurchaseInvoiceNumber returns PINV-YYYYMMDD-000… 0.27s  
+  ✓ TC-INV-003: creating a SaleOrder invoice auto-creates one AccountRe… 0.27s  
+  ✓ TC-INV-004: AR remaining equals invoice total immediately after inv… 0.28s  
+  ✓ TC-INV-005: other_fee_total sums all fee amounts in the JSON array   0.31s  
+  ✓ TC-INV-005b: other_fee_total returns 0 when other_fee is empty       0.35s  
+  ✓ TC-INV-006: dpp + ppn = total for eksklusif 12% PPN                  0.39s  
+  ✓ TC-INV-006b: dpp + ppn = total for inklusif 12% PPN                  0.34s  
+  ✓ TC-INV-007: invoice status becomes paid when AR remaining is set to… 0.27s  
+
+   PASS  Tests\Unit\JournalCabangAndInvoiceDppTest
+  ✓ invoice dpp auto populates from subtotal when null                   0.25s  
+  ✓ invoice dpp keeps explicit value when provided                       0.35s  
+  ✓ resolver returns null for null source                                0.30s  
+  ✓ resolver picks up direct cabang id property                          0.31s  
+  ✓ resolver returns null when no strategy matches                       0.24s  
+  ✓ journal entry auto resolves cabang id from source model              0.24s  
+  ✓ journal entry preserves explicit cabang id                           0.25s  
+  ✓ journal entry stays null when source has no cabang                   0.62s  
+
+   PASS  Tests\Unit\LangIndonesianTest
+  ✓ it setiap kunci bawaan Laravel tersedia dalam bahasa Indonesia dan bukan kunci mentah with ('validation')
+  ✓ it setiap kunci bawaan Laravel tersedia dalam bahasa Indonesia dan bukan kunci mentah with ('auth')
+  ✓ it setiap kunci bawaan Laravel tersedia dalam bahasa Indonesia dan bukan kunci mentah with ('passwords')
+  ✓ it setiap kunci bawaan Laravel tersedia dalam bahasa Indonesia dan bukan kunci mentah with ('pagination')
+  ✓ it pesan Indonesia tidak sama dengan teks Inggris bawaan (benar-benar diterjemahkan) with ('validation')
+  ✓ it pesan Indonesia tidak sama dengan teks Inggris bawaan (benar-benar diterjemahkan) with ('auth')
+  ✓ it pesan Indonesia tidak sama dengan teks Inggris bawaan (benar-benar diterjemahkan) with ('passwords')
+  ✓ it pesan Indonesia tidak sama dengan teks Inggris bawaan (benar-benar diterjemahkan) with ('pagination')
+  ✓ it validator menghasilkan pesan Indonesia lengkap dengan nama atribut
+  ✓ it pesan berparameter dan bertingkat (between, size, max) terisi
+  ✓ it atribut kustom penjualan tersedia
+
+   FAIL  Tests\Unit\LargeOrderRequestNavigatorTest
+  ✓ order request navigator is used for every create and edit form with at least one item
+  ✓ order request money formatting keeps decimal numeric values precise
+  ⨯ large order request navigator keeps server pagination and single ed… 0.01s  
+
+   FAIL  Tests\Unit\LedgerPostingServiceTest
+  ⨯ post invoice without receipt debits inventory                        0.40s  
+  ✓ post invoice with receipt debits unbilled purchase                   0.36s  
+  ✓ post invoice with foreign currency persists idr ledger amounts       0.53s  
+  ✓ post invoice with legacy tax and other fees uses tax as rate         0.39s  
+  ✓ post invoice ignores zero value other fee rows                       0.28s  
+  ✓ post invoice ignores fractional rounding residue without other fees  0.25s  
+  ✓ reverse invoice journal entries creates mirror entries for legacy i… 0.32s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\WarehouseAuditTest > `Warehouse Audit Test Suite` →…   
+  Failed asserting that actual size 5 matches expected size 1.
+
+  at tests/Feature/WarehouseAuditTest.php:180
+    176▕ 
+    177▕             // Query for low stock items
+    178▕             $lowStockItems = InventoryStock::whereColumn('qty_available', '<=', 'qty_min')->get();
+    179▕ 
+  ➜ 180▕             expect($lowStockItems)->toHaveCount(1);
+    181▕             expect($lowStockItems->first()->product_id)->toBe($this->product1->id);
+    182▕         });
+    183▕ 
+    184▕     });
+
+  1   tests/Feature/WarehouseAuditTest.php:180
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\WarehouseAuditTest > `Warehouse Audit Test Suite` →…   
+  Failed asserting that actual size 8 matches expected size 2.
+
+  at tests/Feature/WarehouseAuditTest.php:626
+    622▕ 
+    623▕             // Query low stock items
+    624▕             $lowStockItems = InventoryStock::whereColumn('qty_available', '<=', 'qty_min')->get();
+    625▕ 
+  ➜ 626▕             expect($lowStockItems)->toHaveCount(2);
+    627▕             expect($lowStockItems->pluck('product_id'))->toContain($this->product1->id, $this->product2->id);
+    628▕         });
+    629▕ 
+    630▕         it('monitors stock reservations vs availability', function () {
+
+  1   tests/Feature/WarehouseAuditTest.php:626
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\WarehouseAuditTest > `Warehous…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Test Product 1. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\LargeOrderRequestNavigatorTest > large order request n…   
+  Expected: <style>\n
+      .dt-item-panel {\n
+          padding: 18px;\n
+  ... (2905 more lines)
+
+  To contain: .dt-or-large-repeater .fi-fo-repeater-item{display:none!important}
+
+  at tests/Unit/LargeOrderRequestNavigatorTest.php:46
+     42▕         ->and($resource)->toContain("Hidden::make('_order_request_item_recently_added_key')")
+     43▕         ->and($resource)->toContain("Hidden::make('_order_request_item_recently_added_message')")
+     44▕         ->and($resource)->not->toContain("TextInput::make('_order_request_item_search')")
+     45▕         ->and($resource)->not->toContain("Select::make('_order_request_item_supplier_filter')")
+  ➜  46▕         ->and($navigator)->toContain('.dt-or-large-repeater .fi-fo-repeater-item{display:none!important}')
+     47▕         ->and($navigator)->not->toContain('.dt-or-large-editor-active{display:block!important}')
+     48▕         ->and($navigator)->toContain('data-dt-or-filterbar')
+     49▕         ->and($navigator)->toContain('wire:key="dt-or-navigator-')
+     50▕         ->and($navigator)->toContain('dt-item-toolbar-left')
+
+  1   tests/Unit/LargeOrderRequestNavigatorTest.php:46
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\LedgerPostingServiceTest > post invoice without receip…   
+  Failed asserting that two strings are equal.
+  -'posted'
+  +'error'
+  
+
+  at tests/Unit/LedgerPostingServiceTest.php:75
+     71▕         ]);
+     72▕ 
+     73▕         $result = app(LedgerPostingService::class)->postInvoice($invoice);
+     74▕ 
+  ➜  75▕         $this->assertEquals('posted', $result['status']);
+     76▕ 
+     77▕         $entries = JournalEntry::where('source_type', Invoice::class)
+     78▕             ->where('source_id', $invoice->id)
+     79▕             ->get();
+
+  1   tests/Unit/LedgerPostingServiceTest.php:75
+
+
+  Tests:    5 failed, 193 passed (741 assertions)
+  Duration: 82.55s
+

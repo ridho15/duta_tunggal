@@ -1,0 +1,769 @@
+
+   FAIL  Tests\Unit\MaterialIssueTest
+  ✓ it can create material issue                                         4.93s  
+  ✓ it can add material issue items                                      0.95s  
+  ✓ it calculates total cost when items are added                        0.50s  
+  ✓ it can approve material issue                                        0.49s  
+  ⨯ it can complete material issue and update inventory                  0.50s  
+  ✓ it generates journal entries when completed                          0.63s  
+  ✓ it validates required fields                                         0.47s  
+  ✓ it has relationships with other models                               0.48s  
+  ✓ it can soft delete material issue                                    0.50s  
+  ⨯ it handles stock reservation during material issue                   0.49s  
+  ✓ it requires confirmed warehouse confirmation before approval         0.48s  
+  ✓ it can request approval before warehouse confirmation is confirmed   0.47s  
+  ✓ it can request approval for material issue                           0.57s  
+  ✓ it cannot request approval if already approved                       0.59s  
+  ✓ it can only request approval for draft status                        0.57s  
+
+   PASS  Tests\Unit\MemoryLimitTest
+  ✓ it toBytes membaca notasi php.ini with ('-1', -1)                    0.01s  
+  ✓ it toBytes membaca notasi php.ini with ('', -1)
+  ✓ it toBytes membaca notasi php.ini with ('512M', 536870912)
+  ✓ it toBytes membaca notasi php.ini with ('1G', 1073741824)
+  ✓ it toBytes membaca notasi php.ini with ('256K', 262144)
+  ✓ it toBytes membaca notasi php.ini with ('134217728', 134217728)
+  ✓ it toBytes membaca notasi php.ini with ('512m', 536870912)
+  ✓ it raiseTo tidak pernah menurunkan batas tak terbatas (-1)
+  ✓ it raiseTo tidak menurunkan batas yang lebih besar dari target
+  ✓ it raiseTo menaikkan batas yang lebih rendah dari target
+
+   PASS  Tests\Unit\Models\ProductTest
+  ✓ product can update harga                                             0.64s  
+  ✓ product bulk update harga                                            0.27s  
+  ✓ product supplier relationship                                        0.29s  
+  ✓ product multiple suppliers with different prices                     0.28s  
+  ✓ product creation automatically creates empty inventory stocks        0.49s  
+
+   FAIL  Tests\Unit\Models\StockOpnameItemTest
+  ✓ it can create stock opname item                                      0.32s  
+  ✓ it has relationships with other models                               0.30s  
+  ✓ it calculates average cost correctly                                 0.31s  
+  ✓ it returns zero average cost when no purchase history                0.26s  
+  ✓ it calculates total value correctly                                  0.26s  
+  ⨯ it calculates difference value correctly                             0.26s  
+  ⨯ it handles negative difference value                                 0.26s  
+  ⨯ it handles zero difference value                                     0.27s  
+  ✓ it casts decimal fields correctly                                    0.26s  
+  ✓ it handles foreign key constraints                                   0.26s  
+  ✓ it handles optional rak relationship                                 0.26s  
+  ✓ it validates required fields                                         0.25s  
+  ⨯ it calculates average cost only from past receipts                   0.26s  
+  ✓ it handles products with no receipts                                 0.26s  
+  ⨯ it calculates weighted average cost correctly                        0.26s  
+
+   FAIL  Tests\Unit\Models\StockOpnameTest
+  ✓ it can generate unique opname number                                 0.26s  
+  ✓ it can create stock opname                                           0.25s  
+  ✓ it has relationships with other models                               0.27s  
+  ✓ it can add stock opname items                                        0.27s  
+  ✓ stock opname item can calculate average cost                         0.28s  
+  ✓ stock opname item can calculate total value                          0.27s  
+  ⨯ stock opname item can calculate difference value                     0.27s  
+  ✓ it can change status to in progress                                  0.25s  
+  ✓ it can change status to completed                                    0.27s  
+  ⨯ it creates journal entries when approved with inventory increase     0.32s  
+  ⨯ it creates journal entries when approved with inventory decrease     0.28s  
+  ⨯ it does not create journal entries when no adjustment needed         0.27s  
+  ⨯ it handles multiple items correctly                                  0.28s  
+  ✓ it requires completed status before approval                         0.26s  
+  ✓ it requires items before approval                                    0.26s  
+  ✓ it syncs journal entries when opname data changes                    0.30s  
+  ✓ it has correct relationships                                         0.30s  
+  ✓ it scopes by cabang                                                  0.25s  
+  ✓ it logs global activity                                              0.25s  
+  ✓ it handles soft deletes                                              0.27s  
+  ✓ it validates required fields                                         0.27s  
+  ✓ it validates unique opname number                                    0.27s  
+  ✓ it handles foreign key constraints                                   0.27s  
+
+   FAIL  Tests\Unit\Models\StockTransferTest
+  ✓ it can create stock transfer                                         0.26s  
+  ✓ it has relationships with other models                               0.26s  
+  ⨯ it handles deleting event with cascading stock movement deletion     0.27s  
+  ⨯ it handles force deleting event with force cascading deletion        0.27s  
+  ⨯ it handles restoring event with cascading restoration                0.28s  
+  ✓ it handles updating event for quantity changes                       0.27s  
+  ✓ it only handles updating event for approved transfers                0.26s  
+  ✓ it can generate unique transfer number                               0.26s  
+
+   PASS  Tests\Unit\Observers\CashBankTransferObserverTest
+  ✓ creates journal entries when transfer is posted                      0.26s  
+  ✓ syncs journal entries when amount is updated on posted transfer      0.25s  
+  ✓ syncs journal entries when from coa is updated on posted transfer    0.25s  
+  ✓ syncs journal entries when to coa is updated on posted transfer      0.26s  
+  ✓ does not sync journal entries when non critical fields are updated   0.26s  
+  ✓ handles other fee in journal entries                                 0.25s  
+
+   PASS  Tests\Unit\Observers\CustomerReceiptItemObserverTest
+  ✓ it uses configured accounts receivable coa for receipt item journal  0.25s  
+
+   PASS  Tests\Unit\Observers\InvoiceObserverPostSalesTest
+  ✓ it throws runtime exception when ar coa is missing                   0.24s  
+  ✓ it throws runtime exception when revenue coa is missing              0.24s  
+  ✓ no partial journals remain after missing coa exception               0.24s  
+  ✓ ppn keluaran credit uses stored invoice tax not derived value        0.27s  
+  ✓ invoice whose header total does not match lines is rejected by bala… 0.27s  
+  ✓ calling post twice does not create duplicate entries                 0.26s  
+  ✓ successful posting writes info log                                   0.27s  
+  ✓ missing coa writes error log before throwing                         0.24s  
+  ✓ it throws when cost of sales cannot be derived and rolls back sales… 0.27s  
+  ✓ it can post using configured non legacy coa codes                    0.27s  
+
+   WARN  Tests\Unit\Observers\OtherSaleObserverTest
+  - creates journal entries when other sale is posted → Required test data (COA, Cabang, User) not found in database
+  - syncs journal entries when amount is updated on posted other sale → Required test data (COA, Cabang, User) not found in database
+  - syncs journal entries when transaction date is updated on posted other sale → Required test data (COA, Cabang, User) not found in database
+  - deletes journal entries when other sale is deleted → Required test data (COA, Cabang, User) not found in database
+  - does not create journal entries for draft other sale → Required test data (COA, Cabang, User) not found in database
+  - handles multiple other sale updates correctly → Required test data (COA, Cabang, User) not found in database
+
+   PASS  Tests\Unit\Observers\PurchaseOrderObserverTest
+  ✓ it creates asset records when purchase order is approved             0.32s  
+  ✓ it creates journal entries automatically when asset purchase order…  0.29s  
+  ✓ it handles multiple asset items correctly                            0.31s  
+  ✓ it prevents duplicate asset creation on reapproval                   0.30s  
+  ✓ it does not create journal entries for non asset purchase orders     0.27s  
+
+   FAIL  Tests\Unit\Observers\StockTransferItemObserverTest
+  ⨯ it does not create movements for draft transfer items                0.26s  
+  ✓ it creates and applies movements for approved transfer items         0.26s  
+  ✓ it syncs existing movements when an approved item quantity changes   0.27s  
+  ✓ it reverses movements when an approved item is deleted               0.27s  
+  ✓ it only deletes movements for the deleted item when same product ex… 0.28s  
+
+   FAIL  Tests\Unit\OrderRequestIndexSummaryLayoutTest
+  ⨯ it bounds order request index supplier and item summaries to prevent overlap
+
+   FAIL  Tests\Unit\OrderRequestInlineNavigatorMoneyMaskTest
+  ⨯ it masks inline navigator override price as live money input
+
+   FAIL  Tests\Unit\OrderRequestItemApprovalStatusStaticTest
+  ✓ it adds item approval columns and model helpers for order request items
+  ⨯ it wires item approval decisions into order request approval service
+  ✓ it uses real checkboxes and bulk status actions in the custom order request item navigator
+  ✓ it shows item approval summaries on index and relation manager
+  ✓ it requires explicit item decisions when approving an order request
+  ✓ it keeps the custom order request product select stable with native fallback options
+  ✓ it refreshes inline select2 controls after livewire refreshes
+  ⨯ it only allows approved order request items to feed purchase orders  0.01s  
+
+   FAIL  Tests\Unit\OrderRequestStatusTest
+  ⨯ OrderRequest::syncFulfillmentStatus() → it transitions approved → c… 0.01s  
+  ⨯ OrderRequest::syncFulfillmentStatus() → it transitions approved → partial when some items partially fulfilled
+  ✓ OrderRequest::syncFulfillmentStatus() → it stays approved when nothing is fulfilled
+  ✓ OrderRequest::syncFulfillmentStatus() → it does NOT transition a draft order
+  ✓ OrderRequest::syncFulfillmentStatus() → it does NOT transition a closed order
+  ⨯ OrderRequest::syncFulfillmentStatus() → it transitions partial → complete once last item is fulfilled
+  ✓ OrderRequest::syncFulfillmentStatus() → it remaining_quantity accessor returns correct value
+  ✓ OrderRequest::syncFulfillmentStatus() → it remaining_quantity is never negative
+
+   PASS  Tests\Unit\OrderRequestTriggersTest
+  ✓ manual order request creation                                        0.26s  
+  ✓ auto generated from sale order when stock insufficient               0.28s  
+  ✓ auto generated from minimum stock alert                              0.26s  
+  ✓ auto generated from production planning requirement                  0.25s  
+
+   PASS  Tests\Unit\OverdueStatusPresenterTest
+  ✓ it formats current and overdue labels for unpaid records             0.56s  
+  ✓ it handles paid and deleted invoice records                          0.25s  
+
+   PASS  Tests\Unit\PdfPreviewControllerTest
+  ✓ PdfPreviewController → Document Types Configuration → it has correc… 0.26s  
+  ✓ PdfPreviewController → Document Types Configuration → it maps order… 0.24s  
+  ✓ PdfPreviewController → Document Types Configuration → it maps purch… 0.24s  
+  ✓ PdfPreviewController → Document Types Configuration → it maps purch… 0.24s  
+  ✓ PdfPreviewController → Document Types Configuration → it maps quota… 0.26s  
+  ✓ PdfPreviewController → Document Types Configuration → it maps sale-… 0.24s  
+  ✓ PdfPreviewController → Document Types Configuration → it maps sales… 0.24s  
+  ✓ PdfPreviewController → resolveConfig method → it returns config for… 0.25s  
+  ✓ PdfPreviewController → resolveConfig method → it throws 404 for inv… 0.25s  
+  ✓ PdfPreviewController → resolveRecord method → it loads record with…  0.24s  
+  ✓ PdfPreviewController → resolveRecord method → it throws 404 for non… 0.25s  
+  ✓ PdfPreviewController → filename generation → it generates correct f… 0.24s  
+  ✓ PdfPreviewController → filename generation → it generates correct f… 0.24s  
+  ✓ PdfPreviewController → filename generation → it generates correct f… 0.24s  
+  ✓ PdfPreviewController → filename generation → it generates correct f… 0.29s  
+  ✓ PdfPreviewController → filename generation → it generates correct f… 0.25s  
+  ✓ PdfPreviewController → paper size and orientation → it sets correct… 0.25s  
+
+   PASS  Tests\Unit\PermissionsConsistencyTest
+  ✓ helper controller permissions match database permissions             0.33s  
+
+   PASS  Tests\Unit\ProductionPlanServiceTest
+  ✓ generated plan number is unique and matches pattern                  0.25s  
+
+   PASS  Tests\Unit\ProfitLossMultiDivisionExportPresenterTest
+  ✓ it shapes profit loss multi division rows with vtc percentages       0.27s  
+
+   FAIL  Tests\Unit\PurchaseFlowComprehensiveTest
+  ✓ Purchase Order Creation → it can create a draft purchase order       0.26s  
+  ✓ Purchase Order Creation → it can add items to purchase order         0.26s  
+  ✓ Purchase Order Creation → it can add currency to purchase order      0.25s  
+  ✓ Purchase Order Creation → it can add biaya to purchase order         0.26s  
+  ✓ Purchase Order Approval → it can approve a draft purchase order      0.26s  
+  ✓ Purchase Order Approval → it cannot approve an already approved pur… 0.26s  
+  ✓ Purchase Receipt Creation → it can create purchase receipt from app… 0.26s  
+  ✓ Purchase Receipt Creation → it can add items to purchase receipt     0.26s  
+  ✓ Purchase Receipt Completion → it can complete a purchase receipt     0.28s  
+  ✓ Invoice Generation from Purchase Receipt → it can generate invoice…  0.29s  
+  ✓ Invoice Generation from Purchase Receipt → it creates account payab… 0.29s  
+  ✓ Purchase Return Creation → it can create purchase return from recei… 0.26s  
+  ✓ Purchase Return Creation → it can add items to purchase return       0.35s  
+  ✓ Purchase Return Creation → it can approve purchase return            0.28s  
+  ⨯ Complete Purchase Flow Integration → it runs complete flow: PO -> R… 0.31s  
+  ✓ Purchase Flow Edge Cases → it handles partial receipt correctly      0.29s  
+  ✓ Purchase Flow Edge Cases → it can close purchase order manually      0.27s  
+  ✓ Purchase Flow Edge Cases → it cannot complete already completed PO   0.27s  
+  ✓ Purchase Flow Edge Cases → it calculates receipt fulfillment status… 0.27s  
+
+   PASS  Tests\Unit\PurchaseOrderItemNavigatorTest
+  ✓ it wires purchase order item forms to the custom navigator           0.01s  
+  ✓ it provides purchase order inline item operations and navigator UI
+
+   FAIL  Tests\Unit\PurchaseOrderResourceCreateTest
+  ✓ it validates purchase order creation data structure                  0.26s  
+  ⨯ it creates purchase order with complete data through service         0.26s  
+  ✓ it validates required fields for purchase order                      0.25s  
+  ✓ it handles currency relationships correctly                          0.26s  
+  ✓ it handles biaya relationships correctly                             0.27s  
+  ✓ it calculates total amount correctly with items only (biaya not inc… 0.40s  
+
+   PASS  Tests\Unit\PurchaseReportServiceTest
+  ✓ it builds purchase summary and service backed export rows            0.31s  
+
+=== INITIAL INVENTORY STOCK ===
+Product: Test Product
+Warehouse: Gudang provident
+Available Quantity: 
+Total Quantity: 
+
+=== STOCK MOVEMENT CREATED ===
+Type: manufacture_in
+Quantity: 8
+Product: Test Product
+Warehouse: Gudang provident
+Date: 2026-10-01 01:03:31
+Notes: Stock masuk dari penyelesaian produksi: QC-M-20261001-0001
+
+=== UPDATED INVENTORY STOCK ===
+Available Quantity:  (Expected: 8)
+Total Quantity:  (Expected: 8)
+
+=== MANUFACTURING ORDER STATUS ===
+Status: completed
+Expected: in_progress (since 8 < 10)
+
+=== MANUFACTURING ORDER STATUS (ALL PASSED) ===
+Status: completed
+Expected: completed (since 10 >= 10)
+
+   PASS  Tests\Unit\QualityControlManufactureTest
+  ✓ qc manufacture complete creates stock movement and updates inventor… 0.52s  
+  ✓ qc manufacture complete with all quantity passed updates mo status   0.47s  
+
+   FAIL  Tests\Unit\RolePermissionMappingTest
+  ⨯ roles have expected permissions based on mapping                     0.58s  
+
+   PASS  Tests\Unit\RolePermissionTest
+  ✓ role resource map has no unknown resources                           0.25s  
+  ✓ destructive actions are limited                                      0.24s  
+  ✓ auditor only gets view any                                           0.24s  
+
+   PASS  Tests\Unit\RolesExistenceTest
+  ✓ essential roles are seeded                                           0.35s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\MaterialIssueTest > it can complete materia…  Exception   
+  Stok tidak mencukupi untuk produk 10. Tersedia: 0, dibutuhkan: 5.00.
+
+  at app/Services/StockReservationService.php:64
+     60▕ 
+     61▕                 $freeQty = (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved;
+     62▕ 
+     63▕                 if ($freeQty < (float) $item->quantity) {
+  ➜  64▕                     throw new \Exception("Stok tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$freeQty}, dibutuhkan: {$item->quantity}.");
+     65▕                 }
+     66▕ 
+     67▕                 StockReservation::create([
+     68▕                     'material_issue_id' => $materialIssue->id,
+
+  1   app/Services/StockReservationService.php:64
+      [2m+3 vendor frames [22m
+  5   app/Services/StockReservationService.php:29
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\MaterialIssueTest > it handles stock reserv…  Exception   
+  Stok tidak mencukupi untuk produk 21. Tersedia: 0, dibutuhkan: 5.00.
+
+  at app/Services/StockReservationService.php:64
+     60▕ 
+     61▕                 $freeQty = (float) $inventoryStock->qty_available - (float) $inventoryStock->qty_reserved;
+     62▕ 
+     63▕                 if ($freeQty < (float) $item->quantity) {
+  ➜  64▕                     throw new \Exception("Stok tidak mencukupi untuk produk {$item->product_id}. Tersedia: {$freeQty}, dibutuhkan: {$item->quantity}.");
+     65▕                 }
+     66▕ 
+     67▕                 StockReservation::create([
+     68▕                     'material_issue_id' => $materialIssue->id,
+
+  1   app/Services/StockReservationService.php:64
+      [2m+3 vendor frames [22m
+  5   app/Services/StockReservationService.php:29
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameItemTest > it calculates difference…    
+  Failed asserting that -510000.0 matches expected 75000.
+
+  at tests/Unit/Models/StockOpnameItemTest.php:260
+    256▕         ]);
+    257▕ 
+    258▕         $differenceValue = $item->calculateDifferenceValue();
+    259▕ 
+  ➜ 260▕         $this->assertEquals(75000, $differenceValue); // 10 * 7500
+    261▕     }
+    262▕ 
+    263▕     #[Test]
+    264▕     public function it_handles_negative_difference_value()
+
+  1   tests/Unit/Models/StockOpnameItemTest.php:260
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameItemTest > it handles negative diffe…   
+  Failed asserting that 12000.0 matches expected -120000.
+
+  at tests/Unit/Models/StockOpnameItemTest.php:275
+    271▕         ]);
+    272▕ 
+    273▕         $differenceValue = $item->calculateDifferenceValue();
+    274▕ 
+  ➜ 275▕         $this->assertEquals(-120000, $differenceValue); // -20 * 6000
+    276▕     }
+    277▕ 
+    278▕     #[Test]
+    279▕     public function it_handles_zero_difference_value()
+
+  1   tests/Unit/Models/StockOpnameItemTest.php:275
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameItemTest > it handles zero differenc…   
+  Failed asserting that -750000.0 matches expected 0.
+
+  at tests/Unit/Models/StockOpnameItemTest.php:290
+    286▕         ]);
+    287▕ 
+    288▕         $differenceValue = $item->calculateDifferenceValue();
+    289▕ 
+  ➜ 290▕         $this->assertEquals(0, $differenceValue); // 0 * 10000
+    291▕     }
+    292▕ 
+    293▕     #[Test]
+    294▕     public function it_casts_decimal_fields_correctly()
+
+  1   tests/Unit/Models/StockOpnameItemTest.php:290
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameItemTest >…  InvalidArgumentException   
+  Quantity Received (50) tidak boleh melebihi sisa PO (4).
+
+  at app/Support/OrderRequestQuantityLock.php:228
+    224▕             : 'sisa PO';
+    225▕ 
+    226▕         $epsilon = 0.0001;
+    227▕         if (($qtyReceived - $limit['remaining_received']) > $epsilon) {
+  ➜ 228▕             throw new \InvalidArgumentException("Quantity Received ({$qtyReceived}) tidak boleh melebihi {$label} ({$limit['remaining_received']}).");
+    229▕         }
+    230▕ 
+    231▕         if (($qtyAccepted - $limit['remaining_accepted']) > $epsilon) {
+    232▕             throw new \InvalidArgumentException("Quantity Accepted ({$qtyAccepted}) tidak boleh melebihi {$label} ({$limit['remaining_accepted']}).");
+
+  1   app/Support/OrderRequestQuantityLock.php:228
+  2   app/Observers/PurchaseReceiptItemObserver.php:63
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameItemTest >…  InvalidArgumentException   
+  Quantity Received (10) tidak boleh melebihi sisa PO (1).
+
+  at app/Support/OrderRequestQuantityLock.php:228
+    224▕             : 'sisa PO';
+    225▕ 
+    226▕         $epsilon = 0.0001;
+    227▕         if (($qtyReceived - $limit['remaining_received']) > $epsilon) {
+  ➜ 228▕             throw new \InvalidArgumentException("Quantity Received ({$qtyReceived}) tidak boleh melebihi {$label} ({$limit['remaining_received']}).");
+    229▕         }
+    230▕ 
+    231▕         if (($qtyAccepted - $limit['remaining_accepted']) > $epsilon) {
+    232▕             throw new \InvalidArgumentException("Quantity Accepted ({$qtyAccepted}) tidak boleh melebihi {$label} ({$limit['remaining_accepted']}).");
+
+  1   app/Support/OrderRequestQuantityLock.php:228
+  2   app/Observers/PurchaseReceiptItemObserver.php:63
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameTest > stock opname item can calcula…   
+  Failed asserting that 145000.0 matches expected -50000.
+
+  at tests/Unit/Models/StockOpnameTest.php:294
+    290▕         ]);
+    291▕ 
+    292▕         $differenceValue = $item->calculateDifferenceValue();
+    293▕ 
+  ➜ 294▕         $this->assertEquals(-50000, $differenceValue); // -10 * 5000
+    295▕     }
+    296▕ 
+    297▕     #[Test]
+    298▕     public function it_can_change_status_to_in_progress()
+
+  1   tests/Unit/Models/StockOpnameTest.php:294
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameTest > it creates journal entries wh…   
+  Failed asserting that null is not null.
+
+  at tests/Unit/Models/StockOpnameTest.php:354
+    350▕         $this->assertCount(2, $journalEntries);
+    351▕ 
+    352▕         // Check debit entry (inventory increase)
+    353▕         $debitEntry = $journalEntries->where('debit', 50000)->first();
+  ➜ 354▕         $this->assertNotNull($debitEntry);
+    355▕         $this->assertEquals($this->inventoryCoa->id, $debitEntry->coa_id);
+    356▕         $this->assertEquals(50000, $debitEntry->debit);
+    357▕         $this->assertEquals(0, $debitEntry->credit);
+    358▕
+
+  1   tests/Unit/Models/StockOpnameTest.php:354
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameTest > it creates journal entries wh…   
+  Failed asserting that null is not null.
+
+  at tests/Unit/Models/StockOpnameTest.php:396
+    392▕         $this->assertCount(2, $journalEntries);
+    393▕ 
+    394▕         // Check debit entry (adjustment for decrease)
+    395▕         $debitEntry = $journalEntries->where('debit', 30000)->first();
+  ➜ 396▕         $this->assertNotNull($debitEntry);
+    397▕         $this->assertEquals($this->adjustmentCoa->id, $debitEntry->coa_id);
+    398▕ 
+    399▕         // Check credit entry (inventory decrease)
+    400▕         $creditEntry = $journalEntries->where('credit', 30000)->first();
+
+  1   tests/Unit/Models/StockOpnameTest.php:396
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameTest > it does not create journal en…   
+  Failed asserting that actual size 2 matches expected size 0.
+
+  at tests/Unit/Models/StockOpnameTest.php:430
+    426▕         $journalEntries = JournalEntry::where('source_type', StockOpname::class)
+    427▕             ->where('source_id', $opname->id)
+    428▕             ->get();
+    429▕ 
+  ➜ 430▕         $this->assertCount(0, $journalEntries);
+    431▕     }
+    432▕ 
+    433▕     #[Test]
+    434▕     public function it_handles_multiple_items_correctly()
+
+  1   tests/Unit/Models/StockOpnameTest.php:430
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockOpnameTest > it handles multiple items cor…   
+  Failed asserting that 790142.0 matches expected 5000.
+
+  at tests/Unit/Models/StockOpnameTest.php:477
+    473▕ 
+    474▕         $totalDebit = $journalEntries->sum('debit');
+    475▕         $totalCredit = $journalEntries->sum('credit');
+    476▕ 
+  ➜ 477▕         $this->assertEquals(5000, $totalDebit);
+    478▕         $this->assertEquals(5000, $totalCredit);
+    479▕     }
+    480▕ 
+    481▕     #[Test]
+
+  1   tests/Unit/Models/StockOpnameTest.php:477
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockTransferTest > it han…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk nulla. Stok saat ini: 0, diminta: 10.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockTransferTest > it han…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk earum. Stok saat ini: 0, diminta: 10.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Models\StockTransferTest > it han…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk suscipit. Stok saat ini: 0, diminta: 10.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Observers\StockTransferItemObserverTest > it does not…    
+  Failed asserting that 0.0 matches expected 100.0.
+
+  at tests/Unit/Observers/StockTransferItemObserverTest.php:78
+     74▕             'to_rak_id' => $this->toRak->id,
+     75▕         ]);
+     76▕ 
+     77▕         $this->assertDatabaseCount('stock_movements', 0);
+  ➜  78▕         $this->assertEquals(100.0, InventoryStock::query()->value('qty_available'));
+     79▕     }
+     80▕ 
+     81▕     #[Test]
+     82▕     public function it_creates_and_applies_movements_for_approved_transfer_items(): void
+
+  1   tests/Unit/Observers/StockTransferItemObserverTest.php:78
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestIndexSummaryLayoutTest > it bounds order r…   
+  Expected: renderIndexItemSummary(OrderRequest $record, int $limit = 3): \Illuminate\Support\HtmlString\n
+      {\n
+          $items = $record->relationLoaded('orderRequestItem')\n
+  ... (36 more lines)
+
+  To contain: width:260px;max-width:360px;overflow:hidden;
+
+  at tests/Unit/OrderRequestIndexSummaryLayoutTest.php:23
+     19▕         ->toContain('max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;')
+     20▕         ->toContain('max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;');
+     21▕ 
+     22▕     expect($itemBlock)
+  ➜  23▕         ->toContain('width:260px;max-width:360px;overflow:hidden;')
+     24▕         ->toContain('white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;')
+     25▕         ->not->toContain('min-width:260px;');
+     26▕ });
+     27▕
+
+  1   tests/Unit/OrderRequestIndexSummaryLayoutTest.php:23
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestInlineNavigatorMoneyMaskTest > it masks in…   
+  Expected: s(key = this.expandedKey) {\n
+              if (!key) return;\n
+  \n
+  ... (18 more lines)
+
+  To contain: inputmode="decimal"
+
+  at tests/Unit/OrderRequestInlineNavigatorMoneyMaskTest.php:15
+     11▕ 
+     12▕     $block = substr($file, max(0, $position - 300), 800);
+     13▕ 
+     14▕     expect($block)
+  ➜  15▕         ->toContain('inputmode="decimal"')
+     16▕         ->toContain('x-mask:dynamic="$money($input, \',\', \'.\', 2)"')
+     17▕         ->toContain('x-on:input.debounce.500ms=')
+     18▕         ->toContain("updateInlineItem(@js(\$row['key']), 'unit_price', \$event.target.value)");
+     19▕ });
+
+  1   tests/Unit/OrderRequestInlineNavigatorMoneyMaskTest.php:15
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestItemApprovalStatusStaticTest > it wires it…   
+  Expected: <?php\n
+  \n
+  namespace App\Services;\n
+  ... (605 more lines)
+
+  To contain: Keputusan item wajib diisi sebelum Order Request dapat di-approve.
+
+  at tests/Unit/OrderRequestItemApprovalStatusStaticTest.php:41
+     37▕ 
+     38▕     expect($service)
+     39▕         ->toContain('applyItemApprovalDecisions')
+     40▕         ->toContain('ensureAllItemsHaveApprovalDecision')
+  ➜  41▕         ->toContain('Keputusan item wajib diisi sebelum Order Request dapat di-approve.')
+     42▕         ->toContain('Masih ada item berstatus Draft. Ambil keputusan Approve atau Reject untuk semua item sebelum menyetujui Order Request.')
+     43▕         ->toContain('Alasan reject wajib diisi untuk item yang ditolak.')
+     44▕         ->toContain('OrderRequestItem::STATUS_APPROVED')
+     45▕         ->toContain('OrderRequestItem::STATUS_REJECTED')
+
+  1   tests/Unit/OrderRequestItemApprovalStatusStaticTest.php:41
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestItemApprovalStatusStaticTest > it only all…   
+  Expected: <?php\n
+  \n
+  namespace App\Filament\Resources;\n
+  ... (3536 more lines)
+
+  To contain: OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED
+
+  at tests/Unit/OrderRequestItemApprovalStatusStaticTest.php:222
+    218▕     $viewPage = project_file('app/Filament/Resources/OrderRequestResource/Pages/ViewOrderRequest.php');
+    219▕ 
+    220▕     expect($purchaseOrderResource)
+    221▕         ->toContain('public static function isOrderRequestItemEligibleForPurchaseOrder(OrderRequestItem $orderRequestItem): bool')
+  ➜ 222▕         ->toContain('OrderRequestItem::normalizeApprovalStatus($orderRequestItem->status ?? null) === OrderRequestItem::STATUS_APPROVED')
+    223▕         ->toContain('if (! static::isOrderRequestItemEligibleForPurchaseOrder($orderRequestItem))')
+    224▕         ->toContain('getAvailableOrderRequestItemGroups(OrderRequest $orderRequest): array')
+    225▕         ->toContain('buildOrderRequestItems(')
+    226▕         ->toContain('getAvailableOrderRequestSupplierIds(OrderRequest $orderRequest): array');
+
+  1   tests/Unit/OrderRequestItemApprovalStatusStaticTest.php:222
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestStatusTest > `OrderRequest::syncFulfillmen…   
+  Failed asserting that two strings are identical.
+  -'complete'
+  +'approved'
+  
+
+  at tests/Unit/OrderRequestStatusTest.php:52
+     48▕         ], ['status' => 'complete']);
+     49▕ 
+     50▕         $or->syncFulfillmentStatus();
+     51▕ 
+  ➜  52▕             expect($or->status)->toBe('complete');
+     53▕     });
+     54▕ 
+     55▕     it('transitions approved → partial when some items partially fulfilled', function () {
+     56▕         $or = makeOrderRequestMock('approved', [
+
+  1   tests/Unit/OrderRequestStatusTest.php:52
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestStatusTest > `OrderRequest::syncFulfillmen…   
+  Failed asserting that two strings are identical.
+  -'partial'
+  +'approved'
+  
+
+  at tests/Unit/OrderRequestStatusTest.php:63
+     59▕         ], ['status' => 'partial']);
+     60▕ 
+     61▕         $or->syncFulfillmentStatus();
+     62▕ 
+  ➜  63▕         expect($or->status)->toBe('partial');
+     64▕     });
+     65▕ 
+     66▕     it('stays approved when nothing is fulfilled', function () {
+     67▕         $or = makeOrderRequestMock('approved', [
+
+  1   tests/Unit/OrderRequestStatusTest.php:63
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\OrderRequestStatusTest > `OrderRequest::syncFulfillmen…   
+  Failed asserting that two strings are identical.
+  -'complete'
+  +'partial'
+  
+
+  at tests/Unit/OrderRequestStatusTest.php:104
+    100▕         ], ['status' => 'complete']);
+    101▕ 
+    102▕         $or->syncFulfillmentStatus();
+    103▕ 
+  ➜ 104▕             expect($or->status)->toBe('complete');
+    105▕     });
+    106▕ 
+    107▕     it('remaining_quantity accessor returns correct value', function () {
+    108▕         $item = new OrderRequestItem([
+
+  1   tests/Unit/OrderRequestStatusTest.php:104
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\PurchaseFlowComprehensiveTest > `Compl…  QueryException   
+  SQLSTATE[22003]: Numeric value out of range: 1264 Out of range value for column 'total_amount' at row 1 (Connection: mysql, SQL: update `purchase_orders` set `total_amount` = 27225000000.00, `purchase_orders`.`updated_at` = 2026-10-01 01:03:28 where `id` = 29)
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:595
+    591▕             $statement = $this->getPdo()->prepare($query);
+    592▕ 
+    593▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    594▕ 
+  ➜ 595▕             $statement->execute();
+    596▕ 
+    597▕             $this->recordsHaveBeenModified(
+    598▕                 ($count = $statement->rowCount()) > 0
+    599▕             );
+
+      [2m+10 vendor frames [22m
+  11  app/Services/PurchaseOrderService.php:34
+  12  tests/Unit/PurchaseFlowComprehensiveTest.php:700
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\PurchaseOrderResourceCreateTest > it creates purchase…    
+  Failed asserting that two strings are identical.
+  -'104500.00'
+  +'9927500000.00'
+  
+
+  at tests/Unit/PurchaseOrderResourceCreateTest.php:185
+    181▕     $service->updateTotalAmount($purchaseOrder);
+    182▕     $purchaseOrder->refresh();
+    183▕ 
+    184▕     // Purchase Order total now excludes biaya lain; those belong on Purchase Invoice.
+  ➜ 185▕     expect($purchaseOrder->total_amount)->toBe('104500.00');
+    186▕ });
+    187▕ 
+    188▕ it('validates required fields for purchase order', function () {
+    189▕     $this->actingAs($this->user);
+
+  1   tests/Unit/PurchaseOrderResourceCreateTest.php:185
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\RolePermissionMappingTest > roles have expected permis…   
+  Non-allowed roles have destructive permissions: Sales Manager
+Failed asserting that an array is empty.
+
+  at tests/Unit/RolePermissionMappingTest.php:90
+     86▕                 $q->where('name', 'like', 'delete %')
+     87▕                   ->orWhere('name', 'like', 'force-delete %');
+     88▕             })->pluck('name')->all();
+     89▕ 
+  ➜  90▕         $this->assertEmpty($rolesWithDestructive, 'Non-allowed roles have destructive permissions: ' . implode(', ', $rolesWithDestructive));
+     91▕     }
+     92▕ }
+     93▕
+
+  1   tests/Unit/RolePermissionMappingTest.php:90
+
+
+  Tests:    26 failed, 6 skipped, 156 passed (2069 assertions)
+  Duration: 53.01s
+

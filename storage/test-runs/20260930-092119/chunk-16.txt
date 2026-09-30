@@ -1,0 +1,173 @@
+
+   PASS  Tests\Unit\RupiahFormatterTest
+  ✓ MoneyHelper::rupiah() → it formats zero as Rp 0,00                   0.01s  
+  ✓ MoneyHelper::rupiah() → it formats 1000 as Rp 1.000,00
+  ✓ MoneyHelper::rupiah() → it formats 10000 as Rp 10.000,00
+  ✓ MoneyHelper::rupiah() → it formats 100000 as Rp 100.000,00
+  ✓ MoneyHelper::rupiah() → it formats 1000000 as Rp 1.000.000,00
+  ✓ MoneyHelper::rupiah() → it formats 10500000 as Rp 10.500.000,00
+  ✓ MoneyHelper::rupiah() → it formats 1000000000 as Rp 1.000.000.000,00
+  ✓ MoneyHelper::rupiah() → it accepts string "1000000" and formats as Rp 1.000.000,00
+  ✓ MoneyHelper::rupiah() → it accepts string "0" and formats as Rp 0,00
+  ✓ MoneyHelper::rupiah() → it handles null as Rp 0,00
+  ✓ MoneyHelper::rupiah() → it handles empty string as Rp 0,00
+  ✓ MoneyHelper::rupiah() → it keeps two decimal places for floats
+  ✓ MoneyHelper::rupiah() → it formats negative values with minus prefix -Rp
+  ✓ MoneyHelper::rupiah() → it does NOT contain a comma as thousands separator
+  ✓ MoneyHelper::rupiah() → it prefix is always "Rp " with trailing space, no dot, no uppercase RP
+  ✓ MoneyHelper::rupiah() → it keeps decimal separator for whole numbers
+  ✓ MoneyHelper::rupiahDecimal() → it formats 1500.75 with 2 decimals as Rp 1.500,75
+  ✓ MoneyHelper::rupiahDecimal() → it handles null as Rp 0,00
+  ✓ MoneyHelper::rupiahDecimal() → it uses comma as decimal separator (Indonesian format)
+  ✓ MoneyHelper::parse() → it parses "1.000.000" to float 1000000.0
+  ✓ MoneyHelper::parse() → it parses "1.500,75" to float 1500.75
+  ✓ MoneyHelper::parse() → it parses "Rp 1.000.000" to float 1000000.0
+  ✓ MoneyHelper::parse() → it parses plain "1000000" string to 1000000.0
+  ✓ MoneyHelper::parse() → it parses empty string to 0.0
+  ✓ MoneyHelper::parse() → it parses null to 0.0
+  ✓ MoneyHelper::parse() → it round-trips: format → parse → format gives same result
+  ✓ MoneyHelper::safeParse() → it returns numeric integers and floats without changing value
+  ✓ MoneyHelper::safeParse() → it returns unformatted numeric strings without re-parsing them
+  ✓ MoneyHelper::safeParse() → it parses formatted Indonesian values safely
+  ✓ MoneyHelper::safeParse() → it keeps ambiguous numeric-looking states stable for finance workflows
+  ✓ MoneyHelper::safeParse() → it returns 0.0 for null, empty string, and dash
+
+   PASS  Tests\Unit\SalesReportServiceTest
+  ✓ it builds sales pdf payload summary from service                     4.14s  
+
+   PASS  Tests\Unit\Services\DeliveryOrderServiceTest
+  ✓ it validates journal balance                                         0.45s  
+
+   PASS  Tests\Unit\Services\OtherSaleServiceTest
+  ✓ it uses configured accounts receivable coa when cash bank is absent  0.47s  
+
+   PASS  QualityControlServiceTest
+  ✓ resolve qc journal unit price idr uses stubbed historical rate
+  ✓ resolve qc journal unit price idr rounds only final amount
+
+   PASS  Tests\Unit\Services\RakServiceTest
+  ✓ generate kode rak without warehouse                                  0.57s  
+  ✓ generate kode rak logic                                              0.24s  
+
+   FAIL  Tests\Unit\Smoke\DestructivePermissionSmokeTest
+  ⨯ only allowed roles have destructive permissions                      0.45s  
+
+=== CREATING COMPREHENSIVE STOCK MOVEMENT TEST DATA ===
+
+--- STOCK IN FROM PURCHASE ---
+✓ Created PO: PO-STOCKIN-1790791420
+✓ Created PO Item
+✓ Created PR: PR-STOCKIN-1790791420
+✓ Created PR Item
+
+   FAIL  Tests\Unit\StockMovementComprehensiveTest
+  ⨯ it creates comprehensive stock movement test data                    0.29s  
+
+   PASS  JournalCurrencyAmountResolverTest
+  ✓ resolve preserves high precision amounts for qc valuation
+  ✓ resolve rounds idr to two decimals only at final amount
+
+   PASS  Tests\Unit\TaxCalculationTest
+  ✓ it normalizes eklusif to eksklusif
+  ✓ it normalizes inklusif
+  ✓ it normalizes non pajak
+  ✓ null defaults to eksklusif
+  ✓ tax type helper normalizes inclusive aliases without falling back to eklusif
+  ✓ non pajak returns same amount
+  ✓ eksklusif adds tax on top
+  ✓ eklusif old spelling adds tax on top
+  ✓ inklusif tax is extracted from price
+  ✓ inklusif total does not increase
+  ✓ zero rate always returns no tax
+  ✓ hitung subtotal non pajak
+  ✓ hitung subtotal eksklusif adds tax
+  ✓ hitung subtotal inklusif no extra charge
+  ✓ hitung subtotal with discount eksklusif
+  ✓ hitung subtotal with discount inklusif
+  ✓ hitung subtotal eklusif old spelling
+  ✓ inklusif ppn is less than eksklusif ppn
+  ✓ non pajak item tax rate ignored
+
+   PASS  Tests\Unit\TaxServiceTest
+  ✓ non pajak returns same amount
+  ✓ eksklusif calculates ppn and total
+  ✓ inklusif computes dpp and ppn correctly — rounded to nearest Rupiah (PMK 136/2023)
+  ✓ zero tax rate returns same total regardless of type
+  ✓ non pajak with non-zero rate still charges no tax
+  ✓ eksklusif 11% rate calculation
+  ✓ inklusif 11% rate calculation
+  ✓ normalizeType handles legacy eklusif typo
+  ✓ normalizeType handles inklusif variants
+  ✓ normalizeType handles non pajak variants
+  ✓ normalizeType defaults to Eksklusif for null or empty
+  ✓ hitungSubtotal non pajak: qty * price, no tax added
+  ✓ hitungSubtotal eksklusif: tax added on top
+  ✓ hitungSubtotal inklusif: total stays same, tax already inside
+  ✓ hitungSubtotal eksklusif with discount applied before tax
+  ✓ hitungSubtotal inklusif with discount applied before tax extraction
+  ✓ hitungSubtotal non pajak: tax rate input is ignored
+  ✓ hitungSubtotal legacy eklusif typo normalised to eksklusif
+  ✓ hitungSubtotal formatted indonesian money string is parsed correctly
+  ✓ compute throws InvalidArgumentException for negative amount
+  ✓ compute throws InvalidArgumentException when rate exceeds 100
+  ✓ compute throws InvalidArgumentException for negative rate
+  ✓ hitungSubtotal clamps discount above 100 to 100 percent
+  ✓ hitungSubtotal with null taxType uses Inklusif not Eksklusif
+  ✓ hitungSubtotal negative quantity is clamped to zero
+  ✓ hitungSubtotal logs error on TaxService exception and falls back to exclusive
+  ✓ eksklusif ppn and total are integers (rounded to nearest Rupiah)
+  ✓ inklusif dpp and ppn are integers (rounded to nearest Rupiah)
+  ✓ normalizeType maps English Inclusive to Inklusif
+  ✓ normalizeType maps English Exclusive to Eksklusif
+  ✓ compute Exclusive tax_type: price=2500000 rate=12 gives tax=300000 total=2800000
+  ✓ compute Inclusive tax_type: amount=2500000 rate=12 gives dpp=2232143 ppn=267857 total=2500000
+  ✓ hitungSubtotal with Exclusive tax_type adds tax on top
+  ✓ hitungSubtotal with Inclusive tax_type total stays same
+
+   PASS  Tests\Unit\ViewBalanceSheetPrintTest
+  ✓ it printPdf does not throw when as_of_date is set                    0.27s  
+  ✓ it getReportData exposes actual difference for unbalanced report     0.25s  
+
+   PASS  Tests\Unit\ViewBalanceSheetServiceBackedTest
+  ✓ it adapts balance sheet service totals into the legacy page payload  0.26s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\Smoke\DestructivePermissionSmokeTest > only allowed ro…   
+  Role Admin has destructive permission but is not in allowed list
+Failed asserting that an array contains 'Admin'.
+
+  at tests/Unit/Smoke/DestructivePermissionSmokeTest.php:39
+     35▕         })->pluck('name')->toArray();
+     36▕ 
+     37▕         // All roles that have destructive permissions should be subset of allowed
+     38▕         foreach ($rolesWithDestructive as $roleName) {
+  ➜  39▕             $this->assertContains($roleName, $allowed, "Role $roleName has destructive permission but is not in allowed list");
+     40▕         }
+     41▕ 
+     42▕         // And assert that at least one allowed role actually has destructive perms (sanity)
+     43▕         $found = false;
+
+  1   tests/Unit/Smoke/DestructivePermissionSmokeTest.php:39
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Unit\StockMovementComprehensiveTest > it creates…  Exception   
+  QC passed quantity (30) cannot exceed available quantity (0) in purchase order/order request.
+
+  at app/Observers/QualityControlObserver.php:84
+     80▕                 }
+     81▕ 
+     82▕                 // Validate passed_quantity individually
+     83▕                 if ($qualityControl->passed_quantity > $maxAccepted) {
+  ➜  84▕                     throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed available quantity ({$maxAccepted}) in purchase order/order request.");
+     85▕                 }
+     86▕ 
+     87▕                 // Validate total inspected (passed + rejected)
+     88▕                 $totalInspected = $qualityControl->passed_quantity + $qualityControl->rejected_quantity;
+
+  1   app/Observers/QualityControlObserver.php:84
+      [2m+11 vendor frames [22m
+  13  tests/Unit/StockMovementComprehensiveTest.php:183
+
+
+  Tests:    2 failed, 96 passed (211 assertions)
+  Duration: 7.53s
+

@@ -1,0 +1,614 @@
+
+   PASS  Tests\Feature\GroupedJournalEntriesAccessTest
+  ✓ unauthenticated users cannot access grouped journal entries          6.01s  
+  ✓ authenticated users can access grouped journal entries               2.07s  
+  ✓ grouped journal entries page loads with filters                      1.90s  
+  ✓ grouped journal entries route is registered                          1.60s  
+
+   PASS  Tests\Feature\GroupedJournalEntriesPageTest
+  ✓ page mounts successfully for authenticated user                      0.97s  
+  ✓ page shows filter labels after form is enabled                       0.90s  
+  ✓ page shows grouped view heading                                      0.53s  
+  ✓ summary returns zero totals when no journal entries exist            0.45s  
+  ✓ summary counts entries and sums debit/credit correctly               0.46s  
+  ✓ summary detects unbalanced entries                                   1.11s  
+  ✓ asset account balance = debit minus credit                           0.56s  
+  ✓ liability account balance = credit minus debit                       0.51s  
+  ✓ equity account balance = credit minus debit                          0.55s  
+  ✓ revenue account balance = credit minus debit                         0.46s  
+  ✓ expense account balance = debit minus credit                         0.47s  
+  ✓ entries on child COA are grouped under parent                        0.45s  
+  ✓ child totals accumulate correctly                                    0.46s  
+  ✓ entries directly on parent COA appear in parent entries array        0.48s  
+  ✓ two distinct parent COAs create two groups                           0.74s  
+  ✓ start_date filter excludes entries before the date                   1.02s  
+  ✓ end_date filter excludes entries after the date                      1.22s  
+  ✓ date range filter returns only entries within range                  1.06s  
+  ✓ journal_type filter returns only matching entries                    0.73s  
+  ✓ journal_type filter excludes all entries when no match               0.67s  
+  ✓ summary totals match manual sum of grouped data totals               0.65s  
+  ✓ component exposes groupedData property with correct count            0.88s  
+  ✓ component summary property is_balanced is true when debit equals cr… 0.82s  
+  ✓ component summary property is_balanced is false when unbalanced      0.88s  
+  ✓ applyFilters action reloads data after filter change                 0.93s  
+  ✓ resetFilters restores all data                                       1.00s  
+
+   PASS  Tests\Feature\HppPreviewControllerTest
+  ✓ hpp preview matches hpp service values                               0.88s  
+
+   PASS  Tests\Feature\HubAccessAndMoneyFormattingTest
+  ✓ super admin can access all hubs                                      1.13s  
+  ✓ owner can access all hubs                                            0.58s  
+  ✓ restricted user cannot access unauthorized hubs                      0.86s  
+  ✓ approval rule amount fields use indonesian money                     0.50s  
+  ✓ purchase invoice item price uses indonesian money                    0.63s  
+  ✓ journal entry relation manager uses indonesian money                 0.51s  
+
+   PASS  Tests\Feature\IncomeStatementDisplayOptionsTest
+  ✓ Income Statement Display Options → page can mount with default disp… 0.45s  
+  ✓ Income Statement Display Options → can toggle show only totals opti… 0.46s  
+  ✓ Income Statement Display Options → can toggle show parent accounts…  0.42s  
+  ✓ Income Statement Display Options → can toggle show child accounts o… 0.41s  
+  ✓ Income Statement Display Options → can toggle show zero balance opt… 0.42s  
+  ✓ Income Statement Display Options → displays income statement data c… 0.49s  
+  ✓ Income Statement Display Options → filters accounts with zero balan… 0.51s  
+  ✓ Income Statement Display Options → shows only totals when option is… 0.59s  
+  ✓ Income Statement Display Options → filters parent accounts correctl… 0.86s  
+  ✓ Income Statement Display Options → filters child accounts correctly  0.88s  
+  ✓ Income Statement Display Options → displays all account levels corr… 0.59s  
+  ✓ Income Statement Display Options → page renders without errors with… 0.44s  
+
+   FAIL  Tests\Feature\IncomeStatementServiceTest
+  ✓ service can generate basic income statement                          0.37s  
+  ✓ service correctly calculates revenue from credit entries             0.37s  
+  ✓ service correctly calculates expense from debit entries              0.36s  
+  ✓ service filters entries by date range                                0.36s  
+  ✓ service filters entries by cabang                                    0.35s  
+  ✓ service calculates net income as profit when revenue exceeds expens… 0.33s  
+  ✓ service calculates net income as loss when expense exceeds revenue   0.34s  
+  ✓ service provides summary statistics                                  0.34s  
+  ✓ service handles multiple revenue accounts                            0.35s  
+  ✓ service handles multiple expense accounts                            0.36s  
+  ✓ service excludes inactive accounts                                   0.36s  
+  ✓ service excludes accounts with zero balance                          0.37s  
+  ✓ service can compare two periods                                      0.38s  
+  ✓ service validates COA classification                                 0.36s  
+  ✓ service detects missing revenue accounts                             0.36s  
+  ⨯ service detects missing expense accounts                             0.40s  
+  ✓ service returns empty result when no entries exist                   0.38s  
+  ✓ service handles parent-child account relationships                   0.41s  
+  ✓ service generates complete 5-level income statement structure        0.42s  
+  ✓ service calculates gross profit correctly                            0.41s  
+  ✓ service calculates operating profit correctly                        0.41s  
+  ✓ service handles other income and expenses correctly                  0.41s  
+  ✓ service calculates tax expense and net profit correctly              0.41s  
+  ✓ service detects loss when expenses exceed revenue                    0.36s  
+  ✓ service validates COA classification for complete structure          0.36s  
+  ✓ service detects missing COGS accounts                                0.36s  
+  ✓ service detects missing operating expense accounts                   0.34s  
+  ✓ service compares periods for all 5 levels                            0.35s  
+  ✓ service handles zero revenue gracefully for margin calculations      0.34s  
+  ✓ service filters accounts by code prefix correctly                    0.35s  
+  ✓ service calculates percentage of revenue for each account            0.35s  
+  ✓ service can retrieve journal entries for drill-down                  0.35s  
+  ✓ service can filter drill-down entries by cabang                      0.35s  
+  ✓ service handles non-existent account in drill-down gracefully        0.34s  
+  ✓ service calculates percentage as zero when revenue is zero           0.35s  
+
+   FAIL  Tests\Feature\IndonesianMoneyValidationTest
+  ✓ indonesianMoney macro validation rule → it accepts a plain integer…  0.35s  
+  ✓ indonesianMoney macro validation rule → it accepts a formatted indo… 0.35s  
+  ✓ indonesianMoney macro validation rule → it accepts value with Rp pr… 0.34s  
+  ✓ indonesianMoney macro validation rule → it accepts empty/null value… 0.34s  
+  ✓ indonesianMoney macro validation rule → it rejects a truly invalid…  0.34s  
+  ✓ indonesianMoney dehydration parsing → it parses "1.000.000" correct… 0.34s  
+  ✓ indonesianMoney dehydration parsing → it parses "1.500.750" correct… 0.34s  
+  ✓ indonesianMoney dehydration parsing → it parses plain integer "1000… 0.35s  
+  ✓ indonesianMoney dehydration parsing → it returns 0 for null/empty s… 0.35s  
+  ✓ SupplierResource ProductsRelationManager supplier_price validation…  0.35s  
+  ✓ OrderRequestResource price field validation → it no longer has ->nu… 0.35s  
+  ✓ OrderRequestResource price field validation → it no longer has ->nu… 0.34s  
+  ✓ OrderRequestResource price field validation → it parses formatted o… 0.34s  
+  ⨯ OrderRequestResource price field validation → it updates manual ove… 0.35s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.35s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.34s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.24s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.67s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.36s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.28s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.24s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.27s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.35s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.34s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.24s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.27s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs use debounced live updates when calculations mu… 0.23s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.23s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.23s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.23s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.51s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.25s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.24s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.23s  
+  ✓ Manual money inputs without live calculations stay on blur → it upd… 0.23s  
+  ⨯ Manual money inputs without live calculations stay on blur → it upd… 0.23s  
+  ! Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ! Targeted scan: critical price fields no longer have ->numeric() con… 0.38s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.27s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.24s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.24s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ✓ Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ! Targeted scan: critical price fields no longer have ->numeric() con… 0.24s  
+  ! Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ! Targeted scan: critical price fields no longer have ->numeric() con… 0.23s  
+  ! Targeted scan: critical price fields no longer have ->numeric() con… 0.27s  
+
+   PASS  Tests\Feature\InternalControlAuditVerificationTest
+  ✓ Poin 1: Anti-Self-Approval & Tiered Approval Thresholds → it preven… 0.61s  
+  ✓ Poin 1: Anti-Self-Approval & Tiered Approval Thresholds → it requir… 0.91s  
+  ✓ Poin 1: Anti-Self-Approval & Tiered Approval Thresholds → it preven… 3.17s  
+  ✓ Poin 1: Anti-Self-Approval & Tiered Approval Thresholds → it enforc… 0.90s  
+  ✓ Poin 2: PO Price Deviation Controls → it auto-approves PO when item… 0.64s  
+  ✓ Poin 2: PO Price Deviation Controls → it sets PO to request_approva… 0.56s  
+  ✓ Poin 3: Strict QC Inspector Lock to Auth::id() → it strictly locks…  0.86s  
+  ✓ Poin 4: Supplier Invoice Number & Tax Invoice Number Duplicate Prev… 0.32s  
+  ✓ Poin 4: Supplier Invoice Number & Tax Invoice Number Duplicate Prev… 0.34s  
+  ✓ Poin 4: Supplier Invoice Number & Tax Invoice Number Duplicate Prev… 0.37s  
+  ✓ Poin 5: 3-Way Match Price Tolerance & Accounting Posting → it accep… 0.41s  
+  ✓ Poin 5: 3-Way Match Price Tolerance & Accounting Posting → it rejec… 0.41s  
+  ✓ Poin 5: 3-Way Match Price Tolerance & Accounting Posting → it posts… 0.42s  
+  ✓ Poin 6: QC Reject Follow-Up Actions → it creates draft PurchaseRetu… 0.44s  
+  ✓ Poin 6: QC Reject Follow-Up Actions → it resolves reduce_stock by d… 0.43s  
+  ✓ Poin 6: QC Reject Follow-Up Actions → it resolves wait_next_deliver… 0.47s  
+  ✓ Poin 7: Vendor Payment Transfer Validation & Proof File → it has pr… 0.67s  
+  ✓ Poin 7: Vendor Payment Transfer Validation & Proof File → it requir… 0.96s  
+
+   FAIL  Tests\Feature\Inventory\Adversarial\InventoryThreeWayReconciliationTest
+  ⨯ INV-RC-01: rekonsiliasi tiga arah stok fisik, pergerakan stock move… 0.45s  
+  ✓ INV-RC-02: integritas buku besar stock opname selalu memiliki total… 0.44s  
+  ✓ INV-RC-03: isolasi cabang mencegah akses gudang milik cabang lain s… 0.43s  
+
+   PASS  Tests\Feature\Inventory\Adversarial\StockAdjustmentBoundaryAndUnderflowTest
+  ✓ ADJ-BV-01: menolak persetujuan stock adjustment jika status bukan d… 0.43s  
+  ✓ ADJ-BV-02: menolak item adjustment dengan selisih kuantitas nol ata… 0.40s  
+  ✓ ADJ-BV-03: menolak ketidaksesuaian arah antara tipe adjustment dan…  0.41s  
+  ✓ ADJ-BV-04: menolak pengurangan kuantitas jika stok tidak ditemukan…  0.38s  
+
+   FAIL  Tests\Feature\Inventory\Adversarial\StockOpnameDiscrepancyAndJournalTest
+  ⨯ OPN-GL-01: surplus fisik menerbitkan jurnal Dr Persediaan dan Cr Pe… 0.40s  
+  ⨯ OPN-GL-02: defisit fisik (shrinkage) menerbitkan jurnal Dr Penyesua… 0.40s  
+  ✓ OPN-GL-03: opname tanpa selisih tidak menerbitkan jurnal, dan melem… 0.44s  
+
+   PASS  Tests\Feature\Inventory\Adversarial\StockOpnameStateAndWarehouseBoundaryTest
+  ✓ OPN-ST-01: menolak persetujuan stock opname jika status bukan compl… 0.39s  
+  ✓ OPN-ST-02: menolak persetujuan stock opname tanpa item               0.38s  
+  ✓ OPN-ST-03: menolak persetujuan jika rak item tidak sesuai dengan gu… 0.38s  
+  ✓ OPN-ST-04: menolak item opname tanpa produk atau tanpa rak           0.38s  
+
+   FAIL  Tests\Feature\Inventory\Adversarial\StockTransferSameWarehouseAndRollbackTest
+  ✓ TRF-BV-01: menolak transfer jika gudang dan rak asal sama persis de… 0.39s  
+  ⨯ TRF-BV-02: menolak transfer jika kuantitas non-positif atau spesifi… 0.41s  
+  ✓ TRF-BV-03: observer auto-sync memperbarui movement saat item diubah… 0.40s  
+
+   FAIL  Tests\Feature\Inventory\Adversarial\StockTransferStateAndSourceStockTest
+  ⨯ TRF-ST-01: requestTransfer hanya menerima transfer berstatus Draft…  0.43s  
+  ⨯ TRF-ST-02: approveStockTransfer menolak transfer yang bukan berstat… 0.49s  
+  ✓ TRF-ST-03: menolak persetujuan transfer jika stok fisik sumber di r… 0.79s  
+  ✓ TRF-ST-04: menolak persetujuan transfer jika baris stok sumber di r… 0.48s  
+
+   PASS  Tests\Feature\InventoryCardPreviewTest
+  ✓ inventory card preview uses shared dataset for preview and omits op… 0.71s  
+
+   PASS  Tests\Feature\InventoryFinanceImpactTest
+  ✓ inventory stock affects balance sheet                                3.34s  
+
+   FAIL  Tests\Feature\InventoryFlowTest
+  ✓ it creates a warehouse through the Filament create page              5.06s  
+  ✓ it creates racks for a warehouse                                     1.20s  
+  ⨯ it initializes inventory stock through Filament                      1.44s  
+  ✓ it validates stock locations and relationships                       1.07s  
+  ✓ it tests multi-warehouse support                                     1.07s  
+  ⨯ it edits inventory stock through Filament                            1.01s  
+  ✓ it displays warehouse details on the Filament view page              1.13s  
+  ✓ it displays inventory stock details on the Filament view page        1.12s  
+  ⨯ it covers the inventory management flow through finance posting      1.08s  
+
+   PASS  Tests\Feature\InventoryReportPreviewTest
+  ✓ inventory preview view renders service backed stock and aging data   0.47s  
+
+   PASS  Tests\Feature\InventoryReportTest
+  ✓ it can generate stock by warehouse report                            0.45s  
+  ✓ it can generate movement history report                              0.46s  
+  ✓ it can generate aging stock report                                   0.46s  
+  ✓ it filters stock report by warehouse                                 0.46s  
+  ✓ it filters movement report by product                                0.46s  
+  ✓ it calculates aging categories correctly                             0.45s  
+  ✓ it shows correct stock levels                                        0.46s  
+  ✓ it includes movement details in movement report                      0.45s  
+
+   PASS  Tests\Feature\InvoiceArFeatureTest
+  ✓ can generate invoice from confirmed delivery order                   0.49s  
+  ✓ posts invoice to accounts receivable                                 0.48s  
+  ✓ creates correct journal entries for invoice                          0.48s  
+  ✓ tracks aging for accounts receivable                                 0.48s  
+  ✓ handles customer payment and updates ar remaining                    0.48s  
+  ✓ generates ageing schedule report                                     0.50s  
+  ✓ calculates total totals correctly with tax                           0.49s  
+  ✓ handles multiple invoices per customer                               0.48s  
+  ✓ updates invoice status on full payment                               0.48s  
+  ✓ generates unique invoice numbers                                     0.49s  
+
+   PASS  Tests\Feature\InvoiceCurrencyAuditTest
+  ✓ invoice amount converted or has amount idr                           0.46s  
+
+   PASS  Tests\Feature\InvoiceDppCalculationTest
+  ✓ invoice dpp no discount no tax                                       0.56s  
+  ✓ invoice dpp with discount percentage                                 0.23s  
+  ✓ invoice dpp is pre tax not including ppn                             0.22s  
+  ✓ invoice dpp fixed formula differs from buggy formula                 0.24s  
+  ✓ invoice dpp zero discount still works                                0.22s  
+  ✓ invoice dpp multiple items sum                                       0.23s  
+  ✓ purchase invoice dpp no discount                                     0.23s  
+  ✓ purchase invoice dpp with discount                                   0.23s  
+  ✓ purchase invoice dpp is pre tax                                      0.22s  
+  ✓ purchase invoice dpp fixed differs from buggy                        0.23s  
+  ✓ purchase invoice dpp multiple items sum                              0.23s  
+  ✓ taxservice eksklusif dpp matches invoice dpp formula                 0.23s  
+  ✓ taxservice inklusif dpp calculated from gross                        0.23s  
+  ✓ taxservice non pajak dpp equals gross                                0.22s  
+
+   PASS  Tests\Feature\InvoiceEditAndDeliveryOrderTest
+  ✓ invoice item creation includes all required fields                   0.25s  
+  ✓ invoice item update preserves existing coa when provided             0.24s  
+
+   FAIL  Tests\Feature\InvoiceLineBreakdownPhase5BTest
+  ✓ it Isu 10: contoh UAT — 20 × 8.687, diskon 5%, PPN 11% eksklusif =…  0.23s  
+  ✓ it Isu 10: inklusif — total = nilai setelah diskon, DPP diekstrak,…  0.23s  
+  ✓ it Isu 10: kebijakan pembulatan dapat dikembalikan ke rupiah bulat…  0.23s  
+  ✓ it Isu 10: SO, quotation, dan invoice memakai perhitungan yang sama… 0.23s  
+  ✓ it Isu 10: format uang baku selalu 2 desimal sehingga sen tidak ter… 0.23s  
+  ✓ it Isu 10: invoice dari jalur Sales Order — price GROSS + rincian;…  0.35s  
+  ⨯ it Isu 10: invoice dari jalur Delivery Order — price GROSS (dulu NE… 0.36s  
+  ⨯ it Isu 10: invoice per DO untuk pengiriman sebagian — baris memakai… 0.33s  
+  ⨯ it Isu 10: SO inklusif pada jalur Delivery Order tidak lagi ditamba… 0.33s  
+  ✓ it Isu 10: SalesInvoiceLineBuilder — baris form dicocokkan ke item…  0.32s  
+  ✓ it Isu 10: breakdown() — invoice lama dengan price GROSS dan price…  0.33s  
+  ✓ it Isu 10: net_unit_price (dipakai retur) tidak bergantung pada apa… 0.32s  
+  ✓ it Isu 10: data lama tanpa subtotal (DPP) diturunkan dari total − P… 0.32s  
+  ✓ it Isu 10: invoices:backfill-line-breakdown — dry-run tidak menguba… 0.33s  
+  ✓ it Isu 10: PDF invoice memuat Harga × Qty = Jumlah, Diskon (% dan R… 0.35s  
+  ✓ it Isu 10: PDF Sales Order dan Quotation menampilkan 183.208,83 (bu… 0.32s  
+  ✓ it Isu 10: halaman Lihat invoice menampilkan rincian baris dan tota… 0.45s  
+  ✓ it Isu 10: invoice PDF tampil untuk invoice lama (rincian dihitung…  0.33s  
+  ✓ it Isu 10: endpoint PDF invoice berhasil (landscape, 12 kolom)       0.43s  
+  ✓ it Isu 10: retur customer memakai harga bersih (setelah diskon), bu… 0.24s  
+  ✓ it Isu 10: halaman Ubah invoice menampilkan rincian baris dan menyi… 0.53s  
+
+   PASS  Tests\Feature\InvoiceNumberGeneratorTest
+  ✓ generates first number when no invoices exist                        0.26s  
+  ✓ generates sequential numbers                                         0.24s  
+  ✓ considers invoices from other branches                               0.26s  
+  ✓ resets counter for new date                                          0.26s  
+  ✓ does not loop infinitely when all slots taken                        0.23s  
+
+   PASS  Tests\Feature\InvoicePaymentFlowConsistencyTest
+  ✓ converted invoice total drives receivable and partial receipt balan… 0.32s  
+
+   PASS  Tests\Feature\InvoiceResourceCurrencyConversionTest
+  ✓ invoice create form shows converted sale order values and stores th… 0.48s  
+  ✓ invoice edit keeps decimal item values when saved                    0.33s  
+  ✓ invoice list page shows converted rupiah values                      0.56s  
+
+   PASS  Tests\Feature\InvoiceServiceFeatureTest
+  ✓ tc inv 001 generates invoice number in correct format                0.25s  
+  ✓ tc inv 002 purchase invoice uses pinv prefix different from inv      0.23s  
+  ✓ tc inv 003 auto creates ar when sales invoice is created             0.23s  
+  ✓ tc inv 004 ar remaining equals total and paid is zero on creation    0.24s  
+  ✓ tc inv 005 other fee json array summed correctly                     0.23s  
+  ✓ tc inv 005b empty other fee returns zero                             0.23s  
+  ✓ tc inv 006 ppn dpp plus ppn equals total                             0.24s  
+  ✓ tc inv 007 invoice status becomes paid when ar remaining reaches ze… 0.24s  
+
+   PASS  Tests\Feature\JournalConsolidationPageTest
+  ✓ it builds the preview URL from the current filter state              0.32s  
+  ✓ it can export journal consolidation to excel                         0.39s  
+  ✓ it can export journal consolidation to pdf                           0.42s  
+  ✓ it returns grouped totals from the shared service payload            0.34s  
+
+   PASS  Tests\Feature\JournalConsolidationPreviewControllerTest
+  ✓ journal consolidation preview matches shared service when grouped b… 0.28s  
+  ✓ journal consolidation preview matches shared service in consolidate… 0.27s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncomeStatementServiceTest > service detects missin…   
+  Failed asserting that true is false.
+
+  at tests/Feature/IncomeStatementServiceTest.php:444
+    440▕     ChartOfAccount::factory()->create(['type' => 'Revenue']);
+    441▕ 
+    442▕     $validation = $this->service->validateCOAClassification();
+    443▕ 
+  ➜ 444▕     expect($validation['is_valid'])->toBeFalse();
+    445▕     expect($validation['issues'])->toContain('Tidak ada akun Expense. Pastikan ada akun beban di COA.');
+    446▕ });
+    447▕ 
+    448▕ test('service returns empty result when no entries exist', function () {
+
+  1   tests/Feature/IncomeStatementServiceTest.php:444
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IndonesianMoneyValidationTest > `OrderRequestResour…   
+  Failed asserting that actual size 1 matches expected size 2.
+
+  at tests/Feature/IndonesianMoneyValidationTest.php:302
+    298▕             ->map(fn (int $position) => substr($file, $position, 1400))
+    299▕             ->filter(fn (string $block) => str_contains($block, "label('Harga Override')"))
+    300▕             ->values();
+    301▕ 
+  ➜ 302▕         expect($moneyOverrideBlocks)->toHaveCount(2);
+    303▕ 
+    304▕         foreach ($moneyOverrideBlocks as $block) {
+    305▕             expect($block)
+    306▕                 ->toContain('$money($input,')
+
+  1   tests/Feature/IndonesianMoneyValidationTest.php:302
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IndonesianMoneyValidationTest > `Manual money input…   
+  Expecting [] not to be empty 'No money TextInput block foun…ce.php'.
+
+  at tests/Feature/IndonesianMoneyValidationTest.php:492
+    488▕                         $blocks[] = $block;
+    489▕                     }
+    490▕                 }
+    491▕ 
+  ➜ 492▕                 expect($blocks)->not->toBeEmpty("No money TextInput block found for {$field} in {$path}");
+    493▕ 
+    494▕                 $onBlurBlocks = array_filter(
+    495▕                     $blocks,
+    496▕                     fn (string $block) => str_contains($block, '->live(onBlur: true)')
+
+  1   tests/Feature/IndonesianMoneyValidationTest.php:492
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Inventory\Adversarial\Inventor…  ValidationException   
+  Akun pendapatan penyesuaian persediaan tidak ditemukan.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Services/StockAdjustmentService.php:271
+  3   app/Services/StockAdjustmentService.php:105
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Inventory\Adversarial\StockOpnameDiscrepancyAndJour…   
+  Failed asserting that 1 is identical to 1229.
+
+  at tests/Feature/Inventory/Adversarial/StockOpnameDiscrepancyAndJournalTest.php:37
+     33▕     expect((float) $debitEntry->debit)->toBe(250000.0);
+     34▕     expect((int) $debitEntry->coa_id)->toBe((int) $ctx['inventoryCoa']->id);
+     35▕ 
+     36▕     expect((float) $creditEntry->credit)->toBe(250000.0);
+  ➜  37▕     expect((int) $creditEntry->coa_id)->toBe((int) $ctx['adjustmentCoa']->id);
+     38▕ 
+     39▕     expect((float) $journals->sum('debit'))->toBe((float) $journals->sum('credit'));
+     40▕ });
+     41▕
+
+  1   tests/Feature/Inventory/Adversarial/StockOpnameDiscrepancyAndJournalTest.php:37
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Inventory\Adversarial\StockOpnameDiscrepancyAndJour…   
+  Failed asserting that 1 is identical to 1232.
+
+  at tests/Feature/Inventory/Adversarial/StockOpnameDiscrepancyAndJournalTest.php:67
+     63▕     $debitEntry = $journals->firstWhere('debit', '>', 0);
+     64▕     $creditEntry = $journals->firstWhere('credit', '>', 0);
+     65▕ 
+     66▕     expect((float) $debitEntry->debit)->toBe(200000.0);
+  ➜  67▕     expect((int) $debitEntry->coa_id)->toBe((int) $ctx['adjustmentCoa']->id);
+     68▕ 
+     69▕     expect((float) $creditEntry->credit)->toBe(200000.0);
+     70▕     expect((int) $creditEntry->coa_id)->toBe((int) $ctx['inventoryCoa']->id);
+     71▕
+
+  1   tests/Feature/Inventory/Adversarial/StockOpnameDiscrepancyAndJournalTest.php:67
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Inventory\Adversarial\StockTransferSameWarehouseAnd…   
+  Exception "Illuminate\Validation\ValidationException" not thrown.
+
+  at tests/Feature/Inventory/Adversarial/StockTransferSameWarehouseAndRollbackTest.php:59
+     55▕     ]);
+     56▕     $transferNoTargetRak->setRelation('stockTransferItem', collect([$itemWithoutRak]));
+     57▕ 
+     58▕     expect(fn () => $service->requestTransfer($transferNoTargetRak))
+  ➜  59▕         ->toThrow(ValidationException::class);
+     60▕ });
+     61▕ 
+     62▕ test('TRF-BV-03: observer auto-sync memperbarui movement saat item diubah dan membersihkan saat dihapus', function () {
+     63▕     $ctx = opnContext();
+
+  1   tests/Feature/Inventory/Adversarial/StockTransferSameWarehouseAndRollbackTest.php:59
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Inventory\Adversarial\StockTra…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Komoditas Uji Opname. Stok saat ini: 0, diminta: 5.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Inventory\Adversarial\StockTra…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Komoditas Uji Opname. Stok saat ini: 0, diminta: 5.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\InventoryFlowTest > it initializes…   ErrorException   
+  Attempt to read property "form" on null
+
+  at vendor/filament/forms/src/Testing/TestsForms.php:159
+    155▕     public function assertFormExists(): Closure
+    156▕     {
+    157▕         return function (string $name = 'form'): static {
+    158▕             /** @var ComponentContainer $form */
+  ➜ 159▕             $form = $this->instance()->{$name};
+    160▕ 
+    161▕             $livewireClass = $this->instance()::class;
+    162▕ 
+    163▕             Assert::assertInstanceOf(
+
+      [2m+5 vendor frames [22m
+  6   tests/Feature/InventoryFlowTest.php:148
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\InventoryFlowTest > it edits invent…  ErrorException   
+  Attempt to read property "form" on null
+
+  at vendor/filament/forms/src/Testing/TestsForms.php:159
+    155▕     public function assertFormExists(): Closure
+    156▕     {
+    157▕         return function (string $name = 'form'): static {
+    158▕             /** @var ComponentContainer $form */
+  ➜ 159▕             $form = $this->instance()->{$name};
+    160▕ 
+    161▕             $livewireClass = $this->instance()::class;
+    162▕ 
+    163▕             Assert::assertInstanceOf(
+
+      [2m+5 vendor frames [22m
+  6   tests/Feature/InventoryFlowTest.php:305
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\InventoryFlowTest > it covers the inventory managem…   
+  Failed asserting that 0.0 is identical to 10.0.
+
+  at tests/Feature/InventoryFlowTest.php:486
+    482▕         ->where('warehouse_id', $warehouse->id)
+    483▕         ->first();
+    484▕ 
+    485▕     expect($inventorySnapshot)->not()->toBeNull();
+  ➜ 486▕     expect((float) $inventorySnapshot->qty_available)->toBe(10.0);
+    487▕ 
+    488▕     // Post purchase receipt after QC approval
+    489▕     $result = $service->postPurchaseReceipt($purchaseReceipt->fresh('purchaseReceiptItem.purchaseOrderItem.product'));
+    490▕
+
+  1   tests/Feature/InventoryFlowTest.php:486
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\InvoiceLineBreakdownPhase5BTes…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 5B. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\InvoiceLineBreakdownPhase5BTes…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 5B. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\InvoiceLineBreakdownPhase5BTes…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 5B. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+
+  Tests:    15 failed, 6 risky, 255 passed (987 assertions)
+  Duration: 140.09s
+

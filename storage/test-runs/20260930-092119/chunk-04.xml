@@ -1,0 +1,702 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="308" assertions="1456" errors="5" failures="4" skipped="0" time="306.792773">
+    <testsuite name="Tests\Feature\CurrencyConversionResolverTest" file="tests/Feature/CurrencyConversionResolverTest.php" tests="1" assertions="7" errors="0" failures="0" skipped="0" time="5.846747">
+      <testcase name="currency conversion resolver converts amounts and formats symbols consistently" file="tests/Feature/CurrencyConversionResolverTest.php::currency conversion resolver converts amounts and formats symbols consistently" class="Tests\Feature\CurrencyConversionResolverTest" classname="Tests.Feature.CurrencyConversionResolverTest" assertions="7" time="5.846747"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CurrencyFiveDollarVerificationTest" file="Currency Five Dollar Verification (Tests\Feature\CurrencyFiveDollarVerification)" tests="2" assertions="34" errors="0" failures="0" skipped="0" time="2.010298">
+      <testcase name="Five usd on po flow maps to idr on invoice payment and journal keeps usd context" file="Currency Five Dollar Verification (Tests\Feature\CurrencyFiveDollarVerification)::Five usd on po flow maps to idr on invoice payment and journal keeps usd context" class="Tests\Feature\CurrencyFiveDollarVerificationTest" classname="Tests.Feature.CurrencyFiveDollarVerificationTest" assertions="6" time="1.104321"/>
+      <testcase name="Five usd on so flow stays idr in journal context with current logic" file="Currency Five Dollar Verification (Tests\Feature\CurrencyFiveDollarVerification)::Five usd on so flow stays idr in journal context with current logic" class="Tests\Feature\CurrencyFiveDollarVerificationTest" classname="Tests.Feature.CurrencyFiveDollarVerificationTest" assertions="28" time="0.905977"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CurrencyFlowTraceTest" file="tests/Feature/CurrencyFlowTraceTest.php" tests="2" assertions="13" errors="1" failures="0" skipped="0" time="2.314932">
+      <testcase name="trace $1255.5 USD purchase order through invoice and payment to financial reports" file="tests/Feature/CurrencyFlowTraceTest.php::trace $1255.5 USD purchase order through invoice and payment to financial reports" class="Tests\Feature\CurrencyFlowTraceTest" classname="Tests.Feature.CurrencyFlowTraceTest" assertions="13" time="1.050823">
+        <system-out>
+===== CURRENCY CONVERSION FLOW TRACE =====
+Transaction Amount: $1255.5 USD
+Exchange Rate: 1 USD = 16,000 IDR
+Expected IDR Amount: Rp 20.088.000
+
+STEP 1: CREATE PURCHASE ORDER
+------------------------------
+PO Number: PO-YG708W
+PO Amount (USD): $0.00
+Expected Invoice Amount (IDR): Rp 20.088.000
+PO Item Unit Price (USD): $1255.5
+PO Item Quantity: 1
+PO Item Total (USD): $1255.5
+PO Item Total (IDR, expected): Rp 20.088.000
+
+STEP 2: CREATE PURCHASE RECEIPT
+--------------------------------
+Receipt Number: RC-TEST-1255.5-1790763062
+Receipt Status: completed
+Items Received: 1
+Items Accepted: 1
+
+STEP 3: CREATE INVOICE FROM RECEIPT
+-----------------------------------
+Invoice Number: INV-20260930-0001
+Invoice Status: paid
+Invoice DPP (IDR): Rp 20.088.000
+Invoice Total (IDR): Rp 20.088.000
+Expected Invoice Total (IDR): Rp 20.088.000
+✓ Invoice stored in IDR correctly
+
+STEP 4: INVOICE ITEMS DETAIL
+-----------------------------
+Item Product: 2
+Item Unit Price (IDR): Rp 0
+Item Quantity: 1.00
+Item Total (IDR): Rp 20.088.000
+✓ All invoice items in IDR
+
+STEP 5: JOURNAL ENTRIES FROM INVOICE
+-------------------------------------
+Total Journal Entries: 2
+Entry 1 (DEBIT): Rp 20.088.000 (2100.10 - PENERIMAAN BARANG BELUM TERTAGIH)
+Entry 2 (CREDIT): Rp 20.088.000 (2110 - HUTANG DAGANG)
+Total Debit: Rp 20.088.000
+Total Credit: Rp 20.088.000
+✓ Journal entries balanced
+
+STEP 6: CREATE VENDOR PAYMENT
+------------------------------
+Payment ID: 2
+Amount Paid (IDR): Rp 0
+Payment Status: Paid
+Note: Payment amount_paid field shows 0 (check invoice total instead)
+Invoice Total (for payment): Rp 20.088.000
+✓ Payment matched with invoice total in IDR
+
+STEP 7: JOURNAL ENTRIES FROM PAYMENT
+-------------------------------------
+Total Payment Journal Entries: 0
+Total Debit: Rp 0
+Total Credit: Rp 0
+✓ Payment journal entries balanced
+
+STEP 8: BALANCE SHEET AFTER TRANSACTION
+----------------------------------------
+Assets: Rp 0
+Liabilities: Rp 0
+Equity: Rp 0
+Balance Sheet Difference: Rp 0
+Is Balanced: TRUE
+✓ Balance sheet remains balanced
+
+STEP 9: VERIFY ALL JOURNAL ENTRIES
+-----------------------------------
+Total All Journal Entries:
+  Total Debit: Rp 20.088.000
+  Total Credit: Rp 20.088.000
+  Difference: Rp 0
+✓ All journal entries balanced
+
+===== SUMMARY =====
+Original Amount: $1255.5 USD
+Converted to IDR: Rp 20.088.000
+Invoice Stored Amount: Rp 20.088.000
+Payment Amount: Rp 0
+Journal Entry Totals: Debit = Credit (balanced)
+Balance Sheet: Balanced ✓
+
+KESIMPULAN: Nominal USD dikonversi ke IDR saat pembuatan invoice,
+            disimpan sebagai IDR di semua dokumen (invoice, payment),
+            dan dilaporkan dalam IDR di laporan keuangan.
+            Integritas akuntansi terjaga sempurna.
+</system-out>
+      </testcase>
+      <testcase name="trace $1255.5 USD sale order through delivery, invoice and payment to financial reports" file="tests/Feature/CurrencyFlowTraceTest.php::trace $1255.5 USD sale order through delivery, invoice and payment to financial reports" class="Tests\Feature\CurrencyFlowTraceTest" classname="Tests.Feature.CurrencyFlowTraceTest" assertions="0" time="1.264109">
+        <error type="Illuminate\Validation\ValidationException">trace $1255.5 USD sale order through delivery, invoice and payment to financial reportsIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Produk laudantium. Stok saat ini: 0, diminta: 1.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1219
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1218
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at app/Services/ProductService.php:98
+at app/Observers/SaleOrderObserver.php:542
+at app/Observers/SaleOrderObserver.php:84
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1320
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1233
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1090
+at tests/Feature/CurrencyFlowTraceTest.php:365</error>
+        <system-out>
+===== SALES ORDER USD TO IDR FLOW =====
+Sale Amount: $1255.5 USD
+Exchange Rate: 1 USD = 16,000 IDR
+Expected IDR Amount: Rp 20.088.000
+
+STEP 1: CREATE SALE ORDER (USD)
+--------------------------------
+SO Number: SO-TYJV1R
+SO Amount: Rp 20.088.000
+
+STEP 2: CREATE SALE ORDER ITEM
+-------------------------------
+SO Item Unit Price (IDR): Rp 20.088.000
+SO Item Quantity: 1
+SO Item Total (IDR): Rp 20.088.000
+
+STEP 3: CREATE DELIVERY ORDER
+------------------------------
+</system-out>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\CurrencyRoundtripFormTest" file="Currency Roundtrip Form (Tests\Feature\CurrencyRoundtripForm)" tests="2" assertions="3" errors="0" failures="0" skipped="0" time="1.370718">
+      <testcase name="Idr to usd and back roundtrip preserves display value" file="Currency Roundtrip Form (Tests\Feature\CurrencyRoundtripForm)::Idr to usd and back roundtrip preserves display value" class="Tests\Feature\CurrencyRoundtripFormTest" classname="Tests.Feature.CurrencyRoundtripFormTest" assertions="1" time="0.665338"/>
+      <testcase name="Live input parsing formatting and persisted value consistent" file="Currency Roundtrip Form (Tests\Feature\CurrencyRoundtripForm)::Live input parsing formatting and persisted value consistent" class="Tests\Feature\CurrencyRoundtripFormTest" classname="Tests.Feature.CurrencyRoundtripFormTest" assertions="2" time="0.705380"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerAuditCommandsTest" file="tests/Feature/CustomerAuditCommandsTest.php" tests="6" assertions="37" errors="0" failures="0" skipped="0" time="3.868001">
+      <testcase name="it menemukan grup &quot;Daya Teknik Medika&quot; (varian nama + NPWP + telepon sama + kode menyerupai NIK), survivor = transaksi terbanyak" file="tests/Feature/CustomerAuditCommandsTest.php::it menemukan grup &quot;Daya Teknik Medika&quot; (varian nama + NPWP + telepon sama + kode menyerupai NIK), survivor = transaksi terbanyak" class="Tests\Feature\CustomerAuditCommandsTest" classname="Tests.Feature.CustomerAuditCommandsTest" assertions="17" time="0.686861"/>
+      <testcase name="it READ-ONLY: tidak ada baris atau nilai yang berubah pada customer maupun tabel transaksi" file="tests/Feature/CustomerAuditCommandsTest.php::it READ-ONLY: tidak ada baris atau nilai yang berubah pada customer maupun tabel transaksi" class="Tests\Feature\CustomerAuditCommandsTest" classname="Tests.Feature.CustomerAuditCommandsTest" assertions="1" time="0.686912"/>
+      <testcase name="it --no-csv tidak menulis berkas; tanpa duplikat melaporkan 0 grup dan tidak membuat CSV" file="tests/Feature/CustomerAuditCommandsTest.php::it --no-csv tidak menulis berkas; tanpa duplikat melaporkan 0 grup dan tidak membuat CSV" class="Tests\Feature\CustomerAuditCommandsTest" classname="Tests.Feature.CustomerAuditCommandsTest" assertions="4" time="0.681652"/>
+      <testcase name="it customer terhapus (soft delete) tidak ikut diaudit" file="tests/Feature/CustomerAuditCommandsTest.php::it customer terhapus (soft delete) tidak ikut diaudit" class="Tests\Feature\CustomerAuditCommandsTest" classname="Tests.Feature.CustomerAuditCommandsTest" assertions="1" time="0.745077"/>
+      <testcase name="it audit limit kredit menandai limit 0, limit sangat tinggi, tempo 0, dan piutang melebihi limit; yang wajar tidak muncul" file="tests/Feature/CustomerAuditCommandsTest.php::it audit limit kredit menandai limit 0, limit sangat tinggi, tempo 0, dan piutang melebihi limit; yang wajar tidak muncul" class="Tests\Feature\CustomerAuditCommandsTest" classname="Tests.Feature.CustomerAuditCommandsTest" assertions="11" time="0.615563"/>
+      <testcase name="it ambang --threshold dapat diubah dan piutang berjalan sama dengan CreditValidationService" file="tests/Feature/CustomerAuditCommandsTest.php::it ambang --threshold dapat diubah dan piutang berjalan sama dengan CreditValidationService" class="Tests\Feature\CustomerAuditCommandsTest" classname="Tests.Feature.CustomerAuditCommandsTest" assertions="3" time="0.451936"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerFeedbackAuditVerificationTest" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php" tests="7" assertions="33" errors="0" failures="0" skipped="0" time="4.460870">
+      <testcase name="Point 1: 1 QC and 1 GRN generated for multi-item PO arrival" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 1: 1 QC and 1 GRN generated for multi-item PO arrival" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="7" time="0.565500"/>
+      <testcase name="Point 2: QC draft locks quantity with clear message and auto-cancels when PO closes" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 2: QC draft locks quantity with clear message and auto-cancels when PO closes" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="6" time="0.872597"/>
+      <testcase name="Point 3: Invoice references PO + Receipt directly without OR, and rejects duplicate supplier invoice &amp; tax invoice" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 3: Invoice references PO + Receipt directly without OR, and rejects duplicate supplier invoice &amp; tax invoice" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="4" time="0.721522"/>
+      <testcase name="Point 4: PO enforces warehouse selection and locks branch to Pusat" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 4: PO enforces warehouse selection and locks branch to Pusat" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="2" time="0.505680"/>
+      <testcase name="Point 5: Only users assigned to PO warehouse can perform QC (unless Super Admin)" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 5: Only users assigned to PO warehouse can perform QC (unless Super Admin)" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="3" time="0.512971"/>
+      <testcase name="Point 6: Order Request supports simplified fields required_date and purpose" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 6: Order Request supports simplified fields required_date and purpose" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="2" time="0.601309"/>
+      <testcase name="Point 7: Rejected items trigger reduce_stock, return_supplier, and wait_next_delivery actions correctly" file="tests/Feature/CustomerFeedbackAuditVerificationTest.php::Point 7: Rejected items trigger reduce_stock, return_supplier, and wait_next_delivery actions correctly" class="Tests\Feature\CustomerFeedbackAuditVerificationTest" classname="Tests.Feature.CustomerFeedbackAuditVerificationTest" assertions="9" time="0.681291"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptCashPaymentTest" file="Customer Receipt Cash Payment (Tests\Feature\CustomerReceiptCashPayment)" tests="1" assertions="16" errors="0" failures="0" skipped="0" time="0.655750">
+      <testcase name="Cash payment creates correct journal entries and updates ar" file="Customer Receipt Cash Payment (Tests\Feature\CustomerReceiptCashPayment)::Cash payment creates correct journal entries and updates ar" class="Tests\Feature\CustomerReceiptCashPaymentTest" classname="Tests.Feature.CustomerReceiptCashPaymentTest" assertions="16" time="0.655750">
+        <system-out>
+=== JOURNAL ENTRIES CREATED ===
+COA: 1120 - PIUTANG DAGANG
+Description: Customer receipt for receipt id 2
+Debit: 0.00, Credit: 1000000.00
+Reference: REC-2
+---
+COA: 942749 - Test Account 308713
+Description: Bank/Cash for receipt id 2 via cash
+Debit: 1000000.00, Credit: 0.00
+Reference: REC-2
+---
+=== ACCOUNT RECEIVABLE STATUS ===
+Total: 1000000.00
+Paid: 1000000.00
+Remaining: 0.00
+Status: Lunas
+=== INVOICE STATUS ===
+Status: paid</system-out>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptControlsPhase5ATest" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php" tests="32" assertions="182" errors="0" failures="0" skipped="0" time="38.677093">
+      <testcase name="it Isu 7: daftar akun tidak memuat akun induk, DEPOSITO, maupun INVESTASI (jembatan sebelum ada penanda)" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: daftar akun tidak memuat akun induk, DEPOSITO, maupun INVESTASI (jembatan sebelum ada penanda)" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="4" time="0.471626"/>
+      <testcase name="it Isu 7: default akun hanya bila kandidatnya tepat satu; bila lebih, dikosongkan (tidak jatuh ke akun induk)" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: default akun hanya bila kandidatnya tepat satu; bila lebih, dikosongkan (tidak jatuh ke akun induk)" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="3" time="0.450390"/>
+      <testcase name="it Isu 7: setelah ada akun bertanda is_cash_bank, HANYA akun bertanda yang dapat dipilih" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: setelah ada akun bertanda is_cash_bank, HANYA akun bertanda yang dapat dipilih" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="5" time="0.474963"/>
+      <testcase name="it Isu 7: coa:flag-cash-bank — dry-run tidak mengubah; --apply menandai kandidat + CSV; --codes membatasi; kode asing ditolak" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: coa:flag-cash-bank — dry-run tidak mengubah; --apply menandai kandidat + CSV; --codes membatasi; kode asing ditolak" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="9" time="0.520730"/>
+      <testcase name="it Isu 7: daftar invoice disaring dari AR (sisa &gt; 0) — invoice lunas hilang, invoice SO parsial tetap muncul" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: daftar invoice disaring dari AR (sisa &gt; 0) — invoice lunas hilang, invoice SO parsial tetap muncul" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="4" time="0.828267"/>
+      <testcase name="it Isu 7: pengguna non-&quot;all&quot; tidak melihat invoice cabang lain milik customer yang sama" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: pengguna non-&quot;all&quot; tidak melihat invoice cabang lain milik customer yang sama" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="2" time="2.036687"/>
+      <testcase name="it Isu 7: allocator — kelebihan bayar ditolak dengan pesan jelas (nominal, sisa, kelebihan) dan TIDAK dipotong senyap" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: allocator — kelebihan bayar ditolak dengan pesan jelas (nominal, sisa, kelebihan) dan TIDAK dipotong senyap" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="3" time="1.605892"/>
+      <testcase name="it Isu 7: allocator — dengan opsi deposit, nominal diterapkan sebesar sisa dan kelebihan dilaporkan" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: allocator — dengan opsi deposit, nominal diterapkan sebesar sisa dan kelebihan dilaporkan" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="3" time="1.215644"/>
+      <testcase name="it Isu 7: allocator — invoice bukan milik customer, sudah lunas, tanpa pilihan, dan metode Deposit yang melebihi ditolak" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: allocator — invoice bukan milik customer, sudah lunas, tanpa pilihan, dan metode Deposit yang melebihi ditolak" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="5" time="0.754181"/>
+      <testcase name="it Isu 7: allocator — semua invoice satu cabang (D9-A); pengguna non-&quot;all&quot; hanya cabangnya" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: allocator — semua invoice satu cabang (D9-A); pengguna non-&quot;all&quot; hanya cabangnya" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="5" time="0.661594"/>
+      <testcase name="it Isu 7: allocator — pada mode ubah, nominal penerimaan sendiri dikembalikan ke sisa tagihan" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: allocator — pada mode ubah, nominal penerimaan sendiri dikembalikan ke sisa tagihan" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="2" time="0.696095"/>
+      <testcase name="it Isu 7: akun penerima harus akun yang sah untuk metode pembayaran" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: akun penerima harus akun yang sah untuk metode pembayaran" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="8" time="0.774216"/>
+      <testcase name="it Isu 7: penerimaan pas — cabang = cabang invoice (bukan cabang customer), AR lunas, tanpa deposit" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: penerimaan pas — cabang = cabang invoice (bukan cabang customer), AR lunas, tanpa deposit" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="10" time="1.225707"/>
+      <testcase name="it Isu 7: kelebihan bayar tanpa opsi deposit DITOLAK — tidak ada receipt, AR tidak berubah, pesan pada field total" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: kelebihan bayar tanpa opsi deposit DITOLAK — tidak ada receipt, AR tidak berubah, pesan pada field total" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="8" time="1.205497"/>
+      <testcase name="it Isu 7: kelebihan bayar dengan opsi deposit → Deposit Customer + jurnal Kas/Bank debit, Deposit Pelanggan kredit (cabang invoice)" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: kelebihan bayar dengan opsi deposit → Deposit Customer + jurnal Kas/Bank debit, Deposit Pelanggan kredit (cabang invoice)" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="16" time="1.382415"/>
+      <testcase name="it Isu 7: kelebihan bayar dengan opsi deposit ditolak bila akun Deposit Pelanggan belum ada (tidak ada uang tanpa jurnal)" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: kelebihan bayar dengan opsi deposit ditolak bila akun Deposit Pelanggan belum ada (tidak ada uang tanpa jurnal)" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="7" time="1.480276"/>
+      <testcase name="it Isu 7: invoice dari dua cabang dalam satu penerimaan ditolak dengan pesan pada field Cabang" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: invoice dari dua cabang dalam satu penerimaan ditolak dengan pesan pada field Cabang" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="6" time="1.169183"/>
+      <testsuite name="it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima" tests="4" assertions="24" errors="0" failures="0" skipped="0" time="4.571662">
+        <testcase name="it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('parent_kas_bank')&quot;" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('parent_kas_bank')&quot;" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="6" time="1.316221"/>
+        <testcase name="it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('parent_bank')&quot;" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('parent_bank')&quot;" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="6" time="1.109824"/>
+        <testcase name="it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('bca_deposito')&quot;" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('bca_deposito')&quot;" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="6" time="1.080747"/>
+        <testcase name="it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('bca_investasi')&quot;" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima with data set &quot;('bca_investasi')&quot;" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="6" time="1.064869"/>
+      </testsuite>
+      <testcase name="it Isu 7: tanpa invoice terpilih ditolak — tidak ada lagi alokasi senyap ke invoice pertama" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: tanpa invoice terpilih ditolak — tidak ada lagi alokasi senyap ke invoice pertama" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="3" time="1.113959"/>
+      <testcase name="it Isu 7: form Buat — cabang tidak diisi dari customer, kolom cabang tidak dapat diubah manual, dan opsi deposit tersedia" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: form Buat — cabang tidak diisi dari customer, kolom cabang tidak dapat diubah manual, dan opsi deposit tersedia" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="13" time="1.018387"/>
+      <testcase name="it Isu 7: metode Deposit menyembunyikan opsi kelebihan-sebagai-deposit" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: metode Deposit menyembunyikan opsi kelebihan-sebagai-deposit" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="4" time="1.012442"/>
+      <testcase name="it Isu 7: pilihan COA pada form mengikuti daftar sah (tanpa induk/deposito/investasi) dan default kosong bila ambigu" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: pilihan COA pada form mengikuti daftar sah (tanpa induk/deposito/investasi) dan default kosong bila ambigu" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="3" time="1.046543"/>
+      <testcase name="it Isu 7: halaman Ubah menolak nominal melebihi sisa (tanpa pemotongan senyap) dan tetap memakai akun sah" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: halaman Ubah menolak nominal melebihi sisa (tanpa pemotongan senyap) dan tetap memakai akun sah" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="13" time="1.727121"/>
+      <testcase name="it Isu 7: tabel invoice tidak lagi memuat kolom Penyesuaian Sisa maupun Select2 CDN; kelebihan tidak dipotong dengan alert()" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: tabel invoice tidak lagi memuat kolom Penyesuaian Sisa maupun Select2 CDN; kelebihan tidak dipotong dengan alert()" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="7" time="0.740802"/>
+      <testcase name="it Isu 7: teks bantuan menjelaskan perilaku sebenarnya (kelebihan ditolak / deposit)" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: teks bantuan menjelaskan perilaku sebenarnya (kelebihan ditolak / deposit)" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="2" time="0.716657"/>
+      <testcase name="it Isu 7: halaman Lihat menampilkan cabang dan kelebihan yang dicatat sebagai deposit" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: halaman Lihat menampilkan cabang dan kelebihan yang dicatat sebagai deposit" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="4" time="1.215246"/>
+      <testcase name="it Isu 7: master:readiness — akun kas/bank &quot;sebagian&quot; sampai ada yang ditandai, lalu &quot;siap&quot;" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: master:readiness — akun kas/bank &quot;sebagian&quot; sampai ada yang ditandai, lalu &quot;siap&quot;" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="4" time="0.676774"/>
+      <testcase name="it Isu 7: coa:flag-cash-bank memberi pesan jelas (bukan galat SQL) bila migrasi is_cash_bank belum dijalankan" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: coa:flag-cash-bank memberi pesan jelas (bukan galat SQL) bila migrasi is_cash_bank belum dijalankan" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="4" time="0.911747"/>
+      <testcase name="it Isu 7: penanda &quot;AR sudah diperbarui&quot; milik ID lama tidak menular ke penerimaan baru ber-ID sama" file="tests/Feature/CustomerReceiptControlsPhase5ATest.php::it Isu 7: penanda &quot;AR sudah diperbarui&quot; milik ID lama tidak menular ke penerimaan baru ber-ID sama" class="Tests\Feature\CustomerReceiptControlsPhase5ATest" classname="Tests.Feature.CustomerReceiptControlsPhase5ATest" assertions="1" time="6.972390"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptFeatureTest" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)" tests="10" assertions="22" errors="0" failures="0" skipped="0" time="7.211135">
+      <testcase name="Can create customer receipt with cash payment" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can create customer receipt with cash payment" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="4" time="1.013423"/>
+      <testcase name="Can allocate payment to single invoice" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can allocate payment to single invoice" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="2" time="0.937778"/>
+      <testcase name="Can allocate partial payment to invoice" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can allocate partial payment to invoice" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="2" time="0.751879"/>
+      <testcase name="Can allocate payment to multiple invoices" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can allocate payment to multiple invoices" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="4" time="0.532516"/>
+      <testcase name="Can handle overpayment and create deposit" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can handle overpayment and create deposit" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="2" time="0.514743"/>
+      <testcase name="Can use deposit for payment" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can use deposit for payment" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="2" time="1.101922"/>
+      <testcase name="Creates correct journal entries for payment" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Creates correct journal entries for payment" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="1" time="0.742108"/>
+      <testcase name="Can handle split payment methods" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can handle split payment methods" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="2" time="0.476340"/>
+      <testcase name="Validates payment amount matches allocation" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Validates payment amount matches allocation" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="1" time="0.506184"/>
+      <testcase name="Can print receipt" file="Customer Receipt Feature (Tests\Feature\CustomerReceiptFeature)::Can print receipt" class="Tests\Feature\CustomerReceiptFeatureTest" classname="Tests.Feature.CustomerReceiptFeatureTest" assertions="2" time="0.634243"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptJournalIntegrationTest" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)" tests="6" assertions="38" errors="0" failures="0" skipped="0" time="3.359462">
+      <testcase name="Journal entries are created when customer receipt is created with paid status" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)::Journal entries are created when customer receipt is created with paid status" class="Tests\Feature\CustomerReceiptJournalIntegrationTest" classname="Tests.Feature.CustomerReceiptJournalIntegrationTest" assertions="5" time="0.749478"/>
+      <testcase name="Duplicate selected invoices do not double count account receivable updates" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)::Duplicate selected invoices do not double count account receivable updates" class="Tests\Feature\CustomerReceiptJournalIntegrationTest" classname="Tests.Feature.CustomerReceiptJournalIntegrationTest" assertions="7" time="0.518327"/>
+      <testcase name="Journal entries are updated when customer receipt amount is changed" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)::Journal entries are updated when customer receipt amount is changed" class="Tests\Feature\CustomerReceiptJournalIntegrationTest" classname="Tests.Feature.CustomerReceiptJournalIntegrationTest" assertions="1" time="0.507971"/>
+      <testcase name="Journal entries are NOT deleted when customer receipt is soft deleted" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)::Journal entries are NOT deleted when customer receipt is soft deleted" class="Tests\Feature\CustomerReceiptJournalIntegrationTest" classname="Tests.Feature.CustomerReceiptJournalIntegrationTest" assertions="8" time="0.487214"/>
+      <testcase name="Customer receipt journal resolves currency from detail invoice without selected invoices" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)::Customer receipt journal resolves currency from detail invoice without selected invoices" class="Tests\Feature\CustomerReceiptJournalIntegrationTest" classname="Tests.Feature.CustomerReceiptJournalIntegrationTest" assertions="15" time="0.515998"/>
+      <testcase name="Customer receipt journal rejects mixed currency rates" file="Customer Receipt Journal Integration (Tests\Feature\CustomerReceiptJournalIntegration)::Customer receipt journal rejects mixed currency rates" class="Tests\Feature\CustomerReceiptJournalIntegrationTest" classname="Tests.Feature.CustomerReceiptJournalIntegrationTest" assertions="2" time="0.580474"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptJournalTest" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)" tests="6" assertions="55" errors="0" failures="0" skipped="0" time="7.372441">
+      <testcase name="It creates correct journal entries for cash bank customer receipt" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)::It creates correct journal entries for cash bank customer receipt" class="Tests\Feature\CustomerReceiptJournalTest" classname="Tests.Feature.CustomerReceiptJournalTest" assertions="11" time="1.289605"/>
+      <testcase name="It only creates two total journal entries for a single cash receipt" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)::It only creates two total journal entries for a single cash receipt" class="Tests\Feature\CustomerReceiptJournalTest" classname="Tests.Feature.CustomerReceiptJournalTest" assertions="3" time="1.398853"/>
+      <testcase name="It creates correct journal entries for bank customer receipt" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)::It creates correct journal entries for bank customer receipt" class="Tests\Feature\CustomerReceiptJournalTest" classname="Tests.Feature.CustomerReceiptJournalTest" assertions="11" time="1.699526"/>
+      <testcase name="It creates correct journal entries for deposit customer receipt" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)::It creates correct journal entries for deposit customer receipt" class="Tests\Feature\CustomerReceiptJournalTest" classname="Tests.Feature.CustomerReceiptJournalTest" assertions="11" time="1.440021"/>
+      <testcase name="It creates correct journal entries for mixed payment methods" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)::It creates correct journal entries for mixed payment methods" class="Tests\Feature\CustomerReceiptJournalTest" classname="Tests.Feature.CustomerReceiptJournalTest" assertions="16" time="0.875970"/>
+      <testcase name="It throws when deposit receipt has no deposit coa and rolls back entries" file="Customer Receipt Journal (Tests\Feature\CustomerReceiptJournal)::It throws when deposit receipt has no deposit coa and rolls back entries" class="Tests\Feature\CustomerReceiptJournalTest" classname="Tests.Feature.CustomerReceiptJournalTest" assertions="3" time="0.668466"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptReferenceProofTest" file="tests/Feature/CustomerReceiptReferenceProofTest.php" tests="14" assertions="92" errors="0" failures="0" skipped="0" time="21.751016">
+      <testcase name="it metode menentukan wajib/tidaknya referensi dan label isiannya" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it metode menentukan wajib/tidaknya referensi dan label isiannya" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="9" time="0.893582"/>
+      <testsuite name="it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan" tests="3" assertions="18" errors="0" failures="0" skipped="0" time="5.010523">
+        <testcase name="it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan with data set &quot;('Transfer')&quot;" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan with data set &quot;('Transfer')&quot;" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="6" time="1.662173"/>
+        <testcase name="it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan with data set &quot;('Giro')&quot;" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan with data set &quot;('Giro')&quot;" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="6" time="1.766446"/>
+        <testcase name="it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan with data set &quot;('Cheque')&quot;" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan with data set &quot;('Cheque')&quot;" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="6" time="1.581904"/>
+      </testsuite>
+      <testcase name="it Cash tidak memerlukan referensi; referensi yang terlanjur diisi tidak disimpan untuk Cash" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it Cash tidak memerlukan referensi; referensi yang terlanjur diisi tidak disimpan untuk Cash" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="5" time="1.742013"/>
+      <testcase name="it Transfer dengan referensi, bank, dan bukti tersimpan; bukti hanya di disk PRIVAT" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it Transfer dengan referensi, bank, dan bukti tersimpan; bukti hanya di disk PRIVAT" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="8" time="1.989132"/>
+      <testcase name="it berkas bukti bertipe/ukuran tidak sah ditolak" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it berkas bukti bertipe/ukuran tidak sah ditolak" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="10" time="2.421159"/>
+      <testcase name="it rute bukti: pengguna berizin 200, tanpa izin 403, tamu diarahkan ke login, tanpa berkas 404" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it rute bukti: pengguna berizin 200, tanpa izin 403, tamu diarahkan ke login, tanpa berkas 404" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="4" time="1.436191"/>
+      <testcase name="it kombinasi referensi + akun + nominal yang sama diperingatkan, tetapi penerimaan tetap tersimpan" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it kombinasi referensi + akun + nominal yang sama diperingatkan, tetapi penerimaan tetap tersimpan" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="11" time="1.947866"/>
+      <testcase name="it duplicatesOf: nominal atau akun berbeda bukan duplikat" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it duplicatesOf: nominal atau akun berbeda bukan duplikat" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="1" time="0.909011"/>
+      <testcase name="it View menampilkan referensi, bank, dan tautan bukti; non-tunai tanpa bukti menampilkan &quot;Belum ada bukti&quot;" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it View menampilkan referensi, bank, dan tautan bukti; non-tunai tanpa bukti menampilkan &quot;Belum ada bukti&quot;" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="6" time="0.955316"/>
+      <testcase name="it penerimaan lama (kolom baru kosong, tunai) tetap tampil normal di View dan daftar" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it penerimaan lama (kolom baru kosong, tunai) tetap tampil normal di View dan daftar" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="3" time="1.203789"/>
+      <testcase name="it daftar: kolom No. Referensi dapat dicari; filter &quot;Non-tunai tanpa bukti&quot; hanya non-tunai yang belum berbukti" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it daftar: kolom No. Referensi dapat dicari; filter &quot;Non-tunai tanpa bukti&quot; hanya non-tunai yang belum berbukti" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="9" time="1.598964"/>
+      <testcase name="it Edit: isian terisi, referensi dapat diubah, dan tautan bukti tampil bila ada" file="tests/Feature/CustomerReceiptReferenceProofTest.php::it Edit: isian terisi, referensi dapat diubah, dan tautan bukti tampil bila ada" class="Tests\Feature\CustomerReceiptReferenceProofTest" classname="Tests.Feature.CustomerReceiptReferenceProofTest" assertions="8" time="1.643471"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptResourceTest" file="tests/Feature/CustomerReceiptResourceTest.php" tests="6" assertions="31" errors="0" failures="0" skipped="0" time="5.918651">
+      <testcase name="customer receipt create form keeps JSON state fields hidden and does NOT copy cabang from the customer" file="tests/Feature/CustomerReceiptResourceTest.php::customer receipt create form keeps JSON state fields hidden and does NOT copy cabang from the customer" class="Tests\Feature\CustomerReceiptResourceTest" classname="Tests.Feature.CustomerReceiptResourceTest" assertions="10" time="1.382885"/>
+      <testcase name="customer receipt create form no longer shows payment mode controls" file="tests/Feature/CustomerReceiptResourceTest.php::customer receipt create form no longer shows payment mode controls" class="Tests\Feature\CustomerReceiptResourceTest" classname="Tests.Feature.CustomerReceiptResourceTest" assertions="4" time="1.210273"/>
+      <testcase name="customer receipt filters coa options by payment method" file="tests/Feature/CustomerReceiptResourceTest.php::customer receipt filters coa options by payment method" class="Tests\Feature\CustomerReceiptResourceTest" classname="Tests.Feature.CustomerReceiptResourceTest" assertions="5" time="0.816894"/>
+      <testcase name="customer receipt resolves remaining amount from invoice total when account receivable is absent" file="tests/Feature/CustomerReceiptResourceTest.php::customer receipt resolves remaining amount from invoice total when account receivable is absent" class="Tests\Feature\CustomerReceiptResourceTest" classname="Tests.Feature.CustomerReceiptResourceTest" assertions="1" time="0.800882"/>
+      <testcase name="customer receipt create flow moves draft receipt to paid and posts journal entries" file="tests/Feature/CustomerReceiptResourceTest.php::customer receipt create flow moves draft receipt to paid and posts journal entries" class="Tests\Feature\CustomerReceiptResourceTest" classname="Tests.Feature.CustomerReceiptResourceTest" assertions="7" time="0.823810"/>
+      <testcase name="customer receipt item creation does not double count account receivable after create marker" file="tests/Feature/CustomerReceiptResourceTest.php::customer receipt item creation does not double count account receivable after create marker" class="Tests\Feature\CustomerReceiptResourceTest" classname="Tests.Feature.CustomerReceiptResourceTest" assertions="4" time="0.883907"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptViewPageTest" file="tests/Feature/CustomerReceiptViewPageTest.php" tests="1" assertions="11" errors="0" failures="0" skipped="0" time="1.331072">
+      <testcase name="customer receipt view page renders payment history and journal entries" file="tests/Feature/CustomerReceiptViewPageTest.php::customer receipt view page renders payment history and journal entries" class="Tests\Feature\CustomerReceiptViewPageTest" classname="Tests.Feature.CustomerReceiptViewPageTest" assertions="11" time="1.331072"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReceiptVsVendorPaymentTest" file="Customer Receipt Vs Vendor Payment (Tests\Feature\CustomerReceiptVsVendorPayment)" tests="1" assertions="29" errors="0" failures="0" skipped="0" time="1.194177">
+      <testcase name="Customer receipt and vendor payment mechanisms comparison" file="Customer Receipt Vs Vendor Payment (Tests\Feature\CustomerReceiptVsVendorPayment)::Customer receipt and vendor payment mechanisms comparison" class="Tests\Feature\CustomerReceiptVsVendorPaymentTest" classname="Tests.Feature.CustomerReceiptVsVendorPaymentTest" assertions="29" time="1.194177">
+        <system-out>
+=== Customer Receipt vs Vendor Payment Mechanism Comparison ===
+
+✅ Model structures are similar
+✅ Both have header-detail relationship
+✅ Both support multiple payment methods
+✅ Both track payment amounts and dates
+✅ Both integrate with Chart of Accounts
+✅ Both have status tracking (Draft/Partial/Paid)
+✅ Both support invoice allocation
+
+Key Similarities:
+- Same attribute names and types
+- Same relationship patterns
+- Same payment processing logic
+- Same journal entry integration
+
+Conclusion: Customer Receipt mechanism is implemented similarly to Vendor Payment mechanism.
+</system-out>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReturnAndReturnProductFinancialTest" file="Customer Return And Return Product Financial (Tests\Feature\CustomerReturnAndReturnProductFinancial)" tests="5" assertions="41" errors="0" failures="0" skipped="0" time="4.372209">
+      <testcase name="Customer return with replace decision creates financial journal and adjusts ar" file="Customer Return And Return Product Financial (Tests\Feature\CustomerReturnAndReturnProductFinancial)::Customer return with replace decision creates financial journal and adjusts ar" class="Tests\Feature\CustomerReturnAndReturnProductFinancialTest" classname="Tests.Feature.CustomerReturnAndReturnProductFinancialTest" assertions="10" time="0.871191"/>
+      <testcase name="Customer return approval blocked if any item lacks qc result" file="Customer Return And Return Product Financial (Tests\Feature\CustomerReturnAndReturnProductFinancial)::Customer return approval blocked if any item lacks qc result" class="Tests\Feature\CustomerReturnAndReturnProductFinancialTest" classname="Tests.Feature.CustomerReturnAndReturnProductFinancialTest" assertions="8" time="0.965102"/>
+      <testcase name="Return product for uninvoiced do credits goods delivery account" file="Customer Return And Return Product Financial (Tests\Feature\CustomerReturnAndReturnProductFinancial)::Return product for uninvoiced do credits goods delivery account" class="Tests\Feature\CustomerReturnAndReturnProductFinancialTest" classname="Tests.Feature.CustomerReturnAndReturnProductFinancialTest" assertions="6" time="0.512816"/>
+      <testcase name="Return product for invoiced do credits cogs account and updates sales invoice" file="Customer Return And Return Product Financial (Tests\Feature\CustomerReturnAndReturnProductFinancial)::Return product for invoiced do credits cogs account and updates sales invoice" class="Tests\Feature\CustomerReturnAndReturnProductFinancialTest" classname="Tests.Feature.CustomerReturnAndReturnProductFinancialTest" assertions="13" time="0.530197"/>
+      <testcase name="Edit return product loads max quantity and blocks over return" file="Customer Return And Return Product Financial (Tests\Feature\CustomerReturnAndReturnProductFinancial)::Edit return product loads max quantity and blocks over return" class="Tests\Feature\CustomerReturnAndReturnProductFinancialTest" classname="Tests.Feature.CustomerReturnAndReturnProductFinancialTest" assertions="4" time="1.492903"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerReturnFeatureTest" file="tests/Feature/CustomerReturnFeatureTest.php" tests="24" assertions="61" errors="0" failures="0" skipped="0" time="30.941666">
+      <testcase name="generates unique sequential return number in CR-YYYY-NNNN format" file="tests/Feature/CustomerReturnFeatureTest.php::generates unique sequential return number in CR-YYYY-NNNN format" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="0.517809"/>
+      <testcase name="increments return number on each generation" file="tests/Feature/CustomerReturnFeatureTest.php::increments return number on each generation" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="1" time="0.645367"/>
+      <testcase name="can create a customer return linked to a sales invoice" file="tests/Feature/CustomerReturnFeatureTest.php::can create a customer return linked to a sales invoice" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="5" time="0.900868"/>
+      <testcase name="can add return items linked to invoice items" file="tests/Feature/CustomerReturnFeatureTest.php::can add return items linked to invoice items" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="5" time="0.705613"/>
+      <testcase name="returned quantity must not exceed sold quantity on invoice item" file="tests/Feature/CustomerReturnFeatureTest.php::returned quantity must not exceed sold quantity on invoice item" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="0.765360"/>
+      <testcase name="customer return transitions through status workflow correctly" file="tests/Feature/CustomerReturnFeatureTest.php::customer return transitions through status workflow correctly" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="2.822401"/>
+      <testcase name="qc result can be recorded on return items" file="tests/Feature/CustomerReturnFeatureTest.php::qc result can be recorded on return items" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="2.991276"/>
+      <testcase name="repair decision can be assigned to return item" file="tests/Feature/CustomerReturnFeatureTest.php::repair decision can be assigned to return item" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.617347"/>
+      <testcase name="replace decision can be assigned to return item" file="tests/Feature/CustomerReturnFeatureTest.php::replace decision can be assigned to return item" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.235370"/>
+      <testcase name="reject decision can be assigned to return item" file="tests/Feature/CustomerReturnFeatureTest.php::reject decision can be assigned to return item" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.198085"/>
+      <testcase name="customer return can be approved after qc inspection" file="tests/Feature/CustomerReturnFeatureTest.php::customer return can be approved after qc inspection" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.189114"/>
+      <testcase name="customer return can be rejected after qc inspection" file="tests/Feature/CustomerReturnFeatureTest.php::customer return can be rejected after qc inspection" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.353681"/>
+      <testcase name="customer return can be completed after approval" file="tests/Feature/CustomerReturnFeatureTest.php::customer return can be completed after approval" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="1" time="1.237081"/>
+      <testcase name="customer return relationships load correctly" file="tests/Feature/CustomerReturnFeatureTest.php::customer return relationships load correctly" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="4" time="1.989710"/>
+      <testcase name="customer return supports soft delete and restore" file="tests/Feature/CustomerReturnFeatureTest.php::customer return supports soft delete and restore" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="3" time="1.581888"/>
+      <testcase name="status_label accessor returns correct Indonesian labels" file="tests/Feature/CustomerReturnFeatureTest.php::status_label accessor returns correct Indonesian labels" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="6" time="0.724000"/>
+      <testcase name="decision_label accessor returns correct labels" file="tests/Feature/CustomerReturnFeatureTest.php::decision_label accessor returns correct labels" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="3" time="0.928181"/>
+      <testcase name="processCompletion restores inventory stock for replace decision" file="tests/Feature/CustomerReturnFeatureTest.php::processCompletion restores inventory stock for replace decision" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="4" time="1.568239"/>
+      <testcase name="processCompletion creates a stock_movement of type customer_return" file="tests/Feature/CustomerReturnFeatureTest.php::processCompletion creates a stock_movement of type customer_return" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="4" time="1.245613"/>
+      <testcase name="processCompletion does NOT add repair items to saleable stock" file="tests/Feature/CustomerReturnFeatureTest.php::processCompletion does NOT add repair items to saleable stock" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="1" time="1.090348"/>
+      <testcase name="processCompletion does NOT restore stock for reject decision" file="tests/Feature/CustomerReturnFeatureTest.php::processCompletion does NOT restore stock for reject decision" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.234769"/>
+      <testcase name="processCompletion creates new inventory stock record when none exists" file="tests/Feature/CustomerReturnFeatureTest.php::processCompletion creates new inventory stock record when none exists" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="2" time="1.323875"/>
+      <testcase name="processCompletion throws exception if called twice (double-processing guard)" file="tests/Feature/CustomerReturnFeatureTest.php::processCompletion throws exception if called twice (double-processing guard)" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="1" time="1.029520"/>
+      <testcase name="warehouse relationship loads on customer return" file="tests/Feature/CustomerReturnFeatureTest.php::warehouse relationship loads on customer return" class="Tests\Feature\CustomerReturnFeatureTest" classname="Tests.Feature.CustomerReturnFeatureTest" assertions="1" time="1.046151"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\CustomerSupplierTest" file="tests/Feature/CustomerSupplierTest.php" tests="10" assertions="56" errors="0" failures="1" skipped="0" time="10.994640">
+      <testcase name="it can create customer with credit limit" file="tests/Feature/CustomerSupplierTest.php::it can create customer with credit limit" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="6" time="1.013796"/>
+      <testcase name="it can create customer with international contact numbers" file="tests/Feature/CustomerSupplierTest.php::it can create customer with international contact numbers" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="4" time="1.110882"/>
+      <testcase name="it can create supplier with payment terms" file="tests/Feature/CustomerSupplierTest.php::it can create supplier with payment terms" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="5" time="1.156643"/>
+      <testcase name="it can create supplier with international contact numbers" file="tests/Feature/CustomerSupplierTest.php::it can create supplier with international contact numbers" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="4" time="1.067040"/>
+      <testcase name="it validates customer contact information" file="tests/Feature/CustomerSupplierTest.php::it validates customer contact information" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="10" time="1.422332"/>
+      <testcase name="it validates supplier contact information" file="tests/Feature/CustomerSupplierTest.php::it validates supplier contact information" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="10" time="1.203840"/>
+      <testcase name="it can update customer credit limit" file="tests/Feature/CustomerSupplierTest.php::it can update customer credit limit" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="3" time="1.026326">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">it can update customer credit limitComponent has errors: "data.perusahaan"
+Failed asserting that false is true.
+at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+at vendor/filament/forms/src/Testing/TestsForms.php:139
+at vendor/laravel/framework/src/Illuminate/Macroable/Traits/Macroable.php:126
+at vendor/livewire/livewire/src/Features/SupportTesting/Testable.php:398
+at tests/Feature/CustomerSupplierTest.php:284</failure>
+      </testcase>
+      <testcase name="it can update supplier payment terms" file="tests/Feature/CustomerSupplierTest.php::it can update supplier payment terms" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="4" time="1.015725"/>
+      <testcase name="it customer code must be unique" file="tests/Feature/CustomerSupplierTest.php::it customer code must be unique" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="5" time="1.006543"/>
+      <testcase name="it supplier code must be unique" file="tests/Feature/CustomerSupplierTest.php::it supplier code must be unique" class="Tests\Feature\CustomerSupplierTest" classname="Tests.Feature.CustomerSupplierTest" assertions="5" time="0.971512"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DashboardTest" file="tests/Feature/DashboardTest.php" tests="2" assertions="3" errors="0" failures="0" skipped="0" time="1.432076">
+      <testcase name="guests are redirected to the login page" file="tests/Feature/DashboardTest.php::guests are redirected to the login page" class="Tests\Feature\DashboardTest" classname="Tests.Feature.DashboardTest" assertions="2" time="0.697592"/>
+      <testcase name="authenticated users can visit the dashboard" file="tests/Feature/DashboardTest.php::authenticated users can visit the dashboard" class="Tests\Feature\DashboardTest" classname="Tests.Feature.DashboardTest" assertions="1" time="0.734484"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DataIntegrityTest" file="Data Integrity (Tests\Feature\DataIntegrity)" tests="10" assertions="84" errors="0" failures="0" skipped="0" time="6.665677">
+      <testcase name="Database transaction rollback on failure" file="Data Integrity (Tests\Feature\DataIntegrity)::Database transaction rollback on failure" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="1" time="1.001063"/>
+      <testcase name="Foreign key constraints prevent orphaned records" file="Data Integrity (Tests\Feature\DataIntegrity)::Foreign key constraints prevent orphaned records" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="4" time="0.486233"/>
+      <testcase name="Cross module data consistency sale to invoice" file="Data Integrity (Tests\Feature\DataIntegrity)::Cross module data consistency sale to invoice" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="8" time="0.452974"/>
+      <testcase name="Financial transaction integrity deposit to payment" file="Data Integrity (Tests\Feature\DataIntegrity)::Financial transaction integrity deposit to payment" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="7" time="0.814923"/>
+      <testcase name="Data validation rules enforced" file="Data Integrity (Tests\Feature\DataIntegrity)::Data validation rules enforced" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="5" time="0.730502"/>
+      <testcase name="Cascade operations and soft deletes" file="Data Integrity (Tests\Feature\DataIntegrity)::Cascade operations and soft deletes" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="7" time="0.473160"/>
+      <testcase name="Concurrent transaction isolation" file="Data Integrity (Tests\Feature\DataIntegrity)::Concurrent transaction isolation" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="3" time="0.531766"/>
+      <testcase name="Data integrity across module boundaries" file="Data Integrity (Tests\Feature\DataIntegrity)::Data integrity across module boundaries" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="6" time="1.143135"/>
+      <testcase name="Unique constraints and indexes" file="Data Integrity (Tests\Feature\DataIntegrity)::Unique constraints and indexes" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="3" time="0.543556"/>
+      <testcase name="Data consistency on bulk operations" file="Data Integrity (Tests\Feature\DataIntegrity)::Data consistency on bulk operations" class="Tests\Feature\DataIntegrityTest" classname="Tests.Feature.DataIntegrityTest" assertions="40" time="0.488365"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DataMasterCrudTest" file="tests/Feature/DataMasterCrudTest.php" tests="87" assertions="330" errors="0" failures="1" skipped="0" time="83.972719">
+      <testcase name="`Cabang (Branch) CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Cabang (Branch) CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.625363"/>
+      <testcase name="`Cabang (Branch) CRUD` → it can create cabang" file="tests/Feature/DataMasterCrudTest.php::`Cabang (Branch) CRUD` → it can create cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.011269"/>
+      <testcase name="`Cabang (Branch) CRUD` → it accepts international phone number on cabang form" file="tests/Feature/DataMasterCrudTest.php::`Cabang (Branch) CRUD` → it accepts international phone number on cabang form" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.715248"/>
+      <testcase name="`Cabang (Branch) CRUD` → it validates required fields when creating cabang" file="tests/Feature/DataMasterCrudTest.php::`Cabang (Branch) CRUD` → it validates required fields when creating cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="9" time="0.827592"/>
+      <testcase name="`Cabang (Branch) CRUD` → it can edit cabang" file="tests/Feature/DataMasterCrudTest.php::`Cabang (Branch) CRUD` → it can edit cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.772860"/>
+      <testcase name="`Cabang (Branch) CRUD` → it can delete cabang" file="tests/Feature/DataMasterCrudTest.php::`Cabang (Branch) CRUD` → it can delete cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="0.733776"/>
+      <testcase name="`Customer CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Customer CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.584152"/>
+      <testcase name="`Customer CRUD` → it can create customer" file="tests/Feature/DataMasterCrudTest.php::`Customer CRUD` → it can create customer" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.682739"/>
+      <testcase name="`Customer CRUD` → it validates required fields when creating customer" file="tests/Feature/DataMasterCrudTest.php::`Customer CRUD` → it validates required fields when creating customer" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="0.732151"/>
+      <testcase name="`Customer CRUD` → it can edit customer" file="tests/Feature/DataMasterCrudTest.php::`Customer CRUD` → it can edit customer" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.974069"/>
+      <testcase name="`Customer CRUD` → it can delete customer" file="tests/Feature/DataMasterCrudTest.php::`Customer CRUD` → it can delete customer" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="1.818327"/>
+      <testcase name="`Supplier CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Supplier CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="1.454012"/>
+      <testcase name="`Supplier CRUD` → it can create supplier" file="tests/Feature/DataMasterCrudTest.php::`Supplier CRUD` → it can create supplier" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.083674"/>
+      <testcase name="`Supplier CRUD` → it validates required fields when creating supplier" file="tests/Feature/DataMasterCrudTest.php::`Supplier CRUD` → it validates required fields when creating supplier" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="0.944615"/>
+      <testcase name="`Supplier CRUD` → it can edit supplier" file="tests/Feature/DataMasterCrudTest.php::`Supplier CRUD` → it can edit supplier" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.030554"/>
+      <testcase name="`Supplier CRUD` → it can delete supplier" file="tests/Feature/DataMasterCrudTest.php::`Supplier CRUD` → it can delete supplier" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="1.121783"/>
+      <testcase name="`Product Category CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Product Category CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="1.295154"/>
+      <testcase name="`Product Category CRUD` → it can create product category" file="tests/Feature/DataMasterCrudTest.php::`Product Category CRUD` → it can create product category" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.511098"/>
+      <testcase name="`Product Category CRUD` → it validates required fields when creating product category" file="tests/Feature/DataMasterCrudTest.php::`Product Category CRUD` → it validates required fields when creating product category" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="5" time="1.279521"/>
+      <testcase name="`Product Category CRUD` → it can edit product category" file="tests/Feature/DataMasterCrudTest.php::`Product Category CRUD` → it can edit product category" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.961387"/>
+      <testcase name="`Product Category CRUD` → it can delete product category" file="tests/Feature/DataMasterCrudTest.php::`Product Category CRUD` → it can delete product category" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="0.851773"/>
+      <testcase name="`Unit of Measure CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Unit of Measure CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.860486"/>
+      <testcase name="`Unit of Measure CRUD` → it can create unit of measure" file="tests/Feature/DataMasterCrudTest.php::`Unit of Measure CRUD` → it can create unit of measure" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.933997"/>
+      <testcase name="`Unit of Measure CRUD` → it validates required fields when creating unit of measure" file="tests/Feature/DataMasterCrudTest.php::`Unit of Measure CRUD` → it validates required fields when creating unit of measure" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="0.957781"/>
+      <testcase name="`Unit of Measure CRUD` → it can edit unit of measure" file="tests/Feature/DataMasterCrudTest.php::`Unit of Measure CRUD` → it can edit unit of measure" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.980976"/>
+      <testcase name="`Unit of Measure CRUD` → it can delete unit of measure" file="tests/Feature/DataMasterCrudTest.php::`Unit of Measure CRUD` → it can delete unit of measure" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="0.943336"/>
+      <testcase name="`Currency CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Currency CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.864540"/>
+      <testcase name="`Currency CRUD` → it can create currency" file="tests/Feature/DataMasterCrudTest.php::`Currency CRUD` → it can create currency" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.896265"/>
+      <testcase name="`Currency CRUD` → it validates required fields when creating currency" file="tests/Feature/DataMasterCrudTest.php::`Currency CRUD` → it validates required fields when creating currency" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="0.921044"/>
+      <testcase name="`Currency CRUD` → it can edit currency" file="tests/Feature/DataMasterCrudTest.php::`Currency CRUD` → it can edit currency" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.137964"/>
+      <testcase name="`Currency CRUD` → it can delete currency" file="tests/Feature/DataMasterCrudTest.php::`Currency CRUD` → it can delete currency" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="1.060308"/>
+      <testcase name="`Tax Setting CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Tax Setting CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="1.010409"/>
+      <testcase name="`Tax Setting CRUD` → it can create tax setting PPN" file="tests/Feature/DataMasterCrudTest.php::`Tax Setting CRUD` → it can create tax setting PPN" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.375474"/>
+      <testcase name="`Tax Setting CRUD` → it can create tax setting PPH" file="tests/Feature/DataMasterCrudTest.php::`Tax Setting CRUD` → it can create tax setting PPH" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.174551"/>
+      <testcase name="`Tax Setting CRUD` → it validates required fields when creating tax setting" file="tests/Feature/DataMasterCrudTest.php::`Tax Setting CRUD` → it validates required fields when creating tax setting" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="0.918158"/>
+      <testcase name="`Tax Setting CRUD` → it can edit tax setting" file="tests/Feature/DataMasterCrudTest.php::`Tax Setting CRUD` → it can edit tax setting" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.892317"/>
+      <testcase name="`Tax Setting CRUD` → it can delete tax setting" file="tests/Feature/DataMasterCrudTest.php::`Tax Setting CRUD` → it can delete tax setting" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="0.968087"/>
+      <testcase name="`Warehouse CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Warehouse CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.847328"/>
+      <testcase name="`Warehouse CRUD` → it can create warehouse" file="tests/Feature/DataMasterCrudTest.php::`Warehouse CRUD` → it can create warehouse" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.930353"/>
+      <testcase name="`Warehouse CRUD` → it accepts international phone number on warehouse form" file="tests/Feature/DataMasterCrudTest.php::`Warehouse CRUD` → it accepts international phone number on warehouse form" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.954448"/>
+      <testcase name="`Warehouse CRUD` → it validates required fields when creating warehouse" file="tests/Feature/DataMasterCrudTest.php::`Warehouse CRUD` → it validates required fields when creating warehouse" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="1.034413"/>
+      <testcase name="`Warehouse CRUD` → it can edit warehouse" file="tests/Feature/DataMasterCrudTest.php::`Warehouse CRUD` → it can edit warehouse" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.197250"/>
+      <testcase name="`Warehouse CRUD` → it can delete warehouse" file="tests/Feature/DataMasterCrudTest.php::`Warehouse CRUD` → it can delete warehouse" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="1.028291"/>
+      <testcase name="`Driver CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Driver CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.888798"/>
+      <testcase name="`Driver CRUD` → it can create driver" file="tests/Feature/DataMasterCrudTest.php::`Driver CRUD` → it can create driver" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.975984"/>
+      <testcase name="`Driver CRUD` → it accepts international phone number on driver form" file="tests/Feature/DataMasterCrudTest.php::`Driver CRUD` → it accepts international phone number on driver form" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.879788"/>
+      <testcase name="`Driver CRUD` → it validates required fields when creating driver" file="tests/Feature/DataMasterCrudTest.php::`Driver CRUD` → it validates required fields when creating driver" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="5" time="0.856242"/>
+      <testcase name="`Driver CRUD` → it can edit driver" file="tests/Feature/DataMasterCrudTest.php::`Driver CRUD` → it can edit driver" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.628677"/>
+      <testcase name="`Driver CRUD` → it can delete driver" file="tests/Feature/DataMasterCrudTest.php::`Driver CRUD` → it can delete driver" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="0.639459"/>
+      <testcase name="`Vehicle CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Vehicle CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="1.030934"/>
+      <testcase name="`Vehicle CRUD` → it can create vehicle" file="tests/Feature/DataMasterCrudTest.php::`Vehicle CRUD` → it can create vehicle" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.760823"/>
+      <testcase name="`Vehicle CRUD` → it validates required fields when creating vehicle" file="tests/Feature/DataMasterCrudTest.php::`Vehicle CRUD` → it validates required fields when creating vehicle" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="9" time="0.616351"/>
+      <testcase name="`Vehicle CRUD` → it can edit vehicle" file="tests/Feature/DataMasterCrudTest.php::`Vehicle CRUD` → it can edit vehicle" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.822038"/>
+      <testcase name="`Vehicle CRUD` → it can delete vehicle" file="tests/Feature/DataMasterCrudTest.php::`Vehicle CRUD` → it can delete vehicle" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="0.687035"/>
+      <testcase name="`Rak (Shelf) CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Rak (Shelf) CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.579904"/>
+      <testcase name="`Rak (Shelf) CRUD` → it can create rak" file="tests/Feature/DataMasterCrudTest.php::`Rak (Shelf) CRUD` → it can create rak" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="0.619565"/>
+      <testcase name="`Rak (Shelf) CRUD` → it only offers active warehouses for rak selection" file="tests/Feature/DataMasterCrudTest.php::`Rak (Shelf) CRUD` → it only offers active warehouses for rak selection" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="3" time="0.810052"/>
+      <testcase name="`Rak (Shelf) CRUD` → it validates required fields when creating rak" file="tests/Feature/DataMasterCrudTest.php::`Rak (Shelf) CRUD` → it validates required fields when creating rak" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="9" time="3.259465"/>
+      <testcase name="`Rak (Shelf) CRUD` → it can edit rak" file="tests/Feature/DataMasterCrudTest.php::`Rak (Shelf) CRUD` → it can edit rak" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="2.025447"/>
+      <testcase name="`Rak (Shelf) CRUD` → it can delete rak" file="tests/Feature/DataMasterCrudTest.php::`Rak (Shelf) CRUD` → it can delete rak" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="1.042236"/>
+      <testcase name="`Product CRUD` → it can render list page" file="tests/Feature/DataMasterCrudTest.php::`Product CRUD` → it can render list page" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.943654"/>
+      <testcase name="`Product CRUD` → it can create product" file="tests/Feature/DataMasterCrudTest.php::`Product CRUD` → it can create product" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.271684"/>
+      <testcase name="`Product CRUD` → it validates required fields when creating product" file="tests/Feature/DataMasterCrudTest.php::`Product CRUD` → it validates required fields when creating product" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="7" time="1.392025"/>
+      <testcase name="`Product CRUD` → it can edit product" file="tests/Feature/DataMasterCrudTest.php::`Product CRUD` → it can edit product" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="4" time="1.603509"/>
+      <testcase name="`Product CRUD` → it can delete product" file="tests/Feature/DataMasterCrudTest.php::`Product CRUD` → it can delete product" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="6" time="1.437859"/>
+      <testcase name="`Data Master Integrity` → it warehouse belongs to cabang" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it warehouse belongs to cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.813500"/>
+      <testcase name="`Data Master Integrity` → it driver belongs to cabang" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it driver belongs to cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.810269"/>
+      <testcase name="`Data Master Integrity` → it vehicle belongs to cabang" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it vehicle belongs to cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.817004"/>
+      <testcase name="`Data Master Integrity` → it rak belongs to warehouse" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it rak belongs to warehouse" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.847867"/>
+      <testcase name="`Data Master Integrity` → it customer belongs to cabang" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it customer belongs to cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.881567"/>
+      <testcase name="`Data Master Integrity` → it supplier belongs to cabang" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it supplier belongs to cabang" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="1.051069"/>
+      <testcase name="`Data Master Integrity` → it product category can have multiple records" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it product category can have multiple records" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="3" time="0.884496"/>
+      <testcase name="`Data Master Integrity` → it customer code must be unique (DB constraint)" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it customer code must be unique (DB constraint)" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.944959"/>
+      <testcase name="`Data Master Integrity` → it cabang kode must be unique (DB constraint)" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it cabang kode must be unique (DB constraint)" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.821228"/>
+      <testcase name="`Data Master Integrity` → it supplier code must be unique (DB constraint)" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it supplier code must be unique (DB constraint)" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="1" time="0.832792"/>
+      <testcase name="`Data Master Integrity` → it can create multiple currencies" file="tests/Feature/DataMasterCrudTest.php::`Data Master Integrity` → it can create multiple currencies" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="3" time="0.839708"/>
+      <testcase name="`Data Master Factory Tests` → it can create cabang via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create cabang via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="3" time="0.721549"/>
+      <testcase name="`Data Master Factory Tests` → it can create customer via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create customer via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.708159">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">`Data Master Factory Tests` → it can create customer via factoryExpecting '' not to be empty .
+at tests/Feature/DataMasterCrudTest.php:1203</failure>
+      </testcase>
+      <testcase name="`Data Master Factory Tests` → it can create supplier via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create supplier via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.718731"/>
+      <testcase name="`Data Master Factory Tests` → it can create product category via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create product category via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.671456"/>
+      <testcase name="`Data Master Factory Tests` → it can create unit of measure via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create unit of measure via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="3" time="0.716830"/>
+      <testcase name="`Data Master Factory Tests` → it can create currency via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create currency via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.718116"/>
+      <testcase name="`Data Master Factory Tests` → it can create tax setting via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create tax setting via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.687625"/>
+      <testcase name="`Data Master Factory Tests` → it can create warehouse via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create warehouse via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.694204"/>
+      <testcase name="`Data Master Factory Tests` → it can create driver via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create driver via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.687343"/>
+      <testcase name="`Data Master Factory Tests` → it can create vehicle via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create vehicle via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.711727"/>
+      <testcase name="`Data Master Factory Tests` → it can create rak via factory" file="tests/Feature/DataMasterCrudTest.php::`Data Master Factory Tests` → it can create rak via factory" class="Tests\Feature\DataMasterCrudTest" classname="Tests.Feature.DataMasterCrudTest" assertions="2" time="0.722102"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryOrderFeatureTest" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)" tests="14" assertions="41" errors="1" failures="1" skipped="0" time="10.258588">
+      <testcase name="It can create delivery order manually" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can create delivery order manually" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="3" time="0.784734"/>
+      <testcase name="It can create delivery order from sale order" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can create delivery order from sale order" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="3" time="0.760227"/>
+      <testcase name="It tracks approval logs and status changes" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It tracks approval logs and status changes" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="4" time="0.730374"/>
+      <testcase name="It can approve delivery order without surat jalan" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can approve delivery order without surat jalan" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="1" time="0.730081"/>
+      <testcase name="It can assign vehicle and driver for shipping" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can assign vehicle and driver for shipping" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="4" time="0.728491"/>
+      <testcase name="It can generate surat jalan" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can generate surat jalan" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="2" time="0.756328"/>
+      <testcase name="It handles proof of delivery" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It handles proof of delivery" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="2" time="1.006638"/>
+      <testcase name="It updates stock on delivery" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It updates stock on delivery" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="0" time="0.801972">
+        <error type="Illuminate\Validation\ValidationException">It updates stock on deliveryIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Produk qui. Stok saat ini: 0, diminta: 5.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1219
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1218
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at tests/Feature/DeliveryOrderFeatureTest.php:297</error>
+      </testcase>
+      <testcase name="It calculates total value correctly" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It calculates total value correctly" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="1" time="0.777526"/>
+      <testcase name="It generates unique do number" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It generates unique do number" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="2" time="0.661647"/>
+      <testcase name="It handles delivery order lifecycle" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It handles delivery order lifecycle" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="8" time="0.686024"/>
+      <testcase name="It manages stock correctly through delivery order lifecycle" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It manages stock correctly through delivery order lifecycle" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="6" time="0.844550">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">It manages stock correctly through delivery order lifecycleFailed asserting that 0.0 matches expected 20.
+at tests/Feature/DeliveryOrderFeatureTest.php:511</failure>
+      </testcase>
+      <testcase name="It can create delivery order for ambil sendiri sale order" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can create delivery order for ambil sendiri sale order" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="3" time="0.529613"/>
+      <testcase name="It can generate surat jalan for ambil sendiri delivery order" file="Delivery Order Feature (Tests\Feature\DeliveryOrderFeature)::It can generate surat jalan for ambil sendiri delivery order" class="Tests\Feature\DeliveryOrderFeatureTest" classname="Tests.Feature.DeliveryOrderFeatureTest" assertions="2" time="0.460383"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryOrderFormTest" file="tests/Feature/DeliveryOrderFormTest.php" tests="2" assertions="7" errors="0" failures="0" skipped="0" time="1.200940">
+      <testcase name="debug delivery order form data keys" file="tests/Feature/DeliveryOrderFormTest.php::debug delivery order form data keys" class="Tests\Feature\DeliveryOrderFormTest" classname="Tests.Feature.DeliveryOrderFormTest" assertions="4" time="0.463233"/>
+      <testcase name="delivery order warehouse sources only use active warehouses in the user branch" file="tests/Feature/DeliveryOrderFormTest.php::delivery order warehouse sources only use active warehouses in the user branch" class="Tests\Feature\DeliveryOrderFormTest" classname="Tests.Feature.DeliveryOrderFormTest" assertions="3" time="0.737707"/>
+    </testsuite>
+    <testsuite name="DeliveryOrderJournalIntegrationTest" file="Delivery Order Journal Integration" tests="4" assertions="17" errors="0" failures="1" skipped="0" time="2.267874">
+      <testcase name="Journal entries are created when delivery order status becomes completed" file="Delivery Order Journal Integration::Journal entries are created when delivery order status becomes completed" class="DeliveryOrderJournalIntegrationTest" classname="DeliveryOrderJournalIntegrationTest" assertions="9" time="0.633672"/>
+      <testcase name="Starting delivery schedule for direct linked delivery order releases reservations and creates journals on completion" file="Delivery Order Journal Integration::Starting delivery schedule for direct linked delivery order releases reservations and creates journals on completion" class="DeliveryOrderJournalIntegrationTest" classname="DeliveryOrderJournalIntegrationTest" assertions="1" time="0.491420">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Starting delivery schedule for direct linked delivery order releases reservations and creates journals on completionFailed asserting that 0 is identical to 1.
+at tests/Feature/DeliveryOrderJournalIntegrationTest.php:185</failure>
+      </testcase>
+      <testcase name="Journal entries are updated when delivery order quantity is changed after completed" file="Delivery Order Journal Integration::Journal entries are updated when delivery order quantity is changed after completed" class="DeliveryOrderJournalIntegrationTest" classname="DeliveryOrderJournalIntegrationTest" assertions="4" time="0.527815"/>
+      <testcase name="Journal entries are deleted when delivery order is soft deleted" file="Delivery Order Journal Integration::Journal entries are deleted when delivery order is soft deleted" class="DeliveryOrderJournalIntegrationTest" classname="DeliveryOrderJournalIntegrationTest" assertions="3" time="0.614967"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryOrderTask2326Test" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)" tests="9" assertions="27" errors="0" failures="0" skipped="0" time="9.862178">
+      <testcase name="Task23 do status reaches reservation release only when sj terbit action is triggered" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task23 do status reaches reservation release only when sj terbit action is triggered" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="2" time="0.841911"/>
+      <testcase name="Task23 do resource has no standalone mark as reservation release action" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task23 do resource has no standalone mark as reservation release action" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="3" time="0.520883"/>
+      <testcase name="Task24 do approve action is labeled konfirmasi dana diterima" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task24 do approve action is labeled konfirmasi dana diterima" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="2" time="0.478531"/>
+      <testcase name="Task24 do transitions to approved via service when dana confirmed" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task24 do transitions to approved via service when dana confirmed" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="1" time="0.507933"/>
+      <testcase name="Task25 do resource table has do number customer date status as primary columns" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task25 do resource table has do number customer date status as primary columns" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="7" time="0.917797"/>
+      <testcase name="Task25 do can be queried with relevant fields" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task25 do can be queried with relevant fields" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="4" time="2.470978"/>
+      <testcase name="Task26 surat jalan uses delivery schedule shipping fields" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task26 surat jalan uses delivery schedule shipping fields" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="1" time="1.805026"/>
+      <testcase name="Task26 sj resource table removes legacy shipping columns" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task26 sj resource table removes legacy shipping columns" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="4" time="1.341636"/>
+      <testcase name="Task26 delivery schedule allows delivery method values" file="Delivery Order Task2326 (Tests\Feature\DeliveryOrderTask2326)::Task26 delivery schedule allows delivery method values" class="Tests\Feature\DeliveryOrderTask2326Test" classname="Tests.Feature.DeliveryOrderTask2326Test" assertions="3" time="0.977483"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryOrderValuationTest" file="tests/Feature/DeliveryOrderValuationTest.php" tests="8" assertions="35" errors="0" failures="0" skipped="0" time="8.281387">
+      <testcase name="it nilai DO memakai LineAmounts (harga gross, diskon %, PPN eksklusif) — bukan harga − diskon + pajak" file="tests/Feature/DeliveryOrderValuationTest.php::it nilai DO memakai LineAmounts (harga gross, diskon %, PPN eksklusif) — bukan harga − diskon + pajak" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="6" time="0.762831"/>
+      <testcase name="it paritas: nilai DO sama dengan total invoice otomatis yang terbit saat DO selesai" file="tests/Feature/DeliveryOrderValuationTest.php::it paritas: nilai DO sama dengan total invoice otomatis yang terbit saat DO selesai" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="3" time="0.849350"/>
+      <testcase name="it SO inklusif dan SO tanpa pajak dinilai sesuai tipenya" file="tests/Feature/DeliveryOrderValuationTest.php::it SO inklusif dan SO tanpa pajak dinilai sesuai tipenya" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="2" time="0.804511"/>
+      <testcase name="it item DO tanpa tautan item SO bernilai 0 (tidak menebak harga), ditandai, dan dicatat peringatan" file="tests/Feature/DeliveryOrderValuationTest.php::it item DO tanpa tautan item SO bernilai 0 (tidak menebak harga), ditandai, dan dicatat peringatan" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="5" time="0.907282"/>
+      <testcase name="it nilai banyak DO dihitung dengan jumlah query tetap (bukan per DO)" file="tests/Feature/DeliveryOrderValuationTest.php::it nilai banyak DO dihitung dengan jumlah query tetap (bukan per DO)" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="1" time="1.024477"/>
+      <testcase name="it label pilihan SO, DO, dan Quotation memuat customer, tanggal, dan nilai" file="tests/Feature/DeliveryOrderValuationTest.php::it label pilihan SO, DO, dan Quotation memuat customer, tanggal, dan nilai" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="8" time="1.107880"/>
+      <testcase name="it form Invoice: pilihan SO memuat nama customer &amp; nilai, pilihan DO memuat nilai yang benar (bukan Rp0)" file="tests/Feature/DeliveryOrderValuationTest.php::it form Invoice: pilihan SO memuat nama customer &amp; nilai, pilihan DO memuat nilai yang benar (bukan Rp0)" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="8" time="1.848621"/>
+      <testcase name="it PDF DO menampilkan total yang sama dengan valuation (2 desimal)" file="tests/Feature/DeliveryOrderValuationTest.php::it PDF DO menampilkan total yang sama dengan valuation (2 desimal)" class="Tests\Feature\DeliveryOrderValuationTest" classname="Tests.Feature.DeliveryOrderValuationTest" assertions="2" time="0.976435"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryOrderWarehouseConfirmationPerItemTest" file="tests/Feature/DeliveryOrderWarehouseConfirmationPerItemTest.php" tests="1" assertions="12" errors="0" failures="0" skipped="0" time="0.820765">
+      <testcase name="delivery order warehouse confirmations are created per request item and source warehouse" file="tests/Feature/DeliveryOrderWarehouseConfirmationPerItemTest.php::delivery order warehouse confirmations are created per request item and source warehouse" class="Tests\Feature\DeliveryOrderWarehouseConfirmationPerItemTest" classname="Tests.Feature.DeliveryOrderWarehouseConfirmationPerItemTest" assertions="12" time="0.820765"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryScheduleInventoryFixTest" file="Delivery Schedule Inventory Fix (Tests\Feature\DeliveryScheduleInventoryFix)" tests="3" assertions="1" errors="3" failures="0" skipped="0" time="2.203404">
+      <testcase name="Stock movement created when do sent" file="Delivery Schedule Inventory Fix (Tests\Feature\DeliveryScheduleInventoryFix)::Stock movement created when do sent" class="Tests\Feature\DeliveryScheduleInventoryFixTest" classname="Tests.Feature.DeliveryScheduleInventoryFixTest" assertions="1" time="0.774622">
+        <error type="Illuminate\Validation\ValidationException">Stock movement created when do sentIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Produk vel. Stok saat ini: 0, diminta: 300.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:370
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:367
+at app/Services/ProductService.php:95
+at app/Observers/DeliveryOrderObserver.php:302
+at app/Observers/DeliveryOrderObserver.php:209
+at app/Observers/DeliveryOrderObserver.php:41
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1320
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1233
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1090
+at app/Services/DeliveryOrderService.php:43
+at tests/Feature/DeliveryScheduleInventoryFixTest.php:150</error>
+      </testcase>
+      <testcase name="Qty available decreases after stock movement created" file="Delivery Schedule Inventory Fix (Tests\Feature\DeliveryScheduleInventoryFix)::Qty available decreases after stock movement created" class="Tests\Feature\DeliveryScheduleInventoryFixTest" classname="Tests.Feature.DeliveryScheduleInventoryFixTest" assertions="0" time="0.712690">
+        <error type="Illuminate\Validation\ValidationException">Qty available decreases after stock movement createdIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Produk numquam. Stok saat ini: 0, diminta: 300.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:370
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:367
+at app/Services/ProductService.php:95
+at app/Observers/DeliveryOrderObserver.php:302
+at app/Observers/DeliveryOrderObserver.php:209
+at app/Observers/DeliveryOrderObserver.php:41
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1320
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1233
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1090
+at app/Services/DeliveryOrderService.php:43
+at tests/Feature/DeliveryScheduleInventoryFixTest.php:224</error>
+      </testcase>
+      <testcase name="No duplicate stock movement on completed" file="Delivery Schedule Inventory Fix (Tests\Feature\DeliveryScheduleInventoryFix)::No duplicate stock movement on completed" class="Tests\Feature\DeliveryScheduleInventoryFixTest" classname="Tests.Feature.DeliveryScheduleInventoryFixTest" assertions="0" time="0.716092">
+        <error type="Illuminate\Validation\ValidationException">No duplicate stock movement on completedIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Produk sed. Stok saat ini: 0, diminta: 100.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:370
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:367
+at app/Services/ProductService.php:95
+at app/Observers/DeliveryOrderObserver.php:302
+at app/Observers/DeliveryOrderObserver.php:209
+at app/Observers/DeliveryOrderObserver.php:41
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1320
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1233
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1090
+at app/Services/DeliveryOrderService.php:43
+at tests/Feature/DeliveryScheduleInventoryFixTest.php:293</error>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliverySchedulePermissionTest" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)" tests="11" assertions="66" errors="0" failures="0" skipped="0" time="9.195951">
+      <testcase name="All delivery schedule permissions exist in helper controller" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::All delivery schedule permissions exist in helper controller" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="10" time="0.801702"/>
+      <testcase name="All delivery schedule permissions exist in database" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::All delivery schedule permissions exist in database" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="9" time="0.841990"/>
+      <testcase name="User with all permissions passes all policy checks" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::User with all permissions passes all policy checks" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="8" time="0.827965"/>
+      <testcase name="User without permissions fails all policy checks" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::User without permissions fails all policy checks" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="8" time="0.902476"/>
+      <testcase name="View only user can view but not create or modify" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::View only user can view but not create or modify" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="6" time="0.835972"/>
+      <testcase name="Delivery driver role has delivery schedule permissions" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::Delivery driver role has delivery schedule permissions" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="5" time="0.869731"/>
+      <testcase name="Super admin has all delivery schedule permissions" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::Super admin has all delivery schedule permissions" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="9" time="0.836958"/>
+      <testcase name="Rekap export query returns correct data" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::Rekap export query returns correct data" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="4" time="0.800309"/>
+      <testcase name="Rekap export filters by date" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::Rekap export filters by date" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="2" time="0.813896"/>
+      <testcase name="Rekap service generates valid number" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::Rekap service generates valid number" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="2" time="0.811928"/>
+      <testcase name="Delivery schedule policy is registered" file="Delivery Schedule Permission (Tests\Feature\DeliverySchedulePermission)::Delivery schedule policy is registered" class="Tests\Feature\DeliverySchedulePermissionTest" classname="Tests.Feature.DeliverySchedulePermissionTest" assertions="3" time="0.853022"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\DeliveryScheduleTest" file="Delivery Schedule (Tests\Feature\DeliverySchedule)" tests="21" assertions="72" errors="0" failures="0" skipped="0" time="16.980335">
+      <testcase name="It can generate unique schedule number" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It can generate unique schedule number" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="2" time="0.804654"/>
+      <testcase name="It generates incrementing schedule numbers" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It generates incrementing schedule numbers" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="1" time="0.827719"/>
+      <testcase name="It can create delivery schedule with surat jalan" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It can create delivery schedule with surat jalan" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="3" time="0.867188"/>
+      <testcase name="It lists only surat jalan for the selected cabang" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It lists only surat jalan for the selected cabang" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="4" time="0.886447"/>
+      <testcase name="It filters surat jalan for bau bau cabang" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It filters surat jalan for bau bau cabang" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="3" time="0.830659"/>
+      <testcase name="It still excludes surat jalan used by trashed delivery schedules" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It still excludes surat jalan used by trashed delivery schedules" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="1" time="0.850629"/>
+      <testcase name="It excludes surat jalan that are already used by another delivery schedule" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It excludes surat jalan that are already used by another delivery schedule" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="3" time="0.857735"/>
+      <testcase name="It renders the delivery schedule create form" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It renders the delivery schedule create form" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="6" time="0.855117"/>
+      <testcase name="It can update schedule status" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It can update schedule status" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="7" time="0.828378"/>
+      <testcase name="It creates journal entries when schedule starts shipping not when delivered" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It creates journal entries when schedule starts shipping not when delivered" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="5" time="0.879865"/>
+      <testcase name="It can have multiple surat jalan per schedule" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It can have multiple surat jalan per schedule" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="2" time="0.797489"/>
+      <testcase name="It shows selected surat jalan and delivery orders preview" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It shows selected surat jalan and delivery orders preview" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="4" time="0.861823"/>
+      <testcase name="Delivered schedule completes related delivery orders" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::Delivered schedule completes related delivery orders" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="1" time="0.864609"/>
+      <testcase name="Delivery order no longer requires driver and vehicle" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::Delivery order no longer requires driver and vehicle" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="4" time="0.915635"/>
+      <testcase name="It provides correct status label" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It provides correct status label" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="3" time="0.771721"/>
+      <testcase name="It soft deletes schedule" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It soft deletes schedule" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="2" time="0.508715"/>
+      <testcase name="It has delivery schedule pdf route in preview controller" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It has delivery schedule pdf route in preview controller" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="10" time="0.515060"/>
+      <testcase name="It can generate pdf for delivery schedule" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It can generate pdf for delivery schedule" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="2" time="1.060610"/>
+      <testcase name="It renders delivery schedule pdf without view warnings" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It renders delivery schedule pdf without view warnings" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="2" time="0.818233"/>
+      <testcase name="It preview pdf action visible for all delivery methods" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It preview pdf action visible for all delivery methods" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="6" time="0.546506"/>
+      <testcase name="It can access pdf route for delivery schedule" file="Delivery Schedule (Tests\Feature\DeliverySchedule)::It can access pdf route for delivery schedule" class="Tests\Feature\DeliveryScheduleTest" classname="Tests.Feature.DeliveryScheduleTest" assertions="1" time="0.831542"/>
+    </testsuite>
+  </testsuite>
+</testsuites>

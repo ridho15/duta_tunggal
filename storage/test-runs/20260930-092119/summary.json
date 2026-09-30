@@ -1,0 +1,11 @@
+{
+    "files": 463,
+    "chunks": 16,
+    "tests": 3685,
+    "passed": 3378,
+    "failed": 300,
+    "skipped": 7,
+    "crashes": [],
+    "seconds": 31342,
+    "php": "8.3.25"
+}

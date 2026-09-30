@@ -1,0 +1,1085 @@
+
+   FAIL  Tests\Feature\MaterialIssueWorkflowTest
+  ✓ requesting warehouse confirmation for manufacturing material issue…  5.16s  
+  ⨯ confirmed manufacturing warehouse confirmation consumes stock and r… 1.03s  
+  ⨯ material issue stock metrics include own reservation in effective s… 1.09s  
+✓ Test passed: Product can have multiple suppliers
+✓ Test passed: Supplier can have multiple products
+✓ Test passed: Product-Supplier pivot stores supplier price
+
+   PASS  Tests\Feature\MultiSupplierTest
+  ✓ product can have multiple suppliers                                  0.84s  
+  ✓ supplier can have multiple products                                  0.72s  
+  ✓ product supplier pivot stores additional data                        0.68s  
+  ✓ product supplier price keeps two decimal money format                0.68s  
+
+   PASS  Tests\Feature\NewPurchaseOrderFlowTest
+  ✓ it executes new flow: PO → QC → Auto-Receipt → Stock → Complete      0.95s  
+  ✓ it supports partial QC and completion                                1.06s  
+  ✓ it allows manual completion of purchase order                        0.91s  
+  ✓ it prevents completion of already completed PO                       0.82s  
+  ✓ it creates return product for rejected items                         0.91s  
+  ✓ it handles zero rejected quantity correctly                          0.90s  
+  ✓ it validates QC passed quantity cannot exceed ordered quantity       0.84s  
+
+   PASS  Tests\Feature\OrderRequestApprovalAutoPoAndQcWarehouseTest
+  ✓ it approves an order request with auto-PO and assigns the selected…  2.32s  
+  ✓ it creates purchase order from secondary action on ViewOrderRequest… 1.94s  
+  ✓ it allows creating QC for PO without warehouse by choosing warehous… 1.05s  
+  ✓ it locks QC warehouse when PO already specifies a destination wareh… 1.11s  
+
+   PASS  Tests\Feature\OrderRequestApprovalCurrencyTest
+  ✓ approval with IDR currency preserves currency and prices in PO       0.84s  
+  ✓ approval with USD currency preserves currency and prices in PO       0.87s  
+  ✓ approval creates PurchaseOrderCurrency entry for each unique curren… 0.82s  
+  ✓ multiple OR items with same currency use single currency entry in P… 0.73s  
+  ✓ PO items maintain currency consistency with OR items                 0.76s  
+
+   PASS  Tests\Feature\OrderRequestApprovalGateTest
+  ✓ passes when all items have valid decisions and suppliers for auto p… 0.93s  
+  ✓ throws validation exception when selected items is empty             0.35s  
+  ✓ throws validation exception when decision is draft or missing        0.35s  
+  ✓ throws validation exception when rejected without rejection note     0.35s  
+  ✓ passes when rejected with rejection note                             0.34s  
+  ✓ throws validation exception when auto po enabled but item missing s… 0.35s  
+  ✓ passes when item has no supplier but auto po is disabled             0.36s  
+  ✓ passes when item has no supplier and auto po enabled but item is no… 0.43s  
+
+   PASS  Tests\Feature\OrderRequestComputedFieldsTest
+  ✓ subtotal tax total stay in transaction currency                      0.45s  
+
+   PASS  Tests\Feature\OrderRequestCurrencyChangeIssueTest
+  ✓ konversi Rp 109.859 ke USD menghasilkan 7,32 untuk tampilan 2 desim… 0.40s  
+  ✓ simulasi perubahan mata uang item mengonversi nilai menggunakan rat… 0.40s  
+  ✓ round-trip USD ke IDR menjaga nilai pokok dalam batas presisi desim… 0.27s  
+
+   PASS  Tests\Feature\OrderRequestCurrencyConversionTest
+  ✓ convertIdrToCurrency correctly converts IDR 150000 to USD (150000 /… 0.24s  
+  ✓ convertIdrToCurrency handles zero currency rate gracefully           0.24s  
+  ✓ convertIdrToCurrency with null currency_id returns full amount (ass… 0.24s  
+  ✓ resolveCurrencyRateToRupiah returns correct exchange rate for USD    0.24s  
+  ✓ resolveCurrencyRateToRupiah returns 1 for IDR                        0.24s  
+  ✓ formatMoneyByCurrency formats USD with dollar symbol                 0.24s  
+  ✓ formatMoneyByCurrency formats IDR with Rp symbol                     0.64s  
+  ✓ OrderRequest creates items with currency_id when in USD              0.33s  
+  ✓ resolveCurrencySymbol returns correct symbol for USD                 0.25s  
+  ✓ resolveCurrencySymbol returns correct symbol for IDR                 0.25s  
+  ✓ resolveCurrencySymbol defaults to Rp for null currency_id            0.25s  
+  ✓ supplier options display converted prices in USD                     0.28s  
+  ✓ supplier options display prices in IDR when currency is IDR          0.25s  
+  ✓ supplier label reflects correct converted price in USD               0.31s  
+  ✓ supplier label reflects price in IDR                                 0.29s  
+  ✓ round trip conversion IDR to USD and back should be consistent       0.28s  
+  ✓ order request item with USD currency maintains correct price         0.25s  
+  ✓ mixed currency scenario: one item IDR, one item USD                  0.31s  
+  ✓ order request save preserves IDR anchor instead of recalculating fr… 0.25s  
+  ✓ order request item model does not overwrite existing anchors on sav… 0.30s  
+  ✓ explicit USD override updates anchor from the user entered USD amou… 0.26s  
+  ✓ repair order request currency anchors command is dry-run by default… 0.28s  
+✓ Test passed: Order request can store price fields
+✓ Test passed: Order request can be closed
+✓ Test passed: Order request tracks partial fulfillment (30/100)
+✓ Test passed: PO created from OR is auto-approved
+✓ Test passed: PO inherits correct prices from OR (unit_price: 25000, discount: 500, tax: 9.25)
+✓ Test passed: One OR split into multiple POs (PO1: 40 units, PO2: 30 units, Remaining: 30 units)
+
+   PASS  Tests\Feature\OrderRequestEnhancementsTest
+  ✓ order request can store price fields                                 0.27s  
+  ✓ order request status can be closed                                   0.28s  
+  ✓ order request tracks partial fulfillment                             0.37s  
+  ✓ po from order request is auto approved                               0.46s  
+  ✓ po inherits prices from order request                                0.75s  
+  ✓ one order request can be split into multiple pos                     1.54s  
+
+   PASS  Tests\Feature\OrderRequestFlowTest
+  ✓ complete order request flow                                          1.15s  
+
+   FAIL  Tests\Feature\OrderRequestFrontendLogicTest
+  ✓ supplier product filtering logic                                     0.90s  
+  ✓ order request creation with supplier and products                    0.72s  
+  ✓ supplier change clears invalid items                                 0.49s  
+  ⨯ order request fillable attributes                                    0.58s  
+  ✓ order request item supplier relationship                             0.72s  
+  ✓ order request filters work correctly                                 0.64s  
+  ✓ approve form supplier auto-selected from order request               0.64s  
+
+   PASS  Tests\Feature\OrderRequestLivewireTest
+  ✓ it only shows products belonging to selected supplier                0.89s  
+  ✓ it filters product options based on selected supplier                0.84s  
+  ✓ it prefers product tax, then active setting, then zero for order re… 0.87s  
+
+   PASS  Tests\Feature\OrderRequestMultiSupplierTest
+  ✓ order request items are correctly grouped by supplier_id             0.47s  
+  ✓ createPurchaseOrder for supplier A items creates single-supplier PO  0.45s  
+  ✓ two separate createPurchaseOrder calls produce two single-supplier…  0.44s  
+  ✓ multi-supplier approve creates one PO per supplier and cabang combi… 0.60s  
+  ✓ createPurchaseOrder splits same supplier across different cabang in… 0.51s  
+  ✓ single-supplier OR approve creates exactly one PO                    0.50s  
+  ✓ PO items from multi-supplier flow all have correct refer_item_model… 0.51s  
+
+   FAIL  Tests\Feature\OrderRequestQuantityLockTest
+  ✓ approved po items lock order request quantity on backend             0.45s  
+  ✓ approved po reduces po remaining but not receipt remaining until ac… 0.45s  
+  ✓ purchase receipt for order request cannot exceed order request quan… 0.57s  
+  ✓ qc from order request po item cannot create receipt over order requ… 0.47s  
+  ✓ fully poed items are excluded from create po form                    0.94s  
+  ✓ create po form contains all cost and subtotal fields                 1.09s  
+  ⨯ creating multiple partial pos via filament action works              2.63s  
+  ⨯ creating multiple partial pos with receiving and status changes wor… 2.41s  
+
+   PASS  Tests\Feature\OrderRequestRegressionTest
+  ✓ approve derives supplier_id from first item when not provided        0.44s  
+  ✓ createPurchaseOrder derives supplier_id from first item when not pr… 0.46s  
+  ✓ approve auto-generates po_number when not provided                   0.46s  
+  ✓ approve creates multiple POs for multi-supplier items                0.50s  
+  ✓ approve derives supplier_id from first included item                 0.47s  
+  ✓ approve fails gracefully when items have no supplier                 0.41s  
+
+   PASS  Tests\Feature\OrderRequestRepeaterCollapseTest
+  ✓ it keeps only the newest order request item expanded on create       0.57s  
+  ✓ it collapses order request items on edit                             0.53s  
+  ✓ it adds a new order request item from the edit repeater action       0.55s  
+
+   FAIL  Tests\Feature\OrderRequestResourceTest
+  ✓ it creates an order request through the Filament create page         0.57s  
+  ⨯ it shows localized item validation messages and opens the first inv… 0.56s  
+  ✓ it only offers active warehouses for order request selection         0.50s  
+  ✓ it stores formatted unit_price as numeric value in database          0.56s  
+  ✓ it accepts live formatted decimal unit price and recalculates previ… 0.59s  
+  ✓ it stores decimal unit_price and original_price without changing 15… 0.57s  
+  ✓ it forces item tax to zero when item tax type is non tax             0.59s  
+  ✓ it recalculates approval preview totals when override price changes  0.51s  
+  ✓ it limits product options to fifty entries                           1.07s  
+  ✓ it does not expose a global tax type select and keeps item-level ta… 0.53s  
+  ✓ it keeps guide full width and styles non editable inputs             0.55s  
+  ✓ it makes create purchase order selected items collapsible with item… 0.55s  
+  ✓ it resolves product supplier options and auto-selects supplier when… 0.66s  
+  ✓ it orders linked product suppliers by lowest price before alphabeti… 0.59s  
+  ✓ it keeps inline UOM and original price server controlled and recalc… 0.74s  
+  ✓ it shows foreign currency rate and IDR equivalents in inline naviga… 0.55s  
+  ✓ it formats original and override prices after product and supplier…  0.59s  
+  ✓ it preserves granular plastic supplier price when switching IDR to…  0.62s  
+  ⨯ it persists and shows granular plastic USD values without rounding…  0.68s  
+  ✓ it auto-selects item cabang when product changes                     0.37s  
+  ✓ it formats supplier label using selected currency conversion         0.32s  
+  ✓ it converts item original and override price when item currency cha… 0.33s  
+  ✓ it recalculates total subtotal and tax nominal when item currency c… 0.34s  
+  ✓ it lists order requests on the index page                            0.99s  
+  ✓ it shows fulfilled quantity summary on the index page                0.68s  
+  ⨯ it views order request details on the Filament view page             0.37s  
+  ✓ it keeps order request remaining receipt quantity unchanged after p… 0.37s  
+  ✓ it reduces order request remaining receipt quantity only after acce… 0.48s  
+  ⨯ it approves an order request from the view page action and updates…  0.59s  
+  ⨯ it loads item approval decisions from current item status in the ap… 0.37s  
+  ⨯ it loads item approval decisions from current item status in the cr… 0.47s  
+  ✓ it hides create purchase order action when no approved item has rem… 0.40s  
+  ⨯ it shows create purchase order action when an approved item has rem… 0.45s  
+  ✓ it uses contextual empty approved item messages for purchase order…  0.34s  
+  ⨯ it blocks approval from the view action when any item is still draf… 0.38s  
+  ⨯ it rejects an order request from the view action when all items are… 0.48s  
+  ⨯ it approves from the view action without purchase order when approv… 0.80s  
+  ⨯ it approves from the view action without automatic purchase order w… 2.51s  
+  ⨯ it approves an order request from the view page action and auto-gen… 1.14s  
+  ⨯ it approves an order request from the list table action without cre… 0.80s  
+  ⨯ it approves an order request from the list table action and creates… 0.65s  
+  ⨯ it approves an order request from the list table action and creates… 0.60s  
+  ⨯ it order request create PO modals expose cabang and localized date…  0.65s  
+  ⨯ it shows decimal unit price on the Filament view page                0.61s  
+  ✓ it edits an order request through the Filament edit page             0.66s  
+  ✓ it removes an unused inline order request item from edit state       0.63s  
+  ✓ it adds an inline order request item through edit state and can rem… 2.94s  
+  ✓ it adds an inline order request item through create state and can r… 0.73s  
+  ⨯ it does not remove an inline order request item that is already ref… 0.62s  
+  ✓ it deletes (soft deletes) an order request and its items             0.62s  
+
+   FAIL  Tests\Feature\OrderRequestServiceTest
+  ⨯ approval without approved item keeps header from becoming approved   0.42s  
+  ⨯ approval without selected item decisions is rejected                 0.39s  
+  ✓ approval rejects header when all items are rejected                  0.40s  
+  ⨯ approval rejects partial decision while any item remains draft       0.42s  
+  ✓ approval marks header partial when items are explicitly approved an… 0.42s  
+  ✓ approved item with include false is approved without creating purch… 0.40s  
+  ✓ order request approval generates purchase order and items            0.42s  
+  ✓ explicit cabang_id payload is preserved when creating purchase orde… 0.40s  
+  ✓ order request rejection updates status without creating purchase or… 0.38s  
+  ✓ order request item stores original_price separately from unit_price… 0.50s  
+  ✓ createPurchaseOrder uses unit_price override not original_price      0.51s  
+  ✓ create purchase order from order request auto approves purchase ord… 0.47s  
+  ⨯ createPurchaseOrder with selected_items only converts approved orde… 0.44s  
+  ⨯ createPurchaseOrder without selected_items only converts approved o… 0.43s  
+  ✓ item tax type Inklusif maps to Inklusif on purchase order item       0.44s  
+  ✓ item tax type Eklusif maps to Eklusif on purchase order item         0.45s  
+  ✓ item tax type Non Pajak always maps to Non Pajak                     0.48s  
+  ✓ one order request can generate multiple purchase orders for differe… 0.71s  
+  ✓ second PO can be created for remaining unfulfilled quantity after f… 0.96s  
+  ✓ order request approve creates product_supplier for non-linked suppl… 0.44s  
+  ✓ DIAGNOSTIC: product_supplier NOT updated on item save (removed save… 1.43s  
+  ✓ DIAGNOSTIC: product_supplier created/updated ONLY at approve(), not… 0.33s  
+  ✓ DIAGNOSTIC: product_supplier with unlinked supplier (price=0) creat… 0.41s  
+  ✓ DIAGNOSTIC: OR item supplier_id is used if set, else fallback to pa… 0.46s  
+  ✓ DIAGNOSTIC: creating purchase order does not update product_supplie… 0.41s  
+  ✓ DIAGNOSTIC: updating purchase order item does not update product_su… 0.81s  
+
+   PASS  Tests\Feature\OrderRequestToPurchaseOrderTest
+  ✓ approve without selected_items creates PO with all order request it… 1.18s  
+  ✓ OR item tax types are preserved when building and approving a purch… 1.00s  
+  ✓ purchase order item inherits tax type from referenced order request… 0.82s  
+  ✓ mixed order request tax types are preserved when creating a purchas… 0.56s  
+  ✓ approve with selected_items creates PO with only included items      0.45s  
+  ✓ approve with selected_items keeps fulfilled quantity at zero until…  0.43s  
+  ✓ purchase receipt acceptance updates fulfilled quantity on the linke… 0.39s  
+  ✓ order request fulfillment reconciliation command repairs stale fulf… 0.41s  
+  ✓ approve with all selected_items excluded creates empty PO            0.39s  
+  ✓ approve with create_purchase_order=false only changes status         0.39s  
+  ✓ createPurchaseOrder without selected_items includes all items        0.41s  
+  ✓ createPurchaseOrder with selected_items includes only checked items  0.44s  
+  ✓ manually created PO items linked to an OrderRequest backfill refer_… 0.46s  
+  ✓ PO items have correct refer_item_model traceability after approve    0.47s  
+  ✓ fulfilled_quantity on OrderRequestItems remains zero after approve…  0.48s  
+  ✓ approving an existing PO does not double count fulfilled quantities  0.45s  
+  ✓ PO items receive the correct currency_id from the first available c… 0.53s  
+
+   PASS  Tests\Feature\PaymentCurrencyAuditTest
+  ✓ payment recorded in idr or has amount idr                            0.49s  
+
+   FAIL  Tests\Feature\PaymentLedgerPostingTest
+  ✓ post vendor payment creates debit ap and credit bank                 0.47s  
+  ✓ post vendor payment is idempotent for same payment                   0.44s  
+  ✓ post vendor payment using deposit credits deposit coa                0.41s  
+  ✓ post vendor payment with deposit throws when deposit coa is missing  0.37s  
+  ✓ vendor payment detail creation fails early when supplier deposit is… 0.38s  
+  ✓ vendor payment status update fails early when deposit is unavailabl… 0.28s  
+  ✓ post deposit creates journal entries                                 0.25s  
+  ⨯ import purchase invoice does not post ppn masukan                    0.26s  
+  ✓ import payment posts ppn masukan and other import taxes              0.29s  
+
+   FAIL  Tests\Feature\PaymentRequestVendorPaymentFlowTest
+  ✓ it can create a payment request in draft status                      0.23s  
+  ⨯ payment request total amount is formatted as rupiah in the create f… 0.85s  
+  ✓ payment request generates unique request number                      0.78s  
+  ✓ it can submit payment request for approval                           0.29s  
+  ✓ submit action is only visible from draft status                      0.24s  
+  ✓ it can approve a pending payment request                             0.24s  
+  ✓ approve action is only visible when pending approval                 0.24s  
+  ✓ it can reject a pending payment request                              0.37s  
+  ✓ reject action requires approval notes                                0.29s  
+  ✓ it can create vendor payment linked to approved payment request      0.28s  
+  ✓ after creating vendor payment payment request status becomes paid    0.27s  
+  ✓ creating vendor payment without payment request id does not affect…  0.26s  
+  ✓ vendor payment select only shows approved prs without vendor paymen… 0.26s  
+  ✓ paid payment request is excluded from vendor payment select          0.27s  
+  ✓ payment request belongs to vendor payment                            0.33s  
+  ✓ vendor payment belongs to payment request                            0.27s  
+  ✓ payment request status constants are correctly defined               0.25s  
+  ✓ payment request status labels cover all statuses                     0.26s  
+  ✓ payment request status is normalized to canonical lowercase value    0.28s  
+
+   PASS  Tests\Feature\PdfAuthorizationTest
+  ✓ it pdf-stream: pengguna login TANPA izin view mendapat 403 untuk se… 0.92s  
+  ✓ it customer-return: 403 tanpa izin view customer return; PDF dengan… 0.69s  
+  ✓ it delivery-order: policy Sales — hanya DO dari SO buatannya sendir… 0.92s  
+  ✓ it tanpa login dialihkan ke login; dokumen tak ada tetap 404 untuk…  0.75s  
+
+   PASS  Tests\Feature\PdfGenerationTest
+  ✓ quotation pdf loads required relations                               0.42s  
+  ✓ order request config has required relations                          0.42s  
+  ✓ quotation pdf config has landscape orientation and required relatio… 0.41s  
+  ✓ order request pdf config has landscape orientation and required rel… 0.41s  
+  ✓ quotation pdf view has required sections                             0.38s  
+  ✓ order request pdf view has required sections                         0.39s  
+
+   PASS  Tests\Feature\PdfRoutesTest
+  ✓ PDF Routes → Route Registration → it pdf-stream route is registered  0.49s  
+  ✓ PDF Routes → Route Registration → it pdf-customer-return route is r… 0.47s  
+  ✓ PDF Routes → Route Registration → it all routes require authenticat… 0.47s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for order-request     0.46s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for purchase-order    0.48s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for quotation         0.48s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for sale-order        0.49s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for sales-invoice     0.49s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for purchase-invoice  0.47s  
+  ✓ PDF Routes → pdf-stream route → it streams PDF for delivery-order    0.51s  
+  ✓ PDF Routes → pdf-stream route → it returns 404 for invalid document… 0.53s  
+  ✓ PDF Routes → pdf-stream route → it returns 404 for non-existent rec… 0.49s  
+
+   FAIL  Tests\Feature\PermissionRoleBranchTaxAuditTest
+  ✓ listPermission covers all core modules and follows naming conventio… 0.36s  
+  ✓ sales order module has workflow permissions                          0.35s  
+  ✓ quotation module has approval-workflow permissions                   0.34s  
+  ✓ voucher request module has submit, approve, reject, cancel permissi… 0.35s  
+  ✓ permission seeder creates all expected permissions                   0.63s  
+  ✓ role seeder creates descriptions for each role                       0.63s  
+  ✓ Sales role only has sales-related permissions                        0.63s  
+  ✓ Purchasing role only has purchasing-related permissions              0.62s  
+  ✓ Auditor role has view any on every module but cannot create or dele… 0.64s  
+  ✓ user with view any sales order permission can pass Gate check        0.71s  
+  ✓ user without permission is denied                                    0.66s  
+  ✓ Super Admin user has all permissions                                 1.06s  
+  ✓ sale orders are filtered by branch scope                             0.41s  
+  ✓ CabangScope applies to SaleOrder queries                             0.40s  
+  ✓ TaxService normalizes English Exclusive to Eksklusif                 0.37s  
+  ✓ TaxService normalizes English Inclusive to Inklusif                  0.35s  
+  ✓ TaxService::compute Eksklusif adds PPN on top                        0.35s  
+  ✓ TaxService::compute Inklusif extracts PPN from gross                 0.34s  
+  ✓ TaxService::compute Non Pajak returns zero PPN                       0.33s  
+  ✓ TaxService::compute with zero rate returns no PPN                    0.34s  
+  ✓ hitungSubtotal with Exclusive tax calculates correct total           0.33s  
+  ✓ hitungSubtotal with Inclusive tax returns gross unchanged            0.35s  
+  ✓ hitungSubtotal applies discount before tax                           0.34s  
+  ✓ hitungSubtotal defaults to Inklusif when null taxType passed         0.34s  
+  ✓ QuotationItem stores tax_type None by default from DB column         0.39s  
+  ✓ QuotationItem stores Inclusive when explicitly set                   0.40s  
+  ✓ QuotationService updateTotalAmount uses Exclusive tax_type           0.40s  
+  ✓ QuotationService updateTotalAmount uses Inclusive tax_type           0.39s  
+  ✓ QuotationService updateTotalAmount handles multiple items with mixe… 0.40s  
+  ⨯ SaleOrderItem tipe_pajak column defaults to None                     0.40s  
+  ⨯ SaleOrderItem tipe_pajak can be set to Inclusive                     0.39s  
+  ✓ SalesOrderService updateTotalAmount uses per-item tipe_pajak (Exclu… 0.40s  
+  ✓ SalesOrderService updateTotalAmount uses per-item tipe_pajak (Inclu… 0.36s  
+  ✓ Sale Order items inherit tax_type from Quotation items when created… 0.36s  
+  ⨯ Sale Order total reflects inherited Inclusive tax correctly          0.36s  
+  ✓ TaxService handles all possible tax type strings without exception   0.33s  
+  ✓ TaxSetting can be created and retrieved                              0.33s  
+  ✓ Active PPN tax setting can be queried for default tax rate           0.34s  
+  ✓ Quotation approval workflow: draft → request_approve → approve       0.34s  
+  ✓ Quotation approval workflow: request_approve → reject                0.35s  
+  ✓ InventoryCardController print route returns 403 without permission   0.47s  
+  ✓ InventoryCardController print route passes with correct permission   0.59s  
+  ✓ StockReport preview route returns 403 without permission             0.47s  
+  ✓ StockReport preview route passes with correct permission             0.58s  
+  ✓ Filament resources define canViewAny via policy                      0.34s  
+  ✓ SalesOrderService::generateCode returns a unique SO number           0.34s  
+
+   FAIL  Tests\Feature\ProcurementAuditTest
+  ✓ purchase order creation and approval workflow                        0.38s  
+  ✓ purchase receipt processing and stock updates                        0.39s  
+  ✓ quality control workflow and approval                                0.39s  
+  ⨯ delivery order generation from purchase                              0.38s  
+  ✓ purchase return processing                                           0.37s  
+  ✓ cross module data integrity                                          0.38s  
+  ✓ supplier performance and pricing                                     0.37s  
+  ⨯ end to end procurement workflow                                      0.38s  
+  ✓ procurement data validation and constraints                          0.39s  
+
+   PASS  Tests\Feature\ProductAccountMappingTest
+  ✓ it sets default chart of accounts on newly created products          0.57s  
+  ✓ it sets raw material inventory COA to 1-101 on create                0.58s  
+  ✓ it sets manufactured product inventory COA to 1140.02 on create      0.57s  
+  ✓ it resolves manufacturing coa defaults for manufactured products     0.60s  
+
+   FAIL  Tests\Feature\ProductAccountUiTest
+  ⨯ Product account mapping form defaults → it applies default coa valu… 1.05s  
+  ✓ Product account mapping form defaults → it switches inventory coa t… 1.07s  
+  ✓ Product account mapping form defaults → it switches inventory coa t… 0.88s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\MaterialIssueWorkflowTest > confirmed manufacturing…   
+  Failed asserting that 100.0 is identical to 50.0.
+
+  at tests/Feature/MaterialIssueWorkflowTest.php:203
+    199▕         ->first();
+    200▕ 
+    201▕     $initialStock->refresh();
+    202▕     expect($materialIssue->fresh()->status)->toBe(MaterialIssue::STATUS_COMPLETED);
+  ➜ 203▕     expect((float) $initialStock->qty_available)->toBe(50.0);
+    204▕     expect((float) $initialStock->qty_reserved)->toBe(0.0);
+    205▕     expect($movement)->not->toBeNull();
+    206▕     expect($movement->source_type_label)->toBe('Material Issue');
+    207▕     expect($movement->source_number)->toBe($materialIssue->issue_number);
+
+  1   tests/Feature/MaterialIssueWorkflowTest.php:203
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\MaterialIssueWorkflowTest > material issue stock me…   
+  Failed asserting that 0.0 is identical to 100.0.
+
+  at tests/Feature/MaterialIssueWorkflowTest.php:242
+    238▕     ]);
+    239▕ 
+    240▕     $metrics = MaterialIssueResource::getStockMetrics($rawMaterial->id, $warehouse->id, $materialIssue);
+    241▕ 
+  ➜ 242▕     expect($metrics['physical'])->toBe(100.0);
+    243▕     expect($metrics['reserved'])->toBe(90.0);
+    244▕     expect($metrics['free'])->toBe(10.0);
+    245▕     expect($metrics['own_reserved'])->toBe(50.0);
+    246▕     expect($metrics['effective'])->toBe(60.0);
+
+  1   tests/Feature/MaterialIssueWorkflowTest.php:242
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestFrontendLogicTest > order request filla…   
+  Failed asserting that Illuminate\Support\Carbon Object #1081 (
+    'endOfTime' => false,
+    'startOfTime' => false,
+    'constructedObjectId' => '00000000000004390000000000000000',
+    'clock' => null,
+    'localMonthsOverflow' => null,
+    'localYearsOverflow' => null,
+    'localStrictModeEnabled' => null,
+    'localHumanDiffOptions' => null,
+    'localToStringFormat' => null,
+    'localSerializer' => null,
+    'localMacros' => null,
+    'localGenericMacros' => null,
+    'localFormatFunction' => null,
+    'localTranslator' => null,
+    'dumpProperties' => Array &0 [
+        0 => 'date',
+        1 => 'timezone_type',
+        2 => 'timezone',
+    ],
+    'dumpLocale' => null,
+    'dumpDateProperties' => null,
+    'date' => '2025-11-13 00:00:00.000000',
+    'timezone_type' => 3,
+    'timezone' => 'Asia/Jakarta',
+) is identical to '2025-11-13'.
+
+  at tests/Feature/OrderRequestFrontendLogicTest.php:140
+    136▕ 
+    137▕     $orderRequest = OrderRequest::create($data);
+    138▕ 
+    139▕     expect($orderRequest->request_number)->toBe($data['request_number']);
+  ➜ 140▕     expect($orderRequest->request_date)->toBe($data['request_date']);
+    141▕     expect($orderRequest->status)->toBe($data['status']);
+    142▕     expect($orderRequest->note)->toBe($data['note']);
+    143▕     expect($orderRequest->created_by)->toBe($data['created_by']);
+    144▕ });
+
+  1   tests/Feature/OrderRequestFrontendLogicTest.php:140
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestQuantityLockTest > creating multiple pa…   
+  Failed asserting that a row in the table [purchase_orders] matches the attributes {
+    "po_number": "PO-PARTIAL-ACTION-1"
+}.
+
+The table is empty.
+
+  at tests/Feature/OrderRequestQuantityLockTest.php:297
+    293▕         ])
+    294▕         ->callMountedAction(); // Submit first PO
+    295▕ 
+    296▕         // Check first PO is created
+  ➜ 297▕         $this->assertDatabaseHas('purchase_orders', ['po_number' => 'PO-PARTIAL-ACTION-1']);
+    298▕         $po1 = PurchaseOrder::where('po_number', 'PO-PARTIAL-ACTION-1')->first();
+    299▕         $this->assertEquals(5, $po1->purchaseOrderItem()->first()->quantity);
+    300▕ 
+    301▕         // Do NOT approve the first PO, leave it as draft
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestQuantityLockTest > creating multiple pa…   
+  Failed asserting that a row in the table [purchase_orders] matches the attributes {
+    "po_number": "PO-PARTIAL-TEST-1",
+    "status": "approved"
+}.
+
+The table is empty.
+
+  at tests/Feature/OrderRequestQuantityLockTest.php:370
+    366▕         ])
+    367▕         ->callMountedAction(); // Submit first PO
+    368▕ 
+    369▕         // Check first PO is created and auto-approved by the Order Request action.
+  ➜ 370▕         $this->assertDatabaseHas('purchase_orders', ['po_number' => 'PO-PARTIAL-TEST-1', 'status' => 'approved']);
+    371▕         $po1 = PurchaseOrder::where('po_number', 'PO-PARTIAL-TEST-1')->first();
+    372▕         $po1Item = $po1->purchaseOrderItem()->first();
+    373▕         $this->assertEquals(5, $po1Item->quantity);
+    374▕
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it shows localized item…    
+  Component has no matching failed rule or error message [required] for [data.orderRequestItem.first-item.cabang_id] attribute.
+Failed asserting that an array contains 'required'.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:100
+     96▕             return;
+     97▕         }
+     98▕ 
+     99▕         // If the provided rule/message isn't a failed rule, let's check to see if it's a message...
+  ➜ 100▕         PHPUnit::assertContains($ruleOrMessage, $messages, "Component has no matching failed rule or error message [{$ruleOrMessage}] for [{$key}] attribute.");
+    101▕     }
+    102▕ 
+    103▕ 
+    104▕     public function assertHasNoErrors($keys = [])
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:131
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it persists and shows gr…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="re00tFysIkiFuuTfs1OF"\n
+      class="fi-page fi-resource-view-record-page fi-resource-order-requests fi-resource-record-60"\n
+  >\n
+  ... (1280 more lines)
+
+  To contain: $ 46,93
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/OrderRequestResourceTest.php:707
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it views order request d…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="0T06GdwtvcSPA4hvaibe"\n
+      class="fi-page fi-resource-view-record-page fi-resource-order-requests fi-resource-record-64"\n
+  >\n
+  ... (1306 more lines)
+
+  To contain: Product :
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/OrderRequestResourceTest.php:939
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves an order req…   
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1063
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it loads item approval d…   
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+3 vendor frames [22m
+  4   tests/Feature/OrderRequestResourceTest.php:1113
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it loads…  ErrorException   
+  Undefined array key 91
+
+  at vendor/laravel/framework/src/Illuminate/Collections/Collection.php:1908
+    1904▕      * @return TValue
+    1905▕      */
+    1906▕     public function offsetGet($key): mixed
+    1907▕     {
+  ➜ 1908▕         return $this->items[$key];
+    1909▕     }
+    1910▕ 
+    1911▕     /**
+    1912▕      * Set the item at a given offset.
+
+  1   tests/Feature/OrderRequestResourceTest.php:1175
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it shows create purchase…   
+  Expected: "1fXTgFrys5ikwCl1nmng"\n
+      class="fi-page fi-resource-view-record-page fi-resource-order-requests fi-resource-record-71"\n
+  >\n
+  ... (3252 more lines)
+
+  To contain: Hanya item berstatus Approved dengan sisa qty yang akan dibuatkan Purchase Order.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/OrderRequestResourceTest.php:1233
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it blocks approval from…    
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1276
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it rejects an order requ…   
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1319
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves from the vie…   
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1362
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves from the vie…   
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1405
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves an order req…   
+  Failed asserting that an action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ViewOrderRequest] component.
+Failed asserting that true is false.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:203
+    199▕ 
+    200▕             $livewireClass = $this->instance()::class;
+    201▕             $prettyName = implode(' > ', $name);
+    202▕ 
+  ➜ 203▕             Assert::assertFalse(
+    204▕                 $action->isHidden(),
+    205▕                 message: "Failed asserting that an action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+    206▕             );
+    207▕
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1446
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves an order req…   
+  Failed asserting that a table action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ListOrderRequests] component for record [{"request_number":"OR-20260930-0001","request_date":"2026-07-08T17:00:00.000000Z","note":"Qui quos rerum unde ducimus consequatur aut sequi.","created_by":133,"currency_id":149,"status":"request_approve","updated_at":"2026-09-30T14:03:12.000000Z","created_at":"2026-09-30T14:03:12.000000Z","id":77}].
+Failed asserting that true is false.
+
+  at vendor/filament/tables/src/Testing/TestsActions.php:294
+    290▕             if (($actionGroup = $action->getRootGroup()) instanceof HasRecord) {
+    291▕                 $actionGroup->record($record);
+    292▕             }
+    293▕ 
+  ➜ 294▕             Assert::assertFalse(
+    295▕                 $action->isHidden(),
+    296▕                 message: filled($record) ?
+    297▕                     "Failed asserting that a table action with name [{$prettyName}] is visible on the [{$livewireClass}] component for record [{$record}]." :
+    298▕                     "Failed asserting that a table action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1492
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves an order req…   
+  Failed asserting that a table action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ListOrderRequests] component for record [{"request_number":"OR-20260930-0001","request_date":"2026-08-05T17:00:00.000000Z","note":"Architecto dolores ut perspiciatis iusto aut in vero.","created_by":134,"currency_id":150,"status":"request_approve","updated_at":"2026-09-30T14:03:13.000000Z","created_at":"2026-09-30T14:03:13.000000Z","id":78}].
+Failed asserting that true is false.
+
+  at vendor/filament/tables/src/Testing/TestsActions.php:294
+    290▕             if (($actionGroup = $action->getRootGroup()) instanceof HasRecord) {
+    291▕                 $actionGroup->record($record);
+    292▕             }
+    293▕ 
+  ➜ 294▕             Assert::assertFalse(
+    295▕                 $action->isHidden(),
+    296▕                 message: filled($record) ?
+    297▕                     "Failed asserting that a table action with name [{$prettyName}] is visible on the [{$livewireClass}] component for record [{$record}]." :
+    298▕                     "Failed asserting that a table action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1531
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it approves an order req…   
+  Failed asserting that a table action with name [approve] is visible on the [App\Filament\Resources\OrderRequestResource\Pages\ListOrderRequests] component for record [{"request_number":"OR-20260930-0001","request_date":"2026-09-27T17:00:00.000000Z","note":"Aliquid suscipit unde rerum cum et aut.","created_by":135,"currency_id":151,"status":"request_approve","updated_at":"2026-09-30T14:03:13.000000Z","created_at":"2026-09-30T14:03:13.000000Z","id":79}].
+Failed asserting that true is false.
+
+  at vendor/filament/tables/src/Testing/TestsActions.php:294
+    290▕             if (($actionGroup = $action->getRootGroup()) instanceof HasRecord) {
+    291▕                 $actionGroup->record($record);
+    292▕             }
+    293▕ 
+  ➜ 294▕             Assert::assertFalse(
+    295▕                 $action->isHidden(),
+    296▕                 message: filled($record) ?
+    297▕                     "Failed asserting that a table action with name [{$prettyName}] is visible on the [{$livewireClass}] component for record [{$record}]." :
+    298▕                     "Failed asserting that a table action with name [{$prettyName}] is visible on the [{$livewireClass}] component.",
+
+      [2m+6 vendor frames [22m
+  7   tests/Feature/OrderRequestResourceTest.php:1591
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it order request create…    
+  Expected: <?php\n
+  \n
+  namespace App\Filament\Resources\OrderRequestResource\Pages;\n
+  ... (623 more lines)
+
+  To contain: Select::make('cabang_id')
+
+  at tests/Feature/OrderRequestResourceTest.php:1633
+    1629▕         ->and($resource)->toContain("->label('Cabang')")
+    1630▕         ->and($resource)->toContain("->label('Tanggal Pembelian')")
+    1631▕         ->and($resource)->toContain("->label('Tanggal Diharapkan')")
+    1632▕         ->and($resource)->toContain('->columns(3)')
+  ➜ 1633▕         ->and($viewPage)->toContain("Select::make('cabang_id')")
+    1634▕         ->and($viewPage)->toContain("->label('Cabang')")
+    1635▕         ->and($viewPage)->toContain("->label('Tanggal Pembelian')")
+    1636▕         ->and($viewPage)->toContain("->label('Tanggal Diharapkan')")
+    1637▕         ->and($viewPage)->toContain('->columns(3)');
+
+  1   tests/Feature/OrderRequestResourceTest.php:1633
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it shows decimal unit pr…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="GYIYdhnPhkjPn7vP6MdM"\n
+      class="fi-page fi-resource-view-record-page fi-resource-order-requests fi-resource-record-80"\n
+  >\n
+  ... (1306 more lines)
+
+  To contain: 15,09
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/OrderRequestResourceTest.php:1662
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestResourceTest > it does not remove an in…   
+  Expecting false not to be false .
+
+  at tests/Feature/OrderRequestResourceTest.php:1940
+    1936▕ 
+    1937▕     $items = $component->get('data.orderRequestItem');
+    1938▕     $key = collect($items)->search(fn (array $item) => (int) ($item['id'] ?? 0) === (int) $lockedItem->id);
+    1939▕ 
+  ➜ 1940▕     expect($key)->not->toBeFalse();
+    1941▕ 
+    1942▕     $component->call('removeInlineOrderRequestItem', (string) $key);
+    1943▕ 
+    1944▕     $remainingItems = $component->get('data.orderRequestItem');
+
+  1   tests/Feature/OrderRequestResourceTest.php:1940
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestServiceTest > approval without approved…   
+  Exception "InvalidArgumentException" not thrown.
+
+  at tests/Feature/OrderRequestServiceTest.php:98
+     94▕                 ['item_id' => $this->itemA->id, 'approval_status' => OrderRequestItem::STATUS_DRAFT, 'include' => true],
+     95▕                 ['item_id' => $this->itemB->id, 'approval_status' => OrderRequestItem::STATUS_DRAFT, 'include' => true],
+     96▕             ],
+     97▕         ]))
+  ➜  98▕         ->toThrow(\InvalidArgumentException::class, 'Masih ada item berstatus Draft');
+     99▕ 
+    100▕     expect($this->orderRequest->fresh()->status)->toBe('request_approve');
+    101▕     expect($this->itemA->fresh()->status)->toBe(OrderRequestItem::STATUS_DRAFT);
+    102▕     expect($this->itemB->fresh()->status)->toBe(OrderRequestItem::STATUS_DRAFT);
+
+  1   tests/Feature/OrderRequestServiceTest.php:98
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestServiceTest > approval without selected…   
+  Exception "InvalidArgumentException" not thrown.
+
+  at tests/Feature/OrderRequestServiceTest.php:112
+    108▕ 
+    109▕     expect(fn () => $this->service->approve($this->orderRequest->fresh(['orderRequestItem']), [
+    110▕             'create_purchase_order' => false,
+    111▕         ]))
+  ➜ 112▕         ->toThrow(\InvalidArgumentException::class, 'Keputusan item wajib diisi sebelum Order Request dapat di-approve.');
+    113▕ 
+    114▕     expect($this->orderRequest->fresh()->status)->toBe('request_approve');
+    115▕     expect($this->itemA->fresh()->status)->toBe(OrderRequestItem::STATUS_APPROVED);
+    116▕     expect($this->itemB->fresh()->status)->toBe(OrderRequestItem::STATUS_APPROVED);
+
+  1   tests/Feature/OrderRequestServiceTest.php:112
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestServiceTest > approval rejects partial…    
+  Exception "InvalidArgumentException" not thrown.
+
+  at tests/Feature/OrderRequestServiceTest.php:173
+    169▕                     'include' => true,
+    170▕                 ],
+    171▕             ],
+    172▕         ]))
+  ➜ 173▕         ->toThrow(\InvalidArgumentException::class, 'Masih ada item berstatus Draft');
+    174▕ 
+    175▕     expect($this->orderRequest->fresh()->status)->toBe('request_approve');
+    176▕     expect(PurchaseOrder::count())->toBe(0);
+    177▕ });
+
+  1   tests/Feature/OrderRequestServiceTest.php:173
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestServiceTest > createPurchaseOrder with…    
+  Failed asserting that actual size 2 matches expected size 1.
+
+  at tests/Feature/OrderRequestServiceTest.php:467
+    463▕             ['item_id' => $rejectedItem->id, 'quantity' => 4, 'unit_price' => 12000, 'include' => true],
+    464▕         ],
+    465▕     ])->fresh(['purchaseOrderItem']);
+    466▕ 
+  ➜ 467▕     expect($po->purchaseOrderItem)->toHaveCount(1)
+    468▕         ->and($po->purchaseOrderItem->first()->refer_item_model_id)->toBe($this->itemA->id);
+    469▕ });
+    470▕ 
+    471▕ test('createPurchaseOrder without selected_items only converts approved order request items', function () {
+
+  1   tests/Feature/OrderRequestServiceTest.php:467
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\OrderRequestServiceTest > createPurchaseOrder witho…   
+  Failed asserting that actual size 2 matches expected size 1.
+
+  at tests/Feature/OrderRequestServiceTest.php:495
+    491▕         'supplier_id' => $this->supplier->id,
+    492▕         'order_date' => now()->toDateTimeString(),
+    493▕     ])->fresh(['purchaseOrderItem']);
+    494▕ 
+  ➜ 495▕     expect($po->purchaseOrderItem)->toHaveCount(1)
+    496▕         ->and($po->purchaseOrderItem->first()->refer_item_model_id)->toBe($this->itemA->id);
+    497▕ });
+    498▕ 
+    499▕ // ─── Feature 2: tax_type → tipe_pajak mapping ────────────────────────────────
+
+  1   tests/Feature/OrderRequestServiceTest.php:495
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PaymentLedgerPostingTest > import purchase invoice…    
+  Invoice posting should be posted or skipped
+Failed asserting that false is true.
+
+  at tests/Feature/PaymentLedgerPostingTest.php:518
+    514▕         // Post invoice to ledger
+    515▕         $service = app(LedgerPostingService::class);
+    516▕         $result = $service->postInvoice($invoice);
+    517▕ 
+  ➜ 518▕         $this->assertTrue(in_array($result['status'], ['posted', 'skipped']), 'Invoice posting should be posted or skipped');
+    519▕ 
+    520▕         // Check journal entries - should NOT have PPN Masukan debit for import purchases
+    521▕         $journals = JournalEntry::where('source_type', \App\Models\Invoice::class)->where('source_id', $invoice->id)->get();
+    522▕         $ppnMasukanEntry = $journals->firstWhere('coa_id', $ppnMasukanCoa->id);
+
+  1   tests/Feature/PaymentLedgerPostingTest.php:518
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PaymentRequestVendorPaymentFlowTest > payment reque…   
+  Failed asserting that two strings are equal.
+  -'1.250.000'
+  +'1.250.000,00'
+  
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PaymentRequestVendorPaymentFlowTest.php:123
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PermissionRoleBranchTaxAuditTest > SaleOrderItem ti…   
+  Failed asserting that two strings are identical.
+  -'None'
+  +'eklusif'
+  
+
+  at tests/Feature/PermissionRoleBranchTaxAuditTest.php:602
+    598▕         // tipe_pajak omitted — DB default 'None'
+    599▕     ]);
+    600▕     $item->refresh();
+    601▕ 
+  ➜ 602▕     expect($item->tipe_pajak)->toBe('None');
+    603▕ });
+    604▕ 
+    605▕ test('SaleOrderItem tipe_pajak can be set to Inclusive', function () {
+    606▕     $cabang   = makeCabang('Cabang SOI2');
+
+  1   tests/Feature/PermissionRoleBranchTaxAuditTest.php:602
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PermissionRoleBranchTaxAuditTest > SaleOrderItem ti…   
+  Failed asserting that two strings are identical.
+  -'Inclusive'
+  +'inklusif'
+  
+
+  at tests/Feature/PermissionRoleBranchTaxAuditTest.php:632
+    628▕         'warehouse_id'  => 1,
+    629▕     ]);
+    630▕     $item->refresh();
+    631▕ 
+  ➜ 632▕     expect($item->tipe_pajak)->toBe('Inclusive');
+    633▕ });
+    634▕ 
+    635▕ // ─────────────────────────────────────────────────────────────────────────────
+    636▕ // SECTION 10 — SalesOrderService::updateTotalAmount with tipe_pajak
+
+  1   tests/Feature/PermissionRoleBranchTaxAuditTest.php:632
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PermissionRoleBranchTaxAuditTest > Sale Order total…   
+  Failed asserting that 2000000.0 is identical to 2220000.0.
+
+  at tests/Feature/PermissionRoleBranchTaxAuditTest.php:810
+    806▕     $service->updateTotalAmount($so);
+    807▕     $so->refresh();
+    808▕ 
+    809▕     // Inclusive (TaxService formula): total = base + (base × tax%) = 2,000,000 + 220,000 = 2,220,000
+  ➜ 810▕     expect((float) $so->total_amount)->toBe(2220000.0);
+    811▕ });
+    812▕ 
+    813▕ // ─────────────────────────────────────────────────────────────────────────────
+    814▕ // SECTION 12 — TAX CONSISTENCY: invoice should be able to see tax type
+
+  1   tests/Feature/PermissionRoleBranchTaxAuditTest.php:810
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ProcurementAuditTest > delivery order ge…  Exception   
+  Akun COA untuk produk "Produk sunt" tidak ditemukan. Diperlukan: Persediaan (1140.10) dan Penyerahan Barang (1140.20). Silakan konfigurasi COA produk tersebut sebelum mengirim Delivery Order.
+
+  at app/Observers/DeliveryOrderObserver.php:601
+    597▕             $inventoryCoa = $product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+    598▕             $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
+    599▕ 
+    600▕             if (!$inventoryCoa || !$goodsDeliveryCoa) {
+  ➜ 601▕                 throw new \Exception(
+    602▕                     'Akun COA untuk produk "' . ($product?->name ?? 'tidak diketahui') . '" tidak ditemukan. '
+    603▕                     . 'Diperlukan: Persediaan (' . ($inventoryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('inventory')[0] ?? '-')) . ') dan '
+    604▕                     . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('goods_in_transit')[0] ?? '-')) . '). '
+    605▕                     . 'Silakan konfigurasi COA produk tersebut sebelum mengirim Delivery Order.'
+
+  1   app/Observers/DeliveryOrderObserver.php:601
+  2   app/Observers/DeliveryOrderObserver.php:336
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ProcurementAuditTest > end to end procur…  Exception   
+  QC passed quantity (100) cannot exceed available quantity (0.00) in purchase receipt.
+
+  at app/Observers/QualityControlObserver.php:38
+     34▕                 $maxInspectable = $item->qty_received;
+     35▕ 
+     36▕                 // Validate passed_quantity individually
+     37▕                 if ($qualityControl->passed_quantity > $maxInspectable) {
+  ➜  38▕                     throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) cannot exceed available quantity ({$maxInspectable}) in purchase receipt.");
+     39▕                 }
+     40▕ 
+     41▕                 // Validate total inspected (passed + rejected)
+     42▕                 $totalInspected = $qualityControl->passed_quantity + $qualityControl->rejected_quantity;
+
+  1   app/Observers/QualityControlObserver.php:38
+      [2m+12 vendor frames [22m
+  14  tests/Feature/ProcurementAuditTest.php:619
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ProductAccountUiTest > `Product account mapping for…   
+  Failed asserting that 1256 matches expected 1254.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/ProductAccountUiTest.php:108
+
+
+  Tests:    36 failed, 268 passed (3582 assertions)
+  Duration: 173.41s
+

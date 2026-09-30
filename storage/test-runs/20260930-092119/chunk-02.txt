@@ -1,0 +1,816 @@
+
+   PASS  Tests\Feature\AssetTransferDisposalFormValidationTest
+  ✓ asset transfer validation uses the selected branch state             7.26s  
+  ✓ asset disposal validation requires sale price for sale disposals     0.70s  
+
+   PASS  Tests\Feature\AssetTransferTest
+  ✓ can create asset transfer request                                    0.49s  
+  ✓ can approve transfer request                                         0.61s  
+  ✓ can complete transfer                                                0.66s  
+  ✓ prevents duplicate pending transfers                                 0.52s  
+  ✓ cannot approve non pending transfer                                  0.46s  
+  ✓ cannot complete non approved transfer                                0.50s  
+  ✓ handles transaction rollback on approval error                       1.72s  
+  ✓ can reject transfer request                                          0.71s  
+  ✓ tracks transfer workflow correctly                                   0.57s  
+
+   PASS  Tests\Feature\AuditFixesTest
+  ✓ MoneyHelper::parse() → it parses a plain integer string              0.48s  
+  ✓ MoneyHelper::parse() → it parses Indonesian thousands-dot format "2… 0.46s  
+  ✓ MoneyHelper::parse() → it parses Indonesian format with Rp prefix "… 0.45s  
+  ✓ MoneyHelper::parse() → it parses Western decimal format "1500000.50… 0.45s  
+  ✓ MoneyHelper::parse() → it parses Indonesian decimal format "1.500.0… 0.45s  
+  ✓ MoneyHelper::parse() → it returns 0.0 for null                       0.48s  
+  ✓ MoneyHelper::parse() → it returns 0.0 for empty string               0.46s  
+  ✓ MoneyHelper::parse() → it returns 0.0 for a dash "-"                 0.45s  
+  ✓ MoneyHelper::parse() → it parses raw DB decimal "20000000.00"        0.46s  
+  ✓ PaymentRequest approved_at accessor → it returns null when raw DB a… 0.45s  
+  ✓ PaymentRequest approved_at accessor → it returns null when DB store… 0.51s  
+  ✓ PaymentRequest approved_at accessor → it returns a Carbon instance…  0.61s  
+  ✓ PaymentRequest approved_at accessor → it mutator converts "-" to nu… 0.49s  
+  ✓ PaymentRequest approved_at accessor → it mutator converts empty str… 0.47s  
+  ✓ Deposit money validation rule → it passes for "20.000.000" (Indones… 0.46s  
+  ✓ Deposit money validation rule → it passes for "1.000" (one thousand… 0.46s  
+  ✓ Deposit money validation rule → it passes for plain integer "500000… 0.45s  
+  ✓ Deposit money validation rule → it fails for "0"                     0.45s  
+  ✓ Deposit money validation rule → it fails for empty string            0.45s  
+  ✓ Deposit money validation rule → it would have FAILED under the old…  0.46s  
+  ✓ OrderRequest status enum migration → it accepts request_approve sta… 0.46s  
+  ✓ OrderRequest status enum migration → it accepts partial status       0.46s  
+  ✓ OrderRequest status enum migration → it accepts complete status      0.49s  
+  ✓ OrderRequest status enum migration → it retains existing draft and…  0.52s  
+  ✓ order_request_items supplier_id column → it has supplier_id column…  0.47s  
+  ✓ order_request_items supplier_id column → it allows saving supplier_… 0.47s  
+  ✓ order_request_items supplier_id column → it allows null supplier_id… 0.47s  
+
+   PASS  Tests\Feature\Auth\AuthenticationTest
+  ✓ login screen can be rendered                                         0.47s  
+  ✓ users can authenticate using the login screen                        0.48s  
+  ✓ users can not authenticate with invalid password                     0.71s  
+  ✓ users can logout                                                     0.55s  
+
+   PASS  Tests\Feature\Auth\EmailVerificationTest
+  ✓ email verification screen can be rendered                            0.51s  
+  ✓ email can be verified                                                0.46s  
+  ✓ email is not verified with invalid hash                              0.46s  
+
+   PASS  Tests\Feature\Auth\PasswordConfirmationTest
+  ✓ confirm password screen can be rendered                              0.46s  
+  ✓ password can be confirmed                                            0.47s  
+  ✓ password is not confirmed with invalid password                      0.70s  
+
+   PASS  Tests\Feature\Auth\PasswordResetTest
+  ✓ reset password link screen can be rendered                           0.48s  
+  ✓ reset password link can be requested                                 0.69s  
+  ✓ reset password screen can be rendered                                0.75s  
+  ✓ password can be reset with valid token                               0.75s  
+
+   PASS  Tests\Feature\Auth\RegistrationTest
+  ✓ registration screen can be rendered                                  0.48s  
+  ✓ new users can register                                               0.54s  
+
+   PASS  Tests\Feature\AutoBankReconciliationTest
+  ✓ it auto creates bank reconciliation when transfer is posted          0.47s  
+
+   PASS  Tests\Feature\BalanceSheetClassicLayoutTest
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it returns at… 0.52s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it each group… 0.49s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it KAS DAN BA… 0.47s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it children i… 0.53s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it children i… 0.52s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it groups sor… 0.50s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it zero-balan… 0.48s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it zero-balan… 0.93s  
+  ✓ Classic Balance Sheet Layout → buildClassicGroups() → it total_labe… 1.59s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it returns…  2.19s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it total_as… 5.36s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it BANK gro… 1.45s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it HUTANG D… 2.18s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it MODAL eq… 3.05s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it is_balan… 2.19s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it liabilit… 1.99s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it total_li… 1.27s  
+  ✓ Classic Balance Sheet Layout → getClassicReportData() → it sum of a… 1.90s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it defaults…  1.80s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it can be se… 1.11s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it asset_gro… 0.67s  
+  ✓ Classic Balance Sheet Layout → classic_view property → it all child… 0.51s  
+
+   PASS  Tests\Feature\BalanceSheetComparisonTest
+  ✓ Balance Sheet Comparison Functionality Tests → it enables compariso… 0.54s  
+  ✓ Balance Sheet Comparison Functionality Tests → it disables comparis… 0.48s  
+  ✓ Balance Sheet Comparison Functionality Tests → it returns null comp… 0.83s  
+  ✓ Balance Sheet Comparison Functionality Tests → it returns null comp… 0.52s  
+  ✓ Balance Sheet Comparison Functionality Tests → it calculates compar… 0.51s  
+  ✓ Balance Sheet Comparison Functionality Tests → it calculates compar… 0.52s  
+  ✓ Balance Sheet Comparison Functionality Tests → it handles compariso… 0.49s  
+  ✓ Balance Sheet Comparison Functionality Tests → it applies branch fi… 0.49s  
+  ✓ Balance Sheet Comparison Functionality Tests → it calculates percen… 0.49s  
+  ✓ Balance Sheet Comparison Functionality Tests → it includes all bala… 0.49s  
+
+   FAIL  Tests\Feature\BalanceSheetConsistencyTest
+  ✓ balance sheet remains balanced after purchase transaction with paym… 1.14s  
+  ✓ balance sheet remains balanced after sales transaction with payment  1.21s  
+  ⨯ balance sheet remains balanced after multiple purchase and sales tr… 0.84s  
+
+   PASS  Tests\Feature\BalanceSheetExportTest
+  ✓ BalanceSheetPage Export Tests → it can export PDF with filters appl… 1.15s  
+  ✓ BalanceSheetPage Export Tests → it can export Excel with filters ap… 0.80s  
+  ✓ BalanceSheetPage Export Tests → it exports include filtered data co… 0.56s  
+  ✓ BalanceSheetPage Export Tests → it exports work with all branches f… 1.42s  
+
+   PASS  Tests\Feature\BalanceSheetPageFrontendTest
+  ✓ BalanceSheetPage Frontend Tests → it renders the balance sheet page… 0.68s  
+  ✓ BalanceSheetPage Frontend Tests → it displays summary cards with co… 2.19s  
+  ✓ BalanceSheetPage Frontend Tests → it displays account rows with pro… 0.60s  
+  ✓ BalanceSheetPage Frontend Tests → it shows balanced status when ass… 0.53s  
+  ✓ BalanceSheetPage Frontend Tests → it displays filter section with p… 0.73s  
+  ✓ BalanceSheetPage Frontend Tests → it can toggle comparison mode and… 0.53s  
+  ✓ BalanceSheetPage Frontend Tests → it displays export buttons         0.54s  
+  ✓ BalanceSheetPage Frontend Tests → it shows drill down modal when ac… 0.88s  
+  ✓ BalanceSheetPage Frontend Tests → it displays drill down modal cont… 1.67s  
+  ✓ BalanceSheetPage Frontend Tests → it closes drill down modal correc… 0.65s  
+  ✓ BalanceSheetPage Frontend Tests → it displays cabang options in fil… 1.35s  
+  ✓ BalanceSheetPage Frontend Tests → it shows proper section headers w… 0.55s  
+  ✓ BalanceSheetPage Frontend Tests → it displays subsection headers co… 0.49s  
+  ✓ BalanceSheetPage Frontend Tests → it shows total rows with proper s… 0.52s  
+  ✓ BalanceSheetPage Frontend Tests → it displays account codes in mono… 0.49s  
+  ✓ BalanceSheetPage Frontend Tests → it shows retained earnings sectio… 0.49s  
+  ✓ BalanceSheetPage Frontend Tests → it displays current ratio in summ… 0.50s  
+  ✓ BalanceSheetPage Frontend Tests → it renders comparison section whe… 0.52s  
+  ✓ BalanceSheetPage Frontend Tests → it shows proper balance check mes… 1.39s  
+  ✓ BalanceSheetPage Frontend Tests → it displays account balances with… 0.52s  
+array:6 [
+  "account" => App\Models\ChartOfAccount {#19593
+    #connection: "mysql"
+    #table: "chart_of_accounts"
+    #primaryKey: "id"
+    #keyType: "int"
+    +incrementing: true
+    #with: []
+    #withCount: []
+    +preventsLazyLoading: false
+    #perPage: 15
+    +exists: true
+    +wasRecentlyCreated: false
+    #escapeWhenCastingToString: false
+    #attributes: array:18 [
+      "id" => 1165
+      "code" => "1-1001"
+      "name" => "Kas"
+      "type" => "Asset"
+      "parent_id" => null
+      "is_active" => 1
+      "is_cash_bank" => 0
+      "is_current" => 1
+      "description" => null
+      "opening_balance" => "0.00"
+      "debit" => "0.00"
+      "credit" => "0.00"
+      "ending_balance" => "0.00"
+      "created_at" => "2026-09-30 16:24:57"
+      "updated_at" => "2026-09-30 16:24:57"
+      "deleted_at" => null
+      "kode" => "1-1001"
+      "nama" => "Kas"
+    ]
+    #original: array:16 [
+      "id" => 1165
+      "code" => "1-1001"
+      "name" => "Kas"
+      "type" => "Asset"
+      "parent_id" => null
+      "is_active" => 1
+      "is_cash_bank" => 0
+      "is_current" => 1
+      "description" => null
+      "opening_balance" => "0.00"
+      "debit" => "0.00"
+      "credit" => "0.00"
+      "ending_balance" => "0.00"
+      "created_at" => "2026-09-30 16:24:57"
+      "updated_at" => "2026-09-30 16:24:57"
+      "deleted_at" => null
+    ]
+    #changes: []
+    #previous: []
+    #casts: array:3 [
+      "is_active" => "boolean"
+      "is_cash_bank" => "boolean"
+      "deleted_at" => "datetime"
+    ]
+    #classCastCache: []
+    #attributeCastCache: []
+    #dateFormat: null
+    #appends: []
+    #dispatchesEvents: []
+    #observables: []
+    #relations: []
+    #touches: []
+    #relationAutoloadCallback: null
+    #relationAutoloadContext: null
+    +timestamps: true
+    +usesUniqueIds: false
+    #hidden: []
+    #visible: []
+    #fillable: array:12 [
+      0 => "code"
+      1 => "name"
+      2 => "type"
+      3 => "parent_id"
+      4 => "is_active"
+      5 => "is_cash_bank"
+      6 => "is_current"
+      7 => "description"
+      8 => "opening_balance"
+      9 => "debit"
+      10 => "credit"
+      11 => "ending_balance"
+    ]
+    #guarded: array:1 [
+      0 => "*"
+    ]
+    #forceDeleting: false
+  }
+  "entries" => Illuminate\Database\Eloquent\Collection {#19865
+    #items: array:1 [
+      0 => App\Models\JournalEntry {#16009
+        #connection: "mysql"
+        #table: "journal_entries"
+        #primaryKey: "id"
+        #keyType: "int"
+        +incrementing: true
+        #with: []
+        #withCount: []
+        +preventsLazyLoading: false
+        #perPage: 15
+        +exists: true
+        +wasRecentlyCreated: false
+        #escapeWhenCastingToString: false
+        #attributes: array:27 [
+          "id" => 214
+          "coa_id" => 1165
+          "date" => "2026-09-29"
+          "reference" => "DRILL-001"
+          "description" => "Test transaction"
+          "debit" => "1000000.00"
+          "credit" => "0.00"
+          "journal_type" => null
+          "cabang_id" => 229
+          "created_by" => null
+          "updated_by" => null
+          "department_id" => null
+          "project_id" => null
+          "currency_id" => null
+          "exchange_rate" => "1.00000000"
+          "amount_original_currency" => null
+          "source_type" => "manual"
+          "source_id" => 1
+          "transaction_id" => null
+          "bank_recon_id" => null
+          "bank_recon_status" => null
+          "bank_recon_date" => null
+          "is_reversal" => 0
+          "reversal_of_transaction_id" => null
+          "created_at" => "2026-09-30 16:24:57"
+          "updated_at" => "2026-09-30 16:24:57"
+          "deleted_at" => null
+        ]
+        #original: array:27 [
+          "id" => 214
+          "coa_id" => 1165
+          "date" => "2026-09-29"
+          "reference" => "DRILL-001"
+          "description" => "Test transaction"
+          "debit" => "1000000.00"
+          "credit" => "0.00"
+          "journal_type" => null
+          "cabang_id" => 229
+          "created_by" => null
+          "updated_by" => null
+          "department_id" => null
+          "project_id" => null
+          "currency_id" => null
+          "exchange_rate" => "1.00000000"
+          "amount_original_currency" => null
+          "source_type" => "manual"
+          "source_id" => 1
+          "transaction_id" => null
+          "bank_recon_id" => null
+          "bank_recon_status" => null
+          "bank_recon_date" => null
+          "is_reversal" => 0
+          "reversal_of_transaction_id" => null
+          "created_at" => "2026-09-30 16:24:57"
+          "updated_at" => "2026-09-30 16:24:57"
+          "deleted_at" => null
+        ]
+        #changes: []
+        #previous: []
+        #casts: array:7 [
+          "date" => "date"
+          "debit" => "decimal:2"
+          "credit" => "decimal:2"
+          "exchange_rate" => "decimal:8"
+          "amount_original_currency" => "decimal:4"
+          "is_reversal" => "boolean"
+          "deleted_at" => "datetime"
+        ]
+        #classCastCache: []
+        #attributeCastCache: []
+        #dateFormat: null
+        #appends: []
+        #dispatchesEvents: []
+        #observables: []
+        #relations: array:2 [
+          "cabang" => App\Models\Cabang {#12386
+            #connection: "mysql"
+            #table: "cabangs"
+            #primaryKey: "id"
+            #keyType: "int"
+            +incrementing: true
+            #with: []
+            #withCount: []
+            +preventsLazyLoading: false
+            #perPage: 15
+            +exists: true
+            +wasRecentlyCreated: false
+            #escapeWhenCastingToString: false
+            #attributes: array:24 [
+              "id" => 229
+              "kode" => "TEST"
+              "nama" => "Test Branch"
+              "nama_legal" => null
+              "npwp" => null
+              "alamat" => "Test Address"
+              "alamat_pajak" => null
+              "telepon" => "0123456789"
+              "kenaikan_harga" => "0.00"
+              "status" => 1
+              "warna_background" => null
+              "tipe_penjualan" => "Semua"
+              "kode_invoice_pajak" => null
+              "kode_invoice_non_pajak" => null
+              "kode_invoice_pajak_walkin" => null
+              "nama_kwitansi" => null
+              "label_invoice_pajak" => null
+              "label_invoice_non_pajak" => null
+              "logo_invoice_non_pajak" => null
+              "lihat_stok_cabang_lain" => 0
+              "created_at" => "2026-09-30 16:24:57"
+              "updated_at" => "2026-09-30 16:24:57"
+              "deleted_at" => null
+              "rekening" => null
+            ]
+            #original: array:24 [
+              "id" => 229
+              "kode" => "TEST"
+              "nama" => "Test Branch"
+              "nama_legal" => null
+              "npwp" => null
+              "alamat" => "Test Address"
+              "alamat_pajak" => null
+              "telepon" => "0123456789"
+              "kenaikan_harga" => "0.00"
+              "status" => 1
+              "warna_background" => null
+              "tipe_penjualan" => "Semua"
+              "kode_invoice_pajak" => null
+              "kode_invoice_non_pajak" => null
+              "kode_invoice_pajak_walkin" => null
+              "nama_kwitansi" => null
+              "label_invoice_pajak" => null
+              "label_invoice_non_pajak" => null
+              "logo_invoice_non_pajak" => null
+              "lihat_stok_cabang_lain" => 0
+              "created_at" => "2026-09-30 16:24:57"
+              "updated_at" => "2026-09-30 16:24:57"
+              "deleted_at" => null
+              "rekening" => null
+            ]
+            #changes: []
+            #previous: []
+            #casts: array:2 [
+              "rekening" => "array"
+              "deleted_at" => "datetime"
+            ]
+            #classCastCache: []
+            #attributeCastCache: []
+            #dateFormat: null
+            #appends: []
+            #dispatchesEvents: []
+            #observables: []
+            #relations: []
+            #touches: []
+            #relationAutoloadCallback: null
+            #relationAutoloadContext: null
+            +timestamps: true
+            +usesUniqueIds: false
+            #hidden: []
+            #visible: []
+            #fillable: array:20 [
+              0 => "kode"
+              1 => "nama"
+              2 => "alamat"
+              3 => "telepon"
+              4 => "kenaikan_harga"
+              5 => "status"
+              6 => "warna_background"
+              7 => "tipe_penjualan"
+              8 => "kode_invoice_pajak"
+              9 => "kode_invoice_non_pajak"
+              10 => "kode_invoice_pajak_walkin"
+              11 => "nama_kwitansi"
+              12 => "label_invoice_pajak"
+              13 => "label_invoice_non_pajak"
+              14 => "logo_invoice_non_pajak"
+              15 => "lihat_stok_cabang_lain"
+              16 => "nama_legal"
+              17 => "npwp"
+              18 => "alamat_pajak"
+              19 => "rekening"
+            ]
+            #guarded: array:1 [
+              0 => "*"
+            ]
+            #forceDeleting: false
+          }
+          "coa" => App\Models\ChartOfAccount {#20765
+            #connection: "mysql"
+            #table: "chart_of_accounts"
+            #primaryKey: "id"
+            #keyType: "int"
+            +incrementing: true
+            #with: []
+            #withCount: []
+            +preventsLazyLoading: false
+            #perPage: 15
+            +exists: true
+            +wasRecentlyCreated: false
+            #escapeWhenCastingToString: false
+            #attributes: array:16 [
+              "id" => 1165
+              "code" => "1-1001"
+              "name" => "Kas"
+              "type" => "Asset"
+              "parent_id" => null
+              "is_active" => 1
+              "is_cash_bank" => 0
+              "is_current" => 1
+              "description" => null
+              "opening_balance" => "0.00"
+              "debit" => "0.00"
+              "credit" => "0.00"
+              "ending_balance" => "0.00"
+              "created_at" => "2026-09-30 16:24:57"
+              "updated_at" => "2026-09-30 16:24:57"
+              "deleted_at" => null
+            ]
+            #original: array:16 [
+              "id" => 1165
+              "code" => "1-1001"
+              "name" => "Kas"
+              "type" => "Asset"
+              "parent_id" => null
+              "is_active" => 1
+              "is_cash_bank" => 0
+              "is_current" => 1
+              "description" => null
+              "opening_balance" => "0.00"
+              "debit" => "0.00"
+              "credit" => "0.00"
+              "ending_balance" => "0.00"
+              "created_at" => "2026-09-30 16:24:57"
+              "updated_at" => "2026-09-30 16:24:57"
+              "deleted_at" => null
+            ]
+            #changes: []
+            #previous: []
+            #casts: array:3 [
+              "is_active" => "boolean"
+              "is_cash_bank" => "boolean"
+              "deleted_at" => "datetime"
+            ]
+            #classCastCache: []
+            #attributeCastCache: []
+            #dateFormat: null
+            #appends: []
+            #dispatchesEvents: []
+            #observables: []
+            #relations: []
+            #touches: []
+            #relationAutoloadCallback: null
+            #relationAutoloadContext: null
+            +timestamps: true
+            +usesUniqueIds: false
+            #hidden: []
+            #visible: []
+            #fillable: array:12 [
+              0 => "code"
+              1 => "name"
+              2 => "type"
+              3 => "parent_id"
+              4 => "is_active"
+              5 => "is_cash_bank"
+              6 => "is_current"
+              7 => "description"
+              8 => "opening_balance"
+              9 => "debit"
+              10 => "credit"
+              11 => "ending_balance"
+            ]
+            #guarded: array:1 [
+              0 => "*"
+            ]
+            #forceDeleting: false
+          }
+        ]
+        #touches: []
+        #relationAutoloadCallback: null
+        #relationAutoloadContext: null
+        +timestamps: true
+        +usesUniqueIds: false
+        #hidden: []
+        #visible: []
+        #fillable: array:23 [
+          0 => "coa_id"
+          1 => "date"
+          2 => "reference"
+          3 => "description"
+          4 => "debit"
+          5 => "credit"
+          6 => "journal_type"
+          7 => "cabang_id"
+          8 => "department_id"
+          9 => "project_id"
+          10 => "currency_id"
+          11 => "exchange_rate"
+          12 => "amount_original_currency"
+          13 => "source_type"
+          14 => "source_id"
+          15 => "transaction_id"
+          16 => "bank_recon_id"
+          17 => "bank_recon_status"
+          18 => "bank_recon_date"
+          19 => "is_reversal"
+          20 => "reversal_of_transaction_id"
+          21 => "created_by"
+          22 => "updated_by"
+        ]
+        #guarded: array:1 [
+          0 => "*"
+        ]
+        #forceDeleting: false
+      }
+    ]
+    #escapeWhenCastingToString: false
+  }
+  "total_debit" => 1000000.0
+  "total_credit" => 0.0
+  "balance" => 1000000.0
+  "as_of_date" => "2026-09-29"
+] // tests/Feature/BalanceSheetPageTest.php:208
+
+   PASS  Tests\Feature\BalanceSheetPageTest
+  ✓ BalanceSheetPage Backend Tests → it can mount the page with default… 0.62s  
+  ✓ BalanceSheetPage Backend Tests → it can generate balance sheet data  0.48s  
+  ✓ BalanceSheetPage Backend Tests → it can get cabang options           0.50s  
+  ✓ BalanceSheetPage Backend Tests → it can toggle comparison mode       0.52s  
+  ✓ BalanceSheetPage Backend Tests → it can get comparison data when co… 0.51s  
+  ✓ BalanceSheetPage Backend Tests → it can show account details         0.48s  
+  ✓ BalanceSheetPage Backend Tests → it can close drill down modal       0.49s  
+  ✓ BalanceSheetPage Backend Tests → it can get drill down data for acc… 0.49s  
+  ✓ BalanceSheetPage Backend Tests → it validates date before generatin… 0.66s  
+  ✓ BalanceSheetPage Backend Tests → it can filter by cabang             0.46s  
+  ✓ BalanceSheetPage Backend Tests → it builds balance alert data when…  0.50s  
+
+   PASS  Tests\Feature\BalanceSheetServiceTest
+  ✓ Balance Sheet Structure → it generates complete balance sheet struc… 0.49s  
+  ✓ Balance Sheet Structure → it correctly calculates asset balances (d… 0.49s  
+  ✓ Balance Sheet Structure → it correctly calculates liability balance… 0.46s  
+  ✓ Current vs Non-Current Classification → it separates current and no… 0.47s  
+  ✓ Current vs Non-Current Classification → it separates current and lo… 0.47s  
+  ✓ Retained Earnings Calculation → it calculates retained earnings fro… 0.49s  
+  ✓ Retained Earnings Calculation → it handles negative retained earnin… 0.50s  
+  ✓ Date-based Balance Calculation → it includes only transactions up t… 0.48s  
+  ✓ Date-based Balance Calculation → it calculates cumulative balance c… 0.48s  
+  ✓ Cabang Filtering → it filters by specific cabang when provided       0.47s  
+  ✓ Cabang Filtering → it includes all cabang when cabang_id is null     0.60s  
+  ✓ Period Comparison → it compares two balance sheet dates correctly    0.59s  
+  ✓ Drill-down Functionality → it retrieves journal entries for specifi… 0.50s  
+  ✓ Drill-down Functionality → it filters drill-down by cabang           0.48s  
+  ✓ Financial Ratios and Summary → it calculates current ratio correctl… 0.50s  
+  ✓ Financial Ratios and Summary → it calculates debt-to-equity ratio c… 0.62s  
+  ✓ Financial Ratios and Summary → it calculates working capital correc… 0.66s  
+  ✓ Balance Verification → it detects balanced sheet                     0.50s  
+  ✓ Balance Verification → it detects unbalanced sheet                   0.46s  
+  ✓ Edge Cases → it handles zero balance accounts (excludes from list)   0.46s  
+  ✓ Edge Cases → it handles empty balance sheet (no transactions)        0.46s  
+  ✓ Edge Cases → it handles division by zero in ratios                   0.46s  
+
+   FAIL  Tests\Feature\BillOfMaterialResourceReactivePriceTest
+  ⨯ bom item price refreshes when material changes                       0.97s  
+  ✓ bom conversion rows load from selected product                       0.48s  
+  ✓ bom conversion rows preload on edit and view                         0.47s  
+
+   PASS  Tests\Feature\BillOfMaterialTest
+  ✓ bom creation with components                                         0.48s  
+  ✓ multi level bom support                                              0.50s  
+  ✓ bom cost calculation                                                 0.48s  
+  ✓ bom version update                                                   0.49s  
+  ✓ bom code generation                                                  0.56s  
+  ✓ bom relationships                                                    0.67s  
+  ✓ bom soft delete cascade                                              0.50s  
+  ✓ bom active status filtering                                          0.51s  
+  ✓ bom item subtotal calculation                                        0.59s  
+  ✓ bom with zero costs                                                  0.51s  
+
+   FAIL  Tests\Feature\BranchInheritanceFlowTest
+  ✓ sale order inherits cabang from quotation source                     0.46s  
+  ✓ sales invoice inherits cabang from sale order source                 0.45s  
+  ✓ sales invoice inherits tax fields from sale order source             0.48s  
+  ⨯ purchase invoice inherits cabang from selected purchase order sourc… 0.47s  
+  ✓ manufacturing order inherits cabang from production plan sale order… 0.47s  
+  ✓ manufacturing order create page does not auto-create warehouse conf… 0.46s  
+  ✓ production plan inherits cabang from selected BOM source             0.48s  
+  ✓ asset transfer inherits source cabang from selected asset            0.48s  
+  ✓ delivery order inherits cabang from selected sales order source      0.49s  
+  ✓ surat jalan inherits cabang from selected delivery order source      0.69s  
+  ✓ delivery order rejects mixed-branch sales orders                     0.55s  
+  ✓ surat jalan rejects mixed-branch delivery orders                     0.52s  
+
+   PASS  Tests\Feature\BukuBesarLivewireTest
+  ✓ livewire renders entries when coa selected                           0.52s  
+
+   PASS  Tests\Feature\BukuBesarPageFrontendTest
+  ✓ it shows dynamic buttons when no coa selected                        0.81s  
+  ✓ show all button clears coa selection                                 0.85s  
+  ✓ show by journal entry button clears coa selection                    0.74s  
+  ✓ selecting coa displays ledger                                        0.81s  
+  ✓ changing start date updates component                                0.75s  
+  ✓ changing end date updates component                                  0.76s  
+  ✓ refresh button reloads component                                     0.91s  
+  ✓ coa options are sorted by code                                       0.82s  
+  ✓ ledger displays journal entries within date range                    1.28s  
+  ✓ multiple coa selections work correctly                               0.95s  
+  ✓ computed properties work correctly                                   0.97s  
+
+   PASS  Tests\Feature\BukuBesarPageTest
+  ✓ it can render buku besar page                                        0.85s  
+  ✓ it displays coa options in dropdown                                  1.65s  
+  ✓ it can select a coa and display ledger                               1.05s  
+  ✓ it filters journal entries by date range                             0.79s  
+  ✓ it handles no coa selected gracefully                                0.83s  
+  ✓ it handles coa with no transactions                                  0.74s  
+  ✓ it calculates running balance correctly                              0.81s  
+  ✓ it provides correct coa options                                      0.75s  
+  ✓ it defaults to current month date range                              0.73s  
+  ✓ it can update date range                                             0.74s  
+
+   PASS  Tests\Feature\CashBankServiceIntegrationTest
+  ✓ postTransfer creates correct journal entries without admin fee       0.46s  
+  ✓ postTransfer creates correct journal entries with admin fee and coa  1.07s  
+  ✓ postTransfer with admin fee but no coa only creates two entries      0.64s  
+  ✓ postTransfer maintains double entry balance with admin fee           0.48s  
+  ✓ postTransfer updates transfer status to posted                       0.48s  
+  ✓ postTransfer handles zero admin fee correctly                        0.85s  
+  ✓ postTransfer uses correct descriptions in journal entries            0.49s  
+  ✓ postTransfer records correct transaction date                        0.49s  
+
+   PASS  Tests\Feature\CashBankServiceTest
+  ✓ postTransfer creates correct journal entries without admin fee       0.47s  
+  ✓ postTransfer creates correct journal entries with admin fee and coa  0.67s  
+  ✓ postTransfer with admin fee but no coa only creates two entries      0.60s  
+  ✓ postTransfer maintains double entry balance with admin fee           0.67s  
+  ✓ postTransfer updates transfer status to posted                       0.52s  
+  ✓ postTransfer handles zero admin fee correctly                        0.46s  
+  ✓ postTransfer uses correct descriptions in journal entries            0.46s  
+  ✓ postTransfer records correct transaction date                        0.46s  
+
+   PASS  Tests\Feature\CashBankTransactionDetailsUITest
+  ✓ transaction details form validation                                  0.53s  
+  ✓ amount auto calculation from details                                 0.51s  
+  ✓ transaction details with zero total fails                            0.46s  
+  ✓ all transaction types support details                                0.54s  
+  ✓ transaction details display in table                                 0.46s  
+
+   PASS  Tests\Feature\CashBankTransactionPostingTest
+  ✓ multiple coa posting action                                          0.57s  
+  ✓ posting validation fails with wrong total                            0.50s  
+  ✓ cash in transaction with income breakdown                            0.46s  
+  ✓ transaction with negative amounts for tax reductions                 0.46s  
+  ✓ bank transaction with details available for all types                0.47s  
+  ✓ transaction details with ntpn for tax transactions                   0.46s  
+
+   PASS  Tests\Feature\CashBankTransferResourceTest
+  ✓ view page can be rendered                                            0.46s  
+  ✓ infolist displays transfer information                               0.48s  
+  ✓ view action is available in table                                    0.47s  
+
+   PASS  Tests\Feature\CashBankTransferTest
+  ✓ bank transfer without admin fee creates two journal entries          0.67s  
+  ✓ bank transfer with admin fee creates three journal entries           0.46s  
+  ✓ bank transfer with admin fee but no coa creates two journal entries  0.46s  
+  ✓ bank transfer factory with admin fee state creates proper data       0.46s  
+  ✓ bank transfer posted event is dispatched                             0.45s  
+  ✓ bank transfer cannot be posted twice                                 0.50s  
+  ✓ bank transfer with large admin fee calculates correctly              0.77s  
+
+   PASS  Tests\Feature\CashFlowPageTest
+  ✓ Cash Flow Report Page Tests → it generates report data structure co… 0.61s  
+  ✓ Cash Flow Report Page Tests → it includes period information in rep… 0.61s  
+  ✓ Cash Flow Report Page Tests → it calculates opening balance correct… 0.51s  
+  ✓ Cash Flow Report Page Tests → it calculates net change and closing…  0.51s  
+  ✓ Cash Flow Report Page Tests → it filters data by branch correctly    0.52s  
+  ✓ Cash Flow Report Page Tests → it returns selected branch names corr… 0.50s  
+  ✓ Cash Flow Report Page Tests → it returns empty array when no branch… 0.49s  
+  ✓ Cash Flow Report Page Tests → it handles empty report data graceful… 0.54s  
+  ✓ Cash Flow Report Page Tests → it can export to excel without errors  0.51s  
+  ✓ Cash Flow Report Page Tests → it can export to pdf without errors    0.70s  
+  ✓ Cash Flow Report Page Tests → it includes sections in report data    0.59s  
+  ✓ Cash Flow Report Page Tests → it includes items in sections with co… 0.65s  
+  ✓ Cash Flow Report Page Tests → it handles invalid date ranges gracef… 0.56s  
+  ✓ Cash Flow Report Page Tests → it defaults to current month when no…  0.52s  
+
+   PASS  Tests\Feature\CashFlowReportServiceTest
+  ✓ service can generate direct method cash flow report                  0.65s  
+  ✓ service includes vendor payment journals in direct cash flow         0.77s  
+  ✓ service counts customer deposits once and excludes deposit-funded r… 0.77s  
+  ✓ service includes supplier deposit journals in direct cash flow       0.67s  
+  ✓ service can generate indirect method cash flow report                0.58s  
+  ✓ service validates net change calculation                             0.59s  
+  ✓ service filters by date range correctly                              0.79s  
+  ✓ service filters by branch correctly                                  0.61s  
+  ✓ service handles empty data gracefully                                0.49s  
+  ✓ service defaults to direct method when no method specified           0.59s  
+  ✓ service calculates opening balance correctly                         0.52s  
+  ✓ service handles multiple cash accounts correctly                     0.53s  
+  ✓ indirect method includes net income from income statement            0.49s  
+  ✓ service handles invalid method parameter gracefully                  0.77s  
+  ✓ service returns correct period information                           0.86s  
+  ✓ service handles null dates correctly                                 0.62s  
+  ✓ branch filter limits cash bank outflows                              0.53s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\BalanceSheetConsistencyTest >…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk eum. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\BillOfMaterialResourceReactivePriceTest > bom item…    
+  Failed asserting that two strings are equal.
+  -'82.500'
+  +'83'
+  
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:110
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+    108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+  ➜ 110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕ 
+    113▕         return $this;
+    114▕     }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/BillOfMaterialResourceReactivePriceTest.php:113
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\BranchInheritanceFlowTest > pu…  ValidationException   
+  Minimal satu Purchase Receipt harus dipilih.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Filament/Resources/PurchaseInvoiceResource/Pages/CreatePurchaseInvoice.php:127
+  3   app/Filament/Resources/PurchaseInvoiceResource/Pages/CreatePurchaseInvoice.php:30
+
+
+  Tests:    3 failed, 259 passed (781 assertions)
+  Duration: 184.20s
+

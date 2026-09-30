@@ -1,0 +1,691 @@
+
+   PASS  Tests\Feature\CurrencyConversionResolverTest
+  ✓ currency conversion resolver converts amounts and formats symbols c… 5.85s  
+
+   PASS  Tests\Feature\CurrencyFiveDollarVerificationTest
+  ✓ five usd on po flow maps to idr on invoice payment and journal keep… 1.10s  
+  ✓ five usd on so flow stays idr in journal context with current logic  0.91s  
+
+===== CURRENCY CONVERSION FLOW TRACE =====
+Transaction Amount: $1255.5 USD
+Exchange Rate: 1 USD = 16,000 IDR
+Expected IDR Amount: Rp 20.088.000
+
+STEP 1: CREATE PURCHASE ORDER
+------------------------------
+PO Number: PO-YG708W
+PO Amount (USD): $0.00
+Expected Invoice Amount (IDR): Rp 20.088.000
+PO Item Unit Price (USD): $1255.5
+PO Item Quantity: 1
+PO Item Total (USD): $1255.5
+PO Item Total (IDR, expected): Rp 20.088.000
+
+STEP 2: CREATE PURCHASE RECEIPT
+--------------------------------
+Receipt Number: RC-TEST-1255.5-1790763062
+Receipt Status: completed
+Items Received: 1
+Items Accepted: 1
+
+STEP 3: CREATE INVOICE FROM RECEIPT
+-----------------------------------
+Invoice Number: INV-20260930-0001
+Invoice Status: paid
+Invoice DPP (IDR): Rp 20.088.000
+Invoice Total (IDR): Rp 20.088.000
+Expected Invoice Total (IDR): Rp 20.088.000
+✓ Invoice stored in IDR correctly
+
+STEP 4: INVOICE ITEMS DETAIL
+-----------------------------
+Item Product: 2
+Item Unit Price (IDR): Rp 0
+Item Quantity: 1.00
+Item Total (IDR): Rp 20.088.000
+✓ All invoice items in IDR
+
+STEP 5: JOURNAL ENTRIES FROM INVOICE
+-------------------------------------
+Total Journal Entries: 2
+Entry 1 (DEBIT): Rp 20.088.000 (2100.10 - PENERIMAAN BARANG BELUM TERTAGIH)
+Entry 2 (CREDIT): Rp 20.088.000 (2110 - HUTANG DAGANG)
+Total Debit: Rp 20.088.000
+Total Credit: Rp 20.088.000
+✓ Journal entries balanced
+
+STEP 6: CREATE VENDOR PAYMENT
+------------------------------
+Payment ID: 2
+Amount Paid (IDR): Rp 0
+Payment Status: Paid
+Note: Payment amount_paid field shows 0 (check invoice total instead)
+Invoice Total (for payment): Rp 20.088.000
+✓ Payment matched with invoice total in IDR
+
+STEP 7: JOURNAL ENTRIES FROM PAYMENT
+-------------------------------------
+Total Payment Journal Entries: 0
+Total Debit: Rp 0
+Total Credit: Rp 0
+✓ Payment journal entries balanced
+
+STEP 8: BALANCE SHEET AFTER TRANSACTION
+----------------------------------------
+Assets: Rp 0
+Liabilities: Rp 0
+Equity: Rp 0
+Balance Sheet Difference: Rp 0
+Is Balanced: TRUE
+✓ Balance sheet remains balanced
+
+STEP 9: VERIFY ALL JOURNAL ENTRIES
+-----------------------------------
+Total All Journal Entries:
+  Total Debit: Rp 20.088.000
+  Total Credit: Rp 20.088.000
+  Difference: Rp 0
+✓ All journal entries balanced
+
+===== SUMMARY =====
+Original Amount: $1255.5 USD
+Converted to IDR: Rp 20.088.000
+Invoice Stored Amount: Rp 20.088.000
+Payment Amount: Rp 0
+Journal Entry Totals: Debit = Credit (balanced)
+Balance Sheet: Balanced ✓
+
+KESIMPULAN: Nominal USD dikonversi ke IDR saat pembuatan invoice,
+            disimpan sebagai IDR di semua dokumen (invoice, payment),
+            dan dilaporkan dalam IDR di laporan keuangan.
+            Integritas akuntansi terjaga sempurna.
+
+===== SALES ORDER USD TO IDR FLOW =====
+Sale Amount: $1255.5 USD
+Exchange Rate: 1 USD = 16,000 IDR
+Expected IDR Amount: Rp 20.088.000
+
+STEP 1: CREATE SALE ORDER (USD)
+--------------------------------
+SO Number: SO-TYJV1R
+SO Amount: Rp 20.088.000
+
+STEP 2: CREATE SALE ORDER ITEM
+-------------------------------
+SO Item Unit Price (IDR): Rp 20.088.000
+SO Item Quantity: 1
+SO Item Total (IDR): Rp 20.088.000
+
+STEP 3: CREATE DELIVERY ORDER
+------------------------------
+
+   FAIL  Tests\Feature\CurrencyFlowTraceTest
+  ✓ trace $1255.5 USD purchase order through invoice and payment to fin… 1.05s  
+  ⨯ trace $1255.5 USD sale order through delivery, invoice and payment…  1.26s  
+
+   PASS  Tests\Feature\CurrencyRoundtripFormTest
+  ✓ idr to usd and back roundtrip preserves display value                0.67s  
+  ✓ live input parsing formatting and persisted value consistent         0.71s  
+
+   PASS  Tests\Feature\CustomerAuditCommandsTest
+  ✓ it menemukan grup "Daya Teknik Medika" (varian nama + NPWP + telepo… 0.69s  
+  ✓ it READ-ONLY: tidak ada baris atau nilai yang berubah pada customer… 0.69s  
+  ✓ it --no-csv tidak menulis berkas; tanpa duplikat melaporkan 0 grup…  0.68s  
+  ✓ it customer terhapus (soft delete) tidak ikut diaudit                0.75s  
+  ✓ it audit limit kredit menandai limit 0, limit sangat tinggi, tempo…  0.62s  
+  ✓ it ambang --threshold dapat diubah dan piutang berjalan sama dengan… 0.45s  
+
+   PASS  Tests\Feature\CustomerFeedbackAuditVerificationTest
+  ✓ Point 1: 1 QC and 1 GRN generated for multi-item PO arrival          0.57s  
+  ✓ Point 2: QC draft locks quantity with clear message and auto-cancel… 0.87s  
+  ✓ Point 3: Invoice references PO + Receipt directly without OR, and r… 0.72s  
+  ✓ Point 4: PO enforces warehouse selection and locks branch to Pusat   0.51s  
+  ✓ Point 5: Only users assigned to PO warehouse can perform QC (unless… 0.51s  
+  ✓ Point 6: Order Request supports simplified fields required_date and… 0.60s  
+  ✓ Point 7: Rejected items trigger reduce_stock, return_supplier, and…  0.68s  
+
+=== JOURNAL ENTRIES CREATED ===
+COA: 1120 - PIUTANG DAGANG
+Description: Customer receipt for receipt id 2
+Debit: 0.00, Credit: 1000000.00
+Reference: REC-2
+---
+COA: 942749 - Test Account 308713
+Description: Bank/Cash for receipt id 2 via cash
+Debit: 1000000.00, Credit: 0.00
+Reference: REC-2
+---
+=== ACCOUNT RECEIVABLE STATUS ===
+Total: 1000000.00
+Paid: 1000000.00
+Remaining: 0.00
+Status: Lunas
+=== INVOICE STATUS ===
+Status: paid
+   PASS  Tests\Feature\CustomerReceiptCashPaymentTest
+  ✓ cash payment creates correct journal entries and updates ar          0.66s  
+
+   PASS  Tests\Feature\CustomerReceiptControlsPhase5ATest
+  ✓ it Isu 7: daftar akun tidak memuat akun induk, DEPOSITO, maupun INV… 0.47s  
+  ✓ it Isu 7: default akun hanya bila kandidatnya tepat satu; bila lebi… 0.45s  
+  ✓ it Isu 7: setelah ada akun bertanda is_cash_bank, HANYA akun bertan… 0.47s  
+  ✓ it Isu 7: coa:flag-cash-bank — dry-run tidak mengubah; --apply mena… 0.52s  
+  ✓ it Isu 7: daftar invoice disaring dari AR (sisa > 0) — invoice luna… 0.83s  
+  ✓ it Isu 7: pengguna non-"all" tidak melihat invoice cabang lain mili… 2.04s  
+  ✓ it Isu 7: allocator — kelebihan bayar ditolak dengan pesan jelas (n… 1.61s  
+  ✓ it Isu 7: allocator — dengan opsi deposit, nominal diterapkan sebes… 1.22s  
+  ✓ it Isu 7: allocator — invoice bukan milik customer, sudah lunas, ta… 0.75s  
+  ✓ it Isu 7: allocator — semua invoice satu cabang (D9-A); pengguna no… 0.66s  
+  ✓ it Isu 7: allocator — pada mode ubah, nominal penerimaan sendiri di… 0.70s  
+  ✓ it Isu 7: akun penerima harus akun yang sah untuk metode pembayaran  0.77s  
+  ✓ it Isu 7: penerimaan pas — cabang = cabang invoice (bukan cabang cu… 1.23s  
+  ✓ it Isu 7: kelebihan bayar tanpa opsi deposit DITOLAK — tidak ada re… 1.21s  
+  ✓ it Isu 7: kelebihan bayar dengan opsi deposit → Deposit Customer +…  1.38s  
+  ✓ it Isu 7: kelebihan bayar dengan opsi deposit ditolak bila akun Dep… 1.48s  
+  ✓ it Isu 7: invoice dari dua cabang dalam satu penerimaan ditolak den… 1.17s  
+  ✓ it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebag… 1.32s  
+  ✓ it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebag… 1.11s  
+  ✓ it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebag… 1.08s  
+  ✓ it Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebag… 1.06s  
+  ✓ it Isu 7: tanpa invoice terpilih ditolak — tidak ada lagi alokasi s… 1.11s  
+  ✓ it Isu 7: form Buat — cabang tidak diisi dari customer, kolom caban… 1.02s  
+  ✓ it Isu 7: metode Deposit menyembunyikan opsi kelebihan-sebagai-depo… 1.01s  
+  ✓ it Isu 7: pilihan COA pada form mengikuti daftar sah (tanpa induk/d… 1.05s  
+  ✓ it Isu 7: halaman Ubah menolak nominal melebihi sisa (tanpa pemoton… 1.73s  
+  ✓ it Isu 7: tabel invoice tidak lagi memuat kolom Penyesuaian Sisa ma… 0.74s  
+  ✓ it Isu 7: teks bantuan menjelaskan perilaku sebenarnya (kelebihan d… 0.72s  
+  ✓ it Isu 7: halaman Lihat menampilkan cabang dan kelebihan yang dicat… 1.22s  
+  ✓ it Isu 7: master:readiness — akun kas/bank "sebagian" sampai ada ya… 0.68s  
+  ✓ it Isu 7: coa:flag-cash-bank memberi pesan jelas (bukan galat SQL)…  0.91s  
+  ✓ it Isu 7: penanda "AR sudah diperbarui" milik ID lama tidak menular… 6.97s  
+
+   PASS  Tests\Feature\CustomerReceiptFeatureTest
+  ✓ can create customer receipt with cash payment                        1.01s  
+  ✓ can allocate payment to single invoice                               0.94s  
+  ✓ can allocate partial payment to invoice                              0.75s  
+  ✓ can allocate payment to multiple invoices                            0.53s  
+  ✓ can handle overpayment and create deposit                            0.51s  
+  ✓ can use deposit for payment                                          1.10s  
+  ✓ creates correct journal entries for payment                          0.74s  
+  ✓ can handle split payment methods                                     0.48s  
+  ✓ validates payment amount matches allocation                          0.51s  
+  ✓ can print receipt                                                    0.63s  
+
+   PASS  Tests\Feature\CustomerReceiptJournalIntegrationTest
+  ✓ journal entries are created when customer receipt is created with p… 0.75s  
+  ✓ duplicate selected invoices do not double count account receivable…  0.52s  
+  ✓ journal entries are updated when customer receipt amount is changed  0.51s  
+  ✓ journal entries are n o t deleted when customer receipt is soft del… 0.49s  
+  ✓ customer receipt journal resolves currency from detail invoice with… 0.52s  
+  ✓ customer receipt journal rejects mixed currency rates                0.58s  
+
+   PASS  Tests\Feature\CustomerReceiptJournalTest
+  ✓ it creates correct journal entries for cash bank customer receipt    1.29s  
+  ✓ it only creates two total journal entries for a single cash receipt  1.40s  
+  ✓ it creates correct journal entries for bank customer receipt         1.70s  
+  ✓ it creates correct journal entries for deposit customer receipt      1.44s  
+  ✓ it creates correct journal entries for mixed payment methods         0.88s  
+  ✓ it throws when deposit receipt has no deposit coa and rolls back en… 0.67s  
+
+   PASS  Tests\Feature\CustomerReceiptReferenceProofTest
+  ✓ it metode menentukan wajib/tidaknya referensi dan label isiannya     0.89s  
+  ✓ it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada pener… 1.66s  
+  ✓ it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada pener… 1.77s  
+  ✓ it Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada pener… 1.58s  
+  ✓ it Cash tidak memerlukan referensi; referensi yang terlanjur diisi…  1.74s  
+  ✓ it Transfer dengan referensi, bank, dan bukti tersimpan; bukti hany… 1.99s  
+  ✓ it berkas bukti bertipe/ukuran tidak sah ditolak                     2.42s  
+  ✓ it rute bukti: pengguna berizin 200, tanpa izin 403, tamu diarahkan… 1.44s  
+  ✓ it kombinasi referensi + akun + nominal yang sama diperingatkan, te… 1.95s  
+  ✓ it duplicatesOf: nominal atau akun berbeda bukan duplikat            0.91s  
+  ✓ it View menampilkan referensi, bank, dan tautan bukti; non-tunai ta… 0.96s  
+  ✓ it penerimaan lama (kolom baru kosong, tunai) tetap tampil normal d… 1.20s  
+  ✓ it daftar: kolom No. Referensi dapat dicari; filter "Non-tunai tanp… 1.60s  
+  ✓ it Edit: isian terisi, referensi dapat diubah, dan tautan bukti tam… 1.64s  
+
+   PASS  Tests\Feature\CustomerReceiptResourceTest
+  ✓ customer receipt create form keeps JSON state fields hidden and doe… 1.38s  
+  ✓ customer receipt create form no longer shows payment mode controls   1.21s  
+  ✓ customer receipt filters coa options by payment method               0.82s  
+  ✓ customer receipt resolves remaining amount from invoice total when…  0.80s  
+  ✓ customer receipt create flow moves draft receipt to paid and posts…  0.82s  
+  ✓ customer receipt item creation does not double count account receiv… 0.88s  
+
+   PASS  Tests\Feature\CustomerReceiptViewPageTest
+  ✓ customer receipt view page renders payment history and journal entr… 1.33s  
+
+=== Customer Receipt vs Vendor Payment Mechanism Comparison ===
+
+✅ Model structures are similar
+✅ Both have header-detail relationship
+✅ Both support multiple payment methods
+✅ Both track payment amounts and dates
+✅ Both integrate with Chart of Accounts
+✅ Both have status tracking (Draft/Partial/Paid)
+✅ Both support invoice allocation
+
+Key Similarities:
+- Same attribute names and types
+- Same relationship patterns
+- Same payment processing logic
+- Same journal entry integration
+
+Conclusion: Customer Receipt mechanism is implemented similarly to Vendor Payment mechanism.
+
+   PASS  Tests\Feature\CustomerReceiptVsVendorPaymentTest
+  ✓ customer receipt and vendor payment mechanisms comparison            1.19s  
+
+   PASS  Tests\Feature\CustomerReturnAndReturnProductFinancialTest
+  ✓ customer return with replace decision creates financial journal and… 0.87s  
+  ✓ customer return approval blocked if any item lacks qc result         0.96s  
+  ✓ return product for uninvoiced do credits goods delivery account      0.51s  
+  ✓ return product for invoiced do credits cogs account and updates sal… 0.53s  
+  ✓ edit return product loads max quantity and blocks over return        1.49s  
+
+   PASS  Tests\Feature\CustomerReturnFeatureTest
+  ✓ generates unique sequential return number in CR-YYYY-NNNN format     0.52s  
+  ✓ increments return number on each generation                          0.65s  
+  ✓ can create a customer return linked to a sales invoice               0.90s  
+  ✓ can add return items linked to invoice items                         0.71s  
+  ✓ returned quantity must not exceed sold quantity on invoice item      0.77s  
+  ✓ customer return transitions through status workflow correctly        2.82s  
+  ✓ qc result can be recorded on return items                            2.99s  
+  ✓ repair decision can be assigned to return item                       1.62s  
+  ✓ replace decision can be assigned to return item                      1.24s  
+  ✓ reject decision can be assigned to return item                       1.20s  
+  ✓ customer return can be approved after qc inspection                  1.19s  
+  ✓ customer return can be rejected after qc inspection                  1.35s  
+  ✓ customer return can be completed after approval                      1.24s  
+  ✓ customer return relationships load correctly                         1.99s  
+  ✓ customer return supports soft delete and restore                     1.58s  
+  ✓ status_label accessor returns correct Indonesian labels              0.72s  
+  ✓ decision_label accessor returns correct labels                       0.93s  
+  ✓ processCompletion restores inventory stock for replace decision      1.57s  
+  ✓ processCompletion creates a stock_movement of type customer_return   1.25s  
+  ✓ processCompletion does NOT add repair items to saleable stock        1.09s  
+  ✓ processCompletion does NOT restore stock for reject decision         1.23s  
+  ✓ processCompletion creates new inventory stock record when none exis… 1.32s  
+  ✓ processCompletion throws exception if called twice (double-processi… 1.03s  
+  ✓ warehouse relationship loads on customer return                      1.05s  
+
+   FAIL  Tests\Feature\CustomerSupplierTest
+  ✓ it can create customer with credit limit                             1.01s  
+  ✓ it can create customer with international contact numbers            1.11s  
+  ✓ it can create supplier with payment terms                            1.16s  
+  ✓ it can create supplier with international contact numbers            1.07s  
+  ✓ it validates customer contact information                            1.42s  
+  ✓ it validates supplier contact information                            1.20s  
+  ⨯ it can update customer credit limit                                  1.03s  
+  ✓ it can update supplier payment terms                                 1.02s  
+  ✓ it customer code must be unique                                      1.01s  
+  ✓ it supplier code must be unique                                      0.97s  
+
+   PASS  Tests\Feature\DashboardTest
+  ✓ guests are redirected to the login page                              0.70s  
+  ✓ authenticated users can visit the dashboard                          0.73s  
+
+   PASS  Tests\Feature\DataIntegrityTest
+  ✓ database transaction rollback on failure                             1.00s  
+  ✓ foreign key constraints prevent orphaned records                     0.49s  
+  ✓ cross module data consistency sale to invoice                        0.45s  
+  ✓ financial transaction integrity deposit to payment                   0.81s  
+  ✓ data validation rules enforced                                       0.73s  
+  ✓ cascade operations and soft deletes                                  0.47s  
+  ✓ concurrent transaction isolation                                     0.53s  
+  ✓ data integrity across module boundaries                              1.14s  
+  ✓ unique constraints and indexes                                       0.54s  
+  ✓ data consistency on bulk operations                                  0.49s  
+
+   FAIL  Tests\Feature\DataMasterCrudTest
+  ✓ Cabang (Branch) CRUD → it can render list page                       0.63s  
+  ✓ Cabang (Branch) CRUD → it can create cabang                          1.01s  
+  ✓ Cabang (Branch) CRUD → it accepts international phone number on cab… 0.72s  
+  ✓ Cabang (Branch) CRUD → it validates required fields when creating c… 0.83s  
+  ✓ Cabang (Branch) CRUD → it can edit cabang                            0.77s  
+  ✓ Cabang (Branch) CRUD → it can delete cabang                          0.73s  
+  ✓ Customer CRUD → it can render list page                              0.58s  
+  ✓ Customer CRUD → it can create customer                               0.68s  
+  ✓ Customer CRUD → it validates required fields when creating customer  0.73s  
+  ✓ Customer CRUD → it can edit customer                                 0.97s  
+  ✓ Customer CRUD → it can delete customer                               1.82s  
+  ✓ Supplier CRUD → it can render list page                              1.45s  
+  ✓ Supplier CRUD → it can create supplier                               1.08s  
+  ✓ Supplier CRUD → it validates required fields when creating supplier  0.94s  
+  ✓ Supplier CRUD → it can edit supplier                                 1.03s  
+  ✓ Supplier CRUD → it can delete supplier                               1.12s  
+  ✓ Product Category CRUD → it can render list page                      1.30s  
+  ✓ Product Category CRUD → it can create product category               1.51s  
+  ✓ Product Category CRUD → it validates required fields when creating…  1.28s  
+  ✓ Product Category CRUD → it can edit product category                 0.96s  
+  ✓ Product Category CRUD → it can delete product category               0.85s  
+  ✓ Unit of Measure CRUD → it can render list page                       0.86s  
+  ✓ Unit of Measure CRUD → it can create unit of measure                 0.93s  
+  ✓ Unit of Measure CRUD → it validates required fields when creating u… 0.96s  
+  ✓ Unit of Measure CRUD → it can edit unit of measure                   0.98s  
+  ✓ Unit of Measure CRUD → it can delete unit of measure                 0.94s  
+  ✓ Currency CRUD → it can render list page                              0.86s  
+  ✓ Currency CRUD → it can create currency                               0.90s  
+  ✓ Currency CRUD → it validates required fields when creating currency  0.92s  
+  ✓ Currency CRUD → it can edit currency                                 1.14s  
+  ✓ Currency CRUD → it can delete currency                               1.06s  
+  ✓ Tax Setting CRUD → it can render list page                           1.01s  
+  ✓ Tax Setting CRUD → it can create tax setting PPN                     1.38s  
+  ✓ Tax Setting CRUD → it can create tax setting PPH                     1.17s  
+  ✓ Tax Setting CRUD → it validates required fields when creating tax s… 0.92s  
+  ✓ Tax Setting CRUD → it can edit tax setting                           0.89s  
+  ✓ Tax Setting CRUD → it can delete tax setting                         0.97s  
+  ✓ Warehouse CRUD → it can render list page                             0.85s  
+  ✓ Warehouse CRUD → it can create warehouse                             0.93s  
+  ✓ Warehouse CRUD → it accepts international phone number on warehouse… 0.95s  
+  ✓ Warehouse CRUD → it validates required fields when creating warehou… 1.03s  
+  ✓ Warehouse CRUD → it can edit warehouse                               1.20s  
+  ✓ Warehouse CRUD → it can delete warehouse                             1.03s  
+  ✓ Driver CRUD → it can render list page                                0.89s  
+  ✓ Driver CRUD → it can create driver                                   0.98s  
+  ✓ Driver CRUD → it accepts international phone number on driver form   0.88s  
+  ✓ Driver CRUD → it validates required fields when creating driver      0.86s  
+  ✓ Driver CRUD → it can edit driver                                     0.63s  
+  ✓ Driver CRUD → it can delete driver                                   0.64s  
+  ✓ Vehicle CRUD → it can render list page                               1.03s  
+  ✓ Vehicle CRUD → it can create vehicle                                 0.76s  
+  ✓ Vehicle CRUD → it validates required fields when creating vehicle    0.62s  
+  ✓ Vehicle CRUD → it can edit vehicle                                   0.82s  
+  ✓ Vehicle CRUD → it can delete vehicle                                 0.69s  
+  ✓ Rak (Shelf) CRUD → it can render list page                           0.58s  
+  ✓ Rak (Shelf) CRUD → it can create rak                                 0.62s  
+  ✓ Rak (Shelf) CRUD → it only offers active warehouses for rak selecti… 0.81s  
+  ✓ Rak (Shelf) CRUD → it validates required fields when creating rak    3.26s  
+  ✓ Rak (Shelf) CRUD → it can edit rak                                   2.03s  
+  ✓ Rak (Shelf) CRUD → it can delete rak                                 1.04s  
+  ✓ Product CRUD → it can render list page                               0.94s  
+  ✓ Product CRUD → it can create product                                 1.27s  
+  ✓ Product CRUD → it validates required fields when creating product    1.39s  
+  ✓ Product CRUD → it can edit product                                   1.60s  
+  ✓ Product CRUD → it can delete product                                 1.44s  
+  ✓ Data Master Integrity → it warehouse belongs to cabang               0.81s  
+  ✓ Data Master Integrity → it driver belongs to cabang                  0.81s  
+  ✓ Data Master Integrity → it vehicle belongs to cabang                 0.82s  
+  ✓ Data Master Integrity → it rak belongs to warehouse                  0.85s  
+  ✓ Data Master Integrity → it customer belongs to cabang                0.88s  
+  ✓ Data Master Integrity → it supplier belongs to cabang                1.05s  
+  ✓ Data Master Integrity → it product category can have multiple recor… 0.88s  
+  ✓ Data Master Integrity → it customer code must be unique (DB constra… 0.94s  
+  ✓ Data Master Integrity → it cabang kode must be unique (DB constrain… 0.82s  
+  ✓ Data Master Integrity → it supplier code must be unique (DB constra… 0.83s  
+  ✓ Data Master Integrity → it can create multiple currencies            0.84s  
+  ✓ Data Master Factory Tests → it can create cabang via factory         0.72s  
+  ⨯ Data Master Factory Tests → it can create customer via factory       0.71s  
+  ✓ Data Master Factory Tests → it can create supplier via factory       0.72s  
+  ✓ Data Master Factory Tests → it can create product category via fact… 0.67s  
+  ✓ Data Master Factory Tests → it can create unit of measure via facto… 0.72s  
+  ✓ Data Master Factory Tests → it can create currency via factory       0.72s  
+  ✓ Data Master Factory Tests → it can create tax setting via factory    0.69s  
+  ✓ Data Master Factory Tests → it can create warehouse via factory      0.69s  
+  ✓ Data Master Factory Tests → it can create driver via factory         0.69s  
+  ✓ Data Master Factory Tests → it can create vehicle via factory        0.71s  
+  ✓ Data Master Factory Tests → it can create rak via factory            0.72s  
+
+   FAIL  Tests\Feature\DeliveryOrderFeatureTest
+  ✓ it can create delivery order manually                                0.78s  
+  ✓ it can create delivery order from sale order                         0.76s  
+  ✓ it tracks approval logs and status changes                           0.73s  
+  ✓ it can approve delivery order without surat jalan                    0.73s  
+  ✓ it can assign vehicle and driver for shipping                        0.73s  
+  ✓ it can generate surat jalan                                          0.76s  
+  ✓ it handles proof of delivery                                         1.01s  
+  ⨯ it updates stock on delivery                                         0.80s  
+  ✓ it calculates total value correctly                                  0.78s  
+  ✓ it generates unique do number                                        0.66s  
+  ✓ it handles delivery order lifecycle                                  0.69s  
+  ⨯ it manages stock correctly through delivery order lifecycle          0.84s  
+  ✓ it can create delivery order for ambil sendiri sale order            0.53s  
+  ✓ it can generate surat jalan for ambil sendiri delivery order         0.46s  
+
+   PASS  Tests\Feature\DeliveryOrderFormTest
+  ✓ debug delivery order form data keys                                  0.46s  
+  ✓ delivery order warehouse sources only use active warehouses in the…  0.74s  
+
+   FAIL  DeliveryOrderJournalIntegrationTest
+  ✓ journal entries are created when delivery order status becomes comp… 0.63s  
+  ⨯ starting delivery schedule for direct linked delivery order release… 0.49s  
+  ✓ journal entries are updated when delivery order quantity is changed… 0.53s  
+  ✓ journal entries are deleted when delivery order is soft deleted      0.62s  
+
+   PASS  Tests\Feature\DeliveryOrderTask2326Test
+  ✓ task23 do status reaches reservation release only when sj terbit ac… 0.84s  
+  ✓ task23 do resource has no standalone mark as reservation release ac… 0.52s  
+  ✓ task24 do approve action is labeled konfirmasi dana diterima         0.48s  
+  ✓ task24 do transitions to approved via service when dana confirmed    0.51s  
+  ✓ task25 do resource table has do number customer date status as prim… 0.92s  
+  ✓ task25 do can be queried with relevant fields                        2.47s  
+  ✓ task26 surat jalan uses delivery schedule shipping fields            1.80s  
+  ✓ task26 sj resource table removes legacy shipping columns             1.34s  
+  ✓ task26 delivery schedule allows delivery method values               0.98s  
+
+   PASS  Tests\Feature\DeliveryOrderValuationTest
+  ✓ it nilai DO memakai LineAmounts (harga gross, diskon %, PPN eksklus… 0.76s  
+  ✓ it paritas: nilai DO sama dengan total invoice otomatis yang terbit… 0.85s  
+  ✓ it SO inklusif dan SO tanpa pajak dinilai sesuai tipenya             0.80s  
+  ✓ it item DO tanpa tautan item SO bernilai 0 (tidak menebak harga), d… 0.91s  
+  ✓ it nilai banyak DO dihitung dengan jumlah query tetap (bukan per DO… 1.02s  
+  ✓ it label pilihan SO, DO, dan Quotation memuat customer, tanggal, da… 1.11s  
+  ✓ it form Invoice: pilihan SO memuat nama customer & nilai, pilihan D… 1.85s  
+  ✓ it PDF DO menampilkan total yang sama dengan valuation (2 desimal)   0.98s  
+
+   PASS  Tests\Feature\DeliveryOrderWarehouseConfirmationPerItemTest
+  ✓ delivery order warehouse confirmations are created per request item… 0.82s  
+
+   FAIL  Tests\Feature\DeliveryScheduleInventoryFixTest
+  ⨯ stock movement created when do sent                                  0.77s  
+  ⨯ qty available decreases after stock movement created                 0.71s  
+  ⨯ no duplicate stock movement on completed                             0.72s  
+
+   PASS  Tests\Feature\DeliverySchedulePermissionTest
+  ✓ all delivery schedule permissions exist in helper controller         0.80s  
+  ✓ all delivery schedule permissions exist in database                  0.84s  
+  ✓ user with all permissions passes all policy checks                   0.83s  
+  ✓ user without permissions fails all policy checks                     0.90s  
+  ✓ view only user can view but not create or modify                     0.84s  
+  ✓ delivery driver role has delivery schedule permissions               0.87s  
+  ✓ super admin has all delivery schedule permissions                    0.84s  
+  ✓ rekap export query returns correct data                              0.80s  
+  ✓ rekap export filters by date                                         0.81s  
+  ✓ rekap service generates valid number                                 0.81s  
+  ✓ delivery schedule policy is registered                               0.85s  
+
+   PASS  Tests\Feature\DeliveryScheduleTest
+  ✓ it can generate unique schedule number                               0.80s  
+  ✓ it generates incrementing schedule numbers                           0.83s  
+  ✓ it can create delivery schedule with surat jalan                     0.87s  
+  ✓ it lists only surat jalan for the selected cabang                    0.89s  
+  ✓ it filters surat jalan for bau bau cabang                            0.83s  
+  ✓ it still excludes surat jalan used by trashed delivery schedules     0.85s  
+  ✓ it excludes surat jalan that are already used by another delivery s… 0.86s  
+  ✓ it renders the delivery schedule create form                         0.86s  
+  ✓ it can update schedule status                                        0.83s  
+  ✓ it creates journal entries when schedule starts shipping not when d… 0.88s  
+  ✓ it can have multiple surat jalan per schedule                        0.80s  
+  ✓ it shows selected surat jalan and delivery orders preview            0.86s  
+  ✓ delivered schedule completes related delivery orders                 0.86s  
+  ✓ delivery order no longer requires driver and vehicle                 0.92s  
+  ✓ it provides correct status label                                     0.77s  
+  ✓ it soft deletes schedule                                             0.51s  
+  ✓ it has delivery schedule pdf route in preview controller             0.52s  
+  ✓ it can generate pdf for delivery schedule                            1.06s  
+  ✓ it renders delivery schedule pdf without view warnings               0.82s  
+  ✓ it preview pdf action visible for all delivery methods               0.55s  
+  ✓ it can access pdf route for delivery schedule                        0.83s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CurrencyFlowTraceTest > trace…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk laudantium. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CustomerSupplierTest > it can update customer credi…   
+  Component has errors: "data.perusahaan"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/CustomerSupplierTest.php:284
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DataMasterCrudTest > `Data Master Factory Tests` →…    
+  Expecting '' not to be empty .
+
+  at tests/Feature/DataMasterCrudTest.php:1203
+    1199▕     it('can create customer via factory', function () {
+    1200▕         $cabang = Cabang::factory()->create();
+    1201▕         $customer = Customer::factory()->create(['cabang_id' => $cabang->id]);
+    1202▕         expect($customer->id)->not->toBeNull();
+  ➜ 1203▕         expect($customer->perusahaan)->not->toBeEmpty();
+    1204▕     });
+    1205▕ 
+    1206▕     it('can create supplier via factory', function () {
+    1207▕         $cabang = Cabang::factory()->create();
+
+  1   tests/Feature/DataMasterCrudTest.php:1203
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DeliveryOrderFeatureTest > it…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk qui. Stok saat ini: 0, diminta: 5.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DeliveryOrderFeatureTest > it manages stock correct…   
+  Failed asserting that 0.0 matches expected 20.
+
+  at tests/Feature/DeliveryOrderFeatureTest.php:511
+    507▕         // - StockMovement created, qty_available decreases by 20 (from 100 to 80)
+    508▕         // - Reservation NOT deleted, qty_reserved stays at 20 (for tracking)
+    509▕         // Note: If rak_id doesn't match, qty_available may stay at 100
+    510▕         // The key change is: reservation is NOT deleted anymore
+  ➜ 511▕         $this->assertEquals(20, $stockAfterReservationRelease->qty_reserved); // Reservation still exists
+    512▕ 
+    513▕         // 3. COMPLETED: Stock should be permanently reduced and journals should be created
+    514▕         $this->deliveryOrderService->updateStatus($deliveryOrder, 'completed');
+    515▕
+
+  1   tests/Feature/DeliveryOrderFeatureTest.php:511
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  DeliveryOrderJournalIntegrationTest > starting delivery schedule…    
+  Failed asserting that 0 is identical to 1.
+
+  at tests/Feature/DeliveryOrderJournalIntegrationTest.php:185
+    181▕         $schedule->deliveryOrders()->attach($deliveryOrder->id);
+    182▕ 
+    183▕         $started = app(\App\Services\DeliveryScheduleService::class)->startRelatedDeliveryOrders($schedule->fresh());
+    184▕ 
+  ➜ 185▕         $this->assertSame(1, $started);
+    186▕         $this->assertDatabaseHas('delivery_orders', [
+    187▕             'id' => $deliveryOrder->id,
+    188▕             'status' => 'sent',
+    189▕         ]);
+
+  1   tests/Feature/DeliveryOrderJournalIntegrationTest.php:185
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DeliveryScheduleInventoryFixTe…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk vel. Stok saat ini: 0, diminta: 300.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DeliveryScheduleInventoryFixTe…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk numquam. Stok saat ini: 0, diminta: 300.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DeliveryScheduleInventoryFixTe…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk sed. Stok saat ini: 0, diminta: 100.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+
+  Tests:    9 failed, 299 passed (1456 assertions)
+  Duration: 307.04s
+

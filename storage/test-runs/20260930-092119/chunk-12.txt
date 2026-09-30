@@ -1,0 +1,1096 @@
+
+   PASS  Tests\Feature\Settings\PasswordUpdateTest
+  ✓ password can be updated                                              5.19s  
+  ✓ correct password must be provided to update password                 0.84s  
+
+   PASS  Tests\Feature\Settings\ProfileUpdateTest
+  ✓ profile page is displayed                                            0.83s  
+  ✓ profile information can be updated                                   0.77s  
+  ✓ email verification status is unchanged when email address is unchan… 0.76s  
+  ✓ user can delete their account                                        0.71s  
+  ✓ correct password must be provided to delete account                  0.67s  
+
+   PASS  Tests\Feature\SidebarHubGroupingTest
+  ✓ dashboard hub page is configured as the visible dashboard menu entr… 0.64s  
+  ✓ finance dashboard page is hidden and only exposed through the dashb… 0.68s  
+  ✓ accounting hub page is configured as the visible accounting menu en… 0.74s  
+  ✓ inventory hub page is configured as the visible inventory menu entr… 0.70s  
+  ✓ warehouse and inventory detail hubs are hidden and only exposed thr… 0.69s  
+  ✓ purchase hub page is configured as the visible purchase menu entry   0.68s  
+  ✓ delivery hub page is configured as the visible delivery menu entry   0.68s  
+  ✓ sales hub page is configured as the visible sales menu entry         0.70s  
+  ✓ finance sales, purchase, and payment hubs are hidden and only expos… 0.69s  
+  ✓ detailed accounting sidebar items are hidden and only exposed throu… 0.83s  
+  ✓ detailed warehouse sidebar items are hidden and only exposed throug… 0.80s  
+  ✓ detailed purchase sidebar items are hidden and only exposed through… 0.71s  
+  ✓ detailed delivery sidebar items are hidden and only exposed through… 0.73s  
+  ✓ detailed finance sales and purchase sidebar items are hidden and on… 0.66s  
+  ✓ detailed payment sidebar items are hidden and only exposed through…  0.70s  
+  ✓ sales and manufacturing groups use consistent Indonesian labels      0.57s  
+  ✓ child menu labels use Indonesian wording in the refactored sections  0.45s  
+
+   PASS  Tests\Feature\Sprint1FinancialIntegrityVerificationTest
+  ✓ sent invoice edit page is blocked and redirects                      0.72s  
+  ✓ invoice observer rolls back journal deletion on repost failure       0.77s  
+  ✓ stock adjustment increase uses variance gain and never sales revenu… 0.56s  
+  ✓ stock adjustment decrease uses variance loss and never cogs 5100     0.42s  
+  ✓ purchase return reverses ppn masukan when invoice has vat            0.39s  
+  ✓ repair orphan invoices command dry run executes cleanly              0.67s  
+
+   PASS  Tests\Feature\Sprint1To4AdversarialNegativeAndEdgeTest
+  ✓ negative finalized sales invoice edit is blocked                     0.32s  
+  ✓ edge draft invoice never creates gl or ap ar                         0.31s  
+  ✓ edge double posting sales invoice is strictly idempotent             0.28s  
+  ✓ negative stock adjustment cannot be approved without items           0.25s  
+  ✓ negative stock adjustment approval fails if not draft                0.26s  
+  ✓ negative stock transfer request rejected without items               0.25s  
+  ✓ negative stock transfer item with zero or negative quantity rejecte… 0.25s  
+  ✓ negative stock transfer to same warehouse and rak rejected           0.30s  
+  ✓ negative stock transfer approval fails on insufficient stock         0.26s  
+  ✓ negative surat jalan rejects non approved delivery orders            0.89s  
+  ✓ negative surat jalan rejects multi branch delivery orders            0.30s  
+  ✓ negative outbound stock movement prevents negative inventory         0.26s  
+  ✓ negative stock opname approval requires status completed             0.25s  
+  ✓ negative stock opname item requires rak when warehouse has raks      0.25s  
+  ✓ edge warehouse stock options returns zero on invalid keys            0.25s  
+  ✓ negative customer merger blocks self merge                           0.24s  
+  ✓ negative customer merger blocks already merged candidate             0.25s  
+  ✓ negative customer merger blocks when both have deposits              0.27s  
+  ✓ edge master unit sanitation handles multiple closing brackets        0.39s  
+  ✓ edge reconcile handles negative phantom reserved stock               0.26s  
+
+   PASS  Tests\Feature\Sprint2LogisticsAndStockVerificationTest
+  ✓ bug 2 stock transfer without rak preserves item and executes moveme… 0.33s  
+  ✓ bug 2 stock transfer form rejects empty items                        0.44s  
+  ✓ bug 2 create stock transfer via form without rak succeeds            0.51s  
+  ✓ bug 2 service rejects request on transfer without items              0.34s  
+  ✓ bug 3 return product approval restores stock records movement and c… 0.36s  
+  ✓ bug 5 purchase receipt cannot exceed po quantity                     0.37s  
+  ✓ bug 6 surat jalan rejects delivery orders with non approved status   0.41s  
+
+   PASS  Tests\Feature\Sprint3OperationalAndUiUxVerificationTest
+  ✓ bug 4 stock opname view page registered and validation               0.37s  
+  ✓ bug 9 inventory card report includes all mutation types              0.51s  
+  ✓ bug 10 stock movement prevents negative inventory on outbound        1.69s  
+  ✓ bug 12 delivery order and surat jalan prioritize shipped to          0.84s  
+  ✓ bug 13 payment request status transitions to partial when partially… 0.91s  
+  ✓ bug 14 warehouse stock options calculates free stock                 0.76s  
+  ✓ bug 17 purchase invoice status sent label is menunggu pembayaran     0.61s  
+  ✓ bug 18 quotation pdf watermark and title                             0.45s  
+  ✓ bug 21 coa relation filters out parent accounts                      0.50s  
+
+   PASS  Tests\Feature\Sprint4DataCleanupAndReconciliationTest
+  ✓ dry run mode does not mutate database                                0.47s  
+  ✓ orphan sales invoice reconciliation creates balanced gl entries      0.51s  
+  ✓ approved stock adjustments without gl receive balanced entries       0.42s  
+  ✓ empty stock transfers are force deleted                              0.37s  
+  ✓ orphan reservations cleaned and inventory stock qty reserved reconc… 0.42s  
+  ✓ sanitize master units strips closing bracket                         0.39s  
+  ✓ duplicate customers consolidation merges records and documents       0.55s  
+  ✓ full command run with all tasks and force option                     0.43s  
+
+   PASS  Tests\Feature\Sprint8MinorBugsFixTest
+  ✓ sale order api free stock aggregates across warehouses and floors t… 0.45s  
+  ✓ vendor payment accounts excludes parent accounts and deposito inves… 0.52s  
+  ✓ invoice status sent label is menunggu pembayaran                     0.78s  
+  ✓ quality control aggregates reason reject to header                   0.91s  
+
+   FAIL  Tests\Feature\StatusRowClassesTest
+  ✓ quotation index renders status row classes                           1.05s  
+  ✓ quotation resource includes a status color legend                    0.50s  
+  ✓ order request index renders status row classes                       0.81s  
+  ✓ purchase order index renders status row classes                      0.90s  
+  ⨯ sale order index renders status row classes and legend               1.44s  
+  ✓ sale order rejected and cancelled statuses map to red row class wit… 0.57s  
+  ✓ sale order rejected and cancelled statuses map to red row class wit… 0.54s  
+
+   PASS  Tests\Feature\Stock\Adversarial\DeliveryOrderStateTransitionAdversarialTest
+  ✓ it ST-01: menolak loncat status ilegal langsung dari request_stock…  0.41s  
+  ✓ it ST-02: menolak pembatalan liar (reject) pada DO yang sudah berst… 0.44s  
+  ✓ it ST-03: DO yang sudah completed terkunci dari penambahan item ata… 0.51s  
+  ✓ it ST-04: pelepasan reservasi stok seketika saat DO yang disetujui…  0.70s  
+
+   PASS  Tests\Feature\Stock\Adversarial\StockBoundaryAdversarialTest
+  ✓ it BV-01: menolak kuantitas nol atau negatif pada item Delivery Ord… 0.40s  
+  ✓ it BV-02: kuantitas fraksional desimal ekstrem tidak merusak keseim… 0.50s  
+  ✓ it BV-03: menolak over-delivery saat kuantitas DO melebihi sisa SO…  0.56s  
+  ✓ it BV-04: fallback aman saat warehouse atau sumber alokasi null tan… 0.45s  
+
+   FAIL  Tests\Feature\Stock\Adversarial\StockConcurrencyAdversarialTest
+  ✓ it CC-01: rebutan stok terakhir tidak boleh menghasilkan stok fisik… 0.45s  
+  ✓ it CC-02: eksekusi persetujuan berulang (idempotensi) tidak menggan… 0.43s  
+  ⨯ it CC-03: stok hasil retur pelanggan langsung tersedia aman untuk p… 0.47s  
+
+   PASS  Tests\Feature\Stock\Adversarial\StockFaultInjectionRollbackTest
+  ✓ it FI-01: rollback database menyeluruh saat terjadi kegagalan siste… 0.84s  
+  ✓ it FI-02: simulasi gagal kirim fisik sopir mengembalikan stok fisik… 0.92s  
+  ✓ it FI-03: atomisitas transaksi menjamin tidak ada data parsial yati… 0.52s  
+
+   PASS  Tests\Feature\Stock\Adversarial\StockMultiBranchIsolationTest
+  ✓ it SC-01: isolasi cabang membatasi gudang yang dapat diakses jika l… 0.48s  
+  ✓ it SC-02: proteksi sub-ledger piutang menolak pembuatan atau modifi… 0.42s  
+
+   PASS  Tests\Feature\Stock\Adversarial\StockThreeWayReconciliationTest
+  ✓ it RC-01: invarian stok fisik vs mutasi kartu persediaan bernilai t… 0.49s  
+  ✓ it RC-02: invarian cadangan stok menjamin nol reservasi phantom di…  0.46s  
+  ✓ it RC-03: setiap penerbitan jurnal HPP pengiriman memiliki saldo de… 0.48s  
+
+   FAIL  Tests\Feature\Stock\DeliveryOrderTransitionsTest
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.33s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.33s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.36s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.36s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.35s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.35s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.36s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.35s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.37s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.40s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.46s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.43s  
+  ⨯ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.41s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.40s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.40s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.41s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.39s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.39s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.36s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.35s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.35s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  0.33s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  1.37s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  1.33s  
+  ✓ it matriks: transisi sah diterima dan yang di luar matriks ditolak…  1.68s  
+  ✓ it status final (completed, closed) tidak punya tujuan               1.62s  
+  ⨯ it transisi di luar matriks ditolak dengan pesan berbahasa Indonesi… 3.60s  
+  ✓ it label "Siap Kirim" hanya saat alur ketat aktif                    1.43s  
+  ⨯ it Kirim: stok fisik keluar sekali, reservasi DO dikonsumsi, item D… 0.57s  
+  ⨯ it Kirim dua kali (klik ganda) = satu efek                           0.40s  
+  ⨯ it D15: stok fisik kurang menolak Kirim dengan rincian; stok, statu… 0.37s  
+  ⨯ it D15: pengecualian butuh Owner/Super Admin dan alasan; tercatat d… 0.35s  
+  ⨯ it D15 berlaku di semua pintu: update model langsung juga ditolak    0.40s  
+  ⨯ it D15: SO "Ambil Sendiri" tidak dapat diselesaikan bila stok fisik… 0.30s  
+  ✓ it semua pintu: update model langsung, layanan lama, dan Transition… 0.73s  
+  ⨯ it DeliveryOrderService::updateStatus mengikuti matriks dan menyimp… 1.23s  
+  ✓ it konfirmasi gudang terlambat tidak menarik DO yang sudah Dikirim…  0.38s  
+  ⨯ it D18: gagal kirim setelah Dikirim mengembalikan stok TEPAT SEKALI… 0.30s  
+  ⨯ it gagal kirim dari Siap Kirim (stok belum keluar) tidak menyentuh…  0.28s  
+  ✓ it D19: Batalkan DO butuh alasan, melepas reservasi, DO closed fina… 0.29s  
+  ✓ it DO yang sudah Dikirim tidak dapat dibatalkan (harus lewat gagal…  0.29s  
+  ⨯ it D23: Diterima mencatat tanggal dan nama penerima; Selesaikan men… 0.38s  
+  ✓ it Selesaikan langsung dari Dikirim melewati Diterima otomatis; ked… 0.38s  
+  ⨯ it D5: jadwal tidak dapat ditandai selesai dari pending — di model…  0.34s  
+  ⨯ it jadwal Mulai → DO Dikirim (stok keluar); Tandai Selesai → DO Sel… 0.45s  
+  ⨯ it D15 di jadwal: Mulai ditolak bila stok fisik kurang; jadwal teta… 0.29s  
+  ✓ it Mulai ditolak bila DO terkait belum Siap Kirim                    0.29s  
+  ✓ it D20: jadwal ditandai Gagal setelah berangkat → DO Pengiriman Gag… 0.37s  
+  ✓ it jadwal dari alur lama pending → failed tanpa berangkat tidak men… 0.32s  
+  ✓ it helper UI jadwal: penolakan menjadi notifikasi, bukan galat, dan… 0.30s  
+  ✓ it form Buat Jadwal: status selain Menunggu dipaksa Menunggu Kebera… 0.24s  
+  ⨯ it delivery-orders:resync-item-status melaporkan lalu memperbaiki s… 0.30s  
+  ✓ it [flag mati] model tidak menegakkan matriks dan tidak menulis log… 0.33s  
+
+   FAIL  Tests\Feature\Stock\DeliveryOrderWarehouseConfirmationFlowTest
+  ✓ it DO dapat dibuat tanpa driver/kendaraan (nullable) dan WC dibuat…  0.29s  
+  ✓ it semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) dan re… 0.30s  
+  ⨯ it Ambil Sendiri tidak memerlukan DO: stok fisik keluar saat SO dis… 0.27s  
+
+   FAIL  Tests\Feature\Stock\SaleOrderReservationTest
+  ✓ it approve SO menahan stok: SO 20 / stok 30 → tertahan 20, bebas 10… 0.30s  
+  ✓ it sinkron dipanggil berulang tidak mengubah apa pun dan tidak mena… 0.28s  
+  ✓ it D21: SO kedua yang melebihi sisa bebas ditahan PARSIAL; ringkasa… 0.31s  
+  ⨯ it SO→DO tanpa selisih: DO 12 disetujui → total tertahan tetap 20 (… 0.48s  
+  ✓ it DO Siap Kirim yang dibatalkan/ditutup mengembalikan kebutuhan ke… 1.48s  
+  ✓ it mengedit kuantitas item DO (checker) saat Siap Kirim menjaga tot… 1.58s  
+  ✓ it gagal kirim setelah Dikirim (alur ketat): stok kembali dan total… 1.40s  
+  ✓ it SO dibatalkan melepas semua reservasi (SO dan DO); ditolak/ditut… 1.49s  
+  ✓ it SO draft dan menunggu persetujuan tidak menahan stok              1.40s  
+  ✓ it D22: item tanpa gudang ditempatkan otomatis di gudang cabang den… 1.07s  
+  ✓ it D22: stok gudang cabang lain tidak dipakai penempatan otomatis (… 2.03s  
+  ✓ it alokasi multi-gudang: reservasi per alokasi, dibatasi stok bebas… 1.80s  
+  ✓ it mengubah kuantitas item SO menyesuaikan reservasi; menghapus ite… 0.45s  
+  ✓ it Ambil Sendiri: reservasi SO dikonsumsi saat selesai — stok fisik… 1.06s  
+  ✓ it reservasi Material Issue tidak pernah disentuh sinkronisasi SO    0.57s  
+  ✓ it INVARIAN: sepanjang alur acak, Σ tertahan per item ≤ kebutuhan d… 0.93s  
+  ⨯ it sales:backfill-so-reservations: dry-run tidak mengubah apa pun;…  0.31s  
+  ⨯ it [flag mati] approve SO tidak menahan stok dan DO memakai jalur r… 0.30s  
+  ✓ it F2: DO tidak terblokir oleh reservasi SO-nya sendiri; reservasi…  0.30s  
+
+   FAIL  Tests\Feature\Stock\StockAvailabilityTest
+  ⨯ it D3: gudang yang boleh dipakai = gudang aktif cabang SO; + cabang… 0.30s  
+  ✓ it D3: item tanpa gudang menghitung stok hanya dari gudang cabang S… 0.30s  
+  ✓ it D3: gudang yang DIPILIH pada item tetap dihormati walau milik ca… 0.27s  
+  ✓ it freeByProductForCabang: satu kueri untuk semua produk, hanya gud… 0.30s  
+  ✓ it F2: stok bebas untuk SO = bebas + reservasi milik SO itu; SO lai… 0.27s  
+  ✓ it F2: SO yang menahan stok tidak dianggap kurang stok karena reser… 0.27s  
+  ✓ it reservasi Material Issue tidak pernah dianggap milik SO (tidak a… 0.31s  
+  ✓ it alokasi multi-gudang: tiap alokasi diperiksa pada gudangnya; alo… 0.34s  
+  ✓ it item dengan rak terpilih diperiksa pada rak itu saja              0.29s  
+  ✓ it SO tanpa item tidak pernah kurang stok                            0.29s  
+  ✓ it checkMany menghasilkan hasil identik dengan check per SO          0.31s  
+  ✓ it checkMany: jumlah query sama untuk 3 maupun 25 SO                 0.38s  
+  ✓ it daftar SO: badge STOK KURANG/READY sadar reservasi sendiri; filt… 0.97s  
+  ✓ it daftar SO: jumlah query pemeriksaan stok tetap sama untuk 3 maup… 0.78s  
+  ✓ it pemindai: jalur DO/SO tidak lagi memakai InventoryStock::freeQty… 0.26s  
+
+   FAIL  Tests\Feature\Stock\StockE2ETest
+  ⨯ it E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, res… 0.51s  
+  ✓ it E2E: SO stok kurang ditolak; backorder beralasan menahan sebagia… 0.39s  
+
+   FAIL  Tests\Feature\Stock\StockReconcileCommandTest
+  ⨯ it dry-run melaporkan yatim (12 + 3) tanpa mengubah apa pun          0.33s  
+  ⨯ it --apply menghapus HANYA yatim, menurunkan qty_reserved tepat seb… 0.33s  
+  ✓ it --apply idempoten: menjalankan lagi tidak menemukan yatim dan ti… 0.33s  
+  ✓ it qty_reserved TAK TERJELASKAN hanya dilaporkan (D17) — tidak pern… 0.33s  
+  ✓ it petunjuk menyebut Retur Pembelian bila produk pernah diretur      0.54s  
+  ✓ it stok negatif hanya dilaporkan                                     0.31s  
+  ⨯ it --sale-order membatasi pembersihan yatim ke satu SO               0.35s  
+  ✓ it DO terhapus atau SO terhapus juga dianggap yatim                  0.28s  
+
+   FAIL  Tests\Feature\Stock\StockReservationLedgerTest
+  ⨯ it reserve menaikkan qty_reserved dan mencatat event; stok fisik ti… 0.28s  
+  ✓ it adjust naik dan turun keduanya memengaruhi qty_reserved (observe… 0.30s  
+  ⨯ it adjust ke 0 melepas reservasi; release dan consume menghapus bar… 0.39s  
+  ✓ it qty_reserved tidak pernah menjadi negatif walau reservasi lebih…  0.32s  
+  ⨯ it baris stok dipilih deterministik: rak cocok → rak null; pelepasa… 0.30s  
+  ✓ it releaseWhere hanya menyentuh reservasi penjualan, TIDAK menyentu… 0.31s  
+  ✓ it [ledger] DO Siap Kirim → reservasi DO terpetakan ke item SO; Dik… 0.32s  
+  ✓ it [ledger] skenario probe: jadwal "Tandai Selesai" (strict_dispatc… 0.34s  
+  ⨯ it [ledger] gerakan pengiriman IDEMPOTEN: DO gagal lalu dikirim ula… 0.31s  
+  ✓ it [ledger] pengiriman ulang memotong SELISIH bila kuantitas item D… 0.30s  
+  ✓ it [ledger] DO ditutup, ditolak, atau dihapus melepas reservasinya;… 0.31s  
+  ✓ it [ledger] mengubah kuantitas item DO saat Siap Kirim (edit checke… 0.29s  
+  ✓ it [ledger] DO dengan dua gudang sumber menahan per gudang; kuantit… 0.28s  
+  ⨯ it [flag mati] reservasi DO/edit kuantitas berperilaku lama: tidak…  0.32s  
+
+   FAIL  Tests\Feature\Stock\StockReservationSpecTest
+  ✓ it spec: SO Approved menahan stok — qty_reserved naik, qty_availabl… 0.28s  
+  ✓ it spec (TC-SR-003): reservasi tidak pernah melebihi stok bebas — S… 0.27s  
+  ✓ it spec (TC-SR-004): stok yang sudah ditahan SO pertama tidak ditah… 0.28s  
+  ✓ it spec (TC-SR-005): membatalkan SO melepas reservasi; stok bebas p… 0.28s  
+  ✓ it spec: DO Dikirim mengonsumsi reservasi; DO Selesai tidak menahan… 0.34s  
+  ✓ it spec: pengiriman parsial — DO1 12 dikirim menyisakan tertahan 8;… 0.32s  
+  ⨯ it spec: tidak ada double reservasi — DO Siap Kirim memindahkan res… 0.30s  
+
+   FAIL  Tests\Feature\Stock\StockScenarioProbeTest
+  ✓ it [flag mati] semua flag stok default mati di berkas config         0.24s  
+  ✓ it [flag mati] SO qty 35 dengan stok 30 lolos approve tanpa peringa… 0.28s  
+  ✓ it [flag mati] reservasi baru terbentuk di tahap DO Approved, bukan… 0.30s  
+  ⨯ it [flag mati] jadwal "Tandai Selesai" dari pending menyelesaikan D… 0.33s  
+  ⨯ it [flag mati] DO yang gagal setelah Dikirim tidak mengembalikan st… 0.35s  
+
+   PASS  Tests\Feature\Stock\StockShortageApprovalTest
+  ✓ it D2: SO 35 dengan stok bebas 30 ditolak dengan rincian; status da… 0.37s  
+  ✓ it celah probe tertutup: item TANPA gudang/alokasi yang kurang stok… 0.30s  
+  ✓ it alokasi gudang yang kurang stok ditolak; alokasi yang tidak sama… 0.29s  
+  ✓ it stok cukup: approve lolos seperti biasa dan tidak ditandai backo… 0.29s  
+  ✓ it SO yang sudah menahan stok tidak "kurang stok" karena reservasin… 0.28s  
+  ✓ it Backorder: manajer menyetujui dengan alasan → reservasi parsial…  0.35s  
+  ✓ it Backorder: alasan wajib; Sales biasa dan pembuat SO sendiri dito… 0.36s  
+  ✓ it Backorder pada SO tanpa kekurangan disetujui biasa (bukan backor… 0.36s  
+  ✓ it isi ulang (top-up): stok masuk → SO backorder terisi FIFO menuru… 0.32s  
+  ✓ it tombol "Coba reservasi ulang" (sinkron manual) menutup kekuranga… 0.28s  
+  ✓ it describeShortages: kalimat kekurangan per item dengan nama gudan… 0.27s  
+  ✓ it penjadwalan: sales:top-up-reservations terdaftar tiap 30 menit t… 0.27s  
+  ✓ it API: simpan SO melebihi stok mengembalikan warnings[] (tidak mem… 0.36s  
+  ✓ it [flag mati] approve SO stok kurang tetap lolos (perilaku lama) d… 0.27s  
+  ✓ it UI: aksi Setujui sebagai Backorder tampil di halaman SO hanya un… 0.76s  
+
+   PASS  Tests\Feature\StockAdjustmentMoneyInputTest
+  ✓ unit cost and difference value follow the indonesian money format l… 0.55s  
+  ✓ masked values are saved as plain numbers                             0.58s  
+  ✓ decrease gives a negative difference value that is saved correctly   0.58s  
+  ✓ edit page shows saved money in the same format                       0.39s  
+
+   PASS  Tests\Feature\StockAdjustmentTest
+  ✓ can create stock adjustment with increase type                       0.27s  
+  ✓ can create stock adjustment with decrease type                       0.27s  
+  ✓ can create stock adjustment item                                     0.27s  
+  ✓ stock adjustment has many items relationship                         0.31s  
+  ✓ stock adjustment item belongs to adjustment                          0.27s  
+  ✓ can approve stock adjustment                                         0.27s  
+  ✓ can reject stock adjustment                                          0.25s  
+  ✓ stock adjustment generates stock movements when approved             0.28s  
+  ✓ stock adjustment decrease approval is blocked when stock is insuffi… 0.27s  
+  ✓ stock adjustment approval requires at least one item                 0.24s  
+  ✓ stock adjustment soft deletes                                        0.24s  
+  ✓ stock adjustment item cascades on adjustment delete                  0.27s  
+  ✓ adjustment number is unique                                          0.24s  
+  ✓ adjustment belongs to warehouse                                      0.23s  
+  ✓ adjustment belongs to creator                                        0.24s  
+  ✓ adjustment belongs to approver                                       0.24s  
+  ✓ stock adjustment resource formats product and rack labels with sku…  0.34s  
+  ✓ stock adjustment rak selection stays within the adjustment warehous… 0.26s  
+
+   PASS  Tests\Feature\StockItemRelationManagersMoneyTest
+  ✓ opname values are formatted and recalculated on every change         0.53s  
+  ✓ opname saves formatted values as plain numbers                       0.53s  
+  ✓ adjustment values are formatted and recalculated on every change     0.55s  
+  ✓ adjustment saves formatted values as plain numbers                   0.56s  
+
+   FAIL  Tests\Feature\StockMovementTest
+  ✓ it can track inbound stock movement                                  0.28s  
+  ⨯ it can track outbound stock movement                                 0.26s  
+  ✓ it validates movement types                                          0.28s  
+  ✓ it calculates fifo costing correctly                                 0.27s  
+  ✓ it calculates lifo costing correctly                                 0.27s  
+  ✓ it calculates average costing correctly                              0.26s  
+  ✓ it calculates stock valuation correctly                              0.27s  
+  ⨯ it tracks stock transfers between warehouses                         0.26s  
+  ✓ it handles stock adjustments                                         0.26s  
+  ⨯ it tracks production movements                                       0.27s  
+  ⨯ it handles return movements                                          0.26s  
+  ⨯ it generates stock movement report                                   0.27s  
+  ✓ outbound negative quantity reduces inventory stock                   0.27s  
+  ✓ updating stock movement location rebalances inventory between locat… 0.27s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StatusRowClassesTest > sale order index renders sta…   
+  Expected: <!DOCTYPE html>\n
+  <html\n
+      lang="id"\n
+  ... (9370 more lines)
+
+  To contain: Biru (Approved/Confirmed/Received)
+
+  at tests/Feature/StatusRowClassesTest.php:122
+    118▕     $response->assertOk();
+    119▕     $response->assertSee($saleOrder->so_number);
+    120▕     $response->assertSee('bg-blue-100');
+    121▕     $response->assertSee('Legenda Warna Status Baris Data');
+  ➜ 122▕     $response->assertSee('Biru (Approved/Confirmed/Received)');
+    123▕ });
+    124▕ 
+    125▕ test('sale order rejected and cancelled statuses map to red row class', function (string $status) {
+    126▕     $method = new ReflectionMethod(SaleOrderResource::class, 'statusRowClass');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\Adversarial\StockConcurrencyAdversarialTest >…   
+  Failed asserting that 20.0 is identical to 10.0.
+
+  at tests/Feature/Stock/Adversarial/StockConcurrencyAdversarialTest.php:97
+     93▕         'date' => now()->toDateString(),
+     94▕         'notes' => 'Uji retur customer',
+     95▕     ]);
+     96▕ 
+  ➜  97▕     expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(10.0);
+     98▕ 
+     99▕     // Sekarang DO baru dapat mengalokasikan stok retur tersebut
+    100▕     [$so, $soItem] = stkSaleOrder($ctx, 7);
+    101▕     $do = stkDeliveryOrder($ctx, $so, $soItem, 7, 'approved');
+
+  1   tests/Feature/Stock/Adversarial/StockConcurrencyAdversarialTest.php:97
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it matriks: tr…   
+  Failed asserting that true is identical to false.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:43
+     39▕ 
+     40▕ // ------------------------------------------------------------------ matriks
+     41▕ 
+     42▕ it('matriks: transisi sah diterima dan yang di luar matriks ditolak', function (string $from, string $to, bool $allowed) {
+  ➜  43▕     expect(DeliveryOrderTransitions::allows($from, $to))->toBe($allowed);
+     44▕ })->with([
+     45▕     ['request_stock', 'approved', true],
+     46▕     ['request_stock', 'reject', true],
+     47▕     ['approved', 'sent', true],
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:43
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransition…  AssertionFailedError   
+  seharusnya ditolak
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:83
+     79▕     [, , , $do] = trxReady();
+     80▕ 
+     81▕     try {
+     82▕         app(DeliveryOrderTransitions::class)->to($do, 'completed');
+  ➜  83▕         $this->fail('seharusnya ditolak');
+     84▕     } catch (DeliveryOrderTransitionException $e) {
+     85▕         expect($e->getMessage())->toContain('tidak dapat diubah dari "Siap Kirim" ke "Selesai"')
+     86▕             ->and($e->getMessage())->toContain('Langkah yang diizinkan');
+     87▕     }
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:83
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it Kirim: stok…   
+  Failed asserting that 3 is identical to 1.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:116
+    112▕     expect($do->status)->toBe('sent')
+    113▕         ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0])
+    114▕         ->and(stkReserved($so, $do))->toBe(0.0)
+    115▕         ->and($do->deliveryOrderItem->first()->status)->toBe('sent')
+  ➜ 116▕         ->and(trxSalesMovements())->toBe(1);
+    117▕ 
+    118▕     $log = DeliveryOrderLog::where('delivery_order_id', $do->id)->where('status', 'sent')->first();
+    119▕     expect($log)->not->toBeNull()
+    120▕         ->and($log->old_value)->toBe('approved')
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:116
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it Kirim dua k…   
+  Failed asserting that 3 is identical to 1.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:132
+    128▕     $service->to($do, 'sent');
+    129▕     $service->to($do->fresh(), 'sent');
+    130▕     $service->to($do, 'sent');   // instance basi (status di memori masih approved)
+    131▕ 
+  ➜ 132▕     expect(trxSalesMovements())->toBe(1)
+    133▕         ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(18.0)
+    134▕         ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->where('status', 'sent')->count())->toBe(1);
+    135▕ });
+    136▕
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:132
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D15: stok f…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:152
+    148▕             ->and($e->shortages)->toHaveCount(1);
+    149▕     }
+    150▕ 
+    151▕     expect($do->fresh()->status)->toBe('approved')
+  ➜ 152▕         ->and(trxSalesMovements())->toBe(0)
+    153▕         ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(8.0);
+    154▕ });
+    155▕ 
+    156▕ it('D15: pengecualian butuh Owner/Super Admin dan alasan; tercatat di log', function () {
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:152
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitions…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Uji Stok. Stok saat ini: 8, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D15 berlaku…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:188
+    184▕     [, , , $do] = trxReady(stock: 5, qty: 12);
+    185▕ 
+    186▕     expect(fn () => $do->update(['status' => 'sent']))->toThrow(DeliveryOrderTransitionException::class, 'stok fisik tidak cukup');
+    187▕ 
+  ➜ 188▕     expect($do->fresh()->status)->toBe('approved')->and(trxSalesMovements())->toBe(0);
+    189▕ });
+    190▕ 
+    191▕ it('D15: SO "Ambil Sendiri" tidak dapat diselesaikan bila stok fisik kurang', function () {
+    192▕     $ctx = stkContext();
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:188
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D15: SO "Am…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:199
+    195▕ 
+    196▕     expect(fn () => $so->update(['status' => 'completed']))->toThrow(DeliveryOrderTransitionException::class, 'Ambil Sendiri');
+    197▕ 
+    198▕     expect($so->fresh()->status)->toBe('approved')
+  ➜ 199▕         ->and(trxSalesMovements())->toBe(0)
+    200▕         ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(4.0);
+    201▕ 
+    202▕     stkSetStock($ctx['product'], $ctx['warehouse'], 10);
+    203▕     $so->update(['status' => 'completed']);
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:199
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it DeliveryOrd…   
+  Exception "App\Exceptions\DeliveryOrderTransitionException" not thrown.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:237
+    233▕ 
+    234▕ it('DeliveryOrderService::updateStatus mengikuti matriks dan menyimpan komentar di log', function () {
+    235▕     [, , , $do] = trxReady();
+    236▕ 
+  ➜ 237▕     expect(fn () => app(DeliveryOrderService::class)->updateStatus($do, 'completed'))->toThrow(DeliveryOrderTransitionException::class);
+    238▕ 
+    239▕     app(DeliveryOrderService::class)->updateStatus($do, 'sent', 'berangkat pagi', 'sent');
+    240▕     $log = DeliveryOrderLog::where('delivery_order_id', $do->id)->where('status', 'sent')->first();
+    241▕
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:237
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D18: gagal…    
+  Failed asserting that 2 is identical to 1.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:274
+    270▕         ->and($after['available'])->toBe(30.0)                    // kembali penuh, bukan 42
+    271▕         ->and($after['reserved'])->toBe(12.0)                     // reservasi dibuat ulang untuk penjadwalan ulang
+    272▕         ->and(stkReserved($so, $do))->toBe(12.0)
+    273▕         ->and($do->fresh()->deliveryOrderItem->first()->status)->toBe('confirmed')
+  ➜ 274▕         ->and(StockMovement::where('type', 'adjustment_in')->count())->toBe(1)
+    275▕         ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->where('status', 'delivery_failed')->first()->comments)->toBe('Customer tidak di tempat');
+    276▕ 
+    277▕     $service->to($do, 'sent');   // dijadwalkan ulang
+    278▕
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:274
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it gagal kirim…   
+  Failed asserting that 3 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:292
+    288▕ 
+    289▕     app(DeliveryOrderTransitions::class)->to($do, 'delivery_failed', ['reason' => 'Alamat salah']);
+    290▕ 
+    291▕     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 12.0, 'free' => 18.0])
+  ➜ 292▕         ->and(StockMovement::whereIn('type', ['sales', 'adjustment_in'])->count())->toBe(0);
+    293▕ });
+    294▕ 
+    295▕ // ------------------------------------------------------------------ D19 batalkan DO
+    296▕
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:292
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D23: Diteri…   
+  Failed asserting that 3 is identical to 1.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:340
+    336▕ 
+    337▕     expect($do->fresh()->status)->toBe('completed')
+    338▕         ->and($do->fresh()->deliveryOrderItem->first()->status)->toBe('received')
+    339▕         ->and(\App\Models\Invoice::where('from_model_type', \App\Models\SaleOrder::class)->whereJsonContains('delivery_orders', $do->id)->exists())->toBeTrue()
+  ➜ 340▕         ->and(trxSalesMovements())->toBe(1);   // completed tidak memotong stok lagi
+    341▕ });
+    342▕ 
+    343▕ it('Selesaikan langsung dari Dikirim melewati Diterima otomatis; keduanya tercatat', function () {
+    344▕     [, , , $do] = trxReady();
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:340
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D5: jadwal…    
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:366
+    362▕     expect(fn () => $schedule->update(['status' => 'delivered']))->toThrow(DeliveryOrderTransitionException::class, 'Mulai Pengiriman');
+    363▕ 
+    364▕     expect($schedule->fresh()->status)->toBe('pending')
+    365▕         ->and($do->fresh()->status)->toBe('approved')
+  ➜ 366▕         ->and(trxSalesMovements())->toBe(0);
+    367▕ });
+    368▕ 
+    369▕ it('jadwal Mulai → DO Dikirim (stok keluar); Tandai Selesai → DO Selesai lewat Diterima otomatis', function () {
+    370▕     [$ctx, , , $do] = trxReady();
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:366
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it jadwal Mula…   
+  Failed asserting that 3 is identical to 1.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:382
+    378▕ 
+    379▕     expect($do->fresh()->status)->toBe('completed')
+    380▕         ->and($do->fresh()->deliveryOrderItem->first()->status)->toBe('received')
+    381▕         ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->orderBy('id')->pluck('status')->all())->toBe(['approved', 'sent', 'received', 'completed'])
+  ➜ 382▕         ->and(trxSalesMovements())->toBe(1);
+    383▕ });
+    384▕ 
+    385▕ it('D15 di jadwal: Mulai ditolak bila stok fisik kurang; jadwal tetap pending dan DO tidak berubah', function () {
+    386▕     [$ctx, , , $do] = trxReady(stock: 5, qty: 12);
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:382
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransitionsTest > it D15 di jadw…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:393
+    389▕     expect(fn () => $schedule->update(['status' => 'on_the_way']))->toThrow(DeliveryOrderTransitionException::class, 'stok fisik tidak cukup');
+    390▕ 
+    391▕     expect($schedule->fresh()->status)->toBe('pending')
+    392▕         ->and($do->fresh()->status)->toBe('approved')
+  ➜ 393▕         ->and(trxSalesMovements())->toBe(0);
+    394▕ });
+    395▕ 
+    396▕ it('Mulai ditolak bila DO terkait belum Siap Kirim', function () {
+    397▕     $ctx = stkContext();
+
+  1   tests/Feature/Stock/DeliveryOrderTransitionsTest.php:393
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderTransition…  AssertionFailedError   
+  Output does not contain "Terdeteksi: 1 item".
+
+  at tests/Feature/Stock/DeliveryOrderTransitionsTest.php:459
+    455▕     [, , , $do] = trxReady();
+    456▕     $do->update(['status' => 'sent']);
+    457▕     $do->deliveryOrderItem()->update(['status' => 'requested']);   // seperti data lama
+    458▕ 
+  ➜ 459▕     $this->artisan('delivery-orders:resync-item-status')->expectsOutputToContain('Terdeteksi: 1 item')->assertSuccessful();
+    460▕     expect($do->fresh()->deliveryOrderItem->first()->status)->toBe('requested');
+    461▕ 
+    462▕     $this->artisan('delivery-orders:resync-item-status', ['--apply' => true])->expectsOutputToContain('Diperbaiki: 1 item')->assertSuccessful();
+    463▕     expect($do->fresh()->deliveryOrderItem->first()->status)->toBe('sent');
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\DeliveryOrderWarehouseConfirmationFlowTest >…    
+  Failed asserting that 9 is identical to 0.
+
+  at tests/Feature/Stock/DeliveryOrderWarehouseConfirmationFlowTest.php:63
+     59▕     $ctx = stkContext();
+     60▕     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
+     61▕     [$so] = stkSaleOrder($ctx, 5, ['tipe_pengiriman' => 'Ambil Sendiri']);
+     62▕ 
+  ➜  63▕     expect(DeliveryOrder::count())->toBe(0);
+     64▕ 
+     65▕     $so->update(['status' => 'completed']);
+     66▕ 
+     67▕     expect(DeliveryOrder::count())->toBe(0)
+
+  1   tests/Feature/Stock/DeliveryOrderWarehouseConfirmationFlowTest.php:63
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\SaleOrderReservationTest > it SO→DO tanpa sel…   
+  Failed asserting that 3 is identical to 1.
+
+  at tests/Feature/Stock/SaleOrderReservationTest.php:105
+    101▕     $do->update(['status' => 'sent']);
+    102▕ 
+    103▕     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 8.0, 'free' => 10.0])
+    104▕         ->and(rsvSoLevel($so->fresh()))->toBe(8.0)
+  ➜ 105▕         ->and(StockMovement::where('type', 'sales')->count())->toBe(1);
+    106▕ });
+    107▕ 
+    108▕ it('DO Siap Kirim yang dibatalkan/ditutup mengembalikan kebutuhan ke SO: SO menahan 20 lagi', function () {
+    109▕     $ctx = stkContext();
+
+  1   tests/Feature/Stock/SaleOrderReservationTest.php:105
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\SaleOrderReservationTest > it sales:backfill-…   
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Stock/SaleOrderReservationTest.php:328
+    324▕     $dir = sys_get_temp_dir().'/rsv-backfill-'.uniqid();
+    325▕ 
+    326▕     $this->artisan('sales:backfill-so-reservations', ['--out-dir' => $dir])->expectsOutputToContain('DRY-RUN')->assertSuccessful();
+    327▕     expect(StockReservation::count())->toBe(0)
+  ➜ 328▕         ->and(StockReservationEvent::count())->toBe(0)
+    329▕         ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(0.0);
+    330▕ 
+    331▕     $this->artisan('sales:backfill-so-reservations', ['--apply' => true, '--out-dir' => $dir])->expectsOutputToContain('reservasi ditulis')->assertSuccessful();
+    332▕
+
+  1   tests/Feature/Stock/SaleOrderReservationTest.php:328
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\SaleOrderReservationTest > it [flag mati] app…   
+  Failed asserting that 1 is identical to 0.
+
+  at tests/Feature/Stock/SaleOrderReservationTest.php:354
+    350▕ 
+    351▕     expect(StockReservation::count())->toBe(0);
+    352▕ 
+    353▕     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
+  ➜ 354▕     expect(stkReserved($so, $do))->toBe(12.0)->and(StockReservationEvent::count())->toBe(0);   // tanpa buku besar
+    355▕ });
+    356▕ 
+    357▕ it('F2: DO tidak terblokir oleh reservasi SO-nya sendiri; reservasi SO lain tetap mengurangi stok bebas', function () {
+    358▕     $ctx = stkContext();
+
+  1   tests/Feature/Stock/SaleOrderReservationTest.php:354
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockAvailabilityTest > it D3: gudang yang bo…   
+  Failed asserting that two arrays are identical.
+   Array &0 [
+  -    0 => 114,
+  -    1 => 115,
+  -    2 => 116,
+  +    0 => 1,
+  +    1 => 2,
+  +    2 => 3,
+  +    3 => 4,
+  +    4 => 5,
+  +    5 => 6,
+  +    6 => 7,
+  +    7 => 8,
+  +    8 => 9,
+  +    9 => 10,
+  +    10 => 11,
+  +    11 => 12,
+  +    12 => 13,
+  +    13 => 14,
+  +    14 => 15,
+  +    15 => 16,
+  +    16 => 17,
+  +    17 => 18,
+  +    18 => 19,
+  +    19 => 20,
+  +    20 => 21,
+  +    21 => 22,
+  +    22 => 23,
+  +    23 => 25,
+  +    24 => 27,
+  +    25 => 28,
+  +    26 => 29,
+  +    27 => 30,
+  +    28 => 114,
+  +    29 => 115,
+  +    30 => 116,
+   ]
+  
+
+  at tests/Feature/Stock/StockAvailabilityTest.php:51
+     47▕     expect(availability()->accessibleWarehouseIds($ctx['cabang']->id))->toBe([$ctx['warehouse']->id, $own2->id]);
+     48▕ 
+     49▕     $ctx['cabang']->update(['lihat_stok_cabang_lain' => true]);
+     50▕ 
+  ➜  51▕     expect(availability()->accessibleWarehouseIds($ctx['cabang']->id))->toBe([$ctx['warehouse']->id, $own2->id, $foreign->id])
+     52▕         ->and(availability()->accessibleWarehouseIds(null))->toBe([$ctx['warehouse']->id, $own2->id, $foreign->id]);
+     53▕ });
+     54▕ 
+     55▕ it('D3: item tanpa gudang menghitung stok hanya dari gudang cabang SO — stok cabang lain baru ikut bila diizinkan', function () {
+
+  1   tests/Feature/Stock/StockAvailabilityTest.php:51
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockE2ETest > it E2E: alur penuh SO → DO → j…   
+  Failed asserting that 5 is identical to 3.
+
+  at tests/Feature/Stock/StockE2ETest.php:88
+     84▕ 
+     85▕     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 10.0, 'reserved' => 0.0, 'free' => 10.0])
+     86▕         ->and($so->fresh()->status)->toBe('completed')
+     87▕         ->and(StockReservation::count())->toBe(0)
+  ➜  88▕         ->and(StockMovement::where('type', 'sales')->count())->toBe(3)          // 12 + 8 + 8 (kirim ulang)
+     89▕         ->and(StockMovement::where('type', 'adjustment_in')->count())->toBe(1);  // 8 kembali sekali
+     90▕ 
+     91▕     // 6. Rekonsiliasi: tidak ada reservasi yatim / qty_reserved tak terjelaskan
+     92▕     $this->artisan('stock:reconcile-reservations', ['--no-csv' => true])
+
+  1   tests/Feature/Stock/StockE2ETest.php:88
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReconcileCommandTest > it dry-run melapo…   
+  Failed asserting that 15.0 is identical to 27.0.
+
+  at tests/Feature/Stock/StockReconcileCommandTest.php:78
+     74▕     $s = reconScenario();
+     75▕     $before = reconFingerprint();
+     76▕     $dir = reconDir();
+     77▕ 
+  ➜  78▕     expect(stkStock($s['ctx']['product'], $s['ctx']['warehouse'])['reserved'])->toBe(27.0);   // 5 + 12 + 3 + 7
+     79▕ 
+     80▕     expect(Artisan::call('stock:reconcile-reservations', ['--out-dir' => $dir]))->toBe(0);
+     81▕     $output = Artisan::output();
+     82▕
+
+  1   tests/Feature/Stock/StockReconcileCommandTest.php:78
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReconcileCommandTest > it --apply mengha…   
+  Expected: REKONSILIASI RESERVASI STOK [APPLY]\n
+  A. Reservasi yatim: 1 baris · total 3 unit\n
+  +-----+--------+--------+-----+----+---------------+-------------+\n
+  ... (12 more lines)
+
+  To contain: Dihapus: 2 reservasi yatim
+
+  at tests/Feature/Stock/StockReconcileCommandTest.php:99
+     95▕     $dir = reconDir();
+     96▕ 
+     97▕     Artisan::call('stock:reconcile-reservations', ['--apply' => true, '--out-dir' => $dir]);
+     98▕ 
+  ➜  99▕     expect(Artisan::output())->toContain('[APPLY]')->toContain('Dihapus: 2 reservasi yatim');
+    100▕ 
+    101▕     // 27 − 15 = 12: reservasi DO A (5) + Material Issue (7)
+    102▕     expect(stkStock($s['ctx']['product'], $s['ctx']['warehouse']))->toBe(['available' => 48.0, 'reserved' => 12.0, 'free' => 36.0])
+    103▕         ->and(StockReservation::where('delivery_order_id', $s['valid']->id)->count())->toBe(1)
+
+  1   tests/Feature/Stock/StockReconcileCommandTest.php:99
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReconcileCommandTest > it --sale-order m…   
+  Failed asserting that 0 is identical to 1.
+
+  at tests/Feature/Stock/StockReconcileCommandTest.php:189
+    185▕ 
+    186▕     Artisan::call('stock:reconcile-reservations', ['--apply' => true, '--sale-order' => $s['canceledSo']->id, '--out-dir' => $dir]);
+    187▕ 
+    188▕     expect(StockReservation::where('sale_order_id', $s['canceledSo']->id)->count())->toBe(0)
+  ➜ 189▕         ->and(StockReservation::where('delivery_order_id', $s['leaky']->id)->count())->toBe(1);   // yatim SO lain tidak disentuh
+    190▕ 
+    191▕     File::deleteDirectory($dir);
+    192▕ });
+    193▕
+
+  1   tests/Feature/Stock/StockReconcileCommandTest.php:189
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReservationLedgerTest > it reserve menai…   
+  Failed asserting that two strings are identical.
+  -'reserved'
+  +'released'
+  
+
+  at tests/Feature/Stock/StockReservationLedgerTest.php:42
+     38▕ 
+     39▕     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 12.0, 'free' => 18.0]);
+     40▕ 
+     41▕     $event = StockReservationEvent::firstOrFail();
+  ➜  42▕     expect($event->event)->toBe('reserved')->and($event->quantity)->toBe(12.0)->and($event->stock_reservation_id)->toBe($reservation->id)
+     43▕         ->and($event->reason)->toBe('uji')->and($event->actor_id)->toBe($ctx['user']->id);
+     44▕ });
+     45▕ 
+     46▕ it('adjust naik dan turun keduanya memengaruhi qty_reserved (observer simetris); event membawa selisih bertanda', function () {
+
+  1   tests/Feature/Stock/StockReservationLedgerTest.php:42
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReservationLedgerTest > it adjust ke 0 m…   
+  Failed asserting that two arrays are identical.
+   Array &0 [
+       0 => 'released',
+       1 => 'released',
+  -    2 => 'consumed',
+  +    2 => 'released',
+  +    3 => 'consumed',
+   ]
+  
+
+  at tests/Feature/Stock/StockReservationLedgerTest.php:77
+     73▕     $ledger->consume($c, 'kirim');
+     74▕ 
+     75▕     expect(StockReservation::count())->toBe(0)
+     76▕         ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(0.0)
+  ➜  77▕         ->and(StockReservationEvent::whereIn('event', ['released', 'consumed'])->orderBy('id')->pluck('event')->all())->toBe(['released', 'released', 'consumed'])
+     78▕         ->and(StockReservationEvent::where('event', 'consumed')->value('quantity'))->toEqual(3);
+     79▕ });
+     80▕ 
+     81▕ it('qty_reserved tidak pernah menjadi negatif walau reservasi lebih besar dari qty_reserved; peringatan dicatat', function () {
+
+  1   tests/Feature/Stock/StockReservationLedgerTest.php:77
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReservationLedgerTest > it baris stok di…   
+  Failed asserting that 0.0 is identical to 3.0.
+
+  at tests/Feature/Stock/StockReservationLedgerTest.php:105
+    101▕     $withRak = ledgerReserve($ctx, 4, ['rak_id' => $rak->id]);
+    102▕     $noRak = ledgerReserve($ctx, 3);
+    103▕ 
+    104▕     expect((float) $rakRow->fresh()->qty_reserved)->toBe(4.0)
+  ➜ 105▕         ->and((float) $nullRow->fresh()->qty_reserved)->toBe(3.0);
+    106▕ 
+    107▕     app(StockReservationLedger::class)->release($withRak, 'lepas rak');
+    108▕ 
+    109▕     expect((float) $rakRow->fresh()->qty_reserved)->toBe(0.0)
+
+  1   tests/Feature/Stock/StockReservationLedgerTest.php:105
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReservationLedgerTest > it [ledger] gera…   
+  Failed asserting that 3 is identical to 1.
+
+  at tests/Feature/Stock/StockReservationLedgerTest.php:175
+    171▕     $do->update(['status' => 'delivery_failed']);
+    172▕     $do->update(['status' => 'sent']);   // penjadwalan ulang
+    173▕ 
+    174▕     expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(18.0)
+  ➜ 175▕         ->and(StockMovement::where('type', 'sales')->count())->toBe(1);
+    176▕ });
+    177▕ 
+    178▕ it('[ledger] pengiriman ulang memotong SELISIH bila kuantitas item DO naik setelah pengiriman pertama', function () {
+    179▕     ledgerOn();
+
+  1   tests/Feature/Stock/StockReservationLedgerTest.php:175
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReservationLedgerTest > it [flag mati] r…   
+  Failed asserting that 2 is identical to 0.
+
+  at tests/Feature/Stock/StockReservationLedgerTest.php:271
+    267▕     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
+    268▕ 
+    269▕     $do->update(['status' => 'sent']);
+    270▕ 
+  ➜ 271▕     expect(StockReservationEvent::count())->toBe(0)
+    272▕         ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(12.0);   // yatim — perilaku lama
+    273▕ });
+    274▕
+
+  1   tests/Feature/Stock/StockReservationLedgerTest.php:271
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockReservationSpecTest > it spec: tidak ada…   
+  Failed asserting that 11 is identical to 2.
+
+  at tests/Feature/Stock/StockReservationSpecTest.php:116
+    112▕ 
+    113▕     stkDeliveryOrder($ctx, $soA, $itemA, 12, 'approved');
+    114▕ 
+    115▕     expect(InventoryStock::where('product_id', $ctx['product']->id)->sum('qty_reserved'))->toEqual(30)   // tidak berubah
+  ➜ 116▕         ->and(SaleOrder::count())->toBe(2);
+    117▕ });
+    118▕
+
+  1   tests/Feature/Stock/StockReservationSpecTest.php:116
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockScenarioProbeTest > it [flag mati] jadwa…   
+  Failed asserting that 0.0 is identical to 12.0.
+
+  at tests/Feature/Stock/StockScenarioProbeTest.php:66
+     62▕ 
+     63▕     expect($do->status)->toBe('completed')
+     64▕         ->and($do->deliveryOrderItem->first()->status)->toBe('requested')   // item tak pernah diperbarui (usulan 3)
+     65▕         ->and($stock['available'])->toBe(18.0)                              // stok fisik keluar sekali (benar)
+  ➜  66▕         ->and($stock['reserved'])->toBe(12.0)                               // reservasi yatim: tidak pernah dilepas (X1)
+     67▕         ->and($stock['free'])->toBe(6.0)                                    // seharusnya 18
+     68▕         ->and(StockMovement::where('type', 'sales')->count())->toBe(1);
+     69▕ });
+     70▕
+
+  1   tests/Feature/Stock/StockScenarioProbeTest.php:66
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Stock\StockScenarioProbeTest > it [flag mati] DO ya…   
+  Failed asserting that 4 is identical to 2.
+
+  at tests/Feature/Stock/StockScenarioProbeTest.php:85
+     81▕     expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(18.0);   // tidak kembali
+     82▕ 
+     83▕     $do->update(['status' => 'sent']);   // dijadwalkan ulang
+     84▕     expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(6.0)     // terpotong ganda
+  ➜  85▕         ->and(StockMovement::where('type', 'sales')->count())->toBe(2);
+     86▕ });
+     87▕
+
+  1   tests/Feature/Stock/StockScenarioProbeTest.php:85
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StockMovementTest > it can tra…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk unde. Stok saat ini: 0, diminta: 50.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StockMovementTest > it tracks…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk sint. Stok saat ini: 0, diminta: 25.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StockMovementTest > it tracks…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk quisquam. Stok saat ini: 0, diminta: 10.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StockMovementTest > it handles…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk ratione. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\StockMovementTest > it generat…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk natus. Stok saat ini: 52, diminta: 94.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+
+  Tests:    40 failed, 245 passed (1037 assertions)
+  Duration: 145.39s
+

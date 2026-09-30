@@ -1,0 +1,1131 @@
+
+   FAIL  Tests\Feature\SaleOrderDeliveryProgressPhase2Test
+  ✓ it Isu 3: DO terbuka dihitung "dalam proses", bukan "terkirim"; sis… 5.12s  
+  ⨯ it Isu 3: contoh UAT — 12 dari 20 pcs terkirim => terkirim 12, sisa… 0.95s  
+  ⨯ it Isu 3: status berubah ke completed hanya setelah SEMUA kuantitas… 0.91s  
+  ✓ it Isu 3: guard menolak alokasi ganda — dua DO tidak boleh mengklai… 0.87s  
+  ✓ it Isu 3: DO yang ditutup (closed) melepas kuantitasnya kembali ke…  0.87s  
+  ⨯ it Isu 3: pengiriman gagal mengembalikan terkirim ke 0 dan status S… 0.81s  
+  ⨯ it Isu 3: DO dihapus mengembalikan progres dan status SO             0.81s  
+  ✓ it Isu 3: SO tanpa DO (Ambil Sendiri diselesaikan manual) TIDAK dim… 0.78s  
+  ⨯ it Isu 3: DO tanpa pivot ke SO tidak mengubah status SO (perilaku l… 0.89s  
+  ⨯ it Isu 3: ringkasan di halaman SO memperlihatkan Terkirim, Dalam Pr… 0.85s  
+  ✓ it Isu 5: SO yang sudah Selesai TIDAK bisa dijadikan sumber DO; Dik… 0.83s  
+  ✓ it Isu 5: SO tanpa sisa yang belum terikat DO ditolak; DO yang seda… 0.84s  
+  ✓ it Isu 5: menggabung SO hanya untuk customer DAN alamat kirim yang…  0.84s  
+  ✓ it Isu 5: SO yang sudah dihapus (soft delete) tidak dapat dipakai s… 0.84s  
+  ✓ it Isu 5: pengguna terbatas cabang tetap mendapat penjelasan status… 0.57s  
+  ✓ it Isu 5: assertValid melempar ValidationException pada field sales… 0.52s  
+  ✓ it Isu 5: scope deliverable menyaring SO tanpa sisa dan mengikutkan… 0.53s  
+  ✓ it Isu 5: label status berbahasa Indonesia untuk SO, DO, dan item D… 1.49s  
+  ✓ it Regresi: invoice dari SO Dikirim Sebagian tetap muncul di daftar… 0.58s  
+  ✓ it Backfill: SO "completed" padahal baru 12/20 terkirim dibetulkan…  0.70s  
+  ✓ it Backfill: SO Ambil Sendiri tanpa DO tidak disentuh                0.54s  
+  ✓ it Legacy: SO hasil impor dengan delivered_quantity tanpa DO tetap…  0.52s  
+  ✓ it Legacy: SO yang seluruhnya sudah terkirim menurut cache tidak mu… 0.54s  
+  ✓ it Legacy: resync tidak menyentuh SO impor yang belum punya DO sama… 0.53s  
+  ✓ it Isu 5: halaman Create DO menolak SO Selesai di sisi server        0.55s  
+  ✓ it Isu 5: halaman Create DO menolak penggabungan SO dengan alamat k… 0.77s  
+  ⨯ it Isu 5: halaman Create DO menerima SO Dikirim Sebagian untuk sisa… 1.84s  
+
+   PASS  Tests\Feature\SaleOrderFeatureTest
+  ✓ can create sales order from quotation                                1.46s  
+  ✓ can create sales order directly                                      1.54s  
+  ✓ createPurchaseOrder only includes selected SO items that are not li… 0.93s  
+  ✓ createPurchaseOrder throws when selected SO items are already linke… 0.67s  
+  ✓ sales order approval workflow works correctly                        0.68s  
+  ✓ sales order can calculate total amount correctly                     0.88s  
+  ✓ sales order can be confirmed by warehouse                            0.76s  
+  ✓ sales order can be completed                                         0.84s  
+  ✓ sales order can be closed                                            0.74s  
+  ✓ sales order reserves stock                                           0.94s  
+
+   PASS  Tests\Feature\SaleOrderListRemainingQtyTest
+  ✓ it SO 20 dengan DO 12 terkirim menampilkan sisa 8; SO tanpa DO mena… 1.09s  
+  ✓ it DO yang belum berangkat (draft) tidak mengurangi sisa belum diki… 0.96s  
+  ✓ it forSaleOrders sama persis dengan forSaleOrder per SO              0.80s  
+  ✓ it jumlah query progres pengiriman di daftar SO tetap sama untuk 3…  1.77s  
+
+   PASS  Tests\Feature\SaleOrderLivewireTest
+  ✓ sale order item preserves explicit tax and canonical tipe pajak      1.41s  
+  ✓ sale order currency snapshot converts completed invoice totals to r… 1.39s  
+  ✓ sale order resource exposes quotation locked layout fields           0.86s  
+  ✓ sale order created from quotation currency stores item currency and… 0.83s  
+  ✓ sale order currency preview calculates discount nominal              0.80s  
+  ✓ view sale order renders expandable item infolist                     1.11s  
+
+   PASS  Tests\Feature\SaleOrderMultiWarehouseTest
+  ✓ 1. Alokasi multi-gudang tersimpan dengan benar di DB                 0.66s  
+  ✓ 2. Alokasi multi-gudang dapat diambil via relasi dari SaleOrderItem  0.72s  
+  ✓ 3. Reservasi SO menghitung stok per alokasi (multi-gudang) tanpa ke… 0.71s  
+  ✓ 4. Reservasi SO dibuat per alokasi (multi-gudang); stok fisik tidak… 0.71s  
+  ✓ 5. Stok alokasi kurang: reservasi PARSIAL (D21) dan approve dibloki… 0.73s  
+  ✓ 6. Reservasi SO bekerja untuk mode single-gudang                     0.71s  
+  ✓ 7. SaleOrder::hasInsufficientStock() memeriksa semua alokasi gudang  0.71s  
+  ✓ 8. createWarehouseConfirmation membuat WC items terpisah per alokas… 0.76s  
+  ✓ 9. createWarehouseConfirmation membuat 1 WC item untuk single-gudan… 0.76s  
+  ✓ 10. handleStockReductionForSelfPickup mengurangi stok per alokasi u… 0.71s  
+  ✓ 10b. handleStockReductionForSelfPickup mengonsumsi reservasi tanpa…  0.71s  
+  ✓ 11. handleStockReductionForSelfPickup bekerja untuk single-gudang p… 0.69s  
+  ✓ 12. handleStockReductionForSelfPickup tidak mengurangi stok untuk K… 0.73s  
+
+   PASS  Tests\Feature\SaleOrderQuotationLinkageTest
+  ✓ SO dibuat dari quotation harus mewarisi tempo_pembayaran             0.68s  
+  ✓ SO dibuat dari quotation harus mewarisi cabang_id                    0.77s  
+  ✓ unit_price di SaleOrderItem harus tersimpan sebagai angka float buk… 0.72s  
+  ✓ warehouseAllocations multi-gudang tersimpan ke tabel terpisah dan t… 0.75s  
+  ✓ warehouse_id pada item digunakan sebagai fallback jika tidak ada wa… 0.69s  
+  ✓ unit_price dari quotation item harus sama saat di-copy ke sale orde… 0.72s  
+  ✓ parseIndonesianMoney tidak menginflas nilai DB decimal seperti 1250… 0.67s  
+
+   PASS  Tests\Feature\SaleOrderResourceStockStatusTest
+  ✓ it shows completed sale orders as neutral on the list page           0.91s  
+  ✓ it still shows insufficient stock for unfinished sale orders on the… 0.91s  
+
+   PASS  Tests\Feature\SaleOrderStockApprovalGuardTest
+  ✓ sales order request approval still works when stock is insufficient  0.67s  
+  ✓ sales order approval still works when stock is insufficient          0.55s  
+  ✓ sales order can request approval and approve when stock is sufficie… 0.46s  
+
+   PASS  Tests\Feature\Sales\Adversarial\CustomerReceiptConcurrencyAdversarialTest
+  ✓ it RCP-CC-01: menolak overpayment saat pembayaran pelanggan melebih… 0.47s  
+  ✓ it RCP-CC-02: balapan pembayaran simultan tidak boleh menghasilkan…  0.96s  
+  ✓ it RCP-CC-03: pemanggilan update berulang pada CustomerReceipt tida… 0.54s  
+
+   FAIL  Tests\Feature\Sales\Adversarial\CustomerReturnAdversarialTest
+  ✓ it RET-BV-01: menolak kuantitas retur pelanggan yang melebihi jumla… 0.48s  
+  ✓ it RET-BV-02: proteksi anti-double execution menolak pemrosesan ula… 0.60s  
+  ⨯ it RET-BV-03: pemrosesan retur pelanggan dengan keputusan credit me… 0.48s  
+
+   PASS  Tests\Feature\Sales\Adversarial\InvoiceAntiDuplicateAdversarialTest
+  ✓ it INV-ST-01: menolak keras pembuatan faktur kedua dari Delivery Or… 0.54s  
+  ✓ it INV-ST-02: penghapusan faktur penjualan yang sah membersihkan ju… 0.49s  
+  ✓ it INV-ST-03: Sales Order yang sudah memiliki faktur terbit terkunc… 0.48s  
+
+   PASS  Tests\Feature\Sales\Adversarial\SalesFaultInjectionRollbackTest
+  ✓ it SALES-FI-01: rollback menyeluruh saat terjadi kegagalan di tenga… 0.48s  
+  ✓ it SALES-FI-02: pembatalan penerimaan pembayaran (Customer Receipt…  0.52s  
+  ✓ it SALES-FI-03: kegagalan posting transaksi tidak meninggalkan bari… 0.52s  
+
+   PASS  Tests\Feature\Sales\Adversarial\SalesInvoiceBoundaryAdversarialTest
+  ✓ it INV-BV-01: kalkulasi pajak dan pembulatan desimal ganjil menghas… 0.82s  
+  ✓ it INV-BV-02: penolakan penerbitan faktur dari Delivery Order ilega… 1.07s  
+  ✓ it INV-BV-03: sistem menolak penerbitan faktur penjualan bernilai R… 1.04s  
+  ✓ it INV-BV-04: fallback aman saat exchange rate mata uang nol atau n… 1.06s  
+
+   FAIL  Tests\Feature\Sales\Adversarial\SalesThreeWayReconciliationTest
+  ✓ it SALES-RC-01: invarian jurnal faktur penjualan menjamin keseimban… 0.79s  
+  ✓ it SALES-RC-02: invarian jurnal pembayaran pelanggan menjamin saldo… 0.72s  
+  ⨯ it SALES-RC-03: rekonsiliasi tiga arah sub-ledger AR bernilai tepat… 0.72s  
+
+   PASS  Tests\Feature\SalesAuditTest
+  ✓ quotation creation and approval workflow                             0.70s  
+  ✓ sales order creation from quotation                                  0.89s  
+  ✓ warehouse confirmation and stock reservation                         1.20s  
+  ✓ delivery order generation from sales order                           0.93s  
+  ✓ invoice generation and payment processing                            0.93s  
+  ✓ sales return processing                                              0.82s  
+  ✓ cross module data integrity                                          0.72s  
+  ✓ customer management and performance                                  0.86s  
+  ✓ end to end sales workflow                                            0.84s  
+  ✓ sales data validation and constraints                                0.80s  
+
+   FAIL  Tests\Feature\SalesFlowEndToEndFase1to6Test
+  ⨯ it Alur lengkap fase 1-6: Quotation → SO → 2 pengiriman → 2 invoice… 2.90s  
+
+   FAIL  Tests\Feature\SalesInvoiceFormHintsTest
+  ⨯ it pilihan SO menjelaskan bahwa hanya SO Selesai yang muncul dan in… 1.01s  
+  ⨯ it bila customer belum punya SO Selesai, teks bantu menyatakannya s… 1.14s  
+
+   PASS  Tests\Feature\SalesInvoiceJournalTest
+  ✓ it creates sales invoice journal entries automatically when sale or… 0.80s  
+  ✓ it uses default COAs when product has no specific COAs               0.72s  
+
+   PASS  Tests\Feature\SalesInvoicePostingLockTest
+  ✓ non super admin cannot access edit page for unpaid sales invoice     0.84s  
+  ✓ non super admin can access edit page for draft sales invoice         1.07s  
+  ✓ super admin can access edit page for unpaid sales invoice            0.97s  
+  ✓ super admin emergency override updates ar reposts journals and logs… 1.38s  
+
+   PASS  Tests\Feature\SalesInvoiceResourceTest
+  ✓ creating invoice via resource uses default coa values                0.81s  
+  ✓ the form schema contains hidden coa fields                           0.87s  
+  ✓ ppn rate auto fills from tax setting when tipe pajak changes         1.44s  
+  ✓ legacy sales invoice tax values are normalized for display           0.82s  
+  ✓ sales invoice edit save normalizes formatted money values before pe… 0.80s  
+  ✓ creating invoice via resource uses configured non legacy coa values  0.89s  
+  ✓ sales invoice list defaults to newest first                          0.78s  
+
+   PASS  Tests\Feature\SalesInvoiceShippingCostJournalTest
+  ✓ it creates sales invoice journal entries with shipping costs when d… 0.75s  
+  ✓ it does not create shipping cost journal entry when delivery order…  0.78s  
+
+   PASS  Tests\Feature\SalesInvoiceTaxNumberTest
+  ✓ it format: 16 digit dengan atau tanpa pemisah lolos dan dinormalkan… 0.75s  
+  ✓ it duplikat ditolak terhadap invoice penjualan lain maupun invoice…  0.85s  
+  ✓ it invoice otomatis (unpaid) dapat diberi nomor lewat aksi tabel; j… 1.25s  
+  ✓ it aksi menolak format tidak sah dan nomor ganda dengan galat pada…  1.50s  
+  ✓ it aksi dapat mengubah dan menghapus nomor yang sudah terisi         1.46s  
+  ✓ it aksi tidak tampil untuk invoice draft (dan batal), dan tidak unt… 0.74s  
+  ✓ it halaman Lihat: badge "Belum diisi" untuk invoice ber-PPN tanpa n… 0.86s  
+  ✓ it filter "Faktur pajak": Belum ada hanya invoice ber-PPN yang suda… 1.30s  
+  ✓ it kolom daftar menampilkan nomor, "Belum diisi" (merah) untuk yang… 0.74s  
+  ✓ it form Edit invoice draft: nomor tidak sah ditolak, nomor sah dino… 1.75s  
+  ✓ it PDF invoice memuat No. Faktur Pajak bila terisi dan tidak menamp… 0.74s  
+
+   PASS  Tests\Feature\SalesOrderSelfPickupApprovedTest
+  ✓ sales order self pickup approved does not create stock reservation   0.57s  
+
+   PASS  Tests\Feature\SalesOrderSelfPickupToInvoiceTest
+  ✓ complete flow from sales order self pickup to invoice                0.69s  
+
+
+=== SURAT JALAN CREATED AND PUBLISHED ===
+SJ Number: SJ-20261001-0001
+Status: Published
+
+=== DELIVERY ORDER APPROVED ===
+Status: approved
+   FAIL  Tests\Feature\SalesOrderToDeliveryOrderCompleteTest
+  ⨯ complete flow from sales order to delivery order complete with stoc… 1.55s  
+
+   PASS  Tests\Feature\SalesOrdersDataTest
+  ✓ salesOrders field validation no longer blocks form submission        1.80s  
+
+   FAIL  Tests\Feature\SalesReportPageTest
+  ✓ sales report page can be rendered                                    1.43s  
+  ✓ sales report displays data correctly                                 0.79s  
+  ⨯ sales report filters work                                            0.67s  
+
+   FAIL  Tests\Feature\SalesReportPhase6Test
+  ⨯ it Isu 9: snapshot HPP per baris ditulis saat jurnal HPP diposting,… 0.63s  
+  ⨯ it Isu 9: HPP laporan tidak berubah walau cost_price master berubah… 0.66s  
+  ⨯ it Isu 9: rekonsiliasi — total HPP laporan = total jurnal HPP pada…  0.73s  
+  ⨯ it Isu 9: invoice lama tanpa snapshot dihitung ESTIMASI dan ditanda… 0.74s  
+  ⨯ it Isu 9: backfill memakai nilai stok DO untuk invoice multi-baris…  0.75s  
+  ⨯ it Isu 9: default laporan = Invoice; tanggal mengikuti invoice_date… 0.76s  
+  ⨯ it Isu 9: mode Pesanan memakai order_date; mode Pengiriman memakai…  0.74s  
+  ✓ it Isu 9: opsi status dari konstanta model — semua status nyata SO…  0.69s  
+  ✓ it Isu 9: ringkasan status SO menghitung status nyata (SO Disetujui… 0.94s  
+  ⨯ it Isu 9: status pembayaran turunan dari AR — Belum Bayar / Sebagia… 0.94s  
+  ⨯ it Isu 9: baris laporan invoice memuat DPP, PPN, total, HPP, margin… 0.79s  
+  ⨯ it Isu 9: ringkasan invoice — total DPP/PPN/HPP/margin dan rincian…  0.76s  
+  ⨯ it Isu 9: ekspor Excel mode invoice — kolom sesuai rencana, satu ba… 0.72s  
+  ⨯ it Isu 9: ekspor Excel mode pengiriman dan pesanan tetap dapat dibu… 0.78s  
+  ⨯ it Isu 9: PDF laporan invoice memuat kolom baru, ringkasan HPP/marg… 0.78s  
+  ⨯ it Isu 9: halaman laporan — default Invoice, menampilkan HPP/margin… 0.75s  
+  ✓ it Isu 9: satu instance SalesReportService per request — cache bari… 0.84s  
+  ✓ it Isu 9: mengganti mode mereset filter status; opsi status berasal… 1.18s  
+  ⨯ it Isu 9: mode Pengiriman di halaman menampilkan DO, HPP stok, dan…  1.15s  
+  ✓ it Isu 9: widget "SO Belum Selesai" hanya menampilkan SO yang masih… 0.98s  
+
+   FAIL  Tests\Feature\SalesUatCriticalBugVerificationTest
+  ⨯ it Bug 1 & 5: partial delivery of 12 pcs from 20 pcs keeps SO parti… 0.72s  
+  ✓ it Bug 2: blocks invoicing the same delivery order multiple times    0.64s  
+  ✓ it Bug 3 & 4: rejects Rp0 invoices and ensures sales journals are s… 0.68s  
+  ⨯ it Bug 6: warehouse stock options shows 0 stock warehouse instead o… 0.76s  
+  ✓ it Bug 7: customer return search finds customer beyond 50 records    0.79s  
+
+   FAIL  Tests\Feature\SalesWorkflowAuditTest
+  ✓ it database structure includes cabang_id on account_payables         0.69s  
+  ✓ it invoice model accessor returns monetary ppn amount not rate       0.68s  
+  ✓ it view page logs ppn amount and account payable info                0.69s  
+  ✓ it renders the sales invoice pdf without dompdf table errors         0.78s  
+  ✓ TaxService — Exclusive Tax → it computes 12% exclusive: price=1_000… 0.72s  
+  ✓ TaxService — Exclusive Tax → it computes 11% exclusive: price=1_000… 0.74s  
+  ✓ TaxService — Inclusive Tax → it computes 12% inclusive: gross=1_120… 0.72s  
+  ✓ TaxService — Inclusive Tax → it total stays unchanged for inclusive… 0.95s  
+  ✓ TaxService — Non Pajak → it Non Pajak returns amount unchanged with… 0.73s  
+  ✓ Tax Propagation: Quotation → Sales Order → it propagates tax rate a… 0.87s  
+  ⨯ Invoice Auto-Creation from Completed Sale Order → it creates exactl… 0.76s  
+  ⨯ Invoice Auto-Creation from Completed Sale Order → it does not creat… 0.75s  
+  ⨯ Invoice Auto-Creation from Completed Sale Order → it invoice number… 0.75s  
+  ✓ Sales Order PDF content → it shows tax percentage and nominal tax f… 0.75s  
+  ⨯ Delivery Order view page shows customer information → it includes t… 1.05s  
+  ✓ PDF generators include required item columns and totals → it quotat… 0.72s  
+  ✓ PDF generators include required item columns and totals → it sales…  0.76s  
+  ✓ PDF generators include required item columns and totals → it invoic… 0.59s  
+  ✓ PDF generators include required item columns and totals → it delive… 0.47s  
+  ⨯ PDF generators include required item columns and totals → it surat…  0.47s  
+  ✓ PDF generators include required item columns and totals → Excel exp… 0.46s  
+  ✓ Invoice tax field stores rate, not monetary amount → it stores tax…  1.82s  
+  ⨯ PPN Keluaran journal entry — correct monetary amount → it posts PPN… 0.74s  
+  ✓ PPN Keluaran journal entry — correct monetary amount → it AR debit…  0.52s  
+  ✓ PPN Keluaran journal entry — correct monetary amount → it journal e… 0.52s  
+  ⨯ Account Receivable — creation and branch scope → it creates exactly… 0.48s  
+  ⨯ Account Receivable — creation and branch scope → it AccountReceivab… 0.48s  
+  ⨯ Account Receivable — creation and branch scope → it AccountReceivab… 0.48s  
+  ✓ Account Receivable — creation and branch scope → it no duplicate AR… 0.50s  
+  ✓ Account Receivable — creation and branch scope → it invoice is crea… 0.64s  
+  ✓ Account Receivable — creation and branch scope → it delivery order…  1.15s  
+  ✓ Account Receivable — creation and branch scope → it completing sale… 1.87s  
+  ⨯ Account Receivable — creation and branch scope → it ar-ap:sync comm… 1.53s  
+  ✓ Account Receivable — creation and branch scope → Database integrity… 0.77s  
+  ✓ Account Receivable — creation and branch scope → Database integrity… 0.57s  
+  ✓ Account Receivable — creation and branch scope → Database integrity… 0.58s  
+  ✓ Account Receivable — creation and branch scope → Database integrity… 0.68s  
+  ✓ Account Receivable — creation and branch scope → Database integrity… 0.65s  
+  ✓ Account Receivable — creation and branch scope → it lists only unpa… 0.69s  
+  ⨯ Inclusive tax invoice workflow → it inclusive tax: total stays at g… 0.91s  
+  ✓ Discount applied before tax calculation → it 10% discount on 1_000_… 1.25s  
+  ✓ Multi-item invoice — journals always balance → it 3-item invoice jo… 1.15s  
+  ✓ SalesOrderService::updateTotalAmount — null tipe_pajak defaults to…  0.86s  
+  ✓ SalesOrderService::updateTotalAmount — null tipe_pajak defaults to…  0.73s  
+  ✓ SalesOrderService::updateTotalAmount — null tipe_pajak defaults to…  0.66s  
+  ✓ Quotation tax_type propagates as tipe_pajak to SaleOrderItem → it Q… 0.63s  
+  ✓ Quotation tax_type propagates as tipe_pajak to SaleOrderItem → it Q… 0.71s  
+  ✓ Quotation tax_type propagates as tipe_pajak to SaleOrderItem → it T… 1.00s  
+  ✓ Quotation tax_type propagates as tipe_pajak to SaleOrderItem → it c… 0.86s  
+  ✓ Quotation tax_type propagates as tipe_pajak to SaleOrderItem → it c… 0.85s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk tempora. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk quia. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk voluptatum. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk culpa. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk mollitia. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk qui. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SaleOrderDeliveryProgressPhase…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk autem. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Sales\Adversarial\CustomerReturnAdversar…  Exception   
+  Item Alat Uji Stok belum memiliki hasil pemeriksaan QC. Harap lengkapi hasil QC sebelum menyelesaikan retur.
+
+  at app/Services/CustomerReturnService.php:78
+     74▕                 }
+     75▕ 
+     76▕                 if (empty($item->qc_result)) {
+     77▕                     $productName = $item->product?->name ?? 'Produk';
+  ➜  78▕                     throw new \Exception("Item {$productName} belum memiliki hasil pemeriksaan QC. Harap lengkapi hasil QC sebelum menyelesaikan retur.");
+     79▕                 }
+     80▕ 
+     81▕                 if ($item->decision === CustomerReturnItem::DECISION_REJECT) {
+     82▕                     continue;
+
+  1   app/Services/CustomerReturnService.php:78
+      [2m+3 vendor frames [22m
+  5   app/Services/CustomerReturnService.php:49
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Sales\Adversarial\SalesThreeWayReconcili…  Exception   
+  Item Alat Uji Stok belum memiliki hasil pemeriksaan QC. Harap lengkapi hasil QC sebelum menyelesaikan retur.
+
+  at app/Services/CustomerReturnService.php:78
+     74▕                 }
+     75▕ 
+     76▕                 if (empty($item->qc_result)) {
+     77▕                     $productName = $item->product?->name ?? 'Produk';
+  ➜  78▕                     throw new \Exception("Item {$productName} belum memiliki hasil pemeriksaan QC. Harap lengkapi hasil QC sebelum menyelesaikan retur.");
+     79▕                 }
+     80▕ 
+     81▕                 if ($item->decision === CustomerReturnItem::DECISION_REJECT) {
+     82▕                     continue;
+
+  1   app/Services/CustomerReturnService.php:78
+      [2m+3 vendor frames [22m
+  5   app/Services/CustomerReturnService.php:49
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesFlowEndToEndFase1to6Test > it Alur lengkap fas…   
+  Component has no errors.
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:40
+     36▕     public function assertHasErrors($keys = [])
+     37▕     {
+     38▕         $errors = $this->errors();
+     39▕ 
+  ➜  40▕         PHPUnit::assertTrue($errors->isNotEmpty(), 'Component has no errors.');
+     41▕ 
+     42▕         $keys = (array) $keys;
+     43▕ 
+     44▕         foreach ($keys as $key => $value) {
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/SalesFlowEndToEndFase1to6Test.php:250
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesInvoiceFormHintsTest > it pilihan SO menjelask…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="CIoyX83SnLsAz8RQUrA7"\n
+      class="fi-page fi-resource-create-record-page fi-resource-sales-invoices"\n
+  >\n
+  ... (2204 more lines)
+
+  To contain: Hanya SO berstatus Selesai yang muncul di sini
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/SalesInvoiceFormHintsTest.php:38
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesInvoiceFormHintsTest > it bila customer belum…    
+  Expected: "mTFKkSABEMJMk3jJsuzt"\n
+      class="fi-page fi-resource-create-record-page fi-resource-sales-invoices"\n
+  >\n
+  ... (2204 more lines)
+
+  To contain: Belum ada SO Selesai untuk customer ini
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/SalesInvoiceFormHintsTest.php:52
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesOrderToDeliveryOrderCompl…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk aut. Stok saat ini: 0, diminta: 10.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPageTest > sales report filters work        
+  Expected: "lMXUweUW7bhvwa3e7iwy"\n
+      class="fi-page"\n
+  >\n
+  ... (1404 more lines)
+
+  To contain: SO-FILTER-A
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/SalesReportPageTest.php:66
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesReportPhase6Test > it Isu…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis 6. Stok saat ini: 0, diminta: 20.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesUatCriticalBugVerificatio…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Alat Medis Disposable. Stok saat ini: 0, diminta: 12.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesUatCriticalBugVerificationTest > it Bug 6: war…   
+  Expected: (GDG-01) Gudang Utama - Stok Bebas: 0
+
+  To contain: Stok: 0
+
+  at tests/Feature/SalesUatCriticalBugVerificationTest.php:293
+    289▕ 
+    290▕     // Must NOT be empty
+    291▕     expect($options)->not->toBeEmpty();
+    292▕     expect($options)->toHaveKey($ctx['warehouse']->id);
+  ➜ 293▕     expect($options[$ctx['warehouse']->id])->toContain('Stok: 0');
+    294▕ 
+    295▕     // Create DO and verify warehouse confirmation has product_id and valid product details
+    296▕     $deliveryOrder = DeliveryOrder::create([
+    297▕         'do_number' => 'DO-CONF-TEST-001',
+
+  1   tests/Feature/SalesUatCriticalBugVerificationTest.php:293
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Invo…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk et. Stok saat ini: 0, diminta: 3.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Invo…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk qui. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Invo…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk iure. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Delivery Order view page…    
+  Expected: \n
+  \n
+      \n
+  ... (1495 more lines)
+
+  To contain: Keisha Hartati
+
+  at tests/Feature/SalesWorkflowAuditTest.php:431
+    427▕         $do->salesOrders()->attach($so->id);
+    428▕ 
+    429▕         $response = $this->get("/admin/delivery-orders/{$do->id}");
+    430▕         $response->assertStatus(200);
+  ➜ 431▕         $response->assertSeeText($customer->name);
+    432▕         $response->assertSeeText('Jl. Test No. 123');
+    433▕     });
+    434▕ });
+    435▕ // ─── SECTION 6: PDF Column Audit ─────────────────────────────────────────
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `PDF generators include re…   
+  Expected: <!DOCTYPE html>\n
+  <html lang="id">\n
+  \n
+  ... (257 more lines)
+
+  To contain: Qty
+
+  at tests/Feature/SalesWorkflowAuditTest.php:445
+    441▕     });
+    442▕ 
+    443▕     function assertPdfHasColumns($html, array $cols) {
+    444▕         foreach ($cols as $col) {
+  ➜ 445▕             expect($html)->toContain($col);
+    446▕         }
+    447▕     }
+    448▕ 
+    449▕     it('quotation PDF includes all columns', function () {
+
+  1   tests/Feature/SalesWorkflowAuditTest.php:445
+  2   tests/Feature/SalesWorkflowAuditTest.php:595
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `PPN…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk aliquid. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Acco…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk vel. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Acco…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk et. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Acco…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk accusantium. Stok saat ini: 0, diminta: 3.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Acco…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk sunt. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SalesWorkflowAuditTest > `Incl…  ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk ipsa. Stok saat ini: 0, diminta: 1.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+
+  Tests:    42 failed, 170 passed (981 assertions)
+  Duration: 183.35s
+

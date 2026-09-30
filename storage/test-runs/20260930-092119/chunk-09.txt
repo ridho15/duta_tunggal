@@ -1,0 +1,734 @@
+
+   PASS  Tests\Feature\ProductCoaAuditCommandTest
+  ✓ it reports products that are out of sync with the default coa form   6.04s  
+
+   PASS  Tests\Feature\ProductCoaBackfillCommandTest
+  ✓ it backfill command keeps dry-run read-only                          0.74s  
+  ✓ it backfill command fills product coa fields using create-form defa… 1.45s  
+
+   PASS  Tests\Feature\ProductCoaFallbackTest
+  ✓ purchase receipt posting falls back to default coa when product coa… 1.76s  
+
+   FAIL  Tests\Feature\ProductCrudUiTest
+  ✓ it creates a product through the Filament create page                1.66s  
+  ⨯ it edits a product through the Filament edit page                    1.27s  
+  ✓ it displays product details on the Filament view page                1.00s  
+  ✓ it validates SKU uniqueness                                          1.33s  
+  ✓ it updates product pricing                                           1.49s  
+  ✓ it tests UOM conversions functionality                               1.13s  
+
+   PASS  Tests\Feature\ProductResourceFormTest
+  ✓ product resource form method exists and is callable                  0.79s  
+  ✓ product resource form does not have syntax errors                    0.77s  
+  ✓ product resource form has correct method signature                   0.85s  
+  ✓ product resource form has schema method                              0.73s  
+  ✓ product resource form contains expected components                   0.68s  
+  ✓ product resource form structure is valid                             0.69s  
+  ✓ product resource form validation rules are present                   0.72s  
+  ✓ product resource form labels are present                             0.70s  
+
+   PASS  Tests\Feature\ProductSeederCoaTest
+  ✓ it seeds products with the canonical inventory and temporary procur… 1.59s  
+
+   PASS  Tests\Feature\ProductionPlanBomPersistenceTest
+  ✓ production plan keeps the selected bom on create                     2.03s  
+  ✓ production plan edit keeps cabang product uom and warehouse synchro… 1.45s  
+
+   PASS  Tests\Feature\ProductionPlanViewMaterialRequirementTest
+  ✓ production plan view shows material requirements from bom quantity…  0.78s  
+
+   PASS  Tests\Feature\ProductionReportTest
+  ✓ it can generate production summary report                            0.62s  
+  ✓ it can generate material usage report                                0.61s  
+  ✓ it can generate efficiency report                                    0.65s  
+  ✓ it filters production summary by manufacturing order                 0.74s  
+  ✓ it shows correct production summary data                             0.73s  
+  ✓ it shows correct material usage data                                 0.75s  
+  ✓ it calculates efficiency correctly                                   0.69s  
+  ✓ it filters reports by date range                                     0.74s  
+
+   PASS  Tests\Feature\ProductionViewPageTest
+  ✓ production list shows a view action and the view page shows materia… 1.01s  
+  ✓ production edit page stays editable and shows bom requirements info  0.90s  
+  ✓ production view page exposes finish action and marks draft producti… 1.00s  
+
+   PASS  Tests\Feature\ProfileRequestTest
+  ✓ it DEFAULT MATI: tanpa PERF_PROFILE tidak ada log, tidak ada pereka… 0.74s  
+  ✓ it config bawaan: profiler nonaktif                                  0.71s  
+  ✓ it aktif: request dengan banyak query dicatat sebagai satu baris JS… 1.15s  
+  ✓ it request di bawah ambang tidak dicatat                             1.10s  
+  ✓ it request lambat (di atas min_ms) dicatat walau query sedikit       1.04s  
+  ✓ it nilai binding TIDAK pernah masuk log                              0.66s  
+  ✓ it sample 0 tidak memprofil apa pun                                  0.82s  
+  ✓ it payload Livewire diurai: komponen, metode, dan aksi terbuka; arg… 0.66s  
+  ✓ it request Livewire tercatat dengan komponen dan metode (ambang 0 m… 0.65s  
+  ✓ it normalizeSql merapikan spasi dan meringkas daftar IN agar pengul… 0.68s  
+  ✓ it perf:report mengelompokkan per aksi dengan jumlah, rata-rata, p9… 0.47s  
+  ✓ it perf:report: entri lama di luar --since diabaikan; tanpa data me… 0.45s  
+  ✓ it rute nyata aplikasi (halaman login panel) ikut terekam saat akti… 0.47s  
+
+   PASS  Tests\Feature\ProfitLossMultiDivisionTest
+  ✓ ProfitLossMultiDivisionService → it returns all required keys        0.47s  
+  ✓ ProfitLossMultiDivisionService → it includes all divisions when no…  0.45s  
+  ✓ ProfitLossMultiDivisionService → it filters divisions when cabangId… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it computes revenue balance (credi… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it sums multiple journal entries f… 0.46s  
+  ✓ ProfitLossMultiDivisionService → it ignores entries outside the dat… 0.46s  
+  ✓ ProfitLossMultiDivisionService → it computes COGS balance (debit -…  0.45s  
+  ✓ ProfitLossMultiDivisionService → it computes gross profit = revenue… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it returns zero gross profit when…  0.45s  
+  ✓ ProfitLossMultiDivisionService → it computes opex balance (debit -…  0.45s  
+  ✓ ProfitLossMultiDivisionService → it segments opex into sections by…  0.45s  
+  ✓ ProfitLossMultiDivisionService → it computes operating profit = gro… 0.46s  
+  ✓ ProfitLossMultiDivisionService → it net profit equals operating pro… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it computes vtc percent as balance… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it returns zero vtc when revenue i… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it subtractVectors computes a - b…  0.45s  
+  ✓ ProfitLossMultiDivisionService → it addVectors computes a + b corre… 0.44s  
+  ✓ ProfitLossMultiDivisionService → it revenue_rows contains section_h… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it account rows in revenue_rows ca… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it stores the queried period in th… 0.45s  
+  ✓ ProfitLossMultiDivisionService → it balances for division A do not…  0.45s  
+  ✓ ProfitLossMultiDivisionPage → it mounts with default date range (cu… 0.46s  
+  ✓ ProfitLossMultiDivisionPage → it sets showReport to true when gener… 0.46s  
+  ✓ ProfitLossMultiDivisionPage → it sets showReport to false when rese… 0.58s  
+  ✓ ProfitLossMultiDivisionPage → it returns report data array from get… 0.51s  
+  ✓ ProfitLossMultiDivisionPage → it page renders without errors         0.50s  
+  ✓ ProfitLossMultiDivisionPage → it shows report table after generateR… 0.53s  
+  ✓ ProfitLossMultiDivisionPage → it builds preview and export urls wit… 0.51s  
+  ✓ ProfitLossMultiDivisionPage → it accepts specific cabangIds filter   0.50s  
+
+   PASS  Tests\Feature\Purchase\Adversarial\PurchaseInvoiceBoundaryAndDuplicateTest
+  ✓ it BILL-BV-01: anti-double billing menolak pembuatan faktur kedua d… 0.55s  
+  ✓ it BILL-BV-02: sistem menolak penerbitan tagihan pembelian dengan n… 0.48s  
+  ✓ it BILL-BV-03: kalkulasi presisi PPN Masukan (11%) dan PPh 22 mengh… 0.45s  
+  ✓ it BILL-BV-04: penerbitan faktur pembelian otomatis membentuk recor… 0.49s  
+
+   PASS  Tests\Feature\Purchase\Adversarial\PurchaseOrderBoundaryAdversarialTest
+  ✓ it PO-BV-01: validasi menolak kuantitas nol atau negatif pada item…  0.47s  
+  ✓ it PO-BV-02: Purchase Order yang sudah memiliki penerimaan barang (… 0.50s  
+  ✓ it PO-BV-03: penolakan pembatalan liar pada PO yang sudah berstatus… 0.48s  
+  ✓ it PO-BV-04: kalkulasi total PO menolak nilai minus jika diskon mel… 0.48s  
+
+   PASS  Tests\Feature\Purchase\Adversarial\PurchaseReceiptOverReceiptAdversarialTest
+  ✓ it GRN-BV-01: penolakan over-receipt saat kuantitas penerimaan mele… 0.48s  
+  ✓ it GRN-BV-02: penolakan penerbitan penerimaan barang (GRN) dari PO…  0.48s  
+  ✓ it GRN-BV-03: penerimaan bertahap yang valid menghitung sisa PO den… 0.49s  
+
+   PASS  Tests\Feature\Purchase\Adversarial\PurchaseThreeWayReconciliationTest
+  ✓ it PUR-RC-01: pemadanan tiga arah (Three-Way Matching) menjamin nil… 0.50s  
+  ✓ it PUR-RC-02: retur pembelian (Purchase Return) memotong stok fisik… 0.51s  
+  ✓ it PUR-RC-03: invarian jurnal akuntansi pengadaan menjamin keseimba… 0.48s  
+
+   PASS  Tests\Feature\Purchase\Adversarial\QualityControlPurchaseAdversarialTest
+  ✓ it QC-BV-01: kuantitas rejected pada QC tidak menambah stok fisik s… 0.48s  
+  ✓ it QC-BV-02: sistem menolak keras kuantitas pemeriksaan QC yang mel… 0.46s  
+  ✓ it QC-BV-03: idempotensi status QC mencegah mutasi stok berganda sa… 0.47s  
+
+   PASS  Tests\Feature\Purchase\Adversarial\VendorPaymentConcurrencyAndRollbackTest
+  ✓ it VP-CC-01: proteksi anti-overpayment menolak pembayaran ke vendor… 0.49s  
+  ✓ it VP-CC-02: balapan pembayaran simultan tidak boleh menghasilkan s… 0.51s  
+  ✓ it VP-CC-03: penghapusan pembayaran vendor membalik status dan memu… 0.52s  
+
+   PASS  Tests\Feature\PurchaseInvoiceCancellationTest
+  ✓ cancel reverses journals removes payable and records who when and w… 0.64s  
+  ✓ invoices that cannot be cancelled are rejected without any change    0.74s  
+  ✓ reason is required and reversal date cannot precede the invoice dat… 0.61s  
+  ✓ cancelled invoice is never payable                                   0.62s  
+  ✓ view page action cancels a posted invoice                            0.98s  
+  ✓ view page action reports why an invoice cannot be cancelled          0.85s  
+  ✓ view page action is hidden for drafts cancelled invoices and users…  0.83s  
+  ✓ overdue check is scheduled daily                                     0.63s  
+  ✓ overdue check marks restores and skips the right invoices            0.76s  
+
+   PASS  Tests\Feature\PurchaseInvoiceCreateErrorsTest
+  ✓ duplicate supplier invoice number is reported on the field and in a… 1.01s  
+  ✓ service errors get the data prefix so livewire can attach them to f… 0.64s  
+  ✓ cancelled invoice frees its receipt and supplier and tax numbers     0.62s  
+
+   PASS  Tests\Feature\PurchaseInvoiceReceiptBackedRepairTest
+  ✓ it dry-runs receipt backed purchase invoice repair without changing… 0.50s  
+  ✓ it applies receipt backed purchase invoice repair and reposts journ… 0.55s  
+  ✓ it keeps account payable ageing amounts in idr while retaining sour… 0.52s  
+  ✓ it normalizes malformed receipt backed invoice item prices from pur… 0.48s  
+  ✓ it rejects receipt backed purchase invoice with mixed currencies     0.50s  
+
+   FAIL  Tests\Feature\PurchaseInvoiceResourceTest
+  ✓ purchase invoice resource can render list page                       0.73s  
+  ✓ purchase invoice resource can render create page                     0.70s  
+  ✓ purchase invoice create data forces draft status                     0.64s  
+  ✓ purchase invoice create data persists source currency context        0.69s  
+  ✓ purchase invoice formats foreign source amount with idr equivalent   0.68s  
+  ✓ purchase invoice form currency formatter is compact and rounds high… 0.66s  
+  ⨯ purchase invoice form does not render duplicate source amount field… 0.65s  
+  ⨯ purchase invoice live preview uses service totals without money mas… 0.95s  
+  ✓ purchase invoice edit data clears import charge state for non impor… 0.67s  
+  ✓ purchase invoice view uses stored currency display                   0.69s  
+  ✓ purchase invoice create preserves idr currency for idr po            0.70s  
+  ⨯ mark as sent action shows friendly notification when update fails    0.67s  
+  ✓ purchase invoice pdf renders supplier and ppn correctly              0.64s  
+  ✓ import purchase invoice pdf shows import breakdown                   0.64s  
+  ✓ purchase invoice form has required fields                            0.73s  
+  ✓ purchase invoice source fields put cabang after order request as re… 0.65s  
+  ⨯ purchase invoice manual money fields update on blur to keep mask st… 0.64s  
+  ✓ purchase invoice money parser keeps indonesian thousands as full am… 1.04s  
+  ⨯ purchase invoice total recalculation uses full formatted money valu… 0.65s  
+  ✓ supplier options prioritize five unique recent receipt suppliers     0.68s  
+  ✓ supplier options fall back to alphabetical order and limit fifty     0.71s  
+  ✓ supplier selection filters purchase orders                           1.10s  
+  ✓ order request and purchase order options follow cabang scope         0.68s  
+  ✓ order request selection leaves cabang empty until purchase order is… 1.55s  
+  ✓ purchase invoice locks cabang from first purchase order and reopens… 4.22s  
+  ✓ order request cabang context falls back to item then receipt         1.50s  
+  ✓ partial purchase receipt can be selected for purchase invoice        1.58s  
+  ✓ purchase order selection loads receipts                              1.32s  
+  ⨯ purchase receipt checkbox labels use rupiah format                   1.47s  
+  ✓ receipt selection calculates invoice items                           1.61s  
+  ✓ tax and other fees calculations                                      1.34s  
+  ✓ purchase invoice create normalizes tax to percentage                 1.49s  
+  ✓ purchase invoice from receipt persists full nominal branch ap and j… 1.48s  
+  ✓ purchase invoice ignores manual ppn for mixed tax receipts           1.43s  
+  ✓ purchase receipt resource is not manually creatable or editable      1.39s  
+  ✓ purchase invoice uses receipt branch when order request creator has… 1.63s  
+  ✓ purchase invoice audit command dry runs and repairs with reversal    1.04s  
+  ✓ purchase invoice pdf renders ppn once without legacy tax row         0.96s  
+  ✓ invoice creation with valid data                                     1.41s  
+  ✓ invoice number generation action                                     1.63s  
+  ✓ purchase orders do not require order request before submit           1.48s  
+  ✓ purchase invoice requires purchase order and receipt before submit   1.55s  
+  ✓ purchase invoice requires receipt after purchase order is selected   1.46s  
+  ✓ purchase invoice derives source from receipt and ignores hidden sou… 1.40s  
+  ✓ purchase invoice source state is cleared when purchase order is rem… 1.42s  
+  ✓ purchase invoice rejects invalid receipt source relationships        1.11s  
+  ✓ purchase invoice rejects receipt already used by another invoice     1.03s  
+  ✓ purchase invoice multi po source is derived from selected receipts   1.52s  
+  ✓ purchase invoice creation rolls back when finalisation fails         1.43s  
+  ✓ form validation requires invoice date                                1.37s  
+  ✓ form validation requires due date                                    0.90s  
+  ✓ purchase invoice resource can render edit page                       0.96s  
+  ✓ purchase invoice creation with other fees                            0.86s  
+  ✓ purchase invoice create page persists receipt biaya items            1.23s  
+  ✓ purchase invoice ignores zero value other fee items                  1.09s  
+  ✓ purchase invoice receipt biaya deletion                              0.65s  
+  ✓ create deposit with journal posting                                  0.64s  
+  ✓ create deposit supplier oogne with specific data                     0.68s  
+
+   PASS  Tests\Feature\PurchaseInvoiceTest
+  ✓ purchase invoice creation with proper relationships                  0.76s  
+  ✓ invoice observer creates account payable and ageing schedule         1.36s  
+  ✓ purchase invoice creation posts balanced automatic journal entries   1.47s  
+  ✓ three way matching validation                                        1.14s  
+  ✓ invoice number generation                                            0.74s  
+  ✓ invoice status tracking                                              0.67s  
+  ✓ invoice with tax and other fees calculation                          0.66s  
+  ✓ invoice soft delete cascades to invoice items                        0.79s  
+  ✓ invoice customer accessor for purchase orders                        0.89s  
+
+   PASS  Tests\Feature\PurchaseOrderAssetConfirmationTest
+  ✓ shows success notification after confirming asset purchase order     0.91s  
+
+   PASS  Tests\Feature\PurchaseOrderCabangFilterTest
+  ✓ it returns cabang ids filtered by supplier from order request        0.91s  
+
+   FAIL  Tests\Feature\PurchaseOrderFrontendTest
+  ✓ purchase order index page loads successfully and displays purchase…  1.32s  
+  ⨯ purchase order list shows cabang from order request item and omits…  1.16s  
+  ✓ purchase order index search does not error when cabang_id column is… 1.11s  
+  ✓ purchase order create page is accessible with the correct heading    1.07s  
+  ✓ purchase order can be created with non_ppn option                    0.99s  
+  ✓ purchase order create form no longer shows a global tax field        1.02s  
+  ⨯ purchase order resource no longer exposes cabang item or warehouse…  1.01s  
+  ✓ purchase order status presentation handles paid state                1.18s  
+  ✓ purchase order table uses latest created sorting and status color l… 0.92s  
+  ⨯ purchase order form uses collapsed product item repeater and disabl… 0.92s  
+  ✓ purchase order item fields from order request are locked and show n… 1.08s  
+  ✓ purchase order creation auto approves full order request references… 1.11s  
+
+   FAIL  Tests\Feature\PurchaseOrderLivewireTest
+  ✓ purchase order livewire form auto-fills tempo hutang from supplier…  1.03s  
+  ⨯ purchase order edit and view pages show supplier code and name       0.96s  
+  ✓ purchase order edit page pre-fills cabang from related items when r… 0.99s  
+  ✓ purchase order inline item edits stay in draft until applied         0.98s  
+  ⨯ existing order request backed purchase order item can be saved agai… 0.97s  
+  ⨯ order request backed purchase order item over allocation shows visi… 1.07s  
+  ✓ purchase order view uses infolist sections with purchase order deta… 1.00s  
+  ⨯ purchase order can be created through livewire create page           1.06s  
+  ⨯ order request approval auto approves purchase order when item quant… 1.72s  
+  ⨯ order request approval keeps purchase order draft when item quantit… 1.39s  
+  ⨯ order request approval auto approves purchase order when it consume… 1.30s  
+  ⨯ order request approval keeps multi item purchase order draft when o… 1.15s  
+  ⨯ purchase order subtotal and total amount stay formatted after react… 1.06s  
+  ⨯ purchase order total amount includes formatted other fee values cor… 1.02s  
+  ✓ purchase order item tax auto-fills from active setting when tipe pa… 0.99s  
+  ⨯ purchase order create form preserves inclusive tax type from order…  0.70s  
+  ✓ purchase order resource no longer uses removed header tax fields     0.61s  
+  ✓ scenario 1: supplier non-linked tetap tersedia pada opsi supplier u… 0.92s  
+  ✓ scenario 2: unit_price mengikuti harga supplier jika terhubung, ata… 0.70s  
+  ✓ scenario 3: supplier linked muncul paling atas dan label memuat har… 0.64s  
+
+   FAIL  Tests\Feature\PurchaseOrderMixedCurrencyTest
+  ✓ purchaseorder allows per item currency                               0.56s  
+  ✓ preview formatter matches currency aware input formatting            0.54s  
+  ⨯ purchase order pdf separates expected date from top due date and re… 0.48s  
+
+   PASS  Tests\Feature\PurchaseOrderMultiSupplierORTest
+  ✓ buildOrderRequestItems returns all items when no supplier filter is… 0.49s  
+  ✓ buildOrderRequestItems returns only items for supplier A when filte… 0.48s  
+  ✓ buildOrderRequestItems returns only items for supplier B when filte… 0.48s  
+  ✓ buildOrderRequestItems skips items where remaining quantity is zero… 0.50s  
+  ✓ buildOrderRequestItems falls back to cost_price when unit_price is…  0.54s  
+  ✓ buildOrderRequestItems sets correct refer_item_model_type and refer… 0.83s  
+  ✓ buildOrderRequestItems maps item tipe_pajak inklusif correctly       1.31s  
+  ✓ buildOrderRequestItems maps item tipe_pajak none correctly           1.71s  
+  ✓ unique supplier count is 2 for a multisupplier Order Request         1.26s  
+  ✓ unique supplier count is 1 for a single-supplier Order Request       0.76s  
+  ✓ groupBy supplier_id on multisupplier OR produces correct groups      0.61s  
+  ✓ available order request supplier ids exclude suppliers that already… 0.68s  
+  ✓ available order request supplier ids are empty when all suppliers a… 0.65s  
+  ✓ draft purchase order quantity reduces remaining resource quantity f… 0.87s  
+  ✓ fully allocated draft purchase order hides order request item from…  0.83s  
+  ✓ closed draft allocation is ignored by purchase order resource remai… 0.82s  
+  ✓ partial order request with remaining suppliers still appears in ref… 0.90s  
+  ✓ buildOrderRequestItems for each supplier group produces non-overlap… 0.81s  
+  ✓ buildOrderRequestItems auto-resolves default currency_id when null   0.76s  
+  ✓ purchase order create page is accessible                             0.98s  
+
+   PASS  Tests\Feature\PurchaseOrderServiceTest
+  ✓ updateTotalAmount recalculates purchase order total accurately       0.75s  
+  ✓ updateTotalAmount calculates USD item total using purchase order cu… 0.78s  
+  ✓ calculateTotalAmount uses purchase order rate before global currenc… 0.79s  
+  ✓ purchase order view total summary falls back to computed item total… 0.75s  
+  ✓ generateInvoice creates invoice with correct totals and items        0.77s  
+  ✓ order request approval clamps PO qty to remaining order request qty  0.80s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ProductCrudUiTest > it edits a product through the…    
+  Failed asserting that 11.0 is identical to '11.00'.
+
+  at tests/Feature/ProductCrudUiTest.php:166
+    162▕ 
+    163▕     expect($existingProduct->name)
+    164▕         ->toBe('Produk Setelah Edit')
+    165▕         ->and($existingProduct->sku)->toBe($updateData['sku'])
+  ➜ 166▕         ->and($existingProduct->pajak)->toBe('11.00');
+    167▕ });
+    168▕ 
+    169▕ it('displays product details on the Filament view page', function () {
+    170▕     $product = Product::query()->create(array_merge(
+
+  1   tests/Feature/ProductCrudUiTest.php:166
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice form…   
+  Expected: <?php\n
+  \n
+  namespace App\Filament\Resources;\n
+  ... (1969 more lines)
+
+  To contain: Placeholder::make('unit_price_preview')
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:405
+    401▕         $this->assertStringNotContainsString("->label('Harga (Rp / Source)')", $source);
+    402▕         $this->assertStringNotContainsString("->label('Total Source')", $source);
+    403▕         $this->assertStringNotContainsString("->label('Total (Rp / Source)')", $source);
+    404▕         $this->assertStringNotContainsString("->label('Grand Total Source')", $source);
+  ➜ 405▕         $this->assertStringContainsString("Placeholder::make('unit_price_preview')", $source);
+    406▕         $this->assertStringContainsString("Placeholder::make('grand_total_preview')", $source);
+    407▕     }
+    408▕ 
+    409▕     public function test_purchase_invoice_live_preview_uses_service_totals_without_money_mask_distortion(): void
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:405
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice live…   
+  Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:108
+    104▕     {
+    105▕         $actual = $this->get($name);
+    106▕ 
+    107▕         if (! is_string($value) && is_callable($value)) {
+  ➜ 108▕             PHPUnit::assertTrue($value($actual));
+    109▕         } else {
+    110▕             $strict ? PHPUnit::assertSame($value, $actual) : PHPUnit::assertEquals($value, $actual);
+    111▕         }
+    112▕
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseInvoiceResourceTest.php:465
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > mark as sent action s…   
+  Failed asserting that an action with name [mark_as_sent] exists on the [App\Filament\Resources\PurchaseInvoiceResource\Pages\ViewPurchaseInvoice] page.
+Failed asserting that null is an instance of class Filament\Actions\Action.
+
+  at vendor/filament/actions/src/Testing/TestsActions.php:151
+    147▕ 
+    148▕             $livewireClass = $this->instance()::class;
+    149▕             $prettyName = implode(' > ', $name);
+    150▕ 
+  ➜ 151▕             Assert::assertInstanceOf(
+    152▕                 Action::class,
+    153▕                 $action,
+    154▕                 message: "Failed asserting that an action with name [{$prettyName}] exists on the [{$livewireClass}] page.",
+    155▕             );
+
+      [2m+9 vendor frames [22m
+  10  tests/Feature/PurchaseInvoiceResourceTest.php:672
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice manu…   
+  TextInput::make('total') was not found after Repeater::make('receiptBiayaItems').
+Failed asserting that false is not false.
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:851
+    847▕             $sectionPosition = strpos($resourceSource, $sectionNeedle);
+    848▕             $this->assertNotFalse($sectionPosition, "{$sectionNeedle} was not found.");
+    849▕ 
+    850▕             $fieldPosition = strpos($resourceSource, $fieldNeedle, $sectionPosition);
+  ➜ 851▕             $this->assertNotFalse($fieldPosition, "{$fieldNeedle} was not found after {$sectionNeedle}.");
+    852▕ 
+    853▕             $fieldBlock = substr($resourceSource, $fieldPosition, 800);
+    854▕             $this->assertStringContainsString('->indonesianMoney()', $fieldBlock);
+    855▕             $this->assertStringContainsString('->live(onBlur: true)', $fieldBlock);
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:851
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase invoice tota…   
+  Failed asserting that 110000.0 is identical to '110.000,00'.
+
+  at tests/Feature/PurchaseInvoiceResourceTest.php:898
+    894▕ 
+    895▕         $resource::recalculateForTest($state);
+    896▕ 
+    897▕         $this->assertSame(200000.0, $state['other_fee']);
+  ➜ 898▕         $this->assertSame('110.000,00', $state['ppn_amount']);
+    899▕         $this->assertSame('1.510.000,00', $state['total']);
+    900▕     }
+    901▕ 
+    902▕     public function test_supplier_options_prioritize_five_unique_recent_receipt_suppliers(): void
+
+  1   tests/Feature/PurchaseInvoiceResourceTest.php:898
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseInvoiceResourceTest > purchase receipt chec…   
+  Expected: <div wire:id="htTEqFKIUgJj3yhcL0Ov"\n
+      class="fi-page fi-resource-create-record-page fi-resource-purchase-invoices"\n
+  >\n
+  ... (3296 more lines)
+
+  To contain: [PO-TCONFY] RN-XSILFB - Rp 1.500,00
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:38
+     34▕ 
+     35▕     function assertSeeHtml($values)
+     36▕     {
+     37▕         foreach (Arr::wrap($values) as $value) {
+  ➜  38▕             PHPUnit::assertStringContainsString(
+     39▕                 $value,
+     40▕                 $this->html()
+     41▕             );
+     42▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseInvoiceResourceTest.php:1430
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderFrontendTest > purchase order list sho…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="gWYgOEbopcZ0gxrRfmT6"\n
+      class="fi-page fi-resource-list-records-page fi-resource-purchase-orders"\n
+  >\n
+  ... (4248 more lines)
+
+  Not to contain: Gudang
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:26
+     22▕ 
+     23▕     function assertDontSee($values, $escape = true, $stripInitialData = true)
+     24▕     {
+     25▕         foreach (Arr::wrap($values) as $value) {
+  ➜  26▕             PHPUnit::assertStringNotContainsString(
+     27▕                 $escape ? e($value): $value,
+     28▕                 $this->html($stripInitialData)
+     29▕             );
+     30▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseOrderFrontendTest.php:192
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderFrontendTest > purchase order resource…   
+  Expecting '<?phpnamespace App\Filame…}}' not to contain 'Cabang Item'.
+
+  at tests/Feature/PurchaseOrderFrontendTest.php:263
+    259▕ test('purchase order resource no longer exposes cabang item or warehouse list labels', function () {
+    260▕     $resource = file_get_contents(base_path('app/Filament/Resources/PurchaseOrderResource.php'));
+    261▕ 
+    262▕     expect($resource)->not->toContain('Cabang (Item)')
+  ➜ 263▕         ->and($resource)->not->toContain('Cabang Item')
+    264▕         ->and($resource)->not->toContain("->label('Gudang')");
+    265▕ });
+    266▕ 
+    267▕ test('purchase order status presentation handles paid state', function () {
+
+  1   tests/Feature/PurchaseOrderFrontendTest.php:263
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderFrontendTest > purchase order form use…   
+  Expected: <?php\n
+  \n
+  namespace App\Filament\Resources;\n
+  ... (3536 more lines)
+
+  To contain: ->disabled(fn(Get $get) => $get('refer_model_type') === 'App\\Models\\OrderRequest')
+
+  at tests/Feature/PurchaseOrderFrontendTest.php:296
+    292▕         ->and($resource)->toContain("TextInput::make('po_number')")
+    293▕         ->and($resource)->toContain("Select::make('cabang_id')")
+    294▕         ->and($resource)->toContain("->label('TOP (Term Of Payment)')")
+    295▕         ->and($resource)->toContain("->label('Masa Kredit (Hari)')")
+  ➜ 296▕         ->and($resource)->toContain('->disabled(fn(Get $get) => $get(\'refer_model_type\') === \'App\\\\Models\\\\OrderRequest\')')
+    297▕         ->and($resource)->toContain('->addable(fn(Get $get) => $get(\'refer_model_type\') !== \'App\\\\Models\\\\OrderRequest\')')
+    298▕         ->and($resource)->toContain('->collapsed(function')
+    299▕         ->and($resource)->toContain('->itemLabel(function (array $state)')
+    300▕         ->and($resource)->toContain('->columns(10)')
+
+  1   tests/Feature/PurchaseOrderFrontendTest.php:296
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > purchase order edit and…   
+  Expected: <div wire:snapshot="" wire:effects="" wire:id="5UJ66jKfTpdzuzvmiYbi"\n
+      class="fi-page"\n
+  >\n
+  ... (488 more lines)
+
+  To contain: (SUP-PO-001) PT Supplier Purchase Order
+
+  at vendor/livewire/livewire/src/Features/SupportTesting/MakesAssertions.php:14
+     10▕ {
+     11▕     function assertSee($values, $escape = true, $stripInitialData = true)
+     12▕     {
+     13▕         foreach (Arr::wrap($values) as $value) {
+  ➜  14▕             PHPUnit::assertStringContainsString(
+     15▕                 $escape ? e($value): $value,
+     16▕                 $this->html($stripInitialData)
+     17▕             );
+     18▕         }
+
+      [2m+1 vendor frames [22m
+  2   tests/Feature/PurchaseOrderLivewireTest.php:149
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > existin…  ErrorException   
+  Trying to access array offset on null
+
+  at vendor/livewire/livewire/src/Mechanisms/HandleComponents/HandleComponents.php:88
+     84▕     }
+     85▕ 
+     86▕     public function update($snapshot, $updates, $calls)
+     87▕     {
+  ➜  88▕         $data = $snapshot['data'];
+     89▕         $memo = $snapshot['memo'];
+     90▕ 
+     91▕         if (config('app.debug')) $start = microtime(true);
+     92▕         [ $component, $context ] = $this->fromSnapshot($snapshot);
+
+      [2m+26 vendor frames [22m
+  27  tests/Feature/PurchaseOrderLivewireTest.php:295
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > order reques…  TypeError   
+  array_key_first(): Argument #1 ($array) must be of type array, null given
+
+  at tests/Feature/PurchaseOrderLivewireTest.php:342
+    338▕     $component = Livewire::actingAs($this->user)
+    339▕         ->test(EditPurchaseOrder::class, ['record' => $purchaseOrder->id]);
+    340▕ 
+    341▕     $items = $component->get('data.purchaseOrderItem');
+  ➜ 342▕     $key = (string) array_key_first($items);
+    343▕ 
+    344▕     $component
+    345▕         ->set("data.purchaseOrderItem.{$key}.quantity", 11)
+    346▕         ->call('save')
+
+  1   tests/Feature/PurchaseOrderLivewireTest.php:342
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > purchase order can be c…   
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:428
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > order request approval…    
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:497
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > order request approval…    
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:552
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > order request approval…    
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:626
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > order request approval…    
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:710
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > purchase order subtotal…   
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:754
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > purchase order total am…   
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:827
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderLivewireTest > purchase order create f…   
+  Component has errors: "data.warehouse_id"
+Failed asserting that false is true.
+
+  at vendor/livewire/livewire/src/Features/SupportValidation/TestsValidation.php:109
+    105▕     {
+    106▕         $errors = $this->errors();
+    107▕ 
+    108▕         if (empty($keys)) {
+  ➜ 109▕             PHPUnit::assertTrue($errors->isEmpty(), 'Component has errors: "'.implode('", "', $errors->keys()).'"');
+    110▕ 
+    111▕             return $this;
+    112▕         }
+    113▕
+
+      [2m+4 vendor frames [22m
+  5   tests/Feature/PurchaseOrderLivewireTest.php:926
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PurchaseOrderMixedCurrencyTest > purchase order pdf…   
+  Expected: <!DOCTYPE html>\n
+  <html lang="en">\n
+  \n
+  ... (325 more lines)
+
+  To contain: Credit 14 hari
+
+  at tests/Feature/PurchaseOrderMixedCurrencyTest.php:109
+    105▕         $this->assertStringContainsString('31/05/2026', $html);
+    106▕ 
+    107▕         // Check TOP is displayed correctly
+    108▕         $this->assertStringContainsString('Term of Payment', $html);
+  ➜ 109▕         $this->assertStringContainsString('Credit 14 hari', $html);
+    110▕ 
+    111▕         // Check currency formatting with USD
+    112▕         $this->assertStringContainsString('$ 0.50', $html);
+    113▕         $this->assertStringContainsString('$ 5.00', $html);
+
+  1   tests/Feature/PurchaseOrderMixedCurrencyTest.php:109
+
+
+  Tests:    22 failed, 220 passed (1091 assertions)
+  Duration: 213.01s
+

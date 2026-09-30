@@ -1,0 +1,362 @@
+
+   PASS  Tests\Feature\ChartOfAccountLedgerTest
+  ✓ chart of account ledger displays correct data for specific account   4.92s  
+  ✓ chart of account ledger filters journal entries by date range corre… 1.00s  
+  ✓ chart of account ledger calculates opening balance correctly         0.72s  
+  ✓ chart of account ledger calculates running balance correctly for as… 0.65s  
+  ✓ chart of account ledger handles different date ranges correctly      0.60s  
+  ✓ chart of account ledger handles liability account balance calculati… 0.61s  
+
+   PASS  Tests\Feature\ChartOfAccountTest
+  ✓ can create chart of account                                          0.60s  
+  ✓ can update chart of account                                          0.65s  
+  ✓ can soft delete chart of account                                     0.63s  
+  ✓ validates coa code uniqueness                                        0.63s  
+  ✓ validates account type hierarchy                                     0.63s  
+
+   PASS  Tests\Feature\CogmPreviewControllerTest
+  ✓ preview report matches hpp service values                            1.30s  
+  ✓ preview report filters cogm values by product                        1.81s  
+
+   FAIL  Tests\Feature\CompleteDeliveryOrderFlowTest
+  ⨯ complete delivery order flow with journal entries and stock movemen… 1.46s  
+
+   PASS  Tests\Feature\CompleteProcurementAccountingFlowTest
+  ✓ complete procurement flow with full accounting                       1.18s  
+
+   PASS  Tests\Feature\CompleteSalesFlowFilamentTest
+  ✓ complete sales flow from quotation to customer payment with form si… 0.64s  
+
+   PASS  Tests\Feature\Controls\AccountPayableSummaryTest
+  ✓ it judul halaman bersih, bukan "Rp 0,00"                             0.54s  
+  ✓ it tabel: Invoice Date dan Due Date berformat d/m/Y, bukan timestam… 0.69s  
+  ✓ it ringkasan: Total Hutang, Sudah Dibayar, Sisa Hutang berlabel Ind… 0.49s  
+
+   FAIL  Tests\Feature\Controls\AccountingSettingsTest
+  ✓ it ada 11 kunci akun yang dapat diatur                               0.55s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.50s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.47s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.45s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.47s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.46s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.47s  
+  ✓ it [flag mati / tanpa pengaturan] daftar kode identik dengan perila… 0.47s  
+  ✓ it validasi: akun induk, nonaktif, dan tipe salah ditolak; akun sah… 0.46s  
+  ✓ it [flag hidup] akun pengaturan dipakai lebih dulu; pengaturan yang… 0.47s  
+  ✓ it perubahan pengaturan tercatat di log aktivitas                    0.70s  
+  ✓ it jurnal invoice berikutnya memakai akun pengaturan (Piutang, Pend… 0.55s  
+  ✓ it jurnal invoice berikutnya memakai akun pengaturan (Piutang, Pend… 0.53s  
+  ⨯ it pemindai: tidak ada kode akun hard-code pada berkas alur penjual… 0.49s  
+  ✓ it master:readiness memasukkan Pengaturan Akuntansi hanya bila flag… 0.58s  
+  ✓ it halaman Pengaturan Akuntansi hanya untuk Super Admin dan Finance… 0.75s  
+
+   PASS  Tests\Feature\Controls\ApprovalRulesTest
+  ✓ it nilai awal tabel = konstanta lama (dua aturan per dokumen; Nota…  0.46s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.54s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.56s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.56s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.54s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.54s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.54s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.56s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.74s  
+  ✓ it matriks ekuivalen: hasil aturan tabel = hasil konstanta lama unt… 0.72s  
+  ✓ it pesan penolakan identik dengan teks lama                          0.55s  
+  ✓ it ubah ambang di tabel → berlaku tanpa deploy                       0.79s  
+  ✓ it ubah peran di tabel → berlaku (peran baru boleh, peran lama tida… 0.62s  
+  ✓ it penegakan DI SERVICE: SalesOrderService::approve dan QuotationSe… 0.56s  
+  ✓ it Quotation: pembuat tidak dapat menyetujui sendiri (D26)           0.54s  
+  ✓ it override Owner/Super Admin (menyetujui dokumen sendiri): alasan…  0.54s  
+  ✓ it penyetuju lain (bukan pembuat) tidak butuh alasan override        0.54s  
+  ✓ it QuotationPolicy::approve mengikuti aturan bila flag hidup dan iz… 0.54s  
+  ✓ it [flag mati] service tidak menegakkan aturan dan tidak butuh alas… 0.54s  
+  ✓ it halaman Aturan Persetujuan hanya untuk Super Admin dan Finance M… 0.58s  
+  ✓ it perubahan aturan tercatat di log aktivitas                        0.49s  
+
+   PASS  Tests\Feature\Controls\CreditNoteReturnTest
+  ✓ it draftFromReturn: retur 3 dari 12 pcs berkeputusan credit → Nota…  0.56s  
+  ✓ it draftFromReturn: ditolak untuk retur belum disetujui, tanpa item… 0.55s  
+  ✓ it draftFromReturn: beberapa baris retur atas item invoice yang sam… 0.55s  
+  ✓ it keputusan credit tidak menggandakan: stok kembali + jurnal HPP r… 0.59s  
+  ✓ it laporan: invoice cancelled tidak dihitung; Nota Kredit sebagian…  0.60s  
+  ✓ it laporan: pembatalan penuh → invoice cancelled keluar dari lapora… 0.58s  
+  ✓ it laporan: tanpa Nota Kredit terbit angkanya identik dengan perila… 0.55s  
+  ✓ it invoice cancelled tidak menghalangi Surat Jalannya ditagih ulang… 0.45s  
+
+   PASS  Tests\Feature\Controls\CreditNoteTest
+  ✓ it draf retur 3 dari 12 pcs: DPP 300.000 + PPN 33.000 = 333.000 (te… 0.47s  
+  ✓ it invoice draf atau sudah dibatalkan tidak dapat dikreditkan; flag… 0.69s  
+  ✓ it terbit (invoice belum dibayar): jurnal cermin seimbang, piutang…  0.61s  
+  ✓ it invoice LUNAS: seluruh nilai Nota Kredit menjadi Deposit Custome… 0.60s  
+  ✓ it pembatalan penuh invoice dibayar sebagian: piutang sisa dihapus,… 0.74s  
+  ✓ it deposit yang sudah ada dinaikkan TANPA menyentuh jurnal DEP-{id}… 0.60s  
+  ✓ it koreksi bertahap: tiga Nota Kredit atas satu baris menjumlah TEP… 0.61s  
+  ✓ it kuantitas yang sudah dikreditkan Nota Kredit lain menghalangi te… 0.59s  
+  ✓ it hapus: hanya draf yang dapat dihapus; yang terbit final           0.57s  
+  ✓ it persetujuan: tanpa izin approve credit note ditolak; SoD dan amb… 0.57s  
+  ✓ it nomor Nota Retur Pajak dapat dicatat saat terbit; nomor Nota Kre… 0.57s  
+
+   PASS  Tests\Feature\Controls\CreditNoteUiTest
+  ✓ it flag mati: resource tidak dapat dilihat, aksi Invoice/Retur ters… 0.81s  
+  ✓ it flag hidup: opsi keputusan menyertakan "Refund / Nota Kredit"; I… 0.58s  
+  ✓ it pengguna tanpa izin membuat Nota Kredit tidak melihat aksinya     0.59s  
+  ✓ it aksi "Buat Nota Kredit" pada Invoice membuat draf sesuai kuantit… 1.63s  
+  ✓ it aksi "Batalkan Invoice" membuat draf pembatalan PENUH (invoice b… 0.75s  
+  ✓ it halaman daftar dan View menampilkan Nota Kredit; "Terbitkan" men… 0.93s  
+  ✓ it draf dapat dihapus lewat aksi; policy: yang terbit final (tanpa…  0.71s  
+  ✓ it "Terbitkan" tersembunyi bagi pengguna tanpa izin approve; No. No… 0.66s  
+  ✓ it aksi "Buat Nota Kredit" pada Retur: hanya retur disetujui/selesa… 0.78s  
+  ✓ it pengguna cabang lain tidak melihat Nota Kredit cabang ini (Caban… 0.57s  
+  ✓ it tampilan hub Keuangan Penjualan memuat kartu Nota Kredit hanya b… 0.56s  
+
+   PASS  Tests\Feature\Controls\CreditPolicyTest
+  ✓ it paparan = piutang berjalan + SO aktif yang belum ditagih (invoic… 0.48s  
+  ✓ it SO yang sudah seluruhnya ditagih tidak lagi dihitung sebagai SO…  0.48s  
+  ✓ it D27: SO yang membuat paparan melebihi limit tidak dapat disetuju… 0.55s  
+  ✓ it paparan memasukkan SO yang baru disetujui: SO kedua ditolak sete… 0.63s  
+  ✓ it D28: limit 0 pada tipe Kredit tidak diizinkan                     0.55s  
+  ✓ it D7: COD dan Bebas tidak diblokir; ringkasan menandai kebijakan i… 0.70s  
+  ✓ it D7: COD dan Bebas tidak diblokir; ringkasan menandai kebijakan i… 0.55s  
+  ✓ it pengecualian beralasan: hanya Owner/Super Admin/Finance Manager,… 0.57s  
+  ✓ it Info Customer: endpoint ringkas mengembalikan paparan untuk SEMU… 0.55s  
+  ✓ it [flag mati] perilaku lama: pemakaian = piutang saja dan tidak ad… 0.55s  
+  ✓ it penjaga balapan: baris customer dikunci (SELECT … FOR UPDATE) se… 0.54s  
+
+   PASS  Tests\Feature\Controls\CustomerMasterTest
+  ✓ it [flag mati] create memakai kode yang diisi form (atau membuat ko… 0.47s  
+  ✓ it [central_numbering] kode dibuat server CUST-00001 berurutan, glo… 0.47s  
+  ✓ it [customer_dedup] NIK/NPWP sama ditolak (format berbeda dinormali… 0.48s  
+  ✓ it [customer_dedup] nama (badan usaha diabaikan) dan telepon (awala… 0.47s  
+  ✓ it [customer_dedup] override duplikat: hanya Owner/Super Admin/Admi… 0.55s  
+  ✓ it customers:assign-codes: dry-run tidak mengubah; --apply memberi…  0.48s  
+  ✓ it form Customer membuat customer lewat CustomerService (dedup berl… 0.75s  
+
+   PASS  Tests\Feature\Controls\CustomerMergeTest
+  ✓ it penggabungan memindahkan SEMUA referensi ke survivor; customer y… 0.64s  
+  ✓ it penolak: sama, sudah digabung, survivor sudah digabung, dan depo… 0.65s  
+  ✓ it verifikasi sebelum/sesudah membatalkan penggabungan bila ada tab… 0.71s  
+  ✓ it customers:merge: dry-run tidak mengubah apa pun; --apply meminda… 0.52s  
+  ✓ it customers:merge: CSV tanpa kolom yang benar ditolak               1.79s  
+
+   PASS  Tests\Feature\Controls\DocumentLockTest
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.48s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.55s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.53s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.48s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.46s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.62s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.61s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.52s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  2.84s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.52s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.84s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.83s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  9.15s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.51s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.95s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.91s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.89s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.81s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.39s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  2.13s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  2.56s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.67s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.24s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  1.25s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.95s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.74s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.78s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.73s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.76s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.76s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.86s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.81s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.75s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.75s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.74s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.81s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.74s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.72s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.72s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.75s  
+  ✓ it matriks: setiap dokumen × status × aksi terkunci/terbuka sesuai…  0.76s  
+  ✓ it dokumen terkunci mengembalikan alasan dan jalur koreksi (bukan "… 0.71s  
+  ✓ it kelas dokumen tak dikenal tidak pernah terkunci; aksi yang tidak… 0.73s  
+  ✓ it penerimaan berjurnal terkunci walau statusnya Draft (jurnal ada)  0.86s  
+  ✓ it policy DO/Jadwal/Penerimaan/Retur mengikuti DocumentLock bila fl… 0.90s  
+  ✓ it celah G4 tertutup: DO Dikirim/Selesai tidak dapat di-Edit oleh p… 0.73s  
+  ✓ it X8: peran fiktif "Super Sales" tidak lagi dirujuk policy DO       0.45s  
+  ✓ it [flag mati] policy berperilaku lama: hanya izin (DO Dikirim masi… 0.53s  
+  ✓ it Batalkan Penerimaan: jurnal dibalik (cermin, asli tetap), piutan… 0.51s  
+  ✓ it Batalkan Penerimaan parsial: piutang kembali hanya sebesar pener… 1.67s  
+  ✓ it Batalkan Penerimaan: alasan wajib, tidak dapat dua kali, hanya p… 0.53s  
+  ✓ it penerimaan yang dibatalkan tidak memicu posting ulang jurnal saa… 0.95s  
+  ✓ it penerimaan dengan kelebihan bayar (menghasilkan deposit) tidak d… 0.52s  
+
+   PASS  Tests\Feature\Controls\DocumentNumberReferenceTest
+  ✓ it zeroOutTemporaryProcurementPositions: referensi jurnal = nomor G… 1.22s  
+  ✓ it jurnal retur pembelian: referensi = nota_retur asli (NR-…), buka… 0.93s  
+
+   PASS  Tests\Feature\Controls\DocumentNumberingTest
+  ✓ it format {PREFIX}-{KODECABANG}-{YYMM}-{SEQ4}, berurutan, terpisah…  0.50s  
+  ✓ it reset bulanan: bulan baru memulai dari 0001; bulan lama tetap be… 0.46s  
+  ✓ it tanpa cabang → kode "PST"; cabang pengguna yang login dipakai bi… 0.46s  
+  ✓ it invoice pajak/non-pajak memakai kode Cabang (INV-PJK-001 → INV-P… 0.45s  
+  ✓ it nomor lama tidak berubah dan tidak dihitung; nomor yang sudah ad… 0.48s  
+  ✓ it atomik: baris urutan dikunci (SELECT … FOR UPDATE); transaksi ya… 0.58s  
+  ✓ it jenis tak dikenal ditolak                                         0.48s  
+  ✓ it [flag hidup] generator SO, Quotation, DO, Invoice, SJ, Jadwal, R… 1.44s  
+  ✓ it [flag hidup] generator SO, Quotation, DO, Invoice, SJ, Jadwal, R… 5.21s  
+  ✓ it documents:seed-sequences: dry-run tidak mengubah; --apply menaik… 1.97s  
+  ✓ it documents:check-numbering melaporkan nomor ganda, celah urutan,…  1.75s  
+
+   PASS  Tests\Feature\Controls\DocumentPrintBuilderTest
+  ✓ it kop: data Cabang dipakai lebih dulu; alamat pajak untuk dokumen…  1.53s  
+  ✓ it kop: kolom Cabang kosong → pengaturan global; global kosong → da… 1.29s  
+  ✓ it rekening: baris tanpa bank atau nomor dibuang; bukan array → kos… 1.12s  
+  ✓ it watermark: draft → DRAFT; cancelled/canceled → DIBATALKAN; statu… 0.97s  
+  ✓ it terbilang rupiah untuk kwitansi                                   0.81s  
+  ✓ it partial: kop menampilkan nama legal, NPWP, alamat; kolom kosong…  1.39s  
+  ✓ it bingkai invoice: meta, pelanggan dari SO, watermark status, Nota… 1.81s  
+  ✓ it Pengaturan Aplikasi: kop global tersimpan (kolom kosong dibersih… 1.44s  
+
+   PASS  Tests\Feature\Controls\DocumentPrintTemplatesTest
+  ✓ it Invoice: kop legal + NPWP + alamat pajak, pelanggan, rekening, t… 1.69s  
+  ✓ it Invoice: watermark DRAFT/DIBATALKAN; Nota Kredit terbit tampil d… 1.31s  
+  ✓ it Delivery Order: kop cabang, meta, tanda tangan gudang/pengirim/p… 0.88s  
+  ✓ it Kwitansi dari Penerimaan Customer: penerima, jumlah, terbilang,…  0.77s  
+  ✓ it Nota Kredit: draf berwatermark DRAFT; terbit memuat uraian, DPP/… 0.99s  
+  ✓ it Retur: keputusan "Refund / Nota Kredit" berlabel; kop cabang; bl… 1.15s  
+  ✓ it Sales Order dan Quotation: kop mengikuti data cabang (tanpa alam… 0.91s  
+  ✓ it pemindai: SEMUA template cetak (penjualan, pembelian, laporan) t… 0.88s  
+  ✓ it Purchase Order, Invoice Pembelian, Order Request: kop dari Caban… 0.96s  
+  ✓ it PDF benar-benar terbentuk (Dompdf) untuk Invoice, DO, Kwitansi,…  1.07s  
+  ✓ it rute /pdf/credit-note dan /pdf/customer-receipt: PDF untuk yang…  1.04s  
+
+   PASS  Tests\Feature\Controls\ImpactPreviewTest
+  ✓ it Nota Kredit (invoice belum dibayar): pratinjau = hasil nyata (pi… 0.91s  
+  ✓ it Nota Kredit (invoice lunas): pratinjau = Deposit yang benar-bena… 0.90s  
+  ✓ it Nota Kredit: akun belum diatur → pratinjau memberi PERINGATAN (t… 0.85s  
+  ✓ it modal "Terbitkan" menampilkan pratinjau dampak dengan angka yang… 1.04s  
+  ✓ it Batalkan Penerimaan: pratinjau = hasil nyata (jurnal dibalik, pi… 1.18s  
+  ✓ it klik ganda pada penerbitan Nota Kredit: dua panggilan = satu efe… 1.72s  
+  ✓ it pola aksi (D13): Invoice — aksi utama terlihat, sekunder (Ubah,…  1.35s  
+  ✓ it pola aksi (D13): Nota Kredit draf — "Terbitkan" langsung, "Hapus… 1.09s  
+  ✓ it pola aksi (D13): Retur — tiap status memperlihatkan paling banya… 0.72s  
+  ✓ it pola aksi (D13): Penerimaan — Cetak Kwitansi di atas; Ubah, Jurn… 0.71s  
+  ✓ it penjaga klik ganda: setiap aksi berefek Nota Kredit/Penerimaan m… 1.50s  
+
+   PASS  Tests\Feature\Controls\OverdueInvoiceNotificationTest
+  ✓ it migrasi notifications: dapat dibangun dari kosong dan idempoten…  0.68s  
+  ✓ it invoice hutang lewat jatuh tempo: status jadi Terlambat + notifi… 0.77s  
+  ✓ it invoice piutang lewat jatuh tempo: status jadi Terlambat + notif… 0.74s  
+  ✓ it hutang dan piutang jatuh tempo BERSAMAAN dalam satu jalankan: ma… 0.56s  
+  ✓ it --dry-run: status TIDAK berubah dan TIDAK ada notifikasi terkiri… 0.57s  
+  ✓ it idempoten: menjalankan dua kali hanya mengirim notifikasi SEKALI… 0.57s  
+  ✓ it tidak ada pengguna berizin: tidak mengirim notifikasi dan tidak…  1.67s  
+  ✓ it lebih dari 5 invoice: nomor dipotong dan diberi keterangan "dan…  0.63s  
+  ✓ it OverdueInvoiceNotifier::notify: koleksi kosong tidak melempar da… 0.58s  
+
+   PASS  Tests\Feature\Controls\QueryBudgetTest
+  ✓ it anggaran: Jadwal Mulai/Selesai (rantai DO → stok → jurnal → invo… 0.75s  
+  ✓ it daftar Sales Order: jumlah kueri TIDAK bertambah per baris (10 v… 1.75s  
+
+   PASS  Tests\Feature\Controls\RemoteSearchTest
+  ✓ it pelanggan ke-500 ditemukan lewat nama, kode, perusahaan, dan NIK… 0.80s  
+  ✓ it hasil dibatasi 50; endpoint melaporkan terpotong + petunjuk; kue… 0.66s  
+  ✓ it karakter wildcard LIKE (%, _) dicari apa adanya, tidak menjadi "… 0.59s  
+  ✓ it label nilai terpilih pulih walau di luar 50 teratas; customer ya… 0.97s  
+  ✓ it produk dicari lewat SKU/nama; dokumen (SO, Quotation, Invoice pe… 1.33s  
+  ✓ it endpoint /api/v1/search/{type}: hasil JSON untuk yang berizin; 4… 1.42s  
+  ✓ it form Invoice tidak memuat seluruh tabel customer/produk (kueri b… 1.68s  
+  ✓ it pemindai: resource penjualan tidak memakai pola "Model::all() +…  0.57s  
+
+   PASS  Tests\Feature\Controls\StatusLabelsTest
+  ✓ it label per domain: konstanta model + tambahan; tidak dikenal → ju… 0.63s  
+  ✓ it layar: daftar dan halaman Lihat Invoice menampilkan status dalam… 1.02s  
+  ✓ it pemindai: kolom/entri status Filament tanpa pemetaan label hanya… 0.74s  
+  ✓ it pemindai: Blade cetak penjualan tidak mencetak status mentah (uc… 0.79s  
+
+   PASS  Tests\Feature\CrossCabangProductAutofillTest
+  ✓ it product lookup with global scope only finds products in user cab… 0.79s  
+  ✓ it product lookup without global scope finds product across cabangs  0.73s  
+  ✓ it product all query with global scope filters by user cabang        0.69s  
+  ✓ it product all query without global scope returns products from all… 0.69s  
+  ✓ it p1 patch: purchase order can reference cross-cabang product       0.97s  
+  ✓ it p2 patch: sale order can reference cross-cabang product           1.64s  
+
+   PASS  Tests\Feature\CurrencyAmountInputValidationTest
+  ✓ idr entry stored correctly                                           1.19s  
+  ✓ usd entry not converted to idr                                       0.83s  
+
+   PASS  Tests\Feature\CurrencyAmountPersistenceTest
+  ✓ decimal precision persistence                                        0.80s  
+  ✓ zero and null amounts                                                0.73s  
+
+   PASS  Tests\Feature\CurrencyConsistencyReloadTest
+  ✓ save and reload preserves amounts                                    0.70s  
+
+   PASS  Tests\Feature\CurrencyConversionPrecisionTest
+  ✓ Direct IDR to USD conversion is accurate                             0.75s  
+  ✓ Direct USD to IDR conversion is accurate                             0.74s  
+  ✓ Currency roundtrip conversion IDR→USD→IDR has minimal precision los… 0.77s  
+  ✓ Conversion with different rates maintains precision                  0.79s  
+  ✓ High-value conversion maintains precision                            0.97s  
+  ✓ Zero and null values handled correctly                               0.73s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\CompleteDeliveryOrderFlowTest…   ValidationException   
+  Stok persediaan tidak mencukupi untuk Produk officia. Stok saat ini: 0, diminta: 10.
+
+  at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+     66▕      * @return static
+     67▕      */
+     68▕     public static function withMessages(array $messages)
+     69▕     {
+  ➜  70▕         return new static(tap(ValidatorFacade::make([], []), function ($validator) use ($messages) {
+     71▕             foreach ($messages as $key => $value) {
+     72▕                 foreach (Arr::wrap($value) as $message) {
+     73▕                     $validator->errors()->add($key, $message);
+     74▕                 }
+
+      [2m+1 vendor frames [22m
+  2   app/Observers/StockMovementObserver.php:194
+      [2m+3 vendor frames [22m
+  6   app/Observers/StockMovementObserver.php:171
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Controls\AccountingSettingsTest > it pemindai: tida…   
+  app/Services/CustomerReturnService.php masih memuat kode akun literal: '1140.10', '1140.01', '5100.10', '5100', '4120.10', '4120', '4101', '4100.10', '2120.06', '2130', '1120'
+Failed asserting that two arrays are identical.
+  -Array &0 []
+  +Array &0 [
+  +    0 => ''1140.10'',
+  +    1 => ''1140.01'',
+  +    2 => ''5100.10'',
+  +    3 => ''5100'',
+  +    4 => ''4120.10'',
+  +    5 => ''4120'',
+  +    6 => ''4101'',
+  +    7 => ''4100.10'',
+  +    8 => ''2120.06'',
+  +    9 => ''2130'',
+  +    10 => ''1120'',
+  +]
+  
+
+  at tests/Feature/Controls/AccountingSettingsTest.php:159
+    155▕ 
+    156▕     foreach ($files as $file) {
+    157▕         $source = file_get_contents(base_path($file));
+    158▕         preg_match_all("/'((?:1|2|4|5|6)\d{2,3}(?:[.-]\d{1,2})?|1-\d{3})'/", $source, $matches);
+  ➜ 159▕         expect($matches[0])->toBe([], "{$file} masih memuat kode akun literal: ".implode(', ', $matches[0]));
+    160▕     }
+    161▕ });
+    162▕ 
+    163▕ // ------------------------------------------------------------------ readiness & halaman
+
+  1   tests/Feature/Controls/AccountingSettingsTest.php:159
+
+
+  Tests:    2 failed, 243 passed (1584 assertions)
+  Duration: 216.99s
+

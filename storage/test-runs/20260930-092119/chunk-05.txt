@@ -1,0 +1,352 @@
+
+   PASS  Tests\Feature\DepositFeatureTest
+  ✓ can create customer deposit                                          6.69s  
+  ✓ can create supplier deposit                                          1.32s  
+  ✓ can use customer deposit for sale order                              0.85s  
+  ✓ can use customer deposit for invoice payment                         0.96s  
+  ✓ can refund customer deposit                                          0.79s  
+  ✓ deposit tracking logs all transactions                               0.72s  
+  ✓ deposit status changes based on balance                              0.81s  
+  ✓ can filter deposits by customer supplier                             0.73s  
+  ✓ deposit summary page shows correct data                              0.76s  
+  ✓ can add additional deposit to existing customer                      0.83s  
+  ✓ deposit deletion cascades to journal entries                         0.74s  
+  ✓ deposit restoration cascades to journal entries                      0.73s  
+  ✓ deposit amount update adjusts journal entries                        0.67s  
+  ✓ supplier deposit amount update adjusts journal entries               0.69s  
+
+   PASS  Tests\Feature\DrillDownFinancialReportPageTest
+  ✓ it returns empty data when showPreview is false                      0.71s  
+  ✓ it updatedAccountType resets coa_id                                  0.74s  
+  ✓ it generateReport builds a preview url without toggling inline prev… 0.78s  
+  ✓ it resetReport sets showPreview to false                             0.68s  
+  ✓ it returns financial statement data when financial statement mode i… 0.70s  
+  ✓ it financial statement preview url includes report mode and stateme… 0.71s  
+
+   PASS  Tests\Feature\DrillDownFinancialReportPreviewControllerTest
+  ✓ drill down preview matches shared service with filters               0.74s  
+  ✓ drill down preview pdf downloads a file                              0.71s  
+  ✓ drill down preview excel downloads a file                            0.78s  
+
+   PASS  Tests\Feature\ERP\AccountingTaxTest
+  ✓ ppn calculation on invoice uses rate not absolute amount             0.76s  
+  ✓ ppn calculation for eleven percent rate                              0.72s  
+  ✓ ppn included in total amount                                         0.70s  
+  ✓ invoice stores tax as rate not as absolute amount                    0.70s  
+  ✓ journal entries for purchase invoice include ppn masukan line        0.74s  
+  ✓ account payable stores supplier invoice total paid remaining         1.14s  
+  ✓ account payable status changes to lunas when paid in full            0.98s  
+  ✓ customer receipt has ntpn field in database                          0.96s  
+  ✓ ntpn field is not listed in required customer receipt columns        0.75s  
+
+   PASS  Tests\Feature\ERP\CustomerReturnTest
+  ✓ return product can be created in draft status                        0.73s  
+  ✓ return product can reference delivery order                          0.71s  
+  ✓ return number is stored correctly                                    0.72s  
+  ✓ return product item can be added to return                           0.78s  
+  ✓ return product item stores condition and note                        0.79s  
+  ✓ return product can have multiple items                               0.71s  
+  ✓ return action reduce quantity only is stored                         0.69s  
+  ✓ return action close do partial is stored                             0.71s  
+  ✓ return action close so complete is stored                            0.71s  
+  ✓ return can be approved and deducts delivery item quantity            0.70s  
+  ✓ approved return status is set by service                             0.74s  
+  ✓ all three return action values are valid                             0.78s  
+
+   PASS  Tests\Feature\ERP\DeliveryWorkflowTest
+  ✓ delivery order is created for ambil sendiri pickup type              0.78s  
+  ✓ delivery order is created for kirim langsung type                    0.72s  
+  ✓ delivery order can be created with nullable driver and vehicle       0.63s  
+  ✓ delivery order is linked to sale order                               0.46s  
+  ✓ delivery order status can be set to delivery failed                  0.47s  
+  ✓ delivery order can transition from approved to delivery failed       0.51s  
+  ✓ delivery order has required columns for listing                      0.85s  
+  ✓ do approval required config defaults to true                         0.52s  
+  ✓ do approval not required when config is false                        0.47s  
+  ✓ delivery order service updates status correctly                      0.60s  
+
+   PASS  Tests\Feature\ERP\DocumentCodeGenerationTest
+  ✓ so number generator produces so prefix                               0.70s  
+  ✓ so number generator does not produce rn prefix                       0.46s  
+  ✓ so number generator produces unique codes                            0.47s  
+  ✓ so number increments sequentially                                    0.47s  
+  ✓ so number ignores cabang scope for uniqueness                        0.46s  
+  ✓ grn number generator produces grn prefix                             0.67s  
+  ✓ grn number contains date in format yyyymmdd                          0.49s  
+  ✓ grn number generator produces unique codes                           0.47s  
+  ✓ grn number format is grn date fourdigit                              0.45s  
+  ✓ invoice number has inv prefix                                        0.51s  
+  ✓ invoice number increments across calls                               0.46s  
+
+   PASS  Tests\Feature\ERP\InvoiceTest
+  ✓ invoice number generation produces correct format                    0.45s  
+  ✓ invoice number is sequential and unique                              0.45s  
+  ✓ invoice number has four digit sequence padding                       0.45s  
+  ✓ invoice number generation never returns duplicate                    0.46s  
+  ✓ invoice number generator skips existing numbers                      0.45s  
+  ✓ invoice can be updated without unique constraint violation           0.48s  
+  ✓ invoice service never produces a duplicate number even with concurr… 0.61s  
+
+   PASS  Tests\Feature\ERP\OrderRequestTest
+  ✓ order request item stores original and overridden price              1.34s  
+  ✓ order request item original price differs from unit price after ove… 1.53s  
+  ✓ order request stores ppn included tax type                           1.37s  
+  ✓ order request stores ppn excluded tax type                           0.84s  
+  ✓ order request service applies correct tipe pajak for ppn excluded    0.64s  
+  ✓ order request service applies correct tipe pajak for ppn included    0.59s  
+  ✓ one order request can create multiple purchase orders for different… 0.62s  
+  ✓ or to po only includes selected items                                0.76s  
+  ✓ supplier price from pivot is used as default unit price              0.76s  
+
+   PASS  Tests\Feature\ERP\PurchaseOrderTest
+  ✓ or items are mapped to po items with correct data                    0.83s  
+  ✓ created po is linked to order request                                0.98s  
+  ✓ po can be generated with different supplier than or default          1.16s  
+  ✓ po item quantity can be edited when po status is draft               0.87s  
+  ✓ po item unit price can be edited before approval                     1.06s  
+  ✓ fulfilled quantity on or item stays unchanged when po is created     0.87s  
+  ✓ remaining quantity is calculated correctly after partial fulfillmen… 1.81s  
+  ✓ po is created with correct warehouse and cabang from or              1.81s  
+
+   PASS  Tests\Feature\ERP\QCModuleTest
+  ✓ qc record has qc number and date                                     1.35s  
+  ✓ qc can access supplier through receipt chain                         1.64s  
+  ✓ qc can access po number through receipt chain                        1.99s  
+  ✓ qc can be filtered by date send stock                                1.34s  
+  ✓ qc records can be filtered by po number                              1.37s  
+  ✓ qc records can be filtered by supplier                               1.32s  
+  ✓ qc record has all required display columns                           1.00s  
+
+   FAIL  Tests\Feature\ERP\QualityControlWorkflowTest
+  ✓ qc record has purchase order number accessible                       0.72s  
+  ✓ qc record has supplier name accessible                               0.72s  
+  ✓ qc record exposes product and quantity                               0.66s  
+  ✓ qc record stores status and notes                                    0.69s  
+  ✓ qc record stores inspection date                                     0.79s  
+  ✓ receipt item appears in qc module via from model                     0.76s  
+  ✓ qc passed status means stock was updated                             0.94s  
+  ✓ qc status can transition from pending to passed                      0.90s  
+  ✓ qc with rejected items stores reject reason                          0.75s  
+  ✓ qc passed plus rejected matches received quantity                    0.78s  
+  ✓ qc po number visible via purchase receipt item                       0.75s  
+  ✓ multiple qc records for same receipt have different qc numbers       0.72s  
+  ⨯ journal posting is skipped when coa accounts are missing             0.73s  
+
+   PASS  Tests\Feature\ERP\SalesWorkflowTest
+  ✓ approved quotation creates sale order with request approve status    0.79s  
+  ✓ draft quotation creates sale order with draft status                 0.76s  
+  ✓ quotation item discount is stored correctly                          0.50s  
+  ✓ sale order item discount persists to database                        0.45s  
+  ✓ sale order follows approval status transitions                       0.46s  
+  ✓ sale order can be rejected                                           0.46s  
+  ✓ ppn value in sale order item is stored and not overwritten           0.46s  
+  ✓ ppn field cannot be zero when set to twelve percent                  0.47s  
+
+   PASS  Tests\Feature\ERP\SuratJalanTest
+  ✓ surat jalan can be created for ambil sendiri order                   0.46s  
+  ✓ surat jalan can be created for kirim langsung order                  0.46s  
+  ✓ surat jalan uses delivery schedule shipping details                  0.47s  
+  ✓ surat jalan without delivery schedule has no shipping details        0.47s  
+  ✓ surat jalan can be created without shipping fields                   0.47s  
+  ✓ approving surat jalan marks linked delivery orders as sent           0.46s  
+  ✓ surat jalan approval status persists                                 0.46s  
+
+   PASS  Tests\Feature\ERP\TaxCalculationTest
+  ✓ tax service eksklusif adds tax on top of price                       0.46s  
+  ✓ tax service inklusif extracts tax from gross price                   0.45s  
+  ✓ tax service non pajak returns zero ppn                               0.45s  
+  ✓ tax service zero rate returns no tax                                 0.46s  
+  ✓ tax service normalizes type variants                                 0.46s  
+  ✓ tax service validate negative amount throws                          0.45s  
+  ✓ tax service validate rate out of range throws                        0.46s  
+  ✓ hitung subtotal eksklusif adds tax to line total                     0.46s  
+  ✓ hitung subtotal inklusif total unchanged                             0.45s  
+  ✓ hitung subtotal with discount reduces base before tax                0.46s  
+  ✓ hitung subtotal with max discount zero result                        0.47s  
+  ✓ sale order item tax field stores rate as percent                     0.46s  
+  ✓ sale order total amount computed with inklusif tax                   0.46s  
+  ✓ quotation item stores tax rate                                       0.46s  
+  ✓ invoice tax field stores rate and total includes ppn                 0.45s  
+  ✓ invoice with eleven percent tax computes correctly                   0.46s  
+  ✓ inklusif formula dpp is correct at twelve percent                    0.45s  
+  ✓ eksklusif formula at eleven percent matches spec                     0.45s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ returns a successful response                                        0.50s  
+
+   PASS  Tests\Feature\Filament\StockOpnameItemsRelationManagerTest
+  ✓ it can create stock opname item via relation manager                 0.47s  
+  ✓ it automatically sets system quantity from inventory                 0.46s  
+  ✓ it calculates average cost when creating item                        0.46s  
+  ✓ it automatically calculates difference quantity                      0.46s  
+  ✓ it automatically calculates difference value                         0.46s  
+  ✓ it automatically calculates total value                              0.46s  
+  ✓ it can update stock opname item                                      0.47s  
+  ✓ it can delete stock opname item                                      0.46s  
+  ✓ it validates product is required                                     0.46s  
+  ✓ it handles rak as optional                                           0.46s  
+  ✓ it shows correct table columns                                       0.46s  
+  ✓ it has correct form schema                                           0.46s  
+  ✓ it has create and actions in table                                   0.46s  
+  ✓ it calculates correct difference for inventory increase              0.46s  
+  ✓ it calculates correct difference for inventory decrease              0.46s  
+  ✓ it handles zero difference correctly                                 0.46s  
+  ✓ it calculates average cost from multiple receipts                    0.47s  
+
+   PASS  Tests\Feature\Filament\StockOpnameResourceTest
+  ✓ it can render stock opname index page                                0.74s  
+  ✓ it can render stock opname create page                               0.66s  
+  ✓ it can create stock opname via form                                  0.47s  
+  ✓ it scopes rak selection to the stock opname warehouse                0.46s  
+  ✓ it can render stock opname edit page                                 0.66s  
+  ✓ it can update stock opname via form                                  0.47s  
+  ✓ it can approve stock opname via action                               0.46s  
+  ✓ it can only approve completed stock opname                           0.46s  
+  ✓ it filters stock opname by warehouse                                 0.46s  
+  ✓ it filters stock opname by status                                    0.46s  
+  ✓ it filters stock opname by date range                                0.46s  
+  ✓ it shows correct badge colors for status                             0.69s  
+  ✓ it displays correct warehouse information                            0.71s  
+  ✓ it requires authentication for stock opname pages                    0.48s  
+  ✓ it validates required fields on create                               0.47s  
+  ✓ it validates unique opname number                                    0.46s  
+  ✓ it shows correct navigation and labels                               0.46s  
+  ✓ it has correct table columns                                         0.45s  
+  ✓ it has correct form schema                                           0.46s  
+  ✓ it has stock opname items relation manager                           0.46s  
+  ✓ it has correct pages                                                 0.46s  
+
+   PASS  Tests\Feature\Finance\Adversarial\BankReconciliationAdversarialTest
+  ✓ REC-BV-01: Book balance calculation dynamically updates based on li… 0.49s  
+  ✓ REC-BV-02: Unreconciled entries query excludes reconciled ones and…  0.47s  
+  ✓ REC-BV-03: Difference calculation handles exact match, positive, an… 0.45s  
+
+   PASS  Tests\Feature\Finance\Adversarial\CashBankTransactionBoundaryAdversarialTest
+  ✓ CBT-BV-01: Detail breakdown amount mismatch (sum details != header…  0.46s  
+  ✓ CBT-BV-02: Transaction with withholding tax negative detail balance… 0.46s  
+  ✓ CBT-BV-03: Repeated posting idempotency maintains clean, non-duplic… 0.54s  
+  ✓ CBT-BV-04: Mutation of transaction header amount auto-regenerates j… 0.48s  
+
+   PASS  Tests\Feature\Finance\Adversarial\CashBankTransferBoundaryAdversarialTest
+  ✓ TRF-BV-01: Transfer with non-zero admin fee debits admin COA and cr… 0.47s  
+  ✓ TRF-BV-02: Transfer to same source & destination COA maintains net…  0.47s  
+  ✓ TRF-BV-03: Soft delete of CashBankTransfer cascade-deletes its jour… 0.49s  
+
+   PASS  Tests\Feature\Finance\Adversarial\FinancialThreeWayReconciliationTest
+  ✓ FIN-RC-01: Three-way reconciliation between CashBank, JournalEntry,… 0.52s  
+  ✓ FIN-RC-02: Negative detail amounts (discounts / deductions) in cash… 0.47s  
+  ✓ FIN-RC-03: Transactional integrity and rollback on mid-operation fa… 0.46s  
+
+   PASS  Tests\Feature\Finance\Adversarial\ManualJournalEntryAdversarialTest
+  ✓ JRN-BV-01: Unbalanced manual entry validation throws Exception via…  0.45s  
+  ✓ JRN-BV-02: Posting journal entry into closed accounting period thro… 0.49s  
+  ✓ JRN-BV-03: Cross-branch isolation: JournalEntry adheres to CabangSc… 0.46s  
+  ✓ JRN-BV-04: System-generated journals cascade-deleted when source tr… 0.48s  
+
+   PASS  Tests\Feature\Finance\Adversarial\VoucherRequestKasbonAdversarialTest
+  ✓ VCH-CC-01: Unapproved voucher states (draft, pending, rejected, can… 0.49s  
+  ✓ VCH-CC-02: Multi-use voucher tracks remaining ceiling and rejects o… 0.47s  
+  ✓ VCH-CC-03: Single-use voucher enforces exact nominal match and reje… 0.46s  
+
+   PASS  Tests\Feature\FinanceAuditTest
+  ✓ chart of accounts hierarchy and balance calculation                  0.47s  
+  ✓ double entry bookkeeping validation                                  0.46s  
+  ✓ general ledger running balance calculation                           0.47s  
+  ✓ cash bank transaction posting                                        0.47s  
+  ✓ bank transfer with fee posting                                       0.49s  
+  ✓ voucher request workflow and approval                                0.47s  
+  ✓ balance sheet calculation and verification                           0.47s  
+  ✓ income statement period calculation                                  0.46s  
+  ✓ financial ratios calculation                                         0.47s  
+  ✓ multi branch financial reporting                                     0.46s  
+  ✓ audit trail and activity logging                                     0.46s  
+  ✓ financial period closing and opening balances                        0.81s  
+
+   FAIL  Tests\Feature\FinanceSeederBalanceAuditTest
+  ⨯ finance seeder produces a balanced balance sheet                     0.58s  
+
+   PASS  Tests\Feature\FinancialReportPreviewControllerTest
+  ✓ profit and loss preview matches income statement service             0.60s  
+  ✓ profit loss multi division preview matches service payload           0.60s  
+  ✓ profit loss multi division excel export downloads expected file      0.50s  
+  ✓ cash flow preview matches cash flow service                          0.56s  
+  ✓ cash flow preview uses current april 2026 snapshot                   0.53s  
+  ✓ balance sheet preview matches balance sheet service totals           0.51s  
+  ✓ balance sheet classic view matches balance sheet service totals      0.50s  
+  ✓ financial statement preview matches shared report service            0.90s  
+  ✓ financial statement preview supports cogm statement type             1.63s  
+  ✓ financial statement excel export downloads a file                    2.47s  
+  ✓ financial statement excel export for profit loss only uses summary…  1.34s  
+  ✓ financial statement excel export for cogm only uses summary and cog… 0.75s  
+  ✓ financial statement pdf export downloads a pdf                       0.61s  
+
+   PASS  Tests\Feature\FinancialStatementPageTest
+  ✓ it returns empty array when showPreview is false                     0.58s  
+  ✓ it calculates revenue correctly                                      0.62s  
+  ✓ it calculates COGS from HPP-named expense accounts only              0.64s  
+  ✓ it calculates gross profit as revenue minus COGS                     0.72s  
+  ✓ it calculates OPEX excluding COGS                                    1.04s  
+  ✓ it calculates net profit correctly                                   1.08s  
+  ✓ it does NOT include non-Expense accounts even when name contains Po… 0.81s  
+  ✓ it returns balance sheet data structure                              0.78s  
+  ✓ it returns both pl and bs when statement_type is all                 0.84s  
+  ✓ it returns cogm data when statement_type is cogm                     0.70s  
+  ✓ it asset total_assets reflects debit journal entries                 0.80s  
+  ✓ it generateReport builds a preview url without toggling inline prev… 0.72s  
+  ✓ it builds excel and pdf export urls for the selected filters         0.72s  
+  ✓ it keeps cogm as a valid statement type when building urls           0.75s  
+  ✓ it resetReport sets showPreview to false                             0.76s  
+
+   PASS  Tests\Feature\G03G08WCApproveTriggersDOUpdateTest
+  ✓ it sets DO status to approved when all linked WCs are confirmed      0.78s  
+  ✓ it sets DO status to reject when all linked WCs are rejected         0.79s  
+  ✓ it sets DO status to reject on mixed confirmed/rejected (any reject… 0.85s  
+  ✓ it syncs linked delivery order item status when the DO-linked WC is… 0.84s  
+  ✓ it reverts linked delivery order item status when the DO-linked WC…  0.74s  
+  ✓ it model updated event fires updateStatusFromWarehouseConfirmations… 0.68s  
+  ✓ it syncs linked delivery order item status when the DO-linked WC is… 0.76s  
+
+   PASS  Tests\Feature\G05SuratJalanMarkAsSentTest
+  ✓ it surat jalan resource no longer defines mark as sent action        0.68s  
+  ✓ it surat jalan create page redirects back to index after save        1.01s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ERP\QualityControlWorkflowTest > journal…  Exception   
+  QC passed quantity (10) tidak boleh melebihi Qty Received (0).
+
+  at app/Services/QualityControlService.php:261
+    257▕                 $inspectedQuantity = (float) $qualityControl->passed_quantity + (float) $qualityControl->rejected_quantity;
+    258▕                 $quantityReceived = (float) ($qualityControl->quantity_received ?? 0);
+    259▕ 
+    260▕                 if ((float) $qualityControl->passed_quantity > $quantityReceived) {
+  ➜ 261▕                     throw new \Exception("QC passed quantity ({$qualityControl->passed_quantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+    262▕                 }
+    263▕ 
+    264▕                 if ($inspectedQuantity > $quantityReceived) {
+    265▕                     throw new \Exception("Total QC passed dan rejected ({$inspectedQuantity}) tidak boleh melebihi Qty Received ({$quantityReceived}).");
+
+  1   app/Services/QualityControlService.php:261
+  2   tests/Feature/ERP/QualityControlWorkflowTest.php:490
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\FinanceSeederBalanceAuditTest > fin…  QueryException   
+  SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`duta_tunggal_test`.`sale_orders`, CONSTRAINT `sale_orders_cabang_id_foreign` FOREIGN KEY (`cabang_id`) REFERENCES `cabangs` (`id`) ON DELETE SET NULL) (Connection: mysql, SQL: insert into `sale_orders` (`so_number`, `customer_id`, `order_date`, `delivery_date`, `status`, `cabang_id`, `total_amount`, `created_by`, `updated_at`, `created_at`) values (SO-2025-001, 81, 2026-07-22 19:29:37, 2026-08-06 19:29:37, confirmed, 1, 0, 255, 2026-09-30 19:29:37, 2026-09-30 19:29:37))
+
+  at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+     49▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+     50▕ 
+     51▕             $this->recordsHaveBeenModified();
+     52▕ 
+  ➜  53▕             $result = $statement->execute();
+     54▕ 
+     55▕             $this->lastInsertId = $this->getPdo()->lastInsertId($sequence);
+     56▕ 
+     57▕             return $result;
+
+      [2m+22 vendor frames [22m
+  23  database/seeders/Finance/FinanceSalesSeeder.php:111
+  24  database/seeders/FinanceSeeder.php:30
+
+
+  Tests:    2 failed, 249 passed (682 assertions)
+  Duration: 174.30s
+

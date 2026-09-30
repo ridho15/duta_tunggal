@@ -1,0 +1,1473 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="254" assertions="1553" errors="31" failures="3" skipped="0" time="117.015647">
+    <testsuite name="Tests\Feature\StockReportPreviewTest" file="Stock Report Preview (Tests\Feature\StockReportPreview)" tests="4" assertions="11" errors="0" failures="0" skipped="0" time="7.260049">
+      <testcase name="It uses stock movements for preview rows and outbound totals" file="Stock Report Preview (Tests\Feature\StockReportPreview)::It uses stock movements for preview rows and outbound totals" class="Tests\Feature\StockReportPreviewTest" classname="Tests.Feature.StockReportPreviewTest" assertions="4" time="5.005645"/>
+      <testcase name="It prefers inventory snapshot for qty on hand and computes status and value" file="Stock Report Preview (Tests\Feature\StockReportPreview)::It prefers inventory snapshot for qty on hand and computes status and value" class="Tests\Feature\StockReportPreviewTest" classname="Tests.Feature.StockReportPreviewTest" assertions="5" time="0.855272"/>
+      <testcase name="It does not 500 when dates are unparsable" file="Stock Report Preview (Tests\Feature\StockReportPreview)::It does not 500 when dates are unparsable" class="Tests\Feature\StockReportPreviewTest" classname="Tests.Feature.StockReportPreviewTest" assertions="1" time="0.618880"/>
+      <testcase name="It can render the filament stock report page" file="Stock Report Preview (Tests\Feature\StockReportPreview)::It can render the filament stock report page" class="Tests\Feature\StockReportPreviewTest" classname="Tests.Feature.StockReportPreviewTest" assertions="1" time="0.780252"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\StockReservationServiceTest" file="Stock Reservation Service (Tests\Feature\StockReservationService)" tests="3" assertions="13" errors="0" failures="0" skipped="0" time="1.490003">
+      <testcase name="Tc sr 001 reserve stock increases reserved and decreases available" file="Stock Reservation Service (Tests\Feature\StockReservationService)::Tc sr 001 reserve stock increases reserved and decreases available" class="Tests\Feature\StockReservationServiceTest" classname="Tests.Feature.StockReservationServiceTest" assertions="3" time="0.509636"/>
+      <testcase name="Tc sr 002 release reservation decreases reserved and restores available" file="Stock Reservation Service (Tests\Feature\StockReservationService)::Tc sr 002 release reservation decreases reserved and restores available" class="Tests\Feature\StockReservationServiceTest" classname="Tests.Feature.StockReservationServiceTest" assertions="5" time="0.484153"/>
+      <testcase name="Tc sr 006 consume reservation decreases reserved and leaves available low" file="Stock Reservation Service (Tests\Feature\StockReservationService)::Tc sr 006 consume reservation decreases reserved and leaves available low" class="Tests\Feature\StockReservationServiceTest" classname="Tests.Feature.StockReservationServiceTest" assertions="5" time="0.496213"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\StockTransferTest" file="Stock Transfer (Tests\Feature\StockTransfer)" tests="13" assertions="42" errors="1" failures="0" skipped="0" time="7.324900">
+      <testcase name="It can create stock transfer between warehouses" file="Stock Transfer (Tests\Feature\StockTransfer)::It can create stock transfer between warehouses" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="5" time="0.550718"/>
+      <testcase name="It can create stock transfer between racks" file="Stock Transfer (Tests\Feature\StockTransfer)::It can create stock transfer between racks" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="5" time="0.653707"/>
+      <testcase name="It can request stock transfer" file="Stock Transfer (Tests\Feature\StockTransfer)::It can request stock transfer" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="1" time="0.629869"/>
+      <testcase name="It can approve stock transfer and create stock movements" file="Stock Transfer (Tests\Feature\StockTransfer)::It can approve stock transfer and create stock movements" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="6" time="0.557452"/>
+      <testcase name="It does not move stock before transfer is approved" file="Stock Transfer (Tests\Feature\StockTransfer)::It does not move stock before transfer is approved" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="2" time="0.552919"/>
+      <testcase name="It blocks approval when source stock is insufficient" file="Stock Transfer (Tests\Feature\StockTransfer)::It blocks approval when source stock is insufficient" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="5" time="0.552161"/>
+      <testcase name="It can reject stock transfer" file="Stock Transfer (Tests\Feature\StockTransfer)::It can reject stock transfer" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="1" time="0.545592"/>
+      <testcase name="It validates stock transfer status enum" file="Stock Transfer (Tests\Feature\StockTransfer)::It validates stock transfer status enum" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="5" time="0.548803"/>
+      <testcase name="It generates unique transfer number" file="Stock Transfer (Tests\Feature\StockTransfer)::It generates unique transfer number" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="3" time="0.544292"/>
+      <testcase name="It can soft delete stock transfer and items" file="Stock Transfer (Tests\Feature\StockTransfer)::It can soft delete stock transfer and items" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="2" time="0.549621"/>
+      <testcase name="It can restore stock transfer and items" file="Stock Transfer (Tests\Feature\StockTransfer)::It can restore stock transfer and items" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="0" time="0.547091">
+        <error type="Illuminate\Validation\ValidationException">It can restore stock transfer and itemsIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Produk placeat. Stok saat ini: 0, diminta: 78.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1219
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:1218
+at vendor/laravel/framework/src/Illuminate/Support/Traits/ForwardsCalls.php:23
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2540
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:2556
+at app/Services/StockTransferService.php:245
+at app/Services/StockTransferService.php:157
+at app/Observers/StockTransferItemObserver.php:36
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/StockTransferTest.php:394</error>
+      </testcase>
+      <testcase name="It validates transfer quantity is positive" file="Stock Transfer (Tests\Feature\StockTransfer)::It validates transfer quantity is positive" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="2" time="0.544871"/>
+      <testcase name="It maintains relationships correctly" file="Stock Transfer (Tests\Feature\StockTransfer)::It maintains relationships correctly" class="Tests\Feature\StockTransferTest" classname="Tests.Feature.StockTransferTest" assertions="5" time="0.547804"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\SuperAdminPermissionsTest" file="Super Admin Permissions (Tests\Feature\SuperAdminPermissions)" tests="1" assertions="547" errors="0" failures="0" skipped="0" time="0.864451">
+      <testcase name="Super admin role has all defined permissions" file="Super Admin Permissions (Tests\Feature\SuperAdminPermissions)::Super admin role has all defined permissions" class="Tests\Feature\SuperAdminPermissionsTest" classname="Tests.Feature.SuperAdminPermissionsTest" assertions="547" time="0.864451"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\SupplierProductResourceTest" file="tests/Feature/SupplierProductResourceTest.php" tests="47" assertions="157" errors="0" failures="0" skipped="0" time="31.231048">
+      <testcase name="`Supplier Model Relationships` → it has many purchase orders" file="tests/Feature/SupplierProductResourceTest.php::`Supplier Model Relationships` → it has many purchase orders" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.542457"/>
+      <testcase name="`Supplier Model Relationships` → it has many products via legacy supplier_id" file="tests/Feature/SupplierProductResourceTest.php::`Supplier Model Relationships` → it has many products via legacy supplier_id" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.535089"/>
+      <testcase name="`Supplier Model Relationships` → it belongs to many products via product_supplier pivot" file="tests/Feature/SupplierProductResourceTest.php::`Supplier Model Relationships` → it belongs to many products via product_supplier pivot" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.567512"/>
+      <testcase name="`Supplier Model Relationships` → it pivot table product_supplier records supplier_price" file="tests/Feature/SupplierProductResourceTest.php::`Supplier Model Relationships` → it pivot table product_supplier records supplier_price" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.546177"/>
+      <testcase name="`Supplier Model Relationships` → it belongs to cabang" file="tests/Feature/SupplierProductResourceTest.php::`Supplier Model Relationships` → it belongs to cabang" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.532384"/>
+      <testcase name="`Supplier Model Relationships` → it soft-deletes correctly" file="tests/Feature/SupplierProductResourceTest.php::`Supplier Model Relationships` → it soft-deletes correctly" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.589520"/>
+      <testcase name="`Product Model Relationships` → it belongs to many suppliers" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it belongs to many suppliers" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.665026"/>
+      <testcase name="`Product Model Relationships` → it can attach a supplier with price" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it can attach a supplier with price" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.531242"/>
+      <testcase name="`Product Model Relationships` → it belongs to uom" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it belongs to uom" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.534611"/>
+      <testcase name="`Product Model Relationships` → it belongs to product category" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it belongs to product category" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.532178"/>
+      <testcase name="`Product Model Relationships` → it has many inventory stocks" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it has many inventory stocks" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.527159"/>
+      <testcase name="`Product Model Relationships` → it has many stock movements" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it has many stock movements" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.533908"/>
+      <testcase name="`Product Model Relationships` → it casts is_active, is_manufacture, is_raw_material as boolean" file="tests/Feature/SupplierProductResourceTest.php::`Product Model Relationships` → it casts is_active, is_manufacture, is_raw_material as boolean" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="3" time="0.538281"/>
+      <testcase name="`SupplierResource Form Validation` → it requires sku (code), perusahaan, npwp, address, phone, handphone, email, fax, tempo_hutang" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource Form Validation` → it requires sku (code), perusahaan, npwp, address, phone, handphone, email, fax, tempo_hutang" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="21" time="0.680586"/>
+      <testcase name="`SupplierResource Form Validation` → it rejects invalid email on supplier form" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource Form Validation` → it rejects invalid email on supplier form" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="5" time="0.691930"/>
+      <testcase name="`SupplierResource Form Validation` → it accepts international phone numbers (phone, handphone, fax)" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource Form Validation` → it accepts international phone numbers (phone, handphone, fax)" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="5" time="0.686327"/>
+      <testcase name="`SupplierResource Form Validation` → it rejects phone numbers with only letters" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource Form Validation` → it rejects phone numbers with only letters" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="9" time="0.681536"/>
+      <testcase name="`SupplierResource Form Validation` → it enforces unique supplier code" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource Form Validation` → it enforces unique supplier code" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="5" time="0.683618"/>
+      <testcase name="`SupplierResource CRUD` → it list page renders" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource CRUD` → it list page renders" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.628614"/>
+      <testcase name="`SupplierResource CRUD` → it can create a supplier" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource CRUD` → it can create a supplier" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="0.670533"/>
+      <testcase name="`SupplierResource CRUD` → it can edit a supplier and update tempo hutang" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource CRUD` → it can edit a supplier and update tempo hutang" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="0.722326"/>
+      <testcase name="`SupplierResource CRUD` → it can soft-delete a supplier from list" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource CRUD` → it can soft-delete a supplier from list" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="6" time="0.797361"/>
+      <testcase name="`ProductResource Form Validation` → it requires sku, name, product_category_id, uom_id, kode_merk, tipe_pajak" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource Form Validation` → it requires sku, name, product_category_id, uom_id, kode_merk, tipe_pajak" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="7" time="1.142309"/>
+      <testcase name="`ProductResource Form Validation` → it enforces unique sku" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource Form Validation` → it enforces unique sku" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="5" time="0.832916"/>
+      <testcase name="`ProductResource CRUD` → it list page renders" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it list page renders" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.794348"/>
+      <testcase name="`ProductResource CRUD` → it can create a global product without cabang" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it can create a global product without cabang" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="1.521577"/>
+      <testcase name="`ProductResource CRUD` → it can create a product without suppliers (optional)" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it can create a product without suppliers (optional)" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="0.877044"/>
+      <testcase name="`ProductResource CRUD` → it shows global products to branch users" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it shows global products to branch users" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="3" time="0.563662"/>
+      <testcase name="`ProductResource CRUD` → it can create a product then attach supplier via pivot relationship" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it can create a product then attach supplier via pivot relationship" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="6" time="0.830071"/>
+      <testcase name="`ProductResource CRUD` → it can edit a product name and sell price" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it can edit a product name and sell price" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="1.108733"/>
+      <testcase name="`ProductResource CRUD` → it can soft-delete a product from list" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource CRUD` → it can soft-delete a product from list" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="6" time="0.777167"/>
+      <testcase name="`ProductsRelationManager on Supplier` → it renders the relation manager for a supplier" file="tests/Feature/SupplierProductResourceTest.php::`ProductsRelationManager on Supplier` → it renders the relation manager for a supplier" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.570400"/>
+      <testcase name="`ProductsRelationManager on Supplier` → it shows the associate product action header button" file="tests/Feature/SupplierProductResourceTest.php::`ProductsRelationManager on Supplier` → it shows the associate product action header button" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.558613"/>
+      <testcase name="`ProductsRelationManager on Supplier` → it can associate a product to supplier via custom action" file="tests/Feature/SupplierProductResourceTest.php::`ProductsRelationManager on Supplier` → it can associate a product to supplier via custom action" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="7" time="0.724882"/>
+      <testcase name="`ProductsRelationManager on Supplier` → it can dissociate a product from supplier via ORM" file="tests/Feature/SupplierProductResourceTest.php::`ProductsRelationManager on Supplier` → it can dissociate a product from supplier via ORM" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.555544"/>
+      <testcase name="`ProductsRelationManager on Supplier` → it shows associated products in the table" file="tests/Feature/SupplierProductResourceTest.php::`ProductsRelationManager on Supplier` → it shows associated products in the table" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.560524"/>
+      <testcase name="`PurchaseOrderRelationManager on Supplier` → it renders the relation manager" file="tests/Feature/SupplierProductResourceTest.php::`PurchaseOrderRelationManager on Supplier` → it renders the relation manager" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.597945"/>
+      <testcase name="`PurchaseOrderRelationManager on Supplier` → it shows purchase orders belonging to the supplier" file="tests/Feature/SupplierProductResourceTest.php::`PurchaseOrderRelationManager on Supplier` → it shows purchase orders belonging to the supplier" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.606357"/>
+      <testcase name="`PurchaseOrderRelationManager on Supplier` → it does not show purchase orders of other suppliers" file="tests/Feature/SupplierProductResourceTest.php::`PurchaseOrderRelationManager on Supplier` → it does not show purchase orders of other suppliers" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.676412"/>
+      <testcase name="`InventoryStockRelationManager on Product` → it renders the relation manager" file="tests/Feature/SupplierProductResourceTest.php::`InventoryStockRelationManager on Product` → it renders the relation manager" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.551998"/>
+      <testcase name="`InventoryStockRelationManager on Product` → it shows inventory stock records for the product" file="tests/Feature/SupplierProductResourceTest.php::`InventoryStockRelationManager on Product` → it shows inventory stock records for the product" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.549940"/>
+      <testcase name="`StockMovementRelationManager on Product` → it renders the relation manager" file="tests/Feature/SupplierProductResourceTest.php::`StockMovementRelationManager on Product` → it renders the relation manager" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.545318"/>
+      <testcase name="`StockMovementRelationManager on Product` → it shows stock movements for the product" file="tests/Feature/SupplierProductResourceTest.php::`StockMovementRelationManager on Product` → it shows stock movements for the product" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="1" time="0.557574"/>
+      <testcase name="`SupplierResource structure` → it declares correct relation managers" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource structure` → it declares correct relation managers" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="2" time="0.683869"/>
+      <testcase name="`SupplierResource structure` → it registers all expected pages" file="tests/Feature/SupplierProductResourceTest.php::`SupplierResource structure` → it registers all expected pages" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="0.542178"/>
+      <testcase name="`ProductResource structure` → it declares correct relation managers" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource structure` → it declares correct relation managers" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="3" time="0.537842"/>
+      <testcase name="`ProductResource structure` → it registers all expected pages" file="tests/Feature/SupplierProductResourceTest.php::`ProductResource structure` → it registers all expected pages" class="Tests\Feature\SupplierProductResourceTest" classname="Tests.Feature.SupplierProductResourceTest" assertions="4" time="0.545453"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\SuratJalanRecapTest" file="Surat Jalan Recap (Tests\Feature\SuratJalanRecap)" tests="2" assertions="7" errors="0" failures="0" skipped="0" time="0.951173">
+      <testcase name="It filters rekap surat jalan by date range and status" file="Surat Jalan Recap (Tests\Feature\SuratJalanRecap)::It filters rekap surat jalan by date range and status" class="Tests\Feature\SuratJalanRecapTest" classname="Tests.Feature.SuratJalanRecapTest" assertions="3" time="0.477390"/>
+      <testcase name="It streams a rekap surat jalan pdf download" file="Surat Jalan Recap (Tests\Feature\SuratJalanRecap)::It streams a rekap surat jalan pdf download" class="Tests\Feature\SuratJalanRecapTest" classname="Tests.Feature.SuratJalanRecapTest" assertions="4" time="0.473783"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php" tests="38" assertions="294" errors="1" failures="0" skipped="0" time="24.325863">
+      <testcase name="it Isu 6: endpoint PDF Surat Jalan ber-DO tunggal dan jamak berhasil (sebelumnya 500 karena relasi customer)" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: endpoint PDF Surat Jalan ber-DO tunggal dan jamak berhasil (sebelumnya 500 karena relasi customer)" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="4" time="0.656190"/>
+      <testcase name="it Isu 6: data cetak memuat nomor DO/SO, customer unik, alamat, driver + plat dari jadwal, dan barang per DO tanpa harga" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: data cetak memuat nomor DO/SO, customer unik, alamat, driver + plat dari jadwal, dan barang per DO tanpa harga" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="29" time="0.699665"/>
+      <testcase name="it Isu 6: Surat Jalan yang belum dijadwalkan dicetak &quot;Belum dijadwalkan&quot; (D3b), bukan kosong" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Surat Jalan yang belum dijadwalkan dicetak &quot;Belum dijadwalkan&quot; (D3b), bukan kosong" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="3" time="0.577839"/>
+      <testcase name="it Isu 6: ekspedisi menampilkan nama ekspedisi dan nomor resi" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: ekspedisi menampilkan nama ekspedisi dan nomor resi" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="5" time="0.539815"/>
+      <testcase name="it Isu 6: template memuat blok tanda tangan, tanpa harga, tanpa alamat placeholder, dan kop dari cabang" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: template memuat blok tanda tangan, tanpa harga, tanpa alamat placeholder, dan kop dari cabang" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="14" time="0.550097"/>
+      <testcase name="it Isu 6: alamat/telepon cabang kosong dikosongkan, bukan diisi placeholder" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: alamat/telepon cabang kosong dikosongkan, bukan diisi placeholder" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="3" time="0.548347"/>
+      <testcase name="it Isu 6: Surat Jalan dibatalkan dicetak dengan banner DIBATALKAN dan alasan" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Surat Jalan dibatalkan dicetak dengan banner DIBATALKAN dan alasan" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="2" time="0.538344"/>
+      <testcase name="it Isu 6: policy — hanya Draft yang boleh diubah/dihapus; kemampuan lain mengikuti status" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: policy — hanya Draft yang boleh diubah/dihapus; kemampuan lain mengikuti status" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="18" time="0.630270"/>
+      <testcase name="it Isu 6: halaman Edit Surat Jalan terbit diarahkan ke halaman Lihat; Draft tetap dapat dibuka" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: halaman Edit Surat Jalan terbit diarahkan ke halaman Lihat; Draft tetap dapat dibuka" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="4" time="0.582110"/>
+      <testcase name="it Isu 6: tabel — Ubah/Hapus hanya untuk Draft; Batalkan untuk Terbit; Terbitkan Ulang untuk Dibatalkan" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: tabel — Ubah/Hapus hanya untuk Draft; Batalkan untuk Terbit; Terbitkan Ulang untuk Dibatalkan" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="28" time="0.688467"/>
+      <testcase name="it Isu 6: halaman Lihat menyembunyikan Ubah/Hapus dan menampilkan Batalkan untuk Surat Jalan terbit" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: halaman Lihat menyembunyikan Ubah/Hapus dan menampilkan Batalkan untuk Surat Jalan terbit" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="12" time="0.606665"/>
+      <testcase name="it Isu 6: hapus massal hanya menghapus Draft" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: hapus massal hanya menghapus Draft" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="7" time="0.837871"/>
+      <testcase name="it Isu 6: Batalkan — alasan wajib (min 5 karakter), tercatat siapa/kapan/alasan, tidak dapat dua kali" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Batalkan — alasan wajib (min 5 karakter), tercatat siapa/kapan/alasan, tidak dapat dua kali" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="9" time="0.562996"/>
+      <testcase name="it Isu 6: Draft tidak dapat dibatalkan (cukup dihapus)" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Draft tidak dapat dibatalkan (cukup dihapus)" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="1" time="0.618946"/>
+      <testcase name="it Isu 6: Batalkan ditolak selama Surat Jalan masih dipakai jadwal berjalan/selesai; boleh bila jadwal gagal/batal" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Batalkan ditolak selama Surat Jalan masih dipakai jadwal berjalan/selesai; boleh bila jadwal gagal/batal" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="13" time="0.550432"/>
+      <testcase name="it Isu 6: aksi Batalkan dari tabel dan halaman Lihat mewajibkan alasan dan menyimpannya" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: aksi Batalkan dari tabel dan halaman Lihat mewajibkan alasan dan menyimpannya" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="23" time="1.330103"/>
+      <testcase name="it Isu 6: hanya dokumen bertanda tangan yang dapat diunggah pada Surat Jalan terbit" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: hanya dokumen bertanda tangan yang dapat diunggah pada Surat Jalan terbit" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="8" time="0.745091"/>
+      <testcase name="it Isu 6: Terbitkan Draft — DO harus approved dan belum di Surat Jalan lain" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Terbitkan Draft — DO harus approved dan belum di Surat Jalan lain" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="2" time="0.589202"/>
+      <testcase name="it Isu 6: satu DO tidak boleh tercantum di dua Surat Jalan yang berlaku; setelah dibatalkan boleh lagi" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: satu DO tidak boleh tercantum di dua Surat Jalan yang berlaku; setelah dibatalkan boleh lagi" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="3" time="0.552211"/>
+      <testcase name="it Isu 6: validasi DO — hanya approved, satu cabang, minimal satu" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: validasi DO — hanya approved, satu cabang, minimal satu" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="5" time="0.549579"/>
+      <testcase name="it Isu 6: Terbitkan Ulang membuat Surat Jalan baru (nomor baru, terbit) untuk DO yang sama" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Terbitkan Ulang membuat Surat Jalan baru (nomor baru, terbit) untuk DO yang sama" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="8" time="0.805507"/>
+      <testcase name="it Isu 6: Terbitkan Ulang ditolak bila DO sudah tidak approved" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: Terbitkan Ulang ditolak bila DO sudah tidak approved" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="0" time="0.717297">
+        <error type="Illuminate\Validation\ValidationException">it Isu 6: Terbitkan Ulang ditolak bila DO sudah tidak approvedIlluminate\Validation\ValidationException: Stok persediaan tidak mencukupi untuk Alat Medis Fase 4. Stok saat ini: 0, diminta: 12.
+at vendor/laravel/framework/src/Illuminate/Validation/ValidationException.php:70
+at app/Observers/StockMovementObserver.php:194
+at vendor/laravel/framework/src/Illuminate/Database/Concerns/ManagesTransactions.php:35
+at vendor/laravel/framework/src/Illuminate/Database/DatabaseManager.php:489
+at vendor/laravel/framework/src/Illuminate/Support/Facades/Facade.php:363
+at app/Observers/StockMovementObserver.php:171
+at app/Observers/StockMovementObserver.php:149
+at app/Observers/StockMovementObserver.php:25
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1422
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:370
+at vendor/laravel/framework/src/Illuminate/Support/helpers.php:390
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Relations/HasOneOrMany.php:367
+at app/Services/ProductService.php:95
+at app/Observers/DeliveryOrderObserver.php:302
+at app/Observers/DeliveryOrderObserver.php:209
+at app/Observers/DeliveryOrderObserver.php:41
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:508
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:315
+at vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php:295
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Concerns/HasEvents.php:224
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1320
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1233
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1090
+at tests/Feature/SuratJalanScheduleReadinessPhase4Test.php:506</error>
+      </testcase>
+      <testcase name="it Isu 6: aksi Terbitkan Ulang dari tabel" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: aksi Terbitkan Ulang dari tabel" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="5" time="0.717716"/>
+      <testcase name="it Isu 6: nomor Surat Jalan berurutan per hari, melanjutkan dari nomor terbesar (bukan acak)" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: nomor Surat Jalan berurutan per hari, melanjutkan dari nomor terbesar (bukan acak)" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="3" time="0.584110"/>
+      <testcase name="it Isu 6: halaman Lihat menampilkan status, pengiriman dari jadwal, dan DO tanpa error" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: halaman Lihat menampilkan status, pengiriman dari jadwal, dan DO tanpa error" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="7" time="0.709535"/>
+      <testcase name="it Isu 6: halaman Lihat Surat Jalan dibatalkan menampilkan bagian Pembatalan beserta alasan" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: halaman Lihat Surat Jalan dibatalkan menampilkan bagian Pembatalan beserta alasan" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="2" time="0.699694"/>
+      <testcase name="it Isu 6: daftar menampilkan driver dari jadwal / &quot;Belum dijadwalkan&quot;, badge status, dan filter Draft (0) bekerja" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: daftar menampilkan driver dari jadwal / &quot;Belum dijadwalkan&quot;, badge status, dan filter Draft (0) bekerja" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="12" time="0.754756"/>
+      <testcase name="it Isu 6: rekap Surat Jalan memakai label status Draft/Terbit/Dibatalkan" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 6: rekap Surat Jalan memakai label status Draft/Terbit/Dibatalkan" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="2" time="0.555092"/>
+      <testcase name="it Isu 8: validasi server — internal butuh driver &amp; kendaraan master; ekspedisi cukup nama ekspedisi" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: validasi server — internal butuh driver &amp; kendaraan master; ekspedisi cukup nama ekspedisi" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="6" time="0.530941"/>
+      <testcase name="it Isu 8: master kosong → default metode Ekspedisi dan terdeteksi driver/kendaraan kosong; terisi → Internal" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: master kosong → default metode Ekspedisi dan terdeteksi driver/kendaraan kosong; terisi → Internal" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="6" time="0.541781"/>
+      <testcase name="it Isu 8: form Jadwal dengan master kosong menampilkan penjelasan dan default Ekspedisi; pengiriman ekspedisi dapat dijadwalkan tanpa driver internal" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: form Jadwal dengan master kosong menampilkan penjelasan dan default Ekspedisi; pengiriman ekspedisi dapat dijadwalkan tanpa driver internal" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="9" time="0.687177"/>
+      <testcase name="it Isu 8: jadwal internal tanpa driver/kendaraan ditolak dengan pesan yang menjelaskan" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: jadwal internal tanpa driver/kendaraan ditolak dengan pesan yang menjelaskan" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="8" time="0.876696"/>
+      <testcase name="it Isu 8: tautan tambah master hanya untuk pengguna berizin; lainnya diminta menghubungi admin" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: tautan tambah master hanya untuk pengguna berizin; lainnya diminta menghubungi admin" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="5" time="0.636718"/>
+      <testcase name="it Isu 8: banner tidak tampil dan default Internal bila master lengkap" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: banner tidak tampil dan default Internal bila master lengkap" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="3" time="0.570235"/>
+      <testcase name="it Isu 8: status &quot;Sebagian Terkirim&quot; tersedia dan berlabel; DO ikut berstatus sent (bukan completed)" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: status &quot;Sebagian Terkirim&quot; tersedia dan berlabel; DO ikut berstatus sent (bukan completed)" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="3" time="0.562546"/>
+      <testcase name="it Isu 8: master:readiness melaporkan master kosong dan exit 1 bila ada yang KRITIS" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: master:readiness melaporkan master kosong dan exit 1 bila ada yang KRITIS" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="5" time="0.475419"/>
+      <testcase name="it Isu 8: readiness — status siap/sebagian/kosong dan hanya kosong total pada master kritis yang memblokir" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: readiness — status siap/sebagian/kosong dan hanya kosong total pada master kritis yang memblokir" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="7" time="0.464761"/>
+      <testcase name="it Isu 8: readiness --json memuat pemeriksaan dan kesiapan" file="tests/Feature/SuratJalanScheduleReadinessPhase4Test.php::it Isu 8: readiness --json memuat pemeriksaan dan kesiapan" class="Tests\Feature\SuratJalanScheduleReadinessPhase4Test" classname="Tests.Feature.SuratJalanScheduleReadinessPhase4Test" assertions="10" time="0.481644"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\SuratJalanValidationFeedbackTest" file="Surat Jalan Validation Feedback (Tests\Feature\SuratJalanValidationFeedback)" tests="2" assertions="11" errors="0" failures="1" skipped="0" time="1.191429">
+      <testcase name="Create surat jalan with unapproved do shows danger notification and error" file="Surat Jalan Validation Feedback (Tests\Feature\SuratJalanValidationFeedback)::Create surat jalan with unapproved do shows danger notification and error" class="Tests\Feature\SuratJalanValidationFeedbackTest" classname="Tests.Feature.SuratJalanValidationFeedbackTest" assertions="7" time="0.788854">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Create surat jalan with unapproved do shows danger notification and errorA notification was not sent
+Failed asserting that null is not null.
+at vendor/filament/notifications/src/Notification.php:251
+at vendor/filament/notifications/src/Testing/TestsNotifications.php:20
+at vendor/laravel/framework/src/Illuminate/Macroable/Traits/Macroable.php:126
+at vendor/livewire/livewire/src/Features/SupportTesting/Testable.php:398
+at tests/Feature/SuratJalanValidationFeedbackTest.php:74</failure>
+      </testcase>
+      <testcase name="Create surat jalan with approved do succeeds" file="Surat Jalan Validation Feedback (Tests\Feature\SuratJalanValidationFeedback)::Create surat jalan with approved do succeeds" class="Tests\Feature\SuratJalanValidationFeedbackTest" classname="Tests.Feature.SuratJalanValidationFeedbackTest" assertions="4" time="0.402575"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\SyncArApCommandTest" file="tests/Feature/SyncArApCommandTest.php" tests="2" assertions="9" errors="0" failures="0" skipped="0" time="0.524340">
+      <testcase name="ar-ap sync recalculates receivable paid from receipt items per invoice" file="tests/Feature/SyncArApCommandTest.php::ar-ap sync recalculates receivable paid from receipt items per invoice" class="Tests\Feature\SyncArApCommandTest" classname="Tests.Feature.SyncArApCommandTest" assertions="5" time="0.266123"/>
+      <testcase name="ar-ap sync recalculates payable balances from vendor payment details and adjustments" file="tests/Feature/SyncArApCommandTest.php::ar-ap sync recalculates payable balances from vendor payment details and adjustments" class="Tests\Feature\SyncArApCommandTest" classname="Tests.Feature.SyncArApCommandTest" assertions="4" time="0.258217"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\TaxDefaultResolverTest" file="tests/Feature/TaxDefaultResolverTest.php" tests="3" assertions="3" errors="0" failures="0" skipped="0" time="0.776022">
+      <testcase name="tax resolver prioritizes active setting over product tax" file="tests/Feature/TaxDefaultResolverTest.php::tax resolver prioritizes active setting over product tax" class="Tests\Feature\TaxDefaultResolverTest" classname="Tests.Feature.TaxDefaultResolverTest" assertions="1" time="0.265952"/>
+      <testcase name="tax resolver falls back to product tax when no active setting exists" file="tests/Feature/TaxDefaultResolverTest.php::tax resolver falls back to product tax when no active setting exists" class="Tests\Feature\TaxDefaultResolverTest" classname="Tests.Feature.TaxDefaultResolverTest" assertions="1" time="0.258890"/>
+      <testcase name="tax resolver returns zero for non tax type" file="tests/Feature/TaxDefaultResolverTest.php::tax resolver returns zero for non tax type" class="Tests\Feature\TaxDefaultResolverTest" classname="Tests.Feature.TaxDefaultResolverTest" assertions="1" time="0.251181"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\TrialBalancePreviewControllerTest" file="Trial Balance Preview Controller (Tests\Feature\TrialBalancePreviewController)" tests="1" assertions="3" errors="0" failures="0" skipped="0" time="0.321896">
+      <testcase name="Trial balance preview matches trial balance service" file="Trial Balance Preview Controller (Tests\Feature\TrialBalancePreviewController)::Trial balance preview matches trial balance service" class="Tests\Feature\TrialBalancePreviewControllerTest" classname="Tests.Feature.TrialBalancePreviewControllerTest" assertions="3" time="0.321896"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\TrialBalanceServiceTest" file="tests/Feature/TrialBalanceServiceTest.php" tests="10" assertions="29" errors="0" failures="0" skipped="0" time="2.584588">
+      <testcase name="TC-TB-001 basic period debit credit are computed correctly" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-001 basic period debit credit are computed correctly" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="5" time="0.270432"/>
+      <testcase name="TC-TB-002 beginning balance includes pre-period journal entries" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-002 beginning balance includes pre-period journal entries" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="4" time="0.269380"/>
+      <testcase name="TC-TB-003 opening balance on COA is included in beginning balance" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-003 opening balance on COA is included in beginning balance" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="2" time="0.262292"/>
+      <testcase name="TC-TB-004 liability credit-normal balance computed correctly" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-004 liability credit-normal balance computed correctly" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="3" time="0.263132"/>
+      <testcase name="TC-TB-005 branch filter excludes entries from other branches" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-005 branch filter excludes entries from other branches" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="1" time="0.267420"/>
+      <testcase name="TC-TB-006 show_zero_balance=false hides accounts with all-zero values" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-006 show_zero_balance=false hides accounts with all-zero values" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="1" time="0.248345"/>
+      <testcase name="TC-TB-006b show_zero_balance=true includes zero-balance accounts" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-006b show_zero_balance=true includes zero-balance accounts" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="2" time="0.244193"/>
+      <testcase name="TC-TB-007 grand totals match sum of individual rows" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-007 grand totals match sum of individual rows" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="4" time="0.263031"/>
+      <testcase name="TC-TB-008 normal balance flag is D for asset and expense, C for others" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-008 normal balance flag is D for asset and expense, C for others" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="4" time="0.242402"/>
+      <testcase name="TC-TB-009 parent account appears before its children in ordered rows" file="tests/Feature/TrialBalanceServiceTest.php::TC-TB-009 parent account appears before its children in ordered rows" class="Tests\Feature\TrialBalanceServiceTest" classname="Tests.Feature.TrialBalanceServiceTest" assertions="3" time="0.253960"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase1VerificationTest" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)" tests="10" assertions="50" errors="0" failures="0" skipped="0" time="2.996694">
+      <testcase name="Issue 4 draft invoice does not create ap and does not post journal" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 4 draft invoice does not create ap and does not post journal" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="2" time="0.257393"/>
+      <testcase name="Issue 4 posting draft invoice creates ap and posts journal" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 4 posting draft invoice creates ap and posts journal" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="4" time="0.290484"/>
+      <testcase name="Issue 4 invoice policy restricts edit and delete to draft only" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 4 invoice policy restricts edit and delete to draft only" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="6" time="0.320510"/>
+      <testcase name="Issue 6 purchase order policy locks approved and completed po" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 6 purchase order policy locks approved and completed po" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="10" time="0.313732"/>
+      <testcase name="Issue 6 sales order policy locks approved and completed so" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 6 sales order policy locks approved and completed so" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="10" time="0.318203"/>
+      <testcase name="Issue 6 order request policy locks when po exists or status locked" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 6 order request policy locks when po exists or status locked" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="4" time="0.331129"/>
+      <testcase name="Issue 6 vendor payment policy locks non draft payments" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 6 vendor payment policy locks non draft payments" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="6" time="0.347625"/>
+      <testcase name="Issue 7 purchase receipt table status column is not editable select column" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 7 purchase receipt table status column is not editable select column" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="2" time="0.252912"/>
+      <testcase name="Issue 5 payment request calculates real remaining debt minus active prs" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 5 payment request calculates real remaining debt minus active prs" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="2" time="0.274864"/>
+      <testcase name="Issue 5 vendor payment settlement auto closes related payment request" file="UATPhase1Verification (Tests\Feature\UATPhase1Verification)::Issue 5 vendor payment settlement auto closes related payment request" class="Tests\Feature\UATPhase1VerificationTest" classname="Tests.Feature.UATPhase1VerificationTest" assertions="4" time="0.289842"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase2Batch1VerificationTest" file="UATPhase2Batch1Verification (Tests\Feature\UATPhase2Batch1Verification)" tests="4" assertions="14" errors="0" failures="0" skipped="0" time="1.000980">
+      <testcase name="Order request can be rejected with reason" file="UATPhase2Batch1Verification (Tests\Feature\UATPhase2Batch1Verification)::Order request can be rejected with reason" class="Tests\Feature\UATPhase2Batch1VerificationTest" classname="Tests.Feature.UATPhase2Batch1VerificationTest" assertions="4" time="0.264439"/>
+      <testcase name="Order request approval updates item approval status" file="UATPhase2Batch1Verification (Tests\Feature\UATPhase2Batch1Verification)::Order request approval updates item approval status" class="Tests\Feature\UATPhase2Batch1VerificationTest" classname="Tests.Feature.UATPhase2Batch1VerificationTest" assertions="2" time="0.256439"/>
+      <testcase name="Purchase order top formatting and idr currency rate" file="UATPhase2Batch1Verification (Tests\Feature\UATPhase2Batch1Verification)::Purchase order top formatting and idr currency rate" class="Tests\Feature\UATPhase2Batch1VerificationTest" classname="Tests.Feature.UATPhase2Batch1VerificationTest" assertions="4" time="0.239280"/>
+      <testcase name="Ui labels and tax types have no typos" file="UATPhase2Batch1Verification (Tests\Feature\UATPhase2Batch1Verification)::Ui labels and tax types have no typos" class="Tests\Feature\UATPhase2Batch1VerificationTest" classname="Tests.Feature.UATPhase2Batch1VerificationTest" assertions="4" time="0.240822"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase2Batch2VerificationTest" file="UATPhase2Batch2Verification (Tests\Feature\UATPhase2Batch2Verification)" tests="5" assertions="21" errors="0" failures="0" skipped="0" time="1.317232">
+      <testcase name="Issue 3 rejected item excluded from remaining and or becomes complete" file="UATPhase2Batch2Verification (Tests\Feature\UATPhase2Batch2Verification)::Issue 3 rejected item excluded from remaining and or becomes complete" class="Tests\Feature\UATPhase2Batch2VerificationTest" classname="Tests.Feature.UATPhase2Batch2VerificationTest" assertions="3" time="0.296309"/>
+      <testcase name="Issue 11 delivery order so selection and multi customer rule" file="UATPhase2Batch2Verification (Tests\Feature\UATPhase2Batch2Verification)::Issue 11 delivery order so selection and multi customer rule" class="Tests\Feature\UATPhase2Batch2VerificationTest" classname="Tests.Feature.UATPhase2Batch2VerificationTest" assertions="4" time="0.256584"/>
+      <testcase name="Issue 13 so approval validates free stock" file="UATPhase2Batch2Verification (Tests\Feature\UATPhase2Batch2Verification)::Issue 13 so approval validates free stock" class="Tests\Feature\UATPhase2Batch2VerificationTest" classname="Tests.Feature.UATPhase2Batch2VerificationTest" assertions="1" time="0.260319"/>
+      <testcase name="Issue 14 sales invoice repeater is locked" file="UATPhase2Batch2Verification (Tests\Feature\UATPhase2Batch2Verification)::Issue 14 sales invoice repeater is locked" class="Tests\Feature\UATPhase2Batch2VerificationTest" classname="Tests.Feature.UATPhase2Batch2VerificationTest" assertions="6" time="0.254742"/>
+      <testcase name="Issue 16 customer nik protection and display code" file="UATPhase2Batch2Verification (Tests\Feature\UATPhase2Batch2Verification)::Issue 16 customer nik protection and display code" class="Tests\Feature\UATPhase2Batch2VerificationTest" classname="Tests.Feature.UATPhase2Batch2VerificationTest" assertions="7" time="0.249277"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase2Batch3VerificationTest" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)" tests="13" assertions="45" errors="0" failures="0" skipped="0" time="5.145727">
+      <testcase name="Issue 7 account payable list title is clean and formatted" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 7 account payable list title is clean and formatted" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="3" time="0.387519"/>
+      <testcase name="Issue 7 account payable resource has date columns" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 7 account payable resource has date columns" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="4" time="0.381001"/>
+      <testcase name="Issue 8 invoice is overdue helper correctly detects" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 8 invoice is overdue helper correctly detects" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="2" time="0.385243"/>
+      <testcase name="Issue 8 check overdue command updates invoice status" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 8 check overdue command updates invoice status" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="2" time="0.393506"/>
+      <testcase name="Issue 8 check overdue command is registered" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 8 check overdue command is registered" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="2" time="0.390802"/>
+      <testcase name="Issue 10 vendor payments table has required columns" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 10 vendor payments table has required columns" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="4" time="0.386673"/>
+      <testcase name="Issue 10 vendor payment generates payment number on create" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 10 vendor payment generates payment number on create" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="4" time="0.406179"/>
+      <testcase name="Issue 10 vendor payment resource form has bank info fields" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 10 vendor payment resource form has bank info fields" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="4" time="0.395213"/>
+      <testcase name="Issue 10 ledger posting uses payment number as reference" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 10 ledger posting uses payment number as reference" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="10" time="0.413907"/>
+      <testcase name="Issue 15 default inventory coa is now barang dagangan" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 15 default inventory coa is now barang dagangan" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="2" time="0.395383"/>
+      <testcase name="Issue 15 new standard product gets 1140 10 inventory coa" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 15 new standard product gets 1140 10 inventory coa" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="2" time="0.407532"/>
+      <testcase name="Issue 15 sync command remaps standard products from 1140 01 to 1140 10" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 15 sync command remaps standard products from 1140 01 to 1140 10" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="4" time="0.408128"/>
+      <testcase name="Issue 15 sync command dry run does not modify database" file="UATPhase2Batch3Verification (Tests\Feature\UATPhase2Batch3Verification)::Issue 15 sync command dry run does not modify database" class="Tests\Feature\UATPhase2Batch3VerificationTest" classname="Tests.Feature.UATPhase2Batch3VerificationTest" assertions="2" time="0.394641"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase2Batch4VerificationTest" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)" tests="10" assertions="31" errors="0" failures="0" skipped="0" time="3.968294">
+      <testcase name="Issue 9 sequential number generator produces ordered codes" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 sequential number generator produces ordered codes" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="3" time="0.392394"/>
+      <testcase name="Issue 9 order request number is sequential and prefixed or" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 order request number is sequential and prefixed or" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="4" time="0.388488"/>
+      <testcase name="Issue 9 payment request prefix standardization pay req" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 payment request prefix standardization pay req" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="4" time="0.389669"/>
+      <testcase name="Issue 9 quality control number is sequential" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 quality control number is sequential" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="2" time="0.389068"/>
+      <testcase name="Issue 9 qc auto receipt uses grn prefix" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 qc auto receipt uses grn prefix" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="3" time="0.390725"/>
+      <testcase name="Issue 9 purchase receipt service generates sequential grn number" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 purchase receipt service generates sequential grn number" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="2" time="0.394698"/>
+      <testcase name="Issue 9 qc and manual receipt share one grn sequence" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 qc and manual receipt share one grn sequence" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="3" time="0.387185"/>
+      <testcase name="Issue 9 order request form has default request number" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 9 order request form has default request number" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="2" time="0.408132"/>
+      <testcase name="Issue 12 delivery order get eloquent query eager loads relations" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 12 delivery order get eloquent query eager loads relations" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="5" time="0.418809"/>
+      <testcase name="Issue 12 approval action buttons have loading disabled protection" file="UATPhase2Batch4Verification (Tests\Feature\UATPhase2Batch4Verification)::Issue 12 approval action buttons have loading disabled protection" class="Tests\Feature\UATPhase2Batch4VerificationTest" classname="Tests.Feature.UATPhase2Batch4VerificationTest" assertions="3" time="0.409127"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase2ChainIntegrityTest" file="tests/Feature/UATPhase2ChainIntegrityTest.php" tests="4" assertions="27" errors="0" failures="0" skipped="0" time="4.635722">
+      <testcase name="it Poin 2: Purchase return approval decrements stock, decrements AP, and creates balanced journals" file="tests/Feature/UATPhase2ChainIntegrityTest.php::it Poin 2: Purchase return approval decrements stock, decrements AP, and creates balanced journals" class="Tests\Feature\UATPhase2ChainIntegrityTest" classname="Tests.Feature.UATPhase2ChainIntegrityTest" assertions="6" time="1.146374"/>
+      <testcase name="it Poin 4: Delivery Order allows transition to completed and Surat Jalan PDF outputs complete quantity breakdown" file="tests/Feature/UATPhase2ChainIntegrityTest.php::it Poin 4: Delivery Order allows transition to completed and Surat Jalan PDF outputs complete quantity breakdown" class="Tests\Feature\UATPhase2ChainIntegrityTest" classname="Tests.Feature.UATPhase2ChainIntegrityTest" assertions="14" time="1.182164"/>
+      <testcase name="it Poin 5: Fully delivered SO is excluded from DO options, and fully invoiced SO is excluded from Sales Invoice options" file="tests/Feature/UATPhase2ChainIntegrityTest.php::it Poin 5: Fully delivered SO is excluded from DO options, and fully invoiced SO is excluded from Sales Invoice options" class="Tests\Feature\UATPhase2ChainIntegrityTest" classname="Tests.Feature.UATPhase2ChainIntegrityTest" assertions="3" time="1.192274"/>
+      <testcase name="it Poin 6: Sales invoice unit price is disabled and dehydrated" file="tests/Feature/UATPhase2ChainIntegrityTest.php::it Poin 6: Sales invoice unit price is disabled and dehydrated" class="Tests\Feature\UATPhase2ChainIntegrityTest" classname="Tests.Feature.UATPhase2ChainIntegrityTest" assertions="4" time="1.114910"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPhase3PrecisionAndUXTest" file="tests/Feature/UATPhase3PrecisionAndUXTest.php" tests="7" assertions="19" errors="0" failures="0" skipped="0" time="1.818908">
+      <testcase name="it Poin 7: CustomerReceiptAllocator accepts payments within Rp 1.00 tolerance for invoices with fractional cents" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 7: CustomerReceiptAllocator accepts payments within Rp 1.00 tolerance for invoices with fractional cents" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="2" time="0.244371"/>
+      <testcase name="it Poin 7: CustomerReceiptAllocator correctly rejects genuine overpayments (&gt; Rp 1.00)" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 7: CustomerReceiptAllocator correctly rejects genuine overpayments (&gt; Rp 1.00)" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="1" time="0.249131"/>
+      <testcase name="it Poin 7: CustomerReceiptObserver auto-closes invoice and AR to paid when remaining is &lt;= Rp 1.00" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 7: CustomerReceiptObserver auto-closes invoice and AR to paid when remaining is &lt;= Rp 1.00" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="4" time="0.273918"/>
+      <testcase name="it Poin 7: AccountReceivable model hook automatically reconciles remaining &lt;= 1.00 to paid and zeroes balance" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 7: AccountReceivable model hook automatically reconciles remaining &lt;= 1.00 to paid and zeroes balance" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="2" time="0.264484"/>
+      <testcase name="it Poin 7: AccountPayable model hook automatically reconciles remaining &lt;= 1.00 to paid and zeroes balance" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 7: AccountPayable model hook automatically reconciles remaining &lt;= 1.00 to paid and zeroes balance" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="2" time="0.275540"/>
+      <testcase name="it Poin 7: VendorPaymentObserver allows payment within Rp 1.00 tolerance and auto-closes AP/invoice to paid" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 7: VendorPaymentObserver allows payment within Rp 1.00 tolerance and auto-closes AP/invoice to paid" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="3" time="0.264719"/>
+      <testcase name="it Poin 8: Anti-double-click Blade component exists and is registered in AdminPanelProvider" file="tests/Feature/UATPhase3PrecisionAndUXTest.php::it Poin 8: Anti-double-click Blade component exists and is registered in AdminPanelProvider" class="Tests\Feature\UATPhase3PrecisionAndUXTest" classname="Tests.Feature.UATPhase3PrecisionAndUXTest" assertions="5" time="0.246746"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPriority1StockTransferAndReturnTest" file="UATPriority1Stock Transfer And Return (Tests\Feature\UATPriority1StockTransferAndReturn)" tests="4" assertions="25" errors="0" failures="0" skipped="0" time="1.083542">
+      <testcase name="It can transfer stock between warehouses without raks and moves inventory stock" file="UATPriority1Stock Transfer And Return (Tests\Feature\UATPriority1StockTransferAndReturn)::It can transfer stock between warehouses without raks and moves inventory stock" class="Tests\Feature\UATPriority1StockTransferAndReturnTest" classname="Tests.Feature.UATPriority1StockTransferAndReturnTest" assertions="9" time="0.257705"/>
+      <testcase name="It allows operational roles to request and response stock transfers" file="UATPriority1Stock Transfer And Return (Tests\Feature\UATPriority1StockTransferAndReturn)::It allows operational roles to request and response stock transfers" class="Tests\Feature\UATPriority1StockTransferAndReturnTest" classname="Tests.Feature.UATPriority1StockTransferAndReturnTest" assertions="3" time="0.258839"/>
+      <testcase name="It can return product from delivery order item with null rak and restores inventory" file="UATPriority1Stock Transfer And Return (Tests\Feature\UATPriority1StockTransferAndReturn)::It can return product from delivery order item with null rak and restores inventory" class="Tests\Feature\UATPriority1StockTransferAndReturnTest" classname="Tests.Feature.UATPriority1StockTransferAndReturnTest" assertions="6" time="0.270266"/>
+      <testcase name="It validates that return product options use delivered quantity not sales order quantity" file="UATPriority1Stock Transfer And Return (Tests\Feature\UATPriority1StockTransferAndReturn)::It validates that return product options use delivered quantity not sales order quantity" class="Tests\Feature\UATPriority1StockTransferAndReturnTest" classname="Tests.Feature.UATPriority1StockTransferAndReturnTest" assertions="7" time="0.296732"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)" tests="9" assertions="43" errors="0" failures="0" skipped="0" time="2.516275">
+      <testcase name="Stock adjustment creates balanced journal entries on approval for increase" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock adjustment creates balanced journal entries on approval for increase" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="8" time="0.339950"/>
+      <testcase name="Stock adjustment creates balanced journal entries on approval for decrease" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock adjustment creates balanced journal entries on approval for decrease" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="7" time="0.278131"/>
+      <testcase name="Stock adjustment works with null rak for warehouses without raks" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock adjustment works with null rak for warehouses without raks" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="6" time="0.274900"/>
+      <testcase name="Stock opname works with null rak for warehouses without raks" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock opname works with null rak for warehouses without raks" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="7" time="0.270160"/>
+      <testcase name="Stock opname start physical count populates warehouse products" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock opname start physical count populates warehouse products" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="8" time="0.264123"/>
+      <testcase name="Stock opname cannot be completed when items are not counted" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock opname cannot be completed when items are not counted" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="1" time="0.263957"/>
+      <testcase name="Stock opname can be completed after all items are counted" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock opname can be completed after all items are counted" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="3" time="0.265150"/>
+      <testcase name="Stock opname approval generates stock movements and updates inventory" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Stock opname approval generates stock movements and updates inventory" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="1" time="0.280355"/>
+      <testcase name="Cascading deletes delete stock adjustment journal entries" file="UATPriority2Stock Adjustment And Opname (Tests\Feature\UATPriority2StockAdjustmentAndOpname)::Cascading deletes delete stock adjustment journal entries" class="Tests\Feature\UATPriority2StockAdjustmentAndOpnameTest" classname="Tests.Feature.UATPriority2StockAdjustmentAndOpnameTest" assertions="2" time="0.279549"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATPriority3ReportsAndUxTest" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)" tests="6" assertions="21" errors="0" failures="0" skipped="0" time="3.459401">
+      <testcase name="Product model code attribute aliases sku" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)::Product model code attribute aliases sku" class="Tests\Feature\UATPriority3ReportsAndUxTest" classname="Tests.Feature.UATPriority3ReportsAndUxTest" assertions="1" time="0.434105"/>
+      <testcase name="View inventory card page renders and dispatches preview event" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)::View inventory card page renders and dispatches preview event" class="Tests\Feature\UATPriority3ReportsAndUxTest" classname="Tests.Feature.UATPriority3ReportsAndUxTest" assertions="4" time="0.531617"/>
+      <testcase name="Inventory card print and export routes respond ok" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)::Inventory card print and export routes respond ok" class="Tests\Feature\UATPriority3ReportsAndUxTest" classname="Tests.Feature.UATPriority3ReportsAndUxTest" assertions="3" time="0.489531"/>
+      <testcase name="View stock report page renders and dispatches preview" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)::View stock report page renders and dispatches preview" class="Tests\Feature\UATPriority3ReportsAndUxTest" classname="Tests.Feature.UATPriority3ReportsAndUxTest" assertions="4" time="0.494331"/>
+      <testcase name="Inventory report page renders successfully without sql errors" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)::Inventory report page renders successfully without sql errors" class="Tests\Feature\UATPriority3ReportsAndUxTest" classname="Tests.Feature.UATPriority3ReportsAndUxTest" assertions="4" time="1.056259"/>
+      <testcase name="Inventory report export service and excel generation" file="UATPriority3Reports And Ux (Tests\Feature\UATPriority3ReportsAndUx)::Inventory report export service and excel generation" class="Tests\Feature\UATPriority3ReportsAndUxTest" classname="Tests.Feature.UATPriority3ReportsAndUxTest" assertions="5" time="0.453558"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UATUIUXAuditVerificationTest" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)" tests="12" assertions="37" errors="0" failures="0" skipped="0" time="3.433854">
+      <testcase name="Po item refer item label displays order request number" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Po item refer item label displays order request number" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="1" time="0.296681"/>
+      <testcase name="Indonesian money macro placeholder is zero" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Indonesian money macro placeholder is zero" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="1" time="0.287439"/>
+      <testcase name="Sales invoice due date is deduplicated" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Sales invoice due date is deduplicated" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="3" time="0.278604"/>
+      <testcase name="Hub menu customer receipt is in sales hub not purchase hub" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Hub menu customer receipt is in sales hub not purchase hub" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="2" time="0.272610"/>
+      <testcase name="Sale order redirects to view page on save" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Sale order redirects to view page on save" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="2" time="0.337212"/>
+      <testcase name="Sale order table legend corrected" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Sale order table legend corrected" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="2" time="0.274174"/>
+      <testcase name="Order request infolist has note" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Order request infolist has note" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="1" time="0.267601"/>
+      <testcase name="Quality control preselects first eligible item when po has multiple items" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Quality control preselects first eligible item when po has multiple items" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="2" time="0.303490"/>
+      <testcase name="Quality control preselects by specific item query param" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Quality control preselects by specific item query param" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="2" time="0.308819"/>
+      <testcase name="Empty parenthesis rak bug is eliminated" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Empty parenthesis rak bug is eliminated" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="12" time="0.276211"/>
+      <testcase name="Order request unit price is not required" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Order request unit price is not required" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="3" time="0.272129"/>
+      <testcase name="Order request table styling is responsive and sticky" file="UATUIUXAudit Verification (Tests\Feature\UATUIUXAuditVerification)::Order request table styling is responsive and sticky" class="Tests\Feature\UATUIUXAuditVerificationTest" classname="Tests.Feature.UATUIUXAuditVerificationTest" assertions="6" time="0.258883"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UserResourceListPageTest" file="tests/Feature/UserResourceListPageTest.php" tests="1" assertions="2" errors="0" failures="0" skipped="0" time="0.454147">
+      <testcase name="user list page renders friendly manage type labels" file="tests/Feature/UserResourceListPageTest.php::user list page renders friendly manage type labels" class="Tests\Feature\UserResourceListPageTest" classname="Tests.Feature.UserResourceListPageTest" assertions="2" time="0.454147"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UserResourceTest" file="tests/Feature/UserResourceTest.php" tests="8" assertions="48" errors="0" failures="0" skipped="0" time="3.825699">
+      <testcase name="user list page can be rendered" file="tests/Feature/UserResourceTest.php::user list page can be rendered" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="1" time="0.502383"/>
+      <testcase name="user create page can be rendered without TypeError" file="tests/Feature/UserResourceTest.php::user create page can be rendered without TypeError" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="10" time="0.367477"/>
+      <testcase name="user creation validates password and konfirmasi_password mismatch" file="tests/Feature/UserResourceTest.php::user creation validates password and konfirmasi_password mismatch" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="7" time="0.532069"/>
+      <testcase name="user can be created successfully with correct properties" file="tests/Feature/UserResourceTest.php::user can be created successfully with correct properties" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="11" time="0.514309"/>
+      <testcase name="user can be created with an international phone number" file="tests/Feature/UserResourceTest.php::user can be created with an international phone number" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="4" time="0.493042"/>
+      <testcase name="user creation handles null last_name safely" file="tests/Feature/UserResourceTest.php::user creation handles null last_name safely" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="7" time="0.510844"/>
+      <testcase name="user edit page can be rendered" file="tests/Feature/UserResourceTest.php::user edit page can be rendered" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="2" time="0.358332"/>
+      <testcase name="user edit does not overwrite password when left empty" file="tests/Feature/UserResourceTest.php::user edit does not overwrite password when left empty" class="Tests\Feature\UserResourceTest" classname="Tests.Feature.UserResourceTest" assertions="6" time="0.547243"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\UserViewPageTest" file="tests/Feature/UserViewPageTest.php" tests="1" assertions="13" errors="0" failures="0" skipped="0" time="0.606530">
+      <testcase name="user view page shows permission actions and descriptions" file="tests/Feature/UserViewPageTest.php::user view page shows permission actions and descriptions" class="Tests\Feature\UserViewPageTest" classname="Tests.Feature.UserViewPageTest" assertions="13" time="0.606530"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\VendorPaymentFlowAdjustmentTest" file="Vendor Payment Flow Adjustment (Tests\Feature\VendorPaymentFlowAdjustment)" tests="2" assertions="11" errors="0" failures="2" skipped="0" time="0.549746">
+      <testcase name="Vendor payment observer keeps adjustment amount in account payable remaining" file="Vendor Payment Flow Adjustment (Tests\Feature\VendorPaymentFlowAdjustment)::Vendor payment observer keeps adjustment amount in account payable remaining" class="Tests\Feature\VendorPaymentFlowAdjustmentTest" classname="Tests.Feature.VendorPaymentFlowAdjustmentTest" assertions="2" time="0.280517">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Vendor payment observer keeps adjustment amount in account payable remainingFailed asserting that 819815.0 matches expected 75000.0.
+at tests/Feature/VendorPaymentFlowAdjustmentTest.php:83</failure>
+      </testcase>
+      <testcase name="Manual mode creates details and updates ap with adjustment" file="Vendor Payment Flow Adjustment (Tests\Feature\VendorPaymentFlowAdjustment)::Manual mode creates details and updates ap with adjustment" class="Tests\Feature\VendorPaymentFlowAdjustmentTest" classname="Tests.Feature.VendorPaymentFlowAdjustmentTest" assertions="9" time="0.269230">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">Manual mode creates details and updates ap with adjustmentFailed asserting that 75792.0 matches expected 75000.0.
+at tests/Feature/VendorPaymentFlowAdjustmentTest.php:230</failure>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\VendorPaymentFromPaymentRequestTest" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)" tests="3" assertions="20" errors="0" failures="0" skipped="0" time="1.357134">
+      <testcase name="Create page prefills from payment request query with remaining amount" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)::Create page prefills from payment request query with remaining amount" class="Tests\Feature\VendorPaymentFromPaymentRequestTest" classname="Tests.Feature.VendorPaymentFromPaymentRequestTest" assertions="8" time="0.441147"/>
+      <testcase name="Helpers used by the create page are publicly callable" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)::Helpers used by the create page are publicly callable" class="Tests\Feature\VendorPaymentFromPaymentRequestTest" classname="Tests.Feature.VendorPaymentFromPaymentRequestTest" assertions="3" time="0.235929"/>
+      <testcase name="Create from payment request saves without the not null column crash" file="Vendor Payment From Payment Request (Tests\Feature\VendorPaymentFromPaymentRequest)::Create from payment request saves without the not null column crash" class="Tests\Feature\VendorPaymentFromPaymentRequestTest" classname="Tests.Feature.VendorPaymentFromPaymentRequestTest" assertions="9" time="0.680058"/>
+    </testsuite>
+    <testsuite name="Tests\Feature\VendorPaymentResourceTest" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)" tests="29" assertions="0" errors="29" failures="0" skipped="0" time="0.000000">
+      <testcase name="Vendor payment resource can render list page" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Vendor payment resource can render list page" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Vendor payment resource can render list pageIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:00, 2026-10-01 01:01:00))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Vendor payment resource can render create page" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Vendor payment resource can render create page" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Vendor payment resource can render create pageIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:01, 2026-10-01 01:01:01))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Vendor payment form has required fields" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Vendor payment form has required fields" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Vendor payment form has required fieldsIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:01, 2026-10-01 01:01:01))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Supplier selection is required" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Supplier selection is required" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Supplier selection is requiredIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:02, 2026-10-01 01:01:02))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Payment date is required" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Payment date is required" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Payment date is requiredIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:02, 2026-10-01 01:01:02))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Ntpn is optional" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Ntpn is optional" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Ntpn is optionalIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:03, 2026-10-01 01:01:03))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Coa selection is required" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Coa selection is required" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Coa selection is requiredIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:03, 2026-10-01 01:01:03))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Payment method is required" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Payment method is required" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Payment method is requiredIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:03, 2026-10-01 01:01:03))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Payment method options available" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Payment method options available" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Payment method options availableIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:04, 2026-10-01 01:01:04))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Supplier selection filters available invoices" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Supplier selection filters available invoices" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Supplier selection filters available invoicesIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:04, 2026-10-01 01:01:04))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Selected invoices use fallback remaining when account payable is missing" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Selected invoices use fallback remaining when account payable is missing" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Selected invoices use fallback remaining when account payable is missingIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:05, 2026-10-01 01:01:05))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Form can be filled with basic data" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Form can be filled with basic data" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Form can be filled with basic dataIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:05, 2026-10-01 01:01:05))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Cash payment method selection" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Cash payment method selection" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Cash payment method selectionIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:05, 2026-10-01 01:01:05))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Bank transfer payment method selection" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Bank transfer payment method selection" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Bank transfer payment method selectionIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:06, 2026-10-01 01:01:06))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Credit payment method selection" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Credit payment method selection" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Credit payment method selectionIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:06, 2026-10-01 01:01:06))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Deposit payment method selection" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Deposit payment method selection" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Deposit payment method selectionIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:07, 2026-10-01 01:01:07))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Total payment field exists for auto calculation" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Total payment field exists for auto calculation" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Total payment field exists for auto calculationIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:07, 2026-10-01 01:01:07))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Ntpn field has max length validation" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Ntpn field has max length validation" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Ntpn field has max length validationIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:08, 2026-10-01 01:01:08))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Coa options are available" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Coa options are available" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Coa options are availableIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:08, 2026-10-01 01:01:08))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Supplier options are available" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Supplier options are available" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Supplier options are availableIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:08, 2026-10-01 01:01:08))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Form has hidden fields for backward compatibility" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Form has hidden fields for backward compatibility" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Form has hidden fields for backward compatibilityIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:09, 2026-10-01 01:01:09))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Vendor payment resource can render edit page" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Vendor payment resource can render edit page" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Vendor payment resource can render edit pageIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:09, 2026-10-01 01:01:09))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Vendor payment resource can render view page" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Vendor payment resource can render view page" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Vendor payment resource can render view pageIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:10, 2026-10-01 01:01:10))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Form validation messages are customized" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Form validation messages are customized" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Form validation messages are customizedIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:10, 2026-10-01 01:01:10))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Payment date defaults to today" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Payment date defaults to today" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Payment date defaults to todayIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:10, 2026-10-01 01:01:10))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Status field defaults to draft" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Status field defaults to draft" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Status field defaults to draftIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:11, 2026-10-01 01:01:11))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Payment adjustment defaults to zero" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Payment adjustment defaults to zero" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Payment adjustment defaults to zeroIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:11, 2026-10-01 01:01:11))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Diskon defaults to zero" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Diskon defaults to zero" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Diskon defaults to zeroIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:12, 2026-10-01 01:01:12))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+      <testcase name="Vendor payment infolist debugging" file="Vendor Payment Resource (Tests\Feature\VendorPaymentResource)::Vendor payment infolist debugging" class="Tests\Feature\VendorPaymentResourceTest" classname="Tests.Feature.VendorPaymentResourceTest" assertions="0" time="0.000000">
+        <error type="Illuminate\Database\UniqueConstraintViolationException">Vendor payment infolist debuggingIlluminate\Database\UniqueConstraintViolationException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique' (Connection: mysql, SQL: insert into `chart_of_accounts` (`code`, `name`, `type`, `is_active`, `is_current`, `updated_at`, `created_at`) values (1140.10, Persediaan Barang, Asset, 1, 1, 2026-10-01 01:01:12, 2026-10-01 01:01:12))
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125
+Caused by
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1140.10' for key 'chart_of_accounts.chart_of_accounts_code_unique'
+
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:811
+at vendor/laravel/framework/src/Illuminate/Database/Connection.php:778
+at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:42
+at vendor/laravel/framework/src/Illuminate/Database/Query/Processors/MySqlProcessor.php:35
+at vendor/laravel/framework/src/Illuminate/Database/Query/Builder.php:3853
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:2235
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1436
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1401
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Model.php:1240
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:370
+at vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php:271
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:365
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:321
+at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Factories/Factory.php:315
+at tests/Feature/VendorPaymentResourceTest.php:125</error>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\VendorPaymentTest" file="Vendor Payment (Tests\Feature\VendorPayment)" tests="0" assertions="0" errors="0" failures="0" skipped="0" time="0.000000"/>
+  </testsuite>
+</testsuites>
