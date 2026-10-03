@@ -88,6 +88,7 @@ class StockMovementTest extends TestCase
             'date' => now(),
             'from_model_type' => 'App\\Models\\DeliveryOrder',
             'from_model_id' => 1,
+            'meta' => ['allow_negative_stock' => true],
         ]);
 
         $this->assertDatabaseHas('stock_movements', [
@@ -285,6 +286,7 @@ class StockMovementTest extends TestCase
             'quantity' => -25,
             'value' => 50000,
             'date' => now(),
+            'meta' => ['allow_negative_stock' => true],
         ]);
 
         // Inbound to warehouse 2
@@ -353,6 +355,7 @@ class StockMovementTest extends TestCase
             'date' => now(),
             'from_model_type' => 'App\\Models\\ProductionOrder',
             'from_model_id' => 1,
+            'meta' => ['allow_negative_stock' => true],
         ]);
 
         // Finished goods production
@@ -392,6 +395,7 @@ class StockMovementTest extends TestCase
             'quantity' => -20,
             'value' => 50000,
             'date' => now()->subDay(),
+            'meta' => ['allow_negative_stock' => true],
         ]);
 
         // Return from customer

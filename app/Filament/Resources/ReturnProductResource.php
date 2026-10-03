@@ -5,12 +5,15 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ReturnProductResource\Pages;
 use App\Filament\Resources\ReturnProductResource\Pages\ViewReturnProduct;
 use App\Http\Controllers\HelperController;
+use App\Models\CustomerReturn;
+use App\Models\CustomerReturnItem;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\Product;
 use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptItem;
 use App\Models\ReturnProduct;
+use App\Models\ReturnProductItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Services\ReturnProductService;
@@ -217,9 +220,10 @@ class ReturnProductResource extends Resource
                                     ->required()
                                     ->reactive()
                                     ->options(function ($set, $get) {
+                                        $currentReturnId = $get('../../id');
                                         if ($get('from_item_model_type') == 'App\Models\DeliveryOrderItem') {
                                             $deliveryOrderId = $get('../../from_model_id');
-                                            $listDeliveryOrderItem = DeliveryOrderItem::with(['product'])
+                                            $listDeliveryOrderItem = DeliveryOrderItem::with(['product', 'deliveryOrder'])
                                                 ->where('delivery_order_id', $deliveryOrderId)
                                                 ->get();
                                             $items = [];
@@ -227,7 +231,37 @@ class ReturnProductResource extends Resource
                                                 $sku = $doItem->product?->sku ?? '-';
                                                 $name = $doItem->product?->name ?? 'Produk';
                                                 $qty = rtrim(rtrim((string) $doItem->quantity, '0'), '.');
-                                                $items[$doItem->id] = "({$sku}) {$name} [Terkirim: {$qty}]";
+
+                                                // Hitung kuantitas yang sudah diretur di ReturnProduct lain
+                                                $existingRpQty = (float) ReturnProductItem::where('from_item_model_type', DeliveryOrderItem::class)
+                                                    ->where('from_item_model_id', $doItem->id)
+                                                    ->when($currentReturnId, fn ($q) => $q->where('return_product_id', '!=', $currentReturnId))
+                                                    ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                    ->sum('quantity');
+
+                                                // Hitung kuantitas yang sudah diretur di CustomerReturn untuk produk & DO/SO yang sama
+                                                $existingCrQty = 0.0;
+                                                $do = $doItem->deliveryOrder;
+                                                if ($do) {
+                                                    $existingCrQty = (float) CustomerReturnItem::where('product_id', $doItem->product_id)
+                                                        ->whereHas('customerReturn', function ($q) use ($do) {
+                                                            $q->whereNotIn('status', [CustomerReturn::STATUS_REJECTED])
+                                                              ->where(function ($sq) use ($do) {
+                                                                  $sq->whereHas('invoice', function ($invQ) use ($do) {
+                                                                      $invQ->whereJsonContains('delivery_orders', (int) $do->id)
+                                                                           ->orWhereJsonContains('delivery_orders', (string) $do->id);
+                                                                      if ($do->sale_order_id) {
+                                                                          $invQ->orWhere('from_model_id', $do->sale_order_id);
+                                                                      }
+                                                                  });
+                                                              });
+                                                        })
+                                                        ->sum('quantity');
+                                                }
+
+                                                $sisaRetur = max(0.0, (float) $doItem->quantity - ($existingRpQty + $existingCrQty));
+                                                $sisaReturFormatted = rtrim(rtrim((string) $sisaRetur, '0'), '.');
+                                                $items[$doItem->id] = "({$sku}) {$name} [Terkirim: {$qty}, Sisa Retur: {$sisaReturFormatted}]";
                                             }
 
                                             return $items;
@@ -241,7 +275,16 @@ class ReturnProductResource extends Resource
                                                 $sku = $purchaseReceiptItem->product?->sku ?? '-';
                                                 $name = $purchaseReceiptItem->product?->name ?? 'Produk';
                                                 $qty = rtrim(rtrim((string) $purchaseReceiptItem->quantity, '0'), '.');
-                                                $items[$purchaseReceiptItem->id] = "({$sku}) {$name} [Diterima: {$qty}]";
+
+                                                $existingRpQty = (float) ReturnProductItem::where('from_item_model_type', PurchaseReceiptItem::class)
+                                                    ->where('from_item_model_id', $purchaseReceiptItem->id)
+                                                    ->when($currentReturnId, fn ($q) => $q->where('return_product_id', '!=', $currentReturnId))
+                                                    ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                    ->sum('quantity');
+
+                                                $sisaRetur = max(0.0, (float) $purchaseReceiptItem->quantity - $existingRpQty);
+                                                $sisaReturFormatted = rtrim(rtrim((string) $sisaRetur, '0'), '.');
+                                                $items[$purchaseReceiptItem->id] = "({$sku}) {$name} [Diterima: {$qty}, Sisa Retur: {$sisaReturFormatted}]";
                                             }
                                             return $items;
                                         }
@@ -249,17 +292,57 @@ class ReturnProductResource extends Resource
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $from_item_model_type = $get('from_item_model_type');
+                                        $currentReturnId = $get('../../id');
                                         $fromModelItem = null;
+                                        $maxQuantity = 0.0;
+
                                         if ($from_item_model_type == 'App\Models\DeliveryOrderItem') {
-                                            $fromModelItem = DeliveryOrderItem::find($get('from_item_model_id'));
+                                            $fromModelItem = DeliveryOrderItem::with('deliveryOrder')->find($get('from_item_model_id'));
+                                            if ($fromModelItem) {
+                                                $existingRpQty = (float) ReturnProductItem::where('from_item_model_type', DeliveryOrderItem::class)
+                                                    ->where('from_item_model_id', $fromModelItem->id)
+                                                    ->when($currentReturnId, fn ($q) => $q->where('return_product_id', '!=', $currentReturnId))
+                                                    ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                    ->sum('quantity');
+
+                                                $existingCrQty = 0.0;
+                                                $do = $fromModelItem->deliveryOrder;
+                                                if ($do) {
+                                                    $existingCrQty = (float) CustomerReturnItem::where('product_id', $fromModelItem->product_id)
+                                                        ->whereHas('customerReturn', function ($q) use ($do) {
+                                                            $q->whereNotIn('status', [CustomerReturn::STATUS_REJECTED])
+                                                              ->where(function ($sq) use ($do) {
+                                                                  $sq->whereHas('invoice', function ($invQ) use ($do) {
+                                                                      $invQ->whereJsonContains('delivery_orders', (int) $do->id)
+                                                                           ->orWhereJsonContains('delivery_orders', (string) $do->id);
+                                                                      if ($do->sale_order_id) {
+                                                                          $invQ->orWhere('from_model_id', $do->sale_order_id);
+                                                                      }
+                                                                  });
+                                                              });
+                                                        })
+                                                        ->sum('quantity');
+                                                }
+
+                                                $maxQuantity = max(0.0, (float) $fromModelItem->quantity - ($existingRpQty + $existingCrQty));
+                                            }
                                         } elseif ($from_item_model_type == 'App\Models\PurchaseReceiptItem') {
                                             $fromModelItem = PurchaseReceiptItem::find($get('from_item_model_id'));
+                                            if ($fromModelItem) {
+                                                $existingRpQty = (float) ReturnProductItem::where('from_item_model_type', PurchaseReceiptItem::class)
+                                                    ->where('from_item_model_id', $fromModelItem->id)
+                                                    ->when($currentReturnId, fn ($q) => $q->where('return_product_id', '!=', $currentReturnId))
+                                                    ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                    ->sum('quantity');
+
+                                                $maxQuantity = max(0.0, (float) $fromModelItem->quantity - $existingRpQty);
+                                            }
                                         }
 
                                         if ($fromModelItem) {
                                             $set('product_id', $fromModelItem->product_id);
-                                            $set('max_quantity', (float) $fromModelItem->quantity);
-                                            $set('quantity', (float) $fromModelItem->quantity);
+                                            $set('max_quantity', $maxQuantity);
+                                            $set('quantity', $maxQuantity > 0 ? $maxQuantity : 0);
                                         }
                                     })
                                     ->validationMessages([
@@ -284,18 +367,15 @@ class ReturnProductResource extends Resource
                                     ->numeric()
                                     ->reactive()
                                     ->default(0)
-                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                    ->helperText(function ($get) {
                                         $max = (float) $get('max_quantity');
-                                        if ($max > 0 && (float) $state > $max) {
-                                            $set('quantity', $max);
-                                            HelperController::sendNotification(isSuccess: false, title: "Information", message: "Quantity yang kamu masukkan lebih besar dari jumlah terkirim ({$max}). Disesuaikan ke batas maksimal.");
-                                        }
+                                        return $max > 0 ? "Maksimal dapat diretur: {$max} pcs" : 'Sisa retur: 0 pcs';
                                     })
                                     ->rules([
                                         fn ($get) => function ($attribute, $value, $fail) use ($get) {
                                             $max = (float) $get('max_quantity');
                                             if ($max > 0 && (float) $value > $max) {
-                                                $fail("Quantity retur ({$value}) tidak boleh melebihi quantity sumber ({$max}).");
+                                                $fail("Quantity retur ({$value}) melebihi sisa batas maksimal yang dapat diretur ({$max}).");
                                             }
                                         },
                                     ])

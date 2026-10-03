@@ -478,21 +478,52 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
         $this->assertEquals(50000.0, (float) $creditCogs->credit);
         $this->assertNull($creditDelivery, 'Akun Barang Terkirim TIDAK boleh dikredit saat DO sudah di-invoice.');
 
-        // 2. Assert linked Invoice item quantity reduced from 2 to 1
+        // 2. Audit Protection: Assert linked posted Invoice item quantity is NOT modified in-place
+        // (Perbaikan UAT Poin 3: Invoice yang sudah diposting/unpaid tidak boleh diubah in-place demi integritas jurnal historis)
         $invItem->refresh();
-        $this->assertEquals(1.0, (float) $invItem->quantity);
-        $this->assertEquals(100000.0, (float) $invItem->total);
+        $this->assertEquals(2.0, (float) $invItem->quantity, 'Invoice non-draft harus dilindungi dari perubahan in-place.');
+        $this->assertEquals(200000.0, (float) $invItem->total);
 
-        // 3. Assert linked Invoice total reduced from 200,000 to 100,000
         $invoice->refresh();
-        $this->assertEquals(100000.0, (float) $invoice->total);
-        $this->assertEquals(100000.0, (float) $invoice->subtotal);
+        $this->assertEquals(200000.0, (float) $invoice->total, 'Header invoice non-draft tidak boleh diubah in-place.');
 
-        // 4. Assert AccountReceivable total and remaining reduced to 100,000
-        $ar = AccountReceivable::where('invoice_id', $invoice->id)->first();
-        $this->assertNotNull($ar);
-        $this->assertEquals(100000.0, (float) $ar->total);
-        $this->assertEquals(100000.0, (float) $ar->remaining);
+        // 3. Verifikasi bahwa Invoice DRAFT dapat disesuaikan secara in-place
+        $draftInvoice = Invoice::create([
+            'invoice_number' => 'INV-DRAFT-' . uniqid(),
+            'from_model_type' => DeliveryOrder::class,
+            'from_model_id' => $do->id,
+            'customer_id' => $this->customer->id,
+            'customer_name' => $this->customer->name,
+            'customer_phone' => $this->customer->phone,
+            'delivery_orders' => [$do->id],
+            'invoice_date' => now(),
+            'due_date' => now()->addDays(30),
+            'status' => Invoice::STATUS_DRAFT,
+            'subtotal' => 200000,
+            'dpp' => 200000,
+            'total' => 200000,
+            'ppn_rate' => 0,
+            'tipe_pajak' => 'None',
+        ]);
+
+        $draftInvItem = InvoiceItem::create([
+            'invoice_id' => $draftInvoice->id,
+            'product_id' => $this->product->id,
+            'quantity' => 2,
+            'price' => 100000,
+            'subtotal' => 200000,
+            'total' => 200000,
+            'tax_rate' => 0,
+            'tax_amount' => 0,
+            'coa_id' => $this->salesCoa->id,
+        ]);
+
+        app(ReturnProductService::class)->adjustLinkedSalesInvoice($returnProduct, $do);
+
+        $draftInvItem->refresh();
+        $draftInvoice->refresh();
+        $this->assertEquals(1.0, (float) $draftInvItem->quantity, 'Invoice DRAFT harus berkurang kuantitasnya saat retur.');
+        $this->assertEquals(100000.0, (float) $draftInvoice->total, 'Invoice DRAFT harus berkurang totalnya saat retur.');
     }
 
     public function test_edit_return_product_loads_max_quantity_and_blocks_over_return(): void

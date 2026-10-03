@@ -146,6 +146,16 @@ class PurchaseOrderService
      */
     public function approvePo(PurchaseOrder $purchaseOrder, ?int $userId = null): PurchaseOrder
     {
+        if ($purchaseOrder->purchaseOrderItem()->count() === 0) {
+            throw new \Exception("Purchase Order {$purchaseOrder->po_number} tidak memiliki item dan tidak dapat disetujui (approve).");
+        }
+
+        // Pastikan total_amount terhitung jika sebelumnya kosong/0
+        if ((float) $purchaseOrder->total_amount <= 0) {
+            $this->updateTotalAmount($purchaseOrder);
+            $purchaseOrder->refresh();
+        }
+
         OrderRequestQuantityLock::validatePurchaseOrderApproval($purchaseOrder);
 
         $purchaseOrder->update([

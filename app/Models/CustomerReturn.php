@@ -100,6 +100,11 @@ class CustomerReturn extends Model
         return $this->hasMany(CustomerReturnItem::class, 'customer_return_id');
     }
 
+    public function customerReturnItem()
+    {
+        return $this->customerReturnItems();
+    }
+
     public function stockMovements()
     {
         return $this->morphMany(StockMovement::class, 'from_model');

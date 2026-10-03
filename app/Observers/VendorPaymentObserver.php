@@ -155,8 +155,18 @@ class VendorPaymentObserver
 
             $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
             $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
-            $totalOriginal = (float) ($accountPayable->total_original ?? ((float) $accountPayable->total / $exchangeRate));
-            $newPaidOriginal = min((float) $totalPaidOriginalForInvoice, $totalOriginal);
+            $totalIdr = (float) ($accountPayable->total ?? $accountPayable->invoice?->total ?? 0);
+            $totalOriginal = (float) ($accountPayable->total_original ?? 0);
+            if ($totalOriginal <= 0 || ($totalIdr > 0 && abs(($totalOriginal * $exchangeRate) - $totalIdr) > 1.0)) {
+                $totalOriginal = round($totalIdr / $exchangeRate, 2);
+            }
+
+            // Perhitungkan akumulasi kredit retur pembelian yang disetujui untuk invoice ini
+            $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($accountPayable->invoice);
+            $totalReturnOriginal = round($totalReturnGrossIdr / $exchangeRate, 2);
+
+            $totalPaidOrCreditedOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
+            $newPaidOriginal = min($totalPaidOrCreditedOriginal, $totalOriginal);
             $newRemainingOriginal = max(0, $totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice);
 
             $accountPayable->paid_original = $newPaidOriginal;
@@ -195,10 +205,8 @@ class VendorPaymentObserver
 
         foreach ($paymentDetails as $detail) {
             $invoiceId = $detail->invoice_id;
-            $paidAmount = (float) $detail->amount;
-            $adjustmentAmount = (float) ($detail->adjustment_amount ?? 0);
 
-            // Update Account Payable - subtract the payment amount
+            // Update Account Payable
             $accountPayable = \App\Models\AccountPayable::where('invoice_id', $invoiceId)->first();
             if (!$accountPayable) {
                 continue; // Skip if AP not found
@@ -206,10 +214,32 @@ class VendorPaymentObserver
 
             $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
             $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
-            $totalOriginal = (float) ($accountPayable->total_original ?? ((float) $accountPayable->total / $exchangeRate));
+            $totalIdr = (float) ($accountPayable->total ?? $accountPayable->invoice?->total ?? 0);
+            $totalOriginal = (float) ($accountPayable->total_original ?? 0);
+            if ($totalOriginal <= 0 || ($totalIdr > 0 && abs(($totalOriginal * $exchangeRate) - $totalIdr) > 1.0)) {
+                $totalOriginal = round($totalIdr / $exchangeRate, 2);
+            }
 
-            $newPaidOriginal = max(0, (float) ($accountPayable->paid_original ?? 0) - $paidAmount);
-            $newRemainingOriginal = min($totalOriginal, (float) ($accountPayable->remaining_original ?? 0) + $paidAmount + $adjustmentAmount);
+            $totalPaidOriginalForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+                ->where('vendor_payment_id', '!=', $payment->id)
+                ->whereHas('vendorPayment', function($query) {
+                    $query->whereIn('status', ['partial', 'paid']);
+                })
+                ->sum('amount');
+
+            $totalAdjustmentOriginalForInvoice = \App\Models\VendorPaymentDetail::where('invoice_id', $invoiceId)
+                ->where('vendor_payment_id', '!=', $payment->id)
+                ->whereHas('vendorPayment', function($query) {
+                    $query->whereIn('status', ['partial', 'paid']);
+                })
+                ->sum('adjustment_amount');
+
+            $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($accountPayable->invoice);
+            $totalReturnOriginal = round($totalReturnGrossIdr / $exchangeRate, 2);
+
+            $totalPaidOrCreditedOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
+            $newPaidOriginal = min($totalPaidOrCreditedOriginal, $totalOriginal);
+            $newRemainingOriginal = max(0, $totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice);
 
             $accountPayable->paid_original = $newPaidOriginal;
             $accountPayable->remaining_original = $newRemainingOriginal;

@@ -208,6 +208,9 @@ class DeliveryOrderObserver
         // =========================================================
         $this->createStockMovementsForShippingStart($deliveryOrder);
 
+        // Catat jurnal pengiriman (Dr Barang Terkirim / Cr Persediaan) saat barang berangkat
+        $this->createJournalEntriesForDelivery($deliveryOrder);
+
         // Reservasi DO DIKONSUMSI saat barang berangkat — gerakan stok fisik sudah dibuat di atas.
         // Reservasi harus dilepas agar stok cadangan (qty_reserved) berkurang seiring berkurangnya stok fisik (qty_available).
         app(\App\Services\StockReservationLedger::class)->releaseForDeliveryOrder(
@@ -565,6 +568,14 @@ class DeliveryOrderObserver
      */
     protected function createJournalEntriesForDelivery(DeliveryOrder $deliveryOrder): void
     {
+        // Cegah pembuatan jurnal duplikat jika sudah pernah dibuat (misal saat sent)
+        $hasJournals = \App\Models\JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->exists();
+        if ($hasJournals) {
+            return;
+        }
+
         // Load delivery order items with related data
         $deliveryOrder->load('deliveryOrderItem.product.inventoryCoa', 'deliveryOrderItem.product.goodsDeliveryCoa');
 

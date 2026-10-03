@@ -34,7 +34,7 @@ class StockMovementFactory extends Factory
             'type' => $type,
             'reference_id' => $this->faker->word(),
             'date' => $this->faker->dateTime(),
-            'meta' => ['faker' => true],
+            'meta' => ['faker' => true, 'allow_negative_stock' => true],
         ];
     }
 }

@@ -247,7 +247,7 @@ class PurchaseOrder extends Model
 
     public function receiptFulfillmentSummary(): array
     {
-        $this->loadMissing('purchaseOrderItem.purchaseReceiptItem');
+        $this->loadMissing('purchaseOrderItem.purchaseReceiptItem.purchaseReceipt');
 
         $totalItems = $this->purchaseOrderItem->count();
         $completedItems = 0;
@@ -258,8 +258,12 @@ class PurchaseOrder extends Model
 
         foreach ($this->purchaseOrderItem as $item) {
             $ordered = (float) ($item->quantity ?? 0);
-            $received = (float) $item->purchaseReceiptItem->sum('qty_received');
-            $accepted = (float) $item->purchaseReceiptItem->sum('qty_accepted');
+            $activeReceiptItems = $item->purchaseReceiptItem->filter(function ($ri) {
+                $receipt = $ri->purchaseReceipt;
+                return $receipt && ! $receipt->trashed() && strtolower((string) $receipt->status) !== 'cancelled';
+            });
+            $received = (float) $activeReceiptItems->sum('qty_received');
+            $accepted = (float) $activeReceiptItems->sum('qty_accepted');
 
             $totalOrdered += $ordered;
             $totalReceived += $received;

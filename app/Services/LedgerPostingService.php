@@ -1197,6 +1197,11 @@ class LedgerPostingService
      */
     private function createJournalEntry(array $data, ?int $currencyId, float $exchangeRate): JournalEntry
     {
+        $coaId = $data['coa_id'] ?? null;
+        if ($coaId) {
+            $this->validateNonParentCoa($coaId);
+        }
+
         $debitOrig = (float) ($data['debit'] ?? 0);
         $creditOrig = (float) ($data['credit'] ?? 0);
         $amountsAreIdr = (bool) ($data['amounts_are_idr'] ?? false);

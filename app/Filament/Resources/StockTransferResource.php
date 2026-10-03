@@ -166,6 +166,7 @@ class StockTransferResource extends Resource
                                     ->default(function ($get) {
                                         return $get('../../from_warehouse_id');
                                     })
+                                    ->afterStateUpdated(fn ($set) => $set('from_rak_id', null))
                                     ->options(fn () => static::resolveWarehouseOptions())
                                     ->getSearchResultsUsing(fn (string $search) => static::resolveWarehouseOptions($search))
                                     ->required(),
@@ -184,8 +185,17 @@ class StockTransferResource extends Resource
                                         return StockAdjustmentResource::resolveRakOptions((int) $whId, $search);
                                     })
                                     ->helperText(function ($get) {
-                                        $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
-                                            ->where('rak_id', $get('from_rak_id'))->first();
+                                        $productId = $get('product_id');
+                                        $rakId = $get('from_rak_id');
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        if (! $productId || ! $rakId || ! $whId) {
+                                            return 'Opsional jika gudang tidak memiliki rak.';
+                                        }
+
+                                        $inventoryStock = InventoryStock::where('product_id', $productId)
+                                            ->where('warehouse_id', $whId)
+                                            ->where('rak_id', $rakId)
+                                            ->first();
                                         if ($inventoryStock) {
                                             return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }
@@ -200,6 +210,7 @@ class StockTransferResource extends Resource
                                     ->default(function ($get) {
                                         return $get('../../to_warehouse_id');
                                     })
+                                    ->afterStateUpdated(fn ($set) => $set('to_rak_id', null))
                                     ->options(fn () => static::resolveWarehouseOptions())
                                     ->getSearchResultsUsing(fn (string $search) => static::resolveWarehouseOptions($search))
                                     ->required(),
@@ -218,8 +229,17 @@ class StockTransferResource extends Resource
                                         return StockAdjustmentResource::resolveRakOptions((int) $whId, $search);
                                     })
                                     ->helperText(function ($get) {
-                                        $inventoryStock = InventoryStock::where('product_id', $get('product_id'))
-                                            ->where('rak_id', $get('to_rak_id'))->first();
+                                        $productId = $get('product_id');
+                                        $rakId = $get('to_rak_id');
+                                        $whId = $get('to_warehouse_id') ?: $get('../../to_warehouse_id');
+                                        if (! $productId || ! $rakId || ! $whId) {
+                                            return 'Opsional jika gudang tidak memiliki rak.';
+                                        }
+
+                                        $inventoryStock = InventoryStock::where('product_id', $productId)
+                                            ->where('warehouse_id', $whId)
+                                            ->where('rak_id', $rakId)
+                                            ->first();
                                         if ($inventoryStock) {
                                             return 'Jumlah stok fisik ' . number_format((float) $inventoryStock->qty_available, 0, ',', '.');
                                         }

@@ -9,7 +9,9 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Customer;
 use App\Models\Cabang;
+use App\Models\DeliveryOrderItem;
 use App\Models\Product;
+use App\Models\ReturnProductItem;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\CustomerReturnService;
@@ -88,7 +90,8 @@ class CustomerReturnResource extends Resource
                             ->options(CustomerReturn::STATUS_LABELS)
                             ->required()
                             ->default(CustomerReturn::STATUS_PENDING)
-                            ->disabled(fn (string $operation) => $operation === 'create')
+                            ->disabled()
+                            ->dehydrated()
                             ->columnSpan(1),
 
                         Forms\Components\DatePicker::make('return_date')
@@ -119,7 +122,22 @@ class CustomerReturnResource extends Resource
 
                     Forms\Components\Select::make('warehouse_id')
                         ->label('Gudang Penerima')
-                        ->options(fn () => Warehouse::orderBy('name')->pluck('name', 'id'))
+                        ->options(function (Forms\Get $get) {
+                            $user = Auth::user();
+                            $cabangId = $get('cabang_id') ?? $user?->cabang_id;
+                            $manageType = $user?->manage_type ?? [];
+                            $query = Warehouse::where('status', 1);
+
+                            if ($cabangId && (!is_array($manageType) || !in_array('all', $manageType))) {
+                                $query->where('cabang_id', $cabangId);
+                            } elseif ($cabangId) {
+                                $query->where('cabang_id', $cabangId);
+                            }
+
+                            return $query->orderBy('name')->get()->mapWithKeys(function ($warehouse) {
+                                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+                            });
+                        })
                         ->searchable()
                         ->preload()
                         ->nullable()
@@ -185,12 +203,12 @@ class CustomerReturnResource extends Resource
                                         return [];
                                     }
                                     $currentReturnId = $get('../../id');
-                                    return InvoiceItem::with('product')
+                                    return InvoiceItem::with(['product', 'invoice'])
                                         ->where('invoice_id', $invoiceId)
                                         ->whereNull('deleted_at')
                                         ->get()
                                         ->mapWithKeys(function ($item) use ($currentReturnId) {
-                                            $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $item->id)
+                                            $alreadyReturnedCr = (float) CustomerReturnItem::where('invoice_item_id', $item->id)
                                                 ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
                                                 ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [
                                                     CustomerReturn::STATUS_PENDING,
@@ -200,10 +218,28 @@ class CustomerReturnResource extends Resource
                                                     CustomerReturn::STATUS_COMPLETED,
                                                 ]))
                                                 ->sum('quantity');
-                                            $returnable = max(0, (float) $item->quantity - (float) $alreadyReturned);
+
+                                            $alreadyReturnedRp = 0.0;
+                                            $inv = $item->invoice;
+                                            if ($inv) {
+                                                $doIds = is_array($inv->delivery_orders) ? $inv->delivery_orders : [];
+                                                if (empty($doIds) && $inv->from_model_type === \App\Models\SaleOrder::class && $inv->from_model_id) {
+                                                    $doIds = \App\Models\DeliveryOrder::where('sale_order_id', $inv->from_model_id)->pluck('id')->toArray();
+                                                }
+                                                if (! empty($doIds)) {
+                                                    $alreadyReturnedRp = (float) ReturnProductItem::where('from_item_model_type', DeliveryOrderItem::class)
+                                                        ->where('product_id', $item->product_id)
+                                                        ->whereHas('fromItemModel', fn ($q) => $q->whereIn('delivery_order_id', $doIds))
+                                                        ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                        ->sum('quantity');
+                                                }
+                                            }
+
+                                            $returnable = max(0.0, (float) $item->quantity - ($alreadyReturnedCr + $alreadyReturnedRp));
+                                            $returnableFormatted = rtrim(rtrim((string) $returnable, '0'), '.');
                                             $labelSuffix = $returnable <= 0 
                                                 ? ' — [SUDAH DIRETUR PENUH (0 pcs)]' 
-                                                : ' (Bisa diretur: ' . $returnable . ' / ' . $item->quantity . ' pcs)';
+                                                : " (Bisa diretur: {$returnableFormatted} / {$item->quantity} pcs)";
                                             return [
                                                 $item->id => ($item->product?->name ?? '-') . $labelSuffix,
                                             ];
@@ -236,12 +272,12 @@ class CustomerReturnResource extends Resource
                                     if (! $invoiceItemId) {
                                         return null;
                                     }
-                                    $item = InvoiceItem::find($invoiceItemId);
+                                    $item = InvoiceItem::with('invoice')->find($invoiceItemId);
                                     if (! $item) {
                                         return null;
                                     }
                                     $currentReturnId = $get('../../id');
-                                    $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
+                                    $alreadyReturnedCr = (float) CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
                                         ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
                                         ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [
                                             CustomerReturn::STATUS_PENDING,
@@ -251,7 +287,24 @@ class CustomerReturnResource extends Resource
                                             CustomerReturn::STATUS_COMPLETED,
                                         ]))
                                         ->sum('quantity');
-                                    return max(0, (float) $item->quantity - (float) $alreadyReturned);
+
+                                    $alreadyReturnedRp = 0.0;
+                                    $inv = $item->invoice;
+                                    if ($inv) {
+                                        $doIds = is_array($inv->delivery_orders) ? $inv->delivery_orders : [];
+                                        if (empty($doIds) && $inv->from_model_type === \App\Models\SaleOrder::class && $inv->from_model_id) {
+                                            $doIds = \App\Models\DeliveryOrder::where('sale_order_id', $inv->from_model_id)->pluck('id')->toArray();
+                                        }
+                                        if (! empty($doIds)) {
+                                            $alreadyReturnedRp = (float) ReturnProductItem::where('from_item_model_type', DeliveryOrderItem::class)
+                                                ->where('product_id', $item->product_id)
+                                                ->whereHas('fromItemModel', fn ($q) => $q->whereIn('delivery_order_id', $doIds))
+                                                ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                ->sum('quantity');
+                                        }
+                                    }
+
+                                    return max(0.0, (float) $item->quantity - ($alreadyReturnedCr + $alreadyReturnedRp));
                                 })
                                 ->validationMessages([
                                     'max' => 'Kuantitas retur melebihi batas maksimal sisa faktur.',
@@ -262,12 +315,12 @@ class CustomerReturnResource extends Resource
                                     if (! $invoiceItemId) {
                                         return null;
                                     }
-                                    $item = InvoiceItem::find($invoiceItemId);
+                                    $item = InvoiceItem::with('invoice')->find($invoiceItemId);
                                     if (! $item) {
                                         return null;
                                     }
                                     $currentReturnId = $get('../../id');
-                                    $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
+                                    $alreadyReturnedCr = (float) CustomerReturnItem::where('invoice_item_id', $invoiceItemId)
                                         ->when($currentReturnId, fn ($q) => $q->where('customer_return_id', '!=', $currentReturnId))
                                         ->whereHas('customerReturn', fn ($q) => $q->whereIn('status', [
                                             CustomerReturn::STATUS_PENDING,
@@ -277,11 +330,29 @@ class CustomerReturnResource extends Resource
                                             CustomerReturn::STATUS_COMPLETED,
                                         ]))
                                         ->sum('quantity');
-                                    $max = max(0, (float) $item->quantity - (float) $alreadyReturned);
+
+                                    $alreadyReturnedRp = 0.0;
+                                    $inv = $item->invoice;
+                                    if ($inv) {
+                                        $doIds = is_array($inv->delivery_orders) ? $inv->delivery_orders : [];
+                                        if (empty($doIds) && $inv->from_model_type === \App\Models\SaleOrder::class && $inv->from_model_id) {
+                                            $doIds = \App\Models\DeliveryOrder::where('sale_order_id', $inv->from_model_id)->pluck('id')->toArray();
+                                        }
+                                        if (! empty($doIds)) {
+                                            $alreadyReturnedRp = (float) ReturnProductItem::where('from_item_model_type', DeliveryOrderItem::class)
+                                                ->where('product_id', $item->product_id)
+                                                ->whereHas('fromItemModel', fn ($q) => $q->whereIn('delivery_order_id', $doIds))
+                                                ->whereHas('returnProduct', fn ($q) => $q->whereNotIn('status', ['rejected', 'cancelled']))
+                                                ->sum('quantity');
+                                        }
+                                    }
+
+                                    $max = max(0.0, (float) $item->quantity - ($alreadyReturnedCr + $alreadyReturnedRp));
                                     if ($max <= 0) {
                                         return 'Perhatian: Barang ini telah diretur penuh pada dokumen lain (sisa 0 pcs).';
                                     }
-                                    return "Maksimal dapat diretur: {$max} pcs";
+                                    $maxFormatted = rtrim(rtrim((string) $max, '0'), '.');
+                                    return "Maksimal dapat diretur: {$maxFormatted} pcs";
                                 })
                                 ->step(0.01)
                                 ->columnSpan(2),

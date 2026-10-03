@@ -466,11 +466,15 @@ class ReturnProductService
      */
     public function adjustLinkedSalesInvoice(ReturnProduct $returnProduct, DeliveryOrder $deliveryOrder): ?Invoice
     {
-        $invoice = Invoice::where('from_model_type', \App\Models\SaleOrder::class)
+        $invoice = Invoice::whereIn('from_model_type', [\App\Models\SaleOrder::class, \App\Models\DeliveryOrder::class])
             ->whereNotIn('status', [Invoice::STATUS_CANCELLED])
             ->where(function ($q) use ($deliveryOrder) {
                 $q->whereJsonContains('delivery_orders', (int) $deliveryOrder->id)
-                  ->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id);
+                  ->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id)
+                  ->orWhere(function ($doQ) use ($deliveryOrder) {
+                      $doQ->where('from_model_type', \App\Models\DeliveryOrder::class)
+                          ->where('from_model_id', $deliveryOrder->id);
+                  });
                 if ($deliveryOrder->sale_order_id) {
                     $q->orWhere(function ($soQ) use ($deliveryOrder) {
                         $soQ->where('from_model_id', $deliveryOrder->sale_order_id)
@@ -478,10 +482,20 @@ class ReturnProductService
                     });
                 }
             })
+            ->orderByRaw("CASE WHEN status = '" . Invoice::STATUS_DRAFT . "' THEN 0 ELSE 1 END")
             ->first();
 
         if (! $invoice) {
             return null;
+        }
+
+        // Jangan pernah memodifikasi invoice yang sudah diposting atau lunas secara in-place!
+        // Hanya invoice berstatus draft yang aman untuk disesuaikan kuantitasnya sebelum posting GL.
+        // Jika invoice sudah posted/sent/paid/partially_paid/overdue, retur finansial wajib diproses
+        // melalui modul Retur Penjualan (Customer Return / Credit Note).
+        if ($invoice->status !== Invoice::STATUS_DRAFT) {
+            Log::info("adjustLinkedSalesInvoice skipped: Invoice {$invoice->invoice_number} is in '{$invoice->status}' state. In-place modification skipped to protect GL and sub-ledger integrity.");
+            return $invoice;
         }
 
         $invoice->loadMissing('invoiceItem');

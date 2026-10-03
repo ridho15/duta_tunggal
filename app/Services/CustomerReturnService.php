@@ -4,11 +4,17 @@ namespace App\Services;
 
 use App\Models\AccountReceivable;
 use App\Models\ChartOfAccount;
+use App\Models\Customer;
 use App\Models\CustomerReturn;
 use App\Models\CustomerReturnItem;
+use App\Models\Deposit;
+use App\Models\DepositLog;
 use App\Models\InventoryStock;
+use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\StockMovement;
+use App\Services\AccountingSettings;
+use App\Services\DepositNumberGenerator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -207,11 +213,10 @@ class CustomerReturnService
                 $this->createInventoryJournalEntries($customerReturn, $totalRestoredCost, $replaceCost, $repairCost);
             }
 
-            // ── 3. Create financial journal entries & reduce AR ───────────────────
+            // ── 3. Create financial journal entries & adjust AR / Customer Deposit ──
             $totalReturnFin = round($totalDpp + $totalPpn, 2);
             if ($totalReturnFin > 0) {
-                $this->createFinancialJournalEntries($customerReturn, $totalDpp, $totalPpn, $totalReturnFin);
-                $this->adjustAccountReceivable($customerReturn, $totalReturnFin);
+                $this->createFinancialJournalEntriesAndAdjustAr($customerReturn, $totalDpp, $totalPpn, $totalReturnFin);
             }
 
             // ── 4. Mark as processed ──────────────────────────────────────────────
@@ -235,12 +240,12 @@ class CustomerReturnService
      * Create inventory journal entries for a completed customer return.
      *
      * For 'replace' items (goods back to stock):
-     *   Debit  Inventory            (1140.10 / 1140.01) — goods come back to warehouse @ HPP
-     *   Credit COGS reversal        (5100.10)           — cost of goods is no longer "sold" @ HPP
+     *   Debit  Inventory            (Product COA or fallback 1140.01 / 1140.10) — goods come back to warehouse @ HPP
+     *   Credit COGS reversal        (5100.10)                                   — cost of goods is no longer "sold" @ HPP
      *
      * For 'repair' items (goods in workshop/WIP, not yet back to saleable stock):
      *   Debit  WIP / In-Repair      (1101.02 or fallback to inventory) — goods held for repair
-     *   Credit COGS reversal        (5100.10)           — cost of goods is no longer "sold" @ HPP
+     *   Credit COGS reversal        (5100.10)                          — cost of goods is no longer "sold" @ HPP
      */
     private function createInventoryJournalEntries(CustomerReturn $customerReturn, float $amount, float $replaceAmount, float $repairAmount): void
     {
@@ -256,17 +261,17 @@ class CustomerReturnService
         $reference = $customerReturn->return_number;
         $desc      = "Customer Return: {$reference}";
 
-        // COA: Inventory account
+        // COA: Default Inventory account (utamakan 1140.01 Barang Dagangan daripada 1140.10)
         $settings = app(AccountingSettings::class);
-        $inventoryCoa = $this->firstExistingCoa([
+        $defaultInventoryCoa = $this->firstExistingCoa([
             ...$settings->codes('return_inventory'),
             config('coa.inventory'),
-            '1140.10',
             '1140.01',
+            '1140.10',
         ]);
 
         // COA: WIP / In-Repair holding account
-        $wipCoa = $this->firstExistingCoa($settings->codes('return_wip')) ?? $inventoryCoa;
+        $wipCoa = $this->firstExistingCoa($settings->codes('return_wip')) ?? $defaultInventoryCoa;
 
         // COA: COGS reversal
         $cogsCoa = $this->firstExistingCoa([
@@ -275,23 +280,47 @@ class CustomerReturnService
             '5100',
         ]);
 
-        if (! $inventoryCoa || ! $cogsCoa) {
+        if (! $defaultInventoryCoa || ! $cogsCoa) {
             Log::warning('CustomerReturnService: COA account(s) not found — cannot create inventory journal entries', [
                 'return_id'    => $customerReturn->id,
-                'inventory_ok' => (bool) $inventoryCoa,
+                'inventory_ok' => (bool) $defaultInventoryCoa,
                 'cogs_ok'      => (bool) $cogsCoa,
             ]);
             throw new \Exception('Akun COA tidak ditemukan untuk jurnal persediaan retur customer. Diperlukan akun persediaan dan COGS yang valid.');
         }
 
-        // Debit Inventory (replace items) – goods physically back in stock
-        if ($replaceAmount > 0) {
+        // Kelompokkan item penggantian (replace) berdasarkan COA persediaan produk masing-masing
+        $customerReturn->loadMissing('customerReturnItems.product');
+        $replaceTotalsByCoa = [];
+        $items = $customerReturn->customerReturnItems ?? $customerReturn->customerReturnItem ?? collect();
+        foreach ($items as $item) {
+            if ($item->decision !== CustomerReturnItem::DECISION_REPAIR && $item->decision !== CustomerReturnItem::DECISION_REJECT) {
+                $itemQty = (float) ($item->quantity ?? 0);
+                $cost = (float) ($item->product?->cost_price ?? 0);
+                $lineCost = round($itemQty * $cost, 2);
+                if ($lineCost <= 0) {
+                    continue;
+                }
+                $invCoa = $item->product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+                $coaId = $invCoa->id;
+                if (! isset($replaceTotalsByCoa[$coaId])) {
+                    $replaceTotalsByCoa[$coaId] = [
+                        'coa' => $invCoa,
+                        'amount' => 0.0,
+                    ];
+                }
+                $replaceTotalsByCoa[$coaId]['amount'] += $lineCost;
+            }
+        }
+
+        // Debit Inventory per COA (replace items) – barang kembali ke stok fisik
+        foreach ($replaceTotalsByCoa as $data) {
             JournalEntry::create([
-                'coa_id'       => $inventoryCoa->id,
+                'coa_id'       => $data['coa']->id,
                 'date'         => $date,
                 'reference'    => $reference,
                 'description'  => $desc . ' - Restore inventory value (penggantian)',
-                'debit'        => $replaceAmount,
+                'debit'        => round($data['amount'], 2),
                 'credit'       => 0,
                 'journal_type' => 'customer_return',
                 'source_type'  => CustomerReturn::class,
@@ -300,7 +329,7 @@ class CustomerReturnService
             ]);
         }
 
-        // Debit WIP (repair items) – goods held for repair, not yet saleable
+        // Debit WIP (repair items) – barang dalam perbaikan, belum siap jual
         if ($repairAmount > 0) {
             JournalEntry::create([
                 'coa_id'       => $wipCoa->id,
@@ -316,7 +345,7 @@ class CustomerReturnService
             ]);
         }
 
-        // Credit COGS reversal – cost of all returned goods is no longer "sold"
+        // Credit COGS reversal – beban pokok penjualan dibalik karena barang kembali
         JournalEntry::create([
             'coa_id'       => $cogsCoa->id,
             'date'         => $date,
@@ -332,19 +361,24 @@ class CustomerReturnService
     }
 
     /**
-     * Create financial journal entries:
-     *   Debit  Retur Penjualan (4120.10) @ DPP
-     *   Debit  PPN Keluaran    (2120.06) @ PPN (if applicable)
-     *   Credit Piutang Dagang  (1120)    @ Total Retur (DPP + PPN)
+     * Create financial journal entries and adjust AccountReceivable / Customer Deposit.
+     *
+     * Rules:
+     * - Debit Retur Penjualan (4120.10) @ DPP
+     * - Debit PPN Keluaran (2120.06) @ PPN
+     * - If invoice is unpaid / has remaining AR:
+     *     Credit Piutang Dagang (1120) up to remaining AR
+     * - If invoice is paid or return exceeds remaining AR:
+     *     Credit Deposit Pelanggan (2160.04) for excess / full amount
+     *     Record Deposit & DepositLog for the Customer
+     * - Adjust AR total, paid, remaining so total - paid = remaining invariant holds and remaining never < 0.
      */
-    private function createFinancialJournalEntries(CustomerReturn $customerReturn, float $dpp, float $ppn, float $total): void
+    private function createFinancialJournalEntriesAndAdjustAr(CustomerReturn $customerReturn, float $dpp, float $ppn, float $totalReturnFin): void
     {
-        if (JournalEntry::where('source_type', CustomerReturn::class)
+        $hasFinancialJournal = JournalEntry::where('source_type', CustomerReturn::class)
             ->where('source_id', $customerReturn->id)
             ->where('description', 'like', '%Sales Return%')
-            ->exists()) {
-            return;
-        }
+            ->exists();
 
         $date      = ($customerReturn->completed_at ?? now())->toDateString();
         $reference = $customerReturn->return_number;
@@ -352,6 +386,7 @@ class CustomerReturnService
 
         $settings = app(AccountingSettings::class);
         $salesReturnCoa = $this->firstExistingCoa([
+            ...$settings->codes('sales_return'),
             '4120.10',
             '4120',
             '4101',
@@ -371,6 +406,12 @@ class CustomerReturnService
             '1120',
         ], 'Piutang');
 
+        $depositCoa = $this->firstExistingCoa([
+            ...$settings->codes('customer_deposit'),
+            '2160.04',
+            '2130',
+        ], 'Deposit Konsumen');
+
         if (! $salesReturnCoa || ! $arCoa) {
             Log::warning('CustomerReturnService: COA account(s) not found for financial journal', [
                 'return_id'        => $customerReturn->id,
@@ -380,87 +421,163 @@ class CustomerReturnService
             return;
         }
 
-        // Debit Retur Penjualan (DPP)
-        if ($dpp > 0) {
-            JournalEntry::create([
-                'coa_id'       => $salesReturnCoa->id,
-                'date'         => $date,
-                'reference'    => $reference,
-                'description'  => $desc . ' - Sales Return (DPP)',
-                'debit'        => $dpp,
-                'credit'       => 0,
-                'journal_type' => 'customer_return',
-                'source_type'  => CustomerReturn::class,
-                'source_id'    => $customerReturn->id,
-                'cabang_id'    => $customerReturn->cabang_id,
-            ]);
+        // Determine AR remaining vs to deposit
+        $invoice = $customerReturn->invoice;
+        $ar = $invoice ? AccountReceivable::where('invoice_id', $invoice->id)->lockForUpdate()->first() : null;
+
+        $remainingAr = $ar ? max(0.0, (float) $ar->remaining) : 0.0;
+        $isInvoicePaid = ($invoice && $invoice->status === Invoice::STATUS_PAID) || ($remainingAr <= 0.05);
+
+        if ($isInvoicePaid) {
+            $applyToAr = 0.0;
+            $toDeposit = $totalReturnFin;
+        } else {
+            $applyToAr = min($totalReturnFin, $remainingAr);
+            $toDeposit = round($totalReturnFin - $applyToAr, 2);
         }
 
-        // Debit PPN Keluaran
-        if ($ppn > 0 && $vatCoa) {
-            JournalEntry::create([
-                'coa_id'       => $vatCoa->id,
-                'date'         => $date,
-                'reference'    => $reference,
-                'description'  => $desc . ' - Reversal Output VAT (PPN)',
-                'debit'        => $ppn,
-                'credit'       => 0,
-                'journal_type' => 'customer_return',
-                'source_type'  => CustomerReturn::class,
-                'source_id'    => $customerReturn->id,
-                'cabang_id'    => $customerReturn->cabang_id,
-            ]);
-        }
-
-        // Credit Piutang Dagang (Total)
-        JournalEntry::create([
-            'coa_id'       => $arCoa->id,
-            'date'         => $date,
-            'reference'    => $reference,
-            'description'  => $desc . ' - Reduce Accounts Receivable',
-            'debit'        => 0,
-            'credit'       => $total,
-            'journal_type' => 'customer_return',
-            'source_type'  => CustomerReturn::class,
-            'source_id'    => $customerReturn->id,
-            'cabang_id'    => $customerReturn->cabang_id,
-        ]);
-    }
-
-    /**
-     * Deduct AccountReceivable balance for the returned invoice.
-     */
-    private function adjustAccountReceivable(CustomerReturn $customerReturn, float $totalReturnFin): void
-    {
-        $ar = AccountReceivable::where('invoice_id', $customerReturn->invoice_id)->lockForUpdate()->first();
-        if (! $ar) {
-            return;
-        }
-
-        $rate = (float) ($ar->exchange_rate ?? 1);
-        $rate = $rate > 0 ? $rate : 1.0;
-
-        $ar->total = max(0.0, (float) $ar->total - $totalReturnFin);
-        $ar->remaining = max(0.0, (float) $ar->remaining - $totalReturnFin);
-        $ar->total_original = round((float) $ar->total / $rate, 4);
-        $ar->remaining_original = round((float) $ar->remaining / $rate, 4);
-        $ar->status = $ar->remaining > 0.05 ? 'Belum Lunas' : 'Lunas';
-        $ar->save();
-
-        if ($ar->remaining <= 0.05 && $ar->ageingSchedule()->exists()) {
-            $ar->ageingSchedule->delete();
-        }
-
-        if ($customerReturn->invoice) {
-            $inv = $customerReturn->invoice;
-            if ($ar->remaining <= 0.05 && $ar->total <= 0.05) {
-                $inv->status = \App\Models\Invoice::STATUS_CANCELLED;
-            } elseif ($ar->remaining <= 0.05) {
-                $inv->status = \App\Models\Invoice::STATUS_PAID;
-            } elseif ($ar->paid > 0) {
-                $inv->status = \App\Models\Invoice::STATUS_PARTIALLY_PAID;
+        if (! $hasFinancialJournal) {
+            // Debit Retur Penjualan (DPP)
+            if ($dpp > 0) {
+                JournalEntry::create([
+                    'coa_id'       => $salesReturnCoa->id,
+                    'date'         => $date,
+                    'reference'    => $reference,
+                    'description'  => $desc . ' - Sales Return (DPP)',
+                    'debit'        => $dpp,
+                    'credit'       => 0,
+                    'journal_type' => 'customer_return',
+                    'source_type'  => CustomerReturn::class,
+                    'source_id'    => $customerReturn->id,
+                    'cabang_id'    => $customerReturn->cabang_id,
+                ]);
             }
-            $inv->saveQuietly();
+
+            // Debit PPN Keluaran
+            if ($ppn > 0 && $vatCoa) {
+                JournalEntry::create([
+                    'coa_id'       => $vatCoa->id,
+                    'date'         => $date,
+                    'reference'    => $reference,
+                    'description'  => $desc . ' - Reversal Output VAT (PPN)',
+                    'debit'        => $ppn,
+                    'credit'       => 0,
+                    'journal_type' => 'customer_return',
+                    'source_type'  => CustomerReturn::class,
+                    'source_id'    => $customerReturn->id,
+                    'cabang_id'    => $customerReturn->cabang_id,
+                ]);
+            }
+
+            // Credit Piutang Dagang (jika invoice belum lunas dan masih ada sisa piutang)
+            if ($applyToAr > 0) {
+                JournalEntry::create([
+                    'coa_id'       => $arCoa->id,
+                    'date'         => $date,
+                    'reference'    => $reference,
+                    'description'  => $desc . ' - Reduce Accounts Receivable',
+                    'debit'        => 0,
+                    'credit'       => $applyToAr,
+                    'journal_type' => 'customer_return',
+                    'source_type'  => CustomerReturn::class,
+                    'source_id'    => $customerReturn->id,
+                    'cabang_id'    => $customerReturn->cabang_id,
+                ]);
+            }
+
+            // Credit Deposit Pelanggan (jika invoice sudah lunas atau retur melebihi sisa piutang)
+            if ($toDeposit > 0 && $depositCoa) {
+                JournalEntry::create([
+                    'coa_id'       => $depositCoa->id,
+                    'date'         => $date,
+                    'reference'    => $reference,
+                    'description'  => $desc . ' - Customer Deposit / Store Credit',
+                    'debit'        => 0,
+                    'credit'       => $toDeposit,
+                    'journal_type' => 'customer_return',
+                    'source_type'  => CustomerReturn::class,
+                    'source_id'    => $customerReturn->id,
+                    'cabang_id'    => $customerReturn->cabang_id,
+                ]);
+            }
+        }
+
+        // Adjust AccountReceivable record
+        if ($ar) {
+            $rate = (float) ($ar->exchange_rate ?? 1);
+            $rate = $rate > 0 ? $rate : 1.0;
+
+            $ar->total = max(0.0, (float) $ar->total - $totalReturnFin);
+            if ($applyToAr > 0) {
+                $ar->remaining = max(0.0, (float) $ar->remaining - $applyToAr);
+            }
+            if ($toDeposit > 0) {
+                $ar->paid = max(0.0, (float) $ar->paid - $toDeposit);
+            }
+
+            $ar->total_original = round((float) $ar->total / $rate, 4);
+            $ar->paid_original = round((float) $ar->paid / $rate, 4);
+            $ar->remaining_original = round((float) $ar->remaining / $rate, 4);
+            $ar->status = $ar->remaining > 0.05 ? 'Belum Lunas' : 'Lunas';
+            $ar->save();
+
+            if ($ar->remaining <= 0.05 && $ar->ageingSchedule()->exists()) {
+                $ar->ageingSchedule->delete();
+            }
+        }
+
+        // Jika ada nilai yang masuk ke deposit, catat di tabel Deposit & DepositLog
+        if ($toDeposit > 0) {
+            $customerId = $customerReturn->customer_id ?? $invoice?->fromModel?->customer_id;
+            if ($customerId) {
+                $deposit = Deposit::where('from_model_type', Customer::class)
+                    ->where('from_model_id', $customerId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $deposit) {
+                    $deposit = Deposit::create([
+                        'from_model_type'  => Customer::class,
+                        'from_model_id'    => $customerId,
+                        'amount'           => $toDeposit,
+                        'used_amount'      => 0,
+                        'remaining_amount' => $toDeposit,
+                        'coa_id'           => $depositCoa?->id,
+                        'status'           => 'active',
+                        'created_by'       => auth()->id() ?? $customerReturn->created_by,
+                        'deposit_number'   => app(DepositNumberGenerator::class)->generate(),
+                        'note'             => "Dari Retur Penjualan {$customerReturn->return_number}",
+                    ]);
+                } else {
+                    $deposit->forceFill([
+                        'amount'           => (float) $deposit->amount + $toDeposit,
+                        'remaining_amount' => (float) $deposit->remaining_amount + $toDeposit,
+                        'status'           => 'active',
+                    ])->saveQuietly();
+                }
+
+                DepositLog::create([
+                    'deposit_id'     => $deposit->id,
+                    'type'           => 'add',
+                    'reference_type' => CustomerReturn::class,
+                    'reference_id'   => $customerReturn->id,
+                    'amount'         => $toDeposit,
+                    'note'           => "Kelebihan retur penjualan {$customerReturn->return_number} (Invoice {$invoice?->invoice_number})",
+                    'created_by'     => auth()->id() ?? $customerReturn->created_by,
+                ]);
+            }
+        }
+
+        // Finalize invoice status
+        if ($invoice) {
+            if ($ar && $ar->total <= 0.05 && $ar->remaining <= 0.05) {
+                $invoice->status = Invoice::STATUS_CANCELLED;
+            } elseif ($ar && $ar->remaining <= 0.05) {
+                $invoice->status = Invoice::STATUS_PAID;
+            } elseif ($ar && $ar->paid > 0) {
+                $invoice->status = Invoice::STATUS_PARTIALLY_PAID;
+            }
+            $invoice->saveQuietly();
         }
     }
 

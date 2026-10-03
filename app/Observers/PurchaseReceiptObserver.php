@@ -35,6 +35,18 @@ class PurchaseReceiptObserver
         $this->checkAndUpdatePurchaseOrderStatus($purchaseReceipt);
     }
 
+    public function deleted(PurchaseReceipt $purchaseReceipt)
+    {
+        // Sync PO status when a receipt is cancelled/deleted
+        $this->checkAndUpdatePurchaseOrderStatus($purchaseReceipt);
+    }
+
+    public function restored(PurchaseReceipt $purchaseReceipt)
+    {
+        // Sync PO status when a receipt is restored
+        $this->checkAndUpdatePurchaseOrderStatus($purchaseReceipt);
+    }
+
     protected function createPurchaseReturnForRejectedItems(PurchaseReceipt $purchaseReceipt)
     {
         Log::info("PurchaseReceiptObserver: Checking for rejected items in receipt ID {$purchaseReceipt->id}");
@@ -97,39 +109,17 @@ class PurchaseReceiptObserver
     {
         $purchaseOrder = $purchaseReceipt->purchaseOrder;
 
-        if (!$purchaseOrder) {
+        if (! $purchaseOrder || ! $purchaseOrder->exists) {
+            if ($purchaseReceipt->purchase_order_id) {
+                $purchaseOrder = \App\Models\PurchaseOrder::find($purchaseReceipt->purchase_order_id);
+            }
+        }
+
+        if (! $purchaseOrder) {
             return;
         }
 
-        // Load items with receipts
-        $purchaseOrder->load(['purchaseOrderItem.purchaseReceiptItem']);
-
-        $totalOrdered = $purchaseOrder->purchaseOrderItem->sum('quantity');
-        $totalAccepted = 0;
-
-        foreach ($purchaseOrder->purchaseOrderItem as $poItem) {
-            $totalAccepted += $poItem->purchaseReceiptItem->sum('qty_accepted');
-        }
-
-        Log::info("Observer Check PO {$purchaseOrder->id}: Ordered={$totalOrdered}, Accepted={$totalAccepted}");
-
-        $newStatus = 'approved'; // default
-
-        if ($totalAccepted >= $totalOrdered) {
-            $newStatus = 'completed';
-        } elseif ($totalAccepted > 0) {
-            $newStatus = 'partially_received';
-        }
-
-        Log::info("New Status: {$newStatus}, Current: {$purchaseOrder->status}");
-
-        if ($purchaseOrder->status !== $newStatus) {
-            $purchaseOrder->update([
-                'status' => $newStatus,
-                'completed_by' => $newStatus === 'completed' ? Auth::id() : null,
-                'completed_at' => $newStatus === 'completed' ? now() : null,
-            ]);
-            Log::info("Updated PO {$purchaseOrder->id} to {$newStatus}");
-        }
+        $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
+        Log::info("PurchaseReceiptObserver: Synced PO {$purchaseOrder->id} status to {$purchaseOrder->status}");
     }
 }

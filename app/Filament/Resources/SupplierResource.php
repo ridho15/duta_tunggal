@@ -164,6 +164,20 @@ class SupplierResource extends Resource
                         TextInput::make('nama_bank')
                             ->label('Nama Bank')
                             ->placeholder('Contoh: BCA, Mandiri, BRI')
+                            ->datalist([
+                                'BCA',
+                                'Mandiri',
+                                'BNI',
+                                'BRI',
+                                'BSI (Bank Syariah Indonesia)',
+                                'CIMB Niaga',
+                                'Permata',
+                                'Danamon',
+                                'Panin',
+                                'OCBC NISP',
+                                'Bank Mega',
+                                'Bank Jago',
+                            ])
                             ->maxLength(100),
                         TextInput::make('nomor_rekening')
                             ->label('Nomor Rekening')

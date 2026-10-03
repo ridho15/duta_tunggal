@@ -65,6 +65,20 @@ class InventoryReportPage extends Page implements HasTable
         $this->show_aging_stock = $tab === 'aging';
     }
 
+    protected function getViewData(): array
+    {
+        return [
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'warehouse_id' => $this->warehouse_id,
+            'product_id' => $this->product_id,
+            'show_movement_history' => $this->show_movement_history,
+            'show_aging_stock' => $this->show_aging_stock,
+            'warehouseOptions' => $this->warehouseOptions(),
+            'productOptions' => $this->productOptions(),
+        ];
+    }
+
     public function exportExcel()
     {
         $type = $this->show_movement_history ? 'movement' : ($this->show_aging_stock ? 'aging' : 'stock');

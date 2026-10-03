@@ -96,6 +96,11 @@ class PurchaseReceiptItem extends Model
         return $this->morphMany(JournalEntry::class, 'source');
     }
 
+    public function stockMovement()
+    {
+        return $this->morphMany(StockMovement::class, 'from_model');
+    }
+
     public function qualityControl()
     {
         return $this->hasOne(\App\Models\QualityControl::class, 'from_model_id', 'id')

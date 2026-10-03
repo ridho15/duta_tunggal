@@ -74,8 +74,19 @@ class ProductService
         $fromModel,
         ?float $value = null,
         array $meta = []
-    )
-    {
+    ) {
+        if ($date) {
+            $parsedDate = \Carbon\Carbon::parse($date);
+            if ($parsedDate->format('H:i:s') === '00:00:00') {
+                $now = \Carbon\Carbon::now();
+                $date = $parsedDate->setTime($now->hour, $now->minute, $now->second)->format('Y-m-d H:i:s');
+            } else {
+                $date = $parsedDate->format('Y-m-d H:i:s');
+            }
+        } else {
+            $date = \Carbon\Carbon::now()->format('Y-m-d H:i:s');
+        }
+
         $payload = [
             'product_id' => $product_id,
             'warehouse_id' => $warehouse_id,
@@ -92,7 +103,17 @@ class ProductService
         }
 
         if ($fromModel) {
-            return $fromModel->stockMovement()->create($payload);
+            if (method_exists($fromModel, 'stockMovement')) {
+                return $fromModel->stockMovement()->create($payload);
+            }
+            if (method_exists($fromModel, 'stockMovements')) {
+                return $fromModel->stockMovements()->create($payload);
+            }
+
+            return StockMovement::create(array_merge($payload, [
+                'from_model_type' => get_class($fromModel),
+                'from_model_id' => $fromModel->getKey(),
+            ]));
         }
 
         return StockMovement::create($payload);

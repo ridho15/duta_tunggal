@@ -397,25 +397,33 @@ class SalesOrderService
             'po_number' => $data['po_number'],
             'supplier_id' => $data['supplier_id'],
             'order_date' => $data['order_date'],
-            'note' => $data['note'],
+            'note' => $data['note'] ?? null,
             'warehouse_id' => $data['warehouse_id'],
-            'expected_date' => $data['expected_date'],
-            'tempo_hutang' => $data['tempo_hutang'],
+            'expected_date' => $data['expected_date'] ?? null,
+            'tempo_hutang' => $data['tempo_hutang'] ?? 0,
+            'cabang_id' => $saleOrder->cabang_id ?? auth()->user()?->cabang_id,
         ]);
 
-        $rupiahCurrencyId = Currency::where('name', 'Rupiah')->value('id');
+        $rupiahCurrencyId = Currency::where('code', 'IDR')
+            ->orWhere('name', 'like', '%Rupiah%')
+            ->value('id') ?? Currency::first()?->id;
 
         foreach ($saleOrderItems as $saleOrderItem) {
+            $unitPrice = (float) ($saleOrderItem->product?->cost_price ?: $saleOrderItem->product?->sell_price ?: 0);
             $saleOrderItem->purchaseOrderItem()->create([
                 'purchase_order_id' => $purchaseOrder->id,
                 'product_id' => $saleOrderItem->product_id,
                 'quantity' => $saleOrderItem->quantity,
                 'currency_id' => $rupiahCurrencyId,
-                'unit_price' => $saleOrderItem->product->sell_price,
+                'unit_price' => $unitPrice,
                 'discount' => 0,
                 'tax' => 0,
             ]);
         }
+
+        // Recalculate and update PO total amount
+        app(PurchaseOrderService::class)->updateTotalAmount($purchaseOrder);
+
         return $saleOrder;
     }
 

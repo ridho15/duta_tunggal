@@ -139,8 +139,10 @@ class PurchaseReturnService
             return;
         }
 
-        /** @var PurchaseOrderItem $poItem */
-        $poItem = $qc->fromModel;
+        $fromModel = $qc->fromModel;
+        $poItem = $fromModel instanceof PurchaseOrderItem
+            ? $fromModel
+            : ($fromModel instanceof PurchaseReceiptItem ? $fromModel->purchaseOrderItem : null);
 
         switch ($action) {
             case PurchaseReturn::QC_ACTION_REDUCE_STOCK:
@@ -161,7 +163,7 @@ class PurchaseReturnService
         }
     }
 
-    private function resolveByReturnSupplier(PurchaseReturn $purchaseReturn, PurchaseOrderItem $poItem): void
+    private function resolveByReturnSupplier(PurchaseReturn $purchaseReturn, ?PurchaseOrderItem $poItem): void
     {
         $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
         $purchaseReturn->update([
@@ -172,15 +174,19 @@ class PurchaseReturnService
 
         Log::info('QC return resolved: return_supplier', [
             'return_id'  => $purchaseReturn->id,
-            'po_item_id' => $poItem->id,
+            'po_item_id' => $poItem?->id,
         ]);
     }
 
     /**
      * Option A – Reduce PO item qty so the order reflects actual received amount.
      */
-    private function resolveByReducingPoQty(PurchaseReturn $purchaseReturn, PurchaseOrderItem $poItem): void
+    private function resolveByReducingPoQty(PurchaseReturn $purchaseReturn, ?PurchaseOrderItem $poItem): void
     {
+        if (! $poItem) {
+            return;
+        }
+
         $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
 
         // Lock the PO item row to prevent concurrent returns from reading stale qty.
@@ -212,7 +218,7 @@ class PurchaseReturnService
     /**
      * Option B – Flag the return as pending supplier resend; PO stays open.
      */
-    private function resolveByWaitingNextDelivery(PurchaseReturn $purchaseReturn, PurchaseOrderItem $poItem): void
+    private function resolveByWaitingNextDelivery(PurchaseReturn $purchaseReturn, ?PurchaseOrderItem $poItem): void
     {
         $purchaseReturn->update([
             'supplier_response' => 'pending_resend',
@@ -223,15 +229,19 @@ class PurchaseReturnService
         // Keep PO open so future deliveries can be received
         Log::info('QC return resolved: wait_next_delivery', [
             'return_id'  => $purchaseReturn->id,
-            'po_item_id' => $poItem->id,
+            'po_item_id' => $poItem?->id,
         ]);
     }
 
     /**
      * Option C – Add a new line item to the target PO carrying the original unit price.
      */
-    private function resolveByMergingNextOrder(PurchaseReturn $purchaseReturn, PurchaseOrderItem $originalPoItem): void
+    private function resolveByMergingNextOrder(PurchaseReturn $purchaseReturn, ?PurchaseOrderItem $originalPoItem): void
     {
+        if (! $originalPoItem) {
+            return;
+        }
+
         $targetPoId    = $purchaseReturn->replacement_po_id;
         $totalRejected = $purchaseReturn->purchaseReturnItem->sum('qty_returned');
         $originalPrice = $originalPoItem->unit_price;
@@ -829,22 +839,12 @@ class PurchaseReturnService
                 'approval_notes' => $data['approval_notes'] ?? null,
             ]);
 
-            // If receipt is not linked directly, try linking from QC's PO
-            if (!$purchaseReturn->purchase_receipt_id && $purchaseReturn->qualityControl?->purchase_order_id) {
-                $receipt = \App\Models\PurchaseReceipt::where('purchase_order_id', $purchaseReturn->qualityControl->purchase_order_id)
-                    ->latest('id')
-                    ->first();
-                if ($receipt) {
-                    $purchaseReturn->forceFill(['purchase_receipt_id' => $receipt->id])->saveQuietly();
-                }
-            }
-
             if ($purchaseReturn->isQcReturn()) {
                 $this->executeQcResolution($purchaseReturn);
             }
 
-            // Always create journal, adjust stock, and adjust AP if goods have entered warehouse (receipt exists or standard return)
-            if ($purchaseReturn->purchase_receipt_id || ! $purchaseReturn->isQcReturn()) {
+            // Only create journal, adjust stock, and adjust AP for warehouse returns (goods physically entered warehouse and were billed)
+            if (! $purchaseReturn->isQcReturn() && $purchaseReturn->purchase_receipt_id) {
                 if (!$this->createJournalEntry($purchaseReturn)) {
                     throw new \Exception('Gagal membuat jurnal akuntansi retur pembelian. Silakan periksa konfigurasi akun COA inventory dan hutang dagang aktif.');
                 }
@@ -856,6 +856,59 @@ class PurchaseReturnService
         });
 
         return true;
+    }
+
+    /**
+     * Menghitung total nilai retur pembelian yang disetujui (termasuk PPN jika ada) untuk sebuah faktur pembelian.
+     */
+    public function calculateApprovedReturnsTotalForInvoice(?\App\Models\Invoice $invoice): float
+    {
+        if (! $invoice) {
+            return 0.0;
+        }
+
+        $receiptIds = [];
+        if ($invoice->from_model_type === \App\Models\PurchaseReceipt::class && $invoice->from_model_id) {
+            $receiptIds[] = (int) $invoice->from_model_id;
+        }
+
+        if (! empty($invoice->purchase_receipts) && is_array($invoice->purchase_receipts)) {
+            foreach ($invoice->purchase_receipts as $rId) {
+                $receiptIds[] = (int) $rId;
+            }
+        }
+
+        if ($invoice->from_model_type === \App\Models\PurchaseOrder::class && $invoice->from_model_id) {
+            $poReceiptIds = \App\Models\PurchaseReceipt::where('purchase_order_id', $invoice->from_model_id)->pluck('id')->all();
+            $receiptIds = array_merge($receiptIds, $poReceiptIds);
+        }
+
+        $receiptIds = array_unique(array_filter($receiptIds));
+        if (empty($receiptIds)) {
+            return 0.0;
+        }
+
+        $approvedReturns = PurchaseReturn::whereIn('purchase_receipt_id', $receiptIds)
+            ->where('status', 'approved')
+            ->get();
+
+        if ($approvedReturns->isEmpty()) {
+            return 0.0;
+        }
+
+        $ppnRate = (float) ($invoice->ppn_rate ?? 0);
+        if ($ppnRate <= 0 && (float) $invoice->subtotal > 0 && (float) $invoice->tax > 0) {
+            $ppnRate = round(((float) $invoice->tax / (float) $invoice->subtotal) * 100, 2);
+        }
+
+        $totalReturnGrossIdr = 0.0;
+        foreach ($approvedReturns as $pr) {
+            $retDppIdr = $this->calculateReturnTotalIdr($pr);
+            $ppnAmount = ($ppnRate > 0) ? round($retDppIdr * ($ppnRate / 100), 2) : 0.0;
+            $totalReturnGrossIdr += round($retDppIdr + $ppnAmount, 2);
+        }
+
+        return round($totalReturnGrossIdr, 2);
     }
 
     /**

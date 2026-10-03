@@ -144,6 +144,15 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
             'cost_price' => 25000,
         ]);
 
+        \App\Models\InventoryStock::updateOrCreate([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
+            'rak_id' => null,
+        ], [
+            'qty_available' => 10,
+            'qty_reserved' => 0,
+        ]);
+
         $saleOrder = SaleOrder::factory()->create([
             'customer_id' => $customer->id,
             'status' => 'confirmed',
@@ -188,7 +197,8 @@ class DeliveryOrderJournalIntegrationTest extends TestCase
             'status' => 'sent',
         ]);
 
-        $this->assertSame(0, JournalEntry::where('source_type', DeliveryOrder::class)
+        // Sesuai Rekomendasi UAT Poin 8: Jurnal pengiriman dibuat saat barang mulai dikirim (status 'sent')
+        $this->assertSame(2, JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->count());
 

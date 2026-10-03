@@ -699,8 +699,8 @@
                     ->when($start_date, fn($q) => $q->whereDate('date', '>=', $start_date))
                     ->when($end_date, fn($q) => $q->whereDate('date', '<=', $end_date));
                 $totalMovement = (clone $baseMovQ)->count();
-                $totalIn = (clone $baseMovQ)->where('type', 'in')->count();
-                $totalOut = (clone $baseMovQ)->where('type', 'out')->count();
+                $totalIn = (clone $baseMovQ)->whereIn('type', \App\Models\StockMovement::IN_TYPES)->count();
+                $totalOut = (clone $baseMovQ)->whereIn('type', \App\Models\StockMovement::OUT_TYPES)->count();
                 $stats = [
                     [
                         'label' => 'Total Movement',

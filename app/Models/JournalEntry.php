@@ -66,6 +66,15 @@ class JournalEntry extends Model
     {
         static::addGlobalScope(new CabangScope);
 
+        static::saving(function (JournalEntry $entry): void {
+            if ($entry->description !== null) {
+                $entry->description = \Illuminate\Support\Str::limit((string) $entry->description, 255, '');
+            }
+            if ($entry->reference !== null) {
+                $entry->reference = \Illuminate\Support\Str::limit((string) $entry->reference, 255, '');
+            }
+        });
+
         static::creating(function (JournalEntry $entry): void {
             // Auto-fill created_by from the authenticated user when not explicitly set.
             if (! $entry->created_by && \Illuminate\Support\Facades\Auth::check()) {

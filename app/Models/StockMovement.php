@@ -175,4 +175,19 @@ class StockMovement extends Model
 
         return $source;
     }
+
+    protected static function booted()
+    {
+        static::creating(function ($movement) {
+            if (! empty($movement->date)) {
+                $parsed = \Carbon\Carbon::parse($movement->date);
+                if ($parsed->format('H:i:s') === '00:00:00') {
+                    $now = \Carbon\Carbon::now();
+                    $movement->date = $parsed->setTime($now->hour, $now->minute, $now->second)->format('Y-m-d H:i:s');
+                }
+            } else {
+                $movement->date = \Carbon\Carbon::now()->format('Y-m-d H:i:s');
+            }
+        });
+    }
 }

@@ -13,6 +13,24 @@ class EditSalesInvoice extends EditRecord
 {
     protected static string $resource = SalesInvoiceResource::class;
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        $isDraft = strtolower((string) $this->record->status) === \App\Models\Invoice::STATUS_DRAFT;
+        $isSuperAdmin = (bool) auth()->user()?->hasRole('Super Admin');
+
+        if (! $isDraft && ! $isSuperAdmin) {
+            \Filament\Notifications\Notification::make()
+                ->title('Invoice tidak dapat diedit')
+                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$this->record->status] ?? $this->record->status) . '" telah diposting dan terkunci. Hanya Super Admin yang berhak melakukan koreksi darurat.')
+                ->danger()
+                ->send();
+
+            $this->redirect(SalesInvoiceResource::getUrl('view', ['record' => $this->record]));
+        }
+    }
+
     /**
      * Izinkan akses edit hanya untuk status draft, ATAU Super Admin untuk koreksi darurat.
      * Mencegah bypass via URL langsung (mis. /admin/sales-invoices/1/edit).

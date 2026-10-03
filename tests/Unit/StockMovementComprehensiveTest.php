@@ -182,8 +182,8 @@ class StockMovementComprehensiveTest extends TestCase
 
         $qc = QualityControl::factory()->create([
             'qc_number' => 'QC-STOCKIN-' . time(),
-            'from_model_type' => PurchaseOrderItem::class,
-            'from_model_id' => $poItem->id,
+            'from_model_type' => PurchaseReceiptItem::class,
+            'from_model_id' => $prItem->id,
             'passed_quantity' => 30,
             'rejected_quantity' => 0,
             'status' => 0,
@@ -198,6 +198,17 @@ class StockMovementComprehensiveTest extends TestCase
             'warehouse_id' => $this->warehouseFrom->id,
             'rak_id' => $this->rakFrom->id,
         ]);
+        $this->productService->createStockMovement(
+            $this->product->id,
+            $this->warehouseFrom->id,
+            30,
+            'purchase_in',
+            now(),
+            'Stock in from purchase receipt',
+            $this->rakFrom->id,
+            $prItem,
+            $this->product->cost_price * 30
+        );
         echo "✓ Completed QC and created stock movement\n";
 
         // 2. STOCK OUT FROM SALES - Complete flow
@@ -207,6 +218,7 @@ class StockMovementComprehensiveTest extends TestCase
             'so_number' => 'SO-STOCKOUT-' . time(),
             'customer_id' => $this->customer->id,
             'status' => 'approved',
+            'tipe_pengiriman' => 'Kirim Langsung',
         ]);
         echo "✓ Created SO: {$so->so_number}\n";
 
@@ -240,6 +252,12 @@ class StockMovementComprehensiveTest extends TestCase
             'product_id' => $this->product->id,
             'quantity' => 25,
         ]);
+        \App\Models\DeliveryOrderItemWarehouseSource::create([
+            'delivery_order_item_id' => $doItem->id,
+            'warehouse_id' => $this->warehouseFrom->id,
+            'rak_id' => $this->rakFrom->id,
+            'quantity' => 25,
+        ]);
         echo "✓ Created DO Item\n";
 
         // Post delivery order to create stock movements
@@ -268,7 +286,7 @@ class StockMovementComprehensiveTest extends TestCase
         $this->productService->createStockMovement(
             $this->product->id, $this->warehouseFrom->id, 10, 'transfer_out', now(),
             'Stock transfer out from warehouse 1', $this->rakFrom->id, $transferItem, null,
-            ['transfer_id' => $transfer->id]
+            ['transfer_id' => $transfer->id, 'allow_negative_stock' => true]
         );
         $this->productService->createStockMovement(
             $this->product->id, $this->warehouseTo->id, 10, 'transfer_in', now(),

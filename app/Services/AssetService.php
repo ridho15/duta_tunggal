@@ -26,8 +26,13 @@ class AssetService
                 throw new \Exception('Journal entries already exist for this asset acquisition');
             }
 
+            // Resolve branch from source
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($asset);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($asset);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($asset);
+
             // Get COA accounts
-            $assetCoa = $asset->assetCoa;
+            $assetCoa = $this->resolvePostableCoa($asset->assetCoa, $branchId);
             if (!$assetCoa) {
                 throw new \Exception('Asset COA not found');
             }
@@ -39,7 +44,7 @@ class AssetService
 
             // If credit COA is provided directly, use it
             if ($creditCoaId) {
-                $creditCoa = ChartOfAccount::find($creditCoaId);
+                $creditCoa = $this->resolvePostableCoa(ChartOfAccount::find($creditCoaId), $branchId);
                 if ($creditCoa) {
                     $description .= ' (Manual)';
                 }
@@ -47,15 +52,20 @@ class AssetService
 
             // If asset is from purchase order, credit Accounts Payable
             if (!$creditCoa && $asset->purchaseOrder) {
-                $accountsPayableCoa = ChartOfAccount::where('code', '2100')->first(); // Hutang Usaha
+                $accountsPayableCoa = ChartOfAccount::where('code', '2110.01')->first()
+                    ?? ChartOfAccount::where('code', '2100.01')->first()
+                    ?? ChartOfAccount::where('code', '2100')->first();
                 if ($accountsPayableCoa) {
-                    $creditCoa = $accountsPayableCoa;
+                    $creditCoa = $this->resolvePostableCoa($accountsPayableCoa, $branchId);
                     $description .= ' (PO: ' . $asset->purchaseOrder->po_number . ')';
                 }
             }
 
             if (!$creditCoa) {
-                $creditCoa = ChartOfAccount::where('code', '2100')->first();
+                $accountsPayableCoa = ChartOfAccount::where('code', '2110.01')->first()
+                    ?? ChartOfAccount::where('code', '2100.01')->first()
+                    ?? ChartOfAccount::where('code', '2100')->first();
+                $creditCoa = $this->resolvePostableCoa($accountsPayableCoa, $branchId);
                 if ($creditCoa) {
                     $description .= ' (Default AP)';
                 }
@@ -66,19 +76,13 @@ class AssetService
                 throw new \Exception('Cannot determine credit account for asset acquisition. Please specify the funding source.');
             }
 
-            // Create journal entries
-            // Resolve branch from source
-            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($asset);
-            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($asset);
-            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($asset);
-
             // Debit: Fixed Asset
             JournalEntry::create([
                 'date' => $asset->purchase_date,
                 'coa_id' => $assetCoa->id,
                 'debit' => $asset->purchase_cost,
                 'credit' => 0,
-                'description' => $description,
+                'description' => \Illuminate\Support\Str::limit($description, 255, ''),
                 'journal_type' => 'asset_acquisition',
                 'cabang_id' => $branchId,
                 'department_id' => $departmentId,
@@ -94,7 +98,7 @@ class AssetService
                 'coa_id' => $creditCoa->id,
                 'debit' => 0,
                 'credit' => $asset->purchase_cost,
-                'description' => $description,
+                'description' => \Illuminate\Support\Str::limit($description, 255, ''),
                 'journal_type' => 'asset_acquisition',
                 'cabang_id' => $branchId,
                 'department_id' => $departmentId,
@@ -115,19 +119,19 @@ class AssetService
     public function postAssetDepreciationJournal(Asset $asset, float $depreciationAmount, string $period): void
     {
         DB::transaction(function () use ($asset, $depreciationAmount, $period) {
-            $depreciationExpenseCoa = $asset->depreciationExpenseCoa;
-            $accumulatedDepreciationCoa = $asset->accumulatedDepreciationCoa;
+            // Resolve branch from source
+            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($asset);
+            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($asset);
+            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($asset);
+
+            $depreciationExpenseCoa = $this->resolvePostableCoa($asset->depreciationExpenseCoa, $branchId);
+            $accumulatedDepreciationCoa = $this->resolvePostableCoa($asset->accumulatedDepreciationCoa, $branchId);
 
             if (!$depreciationExpenseCoa || !$accumulatedDepreciationCoa) {
                 throw new \Exception('Depreciation COA accounts not configured for this asset');
             }
 
-            $description = 'Depreciation expense for ' . $asset->name . ' - ' . $period;
-
-            // Resolve branch from source
-            $branchId = app(\App\Services\JournalBranchResolver::class)->resolve($asset);
-            $departmentId = app(\App\Services\JournalBranchResolver::class)->resolveDepartment($asset);
-            $projectId = app(\App\Services\JournalBranchResolver::class)->resolveProject($asset);
+            $description = \Illuminate\Support\Str::limit('Depreciation expense for ' . $asset->name . ' - ' . $period, 255, '');
 
             // Debit: Depreciation Expense
             JournalEntry::create([
@@ -161,6 +165,27 @@ class AssetService
                 'created_by' => Auth::id(),
             ]);
         });
+    }
+
+    /**
+     * Resolve a COA account to ensure it is a leaf (postable) account, preferring branch sub-accounts.
+     */
+    public function resolvePostableCoa(?ChartOfAccount $coa, ?int $cabangId = null): ?ChartOfAccount
+    {
+        if (! $coa) {
+            return null;
+        }
+
+        if ($coa->children()->exists()) {
+            $child = $coa->children()
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->first()
+                ?? $coa->children()->first();
+
+            return $child ? $this->resolvePostableCoa($child, $cabangId) : $coa;
+        }
+
+        return $coa;
     }
 
     /**

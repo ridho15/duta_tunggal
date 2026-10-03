@@ -16,6 +16,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Actions\Action as ActionsAction;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Select;
@@ -297,11 +298,40 @@ class ViewSaleOrder extends ViewRecord
                     ->color('success')
                     ->icon('heroicon-o-document-duplicate')
                     ->visible(function ($record) {
-                        return Auth::user()->hasPermissionTo('create purchase order');
+                        if (! Auth::user()->hasPermissionTo('create purchase order')) {
+                            return false;
+                        }
+
+                        return $record->saleOrderItem()
+                            ->whereDoesntHave('purchaseOrderItem')
+                            ->exists();
                     })
                     ->form([
                         Fieldset::make("Form")
                             ->schema([
+                                CheckboxList::make('selected_sale_order_item_ids')
+                                    ->label('Pilih Item Sales Order')
+                                    ->options(function ($record) {
+                                        return $record->saleOrderItem()
+                                            ->with(['product'])
+                                            ->whereDoesntHave('purchaseOrderItem')
+                                            ->get()
+                                            ->mapWithKeys(function ($item) {
+                                                $productName = $item->product?->name ?? 'Produk';
+                                                $sku = $item->product?->sku ?? '-';
+                                                $unit = $item->product?->uom?->abbreviation ?? '-';
+
+                                                return [
+                                                    $item->id => "({$sku}) {$productName} | Qty: {$item->quantity} {$unit}",
+                                                ];
+                                            })
+                                            ->toArray();
+                                    })
+                                    ->required()
+                                    ->columns(1)
+                                    ->validationMessages([
+                                        'required' => 'Minimal satu item Sales Order harus dipilih',
+                                    ]),
                                 Select::make('supplier_id')
                                     ->label('Supplier')
                                     ->preload()
