@@ -323,7 +323,7 @@ class ResetErpTransactionsCommand extends Command
             // Penanganan Sequence Penomoran Dokumen
             if ($resetSequences) {
                 if (in_array('document_sequences', $existingTables)) {
-                    DB::table('document_sequences')->update(['current_number' => 0]);
+                    DB::table('document_sequences')->truncate();
                     $this->info('✓ Counter penomoran dokumen (document_sequences) berhasil direset ke 0.');
                 }
                 if (in_array('voucher_number_sequences', $existingTables)) {
