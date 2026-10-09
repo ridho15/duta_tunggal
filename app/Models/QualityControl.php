@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -124,5 +125,10 @@ class QualityControl extends Model
     public function purchaseReturns()
     {
         return $this->hasMany(\App\Models\PurchaseReturn::class, 'quality_control_id');
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
     }
 }

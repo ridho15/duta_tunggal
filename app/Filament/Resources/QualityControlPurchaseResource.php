@@ -1025,6 +1025,20 @@ class QualityControlPurchaseResource extends Resource
                                         }
                                         return [];
                                     })
+                                    ->required(function ($get) {
+                                        $whId = $get('../../warehouse_id');
+                                        return filled($whId) && Rak::where('warehouse_id', $whId)->exists();
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Rak penyimpanan wajib dipilih untuk gudang yang memiliki konfigurasi rak.',
+                                    ])
+                                    ->helperText(function ($get) {
+                                        $whId = $get('../../warehouse_id');
+                                        if (!$whId) return null;
+                                        return Rak::where('warehouse_id', $whId)->exists()
+                                            ? 'Pilih rak penyimpanan untuk barang lolos QC.'
+                                            : 'Gudang ini tidak memiliki konfigurasi rak.';
+                                    })
                                     ->searchable()
                                     ->columnSpan(6),
                             ]),
@@ -1291,6 +1305,20 @@ class QualityControlPurchaseResource extends Resource
                                                 ->mapWithKeys(fn($rak) => [$rak->id => filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-')]);
                                         }
                                         return [];
+                                    })
+                                    ->required(function ($get) {
+                                        $warehouseId = $get('warehouse_id');
+                                        return filled($warehouseId) && Rak::where('warehouse_id', $warehouseId)->exists();
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Rak penyimpanan wajib dipilih untuk gudang yang memiliki konfigurasi rak.',
+                                    ])
+                                    ->helperText(function ($get) {
+                                        $warehouseId = $get('warehouse_id');
+                                        if (!$warehouseId) return null;
+                                        return Rak::where('warehouse_id', $warehouseId)->exists()
+                                            ? 'Pilih rak penyimpanan untuk barang lolos QC.'
+                                            : 'Gudang ini tidak memiliki konfigurasi rak.';
                                     })
                                     ->searchable(),
                                 Select::make('inspected_by')

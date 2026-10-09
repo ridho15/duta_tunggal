@@ -145,6 +145,25 @@ class CreateDeliveryOrder extends CreateRecord
                             ->values()
                             ->toArray();
 
+                        if (empty($warehouseSources)) {
+                            $fallbackWarehouseId = $saleOrderItem->warehouse_id;
+                            if (!$fallbackWarehouseId) {
+                                $cabangId = $saleOrder->cabang_id ?? Auth::user()?->cabang_id;
+                                $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
+                                    ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                                    ->value('id');
+                            }
+                            if ($fallbackWarehouseId) {
+                                $warehouseSources = [
+                                    [
+                                        'warehouse_id' => $fallbackWarehouseId,
+                                        'quantity' => (float) $remainingQty,
+                                        'rak_id' => $saleOrderItem->rak_id,
+                                    ]
+                                ];
+                            }
+                        }
+
                         $deliveryItems[] = [
                             'options_from' => 2,
                             'sale_order_item_id' => $saleOrderItem->id,
@@ -257,10 +276,15 @@ class CreateDeliveryOrder extends CreateRecord
                 }
 
                 $warehouseSources = collect($item['warehouseSources'] ?? []);
-                if ($warehouseSources->isNotEmpty()) {
-                    $sourceQty = (float) $warehouseSources->sum(function ($source) {
-                        return (float) ($source['quantity'] ?? 0);
-                    });
+                if ($warehouseSources->isEmpty()) {
+                    $validator = Validator::make([], []);
+                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Pilih minimal satu gudang sumber pengiriman.");
+                    throw new ValidationException($validator);
+                }
+
+                $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                    return (float) ($source['quantity'] ?? 0);
+                });
 
                     if (abs($sourceQty - $quantity) > 0.0001) {
                         $validator = Validator::make([], []);
@@ -287,7 +311,6 @@ class CreateDeliveryOrder extends CreateRecord
                         }
                     }
                 }
-            }
 
             // Check for duplicate sale order items
             $saleOrderItemIds = collect($deliveryItems)->pluck('sale_order_item_id')->filter();
@@ -316,6 +339,9 @@ class CreateDeliveryOrder extends CreateRecord
         if (!empty($this->processedSalesOrderIds)) {
             $deliveryOrder->salesOrders()->sync($this->processedSalesOrderIds);
         }
+
+        // Tahap 3 (Brief Ko Handy): Stok terpotong begitu Dibuat DO (bukan saat SO & bukan saat TERKIRIM)
+        app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($deliveryOrder);
 
         $warehouseConfirmations = app(\App\Services\DeliveryOrderService::class)
             ->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);

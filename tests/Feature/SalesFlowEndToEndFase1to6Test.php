@@ -88,6 +88,11 @@ function e2eContext(): array
         'sales_coa_id' => $revenue->id, 'cogs_coa_id' => $cogs->id, 'goods_delivery_coa_id' => $goods->id, 'inventory_coa_id' => $inventory->id,
     ]);
 
+    \App\Models\InventoryStock::updateOrCreate(
+        ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'rak_id' => null],
+        ['qty_available' => 100, 'qty_reserved' => 0]
+    );
+
     return compact('cabang', 'customerCabang', 'user', 'idr', 'warehouse', 'customer', 'product', 'bank', 'bankDeposito', 'depositLiability');
 }
 

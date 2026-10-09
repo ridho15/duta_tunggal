@@ -202,4 +202,19 @@ class CustomerReceiptObserver
             $ar->invoice?->update(['status' => 'partially_paid']);
         }
     }
+
+    public function deleting(CustomerReceipt $receipt): void
+    {
+        if (in_array(strtolower((string) $receipt->status), ['partial', 'paid'], true) || $receipt->journalEntries()->exists()) {
+            throw new \Exception('Penerimaan customer yang sudah diproses atau memiliki jurnal tidak dapat dihapus. Gunakan fitur Batalkan Penerimaan untuk melakukan pembalikan resmi.');
+        }
+    }
+
+    public function deleted(CustomerReceipt $receipt): void
+    {
+        // Bersihkan entri jurnal terkait (bila ada)
+        \App\Models\JournalEntry::where('source_type', CustomerReceipt::class)
+            ->where('source_id', $receipt->id)
+            ->delete();
+    }
 }

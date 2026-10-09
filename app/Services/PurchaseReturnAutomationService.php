@@ -106,10 +106,14 @@ class PurchaseReturnAutomationService
     {
         $purchaseReturn = PurchaseReturn::create([
             'purchase_receipt_id' => $purchaseReceiptItem->purchase_receipt_id,
-            'return_date' => now(),
-            'nota_retur' => $this->purchaseReturnService->generateNotaRetur(),
-            'created_by' => 1, // System user
-            'notes' => 'Auto-generated return based on quality control rejection: ' . ($qc->qc_number ?? 'QC-' . $qc->id)
+            'quality_control_id'  => $qc->id,
+            'failed_qc_action'    => PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
+            'return_date'         => now(),
+            'nota_retur'          => $this->purchaseReturnService->generateNotaRetur(),
+            'created_by'          => 1, // System user
+            'status'              => 'draft',
+            'cabang_id'           => $qc->cabang_id,
+            'notes'               => 'Auto-generated return based on quality control rejection: ' . ($qc->qc_number ?? 'QC-' . $qc->id)
         ]);
 
         $this->createReturnItem($purchaseReturn, $qc, $purchaseReceiptItem);
@@ -158,18 +162,9 @@ class PurchaseReturnAutomationService
      */
     protected function updateInventoryStock(QualityControl $qc): void
     {
-        // Find inventory stock for this product
-        $inventoryStock = InventoryStock::where('product_id', $qc->product_id)
-            ->where('warehouse_id', $qc->warehouse_id)
-            ->first();
-
-        if ($inventoryStock) {
-            // Decrease available quantity
-            $inventoryStock->decrement('qty_available', $qc->rejected_quantity);
-            
-            // Increase reserved quantity for return processing
-            $inventoryStock->increment('qty_reserved', $qc->rejected_quantity);
-        }
+        // Quality Control rejected items were never added to available inventory stock,
+        // so decrementing qty_available here causes unjustified stock shrinkage / double decrement.
+        return;
     }
 
     /**

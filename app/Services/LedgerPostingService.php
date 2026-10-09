@@ -68,13 +68,16 @@ class LedgerPostingService
         // Check if this is asset purchase
         $isAssetPurchase = false;
         $isImportPurchase = false;
-        if ($invoice->from_model_type === PurchaseOrder::class) {
+        if ($invoice->from_model_type === PurchaseOrder::class || $invoice->from_model_type === 'App\\Models\\PurchaseOrder') {
             $purchaseOrder = $invoice->fromModel;
             $isAssetPurchase = $purchaseOrder && $purchaseOrder->is_asset;
             $isImportPurchase = $purchaseOrder && $purchaseOrder->is_import;
         }
 
-        $inventoryCoa = $invoice->inventory_coa_id ? ChartOfAccount::find($invoice->inventory_coa_id) : ChartOfAccount::where('code', config('coa.inventory'))->first();
+        $inventoryCoa = $invoice->inventory_coa_id
+            ? ChartOfAccount::find($invoice->inventory_coa_id)
+            : (ChartOfAccount::where('code', config('coa.inventory'))->first()
+                ?? ChartOfAccount::where('code', '1140.01')->first());
         $fixedAssetCoa = ChartOfAccount::where('code', config('coa.fixed_asset'))->first() ?? ChartOfAccount::find(11); // HARGA PEROLEHAN ASET TETAP fallback
         $ppnMasukanCoa = $invoice->ppn_masukan_coa_id ? ChartOfAccount::find($invoice->ppn_masukan_coa_id) : ChartOfAccount::where('code', config('coa.ppn_masukan'))->first();
         $utangCoa = $invoice->accounts_payable_coa_id ? ChartOfAccount::find($invoice->accounts_payable_coa_id) : ChartOfAccount::where('code', config('coa.accounts_payable'))->first();
@@ -109,8 +112,8 @@ class LedgerPostingService
 
         // For purchase invoices, inventory recognition now happens through QC approval
         // So we skip creating inventory debit entries here
-        $isPurchaseInvoice = $invoice->from_model_type === PurchaseOrder::class;
-        $isGoodsReceiptInvoice = $invoice->from_model_type === PurchaseReceipt::class;
+        $isPurchaseInvoice = $invoice->from_model_type === PurchaseOrder::class || $invoice->from_model_type === 'App\\Models\\PurchaseOrder';
+        $isGoodsReceiptInvoice = $invoice->from_model_type === PurchaseReceipt::class || $invoice->from_model_type === 'App\\Models\\PurchaseReceipt';
 
         \Illuminate\Support\Facades\Log::info('DEBUG: Invoice type check', [
             'from_model_type' => $invoice->from_model_type,
@@ -119,9 +122,38 @@ class LedgerPostingService
             'isGoodsReceiptInvoice' => $isGoodsReceiptInvoice
         ]);
 
+        // Check if this invoice originates from an asset purchase
+        $isAssetPurchase = false;
+        $linkedPo = null;
+        if ($isPurchaseInvoice && $invoice->from_model_id) {
+            $linkedPo = PurchaseOrder::withoutGlobalScopes()->find($invoice->from_model_id);
+            $isAssetPurchase = $linkedPo ? (bool) $linkedPo->is_asset : false;
+        } elseif ($isGoodsReceiptInvoice && $invoice->from_model_id) {
+            $linkedReceipt = PurchaseReceipt::withoutGlobalScopes()->with('purchaseOrder')->find($invoice->from_model_id);
+            $linkedPo = $linkedReceipt?->purchaseOrder;
+            $isAssetPurchase = $linkedPo ? (bool) $linkedPo->is_asset : false;
+        }
+
+        // Check if asset acquisition journal was already posted for this PO
+        $alreadyRecognizedAssetCost = 0.0;
+        if ($isAssetPurchase && $linkedPo) {
+            $existingAssetJournals = JournalEntry::where(function ($q) {
+                $q->where('source_type', PurchaseOrder::class)
+                  ->orWhere('source_type', 'App\\Models\\PurchaseOrder');
+            })
+            ->where('source_id', $linkedPo->id)
+            ->where('journal_type', 'asset_acquisition')
+            ->where('credit', '>', 0)
+            ->get();
+
+            if ($existingAssetJournals->isNotEmpty()) {
+                $alreadyRecognizedAssetCost = (float) $existingAssetJournals->sum('credit');
+            }
+        }
+
         // For purchase invoices and goods receipt invoices: Simplified journal entry format
         if ($isPurchaseInvoice || $isGoodsReceiptInvoice) {
-            // Determine whether to debit unbilled purchase or inventory.
+            // Determine whether to debit unbilled purchase, fixed asset, or inventory.
             if ($isPurchaseInvoice) {
                 // Check if there are any receipts for this PO
                 $hasReceipts = \App\Models\PurchaseReceipt::where('purchase_order_id', $invoice->from_model_id)->exists();
@@ -132,7 +164,13 @@ class LedgerPostingService
                 $hasReceipts = false;
             }
 
-            if ($hasReceipts) {
+            if ($isAssetPurchase) {
+                // Asset purchase: Debit Fixed Asset COA, NEVER inventory!
+                $assetCoa = ChartOfAccount::where('code', '1500')->first()
+                    ?? ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first()
+                    ?? ChartOfAccount::where('type', 'Asset')->where('name', 'like', '%aset%')->first();
+                $debitCoa = $assetCoa;
+            } elseif ($hasReceipts) {
                 // If there are receipts, debit unbilled purchase (will be credited when QC approved)
                 $debitCoa = $unbilledPurchaseCoa;
             } else {
@@ -143,14 +181,24 @@ class LedgerPostingService
             // Debit for subtotal and purchase price variance
             $varianceOriginal = (float) ($invoice->price_variance_amount ?? 0);
             $variance = $isForeignCurrencyInvoice ? round($varianceOriginal * $exchangeRate, 2) : $varianceOriginal;
-            $unbilledAmount = $hasReceipts ? round($subtotal - $variance, 2) : $subtotal;
+
+            if ($isAssetPurchase) {
+                // If asset acquisition was already recognized at PO stage, only debit incremental asset cost
+                $unbilledAmount = max(0.0, round($subtotal - $alreadyRecognizedAssetCost - $variance, 2));
+            } else {
+                $unbilledAmount = $hasReceipts ? round($subtotal - $variance, 2) : $subtotal;
+            }
 
             if ($unbilledAmount > 0 && $debitCoa) {
+                $descriptionText = $isAssetPurchase
+                    ? 'Purchase invoice - fixed asset for ' . $invoice->invoice_number
+                    : 'Purchase invoice - ' . ($hasReceipts ? 'unbilled purchase' : 'inventory') . ' for ' . $invoice->invoice_number;
+
                 $debitEntry = $this->createJournalEntry([
                     'coa_id' => $debitCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
-                    'description' => 'Purchase invoice - ' . ($hasReceipts ? 'unbilled purchase' : 'inventory') . ' for ' . $invoice->invoice_number,
+                    'description' => $descriptionText,
                     'debit' => $unbilledAmount,
                     'credit' => 0,
                     'amounts_are_idr' => true,
@@ -163,9 +211,11 @@ class LedgerPostingService
                 ], $currencyId, $exchangeRate);
                 $entries[] = $debitEntry;
             } else {
-                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping debit entry for unbilled purchase', [
+                \Illuminate\Support\Facades\Log::info('DEBUG: Skipping debit entry for unbilled purchase / asset', [
                     'subtotal' => $subtotal,
-                    'unbilledPurchaseCoa_exists' => $unbilledPurchaseCoa ? true : false
+                    'alreadyRecognizedAssetCost' => $alreadyRecognizedAssetCost,
+                    'isAssetPurchase' => $isAssetPurchase,
+                    'debitCoa_exists' => $debitCoa ? true : false
                 ]);
             }
 
@@ -285,12 +335,23 @@ class LedgerPostingService
 
             // Credit Accounts Payable for total amount (subtotal + actual PPN + other fees)
             $totalAmount = $subtotal + $actualPpnAmount + $totalOtherFees;
+
+            // For asset purchases where AP was already recognized at PO approval stage,
+            // deduct the already recognized AP to eliminate double AP!
+            if ($isAssetPurchase && $alreadyRecognizedAssetCost > 0) {
+                $totalAmount = max(0.0, round($totalAmount - $alreadyRecognizedAssetCost, 2));
+            }
+
             if ($totalAmount > 0 && $utangCoa) {
+                $apDescription = ($isAssetPurchase && $alreadyRecognizedAssetCost > 0)
+                    ? 'Accounts payable (incremental/tax) for ' . $invoice->invoice_number
+                    : 'Accounts payable for ' . $invoice->invoice_number;
+
                 $creditEntry = $this->createJournalEntry([
                     'coa_id' => $utangCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
-                    'description' => 'Accounts payable for ' . $invoice->invoice_number,
+                    'description' => $apDescription,
                     'debit' => 0,
                     'credit' => $totalAmount,
                     'amounts_are_idr' => true,

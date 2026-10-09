@@ -343,11 +343,15 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
       }
     } catch (err: any) {
       console.error('Error saving sales order:', err);
+      const serverMessage = err.response?.data?.message;
       if (err.response?.status === 422 && err.response?.data?.errors) {
         setErrors(err.response.data.errors);
-        setGeneralError('Validasi gagal. Periksa kembali form input Anda.');
+        setGeneralError(serverMessage || 'Validasi gagal. Periksa kembali form input Anda.');
       } else {
-        setGeneralError(err.response?.data?.message || err.message || 'Terjadi kesalahan sistem saat menyimpan data.');
+        setGeneralError(serverMessage || err.message || 'Terjadi kesalahan sistem saat menyimpan data.');
+      }
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } finally {
       setIsSaving(false);
@@ -472,6 +476,7 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
         summary={summary}
         isSaving={isSaving}
         isEditMode={isEditMode}
+        error={generalError}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
       />

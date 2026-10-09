@@ -21,6 +21,10 @@ class CustomerReceiptPolicy
      */
     public function view(User $user, CustomerReceipt $customerReceipt): bool
     {
+        if (! $user->canAccessCabang($customerReceipt->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view customer receipt');
     }
 
@@ -37,6 +41,14 @@ class CustomerReceiptPolicy
      */
     public function update(User $user, CustomerReceipt $customerReceipt): bool
     {
+        if (! $user->canAccessCabang($customerReceipt->cabang_id)) {
+            return false;
+        }
+
+        if (in_array(strtolower((string) $customerReceipt->status), ['partial', 'paid'], true)) {
+            return false;
+        }
+
         // T3.3 (flag sales.controls.doc_lock): penerimaan berjurnal tidak diubah/dihapus langsung — gunakan Batalkan Penerimaan.
         if (\App\Services\DocumentLock::blocks($customerReceipt, 'update')) {
             return false;
@@ -50,6 +62,14 @@ class CustomerReceiptPolicy
      */
     public function delete(User $user, CustomerReceipt $customerReceipt): bool
     {
+        if (! $user->canAccessCabang($customerReceipt->cabang_id)) {
+            return false;
+        }
+
+        if (in_array(strtolower((string) $customerReceipt->status), ['partial', 'paid'], true) || $customerReceipt->journalEntries()->exists()) {
+            return false;
+        }
+
         // T3.3 (flag sales.controls.doc_lock): penerimaan berjurnal tidak diubah/dihapus langsung — gunakan Batalkan Penerimaan.
         if (\App\Services\DocumentLock::blocks($customerReceipt, 'delete')) {
             return false;
@@ -63,6 +83,10 @@ class CustomerReceiptPolicy
      */
     public function restore(User $user, CustomerReceipt $customerReceipt): bool
     {
+        if (! $user->canAccessCabang($customerReceipt->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore customer receipt');
     }
 
@@ -71,6 +95,14 @@ class CustomerReceiptPolicy
      */
     public function forceDelete(User $user, CustomerReceipt $customerReceipt): bool
     {
+        if (! $user->canAccessCabang($customerReceipt->cabang_id)) {
+            return false;
+        }
+
+        if (in_array(strtolower((string) $customerReceipt->status), ['partial', 'paid'], true) || $customerReceipt->journalEntries()->exists()) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete customer receipt');
     }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Helpers\MoneyHelper;
+use App\Models\Scopes\CabangScope;
 
 class PaymentRequest extends Model
 {
@@ -297,5 +298,16 @@ class PaymentRequest extends Model
         $activePrAmount = static::getActivePrAmountForInvoice((int) $invoice->id, $excludePrId);
 
         return max(0.0, $remainingAp - $activePrAmount);
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+
+        static::creating(function (PaymentRequest $request) {
+            if (empty($request->cabang_id)) {
+                $request->cabang_id = auth()->user()?->cabang_id ?? session('current_cabang_id');
+            }
+        });
     }
 }

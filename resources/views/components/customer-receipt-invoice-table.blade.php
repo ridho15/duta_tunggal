@@ -114,7 +114,10 @@
                                     onchange="handleInvoiceCheckboxChange(this)">
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                {{ $invoice['invoice_number'] }}
+                                <div>{{ $invoice['invoice_number'] }}</div>
+                                @if (!empty($invoice['surat_jalan_numbers']) && $invoice['surat_jalan_numbers'] !== '-')
+                                    <div class="text-xs text-gray-500 font-normal">SJ: {{ $invoice['surat_jalan_numbers'] }}</div>
+                                @endif
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                                 {{ $invoice['customer_name'] ?? '' }}

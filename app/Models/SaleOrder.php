@@ -91,8 +91,10 @@ class SaleOrder extends Model
                 $table = $main->getModel()->getTable();
                 $main->whereIn($table . '.status', self::DELIVERABLE_STATUSES)
                     ->where(function ($q) use ($table) {
-                        $q->whereNull($table . '.tipe_pengiriman')
-                          ->orWhere($table . '.tipe_pengiriman', '!=', 'Ambil Sendiri');
+                        $q->whereDoesntHave('customer', function (Builder $c) {
+                            $c->where('tipe_pembayaran', 'like', '%COD%');
+                        })
+                        ->orWhereNotNull($table . '.cashier_approved_at');
                     })
                     ->whereHas('saleOrderItem', function (Builder $items) {
                         $items->whereRaw(\App\Services\SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items') . ' > 0');
@@ -118,6 +120,7 @@ class SaleOrder extends Model
         'exchange_rate' => 'decimal:8',
         'is_backorder' => 'boolean',
         'backorder_approved_at' => 'datetime',
+        'cashier_approved_at' => 'datetime',
     ];
     protected $fillable = [
         'customer_id',
@@ -152,7 +155,34 @@ class SaleOrder extends Model
         'backorder_reason',
         'backorder_approved_by',
         'backorder_approved_at',
+        'cashier_approved_by',
+        'cashier_approved_at',
+        'cashier_note',
     ];
+
+    public function cashierApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'cashier_approved_by')->withDefault();
+    }
+
+    public function isCod(): bool
+    {
+        $tipe = (string) ($this->customer?->tipe_pembayaran ?? '');
+        return str_contains(strtoupper($tipe), 'COD');
+    }
+
+    public function isCashierApproved(): bool
+    {
+        return ! is_null($this->cashier_approved_at);
+    }
+
+    public function canCreateDeliveryOrder(): bool
+    {
+        if ($this->isCod() && ! $this->isCashierApproved()) {
+            return false;
+        }
+        return in_array($this->status, self::DELIVERABLE_STATUSES);
+    }
 
 
     public function customer()

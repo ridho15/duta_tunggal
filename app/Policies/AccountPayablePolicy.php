@@ -21,6 +21,10 @@ class AccountPayablePolicy
      */
     public function view(User $user, AccountPayable $accountPayable): bool
     {
+        if (! $user->canAccessCabang($accountPayable->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view account payable');
     }
 
@@ -37,6 +41,10 @@ class AccountPayablePolicy
      */
     public function update(User $user, AccountPayable $accountPayable): bool
     {
+        if (! $user->canAccessCabang($accountPayable->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update account payable');
     }
 
@@ -45,6 +53,10 @@ class AccountPayablePolicy
      */
     public function delete(User $user, AccountPayable $accountPayable): bool
     {
+        if (! $user->canAccessCabang($accountPayable->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete account payable');
     }
 
@@ -53,6 +65,10 @@ class AccountPayablePolicy
      */
     public function restore(User $user, AccountPayable $accountPayable): bool
     {
+        if (! $user->canAccessCabang($accountPayable->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore account payable');
     }
 
@@ -61,6 +77,10 @@ class AccountPayablePolicy
      */
     public function forceDelete(User $user, AccountPayable $accountPayable): bool
     {
+        if (! $user->canAccessCabang($accountPayable->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete account payable');
     }
 }

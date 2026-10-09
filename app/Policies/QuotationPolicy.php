@@ -21,6 +21,10 @@ class QuotationPolicy
      */
     public function view(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view quotation');
     }
 
@@ -37,6 +41,10 @@ class QuotationPolicy
      */
     public function update(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         // Hanya Draft / Ditolak yang boleh diubah; selebihnya terkunci (revisi lewat versi baru).
         return $quotation->isEditable() && $user->hasPermissionTo('update quotation');
     }
@@ -46,6 +54,10 @@ class QuotationPolicy
      */
     public function delete(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return $quotation->isEditable() && $user->hasPermissionTo('delete quotation');
     }
 
@@ -54,6 +66,10 @@ class QuotationPolicy
      */
     public function restore(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore quotation');
     }
 
@@ -62,6 +78,10 @@ class QuotationPolicy
      */
     public function forceDelete(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete quotation');
     }
 
@@ -70,6 +90,10 @@ class QuotationPolicy
      */
     public function revise(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return in_array($quotation->status, [Quotation::STATUS_APPROVE, Quotation::STATUS_EXPIRED], true)
             && $quotation->superseded_at === null
             && $user->hasPermissionTo('create quotation');
@@ -77,11 +101,19 @@ class QuotationPolicy
 
     public function requestApprove(User $user, ?Quotation $quotation = null): bool
     {
+        if ($quotation && ! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('request-approve quotation');
     }
 
     public function approve(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         // T3.1 (flag sales.controls.approval_rules): pemisahan tugas + ambang nominal juga berlaku untuk Quotation (D6/D26).
         if (config('sales.controls.approval_rules', false)) {
             return app(\App\Services\ApprovalControlService::class)->canApprove($user, $quotation)['allowed'];
@@ -92,6 +124,10 @@ class QuotationPolicy
 
     public function reject(User $user, Quotation $quotation): bool
     {
+        if (! $user->canAccessCabang($quotation->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('reject quotation');
     }
 }

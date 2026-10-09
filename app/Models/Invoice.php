@@ -60,6 +60,7 @@ class Invoice extends Model
         'supplier_name',
         'supplier_phone',
         'delivery_orders',
+        'surat_jalan_ids',
         'purchase_receipts',
         'purchase_order_ids', // Task 14: multiple POs per invoice
         'accounts_payable_coa_id',
@@ -78,6 +79,7 @@ class Invoice extends Model
 
     protected $casts = [
         'delivery_orders' => 'array',
+        'surat_jalan_ids' => 'array',
         'cancelled_at' => 'datetime',
         'purchase_receipts' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
@@ -378,9 +380,50 @@ class Invoice extends Model
             } elseif ($this->fromModel instanceof \App\Models\DeliveryOrder) {
                 // For DeliveryOrder, get customer from related sales orders
                 return $this->fromModel->salesOrders()->first()?->customer;
+            } elseif ($this->fromModel instanceof \App\Models\SuratJalan) {
+                // For SuratJalan, get customer from related delivery orders and sales orders
+                return $this->fromModel->deliveryOrder->first()?->salesOrders()->first()?->customer;
             }
         }
+
+        // Fallback via surat_jalan_ids
+        if (!empty($this->surat_jalan_ids)) {
+            $firstSj = \App\Models\SuratJalan::with('deliveryOrder.salesOrders.customer')->find($this->surat_jalan_ids[0] ?? null);
+            if ($firstSj) {
+                return $firstSj->deliveryOrder->first()?->salesOrders->first()?->customer;
+            }
+        }
+
         return null;
+    }
+
+    public function getSuratJalansAttribute()
+    {
+        $ids = $this->surat_jalan_ids ?? [];
+        if (empty($ids) && $this->from_model_type === \App\Models\SuratJalan::class && $this->from_model_id) {
+            $ids = [$this->from_model_id];
+        }
+
+        if (empty($ids)) {
+            return collect();
+        }
+
+        return \App\Models\SuratJalan::whereIn('id', (array) $ids)->get();
+    }
+
+    public function suratJalans()
+    {
+        return $this->getSuratJalansAttribute();
+    }
+
+    public function getSuratJalansDisplayAttribute(): string
+    {
+        $sjs = $this->suratJalans();
+        if ($sjs->isNotEmpty()) {
+            return $sjs->pluck('sj_number')->implode(', ');
+        }
+
+        return '-';
     }
 
     public function getCustomerNameDisplayAttribute()

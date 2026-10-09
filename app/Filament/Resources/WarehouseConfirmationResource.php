@@ -251,7 +251,23 @@ class WarehouseConfirmationResource extends Resource
                                         }
 
                                         return [];
-                                    }),
+                                    })
+                                    ->required(function ($get) {
+                                        $warehouseId = $get('warehouse_id');
+                                        return filled($warehouseId) && Rak::where('warehouse_id', $warehouseId)->exists();
+                                    })
+                                    ->validationMessages([
+                                        'required' => 'Rak pengeluaran barang wajib dipilih untuk gudang yang memiliki konfigurasi rak.',
+                                    ])
+                                    ->helperText(function ($get) {
+                                        $warehouseId = $get('warehouse_id');
+                                        if (!$warehouseId) return null;
+                                        return Rak::where('warehouse_id', $warehouseId)->exists()
+                                            ? 'Pilih rak fisik tempat barang diambil untuk konfirmasi pengeluaran.'
+                                            : 'Gudang ini tidak memiliki konfigurasi rak.';
+                                    })
+                                    ->searchable()
+                                    ->preload(),
 
                                 Radio::make('status')
                                     ->label('Item Status')

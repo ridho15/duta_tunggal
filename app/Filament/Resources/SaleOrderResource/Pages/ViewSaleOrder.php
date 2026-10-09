@@ -148,6 +148,48 @@ class ViewSaleOrder extends ViewRecord
                             HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui SO", message: "Terjadi kesalahan: " . $e->getMessage());
                         }
                     }),
+                Action::make('verify_cashier')
+                    ->label('Verifikasi Kasir (COD)')
+                    ->icon('heroicon-o-check-badge')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Verifikasi Kasir untuk Sales Order COD')
+                    ->modalDescription(function ($record) {
+                        $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
+                        $total = 'Rp ' . number_format((float) ($record->total_amount ?? 0), 0, ',', '.');
+                        return "Konfirmasi penerimaan titipan/pembayaran COD untuk SO {$record->so_number} ({$cust} - {$total}). Setelah diverifikasi oleh Kasir, Delivery Order (DO) baru dapat diterbitkan.";
+                    })
+                    ->modalSubmitActionLabel('Verifikasi & Setujui')
+                    ->form([
+                        Textarea::make('cashier_note')
+                            ->label('Catatan Kasir')
+                            ->placeholder('Contoh: DP / Titipan pembayaran tunai/transfer telah diterima kasir')
+                            ->rows(2),
+                    ])
+                    ->visible(function ($record) {
+                        if (! $record->isCod() || $record->isCashierApproved()) {
+                            return false;
+                        }
+                        $user = Auth::user();
+                        if (! $user) {
+                            return false;
+                        }
+                        return $user->hasRole(['Kasir', 'Finance Manager', 'Admin Keuangan', 'Super Admin', 'Owner'])
+                            || $user->hasPermissionTo('update sales order');
+                    })
+                    ->action(function ($record, array $data = []) {
+                        $record->update([
+                            'cashier_approved_by' => Auth::id(),
+                            'cashier_approved_at' => now(),
+                            'cashier_note' => $data['cashier_note'] ?? null,
+                        ]);
+
+                        HelperController::sendNotification(
+                            isSuccess: true,
+                            title: "Verifikasi Kasir Berhasil",
+                            message: "Sales Order {$record->so_number} telah diverifikasi oleh Kasir. Delivery Order sekarang dapat diterbitkan."
+                        );
+                    }),
                 \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
                 \App\Filament\Support\SaleOrderStockActions::retryReservation(Action::make('retry_reservation')),
                 Action::make('closed')

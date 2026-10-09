@@ -550,6 +550,12 @@ class PurchaseReturnService
      */
     public function adjustStock(PurchaseReturn $purchaseReturn): bool
     {
+        // Never adjust inventory stock for returns of QC rejected items
+        // because rejected goods never entered available warehouse inventory.
+        if ($purchaseReturn->isQcReturn()) {
+            return true;
+        }
+
         try {
             DB::transaction(function () use ($purchaseReturn) {
                 $purchaseReturn->loadMissing([
@@ -890,6 +896,7 @@ class PurchaseReturnService
 
         $approvedReturns = PurchaseReturn::whereIn('purchase_receipt_id', $receiptIds)
             ->where('status', 'approved')
+            ->whereNull('quality_control_id')
             ->get();
 
         if ($approvedReturns->isEmpty()) {

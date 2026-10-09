@@ -42,6 +42,7 @@ class StockOpnameService
             }
 
             $warehouseHasRaks = Rak::where('warehouse_id', $lockedOpname->warehouse_id)->exists();
+            $firstRak = $warehouseHasRaks ? Rak::where('warehouse_id', $lockedOpname->warehouse_id)->first() : null;
 
             foreach ($lockedOpname->items as $item) {
                 if (! $item->product_id) {
@@ -51,9 +52,14 @@ class StockOpnameService
                 }
 
                 if ($warehouseHasRaks && ! $item->rak_id) {
-                    throw ValidationException::withMessages([
-                        'items' => 'Setiap item stock opname pada gudang dengan rak harus memiliki rak.',
-                    ]);
+                    if ($firstRak) {
+                        $item->update(['rak_id' => $firstRak->id]);
+                        $item->refresh();
+                    } else {
+                        throw ValidationException::withMessages([
+                            'items' => 'Setiap item stock opname pada gudang dengan rak harus memiliki rak.',
+                        ]);
+                    }
                 }
 
                 if ($item->rak_id && (! $item->rak || (int) $item->rak->warehouse_id !== (int) $lockedOpname->warehouse_id)) {
@@ -135,10 +141,20 @@ class StockOpnameService
                 ]);
             }
 
+            $warehouseHasRaks = Rak::where('warehouse_id', $lockedOpname->warehouse_id)->exists();
+            $firstRak = $warehouseHasRaks ? Rak::where('warehouse_id', $lockedOpname->warehouse_id)->first() : null;
+
             $stocks = InventoryStock::query()
                 ->where('warehouse_id', $lockedOpname->warehouse_id)
                 ->with(['product', 'rak'])
                 ->get();
+
+            if ($warehouseHasRaks) {
+                // Filter out empty ghost rows with rak_id = null and qty <= 0 in racked warehouses
+                $stocks = $stocks->filter(function ($stock) {
+                    return ! (is_null($stock->rak_id) && (float) $stock->qty_available <= 0);
+                });
+            }
 
             $count = 0;
             $opnameDate = $lockedOpname->opname_date ?? now();
@@ -149,13 +165,18 @@ class StockOpnameService
                         continue;
                     }
 
+                    $resolvedRakId = $stock->rak_id;
+                    if ($warehouseHasRaks && ! $resolvedRakId && $firstRak) {
+                        $resolvedRakId = $firstRak->id;
+                    }
+
                     $systemQty = (float) $stock->qty_available;
                     $avgCost = $this->calculateProductCost($stock->product_id, $opnameDate);
 
                     $existingItem = StockOpnameItem::query()
                         ->where('stock_opname_id', $lockedOpname->id)
                         ->where('product_id', $stock->product_id)
-                        ->when($stock->rak_id, fn ($q) => $q->where('rak_id', $stock->rak_id), fn ($q) => $q->whereNull('rak_id'))
+                        ->when($resolvedRakId, fn ($q) => $q->where('rak_id', $resolvedRakId), fn ($q) => $q->whereNull('rak_id'))
                         ->first();
 
                     if (! $existingItem) {
@@ -165,7 +186,7 @@ class StockOpnameService
                         StockOpnameItem::create([
                             'stock_opname_id' => $lockedOpname->id,
                             'product_id' => $stock->product_id,
-                            'rak_id' => $stock->rak_id,
+                            'rak_id' => $resolvedRakId,
                             'system_qty' => $systemQty,
                             'physical_qty' => null,
                             'unit_cost' => $avgCost,

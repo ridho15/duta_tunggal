@@ -1090,6 +1090,34 @@ class QuotationResource extends Resource
 
                                             return static::formatCurrencyInputState($state, $currencyId);
                                         })
+                                        ->rules([
+                                            function ($get) {
+                                                return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                    $productId = $get('product_id');
+                                                    if (! $productId) {
+                                                        return;
+                                                    }
+                                                    $product = \App\Models\Product::find($productId);
+                                                    if (! $product) {
+                                                        return;
+                                                    }
+                                                    $unitPriceNumeric = (float) static::parseCurrencyState($value ?? 0);
+                                                    $error = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPriceNumeric);
+                                                    if ($error) {
+                                                        $fail($error);
+                                                    }
+                                                };
+                                            }
+                                        ])
+                                        ->helperText(function (Get $get) {
+                                            $productId = $get('product_id');
+                                            if (! $productId) return null;
+                                            $product = \App\Models\Product::find($productId);
+                                            if (! $product) return null;
+                                            $floor = \App\Support\ProductPriceLimitation::getMinimumAllowedPrice($product);
+                                            if ($floor <= 0) return null;
+                                            return "Batas harga minimum: Rp " . number_format($floor, 0, ',', '.');
+                                        })
                                         ->afterStateUpdated(function ($set, $get, $state, $livewire) {
                                             static::recalculateQuotationItemState($set, $get, $livewire);
                                         }),
@@ -1405,6 +1433,34 @@ class QuotationResource extends Resource
                                     'required' => 'Unit Price wajib diisi',
                                     'numeric' => 'Unit Price harus berupa angka'
                                 ])
+                                ->rules([
+                                    function ($get) {
+                                        return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                            $productId = $get('product_id');
+                                            if (! $productId) {
+                                                return;
+                                            }
+                                            $product = \App\Models\Product::find($productId);
+                                            if (! $product) {
+                                                return;
+                                            }
+                                            $unitPriceNumeric = (float) static::parseCurrencyState($value ?? 0);
+                                            $error = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPriceNumeric);
+                                            if ($error) {
+                                                $fail($error);
+                                            }
+                                        };
+                                    }
+                                ])
+                                ->helperText(function (Get $get) {
+                                    $productId = $get('product_id');
+                                    if (! $productId) return null;
+                                    $product = \App\Models\Product::find($productId);
+                                    if (! $product) return null;
+                                    $floor = \App\Support\ProductPriceLimitation::getMinimumAllowedPrice($product);
+                                    if ($floor <= 0) return null;
+                                    return "Batas harga minimum: Rp " . number_format($floor, 0, ',', '.');
+                                })
                                 ->live(debounce: 500)
                                 ->afterStateUpdated(function ($state, $set, $get) {
                                     $quantity = $get('quantity') ?? 0;

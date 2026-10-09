@@ -1,11 +1,12 @@
 import React from 'react';
-import { Save, X, Loader2 } from 'lucide-react';
+import { Save, X, Loader2, AlertCircle } from 'lucide-react';
 import { SaleOrderSummary } from './types';
 
 interface Props {
   summary?: SaleOrderSummary;
   isSaving: boolean;
   isEditMode: boolean;
+  error?: string | null;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -14,13 +15,25 @@ export const SaleOrderFloatingSummary: React.FC<Props> = ({
   summary,
   isSaving,
   isEditMode,
+  error,
   onSubmit,
   onCancel,
 }) => {
   const isItemsEmpty = summary?.total_items === 0;
 
   return (
-    <div className="sticky bottom-4 z-40 mt-8 bg-white border border-gray-200 rounded-xl p-4 shadow-md flex items-center justify-end gap-3">
+    <div className="sticky bottom-4 z-40 mt-8 bg-white border border-gray-200 rounded-xl p-4 shadow-md flex items-center justify-between gap-3">
+      {/* Error message inline */}
+      {error ? (
+        <div className="flex-1 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2 max-w-xl">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <span className="truncate" title={error}>{error}</span>
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
+
+      <div className="flex items-center gap-3 shrink-0">
       {/* Batal Button */}
       <button
         type="button"
@@ -51,6 +64,7 @@ export const SaleOrderFloatingSummary: React.FC<Props> = ({
           </>
         )}
       </button>
+      </div>
     </div>
   );
 };

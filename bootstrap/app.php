@@ -32,5 +32,14 @@ return Application::configure(basePath: dirname(__DIR__))
         \App\Providers\FilamentServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (\App\Exceptions\ClosedPeriodException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() || $request->header('X-Livewire')) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'error' => 'CLOSED_ACCOUNTING_PERIOD',
+                ], 422);
+            }
+
+            return back()->withErrors(['date' => $e->getMessage()])->with('error', $e->getMessage());
+        });
     })->create();

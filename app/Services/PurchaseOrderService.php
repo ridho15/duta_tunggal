@@ -50,7 +50,7 @@ class PurchaseOrderService
 
     public function calculateTotalSummary(PurchaseOrder $purchaseOrder): array
     {
-        $purchaseOrder->loadMissing(['purchaseOrderCurrency.currency', 'purchaseOrderItem.currency']);
+        $purchaseOrder->load(['purchaseOrderCurrency.currency', 'purchaseOrderItem.currency']);
         $poCurrencies = $purchaseOrder->purchaseOrderCurrency->keyBy('currency_id');
 
         $totalIdr = 0.0;

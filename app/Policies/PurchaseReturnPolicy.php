@@ -21,6 +21,10 @@ class PurchaseReturnPolicy
      */
     public function view(User $user, PurchaseReturn $purchaseReturn): bool
     {
+        if (! $user->canAccessCabang($purchaseReturn->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view purchase return');
     }
 
@@ -37,6 +41,10 @@ class PurchaseReturnPolicy
      */
     public function update(User $user, PurchaseReturn $purchaseReturn): bool
     {
+        if (! $user->canAccessCabang($purchaseReturn->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update purchase return');
     }
 
@@ -45,6 +53,10 @@ class PurchaseReturnPolicy
      */
     public function delete(User $user, PurchaseReturn $purchaseReturn): bool
     {
+        if (! $user->canAccessCabang($purchaseReturn->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete purchase return');
     }
 
@@ -53,6 +65,10 @@ class PurchaseReturnPolicy
      */
     public function restore(User $user, PurchaseReturn $purchaseReturn): bool
     {
+        if (! $user->canAccessCabang($purchaseReturn->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore purchase return');
     }
 
@@ -61,6 +77,10 @@ class PurchaseReturnPolicy
      */
     public function forceDelete(User $user, PurchaseReturn $purchaseReturn): bool
     {
+        if (! $user->canAccessCabang($purchaseReturn->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete purchase return');
     }
 }

@@ -21,6 +21,10 @@ class PurchaseOrderPolicy
      */
     public function view(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view purchase order');
     }
 
@@ -37,6 +41,10 @@ class PurchaseOrderPolicy
      */
     public function update(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         if (! in_array($purchaseOrder->status, ['draft', 'request_approve'])) {
             return false;
         }
@@ -49,6 +57,10 @@ class PurchaseOrderPolicy
      */
     public function delete(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         if ($purchaseOrder->status !== 'draft') {
             return false;
         }
@@ -61,6 +73,10 @@ class PurchaseOrderPolicy
      */
     public function restore(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore purchase order');
     }
 
@@ -69,16 +85,28 @@ class PurchaseOrderPolicy
      */
     public function forceDelete(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasRole('Super Admin');
     }
 
     public function response(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('response purchase order');
     }
 
     public function request(User $user, PurchaseOrder $purchaseOrder): bool
     {
+        if (! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('request purchase order');
     }
 }

@@ -70,7 +70,11 @@ class EditSalesInvoice extends EditRecord
         $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);
 
         // Load related data for form
-        if ($this->record->from_model_type === 'App\Models\SaleOrder') {
+        if ($this->record->from_model_type === \App\Models\SuratJalan::class || !empty($this->record->surat_jalan_ids)) {
+            $data['selected_customer'] = $this->record->customer?->id ?? null;
+            $data['selected_surat_jalans'] = $this->record->surat_jalan_ids ?? [$this->record->from_model_id];
+            $data['selected_delivery_orders'] = $this->record->delivery_orders ?? [];
+        } elseif ($this->record->from_model_type === 'App\Models\SaleOrder') {
             $data['selected_customer'] = $this->record->fromModel->customer_id ?? null;
             $data['selected_sale_order'] = $this->record->from_model_id ?? null;
             $data['selected_delivery_orders'] = $this->record->delivery_orders ?? [];
@@ -153,6 +157,7 @@ class EditSalesInvoice extends EditRecord
 
         // Remove temporary fields
         unset($data['selected_customer']);
+        unset($data['selected_surat_jalans']);
         unset($data['selected_sale_order']);
         unset($data['selected_delivery_orders']);
         unset($data['delivery_order_items']);

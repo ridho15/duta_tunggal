@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -204,6 +205,8 @@ class Quotation extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+
         // Auto-assign cabang_id when creating so new quotations are branch-scoped
         static::creating(function ($model) {
             if (empty($model->cabang_id)) {

@@ -127,6 +127,16 @@ class DeliveryOrder extends Model
         return $this->belongsToMany(SuratJalan::class, 'surat_jalan_delivery_orders', 'delivery_order_id', 'surat_jalan_id')->withTimestamps();
     }
 
+    /**
+     * Memeriksa apakah Delivery Order ini sudah memiliki Surat Jalan (SJ) yang diterbitkan (status Terbit / STATUS_ISSUED).
+     */
+    public function hasIssuedSuratJalan(): bool
+    {
+        return $this->suratJalan()
+            ->where('surat_jalans.status', SuratJalan::STATUS_ISSUED)
+            ->exists();
+    }
+
     public function deliverySchedules()
     {
         return $this->belongsToMany(DeliverySchedule::class, 'delivery_schedule_delivery_orders', 'delivery_order_id', 'delivery_schedule_id')->withTimestamps();
@@ -176,6 +186,24 @@ class DeliveryOrder extends Model
         static::addGlobalScope(new CabangScope);
 
         static::deleting(function ($deliveryOrder) {
+            if (in_array($deliveryOrder->status, ['sent', 'completed', 'delivered', 'delivering'], true)) {
+                throw new \Exception("Surat Jalan / Delivery Order dengan status '{$deliveryOrder->status}' tidak dapat dihapus karena barang sudah keluar gudang dan mempengaruhi stok fisik serta akuntansi.");
+            }
+
+            $hasInvoices = \App\Models\Invoice::where(function ($q) use ($deliveryOrder) {
+                $q->where('from_model_type', self::class)
+                  ->where('from_model_id', $deliveryOrder->id);
+            })->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id)
+              ->orWhereJsonContains('delivery_orders', (int) $deliveryOrder->id)
+              ->exists();
+
+            if ($hasInvoices) {
+                throw new \Exception("Delivery Order tidak dapat dihapus karena sudah memiliki faktur penjualan (Invoice) terkait.");
+            }
+
+            // Tahap 3: Kembalikan stok fisik bila DO dihapus
+            app(\App\Services\DeliveryShipments::class)->reverse($deliveryOrder, "DO {$deliveryOrder->do_number} dihapus");
+
             if ($deliveryOrder->isForceDeleting()) {
                 $deliveryOrder->deliveryOrderItem()->forceDelete();
             } else {

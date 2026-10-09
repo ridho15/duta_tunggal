@@ -66,6 +66,11 @@ class DeliveryOrderSourceValidator
                 continue;
             }
 
+            if ($order->isCod() && ! $order->isCashierApproved()) {
+                $errors[] = "Sales Order {$order->so_number} memiliki tipe pembayaran COD dan belum disetujui/diverifikasi oleh Kasir.";
+                continue;
+            }
+
             $available = $this->progress->forSaleOrder($order, $excludeDeliveryOrderId)['totals']['available'];
             if ($available <= 0) {
                 $errors[] = "Sales Order {$order->so_number} tidak memiliki sisa kuantitas yang dapat dikirim "

@@ -43,6 +43,8 @@ return [
         'strict_dispatch' => (bool) env('SALES_STOCK_STRICT_DISPATCH', false),
         'reserve_on_so_approve' => (bool) env('SALES_STOCK_RESERVE_ON_SO_APPROVE', false),
         'block_short_approval' => (bool) env('SALES_STOCK_BLOCK_SHORT_APPROVAL', false),
+        // Alur ketat: DO hanya boleh dikirim / selesai bila sudah memiliki Surat Jalan (SJ) yang terbit
+        'require_surat_jalan' => (bool) env('SALES_STOCK_REQUIRE_SURAT_JALAN', true),
     ],
 
     /*

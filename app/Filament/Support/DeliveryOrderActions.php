@@ -55,6 +55,7 @@ class DeliveryOrderActions
             ->modalHeading('Kirim Delivery Order')
             ->modalDescription('Barang akan keluar dari gudang: stok fisik berkurang dan reservasi dikonsumsi. Pastikan barang benar-benar berangkat.')
             ->modalSubmitActionLabel('Ya, Kirim')
+            ->tooltip(fn ($record) => $record && ! $record->hasIssuedSuratJalan() ? 'Delivery Order belum memiliki Surat Jalan (SJ) yang terbit' : null)
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
             ->visible(self::strictAnd(fn ($record) => in_array($record->status, self::SHIPPABLE, true)))
             ->form(fn () => DeliveryOrderTransitions::canOverrideNegativeStock(Auth::user()) ? [
@@ -118,6 +119,7 @@ class DeliveryOrderActions
             ->modalHeading('Selesaikan Delivery Order')
             ->modalDescription('Dokumen pengiriman selesai: jurnal DO dan invoice otomatis diterbitkan. Bila belum dicatat diterima, sistem mencatat penerimaan otomatis.')
             ->modalSubmitActionLabel('Ya, Selesaikan')
+            ->tooltip(fn ($record) => $record && ! $record->hasIssuedSuratJalan() ? 'Delivery Order belum memiliki Surat Jalan (SJ) yang terbit' : null)
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
             ->visible(self::strictAnd(fn ($record) => in_array($record->status, ['approved', 'confirmed', 'partial', 'sent', 'received'], true)))
             ->action(function ($record) {

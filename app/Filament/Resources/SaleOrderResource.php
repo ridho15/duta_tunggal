@@ -1167,46 +1167,9 @@ class SaleOrderResource extends Resource
                                     ])
                                     ->rules([
                                         function ($get) {
-                                            return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                                if (!$value || $value <= 0) {
-                                                    return;
-                                                }
-
-                                                $allocations = collect($get('warehouseAllocations') ?? []);
-
-                                                if ($allocations->isEmpty()) {
-                                                    $fail('Wajib mengisi alokasi gudang minimal 1 gudang.');
-                                                    return;
-                                                }
-
-                                                $allocationQty = (float) $allocations->sum(function ($row) {
-                                                    return (float) ($row['quantity'] ?? 0);
-                                                });
-
-                                                if (abs($allocationQty - (float) $value) > 0.0001) {
-                                                    $fail('Total qty alokasi gudang harus sama dengan quantity item.');
-                                                    return;
-                                                }
-
-                                                $productId = $get('product_id');
-                                                foreach ($allocations as $allocation) {
-                                                    $allocationWarehouseId = $allocation['warehouse_id'] ?? null;
-                                                    $allocationItemQty = (float) ($allocation['quantity'] ?? 0);
-
-                                                    if (!$allocationWarehouseId || $allocationItemQty <= 0) {
-                                                        $fail('Setiap alokasi wajib memiliki gudang dan qty > 0.');
-                                                        return;
-                                                    }
-
-                                                    if ($productId) {
-                                                        $freeStock = (float) InventoryStock::freeQtyFor($productId, $allocationWarehouseId);
-                                                        if ($allocationItemQty > $freeStock) {
-                                                            $warehouse = \App\Models\Warehouse::find($allocationWarehouseId);
-                                                            $whName = $warehouse ? $warehouse->name : "Gudang #{$allocationWarehouseId}";
-                                                            $fail("Kuantitas alokasi ({$allocationItemQty}) melebihi stok bebas di {$whName} (tersedia: " . number_format($freeStock, 0, ',', '.') . ").");
-                                                            return;
-                                                        }
-                                                    }
+                                            return function (string $attribute, $value, \Closure $fail) {
+                                                if (! $value || (float) $value <= 0) {
+                                                    $fail('Quantity harus lebih besar dari 0.');
                                                 }
                                             };
                                         }
@@ -1226,40 +1189,29 @@ class SaleOrderResource extends Resource
                                         $quantity = (float) ($get('quantity') ?? 0);
 
                                         if (!$productId) {
-                                            return 'Pilih produk terlebih dahulu';
+                                            return 'Pilih produk terlebih dahulu untuk melihat ketersediaan stok';
                                         }
 
-                                        $allocations = collect($get('warehouseAllocations') ?? []);
                                         $totalStock = (float) InventoryStock::freeQtyFor($productId);
+                                        $whStocks = InventoryStock::query()
+                                            ->with('warehouse:id,name')
+                                            ->where('product_id', $productId)
+                                            ->where('quantity', '>', 0)
+                                            ->get()
+                                            ->map(fn ($st) => ($st->warehouse?->name ?? 'Gudang #' . $st->warehouse_id) . ': ' . number_format((float) $st->quantity, 0, ',', '.'))
+                                            ->filter()
+                                            ->implode(' | ');
 
-                                        if ($allocations->isEmpty()) {
-                                            // T2.5: peringatan (tidak memblokir simpan draf); persetujuan menolak stok kurang kecuali sebagai backorder.
-                                            $warning = $quantity > $totalStock + 0.00001
-                                                ? '⚠️ Qty melebihi stok bebas — persetujuan hanya sebagai Backorder (alasan wajib). '
-                                                : '';
-
-                                            return $warning . "📦 Total stok bebas: " . number_format($totalStock, 0, ',', '.') . " | Isi alokasi gudang di atas.";
+                                        $text = "📦 Total stok bebas: " . number_format($totalStock, 0, ',', '.');
+                                        if ($whStocks !== '') {
+                                            $text .= " (" . $whStocks . ")";
                                         }
 
-                                        $allocationQty = (float) $allocations->sum(fn($r) => (float) ($r['quantity'] ?? 0));
-                                        if ($quantity > 0 && abs($allocationQty - $quantity) > 0.0001) {
-                                            return "❌ Total alokasi ({$allocationQty}) tidak sama dengan quantity ({$quantity})";
+                                        if ($quantity > $totalStock + 0.00001) {
+                                            $text = '⚠️ Qty melebihi stok bebas (Backorder). ' . $text;
                                         }
 
-                                        foreach ($allocations as $allocation) {
-                                            $whId = $allocation['warehouse_id'] ?? null;
-                                            $itemQty = (float) ($allocation['quantity'] ?? 0);
-                                            if ($whId && $itemQty > 0) {
-                                                $whStock = (float) InventoryStock::freeQtyFor($productId, $whId);
-                                                if ($itemQty > $whStock) {
-                                                    $warehouse = \App\Models\Warehouse::find($whId);
-                                                    $whName = $warehouse ? $warehouse->name : "Gudang #{$whId}";
-                                                    return "⚠️ Stok tidak cukup di {$whName}: Butuh {$itemQty}, tersedia {$whStock}!";
-                                                }
-                                            }
-                                        }
-
-                                        return "✅ Total alokasi gudang: " . number_format($allocationQty, 0, ',', '.') . " (Stok bebas: " . number_format($totalStock, 0, ',', '.') . ")";
+                                        return $text;
                                     })
                                     ->required()
                                     ->default(0),
@@ -1555,7 +1507,7 @@ class SaleOrderResource extends Resource
                                 Repeater::make('warehouseAllocations')
                                     ->relationship('warehouseAllocations')
                                     ->label('Alokasi Gudang')
-                                    ->helperText('Tentukan gudang sumber stok untuk item ini. Dapat dialokasikan ke beberapa gudang sekaligus.')
+                                    ->hidden()
                                     ->schema([
                                         Select::make('warehouse_id')
                                             ->label('Gudang')
@@ -1565,26 +1517,14 @@ class SaleOrderResource extends Resource
                                                     $get('warehouse_id'),
                                                 );
                                             })
-                                            ->helperText('Hanya menampilkan gudang yang memiliki stok bebas untuk produk ini.')
                                             ->searchable()
-                                            ->preload()
-                                            ->required()
-                                            ->validationMessages([
-                                                'required' => 'Gudang alokasi wajib dipilih',
-                                            ]),
+                                            ->preload(),
                                         TextInput::make('quantity')
                                             ->label('Qty Alokasi')
-                                            ->numeric()
-                                            ->required()
-                                            ->validationMessages([
-                                                'required' => 'Qty alokasi wajib diisi',
-                                                'numeric' => 'Qty alokasi harus berupa angka',
-                                            ]),
+                                            ->numeric(),
                                     ])
                                     ->columns(2)
-                                    ->columnspanFull()
-                                    ->minItems(1)
-                                    ->reactive(),
+                                    ->columnspanFull(),
                             ])
                             ->afterStateUpdated(function ($set, $get, $state) {
                                 $totalAmount = is_array($state) ? static::calculateSaleOrderTotalIdr($state) : 0.0;
@@ -1621,6 +1561,33 @@ class SaleOrderResource extends Resource
                     ->formatStateUsing(fn ($state) => SaleOrder::statusLabel($state))
                     ->color(fn ($state) => SaleOrder::statusColor($state))
                     ->badge(),
+                TextColumn::make('cashier_status')
+                    ->label('Verifikasi Kasir')
+                    ->badge()
+                    ->state(function (SaleOrder $record): string {
+                        if (! $record->isCod()) {
+                            return '-';
+                        }
+                        return $record->isCashierApproved() ? 'KASIR OK' : 'MENUNGGU KASIR';
+                    })
+                    ->color(function (SaleOrder $record): string {
+                        if (! $record->isCod()) {
+                            return 'gray';
+                        }
+                        return $record->isCashierApproved() ? 'success' : 'warning';
+                    })
+                    ->tooltip(function (SaleOrder $record): ?string {
+                        if (! $record->isCod()) {
+                            return 'Bukan pesanan COD';
+                        }
+                        if ($record->isCashierApproved()) {
+                            return 'Diverifikasi oleh ' . ($record->cashierApprovedBy?->name ?? 'Kasir')
+                                . ($record->cashier_approved_at ? ' pada ' . $record->cashier_approved_at->format('d/m/Y H:i') : '')
+                                . ($record->cashier_note ? " ({$record->cashier_note})" : '');
+                        }
+                        return 'Menunggu verifikasi penerimaan pembayaran/titipan oleh Kasir sebelum DO dapat diterbitkan.';
+                    })
+                    ->toggleable(),
                 TextColumn::make('shipped_to')
                     ->label('Shipped To')
                     ->searchable(),
@@ -1866,6 +1833,48 @@ class SaleOrderResource extends Resource
                                 HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
                             }
                         }),
+                    Action::make('verify_cashier')
+                        ->label('Verifikasi Kasir (COD)')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Verifikasi Kasir untuk Sales Order COD')
+                        ->modalDescription(function ($record) {
+                            $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
+                            $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
+                            return "Konfirmasi penerimaan titipan/pembayaran COD untuk SO {$record->so_number} ({$cust} - {$total}). Setelah diverifikasi oleh Kasir, Delivery Order (DO) baru dapat diterbitkan.";
+                        })
+                        ->modalSubmitActionLabel('Verifikasi & Setujui')
+                        ->form([
+                            \Filament\Forms\Components\Textarea::make('cashier_note')
+                                ->label('Catatan Kasir')
+                                ->placeholder('Contoh: DP / Titipan pembayaran tunai/transfer telah diterima kasir')
+                                ->rows(2),
+                        ])
+                        ->visible(function ($record) {
+                            if (! $record->isCod() || $record->isCashierApproved()) {
+                                return false;
+                            }
+                            $user = Auth::user();
+                            if (! $user) {
+                                return false;
+                            }
+                            return $user->hasRole(['Kasir', 'Finance Manager', 'Admin Keuangan', 'Super Admin', 'Owner'])
+                                || $user->hasPermissionTo('update sales order');
+                        })
+                        ->action(function ($record, array $data = []) {
+                            $record->update([
+                                'cashier_approved_by' => Auth::id(),
+                                'cashier_approved_at' => now(),
+                                'cashier_note' => $data['cashier_note'] ?? null,
+                            ]);
+
+                            HelperController::sendNotification(
+                                isSuccess: true,
+                                title: "Verifikasi Kasir Berhasil",
+                                message: "Sales Order {$record->so_number} telah diverifikasi oleh Kasir. Delivery Order sekarang dapat diterbitkan."
+                            );
+                        }),
                     \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
                     \App\Filament\Support\SaleOrderStockActions::retryReservation(Action::make('retry_reservation')),
                     DeleteAction::make()
@@ -1949,13 +1958,8 @@ class SaleOrderResource extends Resource
                                 return false;
                             }
 
-                            // Untuk Ambil Sendiri: cukup approved tanpa Delivery Order
-                            if ($record->tipe_pengiriman === 'Ambil Sendiri') {
-                                return true;
-                            }
-
-                            // Untuk Kirim Langsung: perlu Delivery Order completed
-                            // T7.3: memakai relasi yang sudah dimuat di daftar (tanpa satu kueri per baris)
+                            // Untuk SEMUA pengiriman (baik Kirim Langsung maupun Ambil Sendiri):
+                            // Wajib melalui alur SO -> DO -> SJ -> Invoice dan memiliki Delivery Order completed
                             if ($record->relationLoaded('deliveryOrder')) {
                                 return $record->deliveryOrder->contains(fn ($deliveryOrder) => $deliveryOrder->status === 'completed');
                             }

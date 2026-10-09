@@ -37,10 +37,13 @@ class DeliveryShipments
      */
     public function sources(DeliveryOrder $deliveryOrder): array
     {
-        $deliveryOrder->load('deliveryOrderItem.warehouseSources', 'deliveryOrderItem.product');
+        $items = $deliveryOrder->deliveryOrderItem()
+            ->withTrashed()
+            ->with(['warehouseSources' => fn ($q) => $q->withTrashed(), 'product'])
+            ->get();
 
         $rows = [];
-        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+        foreach ($items as $item) {
             $quantity = max(0.0, (float) ($item->quantity ?? 0));
             if ($quantity <= 0) {
                 continue;
@@ -57,8 +60,9 @@ class DeliveryShipments
                 continue;
             }
 
-            if ($deliveryOrder->warehouse_id) {
-                $rows[] = ['item' => $item, 'warehouse_id' => (int) $deliveryOrder->warehouse_id, 'rak_id' => $item->rak_id ? (int) $item->rak_id : null, 'quantity' => $quantity];
+            $warehouseId = $deliveryOrder->warehouse_id ?: $item->warehouse_id;
+            if ($warehouseId) {
+                $rows[] = ['item' => $item, 'warehouse_id' => (int) $warehouseId, 'rak_id' => $item->rak_id ? (int) $item->rak_id : null, 'quantity' => $quantity];
             }
         }
 
@@ -152,7 +156,7 @@ class DeliveryShipments
                 quantity: $net,
                 type: 'adjustment_in',
                 date: now()->toDateString(),
-                notes: "Pengiriman gagal DO {$deliveryOrder->do_number}: stok dikembalikan — {$reason}",
+                notes: "Pengembalian stok DO {$deliveryOrder->do_number}: {$reason}",
                 rak_id: $source['rak_id'],
                 fromModel: $item,
                 value: $item->product->cost_price * $net,

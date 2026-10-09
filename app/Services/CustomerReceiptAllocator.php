@@ -95,12 +95,12 @@ class CustomerReceiptAllocator
                 continue;
             }
 
-            if ($amount > $remaining + self::TOLERANCE) {
+            if ($amount > $remaining + 0.009) {
                 $over = round($amount - $remaining, 2);
                 $excess[$invoiceId] = $over;
                 $applied[$invoiceId] = round($remaining, 2);
             } else {
-                if (abs($amount - $remaining) <= self::TOLERANCE) {
+                if ($remaining - $amount <= self::TOLERANCE) {
                     $applied[$invoiceId] = round($remaining, 2);
                 } else {
                     $applied[$invoiceId] = min($amount, round($remaining, 2));
@@ -205,14 +205,26 @@ class CustomerReceiptAllocator
 
     protected function belongsToCustomer(Invoice $invoice, int $customerId): bool
     {
-        if ($invoice->from_model_type !== SaleOrder::class) {
-            return false;
+        if ($invoice->from_model_type === SaleOrder::class) {
+            if (SaleOrder::withoutGlobalScopes()
+                ->whereKey($invoice->from_model_id)
+                ->where('customer_id', $customerId)
+                ->exists()) {
+                return true;
+            }
         }
 
-        return SaleOrder::withoutGlobalScopes()
-            ->whereKey($invoice->from_model_id)
-            ->where('customer_id', $customerId)
-            ->exists();
+        if ($invoice->from_model_type === \App\Models\SuratJalan::class || ! empty($invoice->surat_jalan_ids)) {
+            if ((int) $invoice->customer?->id === (int) $customerId) {
+                return true;
+            }
+        }
+
+        if ($invoice->accountReceivable && (int) $invoice->accountReceivable->customer_id === (int) $customerId) {
+            return true;
+        }
+
+        return false;
     }
 
     /** @return array<int, float> invoice_id => nominal penerimaan yang sedang diubah */

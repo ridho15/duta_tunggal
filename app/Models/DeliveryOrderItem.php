@@ -90,7 +90,7 @@ class DeliveryOrderItem extends Model
                     app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
                 }
 
-                if ($deliveryOrder && in_array($deliveryOrder->status, ['sent', 'received', 'completed'])) {
+                if ($deliveryOrder && ! in_array($deliveryOrder->status, ['closed', 'reject'], true)) {
                     // Sync journal entries if they exist
                     self::syncJournalEntries($deliveryOrder);
                     
@@ -104,9 +104,14 @@ class DeliveryOrderItem extends Model
         });
 
         static::created(function ($deliveryOrderItem) {
+            $deliveryOrder = $deliveryOrderItem->deliveryOrder;
+            // Tahap 3: Potong stok langsung untuk DO single warehouse
+            if ($deliveryOrder && ! in_array($deliveryOrder->status, ['closed', 'reject'], true) && ($deliveryOrder->warehouse_id || $deliveryOrderItem->warehouse_id)) {
+                app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($deliveryOrder);
+            }
+
             // Cache delivered_quantity & status SO hanya berubah bila DO sudah berstatus terkirim.
             if ($deliveryOrderItem->sale_order_item_id) {
-                $deliveryOrder = $deliveryOrderItem->deliveryOrder;
                 if ($deliveryOrder && in_array($deliveryOrder->status, DeliveryOrder::DELIVERED_STATUSES, true)) {
                     app(\App\Services\SaleOrderDeliveryProgress::class)
                         ->syncForSaleOrderItems([$deliveryOrderItem->sale_order_item_id]);

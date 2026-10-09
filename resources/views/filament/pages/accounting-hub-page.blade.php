@@ -11,6 +11,7 @@
             'items' => [
                 ['label' => 'Journal Entries',            'url' => \App\Filament\Resources\JournalEntryResource::getUrl(),                        'icon' => 'book-open',          'desc' => 'Input & kelola jurnal akuntansi', 'class' => \App\Filament\Resources\JournalEntryResource::class],
                 ['label' => 'Journal Entries (Grouped)',  'url' => \App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries::getUrl(),'icon' => 'table-cells',        'desc' => 'Tampilan jurnal terkelompok per transaksi', 'class' => \App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries::class],
+                ['label' => 'Tutup Buku & Periode',       'url' => \App\Filament\Resources\AccountingPeriodResource::getUrl(),                    'icon' => 'lock-closed',        'desc' => 'Kunci periode transaksi & buat closing entries', 'class' => \App\Filament\Resources\AccountingPeriodResource::class],
                 ['label' => 'AR & AP Management',         'url' => \App\Filament\Pages\ArApManagementPage::getUrl(),                              'icon' => 'arrows-right-left',  'desc' => 'Monitor piutang & hutang secara terpadu', 'class' => \App\Filament\Pages\ArApManagementPage::class],
                 ['label' => 'Rekonsiliasi Bank',          'url' => \App\Filament\Resources\BankReconciliationResource::getUrl(),                  'icon' => 'building-library',   'desc' => 'Cocokkan mutasi bank dengan pembukuan', 'class' => \App\Filament\Resources\BankReconciliationResource::class],
             ],

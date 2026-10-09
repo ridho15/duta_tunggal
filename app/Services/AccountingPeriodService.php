@@ -200,6 +200,7 @@ class AccountingPeriodService
     protected function ensureNoOverlap(string $periodStart, string $periodEnd, ?int $cabangId): void
     {
         $overlapExists = AccountingPeriod::query()
+            ->withoutGlobalScope(CabangScope::class)
             ->where('cabang_id', $cabangId)
             ->where(function ($query) use ($periodStart, $periodEnd) {
                 $query->whereBetween('period_start', [$periodStart, $periodEnd])

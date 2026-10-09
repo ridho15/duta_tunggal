@@ -178,6 +178,12 @@
             </td>
             <td style="vertical-align: top; border: none; padding: 0;">
                 @include('pdf.partials.doc-meta')
+                @if (!empty($doc['surat_jalan']))
+                    <table style="width: 100%; border-collapse: collapse;"><tr>
+                        <td style="width: 32%; padding: 2px 6px 2px 0; border: none;"><strong>No. Surat Jalan</strong></td>
+                        <td style="padding: 2px 0; border: none;">: {{ $doc['surat_jalan'] }}</td>
+                    </tr></table>
+                @endif
                 @if ($doc['source'])
                     <table style="width: 100%; border-collapse: collapse;"><tr>
                         <td style="width: 32%; padding: 2px 6px 2px 0; border: none;"><strong>No. Sales Order</strong></td>

@@ -432,6 +432,19 @@ class QualityControlService
             return;
         }
 
+        // If this QC belongs to an asset purchase PO, skip trade inventory stock movements and inventory journals
+        $isAssetPurchase = (bool) ($qualityControl->purchaseOrder?->is_asset ?? false);
+        if (! $isAssetPurchase && $fromModel?->purchaseOrder) {
+            $isAssetPurchase = (bool) ($fromModel->purchaseOrder->is_asset ?? false);
+        }
+        if ($isAssetPurchase) {
+            Log::info('createJournalEntriesAndInventoryForQC: Skipping inventory movement and journals for Asset purchase', [
+                'qc_id' => $qualityControl->id,
+                'qc_number' => $qualityControl->qc_number,
+            ]);
+            return;
+        }
+
         $amount = round($passedQuantity * $unitPrice, 2);
 
         // Get COA accounts.  Note that the product relation uses withDefault(),

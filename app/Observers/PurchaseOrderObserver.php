@@ -191,6 +191,11 @@ class PurchaseOrderObserver
             'completed_by' => $purchaseOrder->approved_by,
         ]);
 
+        $purchaseOrder->refresh();
+
+        // Create journal entries for asset acquisition at PO level first
+        $this->createAssetAcquisitionJournals($purchaseOrder);
+
         // Auto-create assets for each item
         foreach ($purchaseOrder->purchaseOrderItem as $item) {
             // Compute total per item (for logging); per-unit cost uses unit_price
@@ -202,20 +207,26 @@ class PurchaseOrderObserver
                 $item->tipe_pajak
             );
 
-            // Get default COA for assets from config
-            $assetCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first();
+            // Get default COA for assets
+            $assetCoa = \App\Models\ChartOfAccount::where('code', '1500')->first()
+                ?? \App\Models\ChartOfAccount::where('code', config('asset.coa.asset', '1210.01'))->first()
+                ?? \App\Models\ChartOfAccount::where('type', 'Asset')->where('name', 'like', '%aset%')->first()
+                ?? \App\Models\ChartOfAccount::where('type', 'Asset')->first();
+
             $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.accumulated_depreciation', '1220.01'))->first();
             $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('code', config('asset.coa.depreciation_expense', '6311'))->first();
 
             if (! $accumulatedDepreciationCoa) {
-                $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('type', 'Contra Asset')->first();
+                $accumulatedDepreciationCoa = \App\Models\ChartOfAccount::where('type', 'Contra Asset')->first()
+                    ?? $assetCoa;
             }
 
             if (! $depreciationExpenseCoa) {
                 $depreciationExpenseCoa = \App\Models\ChartOfAccount::where('type', 'Expense')
                     ->where('name', 'like', '%penyusutan%')
                     ->first()
-                    ?? \App\Models\ChartOfAccount::where('type', 'Expense')->first();
+                    ?? \App\Models\ChartOfAccount::where('type', 'Expense')->first()
+                    ?? $assetCoa;
             }
 
             $resolvedCabangId = $this->resolveCabangId($purchaseOrder, $item);
@@ -252,9 +263,6 @@ class PurchaseOrderObserver
             'po_number' => $purchaseOrder->po_number,
             'items_count' => $purchaseOrder->purchaseOrderItem->count(),
         ]);
-
-        // Create journal entries for asset acquisition
-        $this->createAssetAcquisitionJournals($purchaseOrder);
     }
 
     /**
@@ -264,7 +272,10 @@ class PurchaseOrderObserver
     {
         try {
             // Get total asset cost from PO
-            $totalAssetCost = $purchaseOrder->total_amount;
+            $totalAssetCost = (float) $purchaseOrder->total_amount;
+            if ($totalAssetCost <= 0) {
+                $totalAssetCost = (float) $this->purchaseOrderService->calculateTotalAmount($purchaseOrder);
+            }
 
             // Get branch and department info
             $branchId = $this->resolveCabangId($purchaseOrder);

@@ -21,6 +21,10 @@ class QualityControlPolicy
      */
     public function view(User $user, QualityControl $qualityControl): bool
     {
+        if (! $user->canAccessCabang($qualityControl->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view quality control');
     }
 
@@ -37,6 +41,10 @@ class QualityControlPolicy
      */
     public function update(User $user, QualityControl $qualityControl): bool
     {
+        if (! $user->canAccessCabang($qualityControl->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update quality control');
     }
 
@@ -45,6 +53,10 @@ class QualityControlPolicy
      */
     public function delete(User $user, QualityControl $qualityControl): bool
     {
+        if (! $user->canAccessCabang($qualityControl->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete quality control');
     }
 
@@ -53,6 +65,10 @@ class QualityControlPolicy
      */
     public function restore(User $user, QualityControl $qualityControl): bool
     {
+        if (! $user->canAccessCabang($qualityControl->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore quality control');
     }
 
@@ -61,6 +77,10 @@ class QualityControlPolicy
      */
     public function forceDelete(User $user, QualityControl $qualityControl): bool
     {
+        if (! $user->canAccessCabang($qualityControl->cabang_id)) {
+            return false;
+        }
+
         return $user->hasRole('Super Admin');
     }
 }

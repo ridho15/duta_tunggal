@@ -64,6 +64,18 @@ class SuratJalanService
             ]);
         }
 
+        // Multi-DO Consolidation Rule: Semua DO yang digabungkan harus berasal dari customer yang sama
+        $customerIds = $deliveryOrders->flatMap(function (DeliveryOrder $do) {
+            $do->loadMissing('salesOrders.customer');
+            return $do->salesOrders->pluck('customer_id');
+        })->filter()->unique()->values();
+
+        if ($customerIds->count() > 1) {
+            throw ValidationException::withMessages([
+                $field => 'Semua Delivery Order yang dipilih harus berasal dari customer yang sama untuk dapat digabungkan dalam satu Surat Jalan.',
+            ]);
+        }
+
         $taken = DB::table('surat_jalan_delivery_orders as pivot')
             ->join('surat_jalans as sj', 'sj.id', '=', 'pivot.surat_jalan_id')
             ->whereIn('pivot.delivery_order_id', $deliveryOrders->pluck('id'))

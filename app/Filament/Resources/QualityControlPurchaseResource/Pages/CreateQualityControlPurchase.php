@@ -43,32 +43,46 @@ class CreateQualityControlPurchase extends CreateRecord
                 foreach ($po->purchaseOrderItem as $poItem) {
                     $lockInfo = QualityControlPurchaseResource::draftQcLockInfo($poItem);
                     if ($lockInfo['remaining_allowed'] > 0) {
-                        $items[] = [
-                            'purchase_order_item_id' => $poItem->id,
-                            'product_id'             => $poItem->product_id,
-                            'product_name'           => ($poItem->product?->name ?? 'N/A') . ($poItem->product?->sku ? " ({$poItem->product->sku})" : ''),
-                            'uom'                    => $poItem->product?->uom?->name ?? 'pcs',
-                            'ordered_quantity'       => (float) $poItem->quantity,
-                            'remaining_info'         => $lockInfo['message'],
-                            'remaining_allowed'      => (float) $lockInfo['remaining_allowed'],
-                            'quantity_received'      => (float) $lockInfo['remaining_allowed'],
-                            'passed_quantity'        => (float) $lockInfo['remaining_allowed'],
-                            'rejected_quantity'      => 0,
-                            'failed_qc_action'       => 'wait_next_delivery',
-                            'reason_reject'          => null,
-                            'rak_id'                 => null,
-                        ];
+                            $defaultRakId = null;
+                            if ($po->warehouse_id) {
+                                $defaultRakId = \App\Models\Rak::where('warehouse_id', $po->warehouse_id)->first()?->id;
+                            }
+
+                            $items[] = [
+                                'purchase_order_item_id' => $poItem->id,
+                                'product_id'             => $poItem->product_id,
+                                'product_name'           => ($poItem->product?->name ?? 'N/A') . ($poItem->product?->sku ? " ({$poItem->product->sku})" : ''),
+                                'uom'                    => $poItem->product?->uom?->name ?? 'pcs',
+                                'ordered_quantity'       => (float) $poItem->quantity,
+                                'remaining_info'         => $lockInfo['message'],
+                                'remaining_allowed'      => (float) $lockInfo['remaining_allowed'],
+                                'quantity_received'      => (float) $lockInfo['remaining_allowed'],
+                                'passed_quantity'        => (float) $lockInfo['remaining_allowed'],
+                                'rejected_quantity'      => 0,
+                                'failed_qc_action'       => 'wait_next_delivery',
+                                'reason_reject'          => null,
+                                'rak_id'                 => $defaultRakId,
+                            ];
                     }
                 }
 
-                $this->form->fill([
-                    'purchase_order_id' => $po->id,
-                    'warehouse_id'      => $po->warehouse_id,
-                    'cabang_id'         => $po->cabang_id ?? 1,
-                    'items'             => $items,
-                    'auto_process'      => true,
-                    'inspected_by'      => Auth::id(), // FIX #4: Pertahankan user yang login sebagai petugas QC
-                ]);
+                $state = $this->form->getRawState();
+                $state = $state instanceof Arrayable ? $state->toArray() : (array) $state;
+
+                $this->form->fill(array_merge(
+                    $state,
+                    [
+                        'purchase_order_id' => $po->id,
+                        'warehouse_id'      => $po->warehouse_id,
+                        'cabang_id'         => $po->cabang_id ?? 1,
+                        'items'             => $items,
+                        'auto_process'      => true,
+                        'inspected_by'      => Auth::id(), // FIX #4: Pertahankan user yang login sebagai petugas QC
+                    ],
+                    empty($state['qc_number']) ? [
+                        'qc_number' => \App\Http\Controllers\HelperController::generateUniqueCode('quality_controls', 'qc_number', 'QC-' . date('Ymd') . '-', 4),
+                    ] : []
+                ));
 
                 return;
             }
@@ -241,18 +255,24 @@ class CreateQualityControlPurchase extends CreateRecord
                     $qc = QualityControl::create($data);
 
                     foreach ($itemsData as $itemRow) {
-                        QualityControlItem::create([
-                            'quality_control_id'     => $qc->id,
-                            'purchase_order_item_id' => $itemRow['purchase_order_item_id'],
-                            'product_id'             => $itemRow['product_id'],
-                            'quantity_received'      => $itemRow['quantity_received'],
-                            'passed_quantity'        => $itemRow['passed_quantity'],
-                            'rejected_quantity'      => $itemRow['rejected_quantity'] ?? 0,
-                            'failed_qc_action'       => $itemRow['failed_qc_action'] ?? 'wait_next_delivery',
-                            'reason_reject'          => $itemRow['reason_reject'] ?? null,
-                            'rak_id'                 => $itemRow['rak_id'] ?? null,
-                            'status'                 => 0,
-                        ]);
+                            $defaultRakId = null;
+                            $targetWhId = $data['warehouse_id'] ?? $qc->warehouse_id ?? null;
+                            if ($targetWhId) {
+                                $defaultRakId = \App\Models\Rak::where('warehouse_id', $targetWhId)->first()?->id;
+                            }
+
+                            QualityControlItem::create([
+                                'quality_control_id'     => $qc->id,
+                                'purchase_order_item_id' => $itemRow['purchase_order_item_id'],
+                                'product_id'             => $itemRow['product_id'],
+                                'quantity_received'      => $itemRow['quantity_received'],
+                                'passed_quantity'        => $itemRow['passed_quantity'],
+                                'rejected_quantity'      => $itemRow['rejected_quantity'] ?? 0,
+                                'failed_qc_action'       => $itemRow['failed_qc_action'] ?? 'wait_next_delivery',
+                                'reason_reject'          => $itemRow['reason_reject'] ?? null,
+                                'rak_id'                 => $itemRow['rak_id'] ?? $defaultRakId,
+                                'status'                 => 0,
+                            ]);
                     }
 
                     if ($autoProcess) {

@@ -31,6 +31,10 @@ class DeliveryOrderPolicy
      */
     public function view(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        if (! $user->canAccessCabang($deliveryOrder->cabang_id)) {
+            return false;
+        }
+
         // Sales Manager dan Admin bisa lihat semua delivery order
         if ($user->hasRole(['Sales Manager', 'Super Admin', 'Owner', 'Admin'])) {
             return $user->hasPermissionTo('view delivery order');
@@ -60,6 +64,10 @@ class DeliveryOrderPolicy
      */
     public function update(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        if (! $user->canAccessCabang($deliveryOrder->cabang_id)) {
+            return false;
+        }
+
         // T3.3 (flag sales.controls.doc_lock): DO yang sudah diproses terkunci; koreksi lewat Batalkan DO / Pengiriman Gagal.
         if (\App\Services\DocumentLock::blocks($deliveryOrder, 'update')) {
             return false;
@@ -85,6 +93,27 @@ class DeliveryOrderPolicy
      */
     public function delete(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        if (! $user->canAccessCabang($deliveryOrder->cabang_id)) {
+            return false;
+        }
+
+        // P0-1: DO yang sudah dikirim / sedang dikirim / selesai TIDAK BOLEH dihapus untuk mencegah stok & jurnal hilang tanpa jejak.
+        if (in_array($deliveryOrder->status, ['sent', 'completed', 'delivered', 'delivering'], true)) {
+            return false;
+        }
+
+        // DO yang sudah memiliki faktur tidak boleh dihapus
+        $hasInvoices = \App\Models\Invoice::where(function ($q) use ($deliveryOrder) {
+            $q->where('from_model_type', DeliveryOrder::class)
+              ->where('from_model_id', $deliveryOrder->id);
+        })->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id)
+          ->orWhereJsonContains('delivery_orders', (int) $deliveryOrder->id)
+          ->exists();
+
+        if ($hasInvoices) {
+            return false;
+        }
+
         // T3.3 (flag sales.controls.doc_lock): DO yang sudah diproses terkunci; koreksi lewat Batalkan DO / Pengiriman Gagal.
         if (\App\Services\DocumentLock::blocks($deliveryOrder, 'delete')) {
             return false;
@@ -110,6 +139,10 @@ class DeliveryOrderPolicy
      */
     public function restore(User $user, DeliveryOrder $deliveryOrder): bool
     {
+        if (! $user->canAccessCabang($deliveryOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore delivery order');
     }
 
@@ -118,6 +151,25 @@ class DeliveryOrderPolicy
      */
     public function forceDelete(User $user, DeliveryOrder $deliveryOrder): bool
     {
-        return $user->hasRole('Super Admin');
+        if (! $user->canAccessCabang($deliveryOrder->cabang_id)) {
+            return false;
+        }
+
+        if (in_array($deliveryOrder->status, ['sent', 'completed', 'delivered', 'delivering'], true)) {
+            return false;
+        }
+
+        $hasInvoices = \App\Models\Invoice::where(function ($q) use ($deliveryOrder) {
+            $q->where('from_model_type', DeliveryOrder::class)
+              ->where('from_model_id', $deliveryOrder->id);
+        })->orWhereJsonContains('delivery_orders', (string) $deliveryOrder->id)
+          ->orWhereJsonContains('delivery_orders', (int) $deliveryOrder->id)
+          ->exists();
+
+        if ($hasInvoices) {
+            return false;
+        }
+
+        return $user->hasRole('Super Admin') && $user->hasPermissionTo('delete delivery order');
     }
 }

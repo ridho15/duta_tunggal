@@ -811,13 +811,17 @@ class ManufacturingJournalService
 
     protected function resolveDefaultManufacturingLaborCoaId(): ?int
     {
-        return $this->resolveCoaByCodes(['5230', '6-201', '6000'])?->id
+        return $this->resolveCoaByCodes(['5230', '5120', '6-201', '6000'])?->id
             ?? $this->resolveDefaultManufacturingExpenseCoaId();
     }
 
     protected function resolveDefaultManufacturingOverheadCoaId(): ?int
     {
-        return $this->resolveCoaByCodes(['6-202', '6100.10', '6100', '6000'])?->id
+        return $this->resolveCoaByCodes(['5130', '5140', '5150', '5240', '6-202', '6100.10', '6100', '6000'])?->id
+            ?? ChartOfAccount::where('type', 'Expense')->where(function ($q) {
+                $q->where('name', 'like', '%Overhead%')
+                  ->orWhere('name', 'like', '%BOP%');
+            })->orderBy('code')->value('id')
             ?? $this->resolveDefaultManufacturingExpenseCoaId();
     }
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Exceptions\ClosedPeriodException;
+use App\Models\Scopes\CabangScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,12 +45,22 @@ class AccountingPeriod extends Model
 
     public function closedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'closed_by');
+        return $this->belongsTo(User::class, 'closed_by')->withDefault();
+    }
+
+    public function cabang(): BelongsTo
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
     }
 
     public static function ensureDateIsOpen(string|Carbon $date, ?int $cabangId): void
     {
-        $period = static::query()
+        $period = static::withoutGlobalScope(CabangScope::class)
             ->forCabang($cabangId)
             ->coveringDate($date)
             ->first();

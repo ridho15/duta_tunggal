@@ -217,4 +217,20 @@ class SuratJalan extends Model
          ->join('surat_jalan_delivery_orders', 'delivery_sales_orders.delivery_order_id', '=', 'surat_jalan_delivery_orders.delivery_order_id')
          ->where('surat_jalan_delivery_orders.surat_jalan_id', $this->id ?? 0);
     }
+
+    public function invoices()
+    {
+        return Invoice::where(function ($q) {
+            $q->where(function ($inner) {
+                $inner->where('from_model_type', self::class)
+                      ->where('from_model_id', $this->id);
+            })->orWhereJsonContains('surat_jalan_ids', (int) $this->id)
+              ->orWhereJsonContains('surat_jalan_ids', (string) $this->id);
+        })->whereNotIn('status', [Invoice::STATUS_CANCELLED, 'canceled']);
+    }
+
+    public function isInvoiced(): bool
+    {
+        return $this->invoices()->exists();
+    }
 }

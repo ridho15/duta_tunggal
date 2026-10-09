@@ -132,6 +132,16 @@ class JournalEntryResource extends Resource
                                 'required' => 'Tanggal journal entry harus diisi.',
                             ])
                             ->default(now())
+                            ->rules([
+                                fn (\Filament\Forms\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    $cabangId = $get('cabang_id') ?? auth()->user()?->cabang_id;
+                                    try {
+                                        \App\Models\AccountingPeriod::ensureDateIsOpen($value, $cabangId);
+                                    } catch (\App\Exceptions\ClosedPeriodException $e) {
+                                        $fail("Periode akuntansi untuk tanggal {$value} sudah ditutup. Tidak dapat membuat atau mengubah jurnal pada periode yang terkunci.");
+                                    }
+                                },
+                            ])
                             ->columnSpan(1),
 
                         Forms\Components\Select::make('journal_type')

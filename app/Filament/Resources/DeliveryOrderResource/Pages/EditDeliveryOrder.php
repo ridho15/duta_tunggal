@@ -153,10 +153,15 @@ class EditDeliveryOrder extends EditRecord
                 }
 
                 $warehouseSources = collect($item['warehouseSources'] ?? []);
-                if ($warehouseSources->isNotEmpty()) {
-                    $sourceQty = (float) $warehouseSources->sum(function ($source) {
-                        return (float) ($source['quantity'] ?? 0);
-                    });
+                if ($warehouseSources->isEmpty()) {
+                    $validator = Validator::make([], []);
+                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Pilih minimal satu gudang sumber pengiriman.");
+                    throw new ValidationException($validator);
+                }
+
+                $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                    return (float) ($source['quantity'] ?? 0);
+                });
 
                     if (abs($sourceQty - $quantity) > 0.0001) {
                         $validator = Validator::make([], []);
@@ -183,7 +188,6 @@ class EditDeliveryOrder extends EditRecord
                         }
                     }
                 }
-            }
 
             // Check for duplicate sale order items
             $saleOrderItemIds = collect($deliveryItems)->pluck('sale_order_item_id')->filter();

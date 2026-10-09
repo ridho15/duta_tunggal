@@ -76,6 +76,24 @@ class SalesInvoiceLineBuilder
             ? \App\Models\SaleOrder::withoutGlobalScopes()->with('saleOrderItem')->find($invoice->from_model_id)
             : null;
         $soItems = $saleOrder?->saleOrderItem ?? collect();
+
+        // Dukung pencarian soItems dari Surat Jalan bila invoice mengacu pada Surat Jalan (Tahap 5)
+        if ($soItems->isEmpty()) {
+            $sjIds = $invoice->surat_jalan_ids ?? [];
+            if (empty($sjIds) && $invoice->from_model_type === \App\Models\SuratJalan::class && $invoice->from_model_id) {
+                $sjIds = [$invoice->from_model_id];
+            }
+            if (! empty($sjIds)) {
+                $suratJalans = \App\Models\SuratJalan::withoutGlobalScopes()->with('deliveryOrder.salesOrders.saleOrderItem')->whereIn('id', (array) $sjIds)->get();
+                $soItems = $suratJalans->flatMap(function ($sj) {
+                    return $sj->deliveryOrder->flatMap(function ($do) {
+                        return $do->salesOrders->flatMap(function ($so) {
+                            return $so->saleOrderItem;
+                        });
+                    });
+                })->values();
+            }
+        }
         $used = [];
         $matched = true;
         $rows = [];

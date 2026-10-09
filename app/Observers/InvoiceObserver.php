@@ -116,7 +116,7 @@ class InvoiceObserver
                     );
                 }
             }
-        } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+        } elseif (in_array($invoice->from_model_type, ['App\\Models\\SaleOrder', 'App\\Models\\SuratJalan', 'App\\Models\\DeliveryOrder'], true) || !empty($invoice->surat_jalan_ids)) {
             $this->createSalesInvoiceAr($invoice);
 
             // Only post sales journal here if invoice items already exist (e.g. created beforehand).
@@ -192,7 +192,7 @@ class InvoiceObserver
                         ->where('source_id', $invoice->id)
                         ->delete();
 
-                    if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                    if ($this->isSalesInvoice($invoice)) {
                         $this->createSalesInvoiceAr($invoice);
                         $this->postSalesInvoice($invoice);
                     } else {
@@ -226,7 +226,7 @@ class InvoiceObserver
 
                 if ($invoice->from_model_type == 'App\\Models\\PurchaseOrder') {
                     app(PurchaseInvoiceAccountingService::class)->finaliseInvoice($invoice);
-                } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                } elseif ($this->isSalesInvoice($invoice)) {
                     $this->createSalesInvoiceAr($invoice);
                     $this->postSalesInvoice($invoice);
                 }
@@ -236,7 +236,7 @@ class InvoiceObserver
         // When invoice status becomes 'paid', post to ledger (if not already posted)
         if (strtolower($invoice->status) === Invoice::STATUS_PAID) {
             try {
-                if ($invoice->from_model_type == 'App\Models\SaleOrder') {
+                if ($this->isSalesInvoice($invoice)) {
                     $this->postSalesInvoice($invoice);
                 } else {
                     $this->ledger->postInvoice($invoice);
@@ -259,7 +259,7 @@ class InvoiceObserver
         // When invoice status becomes 'approved', post sales invoice journal entries
         if ($invoice->wasChanged('status') && strtolower($invoice->status) === 'approved') {
             try {
-                if ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+                if ($this->isSalesInvoice($invoice)) {
                     $this->postSalesInvoice($invoice);
                 }
             } catch (\Throwable $e) {
@@ -271,11 +271,27 @@ class InvoiceObserver
         }
     }
 
+    public function isSalesInvoice(Invoice $invoice): bool
+    {
+        return in_array($invoice->from_model_type, [
+            'App\\Models\\SaleOrder',
+            \App\Models\SaleOrder::class,
+            'App\\Models\\SuratJalan',
+            \App\Models\SuratJalan::class,
+            'App\\Models\\DeliveryOrder',
+            \App\Models\DeliveryOrder::class,
+        ], true) || ! empty($invoice->surat_jalan_ids);
+    }
+
     public function createSalesInvoiceAr(Invoice $invoice): void
     {
         $fromModel = $invoice->fromModel;
-        if (! $fromModel) {
-            Log::warning('InvoiceObserver: fromModel is null for sales invoice, skipping AR creation', [
+        if (! $fromModel && ! empty($invoice->surat_jalan_ids)) {
+            $fromModel = \App\Models\SuratJalan::find($invoice->surat_jalan_ids[0] ?? null);
+        }
+
+        if (! $fromModel && empty($invoice->customer_id) && ! $invoice->customer) {
+            Log::warning('InvoiceObserver: fromModel and customer are null for sales invoice, skipping AR creation', [
                 'invoice_id'      => $invoice->id,
                 'from_model_type' => $invoice->from_model_type,
                 'from_model_id'   => $invoice->from_model_id,
@@ -288,7 +304,7 @@ class InvoiceObserver
         $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
         $totalIdr = (float) MoneyHelper::safeParse($invoice->total ?? 0);
         $totalOriginal = round($totalIdr / $exchangeRate, 4);
-        $customerId = $fromModel->customer_id ?? $invoice->customer_id;
+        $customerId = $fromModel?->customer_id ?? $invoice->customer?->id ?? $invoice->customer_id;
         $accountReceivable = AccountReceivable::firstOrCreate(
             ['invoice_id' => $invoice->id],
             [
@@ -345,7 +361,7 @@ class InvoiceObserver
             if ($accountPayable) {
                 $accountPayable->delete(); // Ini akan trigger deleting di AccountPayable yang menghapus ageing schedule
             }
-        } elseif ($invoice->from_model_type == 'App\\Models\\SaleOrder') {
+        } elseif (in_array($invoice->from_model_type, ['App\\Models\\SaleOrder', 'App\\Models\\SuratJalan', 'App\\Models\\DeliveryOrder'], true) || !empty($invoice->surat_jalan_ids)) {
             $accountReceivable = AccountReceivable::where('invoice_id', $invoice->id)->first();
             if ($accountReceivable) {
                 $accountReceivable->delete(); // Asumsikan AccountReceivable juga punya logic serupa
@@ -430,6 +446,14 @@ class InvoiceObserver
         $invoiceItems = $invoice->invoiceItem;
         if ($invoiceItems->isEmpty() && $invoice->from_model_type === 'App\\Models\\SaleOrder') {
             $invoiceItems = $invoice->fromModel?->saleOrderItem ?? collect();
+        } elseif ($invoiceItems->isEmpty() && ($invoice->from_model_type === 'App\\Models\\SuratJalan' || ! empty($invoice->surat_jalan_ids))) {
+            $invoiceItems = $invoice->suratJalans()->flatMap(function ($sj) {
+                return $sj->deliveryOrder->flatMap(function ($do) {
+                    return $do->salesOrders->flatMap(function ($so) {
+                        return $so->saleOrderItem;
+                    });
+                });
+            })->values();
         }
 
         // Calculate totals from invoice items for detailed breakdown

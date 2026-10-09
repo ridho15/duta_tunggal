@@ -22,6 +22,21 @@ class AssetObserver
     public function created(Asset $asset): void
     {
         try {
+            // If asset was generated from a PurchaseOrder that already has acquisition journals at PO level, skip duplicate per-unit posting
+            if ($asset->purchase_order_id) {
+                $hasPoJournals = \App\Models\JournalEntry::where(function ($q) {
+                    $q->where('source_type', \App\Models\PurchaseOrder::class)
+                      ->orWhere('source_type', 'App\\Models\\PurchaseOrder');
+                })
+                ->where('source_id', $asset->purchase_order_id)
+                ->where('journal_type', 'asset_acquisition')
+                ->exists();
+
+                if ($hasPoJournals) {
+                    return;
+                }
+            }
+
             $assetService = app(AssetService::class);
 
             if (!$assetService->hasPostedJournals($asset)) {

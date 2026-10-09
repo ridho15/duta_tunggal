@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\LogsGlobalActivity;
 use App\Traits\CascadesJournalEntries;
+use App\Models\Scopes\CabangScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -191,9 +192,14 @@ class VendorPayment extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+
         static::creating(function (VendorPayment $payment) {
             if (empty($payment->payment_number)) {
                 $payment->payment_number = static::generatePaymentNumber();
+            }
+            if (empty($payment->cabang_id)) {
+                $payment->cabang_id = auth()->user()?->cabang_id ?? session('current_cabang_id');
             }
         });
     }

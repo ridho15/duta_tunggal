@@ -59,8 +59,17 @@ class CreateJournalEntry extends CreateRecord
 
             // Return the first entry as the "main" record for Filament
             return $createdEntries[0] ?? throw new \Exception('No journal entries were created. Please check your input data.');
+        } catch (\App\Exceptions\ClosedPeriodException $e) {
+            \Filament\Notifications\Notification::make()
+                ->title('Periode Akuntansi Ditutup')
+                ->body($e->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
+
+            $this->halt();
         } catch (\Exception $e) {
-            // Log the error and re-throw to show debug info
+            // Log the error and notify user cleanly without crashing Livewire
             Log::error('Error creating journal entries: ' . $e->getMessage(), [
                 'data' => $data,
                 'trace' => $e->getTraceAsString()
@@ -70,7 +79,8 @@ class CreateJournalEntry extends CreateRecord
                 ->body('Terjadi kesalahan saat menyimpan jurnal: ' . $e->getMessage())
                 ->danger()
                 ->send();
-            throw $e;
+
+            $this->halt();
         }
     }
 

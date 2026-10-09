@@ -14,6 +14,10 @@ class ProductionPlanPolicy
 
     public function view(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view production plan');
     }
 
@@ -24,31 +28,55 @@ class ProductionPlanPolicy
 
     public function update(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update production plan');
     }
 
     public function delete(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete production plan');
     }
 
     public function restore(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore production plan');
     }
 
     public function forceDelete(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete production plan');
     }
 
     public function approve(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('approve production plan');
     }
 
     public function schedule(User $user, ProductionPlan $productionPlan): bool
     {
+        if (! $user->canAccessCabang($productionPlan->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('schedule production plan');
     }
 }

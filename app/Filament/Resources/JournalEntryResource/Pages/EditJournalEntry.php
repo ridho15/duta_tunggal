@@ -76,49 +76,68 @@ class EditJournalEntry extends EditRecord
 
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        // Get journal entries data
-        $journalEntries = $data['journal_entries'] ?? [];
-        unset($data['journal_entries'], $data['balance_validation']);
+        try {
+            // Get journal entries data
+            $journalEntries = $data['journal_entries'] ?? [];
+            unset($data['journal_entries'], $data['balance_validation']);
 
-        // Get all existing entries with the same reference
-        $existingEntries = JournalEntry::where('reference', $record->reference)->get();
+            // Get all existing entries with the same reference
+            $existingEntries = JournalEntry::where('reference', $record->reference)->get();
 
-        // Delete all existing entries
-        foreach ($existingEntries as $existingEntry) {
-            $existingEntry->delete();
+            // Delete all existing entries
+            foreach ($existingEntries as $existingEntry) {
+                $existingEntry->delete();
+            }
+
+            // Get common data
+            $commonData = [
+                'date' => $data['date'],
+                'reference' => $record->reference, // Keep the same reference
+                'journal_type' => $data['journal_type'],
+                'cabang_id' => $data['cabang_id'] ?? null,
+                'source_type' => $data['source_type'] ?? null,
+                'source_id' => $data['source_id'] ?? null,
+            ];
+
+            $updatedEntries = [];
+
+            // Create new entries
+            foreach ($journalEntries as $entryData) {
+                $entry = JournalEntry::create([
+                    'coa_id' => $entryData['coa_id'],
+                    'date' => $commonData['date'],
+                    'reference' => $commonData['reference'],
+                    'description' => $entryData['description'] ?? $data['description'],
+                    'debit' => (float) ($entryData['debit'] ?? 0),
+                    'credit' => (float) ($entryData['credit'] ?? 0),
+                    'journal_type' => $commonData['journal_type'],
+                    'cabang_id' => $commonData['cabang_id'],
+                    'source_type' => $commonData['source_type'],
+                    'source_id' => $commonData['source_id'],
+                ]);
+
+                $updatedEntries[] = $entry;
+            }
+
+            // Return the first entry as the "main" record
+            return $updatedEntries[0] ?? $record;
+        } catch (\App\Exceptions\ClosedPeriodException $e) {
+            \Filament\Notifications\Notification::make()
+                ->title('Periode Akuntansi Ditutup')
+                ->body($e->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
+
+            $this->halt();
+        } catch (\Exception $e) {
+            \Filament\Notifications\Notification::make()
+                ->title('Gagal Memperbarui Jurnal')
+                ->body('Terjadi kesalahan saat menyimpan jurnal: ' . $e->getMessage())
+                ->danger()
+                ->send();
+
+            $this->halt();
         }
-
-        // Get common data
-        $commonData = [
-            'date' => $data['date'],
-            'reference' => $record->reference, // Keep the same reference
-            'journal_type' => $data['journal_type'],
-            'cabang_id' => $data['cabang_id'] ?? null,
-            'source_type' => $data['source_type'] ?? null,
-            'source_id' => $data['source_id'] ?? null,
-        ];
-
-        $updatedEntries = [];
-
-        // Create new entries
-        foreach ($journalEntries as $entryData) {
-            $entry = JournalEntry::create([
-                'coa_id' => $entryData['coa_id'],
-                'date' => $commonData['date'],
-                'reference' => $commonData['reference'],
-                'description' => $entryData['description'] ?? $data['description'],
-                'debit' => (float) ($entryData['debit'] ?? 0),
-                'credit' => (float) ($entryData['credit'] ?? 0),
-                'journal_type' => $commonData['journal_type'],
-                'cabang_id' => $commonData['cabang_id'],
-                'source_type' => $commonData['source_type'],
-                'source_id' => $commonData['source_id'],
-            ]);
-
-            $updatedEntries[] = $entry;
-        }
-
-        // Return the first entry as the "main" record
-        return $updatedEntries[0] ?? $record;
     }
 }

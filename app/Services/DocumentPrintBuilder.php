@@ -84,6 +84,25 @@ class DocumentPrintBuilder
             ? (int) Carbon::parse($invoice->invoice_date)->diffInDays(Carbon::parse($invoice->due_date), false)
             : null;
 
+        $sjDisplay = $invoice->surat_jalans_display;
+        if ($sjDisplay === '-') {
+            $sjDisplay = null;
+        }
+
+        $sourceNumber = $invoice->fromModel?->so_number ?? null;
+        if (! $sourceNumber && $invoice->suratJalans()->isNotEmpty()) {
+            $soNumbers = $invoice->suratJalans()
+                ->flatMap(fn ($sj) => $sj->deliveryOrder)
+                ->flatMap(fn ($do) => $do->salesOrders)
+                ->pluck('so_number')
+                ->filter()
+                ->unique()
+                ->values();
+            if ($soNumbers->isNotEmpty()) {
+                $sourceNumber = $soNumbers->implode(', ');
+            }
+        }
+
         return [
             'company' => $company = $this->company($invoice->cabang, true),
             'title' => 'INVOICE',
@@ -92,6 +111,7 @@ class DocumentPrintBuilder
             'status_label' => $this->invoiceStatus($invoice->status),
             'meta' => $this->meta([
                 'No. Invoice' => $invoice->invoice_number,
+                'No. Surat Jalan' => $sjDisplay,
                 'No. Faktur Pajak' => $invoice->tax_invoice_number,
                 'Tanggal' => $this->date($invoice->invoice_date),
                 'Jatuh Tempo' => $this->date($invoice->due_date),
@@ -99,7 +119,8 @@ class DocumentPrintBuilder
             ]),
             'party_title' => 'Pelanggan',
             'party' => $this->party($customer, $invoice->customer_name),
-            'source' => $invoice->fromModel?->so_number ?? null,
+            'source' => $sourceNumber,
+            'surat_jalan' => $sjDisplay,
             'credit_notes' => $creditNotes->map(fn (CreditNote $cn) => ['number' => $cn->credit_note_number, 'date' => $this->date($cn->credit_date), 'total' => (float) $cn->total])->all(),
             'credit_total' => $creditTotal,
             'terms' => array_values(array_filter([
@@ -155,6 +176,22 @@ class DocumentPrintBuilder
         $receipt->loadMissing(['cabang', 'customer', 'customerReceiptItem.invoice', 'createdBy']);
         $cancelled = strtolower((string) $receipt->status) === 'cancelled';
         $invoices = $receipt->customerReceiptItem->map(fn ($item) => $item->invoice?->invoice_number)->filter()->unique()->values();
+        $suratJalans = $receipt->customerReceiptItem->flatMap(function ($item) {
+            $invoice = $item->invoice;
+            if (! $invoice) {
+                return [];
+            }
+            $sjs = $invoice->suratJalans();
+            if ($sjs instanceof \Illuminate\Support\Collection && $sjs->isNotEmpty()) {
+                return $sjs->pluck('sj_number')->all();
+            }
+            if (! empty($invoice->surat_jalan_ids)) {
+                return \App\Models\SuratJalan::whereIn('id', (array) $invoice->surat_jalan_ids)->pluck('sj_number')->all();
+            }
+
+            return [];
+        })->filter()->unique()->values();
+
         $amount = (float) $receipt->total_payment;
         $number = 'KW-'.str_pad((string) $receipt->id, 6, '0', STR_PAD_LEFT);
 
@@ -169,6 +206,7 @@ class DocumentPrintBuilder
                 'Tanggal' => $this->date($receipt->payment_date),
                 'Telah terima dari' => $receipt->customer?->name,
                 'Untuk pembayaran' => $invoices->isNotEmpty() ? 'Invoice '.$invoices->implode(', ') : self::clean($receipt->notes),
+                'No. Surat Jalan' => $suratJalans->isNotEmpty() ? $suratJalans->implode(', ') : null,
                 'Metode' => self::clean($receipt->payment_method),
                 'Bank' => self::clean($receipt->bank_name),
                 'Referensi' => self::clean($receipt->payment_reference),

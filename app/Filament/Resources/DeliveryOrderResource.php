@@ -362,15 +362,21 @@ class DeliveryOrderResource extends Resource
                                                 foreach ($value as $deliveryItem) {
                                                     if (!empty($deliveryItem['sale_order_item_id']) && !empty($deliveryItem['quantity'])) {
                                                         $warehouseSources = collect($deliveryItem['warehouseSources'] ?? []);
-                                                        if ($warehouseSources->isNotEmpty()) {
-                                                            $sourceQty = (float) $warehouseSources->sum(function ($source) {
-                                                                return (float) ($source['quantity'] ?? 0);
-                                                            });
+                                                        if ($warehouseSources->isEmpty()) {
+                                                            $saleOrderItem = $soItems->get($deliveryItem['sale_order_item_id']);
+                                                            $productName = $saleOrderItem?->product?->name ?? "Item";
+                                                            $fail("Pilih minimal satu gudang sumber pengiriman untuk item '{$productName}'.");
+                                                            return;
+                                                        }
 
-                                                            if (abs($sourceQty - (float) $deliveryItem['quantity']) > 0.0001) {
-                                                                $fail('Total qty sumber gudang harus sama dengan quantity item delivery order.');
-                                                                return;
-                                                            }
+                                                        $sourceQty = (float) $warehouseSources->sum(function ($source) {
+                                                            return (float) ($source['quantity'] ?? 0);
+                                                        });
+
+                                                        if (abs($sourceQty - (float) $deliveryItem['quantity']) > 0.0001) {
+                                                            $fail('Total qty sumber gudang harus sama dengan quantity item delivery order.');
+                                                            return;
+                                                        }
 
                                                             foreach ($warehouseSources as $source) {
                                                                 $sourceWarehouseId = $source['warehouse_id'] ?? null;
@@ -388,7 +394,6 @@ class DeliveryOrderResource extends Resource
                                                                     return;
                                                                 }
                                                             }
-                                                        }
 
                                                         $saleOrderItem = $soItems->get($deliveryItem['sale_order_item_id']);
 
@@ -509,56 +514,25 @@ class DeliveryOrderResource extends Resource
                                                 if ($optionsFrom == 2 && $saleOrderItemId) {
                                                     $saleOrderItem = SaleOrderItem::find($saleOrderItemId);
                                                     if ($saleOrderItem) {
-                                                        $originalQuantity = $saleOrderItem->quantity;
-                                                        $remainingQuantity = static::availableFor($saleOrderItem, $livewire);
-                                                        $warehouseSources = $saleOrderItem->warehouseAllocations
-                                                            ->map(function ($allocation) {
-                                                                return [
-                                                                    'warehouse_id' => $allocation->warehouse_id,
-                                                                    'quantity' => (float) $allocation->quantity,
-                                                                    'rak_id' => null,
-                                                                ];
-                                                            })
-                                                            ->values()
-                                                            ->toArray();
-
-                                                        if (empty($warehouseSources)) {
-                                                            $fallbackWarehouseId = $saleOrderItem->warehouse_id;
-                                                            if (!$fallbackWarehouseId) {
-                                                                $cabangId = $saleOrderItem->saleOrder?->cabang_id ?? Auth::user()?->cabang_id;
-                                                                $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
-                                                                    ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
-                                                                    ->value('id');
-                                                            }
-                                                            if ($fallbackWarehouseId) {
-                                                                $warehouseSources = [
-                                                                    [
-                                                                        'warehouse_id' => $fallbackWarehouseId,
-                                                                        'quantity' => (float) $remainingQuantity,
-                                                                        'rak_id' => $saleOrderItem->rak_id,
-                                                                    ]
-                                                                ];
-                                                            }
-                                                        }
-
-                                                        if (!empty($warehouseSources)) {
-                                                            $set('warehouseSources', $warehouseSources);
-                                                        }
+                                                        $originalQuantity = (float) $saleOrderItem->quantity;
+                                                        $remainingQuantity = (float) static::availableFor($saleOrderItem, $livewire);
+                                                        $targetQty = (float) $state;
 
                                                         // Validasi 1: Tidak boleh lebih besar dari quantity asli sale order item
-                                                        if ($state > $originalQuantity) {
-                                                            $component->state($originalQuantity);
+                                                        if ($targetQty > $originalQuantity) {
+                                                            $targetQty = $originalQuantity;
+                                                            $component->state($targetQty);
                                                             \Filament\Notifications\Notification::make()
                                                                 ->title('Quantity Validation')
                                                                 ->body("Quantity tidak boleh lebih besar dari quantity sale order item asli. Maksimal: {$originalQuantity}")
                                                                 ->warning()
                                                                 ->send();
-                                                            return;
                                                         }
 
                                                         // Validasi 2: Tidak boleh lebih besar dari remaining quantity
-                                                        if ($state > $remainingQuantity) {
-                                                            $component->state($remainingQuantity);
+                                                        if ($targetQty > $remainingQuantity) {
+                                                            $targetQty = $remainingQuantity;
+                                                            $component->state($targetQty);
 
                                                             if ($remainingQuantity <= 0) {
                                                                 \Filament\Notifications\Notification::make()
@@ -572,6 +546,31 @@ class DeliveryOrderResource extends Resource
                                                                     ->body("Quantity tidak boleh melebihi sisa yang belum dikirim. Maksimal: {$remainingQuantity}")
                                                                     ->warning()
                                                                     ->send();
+                                                            }
+                                                        }
+
+                                                        // Auto-sync warehouseSources dengan target quantity
+                                                        $currentSources = $get('warehouseSources') ?? [];
+                                                        if (is_array($currentSources) && count($currentSources) === 1) {
+                                                            $firstKey = array_key_first($currentSources);
+                                                            $currentSources[$firstKey]['quantity'] = $targetQty;
+                                                            $set('warehouseSources', $currentSources);
+                                                        } elseif (empty($currentSources)) {
+                                                            $fallbackWarehouseId = $saleOrderItem->warehouse_id;
+                                                            if (!$fallbackWarehouseId) {
+                                                                $cabangId = $saleOrderItem->saleOrder?->cabang_id ?? Auth::user()?->cabang_id;
+                                                                $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
+                                                                    ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                                                                    ->value('id');
+                                                            }
+                                                            if ($fallbackWarehouseId) {
+                                                                $set('warehouseSources', [
+                                                                    [
+                                                                        'warehouse_id' => $fallbackWarehouseId,
+                                                                        'quantity' => $targetQty,
+                                                                        'rak_id' => $saleOrderItem->rak_id,
+                                                                    ]
+                                                                ]);
                                                             }
                                                         }
                                                     }
@@ -601,6 +600,12 @@ class DeliveryOrderResource extends Resource
                                         Repeater::make('warehouseSources')
                                             ->relationship('warehouseSources')
                                             ->label('Sumber Gudang (Multi-Gudang)')
+                                            ->minItems(1)
+                                            ->required()
+                                            ->validationMessages([
+                                                'required' => 'Gudang sumber pengiriman wajib dipilih',
+                                                'min' => 'Pilih minimal satu gudang sumber pengiriman',
+                                            ])
                                             ->schema([
                                                 Select::make('warehouse_id')
                                                     ->label('Gudang Sumber')
@@ -649,9 +654,22 @@ class DeliveryOrderResource extends Resource
                                                                 return [$rak->id => filled($rak->code) ? "({$rak->code}) {$rak->name}" : ($rak->name ?? '-')];
                                                             });
                                                     })
+                                                    ->required(function ($get) {
+                                                        $warehouseId = $get('warehouse_id');
+                                                        return filled($warehouseId) && Rak::where('warehouse_id', $warehouseId)->exists();
+                                                    })
+                                                    ->validationMessages([
+                                                        'required' => 'Rak sumber wajib dipilih untuk gudang yang memiliki konfigurasi rak.',
+                                                    ])
+                                                    ->helperText(function ($get) {
+                                                        $warehouseId = $get('warehouse_id');
+                                                        if (!$warehouseId) return null;
+                                                        return Rak::where('warehouse_id', $warehouseId)->exists()
+                                                            ? 'Pilih rak fisik tempat barang diambil untuk pengiriman.'
+                                                            : 'Gudang ini tidak memiliki konfigurasi rak.';
+                                                    })
                                                     ->searchable()
-                                                    ->preload()
-                                                    ->nullable(),
+                                                    ->preload(),
                                                 TextInput::make('quantity')
                                                     ->label('Qty Sumber')
                                                     ->reactive()

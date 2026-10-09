@@ -21,6 +21,10 @@ class VendorPaymentPolicy
      */
     public function view(User $user, VendorPayment $vendorPayment): bool
     {
+        if (! $user->canAccessCabang($vendorPayment->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view vendor payment');
     }
 
@@ -37,6 +41,10 @@ class VendorPaymentPolicy
      */
     public function update(User $user, VendorPayment $vendorPayment): bool
     {
+        if (! $user->canAccessCabang($vendorPayment->cabang_id)) {
+            return false;
+        }
+
         if (strtolower((string) $vendorPayment->status) !== 'draft') {
             return false;
         }
@@ -49,6 +57,10 @@ class VendorPaymentPolicy
      */
     public function delete(User $user, VendorPayment $vendorPayment): bool
     {
+        if (! $user->canAccessCabang($vendorPayment->cabang_id)) {
+            return false;
+        }
+
         if (strtolower((string) $vendorPayment->status) !== 'draft') {
             return false;
         }
@@ -61,6 +73,10 @@ class VendorPaymentPolicy
      */
     public function restore(User $user, VendorPayment $vendorPayment): bool
     {
+        if (! $user->canAccessCabang($vendorPayment->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore vendor payment');
     }
 
@@ -69,6 +85,10 @@ class VendorPaymentPolicy
      */
     public function forceDelete(User $user, VendorPayment $vendorPayment): bool
     {
+        if (! $user->canAccessCabang($vendorPayment->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete vendor payment');
     }
 }

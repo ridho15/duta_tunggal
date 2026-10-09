@@ -62,10 +62,14 @@ class PurchaseReturn extends Model
         ];
     }
 
-    /** Whether this return originated from a QC inspection (not a manual receipt return) */
+    /** Whether this return originated from a QC inspection or receiving reject (not a normal warehouse return) */
     public function isQcReturn(): bool
     {
-        return !is_null($this->quality_control_id);
+        return !is_null($this->quality_control_id)
+            || !is_null($this->failed_qc_action)
+            || str_contains(strtolower($this->notes ?? ''), 'rejected during receiving')
+            || str_contains(strtolower($this->notes ?? ''), 'quality control')
+            || str_contains(strtolower($this->notes ?? ''), 'qc');
     }
 
     public function purchaseReceipt()

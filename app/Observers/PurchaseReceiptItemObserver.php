@@ -92,8 +92,11 @@ class PurchaseReceiptItemObserver
                 Log::info("PurchaseReceiptItemObserver: Creating new PurchaseReturn for receipt {$receiptItem->purchase_receipt_id}");
 
                 // Create PurchaseReturn header
+                $qc = $receiptItem->resolvedQualityControl();
                 $purchaseReturn = PurchaseReturn::create([
                     'purchase_receipt_id' => $receiptItem->purchase_receipt_id,
+                    'quality_control_id' => $qc?->exists ? $qc->id : null,
+                    'failed_qc_action' => PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
                     'return_date' => now(),
                     'nota_retur' => $this->purchaseReturnService->generateNotaRetur(),
                     'created_by' => Auth::id() ?? 1, // System user if no auth
@@ -231,8 +234,11 @@ class PurchaseReceiptItemObserver
                         ]);
                     } else {
                         // Create new PurchaseReturn
+                        $qc = $receiptItem->resolvedQualityControl();
                         $purchaseReturn = \App\Models\PurchaseReturn::create([
                             'purchase_receipt_id' => $receiptItem->purchase_receipt_id,
+                            'quality_control_id' => $qc?->exists ? $qc->id : null,
+                            'failed_qc_action' => \App\Models\PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
                             'return_date' => now(),
                             'nota_retur' => $this->purchaseReturnService->generateNotaRetur(),
                             'created_by' => \Illuminate\Support\Facades\Auth::id() ?? 1,

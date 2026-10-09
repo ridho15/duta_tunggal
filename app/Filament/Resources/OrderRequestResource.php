@@ -3403,4 +3403,18 @@ class OrderRequestResource extends Resource
 
         return $data;
     }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Auth::user();
+        if ($user && $user->cabang_id && ! in_array('all', $user->manage_type ?? [])) {
+            $query->whereHas('orderRequestItem', function (Builder $q) use ($user) {
+                $q->where('cabang_id', $user->cabang_id);
+            });
+        }
+
+        return $query;
+    }
 }

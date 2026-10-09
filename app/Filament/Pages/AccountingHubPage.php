@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\AccountingPeriodResource;
 use App\Filament\Resources\AgeingScheduleResource;
 use App\Filament\Resources\AssetDisposalResource;
 use App\Filament\Resources\AssetResource;
@@ -36,6 +37,7 @@ class AccountingHubPage extends Page
     protected static function getHubClasses(): array
     {
         return [
+            AccountingPeriodResource::class,
             JournalEntryResource::class,
             BankReconciliationResource::class,
             AgeingScheduleResource::class,

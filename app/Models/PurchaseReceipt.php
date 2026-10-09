@@ -186,6 +186,22 @@ class PurchaseReceipt extends Model
         // Stock movement should be done manually after QC approval
 
         static::deleting(function ($purchaseReceipt) {
+            if (in_array($purchaseReceipt->status, ['completed', 'partial'], true)) {
+                throw new \Exception("Penerimaan barang dengan status '{$purchaseReceipt->status}' tidak dapat dihapus karena sudah mempengaruhi stok fisik dan pembukuan.");
+            }
+
+            // Check if downstream invoices exist
+            $hasInvoices = \App\Models\Invoice::where(function ($q) use ($purchaseReceipt) {
+                $q->where('from_model_type', self::class)
+                  ->where('from_model_id', $purchaseReceipt->id);
+            })->orWhereJsonContains('purchase_receipts', (string) $purchaseReceipt->id)
+              ->orWhereJsonContains('purchase_receipts', (int) $purchaseReceipt->id)
+              ->exists();
+
+            if ($hasInvoices) {
+                throw new \Exception("Penerimaan barang tidak dapat dihapus karena sudah memiliki faktur pembelian (Invoice) terkait.");
+            }
+
             if ($purchaseReceipt->isForceDeleting()) {
                 $purchaseReceipt->purchaseReceiptItem()->forceDelete();
                 $purchaseReceipt->purchaseReceiptPhoto()->forceDelete();

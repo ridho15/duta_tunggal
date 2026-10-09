@@ -110,6 +110,12 @@ class CustomerReceipt extends Model
     protected static function booted()
     {
         static::addGlobalScope(new CabangScope);
+
+        static::deleting(function (CustomerReceipt $receipt) {
+            if (in_array(strtolower((string) $receipt->status), ['partial', 'paid'], true) || $receipt->journalEntries()->exists()) {
+                throw new \Exception('Penerimaan customer yang sudah diproses atau memiliki jurnal tidak dapat dihapus. Gunakan fitur Batalkan Penerimaan untuk melakukan pembalikan resmi.');
+            }
+        });
     }
 
     public function cabang()

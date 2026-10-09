@@ -6,6 +6,7 @@ use App\Helpers\MoneyHelper;
 use App\Support\CurrencyConversionResolver;
 use App\Support\TaxDefaultResolver;
 use App\Support\TaxTypeHelper;
+use App\Models\Scopes\CabangScope;
 use App\Models\User;
 use App\Traits\LogsGlobalActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -92,6 +93,8 @@ class OrderRequestItem extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope(new CabangScope);
+
         static::saving(function (OrderRequestItem $item) {
             $item->loadMissing('orderRequest');
             $item->status = static::normalizeApprovalStatus($item->status ?? $item->approval_status ?? null);

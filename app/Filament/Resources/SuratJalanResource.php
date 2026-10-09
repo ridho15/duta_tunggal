@@ -18,6 +18,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Notifications\Notification;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
@@ -87,7 +89,8 @@ class SuratJalanResource extends Resource
                             ->helperText('Tanggal surat jalan dibuat')
                             ->required(),
                         Select::make('deliveryOrder')
-                            ->label('Delivery Order')
+                            ->label('Delivery Order (Boleh > 1 DO)')
+                            ->helperText('1 Surat Jalan boleh terdiri dari >1 DO dengan syarat Customer dan Cabang sama.')
                             ->searchable()
                             ->preload()
                             ->required()
@@ -100,6 +103,11 @@ class SuratJalanResource extends Resource
                                     $q->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES)
                                         ->when($record?->getKey(), fn (Builder $q, $id) => $q->where('surat_jalans.id', '!=', $id));
                                 });
+                            })
+                            ->getOptionLabelFromRecordUsing(function (DeliveryOrder $record): string {
+                                $customer = $record->salesOrders->first()?->customer;
+                                $custName = $customer ? " ({$customer->name})" : '';
+                                return "{$record->do_number}{$custName}";
                             })
                             ->rules([
                                 fn (?SuratJalan $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
@@ -116,6 +124,12 @@ class SuratJalanResource extends Resource
                                         );
                                     } catch (\Illuminate\Validation\ValidationException $e) {
                                         $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+                                        Notification::make()
+                                            ->title('Gagal Membuat Surat Jalan')
+                                            ->body($msg)
+                                            ->danger()
+                                            ->persistent()
+                                            ->send();
                                         $fail($msg);
                                     }
                                 }
@@ -145,6 +159,34 @@ class SuratJalanResource extends Resource
                             ->validationMessages([
                                 'required' => 'Cabang wajib dipilih'
                             ]),
+                        Placeholder::make('customer_info')
+                            ->label('')
+                            ->columnSpanFull()
+                            ->content(function ($get) {
+                                $ids = $get('deliveryOrder');
+                                $ids = is_array($ids) ? $ids : (empty($ids) ? [] : [$ids]);
+                                if (empty($ids)) {
+                                    return null;
+                                }
+                                $deliveryOrders = DeliveryOrder::with(['salesOrders.customer'])->whereIn('id', $ids)->get();
+                                return view('filament.forms.components.surat-jalan-customer-info', [
+                                    'deliveryOrders' => $deliveryOrders,
+                                ]);
+                            })
+                            ->visible(fn ($get) => !empty($get('deliveryOrder'))),
+                        Placeholder::make('items_preview')
+                            ->label('Rincian Barang Dikirim (Cascading Preview)')
+                            ->columnSpanFull()
+                            ->content(function ($get) {
+                                $ids = $get('deliveryOrder');
+                                $ids = is_array($ids) ? $ids : (empty($ids) ? [] : [$ids]);
+                                $deliveryOrders = !empty($ids)
+                                    ? DeliveryOrder::with(['deliveryOrderItem.product.uom', 'salesOrders.customer'])->whereIn('id', $ids)->get()
+                                    : collect();
+                                return view('filament.forms.components.surat-jalan-items-preview', [
+                                    'deliveryOrders' => $deliveryOrders,
+                                ]);
+                            }),
                         FileUpload::make('document_path')
                             ->label('Upload Document')
                             ->directory('surat-jalan-documents')

@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\CabangScope;
 use App\Traits\LogsGlobalActivity;
 use App\Models\Cabang;
 use App\Traits\CascadesJournalEntries;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class ProductionPlan extends Model
@@ -89,6 +91,21 @@ class ProductionPlan extends Model
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
+    }
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new CabangScope);
+
+        static::creating(function ($model) {
+            if (empty($model->cabang_id) && Auth::check()) {
+                $model->cabang_id = Auth::user()?->cabang_id;
+            }
+
+            if (empty($model->created_by)) {
+                $model->created_by = Auth::id() ?: \App\Models\User::first()?->id;
+            }
+        });
     }
 
     /**

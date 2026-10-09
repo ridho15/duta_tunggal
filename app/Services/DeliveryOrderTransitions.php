@@ -61,6 +61,11 @@ class DeliveryOrderTransitions
         return (bool) config('sales.stock.strict_dispatch', false);
     }
 
+    public static function requiresSuratJalan(): bool
+    {
+        return (bool) config('sales.stock.require_surat_jalan', true);
+    }
+
     /** Konteks transisi yang sedang berjalan (dibaca observer untuk alasan/log), atau null bila status diubah di luar `to()`. */
     public static function context(): ?array
     {
@@ -115,6 +120,8 @@ class DeliveryOrderTransitions
             if (self::mustHaveReason($from, $status) && $reason === '') {
                 throw new DeliveryOrderTransitionException($this->reasonMessage($from, $status));
             }
+
+            $this->assertIssuedSuratJalan($locked, $status);
 
             $override = $this->assertPhysicalStock($locked, $status, $options, $actor, $reason);
 
@@ -192,6 +199,7 @@ class DeliveryOrderTransitions
         $service = app(self::class);
 
         $service->assertAllowed($deliveryOrder, $from, $to);
+        $service->assertIssuedSuratJalan($deliveryOrder, $to);
         $service->assertPhysicalStock($deliveryOrder, $to, [], Auth::user(), '');
     }
 
@@ -215,6 +223,29 @@ class DeliveryOrderTransitions
             DeliveryOrder::statusLabel($to),
             $hint
         ));
+    }
+
+    /**
+     * Memastikan Delivery Order memiliki Surat Jalan (SJ) yang sudah terbit sebelum dikirim atau diselesaikan.
+     *
+     * @throws DeliveryOrderTransitionException
+     */
+    public function assertIssuedSuratJalan(DeliveryOrder $deliveryOrder, string $to): void
+    {
+        if (! self::requiresSuratJalan()) {
+            return;
+        }
+
+        if (! in_array($to, ['sent', 'completed'], true)) {
+            return;
+        }
+
+        if (! $deliveryOrder->hasIssuedSuratJalan()) {
+            $number = $deliveryOrder->do_number ?: "#{$deliveryOrder->getKey()}";
+            throw new DeliveryOrderTransitionException(
+                "Delivery Order {$number} belum memiliki Surat Jalan (SJ) yang diterbitkan (status Terbit). Terbitkan Surat Jalan terlebih dahulu sebelum mengirim barang."
+            );
+        }
     }
 
     /**

@@ -86,6 +86,15 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return explode(',', $value ?? '');
     }
 
+    public function setManageTypeAttribute($value)
+    {
+        if (is_array($value)) {
+            $this->attributes['manage_type'] = implode(',', $value);
+        } else {
+            $this->attributes['manage_type'] = $value;
+        }
+    }
+
     public function initials(): string
     {
         return Str::of($this->name)
@@ -125,5 +134,24 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         } catch (PermissionDoesNotExist $exception) {
             return false;
         }
+    }
+
+    /**
+     * Determine whether the user can access records for a specific cabang.
+     */
+    public function canAccessCabang(?int $cabangId): bool
+    {
+        // If user has no branch assigned or record has no branch, allow access
+        if (! $this->cabang_id || ! $cabangId) {
+            return true;
+        }
+
+        // If user has 'all' in manage_type, allow access across all branches
+        $manageType = $this->manage_type ?? [];
+        if (is_array($manageType) && in_array('all', $manageType)) {
+            return true;
+        }
+
+        return (int) $this->cabang_id === (int) $cabangId;
     }
 }

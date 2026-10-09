@@ -167,6 +167,7 @@ class SalesInvoiceResource extends Resource
                 Section::make('Form Invoice')
                     ->schema([
                         // Header Section - Sumber Invoice
+                        // Header Section - Sumber Invoice
                         Section::make('Sumber Invoice')
                             ->description('Silahkan Pilih Customer')
                             ->columns(2)
@@ -181,13 +182,17 @@ class SalesInvoiceResource extends Resource
                                         'required' => 'Customer harus dipilih'
                                     ])
                                     ->afterStateUpdated(function ($set, $get, $state) {
+                                        $set('selected_surat_jalans', []);
                                         $set('selected_sale_order', null);
                                         $set('selected_delivery_orders', []);
                                         $set('invoiceItem', []);
+                                        $set('delivery_order_items', []);
                                         $set('subtotal', 0);
                                         $set('total', 0);
                                         $set('other_fees', []);
                                         $set('dpp', 0);
+                                        $set('delivery_orders', []);
+                                        $set('surat_jalan_ids', []);
                                     }),
 
                                 Select::make('cabang_id')
@@ -204,7 +209,183 @@ class SalesInvoiceResource extends Resource
                                     ->validationMessages([
                                         'required' => 'Cabang harus dipilih'
                                     ]),
+                            ]),
 
+                        // Section Pemilihan Surat Jalan (Tahap 5: 1 Inv Boleh > 1 SJ)
+                        Section::make('Surat Jalan (SJ) yang Difakturkan')
+                            ->description('Pilih satu atau lebih Surat Jalan terbit untuk customer ini. Item barang dan harga akan otomatis diambil dari Surat Jalan dan Sales Order asal.')
+                            ->visible(fn ($get) => filled($get('selected_customer')))
+                            ->schema([
+                                Forms\Components\CheckboxList::make('selected_surat_jalans')
+                                    ->label('Daftar Surat Jalan Terbit')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
+                                    ->options(function ($get, $livewire) {
+                                        $customerId = $get('selected_customer');
+                                        if (!$customerId) return [];
+
+                                        $currentInvoiceId = $get('id') ?? ($livewire instanceof \Filament\Resources\Pages\EditRecord ? $livewire->record?->id : null);
+                                        $currentInvoice = $currentInvoiceId ? \App\Models\Invoice::find($currentInvoiceId) : null;
+                                        $currentSjIds = $currentInvoice ? (array) ($currentInvoice->surat_jalan_ids ?? [$currentInvoice->from_model_id]) : [];
+
+                                        return \App\Models\SuratJalan::query()
+                                            ->where('status', \App\Models\SuratJalan::STATUS_ISSUED)
+                                            ->whereHas('deliveryOrder.salesOrders', function ($q) use ($customerId) {
+                                                $q->where('customer_id', $customerId);
+                                            })
+                                            ->with(['deliveryOrder.deliveryOrderItem', 'cabang'])
+                                            ->get()
+                                            ->filter(function ($sj) use ($currentSjIds) {
+                                                if (in_array($sj->id, $currentSjIds)) {
+                                                    return true;
+                                                }
+                                                return ! $sj->isInvoiced();
+                                            })
+                                            ->mapWithKeys(function ($sj) {
+                                                $doNumbers = $sj->deliveryOrder->pluck('do_number')->filter()->implode(', ');
+                                                $itemCount = $sj->deliveryOrder->flatMap->deliveryOrderItem->count();
+                                                $dateStr = $sj->issued_at ? $sj->issued_at->format('d/m/Y') : '-';
+                                                $cabangName = $sj->cabang?->nama ?? '-';
+                                                return [$sj->id => "{$sj->sj_number} ({$dateStr}) — Cabang: {$cabangName} | DO: {$doNumbers} [{$itemCount} items]"];
+                                            });
+                                    })
+                                    ->columns(1)
+                                    ->reactive()
+                                    ->helperText('Hanya menampilkan Surat Jalan berstatus Terbit yang belum ditagih. Anda dapat memilih lebih dari satu Surat Jalan untuk digabungkan jika cabang sama.')
+                                    ->afterStateUpdated(function ($set, $get, $state) {
+                                        if (empty($state)) {
+                                            $set('surat_jalan_ids', []);
+                                            $set('delivery_orders', []);
+                                            $set('invoiceItem', []);
+                                            $set('delivery_order_items', []);
+                                            $set('subtotal', 0);
+                                            $set('total', 0);
+                                            $set('other_fees', []);
+                                            $set('dpp', 0);
+                                            return;
+                                        }
+
+                                        $customerId = $get('selected_customer');
+                                        $selectedSjs = \App\Models\SuratJalan::with([
+                                            'deliveryOrder.deliveryOrderItem.product',
+                                            'deliveryOrder.deliveryOrderItem.saleOrderItem.saleOrder',
+                                            'deliveryOrder.salesOrders',
+                                            'cabang',
+                                        ])->whereIn('id', (array) $state)->get();
+
+                                        if ($selectedSjs->isEmpty()) {
+                                            return;
+                                        }
+
+                                        // Validasi keseragaman Cabang
+                                        $branchIds = $selectedSjs->pluck('cabang_id')->unique()->values();
+                                        if ($branchIds->count() > 1) {
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Peringatan Cabang Berbeda')
+                                                ->body('Surat Jalan yang dipilih berasal dari cabang yang berbeda.')
+                                                ->danger()
+                                                ->send();
+                                            return;
+                                        }
+
+                                        $firstSj = $selectedSjs->first();
+                                        $set('cabang_id', $firstSj->cabang_id);
+                                        $set('from_model_type', \App\Models\SuratJalan::class);
+                                        $set('from_model_id', $firstSj->id);
+                                        $set('surat_jalan_ids', array_values((array) $state));
+
+                                        // Kumpulkan semua DO
+                                        $deliveryOrders = $selectedSjs->flatMap(fn ($sj) => $sj->deliveryOrder)->unique('id')->values();
+                                        $doIds = $deliveryOrders->pluck('id')->all();
+                                        $set('delivery_orders', $doIds);
+
+                                        // Set customer info
+                                        $customer = \App\Models\Customer::find($customerId);
+                                        $set('customer_name', $customer?->name ?? '');
+                                        $set('customer_phone', $customer?->phone ?? '');
+
+                                        // Hitung Jatuh Tempo dari SO / Customer
+                                        $allSos = $deliveryOrders->flatMap(fn ($do) => $do->salesOrders)->unique('id')->values();
+                                        $firstSo = $allSos->first();
+                                        $invoiceDate = $get('invoice_date') ?? now();
+                                        $tenor = (int) ($firstSo?->tempo_pembayaran ?? $customer?->termin_pembayaran ?? 0);
+                                        if ($tenor > 0) {
+                                            $set('due_date', \Illuminate\Support\Carbon::parse($invoiceDate)->addDays($tenor)->toDateString());
+                                        }
+
+                                        // Auto-fill Tipe Pajak dari SO
+                                        if ($firstSo && $firstSo->saleOrderItem->isNotEmpty()) {
+                                            $tipePajak = static::normalizeInvoiceTaxTypeValue($firstSo->saleOrderItem->first()->tipe_pajak ?? 'None');
+                                            $set('tipe_pajak', $tipePajak);
+                                            if ($tipePajak === 'None') {
+                                                $set('ppn_rate', 0);
+                                            } else {
+                                                $set('ppn_rate', \App\Models\TaxSetting::activeRate('PPN'));
+                                            }
+                                        }
+
+                                        // Susun item DO dan invoiceItem
+                                        $deliveryOrderItems = [];
+                                        $invoiceItems = [];
+                                        $subtotal = 0;
+
+                                        foreach ($deliveryOrders as $do) {
+                                            foreach ($do->deliveryOrderItem as $item) {
+                                                $product = $item->product ?: $item->saleOrderItem?->product;
+                                                $saleOrderItem = $item->saleOrderItem;
+                                                if ($product) {
+                                                    $rawUnitPrice = $saleOrderItem && (float) $saleOrderItem->unit_price > 0
+                                                        ? (float) $saleOrderItem->unit_price
+                                                        : (float) ($product->sell_price ?? 0);
+                                                    $discountPct = $saleOrderItem ? max(0.0, min(100.0, (float) $saleOrderItem->discount)) : 0.0;
+                                                    $originalPrice = round($rawUnitPrice * (1 - $discountPct / 100), 2);
+                                                    $qty = (float) $item->quantity;
+                                                    $lineTotal = round($qty * $originalPrice, 2);
+
+                                                    $deliveryOrderItems[] = [
+                                                        'do_number' => $do->do_number,
+                                                        'product_id' => $item->product_id ?: $product->id,
+                                                        'product_name' => $product->name . ($product->sku ? ' (' . $product->sku . ')' : ''),
+                                                        'original_quantity' => $qty,
+                                                        'invoice_quantity' => $qty,
+                                                        'original_price' => $originalPrice,
+                                                        'unit_price' => $originalPrice,
+                                                        'total_price' => $lineTotal,
+                                                        'coa_id' => $product->sales_coa_id,
+                                                    ];
+
+                                                    $invoiceItems[] = [
+                                                        'product_id' => $item->product_id ?: $product->id,
+                                                        'quantity' => $qty,
+                                                        'price' => $originalPrice,
+                                                        'total' => $lineTotal,
+                                                        'coa_id' => $product->sales_coa_id,
+                                                    ];
+
+                                                    $subtotal += $lineTotal;
+                                                }
+                                            }
+                                        }
+
+                                        $set('delivery_order_items', $deliveryOrderItems);
+                                        $set('invoiceItem', $invoiceItems);
+                                        $set('subtotal', $subtotal);
+                                        $set('dpp', $subtotal);
+
+                                        $ppnRate = (float) ($get('ppn_rate') ?? 0);
+                                        $tipePajak = $get('tipe_pajak') ?? 'None';
+                                        $otherFees = $get('other_fees') ?? [];
+                                        $otherFeeTotal = (float) collect($otherFees)->sum(fn ($fee) => (float) \App\Helpers\MoneyHelper::safeParse($fee['amount'] ?? 0));
+                                        $taxAmount = ($tipePajak !== 'None' && $ppnRate > 0) ? round($subtotal * $ppnRate / 100, 2) : 0;
+                                        $set('total', $subtotal + $otherFeeTotal + $taxAmount);
+                                        $set('other_fee', $otherFeeTotal);
+                                    }),
+                            ]),
+
+                        // Section Alternatif: Pemilihan SO Langsung (Legacy / Ambil Sendiri)
+                        Section::make('Sumber Penjualan Langsung (Opsional / Legacy)')
+                            ->visible(fn ($get) => empty($get('selected_surat_jalans')) && filled($get('selected_customer')))
+                            ->collapsed()
+                            ->schema([
                                 Select::make('selected_sale_order')
                                     ->label('SO (Sales Order)')
                                     ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
@@ -240,22 +421,9 @@ class SalesInvoiceResource extends Resource
                                             })
                                             ->get()
                                             ->filter(function ($so) use ($invoicedDOIds, $currentInvoiceId, $currentInvoiceSoId) {
-                                                // Jika sedang edit invoice dan SO ini adalah asal invoice saat ini, selalu izinkan
                                                 if ($currentInvoiceId && (int) $so->id === (int) $currentInvoiceSoId) {
                                                     return true;
                                                 }
-
-                                                if ($so->tipe_pengiriman === 'Ambil Sendiri') {
-                                                    // Ambil Sendiri: hanya tampil jika belum pernah terbit invoice aktif
-                                                    $alreadyInvoiced = \App\Models\Invoice::where('from_model_type', 'App\Models\SaleOrder')
-                                                        ->where('from_model_id', $so->id)
-                                                        ->whereNotIn('status', ['canceled', 'cancelled'])
-                                                        ->when($currentInvoiceId, fn ($q) => $q->where('id', '!=', $currentInvoiceId))
-                                                        ->exists();
-                                                    return ! $alreadyInvoiced;
-                                                }
-
-                                                // Pengiriman lewat DO: hanya tampil jika masih ada DO terkirim yang BELUM ditagih
                                                 $deliveredDos = $so->deliverySalesOrder
                                                     ? $so->deliverySalesOrder
                                                         ->map(fn ($dso) => $dso->deliveryOrder)
@@ -270,9 +438,7 @@ class SalesInvoiceResource extends Resource
                                             })
                                             ->mapWithKeys(function ($so) {
                                                 $label = \App\Support\DocumentLabels::saleOrder($so);
-                                                if ($so->tipe_pengiriman === 'Ambil Sendiri') {
-                                                    $label .= ' [Ambil Sendiri]';
-                                                } elseif ($so->status === 'partially_delivered') {
+                                                if ($so->status === 'partially_delivered') {
                                                     $label .= ' [Pengiriman Sebagian]';
                                                 } elseif ($so->status === 'completed') {
                                                     $label .= ' [Selesai]';
@@ -284,14 +450,7 @@ class SalesInvoiceResource extends Resource
                                     })
                                     ->searchable()
                                     ->reactive()
-                                    ->helperText(function ($get) {
-                                        $customerId = $get('selected_customer');
-                                        if (!$customerId) {
-                                            return 'Pilih customer terlebih dahulu untuk memuat daftar Sales Order yang siap ditagih.';
-                                        }
-
-                                        return 'Hanya menampilkan SO yang memiliki pengiriman barang belum ditagih (atau SO Ambil Sendiri yang belum terbit invoice).';
-                                    })
+                                    ->helperText('Hanya digunakan bila invoice dibuat langsung dari SO tanpa Surat Jalan.')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $set('selected_delivery_orders', []);
                                         $set('invoiceItem', []);
@@ -375,11 +534,6 @@ class SalesInvoiceResource extends Resource
                                         $saleOrder = SaleOrder::find($saleOrderId);
                                         if (!$saleOrder) return [];
 
-                                        // Jika SO tipe "Ambil Sendiri", return empty array (akan handle di bawah)
-                                        if ($saleOrder->tipe_pengiriman === 'Ambil Sendiri') {
-                                            return [];
-                                        }
-
                                         // Get all DOs from this SO — tampilkan semua DO yang sudah terkirim (DELIVERED_STATUSES)
                                         // FIX #1b: DO berstatus sent/received/completed semuanya sudah kirim barang, bisa ditagih.
                                         $deliveryOrders = $saleOrder->deliverySalesOrder()
@@ -422,10 +576,7 @@ class SalesInvoiceResource extends Resource
                                     ->reactive()
                                     ->visible(function ($get) {
                                         $saleOrderId = $get('selected_sale_order');
-                                        if (!$saleOrderId) return false;
-
-                                        $saleOrder = SaleOrder::find($saleOrderId);
-                                        return $saleOrder && $saleOrder->tipe_pengiriman !== 'Ambil Sendiri';
+                                        return (bool) $saleOrderId;
                                     })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state || empty($state)) {
@@ -557,13 +708,7 @@ class SalesInvoiceResource extends Resource
                                 // Checkbox untuk konfirmasi pemilihan SO Ambil Sendiri
                                 Forms\Components\Checkbox::make('confirm_self_pickup_invoice')
                                     ->label('Buat invoice dari Sales Order "Ambil Sendiri" ini')
-                                    ->visible(function ($get) {
-                                        $saleOrderId = $get('selected_sale_order');
-                                        if (!$saleOrderId) return false;
-
-                                        $saleOrder = SaleOrder::find($saleOrderId);
-                                        return $saleOrder && $saleOrder->tipe_pengiriman === 'Ambil Sendiri';
-                                    })
+                                    ->hidden()
                                     ->reactive()
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (!$state) {
@@ -916,6 +1061,7 @@ class SalesInvoiceResource extends Resource
                         Hidden::make('subtotal')->default(0),
                         Hidden::make('status')->default('draft'),
                         Hidden::make('delivery_orders'),
+                        Hidden::make('surat_jalan_ids'),
                         Hidden::make('dpp')->default(0),
                         Hidden::make('total')->default(0),
 
@@ -996,13 +1142,20 @@ class SalesInvoiceResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->where('from_model_type', 'App\Models\SaleOrder');
+                return $query->whereIn('from_model_type', [\App\Models\SaleOrder::class, \App\Models\SuratJalan::class]);
             })
             ->columns([
                 TextColumn::make('invoice_number')
                     ->label('Nomor Invoice')
                     ->searchable()
                     ->sortable(),
+
+                TextColumn::make('surat_jalans_display')
+                    ->label('Surat Jalan')
+                    ->placeholder('-')
+                    ->searchable(false)
+                    ->sortable(false)
+                    ->toggleable(),
 
                 TextColumn::make('tax_invoice_number')
                     ->label('No. Faktur Pajak')
@@ -1202,7 +1355,7 @@ class SalesInvoiceResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('from_model_type', 'App\Models\SaleOrder')
+            ->whereIn('from_model_type', [\App\Models\SaleOrder::class, \App\Models\SuratJalan::class])
             ->orderByDesc('created_at')
             ->with([
                 'invoiceItem.product',

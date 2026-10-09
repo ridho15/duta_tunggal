@@ -35,37 +35,8 @@ class SaleOrderObserver
      */
     public function updating(SaleOrder $saleOrder): void
     {
-        if (! \App\Services\DeliveryOrderTransitions::enabled()
-            || ! $saleOrder->isDirty('status')
-            || $saleOrder->status !== 'completed'
-            || $saleOrder->getOriginal('status') === 'completed'
-            || $saleOrder->tipe_pengiriman !== 'Ambil Sendiri') {
-            return;
-        }
-
-        $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
-
-        $needs = [];
-        foreach ($saleOrder->saleOrderItem as $item) {
-            if ($item->warehouseAllocations->isNotEmpty()) {
-                foreach ($item->warehouseAllocations as $allocation) {
-                    if ($allocation->warehouse_id && (float) $allocation->quantity > 0) {
-                        $needs[] = ['product_id' => (int) $item->product_id, 'warehouse_id' => (int) $allocation->warehouse_id, 'needed' => (float) $allocation->quantity, 'product' => $item->product?->name];
-                    }
-                }
-            } elseif ($item->warehouse_id && (float) $item->quantity > 0) {
-                $needs[] = ['product_id' => (int) $item->product_id, 'warehouse_id' => (int) $item->warehouse_id, 'needed' => (float) $item->quantity, 'product' => $item->product?->name];
-            }
-        }
-
-        $shortages = app(\App\Services\DeliveryShipments::class)->shortagesForNeeds($needs);
-        if ($shortages !== []) {
-            throw new \App\Exceptions\DeliveryOrderTransitionException(
-                "SO {$saleOrder->so_number} (Ambil Sendiri) belum dapat diselesaikan — stok fisik tidak cukup ("
-                . \App\Services\DeliveryShipments::describeShortages($shortages) . '). Tambah stok atau ubah kuantitas SO.',
-                $shortages
-            );
-        }
+        // Alur SO -> DO -> SJ -> Invoice: SO tidak lagi memotong stok langsung, melainkan melalui DO.
+        return;
     }
 
     /**
@@ -77,12 +48,9 @@ class SaleOrderObserver
         $newStatus = $saleOrder->status;
 
         // WC and DO creation is triggered when a Delivery Order is created.
-
-        // Jika status berubah ke 'completed', buat invoice otomatis dan kurangi stock untuk Ambil Sendiri
-        if ($originalStatus !== 'completed' && $newStatus === 'completed') {
-            $this->createInvoiceForCompletedSaleOrder($saleOrder);
-            $this->handleStockReductionForSelfPickup($saleOrder);
-        }
+        // Alur transaksi wajib: SO -> DO -> SJ -> Invoice.
+        // Stok dipotong pada saat DO disetujui, dan Invoice dibuat dari Surat Jalan (SJ).
+        // Oleh karena itu, SO completion tidak membuat invoice atau memotong stok secara langsung.
 
         // Sync related journal entries if total amount changed
         if ($saleOrder->wasChanged('total_amount')) {
@@ -493,11 +461,34 @@ class SaleOrderObserver
         $saleOrder->loadMissing('saleOrderItem.product', 'saleOrderItem.warehouseAllocations');
 
         $date = $saleOrder->order_date ?? now()->toDateString();
+        $deliveryProgress = app(\App\Services\SaleOrderDeliveryProgress::class)->forSaleOrder($saleOrder);
 
         // Create stock movements for each item to reduce physical inventory
         foreach ($saleOrder->saleOrderItem as $item) {
-            $qtySold = max(0, $item->quantity ?? 0);
-            if ($qtySold <= 0) {
+            $orderedQty = max(0, (float) ($item->quantity ?? 0));
+            if ($orderedQty <= 0) {
+                continue;
+            }
+
+            // Check how much was already delivered via Delivery Order
+            $deliveredViaDo = (float) ($deliveryProgress['items'][$item->id]['delivered'] ?? ($item->delivered_quantity ?? 0));
+
+            // Check how much was already deducted directly for this SaleOrderItem
+            $alreadyDeductedDirectly = (float) \App\Models\StockMovement::where('from_model_type', \App\Models\SaleOrderItem::class)
+                ->where('from_model_id', $item->id)
+                ->where('type', 'sales')
+                ->sum('quantity');
+
+            // Remaining quantity that needs physical deduction
+            $remainingQtyToDeduct = max(0.0, $orderedQty - $deliveredViaDo - $alreadyDeductedDirectly);
+
+            if ($remainingQtyToDeduct <= 0) {
+                Log::info('SaleOrderObserver: Skipping self-pickup stock deduction — quantity already fulfilled via DO or already deducted', [
+                    'sale_order_item_id' => $item->id,
+                    'ordered_qty' => $orderedQty,
+                    'delivered_via_do' => $deliveredViaDo,
+                    'already_deducted' => $alreadyDeductedDirectly,
+                ]);
                 continue;
             }
 
@@ -510,24 +501,33 @@ class SaleOrderObserver
             $allocations = $item->warehouseAllocations;
 
             if ($allocations->isNotEmpty()) {
-                // Multi-warehouse mode: create stock movement per allocation
+                // Multi-warehouse mode: allocate deduction across allocations up to remainingQtyToDeduct
+                $needToDeduct = $remainingQtyToDeduct;
                 foreach ($allocations as $allocation) {
+                    if ($needToDeduct <= 0) {
+                        break;
+                    }
+
                     $allocationQty = max(0, (float) $allocation->quantity);
                     if ($allocationQty <= 0 || !$allocation->warehouse_id) {
                         continue;
                     }
 
+                    $deductNow = min($needToDeduct, $allocationQty);
+
                     $productService->createStockMovement(
                         product_id: $product->id,
                         warehouse_id: $allocation->warehouse_id,
-                        quantity: $allocationQty,
+                        quantity: $deductNow,
                         type: 'sales',
                         date: $date,
                         notes: "Self-pickup sales (multi-gudang) for SO {$saleOrder->so_number}",
                         rak_id: null,
-                        fromModel: null,
-                        value: $product->cost_price * $allocationQty
+                        fromModel: $item,
+                        value: $product->cost_price * $deductNow
                     );
+
+                    $needToDeduct -= $deductNow;
                 }
             } else {
                 // Single warehouse mode
@@ -542,13 +542,13 @@ class SaleOrderObserver
                 $productService->createStockMovement(
                     product_id: $product->id,
                     warehouse_id: $item->warehouse_id,
-                    quantity: $qtySold,
+                    quantity: $remainingQtyToDeduct,
                     type: 'sales',
                     date: $date,
                     notes: "Self-pickup sales for SO {$saleOrder->so_number}",
                     rak_id: $item->rak_id,
-                    fromModel: null,
-                    value: $product->cost_price * $qtySold
+                    fromModel: $item,
+                    value: $product->cost_price * $remainingQtyToDeduct
                 );
             }
         }

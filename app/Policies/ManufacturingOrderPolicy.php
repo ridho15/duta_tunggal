@@ -21,6 +21,10 @@ class ManufacturingOrderPolicy
      */
     public function view(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view manufacturing order');
     }
 
@@ -37,6 +41,10 @@ class ManufacturingOrderPolicy
      */
     public function update(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('update manufacturing order');
     }
 
@@ -45,6 +53,10 @@ class ManufacturingOrderPolicy
      */
     public function delete(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('delete manufacturing order');
     }
 
@@ -53,6 +65,10 @@ class ManufacturingOrderPolicy
      */
     public function restore(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore manufacturing order');
     }
 
@@ -61,21 +77,37 @@ class ManufacturingOrderPolicy
      */
     public function forceDelete(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete manufacturing order');
     }
 
     public function response(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('response manufacturing order');
     }
 
     public function request(User $user, ManufacturingOrder $manufacturingOrder): bool
     {
+        if (! $user->canAccessCabang($manufacturingOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('request manufacturing order');
     }
 
     public function updateStatus(User $user, ManufacturingOrder $mo, string $to): bool
     {
+        if (! $user->canAccessCabang($mo->cabang_id)) {
+            return false;
+        }
+
         // Require permission and enforce allowed transitions
         if (!$user->hasPermissionTo('request manufacturing order')) {
             return false;

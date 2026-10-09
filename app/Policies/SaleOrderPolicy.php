@@ -21,6 +21,10 @@ class SaleOrderPolicy
      */
     public function view(User $user, SaleOrder $saleOrder): bool
     {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('view sales order');
     }
 
@@ -37,6 +41,10 @@ class SaleOrderPolicy
      */
     public function update(User $user, SaleOrder $saleOrder): bool
     {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         if (! in_array($saleOrder->status, ['draft', 'request_approve'])) {
             return false;
         }
@@ -49,6 +57,10 @@ class SaleOrderPolicy
      */
     public function delete(User $user, SaleOrder $saleOrder): bool
     {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         if ($saleOrder->status !== 'draft') {
             return false;
         }
@@ -61,6 +73,10 @@ class SaleOrderPolicy
      */
     public function restore(User $user, SaleOrder $saleOrder): bool
     {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('restore sales order');
     }
 
@@ -69,16 +85,28 @@ class SaleOrderPolicy
      */
     public function forceDelete(User $user, SaleOrder $saleOrder): bool
     {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('force-delete sales order');
     }
 
     public function request(User $user, ?SaleOrder $saleOrder = null): bool
     {
+        if ($saleOrder && ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         return $user->hasPermissionTo('request sales order');
     }
 
     public function response(User $user, SaleOrder $saleOrder): bool
     {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
         $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder($user, $saleOrder);
 
         return $check['allowed'];

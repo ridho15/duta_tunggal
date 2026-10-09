@@ -71,13 +71,17 @@ class PurchaseReceiptObserver
 
         try {
             // Create PurchaseReturn header
+            $qc = $purchaseReceipt->purchaseOrder?->qualityControl ?? null;
             $purchaseReturn = PurchaseReturn::create([
                 'purchase_receipt_id' => $purchaseReceipt->id,
+                'quality_control_id' => $qc?->exists ? $qc->id : null,
+                'failed_qc_action' => PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
                 'return_date' => now(),
                 'nota_retur' => $this->purchaseReturnService->generateNotaRetur(),
                 'created_by' => Auth::id() ?? 1, // System user if no auth
                 'notes' => 'Auto-generated return for items rejected during receiving',
-                'status' => 'draft'
+                'status' => 'draft',
+                'cabang_id' => $purchaseReceipt->cabang_id ?? Auth::user()->cabang_id ?? 1,
             ]);
 
             // Create PurchaseReturnItem for each rejected item

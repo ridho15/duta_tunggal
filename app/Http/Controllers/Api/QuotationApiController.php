@@ -73,18 +73,33 @@ class QuotationApiController extends Controller
                     'products.id',
                     'products.sku',
                     'products.name',
+                    'products.cost_price',
                     'products.sell_price',
+                    'products.harga_batas',
                     'unit_of_measures.id as uom_id',
                     'unit_of_measures.name as uom_name',
                     'unit_of_measures.abbreviation as uom_abbreviation',
                 ])
                 ->get()
                 ->map(function ($p) {
+                    $sellPrice = (float) MoneyHelper::parseHighPrecision($p->sell_price ?? 0);
+                    $costPrice = (float) MoneyHelper::parseHighPrecision($p->cost_price ?? 0);
+                    $hargaBatas = (float) ($p->harga_batas ?? 0);
+                    $dummyProduct = (new Product)->forceFill([
+                        'sell_price' => $sellPrice,
+                        'cost_price' => $costPrice,
+                        'harga_batas' => $hargaBatas,
+                    ]);
+                    $minPrice = \App\Support\ProductPriceLimitation::getMinimumAllowedPrice($dummyProduct);
+
                     return [
                         'id' => (int) $p->id,
                         'sku' => (string) ($p->sku ?? ''),
                         'name' => (string) ($p->name ?? ''),
-                        'sell_price' => (float) MoneyHelper::parseHighPrecision($p->sell_price ?? 0),
+                        'sell_price' => $sellPrice,
+                        'cost_price' => $costPrice,
+                        'harga_batas' => $hargaBatas,
+                        'min_price' => $minPrice,
                         'uom' => $p->uom_id ? [
                             'id' => (int) $p->uom_id,
                             'name' => (string) $p->uom_name,
@@ -218,6 +233,28 @@ class QuotationApiController extends Controller
                 'success' => false,
                 'message' => 'Validasi gagal. Periksa kembali form input Anda.',
                 'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Validasi Rule Limitation (Batas Harga Minimum)
+        $priceErrors = [];
+        foreach ($request->input('items', []) as $idx => $item) {
+            if (! empty($item['product_id']) && isset($item['unit_price'])) {
+                $product = Product::find((int) $item['product_id']);
+                if ($product) {
+                    $err = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                    if ($err) {
+                        $priceErrors["items.{$idx}.unit_price"] = [$err];
+                    }
+                }
+            }
+        }
+
+        if (! empty($priceErrors)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terdapat harga satuan di bawah batas harga minimum yang diizinkan.',
+                'errors' => $priceErrors,
             ], 422);
         }
 
@@ -458,6 +495,28 @@ class QuotationApiController extends Controller
                 'success' => false,
                 'message' => 'Validasi gagal. Periksa kembali form input Anda.',
                 'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Validasi Rule Limitation (Batas Harga Minimum)
+        $priceErrors = [];
+        foreach ($request->input('items', []) as $idx => $item) {
+            if (! empty($item['product_id']) && isset($item['unit_price'])) {
+                $product = Product::find((int) $item['product_id']);
+                if ($product) {
+                    $err = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                    if ($err) {
+                        $priceErrors["items.{$idx}.unit_price"] = [$err];
+                    }
+                }
+            }
+        }
+
+        if (! empty($priceErrors)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terdapat harga satuan di bawah batas harga minimum yang diizinkan.',
+                'errors' => $priceErrors,
             ], 422);
         }
 
