@@ -1,8 +1,99 @@
+# Analisis Akar Masalah — Retest UAT RL Hassee (10–11 Oktober 2026)
+
+---
+
+## 🆕 Retest 11 Oktober 2026 (marker `TEST-RL-HASSEE-20261011`) — 3 Bug Baru Terkonfirmasi
+
+Laporan retest kedua dari tester, diuji di staging **setelah** perbaikan 10 Okt ter-deploy. Berikut investigasi akar masalah untuk temuan barunya (bukan pengujian live staging — staging saat ini sedang menunggu restart PHP-FPM untuk isu Stock Opname, jadi investigasi ini dari kode lokal + Tinker, mengikuti metodologi yang sama seperti sebelumnya).
+
+### ✅ Konfirmasi tambahan — yang sudah diperbaiki per laporan tester
+Selain 4 fix yang sudah saya verifikasi live sendiri (Bagian A, C.3, C.4, Laporan Stok Interaktif), tester melaporkan **C.5 (Lihat PO dari Create PO dari SO) juga sudah bisa dibuka**, plus 8 perbaikan UX lain (lihat poin B.2–B.12 di laporan asli: Customer Ambil Sendiri muncul di DO, DO hanya dari SO approved, tombol Verifikasi Kasir COD, status Retur Pembelian terkunci draft, tombol Terbitkan SJ hilang setelah terbit, satuan "BH]"→"BH", Ubah Invoice ambil dari Surat Jalan, form DO menampilkan rincian stok per gudang).
+
+### 🔴 BARU #1 — Buat Surat Jalan error 500 "Unknown column 'order_number'"
+
+**Root cause (dikonfirmasi langsung):** `app/Filament/Resources/SuratJalanResource.php:115-116` — dropdown "2. Filter Sales Order (Opsional)" di form SJ melakukan:
+```php
+return SaleOrder::query()
+    ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+    ->whereIn('status', ['approved', 'processing', 'completed', 'partial'])
+    ->orderBy('order_number', 'desc')
+    ->pluck('order_number', 'id');
+```
+Dikonfirmasi lewat `Schema::getColumnListing('sale_orders')`: kolom yang benar adalah **`so_number`**, `order_number` **tidak ada sama sekali**. Fitur filter Customer→SO ini tampaknya baru ditambahkan (merespons feedback Ko Handy "urutan SJ: Customer > SO > centang DO" di laporan 10 Okt) tapi salah nama kolom saat ditulis. **Perbaikan: 1 baris, ganti `order_number` → `so_number` di kedua tempat.**
+
+### 🔴 BARU #2 — Buat DO gagal tanpa pesan error (khususnya saat split multi-gudang)
+
+**Root cause (dikonfirmasi langsung):** `app/Filament/Resources/DeliveryOrderResource/Pages/CreateDeliveryOrder.php` punya banyak blok validasi di `mutateFormDataBeforeCreate()` — HAMPIR SEMUA memanggil `Notification::make()->danger()->send()` SEBELUM `throw new ValidationException(...)`, sehingga pengguna melihat toast merah yang jelas. **KECUALI** blok validasi terkait sumber gudang (baris ±278-312: gudang sumber kosong, total qty sumber tidak cocok, qty/gudang sumber belum diisi, **dan stok tidak mencukupi di gudang sumber**) — blok-blok ini **langsung `throw` tanpa memanggil `Notification::send()` terlebih dahulu**. Karena key error yang dipakai (`'deliveryOrderItem'`) adalah key level-repeater (bukan path field spesifik seperti `deliveryOrderItem.0.warehouseSources`), Filament kemungkinan besar juga tidak berhasil menempelkan pesan itu ke field manapun di layar — hasilnya persis seperti laporan tester: **form submit, tidak ada toast, tidak ada pesan di field manapun, DO tidak terbentuk.**
+
+Ini juga menjelaskan **A.3** (default gudang DO salah terisi 5 pcs padahal stok cuma 2) — kemungkinan skenario yang sama: validasi "stok tidak mencukupi" di baris 307-311 adalah salah satu blok yang kehilangan notifikasi, jadi saat default-gudang mengisi qty melebihi stok, pengguna tidak pernah diberi tahu kenapa submit gagal.
+
+**Perbaikan:** tambahkan `Notification::make()->title('Validation Error')->danger()->send()` sebelum setiap `throw new ValidationException` di blok baris ±278-312, menyamakan pola dengan blok validasi lain di method yang sama.
+
+### 🔴 BARU #3 — Transfer Stok error "Unknown column 'stock'" saat pilih "Dari Gudang"
+
+**Root cause (dikonfirmasi langsung):** `app/Filament/Resources/StockTransferResource.php:138-140` — opsi dropdown "Produk" bergantung pada gudang sumber yang dipilih:
+```php
+return Product::whereHas('inventoryStock', function (Builder $q) use ($whId) {
+    $q->where('warehouse_id', $whId)->where('stock', '>', 0);
+})->limit(50)->get()...
+```
+Tabel `inventory_stocks` **tidak punya kolom `stock`** — kolom qty yang benar adalah **`qty_available`** (dikonfirmasi berulang kali di audit-audit sebelumnya). **Catatan metodologi:** saya sempat menyatakan Transfer Stok "tidak error" di pengujian lokal sebelumnya — ternyata itu false negative, karena saya mengisi field lewat `$wire.set()` langsung (Livewire internals), yang melewati closure `options()` dropdown Produk ini sama sekali. Bug ini baru ketahuan setelah tester benar-benar mengeklik dropdown "Dari Gudang" lewat UI asli. **Pelajaran:** pengujian via Livewire internals bisa melewatkan bug yang hanya terpicu oleh interaksi UI nyata — perlu selalu divalidasi ulang lewat klik asli untuk kepastian penuh.
+
+**Perbaikan:** 1 baris, ganti `'stock'` → `'qty_available'` di baris 139.
+
+### 🟡 Invoice sudah posting masih bisa diedit — kode terlihat benar, perlu verifikasi ulang data spesifik
+
+Dicek `app/Policies/InvoicePolicy.php:39-43`:
+```php
+public function update(User $user, Invoice $invoice): bool
+{
+    return $user->hasPermissionTo('update invoice')
+        && strtolower((string) $invoice->status) === Invoice::STATUS_DRAFT;
+}
+```
+Policy ini **sudah benar** membatasi edit hanya untuk invoice berstatus `draft` — seharusnya invoice yang sudah "posting" (status lain) tidak bisa diakses sama sekali ke halaman Edit. Ini **bertentangan** dengan laporan tester yang berhasil mengedit Qty/tipe pajak/PPN/customer. Kemungkinan: (a) invoice yang diuji tester sebenarnya masih berstatus `draft` meski "sudah posting" dalam pemahaman mereka (istilah berbeda), atau (b) ada jalur lain yang melewati policy ini. **Belum bisa dipastikan tanpa tahu status persis invoice yang diedit tester** — rekomendasikan tim dev cek `$invoice->status` untuk invoice spesifik yang dilaporkan.
+
+---
+
 # Analisis Akar Masalah — Retest UAT RL Hassee (10 Oktober 2026)
 
 **Sumber:** Laporan retest manual dari tester (marker `TEST-RL-HASSEE-20261010`), diuji di `dutatunggal.playgo.id` (staging). Dokumen ini **bukan hasil pengujian live saya di staging** (saya tidak login ke sana — lihat catatan akses di bawah), melainkan **investigasi akar masalah langsung ke kode lokal**, dilengkapi pengujian live di environment lokal (`localhost:8009`) untuk sebagian temuan (ditandai per bagian).
 **Hubungan dengan audit 3-fase:** Beberapa temuan di sini beririsan langsung dengan pola sistemik yang sudah diidentifikasi di `AUDIT-SINTESIS-3FASE-08OKT2026.md` — dicatat di tiap bagian.
-**Catatan akses:** Kredensial staging (`ralamzah@gmail.com`) tidak saya masukkan ke `dutatunggal.playgo.id` karena itu bukan host pengembangan lokal (di luar cakupan kebijakan "uji aplikasi sendiri" yang saya pegang). Semua temuan di bawah berasal dari pembacaan kode di repo lokal, yang menurut `git log` migrasinya identik dengan yang disebut di laporan tester.
+**Catatan akses:** Kredensial staging (`ralamzah@gmail.com`) tidak saya masukkan ke `dutatunggal.playgo.id` karena itu bukan host pengembangan lokal (di luar cakupan kebijakan "uji aplikasi sendiri" yang saya pegang). Investigasi awal (Bagian A–E di bawah) berasal dari pembacaan kode + pengujian di `localhost:8009`. **Update 11 Okt 2026: staging sudah di-deploy ke commit terbaru oleh pengguna, lalu pengguna login sendiri di browser pane dan saya lanjutkan retest LANGSUNG di staging** — hasil di bagian "Hasil Retest Live di Staging" di bawah ini menggantikan dugaan sebelumnya dengan bukti nyata.
+
+---
+
+## Hasil Retest Live di Staging (11 Oktober 2026, setelah deploy)
+
+| Temuan | Status di Staging | Bukti |
+|---|---|---|
+| **Bagian A** — migration `cashier_approved_at`/`surat_jalan_ids` | ✅ **FIXED** | Buat DO & Buat Invoice (pilih SO-00005, pilih customer) berhasil tanpa error sama sekali; Subtotal/DPP auto-terisi normal |
+| **C.3** — batas harga SO Mandiri | ✅ **FIXED** | Coba simpan SO dengan harga Rp1.000 untuk COPPER ELBO 1 1/4'' → ditolak backend (`422`) dengan pesan **"Harga satuan... (Rp 1.000,00) di bawah batas harga minimum yang diizinkan (Rp 22.000,00)."**, DAN tampil sebagai banner merah di atas form + toast di bawah — bukan cuma di response API |
+| **C.4** — Return Product belum terkunci setelah SJ | ✅ **FIXED** | Dari 6 Delivery Order di sistem (4 sudah punya Surat Jalan, 2 belum), dropdown "From Order" di form Return Product **hanya menampilkan 2 DO yang belum ada SJ** — 4 yang sudah ber-SJ benar-benar tidak muncul |
+| **Laporan Stok Interaktif** | ✅ **FIXED** | `/admin/inventory-report-page` dimuat sempurna dengan data produk riil skala penuh |
+| **Transfer Stok** | ✅ **Tidak error** | Halaman Buat Transfer Stock dimuat normal tanpa error (tidak diuji submit penuh di staging) |
+| **Stock Opname — item tidak tampil** | ❌ **MASIH BERMASALAH** | Dibuka `SO-TEST-RL-HASSEE-20261007` (11 item riil): halaman **Lihat** sama sekali tidak menampilkan section "Items" (bahkan tidak kosong — section-nya tidak ada). Halaman **Ubah** justru menampilkan item dengan benar, LENGKAP dengan tombol aksi baru ("Mulai Hitung Fisik", "Tandai Selesai Hitung") yang tidak ada di kode lokal saya — bukti staging sudah pakai kode terbaru. Lihat analisis di bawah. |
+| **C.1** — saldo hutang salah | ⚠️ **BELUM BISA DIPASTIKAN** | Angka historis `PINV-TEST-RL-HASSEE-20261010` (Paid Rp48.871,11 / Outstanding Rp30.016,59) **tidak berubah** dari laporan tester — tapi ini wajar karena perbaikan kode tidak menghitung ulang data lama secara otomatis. Perlu salah satu: (a) koreksi manual satu kali untuk 2 invoice test ini, atau (b) skenario baru dari nol untuk memastikan kode yang sudah diperbaiki benar-benar aktif ke depan. |
+| **C.2** (retur dobel) & **C.5** (PO dari SO) | ⏳ **Belum diretest live** | Tidak sempat direproduksi ulang di staging (butuh skenario baru/data spesifik) — akar masalah di kode sudah teridentifikasi di bagian sebelumnya, status perbaikannya belum dikonfirmasi |
+
+### 🆕 Temuan BARU — Pencarian di daftar Invoice crash (bukan dari pengujian saya sebelumnya)
+
+Saat mencoba mencari `PINV-TEST-RL-HASSEE` di `/admin/invoices` (untuk investigasi C.1), muncul **halaman error 500 sungguhan** (bukan dari kesalahan saya — `APP_DEBUG` masih `true` di staging sehingga stack trace lengkap terlihat):
+
+```
+BadMethodCallException: Call to undefined method App\Models\PurchaseOrder::customer()
+app/Filament/Resources/InvoiceResource.php:434
+```
+
+**Root cause:** kolom "Customer" di tabel Invoice memakai `->searchable(query: fn ($query, $search) => $query->whereHas('fromModel.customer', ...))`. `fromModel` adalah relasi polymorphic yang bisa mengarah ke `SaleOrder` (punya `customer()`) ATAU `PurchaseOrder` (**tidak** punya `customer()` — yang ada `supplier()`). Mencari apa pun di daftar Invoice yang memuat baris Purchase Invoice akan crash. **Ini pola yang identik dengan C.5** (eager-load/query pada relasi polymorphic tanpa pembatasan tipe) — kemungkinan besar perlu ditambahkan sebagai **Pola 7** di dokumen sintesis.
+
+### Analisis: kenapa Stock Opname View rusak tapi Edit normal?
+
+Temuan paling mengejutkan di retest ini: pada file kode yang SAMA (sudah dikonfirmasi ter-deploy, terbukti dari fitur baru yang muncul di Edit), halaman **View** dan **Edit** untuk record yang SAMA berperilaku berbeda. Ini **bukan** pola "staging kode lama" seperti 3 temuan Bagian E sebelumnya (yang semuanya hilang begitu kode ter-update) — kode Stock Opname JELAS sudah versi baru.
+
+**Dugaan paling mungkin:** langkah deploy yang dijalankan (`git pull` + `migrate` + `artisan optimize/config/route/view:cache`) **tidak termasuk restart PHP-FPM/OPcache**, padahal `docs/production-deployment.md` sendiri eksplisit menyebut ini sebagai langkah terpisah dan wajib: *"Restart PHP-FPM, queue workers, and long-running application processes after the cache is rebuilt."* Dengan `opcache.validate_timestamps=0` (disarankan untuk produksi), PHP akan terus menjalankan bytecode LAMA untuk file yang sudah di-cache sampai proses PHP-FPM direstart — ini bisa menjelaskan kenapa sebagian halaman (yang kebetulan belum ter-cache/sudah ter-evict) tampil benar sementara halaman lain (masih pakai bytecode lama) tetap rusak, meski file sumbernya sudah berubah semua di disk.
+
+**Rekomendasi:** restart PHP-FPM (dan queue worker bila ada) di server staging, lalu reload halaman Stock Opname View untuk cek ulang.
 
 ---
 
