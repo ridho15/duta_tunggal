@@ -136,7 +136,7 @@ class StockTransferResource extends Resource
                                             return [];
                                         }
                                         return Product::whereHas('inventoryStock', function (Builder $q) use ($whId) {
-                                            $q->where('warehouse_id', $whId)->where('stock', '>', 0);
+                                            $q->where('warehouse_id', $whId)->where('qty_available', '>', 0);
                                         })->limit(50)->get()->mapWithKeys(fn (Product $p) => [$p->id => "({$p->sku}) {$p->name}"])->toArray();
                                     })
                                     ->getSearchResultsUsing(function (string $search, $get) {

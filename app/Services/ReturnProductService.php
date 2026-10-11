@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\ReturnProduct;
+use App\Models\ReturnProductItem;
 use App\Models\StockMovement;
 use App\Support\LineAmounts;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -263,6 +266,68 @@ class ReturnProductService
     public function createReturnProduct($fromModel, $data)
     {
         return $fromModel->returnProduct()->create($data);
+    }
+
+    /**
+     * D23: buat draft Return Product otomatis dari item yang ditandai reject saat "Konfirmasi Diterima" DO.
+     * Mengikuti pola PurchaseReturnService::createFromQualityControl() — draft, tidak auto-approve, dan
+     * dijaga tidak membuat duplikat (DeliveryOrder::returnProduct() adalah morphOne).
+     *
+     * @param  array<int, array{item_id?: int, qty_rejected?: float|string, notes?: string}>  $receivedItems
+     */
+    public function createFromDeliveryOrderReceiving(DeliveryOrder $deliveryOrder, array $receivedItems): ?ReturnProduct
+    {
+        $rejectedLines = collect($receivedItems)
+            ->filter(fn ($it) => (float) ($it['qty_rejected'] ?? 0) > 0 && !empty($it['item_id']));
+
+        if ($rejectedLines->isEmpty()) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($deliveryOrder, $rejectedLines) {
+            $locked = DeliveryOrder::lockForUpdate()->find($deliveryOrder->id);
+            $existing = $locked ? ReturnProduct::where('from_model_type', DeliveryOrder::class)
+                ->where('from_model_id', $locked->id)
+                ->first() : null;
+
+            if ($existing) {
+                Log::info('Return Product already exists for this Delivery Order, skip auto-create', [
+                    'delivery_order_id' => $deliveryOrder->id,
+                    'return_product_id' => $existing->id,
+                ]);
+                return $existing;
+            }
+
+            $returnProduct = ReturnProduct::create([
+                'return_number' => $this->generateReturnNumber(),
+                'from_model_id' => $deliveryOrder->id,
+                'from_model_type' => DeliveryOrder::class,
+                'warehouse_id' => $deliveryOrder->warehouse_id,
+                'status' => 'draft',
+                'reason' => 'Dibuat otomatis dari Konfirmasi Diterima DO ' . $deliveryOrder->do_number . ' (item ditandai reject saat penerimaan).',
+                'return_action' => 'reduce_quantity_only',
+            ]);
+
+            foreach ($rejectedLines as $line) {
+                $doItem = DeliveryOrderItem::with('warehouseSources')->find($line['item_id']);
+                if (! $doItem) {
+                    continue;
+                }
+
+                ReturnProductItem::create([
+                    'return_product_id' => $returnProduct->id,
+                    'from_item_model_id' => $doItem->id,
+                    'from_item_model_type' => DeliveryOrderItem::class,
+                    'product_id' => $doItem->product_id,
+                    'quantity' => (float) $line['qty_rejected'],
+                    'rak_id' => $doItem->warehouseSources->first()?->rak_id,
+                    'condition' => 'damage',
+                    'note' => $line['notes'] ?? 'Reject saat konfirmasi diterima di toko',
+                ]);
+            }
+
+            return $returnProduct;
+        });
     }
 
     public function generateReturnNumber()

@@ -50,6 +50,10 @@ class DeliveryOrderItem extends Model
         'quantity',
         'reason',
         'status',  // G-09: tracks item-level warehouse/delivery state
+        'qty_received',
+        'qty_shortage',
+        'qty_rejected',
+        'receiving_notes',
     ];
 
     public function deliveryOrder()

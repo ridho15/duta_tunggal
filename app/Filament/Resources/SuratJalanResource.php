@@ -112,8 +112,8 @@ class SuratJalanResource extends Resource
                                 return SaleOrder::query()
                                     ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
                                     ->whereIn('status', ['approved', 'processing', 'completed', 'partial'])
-                                    ->orderBy('order_number', 'desc')
-                                    ->pluck('order_number', 'id');
+                                    ->orderBy('so_number', 'desc')
+                                    ->pluck('so_number', 'id');
                             })
                             ->reactive()
                             ->dehydrated(false)

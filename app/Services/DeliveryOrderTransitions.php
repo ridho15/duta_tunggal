@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\DeliveryOrderTransitionException;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryOrderLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -129,6 +130,22 @@ class DeliveryOrderTransitions
             if ($status === 'received') {
                 $attributes['received_at'] = $options['received_at'] ?? now();
                 $attributes['received_by_name'] = filled($options['received_by'] ?? null) ? trim((string) $options['received_by']) : null;
+
+                // D23: simpan rincian qty diterima/kurang/reject per item (bukan cuma ringkasan teks di log).
+                foreach ((array) ($options['received_items'] ?? []) as $receivedItem) {
+                    $itemId = $receivedItem['item_id'] ?? null;
+                    if (! $itemId) {
+                        continue;
+                    }
+                    DeliveryOrderItem::where('id', $itemId)
+                        ->where('delivery_order_id', $locked->id)
+                        ->update([
+                            'qty_received' => $receivedItem['qty_received'] ?? null,
+                            'qty_shortage' => $receivedItem['qty_shortage'] ?? 0,
+                            'qty_rejected' => $receivedItem['qty_rejected'] ?? 0,
+                            'receiving_notes' => $receivedItem['notes'] ?? null,
+                        ]);
+                }
             }
 
             self::$stack[] = [

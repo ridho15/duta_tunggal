@@ -627,7 +627,7 @@ class SalesOrderService
         }
 
         $deliveryOrder = $saleOrder->deliveryOrder()->create([
-            'do_number'     => $this->generateDoNumber(),
+            'do_number'     => $this->generateDoNumber($warehouseId),
             'delivery_date' => $deliveryData['delivery_date'],
             'warehouse_id'  => $warehouseId,
             'driver_id'     => $driverId,
@@ -656,8 +656,8 @@ class SalesOrderService
         return true;
     }
 
-    public function generateDoNumber()
+    public function generateDoNumber(?int $warehouseId = null)
     {
-        return \App\Services\DeliveryOrderService::generateStaticDoNumber();
+        return \App\Services\DeliveryOrderService::generateStaticDoNumber(null, $warehouseId);
     }
 }

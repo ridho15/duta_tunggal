@@ -148,7 +148,8 @@ class SalesInvoiceResource extends Resource
 
     /**
      * Memeriksa apakah field invoice harus dikunci (status non-draft).
-     * Super Admin diizinkan mengedit untuk keperluan koreksi darurat.
+     * Invoice non-draft (posted, unpaid, paid, cancelled) terkunci mutlak demi integritas jurnal.
+     * Koreksi finansial harus dilakukan melalui Credit Note / Debit Note.
      */
     public static function isInvoiceFieldLocked(?Invoice $record): bool
     {
@@ -156,8 +157,7 @@ class SalesInvoiceResource extends Resource
             return false;
         }
 
-        return strtolower((string) $record->status) !== Invoice::STATUS_DRAFT
-            && ! (bool) Auth::user()?->hasRole('Super Admin');
+        return strtolower((string) $record->status) !== Invoice::STATUS_DRAFT;
     }
 
     public static function form(Form $form): Form
@@ -1273,7 +1273,7 @@ class SalesInvoiceResource extends Resource
                 ActionGroup::make([
                     ViewAction::make(),
                     EditAction::make()
-                        ->visible(fn ($record) => strtolower((string) $record->status) === \App\Models\Invoice::STATUS_DRAFT || (bool) Auth::user()?->hasRole('Super Admin')),
+                        ->visible(fn ($record) => strtolower((string) $record->status) === \App\Models\Invoice::STATUS_DRAFT),
                     Tables\Actions\Action::make('print_invoice')
                         ->label('Preview Invoice')
                         ->icon('heroicon-o-document-text')

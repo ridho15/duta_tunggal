@@ -127,7 +127,7 @@ class DeliveryOrderResource extends Resource
                                 ->tooltip('Generate DO Number')
                                 ->action(function ($set, $get, $state) {
                                     $deliveryOrderService = app(DeliveryOrderService::class);
-                                    $set('do_number', $deliveryOrderService->generateDoNumber());
+                                    $set('do_number', $deliveryOrderService->generateDoNumber($get('warehouse_id')));
                                 }))
                             ->required()
                             ->validationMessages([
@@ -244,9 +244,19 @@ class DeliveryOrderResource extends Resource
                                                 $fallbackWarehouseId = $saleOrderItem->warehouse_id;
                                                 if (!$fallbackWarehouseId) {
                                                     $cabangId = $saleOrder->cabang_id ?? Auth::user()?->cabang_id;
-                                                    $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
-                                                        ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
-                                                        ->value('id');
+                                                    // Pilih gudang dengan stok bebas terbanyak untuk produk ini, bukan gudang aktif pertama secara acak.
+                                                    $fallbackWarehouseId = InventoryStock::query()
+                                                        ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
+                                                        ->where('inventory_stocks.product_id', $saleOrderItem->product_id)
+                                                        ->where('warehouses.status', 1)
+                                                        ->when($cabangId, fn ($q) => $q->where('warehouses.cabang_id', $cabangId))
+                                                        ->orderByRaw('(inventory_stocks.qty_available - inventory_stocks.qty_reserved) desc')
+                                                        ->value('inventory_stocks.warehouse_id');
+                                                    if (!$fallbackWarehouseId) {
+                                                        $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
+                                                            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                                                            ->value('id');
+                                                    }
                                                 }
                                                 if ($fallbackWarehouseId) {
                                                     $warehouseSources = [
@@ -365,7 +375,13 @@ class DeliveryOrderResource extends Resource
                                                         if ($warehouseSources->isEmpty()) {
                                                             $saleOrderItem = $soItems->get($deliveryItem['sale_order_item_id']);
                                                             $productName = $saleOrderItem?->product?->name ?? "Item";
-                                                            $fail("Pilih minimal satu gudang sumber pengiriman untuk item '{$productName}'.");
+                                                            $message = "Pilih minimal satu gudang sumber pengiriman untuk item '{$productName}'.";
+                                                            \Filament\Notifications\Notification::make()
+                                                                ->title('Validation Error')
+                                                                ->body($message)
+                                                                ->danger()
+                                                                ->send();
+                                                            $fail($message);
                                                             return;
                                                         }
 
@@ -374,7 +390,13 @@ class DeliveryOrderResource extends Resource
                                                         });
 
                                                         if (abs($sourceQty - (float) $deliveryItem['quantity']) > 0.0001) {
-                                                            $fail('Total qty sumber gudang harus sama dengan quantity item delivery order.');
+                                                            $message = 'Total qty sumber gudang harus sama dengan quantity item delivery order.';
+                                                            \Filament\Notifications\Notification::make()
+                                                                ->title('Validation Error')
+                                                                ->body($message)
+                                                                ->danger()
+                                                                ->send();
+                                                            $fail($message);
                                                             return;
                                                         }
 
@@ -382,7 +404,13 @@ class DeliveryOrderResource extends Resource
                                                                 $sourceWarehouseId = $source['warehouse_id'] ?? null;
                                                                 $sourceQtyItem = (float) ($source['quantity'] ?? 0);
                                                                 if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
-                                                                    $fail('Setiap sumber gudang wajib memiliki gudang dan qty > 0.');
+                                                                    $message = 'Setiap sumber gudang wajib memiliki gudang dan qty > 0.';
+                                                                    \Filament\Notifications\Notification::make()
+                                                                        ->title('Validation Error')
+                                                                        ->body($message)
+                                                                        ->danger()
+                                                                        ->send();
+                                                                    $fail($message);
                                                                     return;
                                                                 }
 
@@ -390,7 +418,14 @@ class DeliveryOrderResource extends Resource
                                                                 $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $sourceWarehouseId, !empty($deliveryItem['sale_order_item_id']) ? (int) $deliveryItem['sale_order_item_id'] : null);
 
                                                                 if ((float) $availableStock < $sourceQtyItem) {
-                                                                    $fail('Stock tidak mencukupi pada salah satu sumber gudang item delivery order.');
+                                                                    $productName = $soItems->get($deliveryItem['sale_order_item_id'])?->product?->name ?? 'produk';
+                                                                    $message = "Stok {$productName} tidak mencukupi di gudang sumber (tersedia {$availableStock}, diminta {$sourceQtyItem}).";
+                                                                    \Filament\Notifications\Notification::make()
+                                                                        ->title('Validation Error')
+                                                                        ->body($message)
+                                                                        ->danger()
+                                                                        ->send();
+                                                                    $fail($message);
                                                                     return;
                                                                 }
                                                             }

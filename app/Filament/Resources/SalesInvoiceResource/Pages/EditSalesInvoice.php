@@ -18,12 +18,11 @@ class EditSalesInvoice extends EditRecord
         parent::mount($record);
 
         $isDraft = strtolower((string) $this->record->status) === \App\Models\Invoice::STATUS_DRAFT;
-        $isSuperAdmin = (bool) auth()->user()?->hasRole('Super Admin');
 
-        if (! $isDraft && ! $isSuperAdmin) {
+        if (! $isDraft) {
             \Filament\Notifications\Notification::make()
                 ->title('Invoice tidak dapat diedit')
-                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$this->record->status] ?? $this->record->status) . '" telah diposting dan terkunci. Hanya Super Admin yang berhak melakukan koreksi darurat.')
+                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$this->record->status] ?? $this->record->status) . '" telah diposting dan terkunci demi integritas jurnal. Koreksi finansial harus dilakukan melalui Credit Note.')
                 ->danger()
                 ->send();
 
@@ -32,19 +31,18 @@ class EditSalesInvoice extends EditRecord
     }
 
     /**
-     * Izinkan akses edit hanya untuk status draft, ATAU Super Admin untuk koreksi darurat.
+     * Izinkan akses edit hanya untuk status draft.
      * Mencegah bypass via URL langsung (mis. /admin/sales-invoices/1/edit).
      */
     public function authorizeAccess(): void
     {
         $record = $this->getRecord();
         $isDraft = strtolower((string) $record->status) === \App\Models\Invoice::STATUS_DRAFT;
-        $isSuperAdmin = (bool) auth()->user()?->hasRole('Super Admin');
 
-        if (! $isDraft && ! $isSuperAdmin) {
+        if (! $isDraft) {
             \Filament\Notifications\Notification::make()
                 ->title('Invoice tidak dapat diedit')
-                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$record->status] ?? $record->status) . '" telah diposting dan terkunci. Hanya Super Admin yang berhak melakukan koreksi darurat.')
+                ->body('Invoice dengan status "' . (\App\Models\Invoice::STATUS_LABELS[$record->status] ?? $record->status) . '" telah diposting dan terkunci demi integritas jurnal. Koreksi finansial harus dilakukan melalui Credit Note.')
                 ->danger()
                 ->send();
 
@@ -147,10 +145,9 @@ class EditSalesInvoice extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $isDraft = strtolower((string) $this->record->status) === \App\Models\Invoice::STATUS_DRAFT;
-        $isSuperAdmin = (bool) auth()->user()?->hasRole('Super Admin');
 
-        if (! $isDraft && ! $isSuperAdmin) {
-            throw new \Illuminate\Auth\Access\AuthorizationException('Invoice yang sudah diposting hanya dapat diedit oleh Super Admin.');
+        if (! $isDraft) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('Invoice yang sudah diposting terkunci dan tidak dapat diedit. Gunakan Credit Note untuk koreksi.');
         }
 
         $data['tipe_pajak'] = \App\Filament\Resources\SalesInvoiceResource::normalizeInvoiceTaxTypeValue($data['tipe_pajak'] ?? null);

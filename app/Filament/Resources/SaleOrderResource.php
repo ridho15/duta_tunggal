@@ -1881,15 +1881,29 @@ class SaleOrderResource extends Resource
                         ->modalDescription(function ($record) {
                             $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
                             $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
-                            return "Konfirmasi penerimaan titipan/pembayaran COD untuk SO {$record->so_number} ({$cust} - {$total}). Setelah diverifikasi oleh Kasir, Delivery Order (DO) baru dapat diterbitkan.";
+                            $depositBalance = (float) ($record->customer?->deposit?->remaining_amount ?? 0);
+                            $depositBalanceStr = 'Rp ' . self::formatMoneyPreviewState($depositBalance);
+                            $description = "Konfirmasi penerimaan titipan/pembayaran COD untuk SO {$record->so_number} ({$cust} - {$total}). Saldo Titip Customer saat ini: {$depositBalanceStr}.";
+                            if ($depositBalance < (float) ($record->total_amount ?? 0)) {
+                                $description .= ' ⚠️ Saldo titip customer LEBIH KECIL dari total SO ini — pastikan titipan/pembayaran benar-benar sudah diterima sebelum verifikasi.';
+                            }
+                            return $description . ' Setelah diverifikasi oleh Kasir, Delivery Order (DO) baru dapat diterbitkan.';
                         })
                         ->modalSubmitActionLabel('Verifikasi & Setujui')
-                        ->form([
-                            \Filament\Forms\Components\Textarea::make('cashier_note')
-                                ->label('Catatan Kasir')
-                                ->placeholder('Contoh: DP / Titipan pembayaran tunai/transfer telah diterima kasir')
-                                ->rows(2),
-                        ])
+                        ->form(function ($record) {
+                            $depositBalance = (float) ($record->customer?->deposit?->remaining_amount ?? 0);
+                            return [
+                                \Filament\Forms\Components\Textarea::make('cashier_note')
+                                    ->label('Catatan Kasir')
+                                    ->placeholder('Contoh: DP / Titipan pembayaran tunai/transfer telah diterima kasir')
+                                    ->rows(2),
+                                \Filament\Forms\Components\Toggle::make('use_deposit')
+                                    ->label('Pakai Saldo Titip Customer untuk transaksi ini')
+                                    ->helperText("Saldo tersedia saat ini: Rp " . self::formatMoneyPreviewState($depositBalance) . '. Saldo akan dikurangi sebesar total SO (atau sisa saldo, mana yang lebih kecil).')
+                                    ->default($depositBalance > 0)
+                                    ->visible($depositBalance > 0),
+                            ];
+                        })
                         ->visible(function ($record) {
                             if (! $record->isCod() || $record->isCashierApproved()) {
                                 return false;
@@ -1902,11 +1916,32 @@ class SaleOrderResource extends Resource
                                 || $user->hasPermissionTo('update sales order');
                         })
                         ->action(function ($record, array $data = []) {
-                            $record->update([
-                                'cashier_approved_by' => Auth::id(),
-                                'cashier_approved_at' => now(),
-                                'cashier_note' => $data['cashier_note'] ?? null,
-                            ]);
+                            DB::transaction(function () use ($record, $data) {
+                                $record->update([
+                                    'cashier_approved_by' => Auth::id(),
+                                    'cashier_approved_at' => now(),
+                                    'cashier_note' => $data['cashier_note'] ?? null,
+                                ]);
+
+                                $deposit = $record->customer?->deposit;
+                                if (($data['use_deposit'] ?? false) && $deposit && $deposit->id && (float) $deposit->remaining_amount > 0) {
+                                    $useAmount = min((float) $deposit->remaining_amount, (float) ($record->total_amount ?? 0));
+                                    if ($useAmount > 0) {
+                                        $deposit->update([
+                                            'used_amount' => (float) $deposit->used_amount + $useAmount,
+                                            'remaining_amount' => (float) $deposit->remaining_amount - $useAmount,
+                                        ]);
+                                        $deposit->depositLog()->create([
+                                            'type' => 'use',
+                                            'reference_type' => \App\Models\SaleOrder::class,
+                                            'reference_id' => $record->id,
+                                            'amount' => $useAmount,
+                                            'note' => "Dipakai untuk verifikasi kasir COD SO {$record->so_number}" . (filled($data['cashier_note'] ?? null) ? " ({$data['cashier_note']})" : ''),
+                                            'created_by' => Auth::id(),
+                                        ]);
+                                    }
+                                }
+                            });
 
                             HelperController::sendNotification(
                                 isSuccess: true,
@@ -2038,7 +2073,7 @@ class SaleOrderResource extends Resource
                                         ->label('COA')
                                         ->preload()
                                         ->searchable()
-                                        ->options(ChartOfAccount::orderBy('code')->get()->mapWithKeys(function ($coa) {
+                                        ->options(ChartOfAccount::where('is_cash_bank', true)->orderBy('code')->get()->mapWithKeys(function ($coa) {
                                             return [$coa->id => "({$coa->code}) {$coa->name}"];
                                         }))
                                         ->required(),

@@ -101,8 +101,8 @@ class DeliveryOrderActions
                     ->label('Pemeriksaan Qty Diterima, Kurang, & Reject')
                     ->schema([
                         Hidden::make('item_id'),
-                        TextInput::make('product_name')->label('Produk')->disabled()->columnSpan(3),
-                        TextInput::make('qty_sent')->label('Qty Dikirim')->disabled()->columnSpan(2),
+                        TextInput::make('product_name')->label('Produk')->disabled()->dehydrated(true)->columnSpan(3), // Required to save disabled values
+                        TextInput::make('qty_sent')->label('Qty Dikirim')->disabled()->dehydrated(true)->columnSpan(2), // Required to save disabled values
                         TextInput::make('qty_received')->label('Qty Diterima')->numeric()->required()->minValue(0)->columnSpan(2),
                         TextInput::make('qty_shortage')->label('Qty Kurang')->numeric()->default(0)->minValue(0)->columnSpan(2),
                         TextInput::make('qty_rejected')->label('Qty Reject')->numeric()->default(0)->minValue(0)->columnSpan(2),
@@ -126,21 +126,41 @@ class DeliveryOrderActions
                     }),
             ])
             ->action(function ($record, array $data) {
-                $itemSummaries = collect($data['received_items'] ?? [])->map(function ($it) {
+                $receivedItems = $data['received_items'] ?? [];
+                $itemSummaries = collect($receivedItems)->map(function ($it) {
                     $note = filled($it['notes'] ?? null) ? " (Ket: {$it['notes']})" : '';
                     return "{$it['product_name']}: Diterima {$it['qty_received']}, Kurang {$it['qty_shortage']}, Reject {$it['qty_rejected']}{$note}";
                 })->implode(" | ");
 
+                $returnProduct = null;
                 self::run(
-                    fn () => app(DeliveryOrderTransitions::class)->to($record, 'received', [
-                        'received_at' => $data['received_at'] ?? now(),
-                        'received_by' => $data['received_by'] ?? null,
-                        'reason' => $itemSummaries ?: null,
-                        'source' => 'action',
-                    ]),
+                    function () use ($record, $data, $receivedItems, $itemSummaries, &$returnProduct) {
+                        app(DeliveryOrderTransitions::class)->to($record, 'received', [
+                            'received_at' => $data['received_at'] ?? now(),
+                            'received_by' => $data['received_by'] ?? null,
+                            'received_items' => $receivedItems,
+                            'reason' => $itemSummaries ?: null,
+                            'source' => 'action',
+                        ]);
+
+                        $hasRejected = collect($receivedItems)->sum(fn ($it) => (float) ($it['qty_rejected'] ?? 0)) > 0;
+                        if ($hasRejected) {
+                            $returnProduct = app(\App\Services\ReturnProductService::class)
+                                ->createFromDeliveryOrderReceiving($record, $receivedItems);
+                        }
+                    },
                     'Penerimaan Dicatat',
                     "DO {$record->do_number} dicatat diterima oleh {$data['received_by']}." . ($itemSummaries ? " Rincian item telah disimpan." : '')
                 );
+
+                if ($returnProduct) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Retur Otomatis Dibuat')
+                        ->body("Ada item reject pada penerimaan ini — draft Return Product {$returnProduct->return_number} telah dibuat. Silakan lengkapi dan setujui lewat menu Return Product.")
+                        ->persistent()
+                        ->send();
+                }
             });
     }
 

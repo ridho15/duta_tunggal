@@ -159,23 +159,34 @@ class DeliveryOrderService
         return $warehouseConfirmation;
     }
 
-    public function generateDoNumber()
+    public function generateDoNumber(?int $warehouseId = null)
     {
-        return static::generateStaticDoNumber();
+        return static::generateStaticDoNumber(null, $warehouseId);
     }
 
     /**
      * Static version so models / observers can call it without injecting the service.
+     *
+     * E.1 (feedback Ko Handy, retest 11 Okt): bila $warehouseId diketahui, counter dibuat per gudang per hari
+     * (format DO-{KODE_GUDANG}-{YYYYMMDD}-{SEQ2}) supaya tiap gudang punya urutan sendiri mulai dari 01.
+     * Bila gudang belum diketahui saat nomor dibuat (mis. sebelum Sales Order dipilih di form), tetap pakai
+     * format lama (counter global per hari) sebagai fallback — dipanggil ulang dengan $warehouseId begitu
+     * gudang sudah pasti (lihat CreateDeliveryOrder::mutateFormDataBeforeCreate()).
      */
-    public static function generateStaticDoNumber(?int $cabangId = null): string
+    public static function generateStaticDoNumber(?int $cabangId = null, ?int $warehouseId = null): string
     {
         // T4.1 (flag central_numbering): penomoran terpusat DO-{KODECABANG}-{YYMM}-{SEQ4}, atomik.
         if (DocumentNumberService::enabled()) {
             return app(DocumentNumberService::class)->next('delivery_order', $cabangId);
         }
 
-        $date   = now()->format('Ymd');
-        $prefix = 'DO-' . $date . '-';
+        $date = now()->format('Ymd');
+
+        $warehouseCode = $warehouseId ? \App\Models\Warehouse::where('id', $warehouseId)->value('kode') : null;
+        $prefix = $warehouseCode
+            ? 'DO-' . $warehouseCode . '-' . $date . '-'
+            : 'DO-' . $date . '-';
+        $padLength = $warehouseCode ? 2 : 4;
 
         // Sequential approach: no infinite-loop risk, works across branches
         $max = DeliveryOrder::withoutGlobalScopes()
@@ -190,7 +201,7 @@ class DeliveryOrderService
             }
         }
 
-        return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($next, $padLength, '0', STR_PAD_LEFT);
     }
 
     /**

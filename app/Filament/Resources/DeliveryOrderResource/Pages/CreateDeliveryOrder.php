@@ -119,6 +119,12 @@ class CreateDeliveryOrder extends CreateRecord
                     $data['warehouse_id'] = $fallbackWarehouseId;
                 }
             }
+
+            // E.1: nomor DO belum warehouse-aware (tombol "Generate" diklik sebelum gudang diketahui) — buat ulang
+            // sekarang gudang sudah pasti. Hanya untuk nomor pola lama DO-YYYYMMDD-SEQ4 (auto-generate), bukan yang diubah manual.
+            if (!empty($data['warehouse_id']) && !empty($data['do_number']) && preg_match('/^DO-\d{8}-\d{4}$/', $data['do_number'])) {
+                $data['do_number'] = \App\Services\DeliveryOrderService::generateStaticDoNumber(null, (int) $data['warehouse_id']);
+            }
         }
 
         // Validate delivery order items against all selected sales orders
@@ -149,9 +155,19 @@ class CreateDeliveryOrder extends CreateRecord
                             $fallbackWarehouseId = $saleOrderItem->warehouse_id;
                             if (!$fallbackWarehouseId) {
                                 $cabangId = $saleOrder->cabang_id ?? Auth::user()?->cabang_id;
-                                $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
-                                    ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
-                                    ->value('id');
+                                // Pilih gudang dengan stok bebas terbanyak untuk produk ini, bukan gudang aktif pertama secara acak.
+                                $fallbackWarehouseId = InventoryStock::query()
+                                    ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
+                                    ->where('inventory_stocks.product_id', $saleOrderItem->product_id)
+                                    ->where('warehouses.status', 1)
+                                    ->when($cabangId, fn ($q) => $q->where('warehouses.cabang_id', $cabangId))
+                                    ->orderByRaw('(inventory_stocks.qty_available - inventory_stocks.qty_reserved) desc')
+                                    ->value('inventory_stocks.warehouse_id');
+                                if (!$fallbackWarehouseId) {
+                                    $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
+                                        ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                                        ->value('id');
+                                }
                             }
                             if ($fallbackWarehouseId) {
                                 $warehouseSources = [
@@ -277,8 +293,15 @@ class CreateDeliveryOrder extends CreateRecord
 
                 $warehouseSources = collect($item['warehouseSources'] ?? []);
                 if ($warehouseSources->isEmpty()) {
+                    $message = "Item delivery order #" . ($index + 1) . ": Pilih minimal satu gudang sumber pengiriman.";
+                    Notification::make()
+                        ->title('Validation Error')
+                        ->body($message)
+                        ->danger()
+                        ->send();
+
                     $validator = Validator::make([], []);
-                    $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Pilih minimal satu gudang sumber pengiriman.");
+                    $validator->errors()->add('deliveryOrderItem', $message);
                     throw new ValidationException($validator);
                 }
 
@@ -286,31 +309,54 @@ class CreateDeliveryOrder extends CreateRecord
                     return (float) ($source['quantity'] ?? 0);
                 });
 
-                    if (abs($sourceQty - $quantity) > 0.0001) {
+                if (abs($sourceQty - $quantity) > 0.0001) {
+                    $message = "Item delivery order #" . ($index + 1) . ": Total kuantitas sumber gudang ({$sourceQty}) harus sama dengan kuantitas item delivery order ({$quantity}).";
+                    Notification::make()
+                        ->title('Validation Error')
+                        ->body($message)
+                        ->danger()
+                        ->send();
+
+                    $validator = Validator::make([], []);
+                    $validator->errors()->add('deliveryOrderItem', $message);
+                    throw new ValidationException($validator);
+                }
+
+                foreach ($warehouseSources as $sourceIndex => $source) {
+                    $sourceWarehouseId = $source['warehouse_id'] ?? null;
+                    $sourceQtyItem = (float) ($source['quantity'] ?? 0);
+
+                    if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
+                        $message = "Item delivery order #" . ($index + 1) . ", sumber #" . ($sourceIndex + 1) . ": Gudang dan kuantitas (> 0) wajib diisi.";
+                        Notification::make()
+                            ->title('Validation Error')
+                            ->body($message)
+                            ->danger()
+                            ->send();
+
                         $validator = Validator::make([], []);
-                        $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Total qty sumber gudang harus sama dengan quantity item.");
+                        $validator->errors()->add('deliveryOrderItem', $message);
                         throw new ValidationException($validator);
                     }
 
-                    foreach ($warehouseSources as $sourceIndex => $source) {
-                        $sourceWarehouseId = $source['warehouse_id'] ?? null;
-                        $sourceQtyItem = (float) ($source['quantity'] ?? 0);
+                    $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, $saleOrderItemId ? (int) $saleOrderItemId : null);   // stok bebas + reservasi milik SO ini
 
-                        if (!$sourceWarehouseId || $sourceQtyItem <= 0) {
-                            $validator = Validator::make([], []);
-                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: gudang dan qty > 0 wajib diisi.");
-                            throw new ValidationException($validator);
-                        }
+                    if ((float) $availableStock < $sourceQtyItem) {
+                        $productName = $saleOrderItem->product->name ?? 'produk';
+                        $whName = \App\Models\Warehouse::find($sourceWarehouseId)?->name ?? "Gudang #{$sourceWarehouseId}";
+                        $message = "Stok {$productName} tidak mencukupi di {$whName} (tersedia: {$availableStock}, diminta: {$sourceQtyItem}).";
+                        Notification::make()
+                            ->title('Validation Error')
+                            ->body($message)
+                            ->danger()
+                            ->send();
 
-                        $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, $saleOrderItemId ? (int) $saleOrderItemId : null);   // stok bebas + reservasi milik SO ini
-
-                        if ((float) $availableStock < $sourceQtyItem) {
-                            $validator = Validator::make([], []);
-                            $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}, sumber #{$sourceIndex}: stok tidak mencukupi di gudang sumber.");
-                            throw new ValidationException($validator);
-                        }
+                        $validator = Validator::make([], []);
+                        $validator->errors()->add('deliveryOrderItem', $message);
+                        throw new ValidationException($validator);
                     }
                 }
+            }
 
             // Check for duplicate sale order items
             $saleOrderItemIds = collect($deliveryItems)->pluck('sale_order_item_id')->filter();
