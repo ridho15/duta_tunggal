@@ -109,7 +109,6 @@ class StockTransferResource extends Resource
                             ->schema([
                                 Select::make('product_id')
                                     ->label('Product')
-                                    ->preload()
                                     ->searchable()
                                     ->live()
                                     ->helperText(function ($get) {
@@ -127,15 +126,18 @@ class StockTransferResource extends Resource
 
                                         return "Rak Default: -";
                                     })
-                                    ->options(function ($get) {
-                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
-                                        $query = Product::query();
-                                        if ($whId) {
-                                            $query->whereHas('inventoryStock', function (Builder $q) use ($whId) {
-                                                $q->where('warehouse_id', $whId);
-                                            });
+                                    ->getOptionLabelUsing(fn ($value): ?string => ($p = Product::find($value)) ? "({$p->sku}) {$p->name}" : null)
+                                    ->options(function ($get, $state) {
+                                        if ($state && ($p = Product::find($state))) {
+                                            return [$p->id => "({$p->sku}) {$p->name}"];
                                         }
-                                        return $query->get()->mapWithKeys(fn (Product $p) => [$p->id => "({$p->sku}) {$p->name}"])->toArray();
+                                        $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');
+                                        if (! $whId) {
+                                            return [];
+                                        }
+                                        return Product::whereHas('inventoryStock', function (Builder $q) use ($whId) {
+                                            $q->where('warehouse_id', $whId)->where('stock', '>', 0);
+                                        })->limit(50)->get()->mapWithKeys(fn (Product $p) => [$p->id => "({$p->sku}) {$p->name}"])->toArray();
                                     })
                                     ->getSearchResultsUsing(function (string $search, $get) {
                                         $whId = $get('from_warehouse_id') ?: $get('../../from_warehouse_id');

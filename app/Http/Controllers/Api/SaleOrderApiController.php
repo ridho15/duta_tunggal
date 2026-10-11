@@ -360,6 +360,23 @@ class SaleOrderApiController extends Controller
         $headerData = $validated['header'];
         $itemsData = $validated['items'];
 
+        // Validasi batas harga bawah (bottom price limitation) untuk setiap produk
+        foreach ($itemsData as $idx => $item) {
+            $product = Product::find($item['product_id']);
+            if ($product) {
+                $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                if ($priceErr) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $priceErr,
+                        'errors' => [
+                            "items.{$idx}.unit_price" => [$priceErr],
+                        ],
+                    ], 422);
+                }
+            }
+        }
+
         // SO baru dari quotation: quotation harus Approved, belum kedaluwarsa, dan belum digantikan revisi.
         if (! empty($headerData['quotation_id'])) {
             $this->salesOrderService->assertQuotationUsable(Quotation::findOrFail($headerData['quotation_id']), 'header.quotation_id');
@@ -608,6 +625,23 @@ class SaleOrderApiController extends Controller
 
         $headerData = $validated['header'];
         $itemsData = $validated['items'];
+
+        // Validasi batas harga bawah (bottom price limitation) untuk setiap produk
+        foreach ($itemsData as $idx => $item) {
+            $product = Product::find($item['product_id']);
+            if ($product) {
+                $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                if ($priceErr) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $priceErr,
+                        'errors' => [
+                            "items.{$idx}.unit_price" => [$priceErr],
+                        ],
+                    ], 422);
+                }
+            }
+        }
 
         // Quotation acuan yang DIGANTI harus masih dapat dipakai (quotation yang sama seperti semula tidak diperiksa ulang).
         if (! empty($headerData['quotation_id']) && (int) $headerData['quotation_id'] !== (int) $saleOrder->quotation_id) {

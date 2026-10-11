@@ -451,6 +451,19 @@ class SaleOrderResource extends Resource
             $item['unit_price'] = $unitPrice;
             $item['subtotal'] = static::formatCurrencyPreviewState($preview['subtotal'], $itemCurrencyId);
             $item['tax_nominal'] = static::formatCurrencyPreviewState($preview['tax_nominal'], $itemCurrencyId);
+
+            if (! empty($item['product_id'])) {
+                $product = \App\Models\Product::find($item['product_id']);
+                if ($product) {
+                    $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPrice);
+                    if ($priceErr) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'saleOrderItem' => $priceErr,
+                        ]);
+                    }
+                }
+            }
+
             $items[] = $item;
         }
 
@@ -1284,6 +1297,32 @@ class SaleOrderResource extends Resource
                                         'required' => 'Unit Price harus diisi',
                                         'numeric' => 'Unit Price tidak valid !'
                                     ])
+                                    ->rules([
+                                        fn (Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                            $productId = $get('product_id');
+                                            if (! $productId) {
+                                                return;
+                                            }
+                                            $product = \App\Models\Product::find($productId);
+                                            if (! $product) {
+                                                return;
+                                            }
+                                            $unitPriceNumeric = (float) static::parseCurrencyState($value ?? 0);
+                                            $error = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPriceNumeric);
+                                            if ($error) {
+                                                $fail($error);
+                                            }
+                                        }
+                                    ])
+                                    ->helperText(function (Get $get) {
+                                        $productId = $get('product_id');
+                                        if (! $productId) return null;
+                                        $product = \App\Models\Product::find($productId);
+                                        if (! $product) return null;
+                                        $floor = \App\Support\ProductPriceLimitation::getMinimumAllowedPrice($product);
+                                        if ($floor <= 0) return null;
+                                        return "Batas harga minimum: Rp " . number_format($floor, 0, ',', '.');
+                                    })
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         $currencyId = static::resolveItemCurrencyId($get('currency_id'));
                                         $qty = (float)($get('quantity') ?? 0);

@@ -41,6 +41,7 @@ use Filament\Tables\Filters\Filter;
 use Illuminate\Validation\ValidationException;
 use App\Models\Customer;
 use App\Models\Cabang;
+use App\Models\SaleOrder;
 
 class SuratJalanResource extends Resource
 {
@@ -88,9 +89,44 @@ class SuratJalanResource extends Resource
                             ])
                             ->helperText('Tanggal surat jalan dibuat')
                             ->required(),
+                        Select::make('filter_customer_id')
+                            ->label('1. Filter Customer')
+                            ->placeholder('Pilih Customer...')
+                            ->helperText('Pilih customer untuk menampilkan Delivery Order yang tersedia.')
+                            ->searchable()
+                            ->options(fn () => Customer::orderBy('name')->pluck('name', 'id'))
+                            ->default(fn (?SuratJalan $record) => $record?->deliveryOrder->first()?->salesOrders->first()?->customer_id)
+                            ->reactive()
+                            ->dehydrated(false)
+                            ->afterStateUpdated(function ($state, $set) {
+                                $set('filter_sale_order_id', null);
+                                $set('deliveryOrder', []);
+                            }),
+                        Select::make('filter_sale_order_id')
+                            ->label('2. Filter Sales Order (Opsional)')
+                            ->placeholder('Pilih Sales Order (opsional)...')
+                            ->helperText('Opsional: persempit pilihan DO hanya dari Sales Order tertentu.')
+                            ->searchable()
+                            ->options(function ($get, ?SuratJalan $record) {
+                                $customerId = $get('filter_customer_id') ?? $record?->deliveryOrder->first()?->salesOrders->first()?->customer_id;
+                                return SaleOrder::query()
+                                    ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+                                    ->whereIn('status', ['approved', 'processing', 'completed', 'partial'])
+                                    ->orderBy('order_number', 'desc')
+                                    ->pluck('order_number', 'id');
+                            })
+                            ->reactive()
+                            ->dehydrated(false)
+                            ->afterStateUpdated(fn ($state, $set) => $set('deliveryOrder', [])),
                         Select::make('deliveryOrder')
-                            ->label('Delivery Order (Boleh > 1 DO)')
-                            ->helperText('1 Surat Jalan boleh terdiri dari >1 DO dengan syarat Customer dan Cabang sama.')
+                            ->label('3. Delivery Order (Boleh > 1 DO)')
+                            ->helperText(function ($get) {
+                                if (! $get('filter_customer_id')) {
+                                    return 'Pilih Customer di atas terlebih dahulu untuk menampilkan Delivery Order yang tersedia.';
+                                }
+                                return 'Pilih satu atau lebih DO untuk customer ini (Customer & Cabang harus sama).';
+                            })
+                            ->placeholder(fn ($get, ?SuratJalan $record) => (! $record?->getKey() && empty($get('filter_customer_id'))) ? 'Pilih Customer terlebih dahulu...' : 'Pilih Delivery Order...')
                             ->searchable()
                             ->preload()
                             ->required()
@@ -103,6 +139,19 @@ class SuratJalanResource extends Resource
                                     $q->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES)
                                         ->when($record?->getKey(), fn (Builder $q, $id) => $q->where('surat_jalans.id', '!=', $id));
                                 });
+
+                                $customerId = $get('filter_customer_id') ?? $record?->deliveryOrder->first()?->salesOrders->first()?->customer_id;
+                                if ($customerId) {
+                                    $query->whereHas('salesOrders', fn ($q) => $q->where('customer_id', $customerId));
+                                } elseif (! $record?->getKey()) {
+                                    // Saat buat baru belum pilih customer, jangan tampilkan DO acak milik customer lain
+                                    $query->whereRaw('1 = 0');
+                                }
+
+                                $soId = $get('filter_sale_order_id');
+                                if ($soId) {
+                                    $query->whereHas('salesOrders', fn ($q) => $q->where('sale_orders.id', $soId));
+                                }
                             })
                             ->getOptionLabelFromRecordUsing(function (DeliveryOrder $record): string {
                                 $customer = $record->salesOrders->first()?->customer;
@@ -523,7 +572,7 @@ class SuratJalanResource extends Resource
             ->label('Terbitkan')
             ->icon('heroicon-o-check-badge')
             ->color('success')
-            ->visible(fn ($record) => (bool) Auth::user()?->can('issue', $record))
+            ->visible(fn ($record) => $record?->isDraft() && (bool) Auth::user()?->can('issue', $record))
             ->requiresConfirmation()
             ->modalHeading('Terbitkan Surat Jalan')
             ->modalDescription('Setelah terbit, Surat Jalan tidak dapat diubah atau dihapus (hanya dapat dibatalkan). Lanjutkan?')
@@ -546,7 +595,7 @@ class SuratJalanResource extends Resource
             ->label('Batalkan')
             ->icon('heroicon-o-no-symbol')
             ->color('danger')
-            ->visible(fn ($record) => (bool) Auth::user()?->can('cancel', $record))
+            ->visible(fn ($record) => $record?->isIssued() && (bool) Auth::user()?->can('cancel', $record))
             ->modalHeading('Batalkan Surat Jalan')
             ->modalDescription('Surat Jalan yang dibatalkan tidak berlaku lagi dan tidak dapat dipulihkan. Delivery Order-nya dapat dibuatkan Surat Jalan baru (Terbitkan Ulang).')
             ->modalSubmitActionLabel('Ya, Batalkan')
@@ -581,7 +630,7 @@ class SuratJalanResource extends Resource
             ->label('Terbitkan Ulang')
             ->icon('heroicon-o-arrow-path')
             ->color('warning')
-            ->visible(fn ($record) => (bool) Auth::user()?->can('reissue', $record))
+            ->visible(fn ($record) => $record?->isCancelled() && (bool) Auth::user()?->can('reissue', $record))
             ->requiresConfirmation()
             ->modalHeading('Terbitkan Ulang Surat Jalan')
             ->modalDescription(fn ($record) => "Membuat Surat Jalan baru (nomor baru) untuk Delivery Order yang sama dengan {$record->sj_number}. Delivery Order harus masih Approved dan belum tercantum di Surat Jalan lain.")

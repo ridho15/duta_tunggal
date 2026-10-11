@@ -112,10 +112,13 @@ class SyncArApCommand extends Command
     {
         $this->info('📊 Syncing Account Payables from Supplier Invoices...');
         
-        // Get all supplier invoices (from Purchase Orders)
-        $supplierInvoices = Invoice::where('from_model_type', 'App\Models\PurchaseOrder')
+        // Get all supplier invoices (from Purchase Orders and Purchase Receipts)
+        $supplierInvoices = Invoice::whereIn('from_model_type', [
+            'App\Models\PurchaseOrder',
+            'App\Models\PurchaseReceipt',
+        ])
             ->when($invoiceId, fn ($query) => $query->where('id', $invoiceId))
-            ->with(['fromModel.supplier', 'accountPayable'])
+            ->with(['accountPayable'])
             ->get();
 
         $created = 0;
@@ -123,7 +126,11 @@ class SyncArApCommand extends Command
         $skipped = 0;
 
         foreach ($supplierInvoices as $invoice) {
-            if (!$invoice->fromModel || !$invoice->fromModel->supplier_id) {
+            $supplierId = $invoice->supplier_id
+                ?? $invoice->fromModel?->supplier_id
+                ?? $invoice->fromModel?->purchaseOrder?->supplier_id;
+
+            if (!$supplierId) {
                 $this->warn("⚠️  Skipping invoice {$invoice->invoice_number} - No supplier found");
                 $skipped++;
                 continue;
@@ -136,24 +143,28 @@ class SyncArApCommand extends Command
                 continue;
             }
 
-            // Calculate remaining amount
+            // Calculate remaining amount and approved manual returns
             $totalPaid = (float) VendorPaymentDetail::query()
                 ->where('invoice_id', $invoice->id)
+                ->whereHas('vendorPayment', fn ($q) => $q->whereIn('status', ['partial', 'paid']))
                 ->sum('amount');
 
             $totalAdjustments = (float) VendorPaymentDetail::query()
                 ->where('invoice_id', $invoice->id)
+                ->whereHas('vendorPayment', fn ($q) => $q->whereIn('status', ['partial', 'paid']))
                 ->sum('adjustment_amount');
 
-            $remaining = max(0, $invoice->total - ($totalPaid + $totalAdjustments));
-            $status = $remaining > 0 ? PaymentStatus::UNPAID->value : PaymentStatus::PAID->value;
+            $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($invoice);
+            $totalPaidWithReturns = min((float) $invoice->total, $totalPaid + $totalReturnGrossIdr);
+            $remaining = max(0, (float) $invoice->total - $totalPaidWithReturns - $totalAdjustments);
+            $status = $remaining <= 1.00 ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
 
             $apData = [
                 'invoice_id' => $invoice->id,
                 'supplier_id' => $invoice->fromModel->supplier_id,
                 'total' => $invoice->total,
-                'paid' => $totalPaid,
-                'remaining' => $remaining,
+                'paid' => round($totalPaidWithReturns, 2),
+                'remaining' => round($remaining, 2),
                 'status' => $status
             ];
 

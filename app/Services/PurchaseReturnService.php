@@ -72,6 +72,19 @@ class PurchaseReturnService
         $unitPrice     = $poItem->unit_price;
 
         return DB::transaction(function () use ($qc, $action, $mergePoId, $poItem, $purchaseOrder, $unitPrice) {
+            $lockedQc = QualityControl::where('id', $qc->id)->lockForUpdate()->first();
+            if ($lockedQc && ($lockedQc->purchase_return_processed || PurchaseReturn::where('quality_control_id', $lockedQc->id)->exists())) {
+                $existing = PurchaseReturn::where('quality_control_id', $lockedQc->id)->first();
+                if ($existing) {
+                    Log::warning('Purchase return already exists for QC, returning existing record', [
+                        'qc_id' => $lockedQc->id,
+                        'purchase_return_id' => $existing->id,
+                        'nota_retur' => $existing->nota_retur,
+                    ]);
+                    return $existing;
+                }
+            }
+
             $purchaseReturn = PurchaseReturn::create([
                 'quality_control_id' => $qc->id,
                 'purchase_receipt_id' => null,          // receipt not yet created at QC stage
@@ -89,14 +102,18 @@ class PurchaseReturnService
             PurchaseReturnItem::create([
                 'purchase_return_id'      => $purchaseReturn->id,
                 'purchase_receipt_item_id' => null,     // no receipt item yet
-                'product_id'             => $qc->product_id,
+                'product_id'             => $qc->product_id ?? $poItem->product_id,
                 'qty_returned'           => $qc->rejected_quantity,
                 'unit_price'             => $unitPrice,  // original PO price preserved
                 'reason'                 => $qc->reason_reject ?? 'Rejected in QC: ' . $qc->qc_number,
             ]);
 
             // Mark QC purchase return as processed
-            $qc->update(['purchase_return_processed' => now()]);
+            if ($lockedQc) {
+                $lockedQc->update(['purchase_return_processed' => now()]);
+            } else {
+                $qc->update(['purchase_return_processed' => now()]);
+            }
 
             Log::info('PurchaseReturn created from QC', [
                 'purchase_return_id' => $purchaseReturn->id,

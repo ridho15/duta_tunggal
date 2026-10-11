@@ -274,7 +274,7 @@ class PurchaseOrderItemRelationManager extends RelationManager
                 'product.uom:id,name,abbreviation',
                 'product.cabang:id,kode,nama',
                 'currency:id,code,name,symbol',
-                'referItemModel.cabang:id,kode,nama',
+                'referItemModel',
                 'purchaseOrder.cabang:id,kode,nama',
                 'purchaseReceiptItem',
                 'qualityControls',
@@ -651,9 +651,15 @@ class PurchaseOrderItemRelationManager extends RelationManager
 
     protected static function itemCabangLabel($record): string
     {
-        $record->loadMissing('referItemModel.cabang', 'product.cabang', 'purchaseOrder.cabang');
+        $record->loadMissing('referItemModel', 'product.cabang', 'purchaseOrder.cabang');
 
-        $cabang = $record->referItemModel?->cabang;
+        $ref = $record->referItemModel;
+        $cabang = null;
+        if ($ref && method_exists($ref, 'cabang')) {
+            $cabang = $ref->cabang;
+        } elseif ($ref && isset($ref->saleOrder)) {
+            $cabang = $ref->saleOrder?->cabang;
+        }
         if (! $cabang || ! $cabang->exists) {
             $cabang = $record->product?->cabang;
         }

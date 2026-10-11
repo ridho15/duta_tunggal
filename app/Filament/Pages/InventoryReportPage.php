@@ -338,7 +338,7 @@ class InventoryReportPage extends Page implements HasTable
     public function productOptions()
     {
         try {
-            return Product::query()->orderBy('name')->pluck('name', 'id');
+            return Product::whereHas('inventoryStock')->orderBy('name')->limit(200)->pluck('name', 'id');
         } catch (Throwable) {
             return collect();
         }

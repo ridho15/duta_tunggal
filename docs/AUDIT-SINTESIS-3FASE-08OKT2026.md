@@ -7,6 +7,7 @@
 - [`AUDIT-FASE1-PROCUREMENT-QC-INVENTORY-07OKT2026.md`](AUDIT-FASE1-PROCUREMENT-QC-INVENTORY-07OKT2026.md)
 - [`AUDIT-FASE2-SALES-DELIVERY-MANUFAKTUR-08OKT2026.md`](AUDIT-FASE2-SALES-DELIVERY-MANUFAKTUR-08OKT2026.md)
 - [`AUDIT-FASE3-KEUANGAN-AKUNTANSI-08OKT2026.md`](AUDIT-FASE3-KEUANGAN-AKUNTANSI-08OKT2026.md)
+- [`AUDIT-RETEST-RL-HASSEE-10OKT2026.md`](AUDIT-RETEST-RL-HASSEE-10OKT2026.md) — analisis akar masalah untuk laporan retest tester eksternal (10 Okt 2026)
 
 Dokumen ini **bukan pengulangan** ketiga laporan di atas — tujuannya menyatukan temuan menjadi gambaran utuh dan menonjolkan **pola yang berulang lintas modul**, karena itulah yang paling berguna untuk menentukan prioritas perbaikan nyata.
 
@@ -183,6 +184,17 @@ Agar sintesis ini adil, berikut rangkuman hal-hal yang terbukti bekerja benar le
 - **`VendorPayment` dan `CashBankTransfer` menangani pembatalan dengan benar** — pola yang seharusnya dicontoh untuk Customer Receipt.
 - **Kunci tutup buku di level model (`JournalEntry`) sudah terpasang kuat** — berlaku universal di semua service yang membuat jurnal, bukan cuma dicek satu tempat yang bisa dilewati.
 - **Maker-checker pada approval Sales Order berjalan** — pembuat SO tidak bisa menyetujui SO miliknya sendiri.
+
+---
+
+## Pembaruan — Retest Tester Eksternal (10 Oktober 2026)
+
+Laporan retest manual dari tester eksternal (marker `TEST-RL-HASSEE-20261010`, diuji di staging `dutatunggal.playgo.id`) mengonfirmasi sebagian besar remediasi di atas memang berhasil (lihat Bagian B laporan tersebut: retur reject QC tidak lagi memotong stok ganda, limit kredit Quotation jalan, dll — sejalan dengan tabel "Status Perbaikan" di atas). Investigasi akar masalah atas temuan yang masih tersisa menghasilkan **2 temuan baru terkonfirmasi** (detail & kutipan kode di `AUDIT-RETEST-RL-HASSEE-10OKT2026.md`):
+
+- **Retur dobel dari reject QC** — `PurchaseReturnService::createFromQualityControl()` tidak pernah mengecek `purchase_return_processed` sebelum membuat retur baru, dan aksi "Selesaikan QC" yang memanggilnya **terduplikasi di 2 halaman Filament berbeda** (`QualityControlPurchaseResource.php:1535` dan `ViewQualityControlPurchase.php:95`). Instance baru dari **Pola 6** (anti-duplikat tidak merata) — bandingkan dengan `PurchaseReturnAutomationService.php:183` yang sudah benar mengecek flag ini.
+- **Error 500 saat lihat PO hasil "Create PO dari SO"** — `PurchaseOrderItemRelationManager.php` (baris 277, 654) eager-load `referItemModel.cabang` tanpa penyaringan tipe; crash saat `referItemModel` adalah `SaleOrderItem` (tidak punya method `cabang()`, beda dari `OrderRequestItem` yang punya). Pola baru: **eager-load pada relasi polymorphic yang tidak type-safe** — gejalanya mirip Pola 1 (isolasi cabang tidak konsisten) tapi akar masalahnya di struktur relasi, bukan `CabangScope`.
+
+Juga dikonfirmasi: keluhan "migration belum jalan" di laporan retest (Bagian A, memblokir alur SO→DO→SJ→Invoice) **bukan kode yang belum selesai** — kedua migrasi terkait sudah ada dan sudah `Ran` di database lokal. Staging kemungkinan besar belum `git pull` + `php artisan migrate` ke commit terbaru.
 
 ---
 

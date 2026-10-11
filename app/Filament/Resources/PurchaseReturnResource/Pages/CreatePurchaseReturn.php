@@ -19,6 +19,7 @@ class CreatePurchaseReturn extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['created_by'] = Auth::user()->id;
+        $data['status'] = 'draft';
         return $data;
     }
 

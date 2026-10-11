@@ -5,6 +5,8 @@ namespace App\Filament\Support;
 use App\Exceptions\DeliveryOrderTransitionException;
 use App\Services\DeliveryOrderTransitions;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -87,24 +89,57 @@ class DeliveryOrderActions
             ->label('Konfirmasi Diterima')
             ->icon('heroicon-o-hand-thumb-up')
             ->color('info')
-            ->modalHeading('Konfirmasi barang diterima customer')
-            ->modalSubmitActionLabel('Simpan')
+            ->modalHeading('Konfirmasi barang diterima customer di toko')
+            ->modalSubmitActionLabel('Simpan Penerimaan')
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
             ->visible(self::strictAnd(fn ($record) => $record->status === 'sent'))
             ->form([
                 DateTimePicker::make('received_at')->label('Diterima pada')->default(now())->required()->seconds(false),
                 TextInput::make('received_by')->label('Nama penerima')->required()->maxLength(150)
                     ->helperText('Nama orang yang menandatangani/menerima barang di tempat customer.'),
+                Repeater::make('received_items')
+                    ->label('Pemeriksaan Qty Diterima, Kurang, & Reject')
+                    ->schema([
+                        Hidden::make('item_id'),
+                        TextInput::make('product_name')->label('Produk')->disabled()->columnSpan(3),
+                        TextInput::make('qty_sent')->label('Qty Dikirim')->disabled()->columnSpan(2),
+                        TextInput::make('qty_received')->label('Qty Diterima')->numeric()->required()->minValue(0)->columnSpan(2),
+                        TextInput::make('qty_shortage')->label('Qty Kurang')->numeric()->default(0)->minValue(0)->columnSpan(2),
+                        TextInput::make('qty_rejected')->label('Qty Reject')->numeric()->default(0)->minValue(0)->columnSpan(2),
+                        TextInput::make('notes')->label('Keterangan / Alasan')->nullable()->columnSpan(3),
+                    ])
+                    ->columns(14)
+                    ->disableItemCreation()
+                    ->disableItemDeletion()
+                    ->default(function ($record) {
+                        if (! $record) return [];
+                        $record->loadMissing('deliveryOrderItem.product');
+                        return $record->deliveryOrderItem->map(fn ($item) => [
+                            'item_id' => $item->id,
+                            'product_name' => ($item->product?->sku ? "({$item->product->sku}) " : '') . ($item->product?->name ?? '-'),
+                            'qty_sent' => (float) $item->quantity,
+                            'qty_received' => (float) $item->quantity,
+                            'qty_shortage' => 0,
+                            'qty_rejected' => 0,
+                            'notes' => '',
+                        ])->toArray();
+                    }),
             ])
             ->action(function ($record, array $data) {
+                $itemSummaries = collect($data['received_items'] ?? [])->map(function ($it) {
+                    $note = filled($it['notes'] ?? null) ? " (Ket: {$it['notes']})" : '';
+                    return "{$it['product_name']}: Diterima {$it['qty_received']}, Kurang {$it['qty_shortage']}, Reject {$it['qty_rejected']}{$note}";
+                })->implode(" | ");
+
                 self::run(
                     fn () => app(DeliveryOrderTransitions::class)->to($record, 'received', [
                         'received_at' => $data['received_at'] ?? now(),
                         'received_by' => $data['received_by'] ?? null,
+                        'reason' => $itemSummaries ?: null,
                         'source' => 'action',
                     ]),
                     'Penerimaan Dicatat',
-                    "DO {$record->do_number} dicatat diterima oleh {$data['received_by']}."
+                    "DO {$record->do_number} dicatat diterima oleh {$data['received_by']}." . ($itemSummaries ? " Rincian item telah disimpan." : '')
                 );
             });
     }

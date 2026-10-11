@@ -86,6 +86,30 @@ class CreateVendorPayment extends CreateRecord
     {
         $data = $this->form->getState();
 
+        // Enforce no overpayment per invoice
+        foreach ($data['payment_details'] ?? [] as $detail) {
+            $invoiceId = $detail['invoice_id'] ?? null;
+            $amount = MoneyHelper::safeParse($detail['payment_amount'] ?? 0);
+            if ($invoiceId && $amount > 0) {
+                $inv = Invoice::with('accountPayable')->find($invoiceId);
+                if ($inv) {
+                    $remaining = VendorPaymentResource::resolveInvoiceRemainingAmount($inv);
+                    if ($amount > ($remaining + 1.00)) {
+                        Notification::make()
+                            ->title('Pembayaran Melebihi Sisa Hutang')
+                            ->body("Jumlah pembayaran untuk invoice {$inv->invoice_number} (" . MoneyHelper::rupiah($amount) . ") melebihi sisa hutang (" . MoneyHelper::rupiah($remaining) . ").")
+                            ->danger()
+                            ->persistent()
+                            ->send();
+
+                        throw ValidationException::withMessages([
+                            'payment_details' => "Jumlah pembayaran untuk invoice {$inv->invoice_number} melebihi sisa hutang (" . MoneyHelper::rupiah($remaining) . ").",
+                        ]);
+                    }
+                }
+            }
+        }
+
         // Validate deposit availability if payment method is 'Deposit'
         if (isset($data['payment_method']) && $data['payment_method'] === 'Deposit') {
             $supplierId = $data['supplier_id'];

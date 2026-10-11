@@ -646,7 +646,18 @@
                             data-placeholder="— Semua Produk —"
                             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition">
                             <option value="">— Semua Produk —</option>
-                            @foreach (\App\Models\Product::orderBy('name')->get() as $product)
+                            @php
+                                $productFilterOptions = \App\Models\Product::whereHas('inventoryStock')
+                                    ->orderBy('name')
+                                    ->limit(200)
+                                    ->get(['id', 'name']);
+                                if ($product_id && ! $productFilterOptions->contains('id', $product_id)) {
+                                    if ($selectedP = \App\Models\Product::find($product_id, ['id', 'name'])) {
+                                        $productFilterOptions->prepend($selectedP);
+                                    }
+                                }
+                            @endphp
+                            @foreach ($productFilterOptions as $product)
                                 <option value="{{ $product->id }}">{{ $product->name }}</option>
                             @endforeach
                         </select>

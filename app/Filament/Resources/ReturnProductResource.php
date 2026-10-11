@@ -101,7 +101,9 @@ class ReturnProductResource extends Resource
                             ->reactive()
                             ->options(function ($set, $get, $state) {
                                 if ($get('from_model_type') == 'App\Models\DeliveryOrder') {
-                                    return DeliveryOrder::select(['id', 'do_number'])->get()->pluck('do_number', 'id');
+                                    return DeliveryOrder::whereDoesntHave('suratJalan', function ($q) {
+                                        $q->whereIn('surat_jalans.status', \App\Models\SuratJalan::ACTIVE_STATUSES);
+                                    })->select(['id', 'do_number'])->get()->pluck('do_number', 'id');
                                 } elseif ($get('from_model_type') == 'App\Models\PurchaseReceipt') {
                                     return PurchaseReceipt::with(['purchaseOrder' => function ($query) {
                                         $query->select(['id', 'po_number', 'order_date']);
@@ -110,6 +112,16 @@ class ReturnProductResource extends Resource
                                 return [];
                             })
                             ->preload()
+                            ->rules([
+                                fn (\Filament\Forms\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    if ($get('from_model_type') === 'App\Models\DeliveryOrder' && $value) {
+                                        $do = DeliveryOrder::find($value);
+                                        if ($do && $do->suratJalan()->whereIn('surat_jalans.status', \App\Models\SuratJalan::ACTIVE_STATUSES)->exists()) {
+                                            $fail("Delivery Order {$do->do_number} tidak dapat diretur karena sudah memiliki Surat Jalan aktif.");
+                                        }
+                                    }
+                                }
+                            ])
                             ->validationMessages([
                                 'required' => 'Order sumber wajib dipilih.',
                             ]),

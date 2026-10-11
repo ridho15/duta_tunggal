@@ -142,7 +142,9 @@ class PurchaseReturnResource extends Resource
                             ]),
                         Select::make('status')
                             ->label('Status')
-                            ->options([
+                            ->options(fn (string $operation) => $operation === 'create' ? [
+                                'draft' => 'Draft',
+                            ] : [
                                 'draft' => 'Draft',
                                 'pending_approval' => 'Pending Approval',
                                 'approved' => 'Approved',

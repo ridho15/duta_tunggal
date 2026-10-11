@@ -167,15 +167,11 @@ class DepositResource extends Resource
                             ->searchable()
                             ->placeholder('Pilih salah satu opsi')
                             ->getSearchResultsUsing(function (string $search, $get): array {
-                                $query = ChartOfAccount::query();
-                                // If the chart_of_accounts table has an account_type column,
-                                // prefer filtering by account_type based on the selected entity.
-                                if (Schema::hasColumn('chart_of_accounts', 'account_type')) {
-                                    if ($get('from_model_type') === 'App\\Models\\Customer') {
-                                        $query->where('account_type', 'Liability');
-                                    } elseif ($get('from_model_type') === 'App\\Models\\Supplier') {
-                                        $query->where('account_type', 'Asset');
-                                    }
+                                $query = ChartOfAccount::query()->where('is_active', true);
+                                if ($get('from_model_type') === 'App\\Models\\Customer') {
+                                    $query->where('type', 'Liability');
+                                } elseif ($get('from_model_type') === 'App\\Models\\Supplier') {
+                                    $query->where('type', 'Asset');
                                 }
                                 return $query->where(function ($q) use ($search) {
                                     $q->where('code', 'LIKE', "%{$search}%")
@@ -189,15 +185,11 @@ class DepositResource extends Resource
                                     ->toArray();
                             })
                             ->options(function ($get) {
-                                $query = ChartOfAccount::query();
-                                // If the chart_of_accounts table has an account_type column,
-                                // prefer filtering by account_type based on the selected entity.
-                                if (Schema::hasColumn('chart_of_accounts', 'account_type')) {
-                                    if ($get('from_model_type') === 'App\\Models\\Customer') {
-                                        $query->where('account_type', 'Liability');
-                                    } elseif ($get('from_model_type') === 'App\\Models\\Supplier') {
-                                        $query->where('account_type', 'Asset');
-                                    }
+                                $query = ChartOfAccount::query()->where('is_active', true);
+                                if ($get('from_model_type') === 'App\\Models\\Customer') {
+                                    $query->where('type', 'Liability');
+                                } elseif ($get('from_model_type') === 'App\\Models\\Supplier') {
+                                    $query->where('type', 'Asset');
                                 }
                                 return $query->get()->mapWithKeys(function ($coa) {
                                     return [$coa->id => "({$coa->code}) {$coa->name}"];
@@ -217,8 +209,7 @@ class DepositResource extends Resource
                             ->searchable()
                             ->placeholder('Pilih COA Kas/Bank')
                             ->getSearchResultsUsing(function (string $search): array {
-                                return ChartOfAccount::where('type', 'asset')
-                                    ->where('code', 'LIKE', '11%')
+                                return ChartOfAccount::cashBank()
                                     ->where(function ($q) use ($search) {
                                         $q->where('code', 'LIKE', "%{$search}%")
                                             ->orWhere('name', 'LIKE', "%{$search}%");
@@ -231,8 +222,7 @@ class DepositResource extends Resource
                                     ->toArray();
                             })
                             ->options(function () {
-                                return ChartOfAccount::where('type', 'asset')
-                                    ->where('code', 'LIKE', '11%')
+                                return ChartOfAccount::cashBank()
                                     ->get()
                                     ->mapWithKeys(function ($coa) {
                                         return [$coa->id => "({$coa->code}) {$coa->name}"];

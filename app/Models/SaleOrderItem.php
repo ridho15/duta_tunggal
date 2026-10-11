@@ -45,6 +45,18 @@ class SaleOrderItem extends Model
         return $this->belongsTo(SaleOrder::class, 'sale_order_id')->withDefault();
     }
 
+    public function cabang()
+    {
+        return $this->hasOneThrough(
+            Cabang::class,
+            SaleOrder::class,
+            'id',
+            'id',
+            'sale_order_id',
+            'cabang_id'
+        );
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();

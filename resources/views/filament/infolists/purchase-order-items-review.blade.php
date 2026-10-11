@@ -8,15 +8,21 @@
         'purchaseOrderItem.product.uom',
         'purchaseOrderItem.product.cabang',
         'purchaseOrderItem.currency',
-        'purchaseOrderItem.referItemModel.cabang',
         'purchaseOrderItem.purchaseReceiptItem',
         'purchaseOrderItem.qualityControls',
         'purchaseOrderItem.purchaseOrder.cabang',
+        'purchaseOrderItem.referItemModel',
     ]);
 
     $formatQty = fn ($qty) => number_format((float) $qty, 2, ',', '.');
     $formatCabang = function ($item): string {
-        $cabang = $item->referItemModel?->cabang;
+        $ref = $item->referItemModel;
+        $cabang = null;
+        if ($ref && method_exists($ref, 'cabang')) {
+            $cabang = $ref->cabang;
+        } elseif ($ref && isset($ref->saleOrder)) {
+            $cabang = $ref->saleOrder?->cabang;
+        }
         if (! $cabang || ! $cabang->exists) {
             $cabang = $item->product?->cabang;
         }
