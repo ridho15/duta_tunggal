@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 class CustomerMerger
 {
     /** Tabel yang menyimpan customer lewat kolom `customer_id`. */
-    public const TABLES = ['sale_orders', 'quotations', 'customer_receipts', 'customer_returns', 'account_receivables', 'other_sales'];
+    public const TABLES = ['sale_orders', 'quotations', 'customer_receipts', 'customer_returns', 'account_receivables', 'other_sales', 'credit_notes'];
 
     /**
      * Ringkasan angka yang wajib kekal bila survivor + yang digabung dijumlahkan.
