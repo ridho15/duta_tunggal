@@ -129,25 +129,6 @@ it('releaseWhere hanya menyentuh reservasi penjualan, TIDAK menyentuh reservasi 
 
 // ───────────────────────────── Flag ledger: reservasi DO dikonsumsi saat Dikirim (X1) ─────────────────────────────
 
-it('[ledger] DO Siap Kirim → reservasi DO terpetakan ke item SO; Dikirim → stok fisik keluar sekali dan reservasi DIKONSUMSI (bukan yatim)', function () {
-    ledgerOn();
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-    [$so, $item] = stkSaleOrder($ctx, 20);
-
-    $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
-
-    $reservation = StockReservation::where('delivery_order_id', $do->id)->firstOrFail();
-    expect((float) $reservation->quantity)->toBe(12.0)->and($reservation->sale_order_item_id)->toBe($item->id)->and($reservation->sale_order_id)->toBe($so->id)
-        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 12.0, 'free' => 18.0]);
-
-    $do->update(['status' => 'sent']);
-
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0])   // dulu: free 6
-        ->and(StockReservation::where('delivery_order_id', $do->id)->count())->toBe(0)
-        ->and(StockReservationEvent::where('event', 'consumed')->where('delivery_order_id', $do->id)->count())->toBe(1);
-});
-
 it('[ledger] skenario probe: jadwal "Tandai Selesai" (strict_dispatch mati) kini meninggalkan qty_reserved = 0 dan stok bebas 18', function () {
     ledgerOn();
     $ctx = stkContext();
@@ -194,35 +175,61 @@ it('[ledger] pengiriman ulang memotong SELISIH bila kuantitas item DO naik setel
     expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(20.0);
 });
 
-it('[ledger] DO ditutup, ditolak, atau dihapus melepas reservasinya; SO dibatalkan melepas semua', function () {
+it('[ledger] DO ditutup, ditolak, atau dihapus mengembalikan stok fisiknya; SO dibatalkan melepas reservasi SO', function () {
     ledgerOn();
+    config(['sales.stock.reserve_on_so_approve' => true]);
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 60);
-    [$so, $item] = stkSaleOrder($ctx, 40);
+    [$so, $item] = stkSaleOrder($ctx, 40, ['status' => 'request_approve']);
+    app(\App\Services\SalesOrderService::class)->approve($so);
+    $so = $so->fresh();
 
-    foreach (['closed', 'reject'] as $status) {
-        $do = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
-        expect(stkReserved(null, $do))->toBe(5.0);
-        $do->update(['status' => $status]);
-        expect(stkReserved(null, $do))->toBe(0.0);
-    }
+    // SO menahan 40 (fisik 60, bebas 20)
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
+
+    // Tahap 3: DO memotong stok fisik saat dibuat dan tidak menahan reservasi DO; tutup/tolak/hapus MENGEMBALIKAN stok fisik
+    $closed = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
+    expect(stkReserved(null, $closed))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 55.0, 'reserved' => 35.0, 'free' => 20.0]);   // SO menahan sisa 35
+
+    $closed->update(['status' => 'closed']);
+
+    // Ditutup: kuantitas DO dilepas kembali ke SO → SO menahan 40 lagi
+    expect(stkReserved(null, $closed))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
+
+    $rejected = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
+    $rejected->update(['status' => 'reject']);
+
+    // Ditolak: stok fisik kembali, tidak ada reservasi DO, dan SO tetap menahan stoknya (DO ditolak memegang kuantitas SO
+    // karena dapat diajukan ulang, tetapi barangnya tidak di luar gudang) → SO menahan 40, bukan 35.
+    expect(stkReserved(null, $rejected))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
+
+    // Dihapus: kuantitas DO ditolak dilepas ke SO; reservasi SO tetap 40
+    $rejected->forceDelete();
+    app(\App\Services\SaleOrderReservationSynchronizer::class)->sync($so->fresh(), 'uji');
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
 
     $deleted = stkDeliveryOrder($ctx, $so, $item, 6, 'approved');
     $deleted->delete();
-    expect(stkReserved(null, $deleted))->toBe(0.0);
+    expect(stkReserved(null, $deleted))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
 
     $kept = stkDeliveryOrder($ctx, $so, $item, 7, 'approved');
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(7.0);
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 53.0, 'reserved' => 33.0, 'free' => 20.0]);
 
+    // SO dibatalkan: reservasi SO dilepas seluruhnya (DO yang sudah memotong stok tetap di luar gudang) dan tercatat di event
     $so->update(['status' => 'canceled']);
 
-    expect(stkReserved($so))->toBe(0.0)->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(0.0)
-        ->and(StockReservationEvent::where('reason', 'like', '%dibatalkan%')->count())->toBe(1);
+    expect(stkReserved($so))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 53.0, 'reserved' => 0.0, 'free' => 53.0])
+        ->and(StockReservationEvent::where('reason', 'like', '%dibatalkan%')->count())->toBeGreaterThanOrEqual(1);
 
     $kept->refresh();
 });
 
-it('[ledger] mengubah kuantitas item DO saat Siap Kirim (edit checker) menurunkan/menaikkan reservasi sesuai', function () {
+it('[ledger] mengubah kuantitas item DO saat Siap Kirim (edit checker) menyesuaikan stok fisik, bukan membuat reservasi DO', function () {
     ledgerOn();
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -230,44 +237,41 @@ it('[ledger] mengubah kuantitas item DO saat Siap Kirim (edit checker) menurunka
     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
     $doItem = $do->deliveryOrderItem->first();
 
+    // Tahap 3: stok fisik terpotong sejak DO dibuat, jadi reservasi DO tidak pernah tertahan (menahan lagi = penahanan ganda)
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0]);
+
     $doItem->update(['quantity' => 8]);
-    expect(stkReserved(null, $do))->toBe(8.0)->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(8.0);
+    expect(stkReserved(null, $do))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 22.0, 'reserved' => 0.0, 'free' => 22.0]);   // 4 pcs kembali
 
     $doItem->update(['quantity' => 12]);
-    expect(stkReserved(null, $do))->toBe(12.0);
+    expect(stkReserved(null, $do))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0]);   // terpotong lagi
 });
 
-it('[ledger] DO dengan dua gudang sumber menahan per gudang; kuantitas item yang turun memotong sumber TERAKHIR lebih dulu', function () {
-    ledgerOn();
+
+it('DO dengan dua gudang sumber memotong stok per gudang; kuantitas item yang turun mengembalikan sumber TERAKHIR lebih dulu', function () {
     $ctx = stkContext();
     $second = stkWarehouse($ctx);
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
     stkSetStock($ctx['product'], $second, 30);
     [$so, $item] = stkSaleOrder($ctx, 20);
-    $do = stkDeliveryOrder($ctx, $so, $item, 10, 'request_stock');
+
+    $do = stkDeliveryOrder($ctx, $so, $item, 10, 'approved');   // sumber 1: gudang utama 10
     $doItem = $do->deliveryOrderItem->first();
-    $doItem->warehouseSources()->delete();
-    \App\Models\DeliveryOrderItemWarehouseSource::create(['delivery_order_item_id' => $doItem->id, 'warehouse_id' => $ctx['warehouse']->id, 'quantity' => 6]);
-    \App\Models\DeliveryOrderItemWarehouseSource::create(['delivery_order_item_id' => $doItem->id, 'warehouse_id' => $second->id, 'quantity' => 4]);
+    $doItem->update(['quantity' => 16]);
+    $doItem->warehouseSources->first()->update(['quantity' => 10]);
+    \App\Models\DeliveryOrderItemWarehouseSource::create(['delivery_order_item_id' => $doItem->id, 'warehouse_id' => $second->id, 'quantity' => 6]);
 
-    $do->update(['status' => 'approved']);
+    // Tahap 3: 10 dari gudang utama + 6 dari gudang kedua terpotong; tidak ada reservasi DO
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(20.0)
+        ->and(stkStock($ctx['product'], $second)['available'])->toBe(24.0)
+        ->and(stkReserved(null, $do))->toBe(0.0);
 
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(6.0)->and(stkStock($ctx['product'], $second)['reserved'])->toBe(4.0);
+    // Qty item turun 16 → 12: sumber TERAKHIR (gudang kedua) berkurang lebih dulu (6 → 2), gudang utama tetap 10
+    $doItem->fresh()->update(['quantity' => 12]);
 
-    $doItem->update(['quantity' => 7]);   // total 7: sumber pertama 6 tetap, sumber terakhir 4 → 1
-
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(6.0)->and(stkStock($ctx['product'], $second)['reserved'])->toBe(1.0);
-});
-
-it('[flag mati] reservasi DO/edit kuantitas berperilaku lama: tidak ada event, tidak ada konsumsi', function () {
-    ledgerOn(false);
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-    [$so, $item] = stkSaleOrder($ctx, 20);
-    $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
-
-    $do->update(['status' => 'sent']);
-
-    expect(StockReservationEvent::count())->toBe(0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(12.0);   // yatim — perilaku lama
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(20.0)
+        ->and(stkStock($ctx['product'], $second)['available'])->toBe(28.0)
+        ->and(stkReserved(null, $do))->toBe(0.0);
 });

@@ -232,7 +232,10 @@ class StockOpnameItemsRelationManager extends RelationManager
                     Tables\Actions\DeleteBulkAction::make()
                         ->visible(fn () => $this->getOwnerRecord()->status !== 'approved'),
                 ]),
-            ]);
+            ])
+            ->emptyStateHeading('Belum Ada Item Hitung Fisik')
+            ->emptyStateDescription('Daftar produk gudang ini belum dimuat. Klik tombol "Mulai Hitung Fisik" di bagian atas halaman atau "Muat / Perbarui Stok Produk" untuk memuat daftar produk.')
+            ->emptyStateIcon('heroicon-o-clipboard-document-list');
     }
 
     /**

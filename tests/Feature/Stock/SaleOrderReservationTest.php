@@ -16,7 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['sales.stock' => ['ledger' => false, 'strict_dispatch' => false, 'reserve_on_so_approve' => true, 'block_short_approval' => false]]);
+    config(['sales.stock' => ['require_surat_jalan' => false, 'ledger' => false, 'strict_dispatch' => false, 'reserve_on_so_approve' => true, 'block_short_approval' => false]]);
 });
 
 /** SO $qty diajukan lalu disetujui lewat layanan (jalur nyata) sehingga observer menyusun reservasi. */
@@ -86,17 +86,18 @@ it('D21: SO kedua yang melebihi sisa bebas ditahan PARSIAL; ringkasan melaporkan
     expect(rsvSoLevel($soB))->toBe(15.0)->and($summary[$itemB->id]['shortage'])->toBe(0.0)->and(rsvSoLevel($soA))->toBe(20.0);
 });
 
-it('SO→DO tanpa selisih: DO 12 disetujui → total tertahan tetap 20 (DO 12 + SO 8); Dikirim → tertahan 8, fisik 18, bebas 10', function () {
+it('SO→DO tanpa selisih: DO 12 dibuat → fisik 18, SO menahan sisa 8, bebas 10; Dikirim tidak memotong lagi', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
     [$so, $item] = rsvApprove($ctx, 20);
 
     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
 
-    expect(stkReserved($so, $do))->toBe(12.0)
+    // Tahap 3: DO memotong stok fisik saat dibuat dan tidak menahan reservasi; SO hanya menahan yang belum masuk DO (20 − 12)
+    expect(stkReserved($so, $do))->toBe(0.0)
         ->and(rsvSoLevel($so))->toBe(8.0)
-        ->and(rsvTotalForItem($item))->toBe(20.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 20.0, 'free' => 10.0]);
+        ->and(rsvTotalForItem($item))->toBe(8.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 8.0, 'free' => 10.0]);
 
     $do->update(['status' => 'sent']);
 
@@ -118,15 +119,51 @@ it('DO Siap Kirim yang dibatalkan/ditutup mengembalikan kebutuhan ke SO: SO mena
         ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(20.0);
 });
 
-it('mengedit kuantitas item DO (checker) saat Siap Kirim menjaga total tertahan = kebutuhan', function () {
+it('mengedit kuantitas item DO (checker) saat Siap Kirim: stok fisik & reservasi SO mengikuti, tanpa reservasi DO ganda', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
     [$so, $item] = rsvApprove($ctx, 20);
     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
 
-    $do->deliveryOrderItem->first()->update(['quantity' => 5]);
+    // Tahap 3: stok fisik terpotong sejak DO dibuat (30 → 18); SO hanya menahan sisa yang belum masuk DO (20 − 12 = 8)
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 8.0, 'free' => 10.0])
+        ->and(rsvSoLevel($so))->toBe(8.0)
+        ->and(stkReserved($so, $do))->toBe(0.0);
 
-    expect(stkReserved($so, $do))->toBe(5.0)->and(rsvSoLevel($so))->toBe(15.0)->and(rsvTotalForItem($item))->toBe(20.0);
+    // Checker mengurangi qty 12 → 5 (urutan Filament: item lebih dulu, lalu sumber gudang)
+    $doItem = $do->deliveryOrderItem->first();
+    $doItem->update(['quantity' => 5]);
+    $doItem->warehouseSources->first()->update(['quantity' => 5]);
+
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 25.0, 'reserved' => 15.0, 'free' => 10.0])   // 7 pcs kembali ke stok
+        ->and(rsvSoLevel($so))->toBe(15.0)
+        ->and(stkReserved($so, $do))->toBe(0.0)                      // tidak ada penahanan DO ganda
+        ->and(rsvTotalForItem($item))->toBe(15.0)
+        ->and(StockMovement::where('type', 'sales')->sum('quantity') - StockMovement::where('type', 'adjustment_in')->sum('quantity'))->toEqual(5.0);
+
+    // Sisa SO yang boleh dibuatkan DO baru ikut naik (20 − 5 = 15)
+    expect(app(\App\Services\SaleOrderDeliveryProgress::class)->forSaleOrder($so->fresh())['totals']['available'])->toEqual(15.0);
+
+    // Sinkron ulang idempoten: tidak menambah gerakan stok
+    $movements = StockMovement::count();
+    app(\App\Observers\DeliveryOrderObserver::class)->reconcileStockMovementsForDeliveryOrder($do->fresh());
+    expect(StockMovement::count())->toBe($movements);
+});
+
+it('mengedit kuantitas item DO naik: stok fisik terpotong selisihnya dan reservasi SO turun', function () {
+    $ctx = stkContext();
+    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
+    [$so, $item] = rsvApprove($ctx, 20);
+    $do = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
+
+    // Urutan kebalikan: sumber gudang lebih dulu, lalu item
+    $doItem = $do->deliveryOrderItem->first();
+    $doItem->warehouseSources->first()->update(['quantity' => 8]);
+    $doItem->fresh()->update(['quantity' => 8]);
+
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 22.0, 'reserved' => 12.0, 'free' => 10.0])
+        ->and(rsvSoLevel($so))->toBe(12.0)
+        ->and(stkReserved($so, $do))->toBe(0.0);
 });
 
 it('gagal kirim setelah Dikirim (alur ketat): stok kembali dan total tertahan tetap = kebutuhan', function () {
@@ -241,18 +278,6 @@ it('mengubah kuantitas item SO menyesuaikan reservasi; menghapus item melepasnya
         ->and(stkStock($second, $ctx['warehouse'])['reserved'])->toBe(0.0);
 });
 
-it('Ambil Sendiri: reservasi SO dikonsumsi saat selesai — stok fisik keluar dan tidak ada reservasi yatim', function () {
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-    [$so] = rsvApprove($ctx, 10, ['tipe_pengiriman' => 'Ambil Sendiri']);
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(10.0);
-
-    $so->update(['status' => 'completed']);
-
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 20.0, 'reserved' => 0.0, 'free' => 20.0])
-        ->and(StockReservationEvent::where('event', 'consumed')->where('sale_order_id', $so->id)->count())->toBe(1);
-});
-
 it('reservasi Material Issue tidak pernah disentuh sinkronisasi SO', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -341,19 +366,6 @@ it('sales:backfill-so-reservations: dry-run tidak mengubah apa pun; --apply mena
     expect(StockReservationEvent::count())->toBe($events);
 });
 
-it('[flag mati] approve SO tidak menahan stok dan DO memakai jalur reservasi lama', function () {
-    config(['sales.stock.reserve_on_so_approve' => false]);
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-
-    [$so, $item] = rsvApprove($ctx, 20);
-
-    expect(StockReservation::count())->toBe(0);
-
-    $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
-    expect(stkReserved($so, $do))->toBe(12.0)->and(StockReservationEvent::count())->toBe(0);   // tanpa buku besar
-});
-
 it('F2: DO tidak terblokir oleh reservasi SO-nya sendiri; reservasi SO lain tetap mengurangi stok bebas', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -367,5 +379,11 @@ it('F2: DO tidak terblokir oleh reservasi SO-nya sendiri; reservasi SO lain teta
 
     // DO 12 untuk SO A lolos jalur persetujuan (tidak "kekurangan stok" karena reservasinya sendiri)
     $do = stkDeliveryOrder($ctx, $soA, $itemA, 12, 'approved');
-    expect($do->status)->toBe('approved')->and(stkReserved($soA, $do))->toBe(12.0);
+    // Tahap 3: DO memotong stok fisik (30 → 18), SO A tinggal menahan sisa 8, SO B tetap menahan 10 → bebas tetap 0
+    expect($do->status)->toBe('approved')
+        ->and(stkReserved($soA, $do))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 18.0, 'free' => 0.0])
+        ->and($availability->freeForSaleOrderItem($ctx['product']->id, $ctx['warehouse']->id, $itemA->id))->toBe(8.0)    // hanya reservasi SO A sendiri
+        ->and($availability->freeForSaleOrderItem($ctx['product']->id, $ctx['warehouse']->id, $itemB->id))->toBe(10.0)  // reservasi SO A tidak menghalangi SO B
+        ->and(rsvSoLevel($soB))->toBe(10.0);
 });

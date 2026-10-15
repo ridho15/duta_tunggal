@@ -223,6 +223,7 @@
                     <th style="width: 4%;" class="center">No</th>
                     <th style="width: 14%;">SKU</th>
                     <th>Nama Barang</th>
+                    <th style="width: 12%;">Gudang Asal</th>
                     <th style="width: 8%;" class="num">Total Pesan</th>
                     <th style="width: 8%;" class="num">Sudah Dikirim</th>
                     <th style="width: 8%;" class="num">Kirim Sekarang</th>
@@ -237,6 +238,7 @@
                         <td class="center">{{ $item['no'] }}</td>
                         <td>{{ $item['sku'] }}</td>
                         <td>{{ $item['name'] }}</td>
+                        <td>{{ $item['warehouse'] ?? '-' }}</td>
                         <td class="num">{{ $item['ordered_quantity'] ?? $item['quantity'] }}</td>
                         <td class="num">{{ $item['delivered_quantity'] ?? '0' }}</td>
                         <td class="num"><strong>{{ $item['quantity'] }}</strong></td>
@@ -246,7 +248,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="center muted">Tidak ada barang pada Delivery Order ini.</td>
+                        <td colspan="10" class="center muted">Tidak ada barang pada Delivery Order ini.</td>
                     </tr>
                 @endforelse
             </tbody>

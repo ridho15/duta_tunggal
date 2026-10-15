@@ -11,6 +11,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['sales.stock' => [
+        'require_surat_jalan' => false,
         'ledger' => false,
         'strict_dispatch' => true,
         'reserve_on_so_approve' => false,
@@ -71,26 +72,25 @@ it('ST-03: DO yang sudah completed terkunci dari penambahan item atau manipulasi
     expect($do->fresh()->status)->toBe('completed');
 });
 
-it('ST-04: pelepasan reservasi stok seketika saat DO yang disetujui dibatalkan (closed)', function () {
+it('ST-04: stok fisik kembali seketika saat DO yang disetujui dibatalkan (closed)', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 25);
     [$so, $soItem] = stkSaleOrder($ctx, 15);
 
-    // 1. DO Approved -> menahan cadangan stok
+    // 1. DO dibuat/Approved -> Tahap 3: stok fisik langsung terpotong (25 → 15); tidak ada reservasi DO yang tertahan
     $do = stkDeliveryOrder($ctx, $so, $soItem, 10, 'approved');
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(10.0)
-        ->and(stkReserved(null, $do))->toBe(10.0);
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 15.0, 'reserved' => 0.0, 'free' => 15.0])
+        ->and(stkReserved(null, $do))->toBe(0.0);
 
     // 2. Transisi langsung ke 'reject' ditolak oleh matriks status (langkah sah pembatalan approved adalah 'closed')
     expect(function () use ($do) {
         app(DeliveryOrderTransitions::class)->to($do, 'reject');
     })->toThrow(DeliveryOrderTransitionException::class);
 
-    // 3. Batalkan DO secara sah via 'closed' dengan alasan -> cadangan HARUS dilepas seketika (menjadi 0)
+    // 3. Batalkan DO secara sah via 'closed' dengan alasan -> stok fisik HARUS kembali seketika (25) dan tidak ada reservasi
     app(DeliveryOrderTransitions::class)->to($do, 'closed', ['reason' => 'Pelanggan membatalkan pesanan']);
 
     expect($do->fresh()->status)->toBe('closed')
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(0.0)
-        ->and(stkReserved(null, $do))->toBe(0.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['free'])->toBe(25.0);
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 25.0, 'reserved' => 0.0, 'free' => 25.0])
+        ->and(stkReserved(null, $do))->toBe(0.0);
 });

@@ -466,6 +466,27 @@ export const SaleOrderHeaderForm: React.FC<Props> = ({
           />
         </div>
 
+        {/* Ongkos Kirim (col-span-1) */}
+        <div className="col-span-1 md:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Ongkos Kirim (Rp)
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={header.shipping_cost ?? 0}
+            onChange={(e) =>
+              onChange({
+                ...header,
+                shipping_cost: Math.max(0, parseFloat(e.target.value) || 0),
+              })
+            }
+            className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all"
+            placeholder="0"
+          />
+        </div>
+
         {/* Alamat Pengiriman (Shipped To) (col-span-3) */}
         <div className="col-span-1 md:col-span-3">
           <label className="block text-sm font-medium text-gray-700 mb-1">

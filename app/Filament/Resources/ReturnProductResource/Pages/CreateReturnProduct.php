@@ -23,11 +23,11 @@ class CreateReturnProduct extends CreateRecord
         $data = $this->form->getState();
 
         // Validate return number format for new records
-        if (!preg_match('/^RN-\d{8}-\d{4}$/', $data['return_number'])) {
+        if (! app(\App\Services\ReturnProductService::class)->isValidReturnNumber((string) $data['return_number'], $data['from_model_type'] ?? null, $data['from_model_id'] ?? null)) {
             HelperController::sendNotification(
                 isSuccess: false,
                 title: "Validation Error",
-                message: "Format nomor return tidak valid. Gunakan format: RN-YYYYMMDD-XXXX"
+                message: "Format nomor return tidak valid. Gunakan format: RN-YYYYMMDD-XXXX, atau untuk retur dari Delivery Order: nomor DO asal + R (mis. DO-0001R)"
             );
             throw ValidationException::withMessages([
                 'return_number' => 'Format nomor return tidak valid. Gunakan format: RN-YYYYMMDD-XXXX'

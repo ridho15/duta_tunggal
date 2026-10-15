@@ -38,6 +38,17 @@ return [
     |   reserve_on_so_approve : reservasi stok sejak SO Approved (dipindahkan ke DO saat DO disetujui).
     |   block_short_approval  : approve SO stok kurang DIBLOKIR kecuali backorder beralasan.
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Invoice penjualan (UAT 13 Okt 2026, B25)
+    |--------------------------------------------------------------------------
+    |   auto_on_do_complete : invoice terbit otomatis saat DO diselesaikan (perilaku LAMA). Default mati:
+    |                         invoice dibuat manual dari Surat Jalan (Customer → SO → centang SJ).
+    */
+    'invoice' => [
+        'auto_on_do_complete' => (bool) env('SALES_INVOICE_AUTO_ON_DO_COMPLETE', false),
+    ],
+
     'stock' => [
         'ledger' => (bool) env('SALES_STOCK_LEDGER', false),
         'strict_dispatch' => (bool) env('SALES_STOCK_STRICT_DISPATCH', false),

@@ -242,7 +242,7 @@ class QuotationApiController extends Controller
             if (! empty($item['product_id']) && isset($item['unit_price'])) {
                 $product = Product::find((int) $item['product_id']);
                 if ($product) {
-                    $err = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                    $err = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price'], (float) ($item['discount'] ?? 0));
                     if ($err) {
                         $priceErrors["items.{$idx}.unit_price"] = [$err];
                     }
@@ -504,7 +504,7 @@ class QuotationApiController extends Controller
             if (! empty($item['product_id']) && isset($item['unit_price'])) {
                 $product = Product::find((int) $item['product_id']);
                 if ($product) {
-                    $err = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                    $err = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price'], (float) ($item['discount'] ?? 0));
                     if ($err) {
                         $priceErrors["items.{$idx}.unit_price"] = [$err];
                     }

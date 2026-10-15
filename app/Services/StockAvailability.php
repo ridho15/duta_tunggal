@@ -30,6 +30,7 @@ class StockAvailability
         return DB::table('warehouses')
             ->whereNull('deleted_at')
             ->where(fn ($q) => $q->where('status', 1)->orWhereNull('status'))
+            ->where(fn ($q) => $q->where('is_quarantine', false)->orWhereNull('is_quarantine'))   // gudang karantina/rusak bukan stok jual
             ->when(! $seeOthers && $cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->orderBy('id')
             ->pluck('id')
@@ -52,6 +53,182 @@ class StockAvailability
     public function freeInWarehouse(int $productId, int $warehouseId, ?int $rakId = null): float
     {
         return $this->stockByWarehouse($productId, [$warehouseId], $rakId)[$warehouseId]['free'] ?? 0.0;
+    }
+
+    /**
+     * Rak dengan stok bebas terbesar untuk produk×gudang (null bila stok tersimpan tanpa rak / tidak ada stok).
+     * Dipakai mengisi otomatis rak sumber DO: pemotongan stok bekerja per baris (produk, gudang, rak),
+     * sehingga rak yang kosong membuat pemotongan gagal walau total gudang cukup.
+     */
+    public function bestRakId(int $productId, int $warehouseId): ?int
+    {
+        $row = DB::table('inventory_stocks')
+            ->whereNull('deleted_at')
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->orderByRaw('(qty_available - qty_reserved) desc')
+            ->first(['rak_id']);
+
+        return $row && $row->rak_id ? (int) $row->rak_id : null;
+    }
+
+    /**
+     * Baris sumber gudang untuk SATU item DO yang menampilkan SEMUA gudang×rak berstok bebas > 0 (UAT B7): user tinggal mengisi/mengubah
+     * kuantitas per baris. Kuantitas awal diisi serakah: gudang pilihan/alokasi dulu (dibatasi alokasinya), lalu gudang lain berstok
+     * bebas terbanyak; baris lain bernilai 0 (dibuang saat DO disimpan). Stok bebas = bebas + reservasi milik SO itu sendiri.
+     *
+     * @param  array<int, int>  $preferredWarehouseIds  urutan gudang pilihan (alokasi SO / gudang item)
+     * @param  array<int, float>  $caps  batas kuantitas per gudang pilihan (alokasi); gudang tanpa batas = tak terbatas
+     * @return array<int, array{warehouse_id: int, rak_id: int|null, quantity: float, free: float}>
+     */
+    public function sourceRowsForItem(int $productId, ?int $saleOrderItemId, float $quantity, ?int $cabangId, array $preferredWarehouseIds = [], array $caps = []): array
+    {
+        $warehouseIds = array_values(array_unique(array_merge($this->accessibleWarehouseIds($cabangId), array_map('intval', $preferredWarehouseIds))));
+        if ($warehouseIds === []) {
+            return [];
+        }
+
+        $stockRows = DB::table('inventory_stocks')
+            ->whereNull('deleted_at')->where('product_id', $productId)->whereIn('warehouse_id', $warehouseIds)
+            ->get(['warehouse_id', 'rak_id', 'qty_available', 'qty_reserved']);
+
+        $perWarehouse = [];
+        foreach ($stockRows as $row) {
+            $free = (float) $row->qty_available - (float) $row->qty_reserved;
+            $perWarehouse[(int) $row->warehouse_id][] = ['rak_id' => $row->rak_id ? (int) $row->rak_id : null, 'free' => $free];
+        }
+
+        $saleOrderId = $saleOrderItemId ? DB::table('sale_order_items')->where('id', $saleOrderItemId)->value('sale_order_id') : null;
+        $rows = [];
+        foreach ($perWarehouse as $warehouseId => $raks) {
+            usort($raks, fn ($a, $b) => $b['free'] <=> $a['free']);
+            $own = $saleOrderId
+                ? (float) DB::table('stock_reservations')->whereNull('material_issue_id')->where('sale_order_id', $saleOrderId)
+                    ->where('product_id', $productId)->where('warehouse_id', $warehouseId)->sum('quantity')
+                : 0.0;
+            foreach ($raks as $i => $rak) {
+                $free = max(0.0, $rak['free'] + ($i === 0 ? $own : 0.0));
+                if ($free > self::EPS) {
+                    $rows[] = ['warehouse_id' => (int) $warehouseId, 'rak_id' => $rak['rak_id'], 'quantity' => 0.0, 'free' => $free];
+                }
+            }
+        }
+
+        if ($rows === []) {
+            return [];
+        }
+
+        $rank = array_flip(array_map('intval', $preferredWarehouseIds));
+        $warehouseFree = [];
+        foreach ($rows as $r) {
+            $warehouseFree[$r['warehouse_id']] = ($warehouseFree[$r['warehouse_id']] ?? 0.0) + $r['free'];
+        }
+        usort($rows, function ($a, $b) use ($rank, $warehouseFree) {
+            $ra = $rank[$a['warehouse_id']] ?? PHP_INT_MAX;
+            $rb = $rank[$b['warehouse_id']] ?? PHP_INT_MAX;
+
+            return [$ra, $warehouseFree[$b['warehouse_id']], $a['warehouse_id'], $b['free']] <=> [$rb, $warehouseFree[$a['warehouse_id']], $b['warehouse_id'], $a['free']];
+        });
+
+        $remaining = max(0.0, $quantity);
+        $capLeft = array_map('floatval', $caps);
+        foreach ($rows as &$r) {
+            if ($remaining <= self::EPS) {
+                break;
+            }
+            $limit = array_key_exists($r['warehouse_id'], $capLeft) ? $capLeft[$r['warehouse_id']] : INF;
+            $take = min($remaining, $r['free'], $limit);
+            if ($take > self::EPS) {
+                $r['quantity'] = $take;
+                $remaining -= $take;
+                if (array_key_exists($r['warehouse_id'], $capLeft)) {
+                    $capLeft[$r['warehouse_id']] -= $take;
+                }
+            }
+        }
+        unset($r);
+
+        // Pass 2: gudang pilihan yang sudah habis dibatasi alokasinya — sisa tetap dicari di baris mana pun yang masih berstok.
+        foreach ($rows as &$r) {
+            if ($remaining <= self::EPS) {
+                break;
+            }
+            $room = $r['free'] - $r['quantity'];
+            if ($room > self::EPS) {
+                $take = min($remaining, $room);
+                $r['quantity'] += $take;
+                $remaining -= $take;
+            }
+        }
+        unset($r);
+
+        if ($remaining > self::EPS) {
+            // Stok total tidak cukup: bebankan sisanya ke baris pertama agar validasi melaporkan kekurangan stok dengan jelas.
+            $rows[0]['quantity'] += $remaining;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Menyesuaikan usulan sumber gudang DO dengan stok bebas yang nyata: tiap sumber dibatasi stok bebasnya
+     * (+ reservasi milik SO), kekurangannya dialihkan ke gudang lain yang masih punya stok (terbanyak dulu), dan rak
+     * kosong diisi rak berstok terbanyak. Total kuantitas tetap = $quantity bila stok mencukupi; bila stok tidak cukup,
+     * sisanya dibebankan ke sumber pertama agar validasi tetap menampilkan pesan kekurangan stok yang jelas.
+     *
+     * @param  array<int, array{warehouse_id: int|string, quantity: float|int|string, rak_id?: int|string|null}>  $sources
+     * @return array<int, array{warehouse_id: int, quantity: float, rak_id: int|null}>
+     */
+    public function fitSourcesToStock(array $sources, int $productId, ?int $saleOrderItemId, float $quantity, ?int $cabangId): array
+    {
+        $fitted = [];
+        $remaining = $quantity;
+
+        foreach ($sources as $source) {
+            $warehouseId = (int) ($source['warehouse_id'] ?? 0);
+            if (! $warehouseId || $remaining <= self::EPS) {
+                continue;
+            }
+            $free = max(0.0, $this->freeForSaleOrderItem($productId, $warehouseId, $saleOrderItemId));
+            $take = min((float) ($source['quantity'] ?? 0), $remaining, $free);
+            if ($take > self::EPS) {
+                $fitted[$warehouseId] = ['warehouse_id' => $warehouseId, 'quantity' => $take, 'rak_id' => ! empty($source['rak_id']) ? (int) $source['rak_id'] : null];
+                $remaining -= $take;
+            }
+        }
+
+        if ($remaining > self::EPS) {
+            $candidates = collect($this->accessibleWarehouseIds($cabangId))
+                ->reject(fn ($id) => isset($fitted[$id]))
+                ->map(fn ($id) => ['id' => $id, 'free' => $this->freeForSaleOrderItem($productId, (int) $id, $saleOrderItemId)])
+                ->filter(fn ($row) => $row['free'] > self::EPS)
+                ->sortByDesc('free');
+
+            foreach ($candidates as $row) {
+                if ($remaining <= self::EPS) {
+                    break;
+                }
+                $take = min($remaining, $row['free']);
+                $fitted[$row['id']] = ['warehouse_id' => (int) $row['id'], 'quantity' => $take, 'rak_id' => null];
+                $remaining -= $take;
+            }
+        }
+
+        if ($remaining > self::EPS) {
+            // Stok total tidak cukup: bebankan sisanya ke sumber pertama (atau sumber awal) supaya total = qty dan validasi melapor.
+            $firstKey = array_key_first($fitted) ?? (int) ($sources[0]['warehouse_id'] ?? 0);
+            if ($firstKey) {
+                $fitted[$firstKey] ??= ['warehouse_id' => (int) $firstKey, 'quantity' => 0.0, 'rak_id' => null];
+                $fitted[$firstKey]['quantity'] += $remaining;
+            }
+        }
+
+        foreach ($fitted as &$row) {
+            $row['rak_id'] ??= $this->bestRakId($productId, $row['warehouse_id']);
+        }
+        unset($row);
+
+        return array_values($fitted);
     }
 
     /**
@@ -85,6 +262,31 @@ class StockAvailability
             : null;
 
         return $this->freeForSaleOrders($productId, $warehouseId, $saleOrderId ? [(int) $saleOrderId] : [], $rakId);
+    }
+
+    /**
+     * Seperti freeForSaleOrderItem, ditambah stok yang SUDAH dipotong oleh item DO ini pada produk×gudang (opsional per rak).
+     * Sejak Tahap 3 stok terpotong saat DO dibuat, jadi saat DO diedit (mis. checker mengurangi qty) kuantitas lamanya sudah tidak
+     * ada di stok bebas; tanpa penambahan ini validasi menolak pengurangan qty dengan "stok tidak mencukupi".
+     */
+    public function freeForDeliveryOrderSource(int $productId, int $warehouseId, ?int $saleOrderItemId, ?int $rakId, ?int $deliveryOrderItemId): float
+    {
+        $free = $this->freeForSaleOrderItem($productId, $warehouseId, $saleOrderItemId, $rakId);
+
+        if (! $deliveryOrderItemId) {
+            return $free;
+        }
+
+        $base = DB::table('stock_movements')
+            ->where('from_model_type', \App\Models\DeliveryOrderItem::class)
+            ->where('from_model_id', $deliveryOrderItemId)
+            ->where('warehouse_id', $warehouseId)
+            ->when($rakId, fn ($q) => $q->where('rak_id', $rakId));
+
+        $shipped = (float) (clone $base)->where('type', 'sales')->sum('quantity');
+        $returned = (float) (clone $base)->where('type', 'adjustment_in')->sum('quantity');
+
+        return $free + max(0.0, $shipped - $returned);
     }
 
     /** Stok bebas satu produk untuk keputusan otomatis suatu cabang (Σ gudang yang boleh dipakai) — dipakai daftar produk API/React. */

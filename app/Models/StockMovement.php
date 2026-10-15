@@ -18,7 +18,7 @@ class StockMovement extends Model
      * recompute/reconciliation path — keep these in sync or recomputes
      * will silently erase movements the observer already applied.
      */
-    public const IN_TYPES = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in', 'customer_return', 'return_in', 'sales_return_in'];
+    public const IN_TYPES = ['purchase_in', 'transfer_in', 'manufacture_in', 'adjustment_in', 'customer_return', 'do_return', 'return_in', 'sales_return_in'];
 
     /**
      * Movement types that decrease InventoryStock.qty_available.

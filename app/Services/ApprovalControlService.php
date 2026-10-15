@@ -24,8 +24,12 @@ class ApprovalControlService
         'Admin',
     ];
 
+    /** Kasir hanya menyetujui SO yang harganya sesuai batas harga master produk (UAT B2/B5). */
+    public const CASHIER_ROLE = 'Kasir';
+
     public const SALES_TIER_1_ROLES = [
         'Sales Manager',
+        'Kasir',
         'Super Admin',
         'Owner',
         'Finance Manager',
@@ -183,6 +187,20 @@ class ApprovalControlService
             : ($amount > self::TIER_1_MAX_AMOUNT
                 ? [self::TOP_TIER_ROLES, 'Direktur / Owner / Finance Manager', self::TIER_1_MAX_AMOUNT]
                 : [self::SALES_TIER_1_ROLES, 'Sales Manager / Direktur', null]);
+
+        // Kasir (UAT B2/B5): boleh menyetujui SO HANYA bila semua harga item sesuai batas harga master produk.
+        // Bila ada harga di bawah batas dan Kasir adalah satu-satunya peran yang lolos, SO naik ke atasan (Sales Manager / Direktur).
+        if ($type === ApprovalRule::TYPE_SALE_ORDER && $user->hasRole(self::CASHIER_ROLE)) {
+            $otherRoles = array_values(array_diff((array) $roles, [self::CASHIER_ROLE]));
+            $qualifiesOtherwise = $otherRoles !== [] && $user->hasRole($otherRoles);
+
+            if (! $qualifiesOtherwise && $document instanceof SaleOrder) {
+                $violations = $document->priceLimitViolations();
+                if ($violations !== []) {
+                    return $deny('Harga pada SO ini di bawah batas harga master produk sehingga tidak dapat disetujui Kasir; perlu persetujuan atasan (Sales Manager / Direktur). '.implode(' ', array_slice($violations, 0, 3)));
+                }
+            }
+        }
 
         if (! $user->hasRole($roles)) {
             return $deny($above !== null

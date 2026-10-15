@@ -132,6 +132,7 @@ export interface SaleOrderHeader {
   currency_id: number;
   exchange_rate: number;
   tempo_pembayaran: number;
+  shipping_cost?: number; // ongkos kirim, di luar total_amount barang
   notes?: string;
   status: string;
   total_amount?: number;

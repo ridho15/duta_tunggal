@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Log;
 
 class ReturnProductService
 {
+    /** Ringkasan pemrosesan retur DO terakhir (Stock Adjustment, karantina, DO pengganti) untuk ditampilkan di notifikasi. */
+    public static array $lastSummary = [];
+
     public function updateQuantityFromModel($returnProduct)
     {
         return DB::transaction(function () use ($returnProduct) {
@@ -56,38 +59,48 @@ class ReturnProductService
                 }
 
                 // Create stock movement if not already created
-                $existingMovement = StockMovement::where('from_model_type', ReturnProduct::class)
+                // Retur DO (penjualan) dicatat terpusat oleh DeliveryOrderReturnProcessor (Stock Adjustment + jenis mutasi `do_return` + karantina);
+                // alur ini hanya untuk retur pembelian (Purchase Receipt).
+                $existingMovement = $isSalesReturn ? true : StockMovement::where('from_model_type', ReturnProduct::class)
                     ->where('from_model_id', $returnProduct->id)
                     ->where('meta->return_product_item_id', $returnProductItem->id)
                     ->first();
 
                 if (! $existingMovement && (float) $returnProductItem->quantity > 0) {
-                    $warehouseId = $returnProductItem->fromItemModel?->warehouse_id ?? $returnProduct->warehouse_id;
-                    $rakId = $returnProductItem->rak_id ?? $returnProductItem->fromItemModel?->rak_id;
                     $costPrice = (float) ($returnProductItem->product?->cost_price ?? 0);
                     $type = $isSalesReturn ? 'customer_return' : 'purchase_return';
                     $notes = ($isSalesReturn ? 'Retur Penjualan (Customer Return): ' : 'Retur Pembelian (Vendor Return): ') . $returnProduct->return_number;
 
-                    StockMovement::create([
-                        'product_id' => $returnProductItem->product_id,
-                        'warehouse_id' => $warehouseId,
-                        'rak_id' => $rakId,
-                        'quantity' => (float) $returnProductItem->quantity,
-                        'value' => round((float) $returnProductItem->quantity * $costPrice, 2),
-                        'type' => $type,
-                        'reference_id' => $returnProduct->id,
-                        'date' => now()->toDateString(),
-                        'notes' => $notes,
-                        'from_model_type' => ReturnProduct::class,
-                        'from_model_id' => $returnProduct->id,
-                        'meta' => [
-                            'return_product_id' => $returnProduct->id,
-                            'return_product_item_id' => $returnProductItem->id,
-                            'from_model_type' => $returnProduct->from_model_type,
-                            'from_model_id' => $returnProduct->from_model_id,
-                        ],
-                    ]);
+                    // Barang retur kembali ke gudang/rak ASAL pengiriman per baris sumber (DO multi-gudang), bukan gudang header DO.
+                    foreach ($this->resolveReturnDestinations($returnProductItem, $returnProduct) as $destination) {
+                        StockMovement::create([
+                            'product_id' => $returnProductItem->product_id,
+                            'warehouse_id' => $destination['warehouse_id'],
+                            'rak_id' => $destination['rak_id'],
+                            'quantity' => $destination['quantity'],
+                            'value' => round($destination['quantity'] * $costPrice, 2),
+                            'type' => $type,
+                            'reference_id' => $returnProduct->id,
+                            'date' => now()->toDateString(),
+                            'notes' => $notes,
+                            'from_model_type' => ReturnProduct::class,
+                            'from_model_id' => $returnProduct->id,
+                            'meta' => [
+                                'return_product_id' => $returnProduct->id,
+                                'return_product_item_id' => $returnProductItem->id,
+                                'from_model_type' => $returnProduct->from_model_type,
+                                'from_model_id' => $returnProduct->from_model_id,
+                            ],
+                        ]);
+                    }
                 }
+            }
+
+            // Retur DO: stok kembali lewat Stock Adjustment (gudang sumber / karantina) dengan jenis mutasi `do_return`
+            $processor = null;
+            if ($isSalesReturn) {
+                $processor = app(DeliveryOrderReturnProcessor::class);
+                $processor->restock($returnProduct);
             }
 
             // Create reversing journal entries if not already created
@@ -105,8 +118,50 @@ class ReturnProductService
             // Check if all quantities are returned and close SO/DO partial if needed
             $this->handleReturnAction($returnProduct);
 
+            // Tandai DO asal "sudah diretur" dan buat DO pengganti (DO…C)
+            if ($processor) {
+                $processor->afterApproval($returnProduct->fresh());
+                static::$lastSummary = $processor->summary;
+            }
+
             return $returnProduct;
         });
+    }
+
+    /**
+     * Tujuan stok retur per item: untuk item DO, dibagi mengikuti baris sumber gudang pengiriman (urut, maks. sebesar qty
+     * tiap sumber); sisanya / item lain ke gudang item atau gudang header retur.
+     *
+     * @return array<int, array{warehouse_id: int|null, rak_id: int|null, quantity: float}>
+     */
+    public function resolveReturnDestinations(ReturnProductItem $returnProductItem, ReturnProduct $returnProduct): array
+    {
+        $remaining = (float) $returnProductItem->quantity;
+        $fromItem = $returnProductItem->fromItemModel;
+        $destinations = [];
+
+        if ($fromItem instanceof DeliveryOrderItem) {
+            foreach ($fromItem->warehouseSources()->orderBy('id')->get() as $source) {
+                if ($remaining <= 0.00001 || ! $source->warehouse_id) {
+                    continue;
+                }
+                $take = min($remaining, (float) $source->quantity);
+                if ($take > 0) {
+                    $destinations[] = ['warehouse_id' => (int) $source->warehouse_id, 'rak_id' => $source->rak_id ? (int) $source->rak_id : null, 'quantity' => $take];
+                    $remaining -= $take;
+                }
+            }
+        }
+
+        if ($remaining > 0.00001) {
+            $destinations[] = [
+                'warehouse_id' => $fromItem?->warehouse_id ?? $returnProduct->warehouse_id,
+                'rak_id' => $returnProductItem->rak_id ?? $fromItem?->rak_id,
+                'quantity' => $remaining,
+            ];
+        }
+
+        return $destinations;
     }
 
     /**
@@ -299,10 +354,12 @@ class ReturnProductService
             }
 
             $returnProduct = ReturnProduct::create([
-                'return_number' => $this->generateReturnNumber(),
+                'return_number' => $this->generateReturnNumber(DeliveryOrder::class, $deliveryOrder->id),
                 'from_model_id' => $deliveryOrder->id,
                 'from_model_type' => DeliveryOrder::class,
-                'warehouse_id' => $deliveryOrder->warehouse_id,
+                // DO tanpa gudang header (mis. DO warisan): pakai gudang sumber pertama agar retur tetap punya gudang
+                'warehouse_id' => $deliveryOrder->warehouse_id
+                    ?? $rejectedLines->map(fn ($line) => DeliveryOrderItem::with('warehouseSources')->find($line['item_id'])?->warehouseSources->first()?->warehouse_id)->filter()->first(),
                 'status' => 'draft',
                 'reason' => 'Dibuat otomatis dari Konfirmasi Diterima DO ' . $deliveryOrder->do_number . ' (item ditandai reject saat penerimaan).',
                 'return_action' => 'reduce_quantity_only',
@@ -330,8 +387,25 @@ class ReturnProductService
         });
     }
 
-    public function generateReturnNumber()
+    /**
+     * Nomor retur. Retur dari Delivery Order mengikuti DO asal: `<nomor DO>R` (UAT B13; bila sudah ada: R2, R3, …).
+     * Sumber lain tetap `RN-YYYYMMDD-XXXX`.
+     */
+    public function generateReturnNumber(?string $fromModelType = null, int|string|null $fromModelId = null)
     {
+        if ($fromModelType === DeliveryOrder::class && $fromModelId) {
+            $doNumber = DeliveryOrder::withoutGlobalScopes()->whereKey($fromModelId)->value('do_number');
+            if ($doNumber) {
+                $candidate = $doNumber.'R';
+                $n = 1;
+                while (ReturnProduct::withTrashed()->where('return_number', $candidate)->exists()) {
+                    $candidate = $doNumber.'R'.(++$n);
+                }
+
+                return $candidate;
+            }
+        }
+
         $date = now()->format('Ymd');
         $prefix = 'RN-' . $date . '-';
 
@@ -342,6 +416,44 @@ class ReturnProductService
         } while ($exists);
 
         return $candidate;
+    }
+
+    /** Kalimat ringkasan hasil persetujuan retur DO untuk notifikasi (Stock Adjustment, karantina, DO pengganti). */
+    public static function approvalSummaryText(): string
+    {
+        $summary = static::$lastSummary;
+        if ($summary === []) {
+            return '';
+        }
+
+        $parts = [];
+        if (! empty($summary['adjustments'])) {
+            $parts[] = 'Tercatat di Stock Adjustment '.implode(', ', $summary['adjustments']).'.';
+        }
+        if (($summary['quarantine_qty'] ?? 0) > 0) {
+            $parts[] = rtrim(rtrim(number_format($summary['quarantine_qty'], 2, ',', '.'), '0'), ',').' unit rusak masuk gudang karantina (bukan stok jual).';
+        }
+        if (! empty($summary['replacement'])) {
+            $parts[] = 'DO pengganti '.$summary['replacement'].' dibuat'.($summary['replacement_allocated'] ? ' dan menunggu konfirmasi gudang.' : ' sebagai draf — stok belum cukup, lengkapi sumber gudangnya.');
+        }
+
+        return implode(' ', $parts);
+    }
+
+    /** Format nomor yang sah: RN-YYYYMMDD-XXXX, atau untuk retur DO: `<nomor DO asal>R` / `R2`, … */
+    public function isValidReturnNumber(string $number, ?string $fromModelType = null, int|string|null $fromModelId = null): bool
+    {
+        if (preg_match('/^RN-\d{8}-\d{4}$/', $number)) {
+            return true;
+        }
+
+        if ($fromModelType === DeliveryOrder::class && $fromModelId) {
+            $doNumber = DeliveryOrder::withoutGlobalScopes()->whereKey($fromModelId)->value('do_number');
+
+            return $doNumber && preg_match('/^'.preg_quote($doNumber, '/').'R\d*$/', $number) === 1;
+        }
+
+        return false;
     }
 
     /**

@@ -16,6 +16,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+// B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji JURNAL invoice hasil jalur lama tersebut.
+beforeEach(fn () => config(['sales.invoice.auto_on_do_complete' => true]));
+
 it('creates sales invoice journal entries with shipping costs when delivery order has additional costs', function () {
     // Create cabang
     $cabang = Cabang::factory()->create([
@@ -91,6 +94,7 @@ it('creates sales invoice journal entries with shipping costs when delivery orde
     ]);
 
     // Invoice untuk SO yang dikirim lewat DO terbit PER DO saat DO selesai (bukan saat SO selesai).
+    stkEnsureStockForDo($deliveryOrder, $product);
     DeliveryOrderItem::create([
         'delivery_order_id' => $deliveryOrder->id,
         'sale_order_item_id' => $soItem->id,
@@ -265,6 +269,7 @@ it('does not create shipping cost journal entry when delivery order has no addit
     ]);
 
     // Invoice untuk SO yang dikirim lewat DO terbit PER DO saat DO selesai (bukan saat SO selesai).
+    stkEnsureStockForDo($deliveryOrder, $product);
     DeliveryOrderItem::create([
         'delivery_order_id' => $deliveryOrder->id,
         'sale_order_item_id' => $soItem->id,

@@ -41,6 +41,9 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
     {
         parent::setUp();
 
+        // B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+        config(['sales.invoice.auto_on_do_complete' => true]);
+
         // Create test data
         $this->user = User::create([
             'name' => 'Test User',
@@ -140,12 +143,8 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
         // ==========================================
 
         $initialStockQty = 20;
-        $inventoryStock = InventoryStock::factory()->create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->warehouse->id,
-            'qty_available' => $initialStockQty,
-            'qty_reserved' => 0,
-        ]);
+        config(['sales.invoice.auto_on_do_complete' => true]); // B25: invoice otomatis saat DO selesai (perilaku lama, dinyalakan khusus tes ini)
+        $inventoryStock = stkSetStock($this->product, $this->warehouse, $initialStockQty);
 
         $this->assertDatabaseHas('inventory_stocks', [
             'product_id' => $this->product->id,
@@ -282,11 +281,8 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
         echo "\n\n=== DELIVERY ORDER APPROVED ===";
         echo "\nStatus: {$deliveryOrder->fresh()->status}";
 
-        // DeliveryOrderObserver should create stock reservations
-        $stockReservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $stockReservations, 'Stock reservation should be created');
-        $reservation = $stockReservations->first();
-        $this->assertEquals(10, $reservation->quantity);
+        // Tahap 3: stok fisik sudah dipotong saat DO dibuat, DO tidak menahan reservasi.
+        $this->assertCount(0, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get());
 
         // Check inventory stock after reservation
         // NOTE: qty_reserved may not update if product/warehouse/rak don't match exactly in test
@@ -298,19 +294,18 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
 
         // BUG FIX: StockReservation is NOT deleted - it remains for tracking
         $stockReservationsAfterSent = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $stockReservationsAfterSent, 'Reservation should NOT be deleted after sent');
+        $this->assertCount(0, $stockReservationsAfterSent, 'DO tidak menahan reservasi');
 
         // Verify StockMovement was created
         $stockMovements = StockMovement::where('type', 'sales')
             ->where('from_model_type', DeliveryOrderItem::class)
             ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
             ->get();
-        $this->assertCount(1, $stockMovements, 'StockMovement should be created at sent');
+        $this->assertCount(1, $stockMovements, 'Satu mutasi keluar (dibuat saat DO dibuat, tidak ganda di sent)');
 
-        // Check that StockMovement has shipping_start meta
         $stockMovement = $stockMovements->first();
         $meta = is_string($stockMovement->meta) ? json_decode($stockMovement->meta, true) : $stockMovement->meta;
-        $this->assertArrayHasKey('shipping_start', $meta, 'StockMovement should have shipping_start meta');
+        $this->assertArrayHasKey('do_created_deduction', $meta, 'Mutasi berasal dari pemotongan saat DO dibuat');
 
         // ==========================================
         // STEP 8: RECEIVE DELIVERY ORDER

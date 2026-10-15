@@ -74,6 +74,16 @@ class CreateSalesInvoice extends CreateRecord
                 ]);
             }
 
+            // 3b. B24: SJ yang digabung dalam satu invoice harus dari Sales Order yang SAMA
+            $saleOrderSets = $sjs->map(fn ($sj) => $sj->deliveryOrder->flatMap->salesOrders->pluck('id')->unique()->sort()->values()->implode(','))->unique();
+            if ($saleOrderSets->count() > 1) {
+                $msg = 'Surat Jalan dalam satu invoice harus berasal dari Sales Order yang sama.';
+                throw ValidationException::withMessages([
+                    'data.selected_surat_jalans' => $msg,
+                    'selected_surat_jalans' => $msg,
+                ]);
+            }
+
             // 4. Validasi agar SJ yang sudah ditagih tidak dapat ditagih kembali
             foreach ($sjs as $sj) {
                 if ($sj->isInvoiced()) {

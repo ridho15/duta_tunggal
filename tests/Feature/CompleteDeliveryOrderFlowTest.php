@@ -44,6 +44,9 @@ class CompleteDeliveryOrderFlowTest extends TestCase
     {
         parent::setUp();
 
+        // B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+        config(['sales.invoice.auto_on_do_complete' => true]);
+
         // Create test data
         $this->user = User::create([
             'name' => 'Test User',
@@ -99,14 +102,12 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             $rak = Rak::factory()->create(['warehouse_id' => $this->warehouse->id]);
         }
 
-        $inventoryStock = InventoryStock::create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $rak->id,
-            'qty_available' => $initialStockQty,
-            'qty_reserved' => 0,
-            'qty_min' => 10,
-        ]);
+        // Item DO tidak menyimpan rak/gudang sendiri (bukan fillable) → pemotongan stok Tahap 3 memakai gudang header DO
+        // dan rak null; Product::created sudah membuat baris rak null, jadi atur kuantitas pada baris itu (bukan baris ke-2).
+        $inventoryStock = InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null],
+            ['qty_available' => $initialStockQty, 'qty_reserved' => 0, 'qty_min' => 10]
+        );
 
         $this->assertDatabaseHas('inventory_stocks', [
             'product_id' => $this->product->id,
@@ -204,35 +205,29 @@ class CompleteDeliveryOrderFlowTest extends TestCase
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
         $this->assertEquals('approved', $deliveryOrder->fresh()->status);
 
-        // DeliveryOrderObserver should create stock reservations
-        $stockReservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $stockReservations, 'Stock reservation should be created');
-        $reservation = $stockReservations->first();
-        $this->assertEquals(10, $reservation->quantity);
+        // Tahap 3 (Brief Ko Handy): stok fisik sudah terpotong sejak DO dibuat, jadi tidak ada reservasi DO yang tertahan.
+        $this->assertCount(0, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get(), 'Tidak ada reservasi DO: stok fisik sudah terpotong saat DO dibuat');
+
+        $movementsBeforeSent = StockMovement::where('type', 'sales')
+            ->where('from_model_type', DeliveryOrderItem::class)
+            ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
+            ->get();
+        $this->assertCount(1, $movementsBeforeSent, 'StockMovement dibuat saat DO dibuat');
+        $this->assertEquals(10, $movementsBeforeSent->first()->quantity);
 
         // ==========================================
-        // STEP 7: SEND DELIVERY ORDER (BUG FIX: Creates StockMovement, keeps reservation)
+        // STEP 7: SEND DELIVERY ORDER (idempoten: tidak memotong stok lagi)
         // ==========================================
 
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
         $this->assertEquals('sent', $deliveryOrder->fresh()->status);
 
-        // BUG FIX VERIFICATION: StockReservation is NOT deleted - it remains for tracking
-        $stockReservationsAfterSent = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $stockReservationsAfterSent, 'Reservation should NOT be deleted after sent');
-
-        // BUG FIX VERIFICATION: StockMovement should be created when status changes to 'sent'
         $stockMovementsAtSent = StockMovement::where('type', 'sales')
             ->where('from_model_type', DeliveryOrderItem::class)
             ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
             ->get();
-        $this->assertCount(1, $stockMovementsAtSent, 'StockMovement should be created at sent');
-
-        // Verify StockMovement has shipping_start meta
-        $stockMovement = $stockMovementsAtSent->first();
-        $meta = is_string($stockMovement->meta) ? json_decode($stockMovement->meta, true) : $stockMovement->meta;
-        $this->assertArrayHasKey('shipping_start', $meta, 'StockMovement should have shipping_start meta');
-        $this->assertTrue($meta['shipping_start'], 'shipping_start should be true');
+        $this->assertCount(1, $stockMovementsAtSent, 'Dikirim tidak memotong stok dua kali');
+        $this->assertEquals(10, (float) InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouse->id)->sum('qty_available'), 'stok akhir 10 (20 - 10)');
 
         // ==========================================
         // STEP 8: COMPLETE DELIVERY ORDER
@@ -279,7 +274,7 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             ->get();
 
         // BUG FIX VERIFICATION: Should still have only 1 stock movement (not duplicated at 'completed')
-        $this->assertCount(1, $stockMovements, 'Should have 1 stock movement (created at sent, not at completed)');
+        $this->assertCount(1, $stockMovements, 'Should have 1 stock movement (created at DO creation, not duplicated later)');
         $this->assertEquals(10, $stockMovements->first()->quantity);
         $this->assertEquals('sales', $stockMovements->first()->type);
         $this->assertEquals($this->product->id, $stockMovements->first()->product_id);

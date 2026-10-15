@@ -184,11 +184,27 @@ class DeliveryOrderObserver
      * Tahap 3: Buat StockMovement untuk mengurangi qty_available begitu DO dibuat / disetujui.
      * Idempoten: kuantitas yang sudah keluar (netShipped) tidak akan dipotong ulang.
      */
-    public function createStockMovementsForDeliveryOrder(DeliveryOrder $deliveryOrder): void
+    /**
+     * Saat true, pemotongan stok DITUNDA (hook item/sumber gudang tidak memotong). Dipakai halaman Create DO: item DO
+     * tersimpan lebih dulu daripada sumber gudangnya, sehingga tanpa penundaan hook item memotong SELURUH kuantitas dari
+     * gudang header DO (fallback single-warehouse), lalu sumber gudang memotong lagi — stok terpotong ganda / gagal
+     * di gudang yang bukan pilihan user. Pemotongan dijalankan sekali setelah semua relasi tersimpan.
+     */
+    public static bool $deferStockDeduction = false;
+
+    public function createStockMovementsForDeliveryOrder(DeliveryOrder $deliveryOrder, bool $force = false): void
     {
+        if (self::$deferStockDeduction && ! $force) {
+            return;
+        }
+
         $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
 
         $date = $deliveryOrder->delivery_date ?? now()->toDateString();
+
+        // Pengecualian stok negatif (D15) oleh Owner/Super Admin sudah divalidasi & dicatat di DeliveryOrderTransitions;
+        // di sini hanya diteruskan ke penjaga stok agar pemotongannya benar-benar diizinkan melewati nol.
+        $overrideNegative = (bool) (\App\Services\DeliveryOrderTransitions::context()['override'] ?? false);
 
         foreach ($deliveryOrder->deliveryOrderItem as $item) {
             $qtyToShip = max(0, (float) ($item->quantity ?? 0));
@@ -233,6 +249,7 @@ class DeliveryOrderObserver
                             'delivery_status' => $deliveryOrder->status,
                             'do_created_deduction' => true,
                             'source' => 'delivery_order_observer',
+                            'allow_negative_stock' => $overrideNegative,
                         ]
                     );
                 }
@@ -265,8 +282,88 @@ class DeliveryOrderObserver
                     'delivery_status' => $deliveryOrder->status,
                     'do_created_deduction' => true,
                     'source' => 'delivery_order_observer',
+                    'allow_negative_stock' => $overrideNegative,
                 ]
             );
+        }
+    }
+
+    /**
+     * Menyelaraskan stok fisik dengan isi DO terbaru (kuantitas item × sumber gudang) dengan memotong/mengembalikan SELISIHNYA saja
+     * (tanpa menghapus gerakan lama). Dipakai saat kuantitas item atau kuantitas/gudang/rak sumber diedit (mis. checker mengurangi qty).
+     *
+     * Kuantitas tiap sumber dibatasi sisa kuantitas item (sumber terakhir terpotong lebih dulu), sama seperti aturan reservasi.
+     * Idempoten: dipanggil berulang tidak menambah gerakan.
+     */
+    public function reconcileStockMovementsForDeliveryOrder(DeliveryOrder $deliveryOrder): void
+    {
+        if (self::$deferStockDeduction || in_array($deliveryOrder->status, ['closed', 'reject'], true)) {
+            return;
+        }
+
+        $deliveryOrder->unsetRelation('deliveryOrderItem');
+        $deliveryOrder->load('deliveryOrderItem.product', 'deliveryOrderItem.warehouseSources');
+        $date = $deliveryOrder->delivery_date ?? now()->toDateString();
+        $productService = app(\App\Services\ProductService::class);
+
+        foreach ($deliveryOrder->deliveryOrderItem as $item) {
+            $product = $item->product;
+            if (! $product) {
+                continue;
+            }
+
+            // Target per (gudang, rak)
+            $desired = [];
+            $remaining = max(0.0, (float) ($item->quantity ?? 0));
+            if ($item->warehouseSources->isNotEmpty()) {
+                foreach ($item->warehouseSources as $source) {
+                    if (! $source->warehouse_id) {
+                        continue;
+                    }
+                    $take = min(max(0.0, (float) $source->quantity), $remaining);
+                    $key = $source->warehouse_id.'|'.($source->rak_id ?: 0);
+                    $desired[$key] = ['warehouse_id' => (int) $source->warehouse_id, 'rak_id' => $source->rak_id ? (int) $source->rak_id : null, 'quantity' => ($desired[$key]['quantity'] ?? 0.0) + $take];
+                    $remaining -= $take;
+                }
+            } elseif ($deliveryOrder->warehouse_id || $item->warehouse_id) {
+                $warehouseId = (int) ($deliveryOrder->warehouse_id ?: $item->warehouse_id);
+                $desired[$warehouseId.'|'.($item->rak_id ?: 0)] = ['warehouse_id' => $warehouseId, 'rak_id' => $item->rak_id ? (int) $item->rak_id : null, 'quantity' => $remaining];
+            }
+
+            // Kunci yang pernah bergerak tetapi tidak lagi dibutuhkan → target 0 (dikembalikan)
+            $moved = \App\Models\StockMovement::query()
+                ->where('from_model_type', \App\Models\DeliveryOrderItem::class)->where('from_model_id', $item->id)
+                ->whereIn('type', ['sales', 'adjustment_in'])
+                ->get(['warehouse_id', 'rak_id']);
+            foreach ($moved as $row) {
+                $key = $row->warehouse_id.'|'.($row->rak_id ?: 0);
+                $desired[$key] ??= ['warehouse_id' => (int) $row->warehouse_id, 'rak_id' => $row->rak_id ? (int) $row->rak_id : null, 'quantity' => 0.0];
+            }
+
+            foreach ($desired as $target) {
+                $net = \App\Services\DeliveryShipments::netShipped($item, $target['warehouse_id'], $target['rak_id']);
+                $delta = $target['quantity'] - $net;
+                if (abs($delta) <= 0.00001) {
+                    continue;
+                }
+
+                $productService->createStockMovement(
+                    product_id: $product->id,
+                    warehouse_id: $target['warehouse_id'],
+                    quantity: abs($delta),
+                    type: $delta > 0 ? 'sales' : 'adjustment_in',
+                    date: $date,
+                    notes: ($delta > 0
+                        ? "Penyesuaian stok: kuantitas DO {$deliveryOrder->do_number} bertambah"
+                        : "Penyesuaian stok: kuantitas DO {$deliveryOrder->do_number} berkurang, stok dikembalikan"),
+                    rak_id: $target['rak_id'],
+                    fromModel: $item,
+                    value: $product->cost_price * abs($delta),
+                    meta: $delta > 0
+                        ? ['do_created_deduction' => true, 'source' => 'do_quantity_reconcile']
+                        : ['delivery_reversal' => true, 'source' => 'do_quantity_reconcile']
+                );
+            }
         }
     }
 
@@ -313,8 +410,11 @@ class DeliveryOrderObserver
         // (approved -> partially_delivered -> completed) lewat satu service, bukan dari event DO.
         $this->syncDeliveryProgress($deliveryOrder);
 
-        // Terbitkan invoice otomatis khusus untuk item dan kuantitas yang dikirim pada Delivery Order ini
-        $this->createInvoiceForCompletedDeliveryOrder($deliveryOrder);
+        // B25 (UAT 13 Okt 2026): invoice TIDAK lagi terbit otomatis saat DO diselesaikan — invoice dibuat manual dari Surat Jalan
+        // (Customer → SO → centang SJ). Jalur lama hanya hidup bila `sales.invoice.auto_on_do_complete` diaktifkan.
+        if (config('sales.invoice.auto_on_do_complete', false)) {
+            $this->createInvoiceForCompletedDeliveryOrder($deliveryOrder);
+        }
     }
 
     /**

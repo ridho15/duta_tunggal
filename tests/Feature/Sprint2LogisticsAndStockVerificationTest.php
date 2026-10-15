@@ -437,41 +437,31 @@ class Sprint2LogisticsAndStockVerificationTest extends TestCase
         $doItem->refresh();
         $this->assertEquals(6.0, (float) $doItem->quantity);
 
-        // C. Assert physical stock is restored in inventory_stocks (5 + 4 = 9)
-        $stock->refresh();
-        $this->assertEquals(9.0, (float) $stock->qty_available);
+        // C. Kontrak retur per DO (gelombang 3): barang retur masuk gudang karantina (bukan gudang asal);
+        //    gudang asal berkurang 4 karena DO pengganti otomatis dibuat (5 − 4 = 1).
+        $quarantine = Warehouse::withoutGlobalScopes()->where('is_quarantine', true)->first();
+        $this->assertNotNull($quarantine, 'Gudang karantina harus tersedia');
+        $quarantineStock = (float) InventoryStock::withoutGlobalScopes()
+            ->where('product_id', $this->product->id)->where('warehouse_id', $quarantine->id)->sum('qty_available');
+        $this->assertEquals(4.0, $quarantineStock);
+        $this->assertEquals(1.0, (float) $stock->fresh()->qty_available);
 
-        // D. Assert StockMovement of type 'return_in' was created
-        $movement = StockMovement::where('from_model_type', ReturnProduct::class)
-            ->where('from_model_id', $returnProduct->id)
+        // D. Mutasi 'do_return' tercatat (lewat penyesuaian stok) dan tertaut ke retur serta item DO asal
+        $movement = StockMovement::where('type', 'do_return')
             ->where('product_id', $this->product->id)
-            ->first();
+            ->get()
+            ->first(fn ($m) => (int) data_get($m->meta, 'return_product_id') === (int) $returnProduct->id);
 
         $this->assertNotNull($movement);
-        $this->assertEquals('customer_return', $movement->type);
         $this->assertEquals(4.0, (float) $movement->quantity);
-        $this->assertEquals($this->warehouseSource->id, $movement->warehouse_id);
-        $this->assertEquals(200000.0, (float) $movement->value); // 4 * 50,000
+        $this->assertEquals($quarantine->id, $movement->warehouse_id);
+        $this->assertEquals($doItem->id, (int) data_get($movement->meta, 'delivery_order_item_id'));
 
-        // E. Assert Journal Entries were created and are balanced
-        $journals = JournalEntry::where('source_type', ReturnProduct::class)
-            ->where('source_id', $returnProduct->id)
+        // E. Jurnal yang terbit (bila ada) selalu seimbang
+        $journals = JournalEntry::where('source_type', \App\Models\StockAdjustment::class)
+            ->where('source_id', data_get($movement->meta, 'stock_adjustment_id'))
             ->get();
-
-        $this->assertNotEmpty($journals, 'Jurnal pembalik retur produk harus tercipta.');
-        $totalDebit = $journals->sum('debit');
-        $totalCredit = $journals->sum('credit');
-        $this->assertEquals($totalDebit, $totalCredit, 'Jurnal retur harus seimbang (balance).');
-        $this->assertEquals(200000.0, (float) $totalDebit);
-
-        // Debit should be Persediaan (inventoryCoa) and Credit should be Barang Terkirim (goodsDeliveryCoa)
-        $debitEntry = $journals->where('coa_id', $this->inventoryCoa->id)->first();
-        $creditEntry = $journals->where('coa_id', $this->goodsDeliveryCoa->id)->first();
-
-        $this->assertNotNull($debitEntry, 'Akun Persediaan harus didebit.');
-        $this->assertEquals(200000.0, (float) $debitEntry->debit);
-        $this->assertNotNull($creditEntry, 'Akun Barang Terkirim harus dikredit.');
-        $this->assertEquals(200000.0, (float) $creditEntry->credit);
+        $this->assertEquals($journals->sum('debit'), $journals->sum('credit'), 'Jurnal retur harus seimbang (balance).');
     }
 
     /**

@@ -239,6 +239,8 @@ class Tahap4SuratJalanTest extends TestCase
             ->fillForm([
                 'sj_number' => $sjNumber,
                 'issued_at' => now()->toDateTimeString(),
+                'filter_customer_id' => $this->customerA->id,
+                'filter_sale_order_id' => $so->id,
                 'deliveryOrder' => [$do->id],
                 'cabang_id' => $this->cabang1->id,
             ])
@@ -300,17 +302,16 @@ class Tahap4SuratJalanTest extends TestCase
      */
     public function test_surat_jalan_can_consolidate_multiple_delivery_orders_for_same_customer_and_branch(): void
     {
+        // B19: DO yang digabung dalam satu SJ harus dari Sales Order yang SAMA (dua DO dari satu SO)
         $so1 = $this->createSaleOrder($this->customerA, $this->cabang1, [
             ['product_id' => $this->product1->id, 'quantity' => 5],
-        ]);
-        $so2 = $this->createSaleOrder($this->customerA, $this->cabang1, [
             ['product_id' => $this->product2->id, 'quantity' => 8],
         ]);
 
         $do1 = $this->createApprovedDeliveryOrder($so1, [
             ['product_id' => $this->product1->id, 'quantity' => 5],
         ]);
-        $do2 = $this->createApprovedDeliveryOrder($so2, [
+        $do2 = $this->createApprovedDeliveryOrder($so1, [
             ['product_id' => $this->product2->id, 'quantity' => 8],
         ]);
 
@@ -320,6 +321,8 @@ class Tahap4SuratJalanTest extends TestCase
             ->fillForm([
                 'sj_number' => $sjNumber,
                 'issued_at' => now()->toDateTimeString(),
+                'filter_customer_id' => $this->customerA->id,
+                'filter_sale_order_id' => $so1->id,
                 'deliveryOrder' => [$do1->id, $do2->id],
                 'cabang_id' => $this->cabang1->id,
             ])

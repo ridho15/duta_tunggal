@@ -319,6 +319,12 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
             'total_amount' => 100000,
         ]);
 
+        // Stok fisik terpotong saat item DO dibuat (Tahap 3) → sediakan stok di gudang DO.
+        InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null],
+            ['qty_available' => 50, 'qty_reserved' => 0]
+        );
+
         $do = DeliveryOrder::create([
             'do_number' => 'DO-UNINV-' . uniqid(),
             'sale_order_id' => $so->id,
@@ -394,6 +400,12 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
             'total_price' => 200000,
             'warehouse_id' => $this->warehouse->id,
         ]);
+
+        // Stok fisik terpotong saat item DO dibuat (Tahap 3) → sediakan stok di gudang DO.
+        InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null],
+            ['qty_available' => 50, 'qty_reserved' => 0]
+        );
 
         $do = DeliveryOrder::create([
             'do_number' => 'DO-INV-' . uniqid(),
@@ -536,6 +548,12 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
             'status' => 'approved',
             'total_amount' => 500000,
         ]);
+
+        // Stok fisik terpotong saat item DO dibuat (Tahap 3) → sediakan stok di gudang DO.
+        InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null],
+            ['qty_available' => 50, 'qty_reserved' => 0]
+        );
 
         $do = DeliveryOrder::create([
             'do_number' => 'DO-EDIT-' . uniqid(),

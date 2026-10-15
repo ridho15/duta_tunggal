@@ -32,6 +32,9 @@ use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
+// B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+beforeEach(fn () => config(['sales.invoice.auto_on_do_complete' => true]));
+
 function dovContext(): array
 {
     $cabang = Cabang::factory()->create(['kode' => 'DOV-'.strtoupper(substr(uniqid(), -5)), 'nama' => 'Cabang DOV', 'status' => 1]);
@@ -92,6 +95,8 @@ function dovDeliveryOrder(array $ctx, SaleOrder $saleOrder, ?SaleOrderItem $sale
     ], $do));
     $deliveryOrder->salesOrders()->attach($saleOrder->id);
 
+    // Tahap 3: DO memotong stok fisik saat item dibuat — sediakan stok cukup di gudang DO.
+    stkSetStock($product ?? $ctx['product'], $ctx['warehouse'], 100000);
     DeliveryOrderItem::create([
         'delivery_order_id' => $deliveryOrder->id, 'sale_order_item_id' => $saleOrderItem?->id,
         'product_id' => $product?->id ?? $ctx['product']->id, 'quantity' => $qty, 'reason' => 'Uji nilai DO',

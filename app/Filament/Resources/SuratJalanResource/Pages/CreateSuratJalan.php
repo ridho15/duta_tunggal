@@ -55,4 +55,26 @@ class CreateSuratJalan extends CreateRecord
         $data['status'] = SuratJalan::STATUS_ISSUED;   // auto-terbit (J2), langsung terkunci
         return $data;
     }
+
+    /** Surat Jalan + penandaan DO "Diterima" (B21) atomik: bila DO gagal ditandai, Surat Jalan tidak ikut tersimpan. */
+    public function hasDatabaseTransactions(): bool
+    {
+        return true;
+    }
+
+    protected function afterCreate(): void
+    {
+        try {
+            app(SuratJalanService::class)->markDeliveryOrdersReceived($this->record);
+        } catch (\App\Exceptions\DeliveryOrderTransitionException|\Exception $e) {   // termasuk akun COA produk yang belum diatur (jurnal pengiriman)
+            Notification::make()
+                ->title('Gagal Membuat Surat Jalan')
+                ->body($e->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
+
+            throw ValidationException::withMessages(['data.deliveryOrder' => $e->getMessage()]);
+        }
+    }
 }

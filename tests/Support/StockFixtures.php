@@ -139,6 +139,13 @@ function stkSaleOrder(array $ctx, float $qty, array $so = [], array $item = []):
  */
 function stkDeliveryOrder(array $ctx, SaleOrder $saleOrder, SaleOrderItem $item, float $qty, string $status = 'request_stock', ?Warehouse $source = null): DeliveryOrder
 {
+    // Stok fisik terpotong begitu sumber gudang DO dibuat (Tahap 3): bila fixture belum mengatur stok sama sekali (0),
+    // sediakan persis $qty agar pembuatan DO tidak ditolak "stok tidak mencukupi". Tes yang mengatur stok sendiri tidak tersentuh.
+    $stockWarehouse = $source ?? $ctx['warehouse'];
+    if (stkStock($item->product ?? Product::find($item->product_id), $stockWarehouse)['available'] <= 0) {
+        stkSetStock($item->product ?? Product::find($item->product_id), $stockWarehouse, $qty);
+    }
+
     $deliveryOrder = DeliveryOrder::create([
         'do_number' => 'DO-STK-'.strtoupper(substr(uniqid(), -6)), 'delivery_date' => now(), 'status' => 'request_stock',
         'cabang_id' => $ctx['cabang']->id, 'warehouse_id' => ($source ?? $ctx['warehouse'])->id,
@@ -178,4 +185,27 @@ function stkSchedule(array $ctx, DeliveryOrder $deliveryOrder, string $status = 
     }
 
     return $schedule->fresh();
+}
+
+/**
+ * Tahap 3: DO memotong stok fisik saat item dibuat. Fixture lama yang membuat DO langsung (tanpa menyiapkan stok)
+ * memanggil ini sebelum membuat item, agar gudang DO punya stok cukup.
+ */
+function stkEnsureStockForDo(\App\Models\DeliveryOrder $deliveryOrder, Product $product, float $qty = 100000): void
+{
+    if ($deliveryOrder->warehouse_id) {
+        stkSetStock($product, Warehouse::findOrFail($deliveryOrder->warehouse_id), $qty);
+    }
+}
+
+/**
+ * Observer SO tidak lagi menerbitkan invoice saat SO selesai (alur SO -> DO -> SJ -> Invoice). Tes yang menguji logika
+ * penerbitan invoice dari SO (pajak, AR, jurnal) memicunya langsung lewat helper ini.
+ */
+function stkCompleteSoAndInvoice(\App\Models\SaleOrder $saleOrder): void
+{
+    $saleOrder->update(['status' => 'completed']);
+    $m = new \ReflectionMethod(\App\Observers\SaleOrderObserver::class, 'createInvoiceForCompletedSaleOrder');
+    $m->setAccessible(true);
+    $m->invoke(app(\App\Observers\SaleOrderObserver::class), $saleOrder->fresh());
 }

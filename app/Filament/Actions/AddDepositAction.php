@@ -61,10 +61,10 @@ class AddDepositAction
                     ->dehydrated(),
                     
                 Select::make('coa_id')
-                    ->label('Chart Of Account')
+                    ->label('Akun Kas / Bank')
                     ->required()
-                    ->searchable(['code', 'perusahaan'])
-                    ->relationship('coa', 'code')
+                    ->searchable(['code', 'name'])
+                    ->relationship('coa', 'code', fn ($query) => $query->where('is_cash_bank', true)->where('is_active', true))
                     ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                         return "({$chartOfAccount->code}) {$chartOfAccount->name}";
                     }),

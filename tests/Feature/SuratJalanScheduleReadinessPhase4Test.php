@@ -66,6 +66,11 @@ function phase4Context(?array $permissions = null): array
     ]);
     $warehouse = Warehouse::factory()->create(['cabang_id' => $cabang->id]);
 
+    // Terbitnya Surat Jalan menandai DO Dikirim/Diterima (B21) dan mencatat jurnal pengiriman → akun persediaan & barang terkirim harus ada
+    foreach ([['1140.10', 'Persediaan Barang Dagangan', 'Asset'], ['1140.20', 'Barang Terkirim', 'Asset'], ['5100.10', 'HPP Barang Dagangan', 'Expense']] as [$code, $name, $type]) {
+        \App\Models\ChartOfAccount::firstOrCreate(['code' => $code], ['name' => $name, 'type' => $type, 'is_active' => true, 'opening_balance' => 0]);
+    }
+
     return compact('cabang', 'user', 'uom', 'customer', 'product', 'warehouse');
 }
 
@@ -84,6 +89,12 @@ function phase4DeliveryOrder(array $ctx, string $doNumber, array $items = [], st
     $do->salesOrders()->attach($so->id);
 
     foreach ($items ?: [['quantity' => 12, 'reason' => 'Rak A']] as $item) {
+        // Pembuatan item DO memotong stok gudang header (Tahap 3) → sediakan stok sebesar kebutuhan item
+        \App\Models\InventoryStock::query()->updateOrCreate(
+            ['product_id' => $item['product_id'] ?? $ctx['product']->id, 'warehouse_id' => $ctx['warehouse']->id, 'rak_id' => null],
+            ['qty_reserved' => 0]
+        )->increment('qty_available', (float) $item['quantity']);
+
         DeliveryOrderItem::create([
             'delivery_order_id' => $do->id,
             'product_id' => $item['product_id'] ?? $ctx['product']->id,
@@ -478,6 +489,7 @@ it('Isu 6: Terbitkan Ulang membuat Surat Jalan baru (nomor baru, terbit) untuk D
     $ctx = phase4Context();
     $do1 = phase4DeliveryOrder($ctx, 'DO-P4-C01');
     $do2 = phase4DeliveryOrder($ctx, 'DO-P4-C02');
+    $do2->salesOrders()->sync($do1->salesOrders()->pluck('sale_orders.id')->all());   // B19: DO dalam satu SJ harus dari SO yang sama
     $old = phase4SuratJalan($ctx, [$do1, $do2]);
     $service = app(SuratJalanService::class);
 

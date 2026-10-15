@@ -496,8 +496,10 @@ class InvoiceResource extends Resource
                     ViewAction::make()
                         ->color('primary'),
                     EditAction::make()
-                        ->color('success'),
-                    DeleteAction::make(),
+                        ->color('success')
+                        ->visible(fn ($record) => strtolower((string) $record->status) === Invoice::STATUS_DRAFT),
+                    DeleteAction::make()
+                        ->visible(fn ($record) => strtolower((string) $record->status) === Invoice::STATUS_DRAFT),
                     Action::make('cetak_invoice')
                         ->label('Preview / Download PDF')
                         ->color('primary')

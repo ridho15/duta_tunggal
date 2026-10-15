@@ -10,6 +10,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['sales.stock' => [
+        'require_surat_jalan' => false,
         'ledger' => false,
         'strict_dispatch' => true,
         'reserve_on_so_approve' => false,
@@ -52,7 +53,7 @@ it('RC-01: invarian stok fisik vs mutasi kartu persediaan bernilai tepat 0 (tanp
         ->and($currentAvailable)->toBe(15.0);
 });
 
-it('RC-02: invarian cadangan stok menjamin nol reservasi phantom di setiap siklus DO', function () {
+it('RC-02: invarian cadangan stok menjamin nol reservasi phantom dan stok fisik benar di setiap siklus DO', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 40);
 
@@ -73,8 +74,11 @@ it('RC-02: invarian cadangan stok menjamin nol reservasi phantom di setiap siklu
         ->where('warehouse_id', $ctx['warehouse']->id)
         ->sum('quantity');
 
-    expect($reservedInStock)->toBe(20.0)
-        ->and($activeReservations)->toBe(20.0)
+    // Tahap 3: DO memotong stok fisik saat dibuat (40 → 20) dan tidak menahan reservasi apa pun
+    $physicalNow = fn () => (float) InventoryStock::withoutGlobalScopes()->where('product_id', $ctx['product']->id)->where('warehouse_id', $ctx['warehouse']->id)->sum('qty_available');
+    expect($reservedInStock)->toBe(0.0)
+        ->and($activeReservations)->toBe(0.0)
+        ->and($physicalNow())->toBe(20.0)
         ->and(abs($reservedInStock - $activeReservations))->toBe(0.0);
 
     // DO 1 dikirim -> reservasi DO 1 dilepas/dikonsumsi
@@ -90,8 +94,10 @@ it('RC-02: invarian cadangan stok menjamin nol reservasi phantom di setiap siklu
         ->where('warehouse_id', $ctx['warehouse']->id)
         ->sum('quantity');
 
-    expect($reservedAfterSend)->toBe(8.0)
-        ->and($activeAfterSend)->toBe(8.0)
+    // Dikirim tidak memotong lagi (fisik tetap 20) dan tidak ada reservasi phantom
+    expect($reservedAfterSend)->toBe(0.0)
+        ->and($activeAfterSend)->toBe(0.0)
+        ->and($physicalNow())->toBe(20.0)
         ->and(abs($reservedAfterSend - $activeAfterSend))->toBe(0.0);
 
     // DO 2 dibatalkan (closed) -> cadangan harus kembali menjadi 0
@@ -106,8 +112,10 @@ it('RC-02: invarian cadangan stok menjamin nol reservasi phantom di setiap siklu
         ->where('warehouse_id', $ctx['warehouse']->id)
         ->sum('quantity');
 
+    // DO 2 (8 pcs) dibatalkan → 8 pcs kembali ke stok fisik (20 → 28); DO 1 (12) tetap di luar gudang
     expect($finalReserved)->toBe(0.0)
         ->and($finalActive)->toBe(0.0)
+        ->and($physicalNow())->toBe(28.0)
         ->and(abs($finalReserved - $finalActive))->toBe(0.0);
 });
 

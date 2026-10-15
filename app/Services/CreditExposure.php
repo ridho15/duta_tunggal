@@ -38,7 +38,7 @@ class CreditExposure
         $orders = SaleOrder::withoutGlobalScopes()
             ->where('customer_id', $customer->id)
             ->whereIn('status', self::OPEN_SO_STATUSES)
-            ->get(['id', 'total_amount']);
+            ->get(['id', 'total_amount', 'shipping_cost']);
 
         if ($orders->isEmpty()) {
             return ['total' => 0.0, 'count' => 0];
@@ -55,7 +55,7 @@ class CreditExposure
         $total = 0.0;
         $count = 0;
         foreach ($orders as $order) {
-            $open = max(0.0, (float) $order->total_amount - (float) ($invoiced[$order->id] ?? 0));
+            $open = max(0.0, (float) $order->total_amount + (float) $order->shipping_cost - (float) ($invoiced[$order->id] ?? 0));   // ongkir ikut ditagih lewat invoice
             if ($open > 0.005) {
                 $total += $open;
                 $count++;

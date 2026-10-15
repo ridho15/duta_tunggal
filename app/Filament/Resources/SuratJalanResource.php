@@ -103,9 +103,10 @@ class SuratJalanResource extends Resource
                                 $set('deliveryOrder', []);
                             }),
                         Select::make('filter_sale_order_id')
-                            ->label('2. Filter Sales Order (Opsional)')
-                            ->placeholder('Pilih Sales Order (opsional)...')
-                            ->helperText('Opsional: persempit pilihan DO hanya dari Sales Order tertentu.')
+                            ->label('2. Sales Order')
+                            ->placeholder('Pilih Sales Order...')
+                            ->required(fn (string $operation) => $operation === 'create')
+                            ->helperText('Wajib: Surat Jalan hanya menggabungkan DO dari Sales Order yang sama.')
                             ->searchable()
                             ->options(function ($get, ?SuratJalan $record) {
                                 $customerId = $get('filter_customer_id') ?? $record?->deliveryOrder->first()?->salesOrders->first()?->customer_id;
@@ -118,17 +119,18 @@ class SuratJalanResource extends Resource
                             ->reactive()
                             ->dehydrated(false)
                             ->afterStateUpdated(fn ($state, $set) => $set('deliveryOrder', [])),
-                        Select::make('deliveryOrder')
-                            ->label('3. Delivery Order (Boleh > 1 DO)')
+                        \Filament\Forms\Components\CheckboxList::make('deliveryOrder')
+                            ->label('3. Delivery Order (centang satu atau lebih)')
                             ->helperText(function ($get) {
                                 if (! $get('filter_customer_id')) {
                                     return 'Pilih Customer di atas terlebih dahulu untuk menampilkan Delivery Order yang tersedia.';
                                 }
-                                return 'Pilih satu atau lebih DO untuk customer ini (Customer & Cabang harus sama).';
+                                if (! $get('filter_sale_order_id')) {
+                                    return 'Pilih Sales Order (langkah 2) terlebih dahulu: DO yang tampil hanya milik SO tersebut.';
+                                }
+                                return 'Centang DO yang dikirim bersama. DO dalam satu Surat Jalan harus dari Sales Order yang sama; DO yang pernah diretur tidak tampil (gunakan DO pengganti …C). Terbitnya Surat Jalan otomatis menandai DO Diterima.';
                             })
-                            ->placeholder(fn ($get, ?SuratJalan $record) => (! $record?->getKey() && empty($get('filter_customer_id'))) ? 'Pilih Customer terlebih dahulu...' : 'Pilih Delivery Order...')
-                            ->searchable()
-                            ->preload()
+                            ->columns(1)
                             ->required()
                             ->reactive()
                             ->relationship('deliveryOrder', 'do_number', function (Builder $query, $get, ?SuratJalan $record) {
@@ -148,15 +150,24 @@ class SuratJalanResource extends Resource
                                     $query->whereRaw('1 = 0');
                                 }
 
+                                // B18/B19: urutan Customer → Sales Order → centang DO; DO yang tampil hanya milik SO terpilih
                                 $soId = $get('filter_sale_order_id');
                                 if ($soId) {
                                     $query->whereHas('salesOrders', fn ($q) => $q->where('sale_orders.id', $soId));
+                                } elseif (! $record?->getKey()) {
+                                    $query->whereRaw('1 = 0');
                                 }
+
+                                // B20: DO yang pernah diretur hanya muncul sebagai DO pengganti (…C)
+                                $query->whereNull('delivery_orders.returned_at');
                             })
                             ->getOptionLabelFromRecordUsing(function (DeliveryOrder $record): string {
                                 $customer = $record->salesOrders->first()?->customer;
                                 $custName = $customer ? " ({$customer->name})" : '';
-                                return "{$record->do_number}{$custName}";
+                                $warehouseName = \App\Models\Warehouse::withoutGlobalScopes()->whereKey($record->warehouse_id)->value('name');
+                                $itemCount = $record->deliveryOrderItem()->count();
+
+                                return "{$record->do_number}{$custName}".($warehouseName ? " — Gudang {$warehouseName}" : '')." — {$itemCount} item";
                             })
                             ->rules([
                                 fn (?SuratJalan $record) => function (string $attribute, $value, \Closure $fail) use ($record) {
@@ -183,7 +194,6 @@ class SuratJalanResource extends Resource
                                     }
                                 }
                             ])
-                            ->multiple()
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 $ids = is_array($state) ? $state : (empty($state) ? [] : [$state]);
                                 $deliveryOrders = DeliveryOrder::whereIn('id', $ids)->get();

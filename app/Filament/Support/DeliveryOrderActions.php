@@ -172,7 +172,7 @@ class DeliveryOrderActions
             ->color('success')
             ->requiresConfirmation()
             ->modalHeading('Selesaikan Delivery Order')
-            ->modalDescription('Dokumen pengiriman selesai: jurnal DO dan invoice otomatis diterbitkan. Bila belum dicatat diterima, sistem mencatat penerimaan otomatis.')
+            ->modalDescription('Dokumen pengiriman selesai: jurnal DO dicatat. Invoice TIDAK terbit otomatis — buat dari menu Invoice Penjualan (Customer → SO → centang Surat Jalan). Bila belum dicatat diterima, sistem mencatat penerimaan otomatis.')
             ->modalSubmitActionLabel('Ya, Selesaikan')
             ->tooltip(fn ($record) => $record && ! $record->hasIssuedSuratJalan() ? 'Delivery Order belum memiliki Surat Jalan (SJ) yang terbit' : null)
             ->extraAttributes(['wire:loading.attr' => 'disabled'])
@@ -181,7 +181,7 @@ class DeliveryOrderActions
                 self::run(
                     fn () => app(DeliveryOrderTransitions::class)->complete($record, ['source' => 'action']),
                     'Delivery Order Selesai',
-                    "DO {$record->do_number} selesai. Invoice diterbitkan otomatis bila belum ada."
+                    "DO {$record->do_number} selesai. Buat invoice dari menu Invoice Penjualan (pilih Surat Jalan)."
                 );
             });
     }

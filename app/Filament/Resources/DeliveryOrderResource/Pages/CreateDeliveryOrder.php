@@ -19,6 +19,52 @@ class CreateDeliveryOrder extends CreateRecord
     // Store salesOrderIds for use in afterCreate
     protected array $processedSalesOrderIds = [];
 
+    /**
+     * Seluruh pembuatan DO (header, item, sumber gudang, pemotongan stok, konfirmasi gudang) atomik: pemotongan stok
+     * berjalan saat baris sumber gudang disimpan, jadi tanpa transaksi kegagalannya meninggalkan DO setengah jadi.
+     */
+    public function hasDatabaseTransactions(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Kegagalan saat membuat DO (mis. stok rak tidak cukup) dibatalkan penuh dan SELALU disampaikan ke user —
+     * ValidationException dengan key non-field (mis. "quantity") tidak tampil di form Filament.
+     */
+    public function create(bool $another = false): void
+    {
+        try {
+            \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+            parent::create($another);
+        } catch (ValidationException $e) {
+            // Error validasi field form (key "data.*") tampil sendiri di bawah field; sisanya (pesan dari
+            // service/observer dengan key non-field) perlu ditampilkan manual.
+            $nonField = collect($e->errors())->reject(fn ($messages, $key) => str_starts_with((string) $key, 'data.'));
+            if ($nonField->isNotEmpty()) {
+                Notification::make()
+                    ->title('Delivery Order Gagal Dibuat')
+                    ->body($nonField->flatten()->implode(' '))
+                    ->danger()
+                    ->persistent()
+                    ->send();
+            }
+
+            throw $e;
+        } catch (\Throwable $e) {
+            report($e);
+
+            Notification::make()
+                ->title('Delivery Order Gagal Dibuat')
+                ->body('Terjadi kesalahan saat menyimpan DO; tidak ada data yang tersimpan. ' . $e->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
+        } finally {
+            \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false;
+        }
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Normalize and validate that salesOrders is not empty
@@ -127,6 +173,15 @@ class CreateDeliveryOrder extends CreateRecord
             }
         }
 
+        // Ongkos kirim SO (B1): bebankan ke DO ini bila belum ditagih lewat DO lain → tampil di invoice sebagai biaya pengiriman.
+        if (empty($data['additional_cost'])) {
+            $shipping = \App\Services\DeliveryOrderService::shippingCostToBill($salesOrderIds);
+            if ($shipping['amount'] > 0) {
+                $data['additional_cost'] = $shipping['amount'];
+                $data['additional_cost_description'] = $shipping['description'];
+            }
+        }
+
         // Validate delivery order items against all selected sales orders
         $deliveryItems = $data['deliveryOrderItem'] ?? [];
 
@@ -141,11 +196,11 @@ class CreateDeliveryOrder extends CreateRecord
                     // Only add items that still have remaining quantity
                     if ($remainingQty > 0) {
                         $warehouseSources = $saleOrderItem->warehouseAllocations
-                            ->map(function ($allocation) {
+                            ->map(function ($allocation) use ($saleOrderItem) {
                                 return [
                                     'warehouse_id' => $allocation->warehouse_id,
                                     'quantity' => (float) $allocation->quantity,
-                                    'rak_id' => null,
+                                    'rak_id' => app(\App\Services\StockAvailability::class)->bestRakId((int) $saleOrderItem->product_id, (int) $allocation->warehouse_id),
                                 ];
                             })
                             ->values()
@@ -174,10 +229,27 @@ class CreateDeliveryOrder extends CreateRecord
                                     [
                                         'warehouse_id' => $fallbackWarehouseId,
                                         'quantity' => (float) $remainingQty,
-                                        'rak_id' => $saleOrderItem->rak_id,
+                                        'rak_id' => $saleOrderItem->rak_id ?: app(\App\Services\StockAvailability::class)->bestRakId((int) $saleOrderItem->product_id, (int) $fallbackWarehouseId),
                                     ]
                                 ];
                             }
+                        }
+
+                        // B7: tampilkan SEMUA gudang×rak berstok bebas > 0 untuk produk ini; qty awal diisi dari alokasi/gudang item lalu gudang berstok terbanyak
+                        $stockRows = app(\App\Services\StockAvailability::class)->sourceRowsForItem(
+                            (int) $saleOrderItem->product_id,
+                            (int) $saleOrderItem->id,
+                            (float) $remainingQty,
+                            $saleOrder->cabang_id ? (int) $saleOrder->cabang_id : null,
+                            collect($warehouseSources)->pluck('warehouse_id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
+                            collect($warehouseSources)->mapWithKeys(fn ($src) => [(int) $src['warehouse_id'] => (float) $src['quantity']])->all(),
+                        );
+                        if (! empty($stockRows)) {
+                            $warehouseSources = collect($stockRows)->map(fn ($row) => [
+                                'warehouse_id' => $row['warehouse_id'],
+                                'quantity' => (float) $row['quantity'],
+                                'rak_id' => $row['rak_id'],
+                            ])->values()->all();
                         }
 
                         $deliveryItems[] = [
@@ -291,7 +363,10 @@ class CreateDeliveryOrder extends CreateRecord
                     throw new ValidationException($validator);
                 }
 
-                $warehouseSources = collect($item['warehouseSources'] ?? []);
+                // Baris qty 0 (gudang berstok yang tidak dipakai, B7) diabaikan
+                $warehouseSources = collect($item['warehouseSources'] ?? [])
+                    ->filter(fn ($zeroSource) => (float) ($zeroSource['quantity'] ?? 0) > 0)
+                    ->values();
                 if ($warehouseSources->isEmpty()) {
                     $message = "Item delivery order #" . ($index + 1) . ": Pilih minimal satu gudang sumber pengiriman.";
                     Notification::make()
@@ -339,7 +414,7 @@ class CreateDeliveryOrder extends CreateRecord
                         throw new ValidationException($validator);
                     }
 
-                    $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, $saleOrderItemId ? (int) $saleOrderItemId : null);   // stok bebas + reservasi milik SO ini
+                    $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, $saleOrderItemId ? (int) $saleOrderItemId : null, ! empty($source['rak_id']) ? (int) $source['rak_id'] : null);   // stok bebas + reservasi milik SO ini
 
                     if ((float) $availableStock < $sourceQtyItem) {
                         $productName = $saleOrderItem->product->name ?? 'produk';
@@ -386,8 +461,37 @@ class CreateDeliveryOrder extends CreateRecord
             $deliveryOrder->salesOrders()->sync($this->processedSalesOrderIds);
         }
 
-        // Tahap 3 (Brief Ko Handy): Stok terpotong begitu Dibuat DO (bukan saat SO & bukan saat TERKIRIM)
-        app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($deliveryOrder);
+        // B7: form menampilkan SEMUA gudang berstok per produk dan user hanya mengisi qty; baris yang dibiarkan 0 dibuang
+        // (sebelum pemotongan stok & konfirmasi gudang) agar tidak tersimpan sebagai sumber kosong.
+        \App\Models\DeliveryOrderItemWarehouseSource::query()
+            ->whereIn('delivery_order_item_id', $deliveryOrder->deliveryOrderItem()->pluck('id'))
+            ->where(fn ($q) => $q->whereNull('quantity')->orWhere('quantity', '<=', 0))
+            ->delete();
+
+        // B9: DO dengan sumber dari beberapa gudang dipecah otomatis per gudang (DO …-01, …-02) sebelum stok dipotong.
+        $orders = app(\App\Services\DeliveryOrderSplitter::class)->splitByWarehouse($deliveryOrder);
+        $this->record = $orders[0];
+
+        foreach ($orders as $order) {
+            $this->finalizeCreatedOrder($order, count($orders));
+        }
+
+        if (count($orders) > 1) {
+            \Filament\Notifications\Notification::make()
+                ->title('Delivery Order Dipecah per Gudang')
+                ->success()
+                ->body('DO diambil dari ' . count($orders) . ' gudang sehingga dipecah otomatis: ' . collect($orders)->pluck('do_number')->implode(', ') . '.')
+                ->persistent()
+                ->send();
+        }
+    }
+
+    /** Potong stok, buat konfirmasi gudang, dan majukan status untuk satu DO hasil pembuatan/pemecahan. */
+    private function finalizeCreatedOrder(\App\Models\DeliveryOrder $deliveryOrder, int $totalOrders): void
+    {
+        // Tahap 3 (Brief Ko Handy): Stok terpotong begitu Dibuat DO (bukan saat SO & bukan saat TERKIRIM).
+        // Penundaan (deferStockDeduction) berlaku sampai di sini: item & sumber gudang sudah tersimpan semua → potong sekali.
+        app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($deliveryOrder, force: true);
 
         $warehouseConfirmations = app(\App\Services\DeliveryOrderService::class)
             ->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);
@@ -406,11 +510,13 @@ class CreateDeliveryOrder extends CreateRecord
                 comments: 'WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang.',
             );
 
-            \Filament\Notifications\Notification::make()
-                ->title('Delivery Order Dibuat')
-                ->success()
-                ->body('WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang. Status: Request Stock.')
-                ->send();
+            if ($totalOrders === 1) {
+                \Filament\Notifications\Notification::make()
+                    ->title('Delivery Order Dibuat')
+                    ->success()
+                    ->body('WC otomatis dibuat per item request untuk ' . count($warehouseConfirmations) . ' request dari ' . $warehouseCount . ' gudang. Status: Request Stock.')
+                    ->send();
+            }
         }
     }
 }

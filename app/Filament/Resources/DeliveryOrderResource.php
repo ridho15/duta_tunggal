@@ -230,11 +230,11 @@ class DeliveryOrderResource extends Resource
                                         // Only add items that still have remaining quantity
                                         if ($remainingQty > 0) {
                                             $warehouseSources = $saleOrderItem->warehouseAllocations
-                                                ->map(function ($allocation) use ($remainingQty) {
+                                                ->map(function ($allocation) use ($remainingQty, $saleOrderItem) {
                                                     return [
                                                         'warehouse_id' => $allocation->warehouse_id,
                                                         'quantity' => (float) min((float) $allocation->quantity, $remainingQty),
-                                                        'rak_id' => null,
+                                                        'rak_id' => app(\App\Services\StockAvailability::class)->bestRakId((int) $saleOrderItem->product_id, (int) $allocation->warehouse_id),
                                                     ];
                                                 })
                                                 ->values()
@@ -263,10 +263,27 @@ class DeliveryOrderResource extends Resource
                                                         [
                                                             'warehouse_id' => $fallbackWarehouseId,
                                                             'quantity' => (float) $remainingQty,
-                                                            'rak_id' => $saleOrderItem->rak_id,
+                                                            'rak_id' => $saleOrderItem->rak_id ?: app(\App\Services\StockAvailability::class)->bestRakId((int) $saleOrderItem->product_id, (int) $fallbackWarehouseId),
                                                         ]
                                                     ];
                                                 }
+                                            }
+
+                                            // B7: tampilkan SEMUA gudang×rak berstok bebas > 0 untuk produk ini; qty awal diisi dari alokasi/gudang item lalu gudang berstok terbanyak
+                                            $stockRows = app(\App\Services\StockAvailability::class)->sourceRowsForItem(
+                                                (int) $saleOrderItem->product_id,
+                                                (int) $saleOrderItem->id,
+                                                (float) $remainingQty,
+                                                $saleOrder->cabang_id ? (int) $saleOrder->cabang_id : null,
+                                                collect($warehouseSources)->pluck('warehouse_id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
+                                                collect($warehouseSources)->mapWithKeys(fn ($src) => [(int) $src['warehouse_id'] => (float) $src['quantity']])->all(),
+                                            );
+                                            if (! empty($stockRows)) {
+                                                $warehouseSources = collect($stockRows)->map(fn ($row) => [
+                                                    'warehouse_id' => $row['warehouse_id'],
+                                                    'quantity' => (float) $row['quantity'],
+                                                    'rak_id' => $row['rak_id'],
+                                                ])->values()->all();
                                             }
 
                                             $deliveryItems[] = [
@@ -321,7 +338,7 @@ class DeliveryOrderResource extends Resource
                                     ->live()
                                     ->columns(2)
                                     ->columnSpanFull()
-                                    ->collapsed() // UX: collapsible items for better UX
+                                    // Tidak dilipat: error validasi di dalam item terlipat tidak terlihat user (Filament 3 tidak membukanya otomatis).
                                     ->addAction(fn($action) => $action->hidden()) // Hide add button: items come from Sales Order
                                     ->itemLabel(function (array $state): string {
                                         $productId = $state['product_id'] ?? null;
@@ -369,9 +386,12 @@ class DeliveryOrderResource extends Resource
                                                 $soItems = SaleOrderItem::with('product')->whereIn('id', $soItemIds)->get()->keyBy('id');
 
                                                 // Validasi setiap delivery item
-                                                foreach ($value as $deliveryItem) {
+                                                foreach ($value as $deliveryItemKey => $deliveryItem) {
                                                     if (!empty($deliveryItem['sale_order_item_id']) && !empty($deliveryItem['quantity'])) {
-                                                        $warehouseSources = collect($deliveryItem['warehouseSources'] ?? []);
+                                                        // Baris qty 0 (gudang berstok yang tidak dipakai, B7) diabaikan
+                                                        $warehouseSources = collect($deliveryItem['warehouseSources'] ?? [])
+                                                            ->filter(fn ($zeroSource) => (float) ($zeroSource['quantity'] ?? 0) > 0)
+                                                            ->values();
                                                         if ($warehouseSources->isEmpty()) {
                                                             $saleOrderItem = $soItems->get($deliveryItem['sale_order_item_id']);
                                                             $productName = $saleOrderItem?->product?->name ?? "Item";
@@ -415,7 +435,7 @@ class DeliveryOrderResource extends Resource
                                                                 }
 
                                                                 $productId = $deliveryItem['product_id'] ?? null;
-                                                                $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $sourceWarehouseId, !empty($deliveryItem['sale_order_item_id']) ? (int) $deliveryItem['sale_order_item_id'] : null);
+                                                                $availableStock = app(\App\Services\StockAvailability::class)->freeForDeliveryOrderSource((int) $productId, (int) $sourceWarehouseId, !empty($deliveryItem['sale_order_item_id']) ? (int) $deliveryItem['sale_order_item_id'] : null, !empty($source['rak_id']) ? (int) $source['rak_id'] : null, (preg_match('/^record-(\d+)$/', (string) $deliveryItemKey, $doItemMatch) ? (int) $doItemMatch[1] : (!empty($deliveryItem['id']) ? (int) $deliveryItem['id'] : null)));
 
                                                                 if ((float) $availableStock < $sourceQtyItem) {
                                                                     $productName = $soItems->get($deliveryItem['sale_order_item_id'])?->product?->name ?? 'produk';
@@ -594,16 +614,24 @@ class DeliveryOrderResource extends Resource
                                                             $fallbackWarehouseId = $saleOrderItem->warehouse_id;
                                                             if (!$fallbackWarehouseId) {
                                                                 $cabangId = $saleOrderItem->saleOrder?->cabang_id ?? Auth::user()?->cabang_id;
-                                                                $fallbackWarehouseId = \App\Models\Warehouse::where('status', 1)
-                                                                    ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
-                                                                    ->value('id');
+                                                                // Gudang aktif dengan stok bebas terbanyak untuk produk ini (bukan gudang pertama secara acak).
+                                                                $fallbackWarehouseId = InventoryStock::query()
+                                                                    ->join('warehouses', 'warehouses.id', '=', 'inventory_stocks.warehouse_id')
+                                                                    ->where('inventory_stocks.product_id', $saleOrderItem->product_id)
+                                                                    ->where('warehouses.status', 1)
+                                                                    ->when($cabangId, fn ($q) => $q->where('warehouses.cabang_id', $cabangId))
+                                                                    ->orderByRaw('(inventory_stocks.qty_available - inventory_stocks.qty_reserved) desc')
+                                                                    ->value('inventory_stocks.warehouse_id')
+                                                                    ?: \App\Models\Warehouse::where('status', 1)
+                                                                        ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                                                                        ->value('id');
                                                             }
                                                             if ($fallbackWarehouseId) {
                                                                 $set('warehouseSources', [
                                                                     [
                                                                         'warehouse_id' => $fallbackWarehouseId,
                                                                         'quantity' => $targetQty,
-                                                                        'rak_id' => $saleOrderItem->rak_id,
+                                                                        'rak_id' => $saleOrderItem->rak_id ?: app(\App\Services\StockAvailability::class)->bestRakId((int) $saleOrderItem->product_id, (int) $fallbackWarehouseId),
                                                                     ]
                                                                 ]);
                                                             }
@@ -666,6 +694,7 @@ class DeliveryOrderResource extends Resource
                                                             $get('warehouse_id'),
                                                             true,
                                                             $cabangId ? (int) $cabangId : null,
+                                                            excludeZeroStock: true,
                                                         );
                                                     })
                                                     ->searchable()
@@ -691,7 +720,8 @@ class DeliveryOrderResource extends Resource
                                                     })
                                                     ->required(function ($get) {
                                                         $warehouseId = $get('warehouse_id');
-                                                        return filled($warehouseId) && Rak::where('warehouse_id', $warehouseId)->exists();
+                                                        // Baris qty 0 (gudang berstok yang tidak dipakai) tidak wajib rak
+                                                        return filled($warehouseId) && (float) ($get('quantity') ?? 0) > 0 && Rak::where('warehouse_id', $warehouseId)->exists();
                                                     })
                                                     ->validationMessages([
                                                         'required' => 'Rak sumber wajib dipilih untuk gudang yang memiliki konfigurasi rak.',
@@ -709,6 +739,7 @@ class DeliveryOrderResource extends Resource
                                                     ->label('Qty Sumber')
                                                     ->reactive()
                                                     ->numeric()
+                                                    ->minValue(0)
                                                     ->suffix(function ($get) {
                                                         $productId = $get('../../product_id') ?? $get('../product_id');
                                                         $warehouseId = $get('warehouse_id');
@@ -725,7 +756,7 @@ class DeliveryOrderResource extends Resource
                                                             $stockQuery->where('rak_id', $rakId);
                                                         }
 
-                                                        $available = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $warehouseId, ($soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id')) ? (int) $soItemId : null, $rakId ? (int) $rakId : null);
+                                                        $available = app(\App\Services\StockAvailability::class)->freeForDeliveryOrderSource((int) $productId, (int) $warehouseId, ($soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id')) ? (int) $soItemId : null, $rakId ? (int) $rakId : null, ($doItemId = $get('../../id') ?? $get('../id')) ? (int) $doItemId : null);
                                                         if ($available <= 0) {
                                                             return '🚨 HABIS';
                                                         }
@@ -752,7 +783,7 @@ class DeliveryOrderResource extends Resource
                                                             $stockQuery->where('rak_id', $rakId);
                                                         }
 
-                                                        $available = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) $productId, (int) $warehouseId, ($soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id')) ? (int) $soItemId : null, $rakId ? (int) $rakId : null);
+                                                        $available = app(\App\Services\StockAvailability::class)->freeForDeliveryOrderSource((int) $productId, (int) $warehouseId, ($soItemId = $get('../../sale_order_item_id') ?? $get('../sale_order_item_id')) ? (int) $soItemId : null, $rakId ? (int) $rakId : null, ($doItemId = $get('../../id') ?? $get('../id')) ? (int) $doItemId : null);
                                                         if ($qty > 0 && $qty > $available) {
                                                             return 'Qty melebihi stok bebas: ' . number_format($available, 0, ',', '.');
                                                         }
@@ -763,8 +794,14 @@ class DeliveryOrderResource extends Resource
                                             ])
                                             ->columns(3)
                                             ->columnSpanFull()
-                                            ->collapsed()
-                                            ->helperText('Pilih gudang sumber. Jika SO sudah memiliki alokasi gudang, akan diisi otomatis. Anda tetap dapat mengubahnya jika diperlukan.'),
+                                            ->helperText(function ($get) {
+                                                $needed = (float) ($get('quantity') ?? 0);
+                                                $filled = collect($get('warehouseSources') ?? [])->sum(fn ($row) => (float) ($row['quantity'] ?? 0));
+                                                $status = abs($filled - $needed) < 0.0001 ? '✅ sesuai' : ($filled < $needed ? '⚠️ kurang ' . ($needed - $filled) : '⚠️ lebih ' . ($filled - $needed));
+
+                                                return "Semua gudang berstok ditampilkan: isi qty tiap gudang yang dipakai (baris 0 diabaikan). Terisi {$filled} dari {$needed} ({$status}). "
+                                                    . 'Bila diambil dari lebih dari satu gudang, DO dipecah otomatis per gudang.';
+                                            }),
                                     ])
                                     ->visible(function ($get, $context) {
                                         // Show deliveryOrderItem repeater when editing OR when creating (to enable relationship saving)
@@ -796,6 +833,20 @@ class DeliveryOrderResource extends Resource
                             })
                             ->placeholder('-'),
                         TextEntry::make('notes'),
+                        TextEntry::make('returned_at')
+                            ->label('Status Retur')
+                            ->getStateUsing(fn ($record) => $record->returned_at ? 'Sudah diretur pada ' . $record->returned_at->format('d/m/Y H:i') : null)
+                            ->badge()
+                            ->color('warning')
+                            ->placeholder('-'),
+                        TextEntry::make('replacement_for')
+                            ->label('DO Pengganti dari')
+                            ->getStateUsing(fn ($record) => $record->replacementFor?->do_number)
+                            ->placeholder('-'),
+                        TextEntry::make('replaced_by')
+                            ->label('DO Pengganti')
+                            ->getStateUsing(fn ($record) => $record->replacements->pluck('do_number')->implode(', ') ?: null)
+                            ->placeholder('-'),
                         TextEntry::make('cabang.nama')->label('Cabang'),
                     ])->columns(2),
                 // customer info derived from the first linked sale order
@@ -942,7 +993,8 @@ class DeliveryOrderResource extends Resource
                 TextColumn::make('do_number')
                     ->label('Nomor DO')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn ($record) => $record->returned_at ? 'Sudah diretur' : ($record->replacement_for_delivery_order_id ? 'DO pengganti' : null)),
                 TextColumn::make('customer_names')
                     ->label('Customer')
                     ->getStateUsing(function ($record) {

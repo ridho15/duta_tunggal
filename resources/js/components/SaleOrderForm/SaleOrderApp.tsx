@@ -51,6 +51,7 @@ export const SaleOrderApp: React.FC<Props> = ({ recordId, initialQuotationId }) 
     currency_id: 1,
     exchange_rate: 1.0,
     tempo_pembayaran: 0,
+    shipping_cost: 0,
     notes: '',
     status: 'draft',
   });

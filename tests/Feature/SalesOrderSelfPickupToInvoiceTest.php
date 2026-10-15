@@ -39,6 +39,9 @@ class SalesOrderSelfPickupToInvoiceTest extends TestCase
     {
         parent::setUp();
 
+        // B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+        config(['sales.invoice.auto_on_do_complete' => true]);
+
         // Create test data
         $this->user = User::create([
             'name' => 'Test User',
@@ -317,7 +320,8 @@ class SalesOrderSelfPickupToInvoiceTest extends TestCase
             ->where('warehouse_id', $this->warehouse->id)
             ->sum('qty_available');
 
-        // Stock should be reduced by 5 units across the warehouse balance.
-        $this->assertEquals(45, $remainingStock);
+        // Alur SO -> DO -> SJ -> Invoice: menyelesaikan SO (termasuk Ambil Sendiri) tidak memotong stok langsung
+        // (SaleOrderObserver::updating); pemotongan hanya lewat DO. Stok awal 50 tetap.
+        $this->assertEquals(50, $remainingStock);
     }
 }

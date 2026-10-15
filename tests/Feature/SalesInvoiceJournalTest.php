@@ -13,6 +13,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+// B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji JURNAL invoice hasil jalur lama tersebut.
+beforeEach(fn () => config(['sales.invoice.auto_on_do_complete' => true]));
+
 it('creates sales invoice journal entries automatically when sale order is approved', function () {
     // Create cabang
     $cabang = Cabang::factory()->create([
@@ -64,7 +67,7 @@ it('creates sales invoice journal entries automatically when sale order is appro
     ]);
 
     // Approve sale order to trigger invoice creation
-    $saleOrder->update(['status' => 'completed']);
+    stkCompleteSoAndInvoice($saleOrder);
 
     // Assert invoice created
     $invoice = Invoice::where('from_model_type', SaleOrder::class)
@@ -168,7 +171,7 @@ it('uses default COAs when product has no specific COAs', function () {
     ]);
 
     // Approve sale order to trigger invoice creation
-    $saleOrder->update(['status' => 'completed']);
+    stkCompleteSoAndInvoice($saleOrder);
 
     // Assert invoice created
     $invoice = Invoice::where('from_model_type', SaleOrder::class)

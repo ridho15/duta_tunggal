@@ -204,7 +204,8 @@ class ProductResource extends Resource
                                 'required' => 'Biaya tidak boleh kosong',
                             ]),
                         TextInput::make('harga_batas')
-                            ->label('Harga Batas (%)')
+                            ->label('Harga Batas')
+                            ->helperText('Isi 0–100 = persen diskon maksimal dari harga jual. Isi di atas 100 = harga jual minimum dalam rupiah (nominal). Harga tidak boleh di bawah modal.')
                             ->numeric()
                             ->default(0)
                             ->validationMessages([
@@ -513,7 +514,7 @@ class ProductResource extends Resource
                     ->rupiah()
                     ->label('Harga Jual (Rp)'),
                 TextColumn::make('harga_batas')
-                    ->label('Harga Batas (%)')
+                    ->label('Harga Batas')
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('cost_price')
@@ -759,7 +760,7 @@ class ProductResource extends Resource
                                             'required' => 'Biaya tidak boleh kosong',
                                         ]),
                                     TextInput::make('harga_batas')
-                                        ->label('Harga Batas (%)')
+                                        ->label('Harga Batas')
                                         ->numeric()
                                         ->default(fn ($record) => $record->harga_batas)
                                         ->validationMessages([
@@ -1072,7 +1073,7 @@ class ProductResource extends Resource
                                             ->default($record->biaya)
                                             ->placeholder('Kosongkan jika tidak diubah'),
                                         TextInput::make("products.{$index}.harga_batas")
-                                            ->label('Harga Batas (%)')
+                                            ->label('Harga Batas')
                                             ->default($record->harga_batas)
                                             ->placeholder('Kosongkan jika tidak diubah'),
                                         TextInput::make("products.{$index}.item_value")

@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 
 class StockReportService
 {
-    private const IN_TYPES = ['purchase_in', 'manufacture_in', 'transfer_in', 'adjustment_in', 'opname_in', 'beginning', 'return_in'];
+    private const IN_TYPES = ['purchase_in', 'manufacture_in', 'transfer_in', 'adjustment_in', 'opname_in', 'beginning', 'return_in', 'do_return'];
 
     private const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'opname_out', 'return_out'];
 

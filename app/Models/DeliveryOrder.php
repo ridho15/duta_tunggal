@@ -84,6 +84,7 @@ class DeliveryOrder extends Model
 
     protected $casts = [
         'received_at' => 'datetime',
+        'returned_at' => 'datetime',
     ];
 
     protected $fillable = [
@@ -100,7 +101,21 @@ class DeliveryOrder extends Model
         'cabang_id',
         'received_at',
         'received_by_name',
+        'returned_at',
+        'replacement_for_delivery_order_id',
     ];
+
+    /** DO asal yang digantikan oleh DO ini (DO pengganti …C akibat retur). */
+    public function replacementFor()
+    {
+        return $this->belongsTo(self::class, 'replacement_for_delivery_order_id');
+    }
+
+    /** DO pengganti (…C) yang dibuat dari DO ini setelah retur. */
+    public function replacements()
+    {
+        return $this->hasMany(self::class, 'replacement_for_delivery_order_id');
+    }
 
     public function driver()
     {

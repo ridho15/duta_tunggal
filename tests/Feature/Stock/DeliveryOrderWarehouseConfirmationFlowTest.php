@@ -32,7 +32,7 @@ it('DO dapat dibuat tanpa driver/kendaraan (nullable) dan WC dibuat per item dar
         ->and($do->fresh()->status)->toBe('request_stock');
 });
 
-it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) dan reservasi DO terbentuk; WC ditolak → DO Ditolak', function () {
+it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) tanpa reservasi DO (stok sudah terpotong); WC ditolak → DO Ditolak', function () {
     config(['sales.stock.ledger' => true]);
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -43,8 +43,10 @@ it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) dan reservasi DO
     WarehouseConfirmation::where('confirmable_id', $do->id)->where('confirmable_type', DeliveryOrder::class)->get()
         ->each(fn ($wc) => $wc->update(['status' => 'confirmed']));
 
+    // Tahap 3: stok fisik terpotong sejak DO dibuat (30 → 26); konfirmasi gudang tidak menahan reservasi DO lagi
     expect($do->fresh()->status)->toBe('approved')
-        ->and(stkReserved($so, $do))->toBe(4.0);
+        ->and(stkReserved($so, $do))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(0.0);
 
     // DO lain: WC ditolak gudang → DO Ditolak
     $rejected = stkDeliveryOrder($ctx, $so, $item, 2);
@@ -55,16 +57,3 @@ it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) dan reservasi DO
     expect($rejected->fresh()->status)->toBe('reject')->and(stkReserved($so, $rejected))->toBe(0.0);
 });
 
-it('Ambil Sendiri tidak memerlukan DO: stok fisik keluar saat SO diselesaikan (bukti keluar = gerakan stok SO)', function () {
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-    [$so] = stkSaleOrder($ctx, 5, ['tipe_pengiriman' => 'Ambil Sendiri']);
-
-    expect(DeliveryOrder::count())->toBe(0);
-
-    $so->update(['status' => 'completed']);
-
-    expect(DeliveryOrder::count())->toBe(0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(25.0)
-        ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(1);
-});

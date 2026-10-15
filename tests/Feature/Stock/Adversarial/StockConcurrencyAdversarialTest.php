@@ -13,6 +13,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['sales.stock' => [
+        'require_surat_jalan' => false,
         'ledger' => false,
         'strict_dispatch' => true,
         'reserve_on_so_approve' => false,
@@ -61,15 +62,18 @@ it('CC-02: eksekusi persetujuan berulang (idempotensi) tidak menggandakan pemoto
 
     $do = stkDeliveryOrder($ctx, $so, $soItem, 8, 'approved');
 
-    $firstReserved = stkReserved(null, $do);
-    expect($firstReserved)->toBe(8.0);
+    // Tahap 3: stok fisik terpotong sekali saat DO dibuat (20 → 12); tidak ada reservasi DO
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 12.0, 'reserved' => 0.0, 'free' => 12.0])
+        ->and(stkReserved(null, $do))->toBe(0.0)
+        ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(1);
 
     // Panggil update status 'approved' sekali lagi (simulasi klik ganda)
     $do->update(['status' => 'approved']);
 
-    // Jumlah cadangan tetap harus tepat 8, tidak boleh menjadi 16
-    expect(stkReserved(null, $do->fresh()))->toBe(8.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(8.0);
+    // Potongan tetap tepat 8 (stok 12, satu gerakan), tidak menjadi 16 dan tidak ada reservasi
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 12.0, 'reserved' => 0.0, 'free' => 12.0])
+        ->and(stkReserved(null, $do->fresh()))->toBe(0.0)
+        ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(1);
 });
 
 it('CC-03: stok hasil retur pelanggan langsung tersedia aman untuk pengiriman DO berikutnya', function () {
@@ -77,13 +81,8 @@ it('CC-03: stok hasil retur pelanggan langsung tersedia aman untuk pengiriman DO
     // Awalnya stok fisik 0
     stkSetStock($ctx['product'], $ctx['warehouse'], 0);
 
-    // Simulasi penerimaan barang retur fisik ke gudang (10 pcs)
-    $stock = InventoryStock::withoutGlobalScopes()
-        ->where('product_id', $ctx['product']->id)
-        ->where('warehouse_id', $ctx['warehouse']->id)
-        ->first();
-
-    $stock->increment('qty_available', 10);
+    // Simulasi penerimaan barang retur fisik ke gudang (10 pcs): gerakan masuk `customer_return` sendiri yang menambah stok
+    // (observer StockMovement), jadi tidak boleh ditambah manual lagi (dulu menggandakan menjadi 20).
     StockMovement::create([
         'product_id' => $ctx['product']->id,
         'warehouse_id' => $ctx['warehouse']->id,

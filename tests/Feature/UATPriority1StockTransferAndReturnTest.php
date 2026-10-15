@@ -167,6 +167,10 @@ class UATPriority1StockTransferAndReturnTest extends TestCase
     #[Test]
     public function it_can_return_product_from_delivery_order_item_with_null_rak_and_restores_inventory(): void
     {
+        // Gudang pabrik acak: DO pengganti hanya mengalokasikan dari gudang AKTIF cabang → pastikan aktif
+        \App\Models\Warehouse::query()->update(['status' => 1]);
+        \App\Models\Cabang::query()->update(['lihat_stok_cabang_lain' => false]);
+
         // 1. Initial stock in warehouse A (null rak)
         InventoryStock::updateOrCreate(
             [
@@ -214,20 +218,8 @@ class UATPriority1StockTransferAndReturnTest extends TestCase
             'quantity' => 3,
         ]);
 
-        // Initial stock was 10, DO delivered 3 -> stock should be 7
-        // (Simulate stock movement for DO sales delivery)
-        app(\App\Services\ProductService::class)->createStockMovement(
-            product_id: $this->product->id,
-            warehouse_id: $this->warehouseA->id,
-            quantity: 3,
-            type: 'sales',
-            date: now()->toDateString(),
-            notes: 'DO Shipped',
-            rak_id: null,
-            fromModel: $deliveryOrderItem,
-            value: $this->product->cost_price * 3
-        );
-
+        // Stok awal 10; pembuatan item DO (header gudang A) sudah memotong 3 saat dibuat (Tahap 3) → 7.
+        // (Pemotongan manual dihapus: sebelumnya menggandakan potongan menjadi 4.)
         $currentStock = InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouseA->id)->whereNull('rak_id')->first();
         $this->assertEquals(7, (float) $currentStock->qty_available);
 
@@ -266,14 +258,25 @@ class UATPriority1StockTransferAndReturnTest extends TestCase
         $deliveryOrderItem->refresh();
         $this->assertEquals(2, (float) $deliveryOrderItem->quantity);
 
-        // 6. Verify stock in warehouse A restored by 1 (7 + 1 = 8)
-        $restoredStock = InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouseA->id)->whereNull('rak_id')->first();
-        $this->assertEquals(8, (float) $restoredStock->qty_available);
+        // 6. Retur DO (good) kembali ke gudang A sebagai gerakan `do_return` 1 pcs (Stock Adjustment bernomor retur)
+        $this->assertEquals(1.0, (float) \App\Models\StockMovement::where('type', 'do_return')->where('warehouse_id', $this->warehouseA->id)->sum('quantity'));
+        $this->assertTrue(\App\Models\StockAdjustment::where('adjustment_number', $returnNumber)->exists());
+
+        // Stok 7 + 1 kembali = 8, lalu DO pengganti otomatis (1 pcs) memakai stok itu → 7
+        // (DO pengganti boleh mengambil dari rak mana pun di gudang A, jadi total gudang yang dibandingkan)
+        $this->assertEquals(7, (float) InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouseA->id)->sum('qty_available'));
+        $this->assertSame(1, DeliveryOrder::where('replacement_for_delivery_order_id', $deliveryOrder->id)->count());
     }
 
     #[Test]
     public function it_validates_that_return_product_options_use_delivered_quantity_not_sales_order_quantity(): void
     {
+        // Pembuatan item DO memotong stok gudang (Tahap 3) → sediakan stok
+        InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouseA->id, 'rak_id' => null],
+            ['qty_available' => 10, 'qty_reserved' => 0]
+        );
+
         $customer = Customer::factory()->create();
         $saleOrder = SaleOrder::create([
             'so_number' => 'SO-TEST-002',

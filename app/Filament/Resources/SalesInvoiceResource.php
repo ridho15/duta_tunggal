@@ -216,6 +216,44 @@ class SalesInvoiceResource extends Resource
                             ->description('Pilih satu atau lebih Surat Jalan terbit untuk customer ini. Item barang dan harga akan otomatis diambil dari Surat Jalan dan Sales Order asal.')
                             ->visible(fn ($get) => filled($get('selected_customer')))
                             ->schema([
+                                // B24: urutan input Customer → Sales Order → centang Surat Jalan (SJ dalam SO yang sama)
+                                Select::make('filter_sale_order')
+                                    ->label('Sales Order')
+                                    ->placeholder('Pilih Sales Order...')
+                                    ->dehydrated(false)
+                                    ->required(fn (string $operation) => $operation === 'create')
+                                    ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
+                                    ->searchable()
+                                    ->reactive()
+                                    ->options(function ($get) {
+                                        $customerId = $get('selected_customer');
+                                        if (! $customerId) {
+                                            return [];
+                                        }
+
+                                        return SaleOrder::query()
+                                            ->where('customer_id', $customerId)
+                                            ->whereHas('deliverySalesOrder.deliveryOrder.suratJalan', function ($q) {
+                                                $q->where('surat_jalans.status', \App\Models\SuratJalan::STATUS_ISSUED);
+                                            })
+                                            ->orderByDesc('id')
+                                            ->get()
+                                            ->mapWithKeys(fn ($so) => [$so->id => \App\Support\DocumentLabels::saleOrder($so)])
+                                            ->all();
+                                    })
+                                    ->helperText('Hanya Sales Order milik customer yang sudah punya Surat Jalan terbit. Surat Jalan yang digabung dalam satu invoice harus dari SO yang sama.')
+                                    ->afterStateUpdated(function ($set) {
+                                        $set('selected_surat_jalans', []);
+                                        $set('surat_jalan_ids', []);
+                                        $set('delivery_orders', []);
+                                        $set('invoiceItem', []);
+                                        $set('delivery_order_items', []);
+                                        $set('subtotal', 0);
+                                        $set('total', 0);
+                                        $set('other_fees', []);
+                                        $set('dpp', 0);
+                                    }),
+
                                 Forms\Components\CheckboxList::make('selected_surat_jalans')
                                     ->label('Daftar Surat Jalan Terbit')
                                     ->disabled(fn (?Invoice $record) => static::isInvoiceFieldLocked($record))
@@ -227,10 +265,16 @@ class SalesInvoiceResource extends Resource
                                         $currentInvoice = $currentInvoiceId ? \App\Models\Invoice::find($currentInvoiceId) : null;
                                         $currentSjIds = $currentInvoice ? (array) ($currentInvoice->surat_jalan_ids ?? [$currentInvoice->from_model_id]) : [];
 
+                                        $saleOrderId = $get('filter_sale_order');
+                                        if (! $saleOrderId && ! $currentInvoice) {
+                                            return [];   // B24: pilih Sales Order dulu
+                                        }
+
                                         return \App\Models\SuratJalan::query()
                                             ->where('status', \App\Models\SuratJalan::STATUS_ISSUED)
-                                            ->whereHas('deliveryOrder.salesOrders', function ($q) use ($customerId) {
-                                                $q->where('customer_id', $customerId);
+                                            ->whereHas('deliveryOrder.salesOrders', function ($q) use ($customerId, $saleOrderId) {
+                                                $q->where('customer_id', $customerId)
+                                                    ->when($saleOrderId, fn ($qq) => $qq->where('sale_orders.id', $saleOrderId));
                                             })
                                             ->with(['deliveryOrder.deliveryOrderItem', 'cabang'])
                                             ->get()
@@ -250,7 +294,7 @@ class SalesInvoiceResource extends Resource
                                     })
                                     ->columns(1)
                                     ->reactive()
-                                    ->helperText('Hanya menampilkan Surat Jalan berstatus Terbit yang belum ditagih. Anda dapat memilih lebih dari satu Surat Jalan untuk digabungkan jika cabang sama.')
+                                    ->helperText('Centang Surat Jalan berstatus Terbit yang belum ditagih dari Sales Order di atas. Boleh lebih dari satu SJ (SO dan cabang harus sama).')
                                     ->afterStateUpdated(function ($set, $get, $state) {
                                         if (empty($state)) {
                                             $set('surat_jalan_ids', []);
@@ -383,7 +427,7 @@ class SalesInvoiceResource extends Resource
 
                         // Section Alternatif: Pemilihan SO Langsung (Legacy / Ambil Sendiri)
                         Section::make('Sumber Penjualan Langsung (Opsional / Legacy)')
-                            ->visible(fn ($get) => empty($get('selected_surat_jalans')) && filled($get('selected_customer')))
+                            ->visible(fn ($get, ?Invoice $record) => $record?->exists && empty($get('selected_surat_jalans')) && filled($get('selected_customer')))   // B24/B25: invoice baru hanya dari Surat Jalan
                             ->collapsed()
                             ->schema([
                                 Select::make('selected_sale_order')

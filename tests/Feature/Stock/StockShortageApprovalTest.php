@@ -20,7 +20,7 @@ use Spatie\Permission\Models\Role;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['sales.stock' => ['ledger' => false, 'strict_dispatch' => false, 'reserve_on_so_approve' => true, 'block_short_approval' => true]]);
+    config(['sales.stock' => ['require_surat_jalan' => false, 'ledger' => false, 'strict_dispatch' => false, 'reserve_on_so_approve' => true, 'block_short_approval' => true]]);
 });
 
 /** Pengguna dengan peran/izin persetujuan SO, opsional bukan pembuat SO. */

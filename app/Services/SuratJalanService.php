@@ -76,6 +76,34 @@ class SuratJalanService
             ]);
         }
 
+        // B20: DO yang pernah diretur tidak ikut Surat Jalan — yang dikirim/ditagih adalah DO pengganti (…C)
+        $returned = $deliveryOrders->filter(fn (DeliveryOrder $do) => $do->returned_at !== null);
+        if ($returned->isNotEmpty()) {
+            $details = $returned->map(function (DeliveryOrder $do) {
+                $replacements = $do->replacements()->pluck('do_number')->implode(', ');
+
+                return $do->do_number.($replacements !== '' ? " (gunakan DO pengganti {$replacements})" : ' (belum ada DO pengganti)');
+            })->implode('; ');
+
+            throw ValidationException::withMessages([
+                $field => "Delivery Order yang pernah diretur tidak dapat dibuatkan Surat Jalan; gunakan DO pengganti (…C): {$details}.",
+            ]);
+        }
+
+        // B19: DO yang digabung dalam satu Surat Jalan harus berasal dari Sales Order yang SAMA
+        $saleOrderSets = $deliveryOrders->map(function (DeliveryOrder $do) {
+            $do->loadMissing('salesOrders');
+
+            return $do->salesOrders->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->implode(',');
+        })->unique();
+        if ($saleOrderSets->count() > 1) {
+            $numbers = $deliveryOrders->map(fn (DeliveryOrder $do) => $do->do_number.' ('.($do->salesOrders->pluck('so_number')->implode(' + ') ?: 'tanpa SO').')')->implode(', ');
+
+            throw ValidationException::withMessages([
+                $field => "Delivery Order dalam satu Surat Jalan harus berasal dari Sales Order yang sama. DO yang dipilih berasal dari SO berbeda: {$numbers}.",
+            ]);
+        }
+
         $taken = DB::table('surat_jalan_delivery_orders as pivot')
             ->join('surat_jalans as sj', 'sj.id', '=', 'pivot.surat_jalan_id')
             ->whereIn('pivot.delivery_order_id', $deliveryOrders->pluck('id'))
@@ -96,6 +124,35 @@ class SuratJalanService
         }
     }
 
+    /**
+     * B21 (UAT 13 Okt 2026): terbitnya Surat Jalan otomatis menandai DO-nya "Diterima" dalam SATU langkah — DO melewati Dikirim lalu
+     * Diterima (tercatat di log DO, penerima = nomor SJ). Tidak perlu tombol Konfirmasi Diterima terpisah. DO yang sudah lebih jauh
+     * (Dikirim/Diterima/Selesai) dibiarkan. Aturan "SJ wajib terbit sebelum DO dikirim" (B22) terpenuhi karena SJ sudah terbit.
+     *
+     * @throws \App\Exceptions\DeliveryOrderTransitionException
+     */
+    public function markDeliveryOrdersReceived(SuratJalan $suratJalan): void
+    {
+        $transitions = app(DeliveryOrderTransitions::class);
+        $note = "Surat Jalan {$suratJalan->sj_number} terbit";
+
+        foreach ($suratJalan->deliveryOrder()->get() as $deliveryOrder) {
+            $deliveryOrder->refresh();
+
+            if (in_array($deliveryOrder->status, ['approved', 'confirmed', 'partial'], true)) {
+                $transitions->to($deliveryOrder, 'sent', ['comments' => "Dikirim otomatis: {$note}", 'source' => 'surat_jalan']);
+            }
+
+            if ($deliveryOrder->refresh()->status === 'sent') {
+                $transitions->to($deliveryOrder, 'received', [
+                    'comments' => "Diterima otomatis: {$note}",
+                    'received_by' => "Surat Jalan {$suratJalan->sj_number}",
+                    'source' => 'surat_jalan',
+                ]);
+            }
+        }
+    }
+
     /** Draft → Terbit. */
     public function issue(SuratJalan $suratJalan): SuratJalan
     {
@@ -106,7 +163,10 @@ class SuratJalanService
         $deliveryOrders = $suratJalan->deliveryOrder()->get();
         $this->assertDeliveryOrdersUsable($deliveryOrders, $suratJalan->id, 'status');
 
-        $suratJalan->update(['status' => SuratJalan::STATUS_ISSUED, 'issued_at' => $suratJalan->issued_at ?? now()]);
+        DB::transaction(function () use ($suratJalan) {
+            $suratJalan->update(['status' => SuratJalan::STATUS_ISSUED, 'issued_at' => $suratJalan->issued_at ?? now()]);
+            $this->markDeliveryOrdersReceived($suratJalan);
+        });
 
         return $suratJalan->refresh();
     }
@@ -132,6 +192,15 @@ class SuratJalanService
         if (mb_strlen($reason) < self::MIN_CANCEL_REASON_LENGTH) {
             throw ValidationException::withMessages([
                 'cancel_reason' => 'Alasan pembatalan wajib diisi (minimal ' . self::MIN_CANCEL_REASON_LENGTH . ' karakter).',
+            ]);
+        }
+
+        $advanced = $suratJalan->deliveryOrder()->get()->filter(fn (DeliveryOrder $do) => in_array($do->status, ['sent', 'received', 'completed'], true));
+        if ($advanced->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'status' => "Surat Jalan {$suratJalan->sj_number} tidak dapat dibatalkan: DO "
+                    .$advanced->map(fn ($do) => $do->do_number.' ('.DeliveryOrder::statusLabel($do->status).')')->implode(', ')
+                    .' sudah ditandai Diterima saat Surat Jalan terbit. Koreksi barang lewat Retur Delivery Order / Return Product.',
             ]);
         }
 
@@ -178,6 +247,7 @@ class SuratJalanService
                 'cabang_id' => $cancelled->cabang_id,
             ]);
             $new->deliveryOrder()->sync($deliveryOrders->pluck('id')->all());
+            $this->markDeliveryOrdersReceived($new);
 
             activity()
                 ->causedBy(Auth::user())

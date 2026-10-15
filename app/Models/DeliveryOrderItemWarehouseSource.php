@@ -30,6 +30,17 @@ class DeliveryOrderItemWarehouseSource extends Model
             }
         });
 
+        // Edit kuantitas/gudang/rak sumber (mis. checker mengurangi qty per gudang) → stok fisik disesuaikan dengan selisihnya.
+        static::updated(function ($source) {
+            if (! $source->wasChanged(['quantity', 'warehouse_id', 'rak_id'])) {
+                return;
+            }
+            $do = $source->deliveryOrderItem?->deliveryOrder;
+            if ($do && ! in_array($do->status, ['closed', 'reject'], true)) {
+                app(\App\Observers\DeliveryOrderObserver::class)->reconcileStockMovementsForDeliveryOrder($do);
+            }
+        });
+
         static::deleted(function ($source) {
             $item = $source->deliveryOrderItem;
             $do = $item?->deliveryOrder;

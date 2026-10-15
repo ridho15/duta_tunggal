@@ -18,7 +18,7 @@ use Spatie\Permission\Models\Role;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['sales.stock' => ['ledger' => false, 'strict_dispatch' => true, 'reserve_on_so_approve' => false, 'block_short_approval' => false]]);
+    config(['sales.stock' => ['require_surat_jalan' => false, 'ledger' => false, 'strict_dispatch' => true, 'reserve_on_so_approve' => false, 'block_short_approval' => false]]);
 });
 
 /** DO Siap Kirim 12 dari stok $stock; SO qty 20. */
@@ -30,6 +30,25 @@ function trxReady(float $stock = 30, float $qty = 12): array
     $do = stkDeliveryOrder($ctx, $so, $item, $qty, 'approved');
 
     return [$ctx, $so, $item, $do];
+}
+
+/**
+ * DO Siap Kirim yang BELUM memotong stok fisik (kasus yang masih mungkin sejak Tahap 3: DO warisan dari sebelum Tahap 3, atau DO yang stoknya
+ * sudah dikembalikan lalu dikirim ulang) dan stok gudang kini hanya $stock. Dibuat dengan membuat DO normal lalu mengembalikan potongannya.
+ */
+function trxUnshipped(float $stock, float $qty = 12): array
+{
+    [$ctx, $so, $item, $do] = trxReady(30, $qty);
+    app(\App\Services\DeliveryShipments::class)->reverse($do, 'uji: potongan dikembalikan');
+    stkSetStock($ctx['product'], $ctx['warehouse'], $stock);
+
+    return [$ctx, $so, $item, $do];
+}
+
+/** Kuantitas bersih yang keluar gudang: Σ gerakan `sales` − Σ pengembalian `adjustment_in`. */
+function trxNetShipped(): float
+{
+    return (float) StockMovement::where('type', 'sales')->sum('quantity') - (float) StockMovement::where('type', 'adjustment_in')->sum('quantity');
 }
 
 function trxSalesMovements(?DeliveryOrder $do = null): int
@@ -46,6 +65,7 @@ it('matriks: transisi sah diterima dan yang di luar matriks ditolak', function (
     ['request_stock', 'reject', true],
     ['approved', 'sent', true],
     ['approved', 'closed', true],
+    ['approved', 'completed', true],   // Selesaikan langsung dari Siap Kirim (alur Tahap 3; tetap butuh SJ terbit bila require_surat_jalan)
     ['approved', 'delivery_failed', true],
     ['sent', 'received', true],
     ['sent', 'completed', true],
@@ -55,7 +75,6 @@ it('matriks: transisi sah diterima dan yang di luar matriks ditolak', function (
     ['delivery_failed', 'sent', true],
     ['request_close', 'closed', true],
     // di luar matriks
-    ['approved', 'completed', false],
     ['approved', 'received', false],
     ['sent', 'approved', false],
     ['sent', 'closed', false],
@@ -79,15 +98,16 @@ it('transisi di luar matriks ditolak dengan pesan berbahasa Indonesia dan status
     [, , , $do] = trxReady();
 
     try {
-        app(DeliveryOrderTransitions::class)->to($do, 'completed');
+        app(DeliveryOrderTransitions::class)->to($do, 'received');   // Siap Kirim tidak boleh loncat ke Diterima
         $this->fail('seharusnya ditolak');
     } catch (DeliveryOrderTransitionException $e) {
-        expect($e->getMessage())->toContain('tidak dapat diubah dari "Siap Kirim" ke "Selesai"')
+        expect($e->getMessage())->toContain('tidak dapat diubah dari "Siap Kirim" ke "Diterima"')
             ->and($e->getMessage())->toContain('Langkah yang diizinkan');
     }
 
+    // Transisi ditolak tidak mengubah status maupun stok (1 gerakan = potongan saat DO dibuat, Tahap 3)
     expect($do->fresh()->status)->toBe('approved')
-        ->and(trxSalesMovements())->toBe(0);
+        ->and(trxSalesMovements())->toBe(1);
 });
 
 it('label "Siap Kirim" hanya saat alur ketat aktif', function () {
@@ -102,9 +122,11 @@ it('label "Siap Kirim" hanya saat alur ketat aktif', function () {
 
 // ------------------------------------------------------------------ Kirim: stok, idempotensi, log, item
 
-it('Kirim: stok fisik keluar sekali, reservasi DO dikonsumsi, item DO "sent", log tercatat', function () {
+it('Kirim: stok fisik sudah keluar sejak DO dibuat dan tidak dipotong lagi, item DO "sent", log tercatat', function () {
     [$ctx, $so, , $do] = trxReady();
-    expect(stkReserved($so, $do))->toBe(12.0);
+    // Tahap 3: potongan 12 terjadi saat DO dibuat; tidak ada reservasi DO yang tertahan
+    expect(stkReserved($so, $do))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(18.0);
 
     app(DeliveryOrderTransitions::class)->to($do, 'sent');
 
@@ -137,7 +159,7 @@ it('Kirim dua kali (klik ganda) = satu efek', function () {
 // ------------------------------------------------------------------ D15
 
 it('D15: stok fisik kurang menolak Kirim dengan rincian; stok, status dan gerakan tidak berubah', function () {
-    [$ctx, , , $do] = trxReady(stock: 8, qty: 12);
+    [$ctx, , , $do] = trxUnshipped(8, 12);
 
     try {
         app(DeliveryOrderTransitions::class)->to($do, 'sent');
@@ -149,12 +171,12 @@ it('D15: stok fisik kurang menolak Kirim dengan rincian; stok, status dan geraka
     }
 
     expect($do->fresh()->status)->toBe('approved')
-        ->and(trxSalesMovements())->toBe(0)
+        ->and(trxNetShipped())->toBe(0.0)
         ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(8.0);
 });
 
 it('D15: pengecualian butuh Owner/Super Admin dan alasan; tercatat di log', function () {
-    [$ctx, , , $do] = trxReady(stock: 8, qty: 12);
+    [$ctx, , , $do] = trxUnshipped(8, 12);
     $service = app(DeliveryOrderTransitions::class);
 
     // pengguna biasa: ditolak walau meminta pengecualian
@@ -181,29 +203,11 @@ it('D15: pengecualian butuh Owner/Super Admin dan alasan; tercatat di log', func
 });
 
 it('D15 berlaku di semua pintu: update model langsung juga ditolak', function () {
-    [, , , $do] = trxReady(stock: 5, qty: 12);
+    [, , , $do] = trxUnshipped(5, 12);
 
     expect(fn () => $do->update(['status' => 'sent']))->toThrow(DeliveryOrderTransitionException::class, 'stok fisik tidak cukup');
 
-    expect($do->fresh()->status)->toBe('approved')->and(trxSalesMovements())->toBe(0);
-});
-
-it('D15: SO "Ambil Sendiri" tidak dapat diselesaikan bila stok fisik kurang', function () {
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 4);
-    [$so] = stkSaleOrder($ctx, 10, ['tipe_pengiriman' => 'Ambil Sendiri']);
-
-    expect(fn () => $so->update(['status' => 'completed']))->toThrow(DeliveryOrderTransitionException::class, 'Ambil Sendiri');
-
-    expect($so->fresh()->status)->toBe('approved')
-        ->and(trxSalesMovements())->toBe(0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(4.0);
-
-    stkSetStock($ctx['product'], $ctx['warehouse'], 10);
-    $so->update(['status' => 'completed']);
-
-    expect($so->fresh()->status)->toBe('completed')
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(0.0);
+    expect($do->fresh()->status)->toBe('approved')->and(trxNetShipped())->toBe(0.0);
 });
 
 // ------------------------------------------------------------------ semua pintu = hasil sama
@@ -234,7 +238,7 @@ it('semua pintu: update model langsung, layanan lama, dan Transitions menghasilk
 it('DeliveryOrderService::updateStatus mengikuti matriks dan menyimpan komentar di log', function () {
     [, , , $do] = trxReady();
 
-    expect(fn () => app(DeliveryOrderService::class)->updateStatus($do, 'completed'))->toThrow(DeliveryOrderTransitionException::class);
+    expect(fn () => app(DeliveryOrderService::class)->updateStatus($do, 'received'))->toThrow(DeliveryOrderTransitionException::class);
 
     app(DeliveryOrderService::class)->updateStatus($do, 'sent', 'berangkat pagi', 'sent');
     $log = DeliveryOrderLog::where('delivery_order_id', $do->id)->where('status', 'sent')->first();
@@ -283,13 +287,21 @@ it('D18: gagal kirim setelah Dikirim mengembalikan stok TEPAT SEKALI, reservasi 
         ->and(stkReserved($so, $do))->toBe(0.0);
 });
 
-it('gagal kirim dari Siap Kirim (stok belum keluar) tidak menyentuh stok', function () {
+it('gagal kirim dari Siap Kirim (barang belum berangkat) tidak mengubah stok: potongan tetap, DO dijadwalkan ulang', function () {
     [$ctx, , , $do] = trxReady();
 
     app(DeliveryOrderTransitions::class)->to($do, 'delivery_failed', ['reason' => 'Alamat salah']);
 
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 12.0, 'free' => 18.0])
-        ->and(StockMovement::whereIn('type', ['sales', 'adjustment_in'])->count())->toBe(0);
+    // Keputusan C: barang tidak pernah meninggalkan gudang, jadi tidak ada yang "dikembalikan" — potongan Tahap 3 (12) tetap berlaku
+    // sampai DO dikirim, dibatalkan (closed), atau dihapus. Tidak ada reservasi dibuat ulang (stok sudah terpotong).
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0])
+        ->and(trxNetShipped())->toBe(12.0)
+        ->and(StockMovement::where('type', 'adjustment_in')->count())->toBe(0);
+
+    // Dijadwalkan ulang dan dikirim: tidak memotong lagi
+    app(DeliveryOrderTransitions::class)->to($do->fresh(), 'sent');
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(18.0)
+        ->and(trxNetShipped())->toBe(12.0);
 });
 
 // ------------------------------------------------------------------ D19 batalkan DO
@@ -336,7 +348,7 @@ it('D23: Diterima mencatat tanggal dan nama penerima; Selesaikan menerbitkan jur
 
     expect($do->fresh()->status)->toBe('completed')
         ->and($do->fresh()->deliveryOrderItem->first()->status)->toBe('received')
-        ->and(\App\Models\Invoice::where('from_model_type', \App\Models\SaleOrder::class)->whereJsonContains('delivery_orders', $do->id)->exists())->toBeTrue()
+        ->and(\App\Models\Invoice::where('from_model_type', \App\Models\SaleOrder::class)->whereJsonContains('delivery_orders', $do->id)->exists())->toBeFalse()   // B25: invoice tidak lagi terbit otomatis saat DO selesai
         ->and(trxSalesMovements())->toBe(1);   // completed tidak memotong stok lagi
 });
 
@@ -361,9 +373,10 @@ it('D5: jadwal tidak dapat ditandai selesai dari pending — di model (tombol ma
 
     expect(fn () => $schedule->update(['status' => 'delivered']))->toThrow(DeliveryOrderTransitionException::class, 'Mulai Pengiriman');
 
+    // Gerakan stok tetap 1: potongan saat DO dibuat (Tahap 3), tidak bertambah oleh upaya selesai yang ditolak
     expect($schedule->fresh()->status)->toBe('pending')
         ->and($do->fresh()->status)->toBe('approved')
-        ->and(trxSalesMovements())->toBe(0);
+        ->and(trxSalesMovements())->toBe(1);
 });
 
 it('jadwal Mulai → DO Dikirim (stok keluar); Tandai Selesai → DO Selesai lewat Diterima otomatis', function () {
@@ -383,14 +396,14 @@ it('jadwal Mulai → DO Dikirim (stok keluar); Tandai Selesai → DO Selesai lew
 });
 
 it('D15 di jadwal: Mulai ditolak bila stok fisik kurang; jadwal tetap pending dan DO tidak berubah', function () {
-    [$ctx, , , $do] = trxReady(stock: 5, qty: 12);
+    [$ctx, , , $do] = trxUnshipped(5, 12);
     $schedule = stkSchedule($ctx, $do);
 
     expect(fn () => $schedule->update(['status' => 'on_the_way']))->toThrow(DeliveryOrderTransitionException::class, 'stok fisik tidak cukup');
 
     expect($schedule->fresh()->status)->toBe('pending')
         ->and($do->fresh()->status)->toBe('approved')
-        ->and(trxSalesMovements())->toBe(0);
+        ->and(trxNetShipped())->toBe(0.0);
 });
 
 it('Mulai ditolak bila DO terkait belum Siap Kirim', function () {
@@ -473,4 +486,37 @@ it('[flag mati] model tidak menegakkan matriks dan tidak menulis log baru (peril
 
     expect($do->fresh()->status)->toBe('completed')
         ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->count())->toBe(0);
+});
+
+// ------------------------------------------------------------------ Ambil Sendiri (menggantikan jalur lama: SO selesai memotong stok)
+
+it('Ambil Sendiri lewat DO: stok terpotong saat DO dibuat, dan penyelesaian SO tidak memotong lagi', function () {
+    $ctx = stkContext();
+    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
+    [$so, $item] = stkSaleOrder($ctx, 5, ['tipe_pengiriman' => 'Ambil Sendiri']);
+
+    // SO tidak memotong stok sendiri, juga untuk Ambil Sendiri (wajib lewat DO)
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(30.0);
+
+    $do = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(25.0)
+        ->and(trxSalesMovements())->toBe(1);
+
+    $so->update(['status' => 'completed']);
+
+    // Tidak ada pemotongan kedua oleh penyelesaian SO
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(25.0)
+        ->and(trxSalesMovements())->toBe(1)
+        ->and(DeliveryOrder::count())->toBe(1);
+});
+
+it('Ambil Sendiri lewat DO: DO tidak dapat dibuat bila stok fisik kurang, tanpa meninggalkan gerakan stok', function () {
+    $ctx = stkContext();
+    stkSetStock($ctx['product'], $ctx['warehouse'], 4);
+    [$so, $item] = stkSaleOrder($ctx, 10, ['tipe_pengiriman' => 'Ambil Sendiri']);
+
+    // stkDeliveryOrder hanya menambah stok bila 0, jadi stok 4 dipertahankan dan pemotongan 10 ditolak penjaga stok
+    expect(fn () => stkDeliveryOrder($ctx, $so, $item, 10, 'approved'))->toThrow(\Illuminate\Validation\ValidationException::class);
+
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(4.0);
 });

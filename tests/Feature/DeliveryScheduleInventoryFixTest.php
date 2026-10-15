@@ -105,23 +105,16 @@ class DeliveryScheduleInventoryFixTest extends TestCase
     }
 
     /**
-     * Test that StockMovement is created with shipping_start meta when DO status changes to 'sent'
+     * Kontrak Tahap 3: stok fisik dipotong saat item DO dibuat (satu mutasi 'sales'), bukan saat status 'sent'.
+     * Persetujuan/pengiriman/penyelesaian tidak menambah mutasi maupun reservasi DO.
      */
-    public function test_stock_movement_created_when_do_sent()
+    private function makeDeliveryOrderWithItem(string $suffix, float $stock, float $qty): array
     {
-        // Create inventory stock
-        $inventoryStock = InventoryStock::create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $this->rak->id,
-            'qty_available' => 300,
-            'qty_reserved' => 0,
-            'qty_min' => 10,
-        ]);
+        // DO tanpa baris sumber memotong stok gudang tanpa rak (fallback gudang tunggal)
+        $inventoryStock = stkSetStock($this->product, $this->warehouse, $stock);
 
-        // Create DO
         $deliveryOrder = DeliveryOrder::create([
-            'do_number' => 'DO-' . now()->format('Ymd') . '-TEST001',
+            'do_number' => 'DO-' . now()->format('Ymd') . '-' . $suffix,
             'delivery_date' => now(),
             'warehouse_id' => $this->warehouse->id,
             'driver_id' => $this->driver->id,
@@ -130,178 +123,46 @@ class DeliveryScheduleInventoryFixTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        $deliveryOrderItem = DeliveryOrderItem::create([
+        $item = DeliveryOrderItem::create([
             'delivery_order_id' => $deliveryOrder->id,
             'product_id' => $this->product->id,
-            'quantity' => 300,
+            'quantity' => $qty,
             'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $this->rak->id,
         ]);
 
-        // Approve DO
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'request_approve');
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
-
-        // Verify reservation created
-        $reservations = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $reservations, 'Reservation should be created on approval');
-
-        // Send DO - this should create StockMovement
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
-
-        // Verify StockMovement was created
-        $stockMovements = StockMovement::where('from_model_type', DeliveryOrderItem::class)
-            ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
-            ->where('type', 'sales')
-            ->get();
-
-        $this->assertCount(1, $stockMovements, 'StockMovement should be created when DO sent');
-
-        $stockMovement = $stockMovements->first();
-        $this->assertEquals(300, $stockMovement->quantity);
-        $this->assertEquals($this->warehouse->id, $stockMovement->warehouse_id);
-
-        // Verify meta has shipping_start flag
-        $meta = is_string($stockMovement->meta) ? json_decode($stockMovement->meta, true) : $stockMovement->meta;
-        $this->assertArrayHasKey('shipping_start', $meta);
-        $this->assertTrue($meta['shipping_start']);
-
-        // Verify reservation NOT deleted
-        $reservationsAfterSent = StockReservation::where('delivery_order_id', $deliveryOrder->id)->get();
-        $this->assertCount(1, $reservationsAfterSent, 'Reservation should NOT be deleted when DO sent');
-
-        echo "\n\n=== STOCK MOVEMENT CREATION TEST PASSED ===";
-        echo "\n✅ StockMovement created with type='sales' and quantity=300";
-        echo "\n✅ Meta contains 'shipping_start' flag";
-        echo "\n✅ Reservation NOT deleted (remains for tracking)";
+        return [$deliveryOrder, $item, $inventoryStock];
     }
 
-    /**
-     * Test that qty_available decreases when StockMovement is created
-     *
-     * NOTE: This test checks if StockMovement is created with correct data.
-     * The actual qty_available reduction depends on StockMovementObserver
-     * finding a matching InventoryStock record (product_id, warehouse_id, rak_id).
-     *
-     * In the application, the StockMovementObserver::adjustAvailableStockByKey()
-     * only updates inventory if a matching record is found with the same
-     * product_id, warehouse_id, AND rak_id.
-     */
-    public function test_qty_available_decreases_after_stock_movement_created()
+    private function salesMovements(DeliveryOrderItem $item)
     {
-        // Create inventory stock with exact values - use rak_id explicitly
-        $inventoryStock = InventoryStock::create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $this->rak->id,
-            'qty_available' => 300,
-            'qty_reserved' => 0,
-            'qty_min' => 10,
-        ]);
-
-        // Create DO
-        $deliveryOrder = DeliveryOrder::create([
-            'do_number' => 'DO-' . now()->format('Ymd') . '-TEST002',
-            'delivery_date' => now(),
-            'warehouse_id' => $this->warehouse->id,
-            'driver_id' => $this->driver->id,
-            'vehicle_id' => $this->vehicle->id,
-            'status' => 'draft',
-            'created_by' => $this->user->id,
-        ]);
-
-        $deliveryOrderItem = DeliveryOrderItem::create([
-            'delivery_order_id' => $deliveryOrder->id,
-            'product_id' => $this->product->id,
-            'quantity' => 300,
-            'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $this->rak->id,
-        ]);
-
-        // Approve and send
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'request_approve');
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
-
-        // Verify StockMovement was created
-        $stockMovements = StockMovement::where('from_model_type', DeliveryOrderItem::class)
-            ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
+        return StockMovement::where('from_model_type', DeliveryOrderItem::class)
+            ->where('from_model_id', $item->id)
             ->where('type', 'sales')
             ->get();
-
-        $this->assertCount(1, $stockMovements, 'StockMovement should be created');
-        $stockMovement = $stockMovements->first();
-
-        // Verify the StockMovement has correct data for inventory update
-        $this->assertEquals($this->product->id, $stockMovement->product_id);
-        $this->assertEquals($this->warehouse->id, $stockMovement->warehouse_id);
-
-        // Refresh inventory stock and check qty_available
-        $inventoryStock->refresh();
-
-        // Log for debugging
-        echo "\n\n=== QTY AVAILABLE TEST ===";
-        echo "\nInitial qty_available: 300";
-        echo "\nAfter sent - qty_available: " . $inventoryStock->qty_available;
-        echo "\nStockMovement warehouse_id: " . $stockMovement->warehouse_id;
-        echo "\nStockMovement rak_id: " . ($stockMovement->rak_id ?? 'null');
-        echo "\nInventoryStock warehouse_id: " . $inventoryStock->warehouse_id;
-        echo "\nInventoryStock rak_id: " . ($inventoryStock->rak_id ?? 'null');
-
-        // Note: qty_available update depends on StockMovementObserver finding
-        // a matching InventoryStock record with same product_id, warehouse_id, AND rak_id
-        // If rak_id doesn't match exactly, the update won't happen
     }
 
-    /**
-     * Test that no duplicate StockMovement is created on 'completed' status
-     */
-    public function test_no_duplicate_stock_movement_on_completed()
+    public function test_stock_movement_created_when_do_item_created()
     {
-        // Create inventory stock
-        InventoryStock::create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $this->rak->id,
-            'qty_available' => 100,
-            'qty_reserved' => 0,
-            'qty_min' => 10,
-        ]);
+        [$do, $item, $stock] = $this->makeDeliveryOrderWithItem('TEST001', 300, 300);
 
-        // Create DO
-        $deliveryOrder = DeliveryOrder::create([
-            'do_number' => 'DO-' . now()->format('Ymd') . '-TEST003',
-            'delivery_date' => now(),
-            'warehouse_id' => $this->warehouse->id,
-            'driver_id' => $this->driver->id,
-            'vehicle_id' => $this->vehicle->id,
-            'status' => 'draft',
-            'created_by' => $this->user->id,
-        ]);
+        $movements = $this->salesMovements($item);
+        $this->assertCount(1, $movements, 'Satu mutasi keluar dibuat saat item DO dibuat');
+        $this->assertEquals(300, $movements->first()->quantity);
+        $this->assertEquals($this->warehouse->id, $movements->first()->warehouse_id);
+        $this->assertEquals(0, (float) $stock->fresh()->qty_available);
+    }
 
-        DeliveryOrderItem::create([
-            'delivery_order_id' => $deliveryOrder->id,
-            'product_id' => $this->product->id,
-            'quantity' => 100,
-            'warehouse_id' => $this->warehouse->id,
-            'rak_id' => $this->rak->id,
-        ]);
+    public function test_status_transitions_do_not_duplicate_stock_movement_or_reservation()
+    {
+        [$do, $item, $stock] = $this->makeDeliveryOrderWithItem('TEST002', 100, 100);
 
-        // Approve, send, complete
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'request_approve');
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
-        $this->deliveryOrderService->updateStatus($deliveryOrder, 'completed');
+        $this->deliveryOrderService->updateStatus($do, 'request_approve');
+        $this->deliveryOrderService->updateStatus($do, 'approved');
+        $this->assertCount(0, StockReservation::where('delivery_order_id', $do->id)->get(), 'DO tidak menahan reservasi (stok sudah dipotong)');
 
-        // Count stock movements
-        $stockMovements = StockMovement::where('from_model_type', DeliveryOrderItem::class)
-            ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
-            ->where('type', 'sales')
-            ->get();
+        $this->deliveryOrderService->updateStatus($do, 'sent');
 
-        $this->assertCount(1, $stockMovements, 'Only ONE StockMovement should exist (created at sent, not at completed)');
-
-        echo "\n\n=== NO DUPLICATE STOCK MOVEMENT TEST PASSED ===";
-        echo "\n✅ Only 1 StockMovement exists (not duplicated at completed)";
+        $this->assertCount(1, $this->salesMovements($item), 'Tidak ada mutasi ganda setelah approve/sent');
+        $this->assertEquals(0, (float) $stock->fresh()->qty_available, 'Stok fisik tidak dipotong dua kali');
     }
 }

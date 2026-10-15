@@ -118,6 +118,7 @@ class SaleOrder extends Model
         'reject_at' => 'datetime',
         'warehouse_confirmed_at' => 'datetime',
         'exchange_rate' => 'decimal:8',
+        'shipping_cost' => 'decimal:2',
         'is_backorder' => 'boolean',
         'backorder_approved_at' => 'datetime',
         'cashier_approved_at' => 'datetime',
@@ -130,6 +131,7 @@ class SaleOrder extends Model
         'status', // draft, request_approve, request_close, approved, closed, completed, confirmed, received, canceled, 'reject
         'delivery_date',
         'total_amount',
+        'shipping_cost', // ongkos kirim (di luar total_amount barang)
         'request_approve_by',
         'request_approve_at',
         'request_close_by',
@@ -163,6 +165,42 @@ class SaleOrder extends Model
     public function cashierApprovedBy()
     {
         return $this->belongsTo(User::class, 'cashier_approved_by')->withDefault();
+    }
+
+    public function setShippingCostAttribute($value): void
+    {
+        $this->attributes['shipping_cost'] = ($value === null || $value === '') ? 0 : $value;
+    }
+
+    /** Total yang harus dibayar customer: nilai barang (total_amount) + ongkos kirim. Dipakai cek limit kredit & verifikasi kasir. */
+    public function grandTotal(): float
+    {
+        return round((float) $this->total_amount + (float) $this->shipping_cost, 2);
+    }
+
+    /**
+     * Pelanggaran batas harga master produk pada item SO ini (harga efektif setelah diskon di bawah batas).
+     * Dipakai saat persetujuan: harga yang tidak sesuai batas tidak boleh disetujui Kasir (perlu atasan).
+     *
+     * @return array<int, string> pesan per item yang melanggar
+     */
+    public function priceLimitViolations(): array
+    {
+        $this->loadMissing('saleOrderItem.product');
+        $messages = [];
+
+        foreach ($this->saleOrderItem as $item) {
+            if (! $item->product) {
+                continue;
+            }
+            $unitPrice = (float) \App\Helpers\MoneyHelper::parseHighPrecision($item->unit_price ?? 0);
+            $message = \App\Support\ProductPriceLimitation::validatePrice($item->product, $unitPrice, (float) ($item->discount ?? 0));
+            if ($message) {
+                $messages[] = $message;
+            }
+        }
+
+        return $messages;
     }
 
     public function isCod(): bool

@@ -238,7 +238,7 @@ class StockMovementResource extends Resource
                 TextColumn::make('type')
                     ->color(function ($state) {
                         return match ($state) {
-                            'purchase_in', 'customer_return' => 'success',
+                            'purchase_in', 'customer_return', 'do_return' => 'success',
                             'sales', 'purchase_return' => 'danger',
                             'transfer_in' => 'primary',
                             'transfer_out' => 'warning',
@@ -259,6 +259,7 @@ class StockMovementResource extends Resource
                             'adjustment_in' => 'Adjustment In',
                             'adjustment_out' => 'Adjustment Out',
                             'customer_return' => 'Customer Return',
+                            'do_return' => 'Retur DO',
                             'purchase_return' => 'Purchase Return',
                             default => '-'
                         };

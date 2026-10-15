@@ -159,6 +159,43 @@ class DeliveryOrderService
         return $warehouseConfirmation;
     }
 
+    /**
+     * Ongkos kirim SO yang BELUM ditagihkan lewat DO lain (UAT B1): Σ SO.shipping_cost − Σ additional_cost DO aktif (bukan closed/reject)
+     * yang sudah terhubung ke SO tersebut. Hasilnya mengisi additional_cost DO baru sehingga ongkir tertagih sekali, di invoice DO pertama.
+     *
+     * @param  array<int, int|string>  $saleOrderIds
+     * @return array{amount: float, description: string|null}
+     */
+    public static function shippingCostToBill(array $saleOrderIds, ?int $excludeDeliveryOrderId = null): array
+    {
+        $amount = 0.0;
+        $numbers = [];
+
+        foreach (\App\Models\SaleOrder::withoutGlobalScopes()->whereIn('id', $saleOrderIds)->get(['id', 'so_number', 'shipping_cost']) as $order) {
+            $shipping = (float) $order->shipping_cost;
+            if ($shipping <= 0) {
+                continue;
+            }
+
+            $alreadyBilled = (float) \App\Models\DeliveryOrder::withoutGlobalScopes()
+                ->whereIn('id', \Illuminate\Support\Facades\DB::table('delivery_sales_orders')->where('sales_order_id', $order->id)->pluck('delivery_order_id'))
+                ->when($excludeDeliveryOrderId, fn ($q) => $q->where('id', '!=', $excludeDeliveryOrderId))
+                ->whereNotIn('status', ['closed', 'reject'])
+                ->sum('additional_cost');
+
+            $remaining = max(0.0, $shipping - $alreadyBilled);
+            if ($remaining > 0.005) {
+                $amount += $remaining;
+                $numbers[] = $order->so_number;
+            }
+        }
+
+        return [
+            'amount' => round($amount, 2),
+            'description' => $numbers === [] ? null : 'Ongkos kirim SO ' . implode(', ', $numbers),
+        ];
+    }
+
     public function generateDoNumber(?int $warehouseId = null)
     {
         return static::generateStaticDoNumber(null, $warehouseId);

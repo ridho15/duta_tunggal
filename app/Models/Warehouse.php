@@ -20,7 +20,12 @@ class Warehouse extends Model
         'telepon',
         'tipe',
         'status',
+        'is_quarantine',
         'warna_background',
+    ];
+
+    protected $casts = [
+        'is_quarantine' => 'boolean',
     ];
 
     public function rak()

@@ -43,6 +43,9 @@ use Illuminate\Support\Facades\Artisan;
 
 uses(RefreshDatabase::class);
 
+// B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+beforeEach(fn () => config(['sales.invoice.auto_on_do_complete' => true]));
+
 it('database structure includes cabang_id on account_payables', function () {
     $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('account_payables', 'cabang_id'),
         'account_payables table must have cabang_id for branch scoping');
@@ -261,6 +264,18 @@ describe('Tax Propagation: Quotation → Sales Order', function () {
     });
 });
 
+/**
+ * Alur SO -> DO -> SJ -> Invoice: observer SO tidak lagi menerbitkan invoice saat SO selesai.
+ * Berkas ini menguji logika penerbitan invoice (pajak, AR, jurnal) — helper memicunya langsung.
+ */
+function auditCompleteSo(SaleOrder $so): void
+{
+    $so->update(['status' => 'completed']);
+    $m = new \ReflectionMethod(\App\Observers\SaleOrderObserver::class, 'createInvoiceForCompletedSaleOrder');
+    $m->setAccessible(true);
+    $m->invoke(app(\App\Observers\SaleOrderObserver::class), $so->fresh());
+}
+
 // ─── SECTION 3: Invoice Creation from Completed Sale Order ───────────────────
 
 describe('Invoice Auto-Creation from Completed Sale Order', function () {
@@ -298,7 +313,7 @@ describe('Invoice Auto-Creation from Completed Sale Order', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoices = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -324,9 +339,9 @@ describe('Invoice Auto-Creation from Completed Sale Order', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
         // Simulate a duplicate event (e.g., retry)
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $count = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -352,7 +367,7 @@ describe('Invoice Auto-Creation from Completed Sale Order', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -413,6 +428,7 @@ describe('Delivery Order view page shows customer information', function () {
         $customer = Customer::factory()->create([
             'cabang_id' => $cabang->id,
             'address' => 'Jl. Test No. 123',
+            'perusahaan' => 'PT Uji Infolist DO',
         ]);
         $so = SaleOrder::factory()->create([
             'customer_id' => $customer->id,
@@ -428,7 +444,8 @@ describe('Delivery Order view page shows customer information', function () {
 
         $response = $this->get("/admin/delivery-orders/{$do->id}");
         $response->assertStatus(200);
-        $response->assertSeeText($customer->name);
+        // Infolist DO menampilkan nama perusahaan customer pada daftar SO.
+        $response->assertSeeText('PT Uji Infolist DO');
         $response->assertSeeText('Jl. Test No. 123');
     });
 });
@@ -537,10 +554,13 @@ describe('PDF generators include required item columns and totals', function () 
     });
 
     it('delivery order PDF includes all columns', function () {
+        $pdfWh = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        stkSetStock($this->product, $pdfWh, 10);
         $do = DeliveryOrder::factory()->create([
             'do_number' => 'DOX',
             'delivery_date' => now(),
             'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $pdfWh->id,
         ]);
         $item = DeliveryOrderItem::factory()->create([
             'delivery_order_id' => $do->id,
@@ -566,6 +586,8 @@ describe('PDF generators include required item columns and totals', function () 
     });
 
     it('surat jalan PDF includes all columns', function () {
+        $pdfWh = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        stkSetStock($this->product, $pdfWh, 10);
         // create at least one user for factory requirements
         $user = \App\Models\User::factory()->create();
         $sj = \App\Models\SuratJalan::create([
@@ -575,7 +597,7 @@ describe('PDF generators include required item columns and totals', function () 
             'created_by' => $user->id,
             'status' => 1,
         ]);
-        $do = DeliveryOrder::factory()->create(['do_number'=>'DOX','delivery_date'=>now(),'cabang_id'=>$this->cabang->id]);
+        $do = DeliveryOrder::factory()->create(['do_number'=>'DOX','delivery_date'=>now(),'cabang_id'=>$this->cabang->id,'warehouse_id'=>$pdfWh->id]);
         $sj->deliveryOrder()->attach($do->id);
         $so = SaleOrder::factory()->create(['customer_id'=>$this->customer->id,'cabang_id'=>$this->cabang->id,'status'=>'approved']);
         $soItem=SaleOrderItem::factory()->create(['sale_order_id'=>$so->id,'product_id'=>$this->product->id,'unit_price'=>100000,'discount'=>0,'tax'=>0,'tipe_pajak'=>'Eksklusif']);
@@ -592,7 +614,7 @@ describe('PDF generators include required item columns and totals', function () 
         expect($html)->toContain($so->shipped_to);
         expect($html)->toContain($this->cabang->nama);
         // Surat Jalan = dokumen serah-terima (Fase 4, keputusan D3): daftar barang TANPA harga/diskon/pajak.
-        assertPdfHasColumns($html, ['SKU', 'Nama Barang', 'Qty', 'Satuan', 'Keterangan']);
+        assertPdfHasColumns($html, ['SKU', 'Nama Barang', 'Gudang Asal', 'Total Pesan', 'Kirim Sekarang', 'Sisa Pesanan', 'Satuan', 'Keterangan']);
         foreach (['Harga Satuan', 'Discount', 'Tax Amount', 'Subtotal'] as $priceColumn) {
             expect($html)->not->toContain($priceColumn);
         }
@@ -678,7 +700,7 @@ describe('Invoice tax field stores rate, not monetary amount', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -729,7 +751,7 @@ describe('PPN Keluaran journal entry — correct monetary amount', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -761,7 +783,7 @@ describe('PPN Keluaran journal entry — correct monetary amount', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -792,7 +814,7 @@ describe('PPN Keluaran journal entry — correct monetary amount', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::whereMorphedTo('fromModel', $so)->first();
         $entries = JournalEntry::where('source_type', Invoice::class)
@@ -821,6 +843,9 @@ describe('Account Receivable — creation and branch scope', function () {
             'goods_delivery_coa_id'  => $this->coas['delivery']->id,
         ]);
         $this->warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
+        // Tahap 3: DO memotong stok saat dibuat; B22: SJ wajib sebelum DO selesai (tes ini menguji idempotensi penyelesaian, bukan SJ).
+        stkSetStock($this->product, $this->warehouse, 10);
+        config(['sales.stock.require_surat_jalan' => false]);
     });
 
     it('creates exactly one AccountReceivable per invoice', function () {
@@ -840,7 +865,7 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -870,7 +895,7 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -901,7 +926,7 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -934,10 +959,10 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         // Attempt a second completion (simulates observer double-fire)
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -967,8 +992,8 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
-        $so->update(['status' => 'completed']); // repeat
+        auditCompleteSo($so);
+        auditCompleteSo($so); // repeat
 
         $invoiceCount = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -1000,6 +1025,7 @@ describe('Account Receivable — creation and branch scope', function () {
             'do_number' => 'DOX',
             'delivery_date' => now(),
             'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
         $do->salesOrders()->attach($so->id);
         $doItem = DeliveryOrderItem::factory()->create([
@@ -1043,12 +1069,13 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $do = DeliveryOrder::factory()->create([
             'do_number' => 'DOX',
             'delivery_date' => now(),
             'cabang_id' => $this->cabang->id,
+            'warehouse_id' => $this->warehouse->id,
         ]);
         $do->salesOrders()->attach($so->id);
         $doItem = DeliveryOrderItem::factory()->create([
@@ -1088,7 +1115,7 @@ describe('Account Receivable — creation and branch scope', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -1302,7 +1329,7 @@ describe('Inclusive tax invoice workflow', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -1357,7 +1384,7 @@ describe('Discount applied before tax calculation', function () {
             'warehouse_id'  => $this->warehouse->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::where('from_model_type', SaleOrder::class)
             ->where('from_model_id', $so->id)
@@ -1414,7 +1441,7 @@ describe('Multi-item invoice — journals always balance', function () {
             ]);
         }
 
-        $so->update(['status' => 'completed']);
+        auditCompleteSo($so);
 
         $invoice = Invoice::whereMorphedTo('fromModel', $so)->first();
         $entries = JournalEntry::where('source_type', Invoice::class)

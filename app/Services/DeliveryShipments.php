@@ -27,7 +27,16 @@ class DeliveryShipments
         $shipped = (float) (clone $base)->where('type', 'sales')->sum('quantity');
         $returned = (float) (clone $base)->where('type', 'adjustment_in')->sum('quantity');
 
-        return max(0.0, $shipped - $returned);
+        // Retur DO yang sudah disetujui (jenis `do_return`) mengembalikan barang dari lokasi ASAL ini — ke gudang asal ATAU karantina —
+        // sehingga tidak lagi "di luar gudang"; tanpa ini penutupan/edit DO mengembalikan stok dua kali.
+        $returnedByDo = (float) StockMovement::query()
+            ->where('type', 'do_return')
+            ->where('meta->delivery_order_item_id', $item->id)
+            ->where('meta->origin_warehouse_id', $warehouseId)
+            ->where('meta->origin_rak_id', (int) ($rakId ?? 0))
+            ->sum('quantity');
+
+        return max(0.0, $shipped - $returned - $returnedByDo);
     }
 
     /**

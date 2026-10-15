@@ -21,7 +21,7 @@ use Spatie\Permission\Models\Role;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['sales.stock' => ['ledger' => false, 'strict_dispatch' => true, 'reserve_on_so_approve' => true, 'block_short_approval' => true]]);
+    config(['sales.stock' => ['require_surat_jalan' => false, 'ledger' => false, 'strict_dispatch' => true, 'reserve_on_so_approve' => true, 'block_short_approval' => true]]);
 });
 
 function e2eManager(array $ctx): User
@@ -45,12 +45,12 @@ it('E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, reserva
     app(SalesOrderService::class)->approve($so);
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 20.0, 'free' => 10.0]);
 
-    // 2. DO 12 Siap Kirim → reservasi pindah (total tertahan tetap 20)
+    // 2. DO 12 dibuat/Siap Kirim → Tahap 3: stok fisik langsung terpotong (30 → 18); SO hanya menahan sisa 8; tidak ada reservasi DO
     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(20.0)
-        ->and(stkReserved($so, $do))->toBe(12.0);
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 8.0, 'free' => 10.0])
+        ->and(stkReserved($so, $do))->toBe(0.0);
 
-    // 3. Jadwal: Selesai dari Menunggu ditolak; Mulai → stok fisik keluar, reservasi DO terkonsumsi
+    // 3. Jadwal: Selesai dari Menunggu ditolak; Mulai → DO Dikirim (stok TIDAK terpotong lagi)
     $schedule = stkSchedule($ctx, $do);
     expect(fn () => $schedule->update(['status' => 'delivered']))->toThrow(\App\Exceptions\DeliveryOrderTransitionException::class);
 
@@ -66,7 +66,7 @@ it('E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, reserva
 
     $schedule->update(['status' => 'delivered']);
     expect($do->fresh()->status)->toBe('completed')
-        ->and(Invoice::where('from_model_type', SaleOrder::class)->whereJsonContains('delivery_orders', $do->id)->exists())->toBeTrue()
+        ->and(Invoice::where('from_model_type', SaleOrder::class)->whereJsonContains('delivery_orders', $do->id)->exists())->toBeFalse()   // B25: invoice tidak lagi terbit otomatis saat DO selesai
         ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->orderBy('id')->pluck('status')->all())->toBe(['approved', 'sent', 'received', 'completed']);
 
     // 5. DO kedua (sisa 8): gagal kirim → stok kembali; kirim ulang; selesai
@@ -95,7 +95,7 @@ it('E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, reserva
         ->assertSuccessful();
 });
 
-it('E2E: SO stok kurang ditolak; backorder beralasan menahan sebagian; DO Siap Kirim dibatalkan mengembalikan kebutuhan; SO dibatalkan melepas semua', function () {
+it('E2E: SO stok kurang ditolak; backorder beralasan menahan sebagian; DO Siap Kirim dibatalkan mengembalikan stok fisik & kebutuhan; SO dibatalkan melepas semua', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 15);
     [$so, $item] = stkSaleOrder($ctx, 20, ['status' => 'request_approve']);
@@ -110,7 +110,8 @@ it('E2E: SO stok kurang ditolak; backorder beralasan menahan sebagian; DO Siap K
         ->and((float) StockReservation::where('sale_order_id', $so->id)->sum('quantity'))->toBe(15.0);
 
     $do = stkDeliveryOrder($ctx, $so->fresh(), $item, 10, 'approved');
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(15.0);
+    // Tahap 3: DO 10 langsung memotong stok fisik (15 → 5); SO (butuh 20 − 10 di DO = 10) hanya bisa menahan 5 yang tersisa
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 5.0, 'reserved' => 5.0, 'free' => 0.0]);
 
     app(DeliveryOrderTransitions::class)->to($do, 'closed', ['reason' => 'Customer menunda']);
     expect(stkReserved($so, $do))->toBe(0.0)

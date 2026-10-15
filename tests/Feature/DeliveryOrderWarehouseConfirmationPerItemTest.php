@@ -73,6 +73,14 @@ test('delivery order warehouse confirmations are created per request item and so
         'rak_id' => $rakA->id,
     ]);
 
+    // Stok fisik terpotong begitu sumber gudang DO dibuat (Tahap 3) → sediakan stok pada gudang/rak sumber.
+    foreach ([[$productA, $warehouseA, $rakA, 10], [$productB, $warehouseA, $rakA, 4], [$productB, $warehouseB, $rakB, 3]] as [$stockProduct, $stockWarehouse, $stockRak, $stockQty]) {
+        \App\Models\InventoryStock::updateOrCreate(
+            ['product_id' => $stockProduct->id, 'warehouse_id' => $stockWarehouse->id, 'rak_id' => $stockRak->id],
+            ['qty_available' => $stockQty, 'qty_reserved' => 0]
+        );
+    }
+
     $deliveryOrder = DeliveryOrder::create([
         'do_number' => 'DO-WC-PER-ITEM-001',
         'delivery_date' => now()->toDateString(),
@@ -121,7 +129,7 @@ test('delivery order warehouse confirmations are created per request item and so
         'quantity' => 3,
     ]);
 
-    $confirmations = app(DeliveryOrderService::class)->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);
+    $confirmations = app(DeliveryOrderService::class)->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder->fresh());
 
     expect($confirmations)->toHaveCount(3);
 

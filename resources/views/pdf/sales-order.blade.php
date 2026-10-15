@@ -271,15 +271,25 @@
                 <td colspan="10" class="right"><strong>PPN (Pajak Pertambahan Nilai)</strong></td>
                 <td class="right"><strong>{{ $formatMoney($totalPpn) }}</strong></td>
             </tr>
+            @php
+                $shippingCost = (float) ($saleOrder->shipping_cost ?? 0);
+                $grandTotal = $total + $shippingCost;
+            @endphp
+            @if ($shippingCost > 0)
+                <tr class="summary-row">
+                    <td colspan="10" class="right"><strong>Ongkos Kirim</strong></td>
+                    <td class="right"><strong>{{ $formatMoney($shippingCost) }}</strong></td>
+                </tr>
+            @endif
             <tr class="summary-row total">
-                <td colspan="10" class="right">GRAND TOTAL</td>
-                <td class="right">{{ $formatMoney($total) }}</td>
+                <td colspan="10" class="right">GRAND TOTAL{{ $shippingCost > 0 ? ' (termasuk Ongkos Kirim)' : '' }}</td>
+                <td class="right">{{ $formatMoney($grandTotal) }}</td>
             </tr>
         </tbody>
     </table>
 
     <div style="margin-top: 15px; font-size: 11px;">
-        <strong>Terbilang:</strong> <em>{{ \App\Http\Controllers\HelperController::terbilang($saleOrder->total_amount) }} Rupiah</em>
+        <strong>Terbilang:</strong> <em>{{ \App\Http\Controllers\HelperController::terbilang($grandTotal) }} Rupiah</em>
     </div>
 
     <div class="signature-section">

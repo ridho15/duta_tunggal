@@ -88,21 +88,21 @@ class DeliveryOrderItem extends Model
             if ($deliveryOrderItem->isDirty('quantity')) {
                 $deliveryOrder = $deliveryOrderItem->deliveryOrder;
 
-                // T2.1 (flag stock.ledger): edit kuantitas (mis. checker) saat DO masih Siap Kirim → reservasi ikut turun/naik.
-                if ($deliveryOrder && $deliveryOrder->status === 'approved' && \App\Services\StockReservationLedger::enabled()) {
-                    app(\App\Services\DeliveryOrderReservations::class)->sync($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
-                    app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
-                }
+                // Tahap 3: stok fisik sudah terpotong sejak DO dibuat, jadi edit kuantitas (mis. checker) TIDAK boleh membuat
+                // reservasi level-DO lagi (penahanan ganda). Reservasi level-SO disusun ulang di bawah (setelah stok disesuaikan).
 
                 if ($deliveryOrder && ! in_array($deliveryOrder->status, ['closed', 'reject'], true)) {
                     // Sync journal entries if they exist
                     self::syncJournalEntries($deliveryOrder);
                     
-                    // Sync stock movements if they exist
-                    self::syncStockMovements($deliveryOrder);
+                    // Sesuaikan stok fisik dengan kuantitas/sumber gudang terbaru (selisih saja, tanpa menghapus gerakan lama)
+                    app(\App\Observers\DeliveryOrderObserver::class)->reconcileStockMovementsForDeliveryOrder($deliveryOrder);
                     
                     // Update delivered_quantity for sale order items
                     self::syncDeliveredQuantities($deliveryOrder);
+
+                    // Reservasi level-SO (flag reserve_on_so_approve) mengikuti kebutuhan baru; no-op bila flag mati
+                    app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "Kuantitas item DO {$deliveryOrder->do_number} diubah");
                 }
             }
         });

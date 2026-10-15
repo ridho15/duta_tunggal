@@ -152,7 +152,10 @@ class EditDeliveryOrder extends EditRecord
                     throw new ValidationException($validator);
                 }
 
-                $warehouseSources = collect($item['warehouseSources'] ?? []);
+                // Baris qty 0 (gudang berstok yang tidak dipakai, B7) diabaikan
+                $warehouseSources = collect($item['warehouseSources'] ?? [])
+                    ->filter(fn ($zeroSource) => (float) ($zeroSource['quantity'] ?? 0) > 0)
+                    ->values();
                 if ($warehouseSources->isEmpty()) {
                     $validator = Validator::make([], []);
                     $validator->errors()->add('deliveryOrderItem', "Item delivery order #{$index}: Pilih minimal satu gudang sumber pengiriman.");
@@ -179,7 +182,7 @@ class EditDeliveryOrder extends EditRecord
                             throw new ValidationException($validator);
                         }
 
-                        $availableStock = app(\App\Services\StockAvailability::class)->freeForSaleOrderItem((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, !empty($item['sale_order_item_id']) ? (int) $item['sale_order_item_id'] : null);   // stok bebas + reservasi milik SO ini
+                        $availableStock = app(\App\Services\StockAvailability::class)->freeForDeliveryOrderSource((int) ($item['product_id'] ?? 0), (int) $sourceWarehouseId, !empty($item['sale_order_item_id']) ? (int) $item['sale_order_item_id'] : null, !empty($source['rak_id']) ? (int) $source['rak_id'] : null, (preg_match('/^record-(\d+)$/', (string) $index, $doItemMatch) ? (int) $doItemMatch[1] : (!empty($item['id']) ? (int) $item['id'] : null)));   // stok bebas + reservasi milik SO ini
 
                         if ((float) $availableStock < $sourceQtyItem) {
                             $validator = Validator::make([], []);
@@ -206,5 +209,14 @@ class EditDeliveryOrder extends EditRecord
         }
 
         return $data;
+    }
+
+    /** Baris sumber gudang berqty 0 (B7: gudang berstok yang tidak dipakai) dibuang setelah simpan. */
+    protected function afterSave(): void
+    {
+        \App\Models\DeliveryOrderItemWarehouseSource::query()
+            ->whereIn('delivery_order_item_id', $this->record->deliveryOrderItem()->pluck('id'))
+            ->where(fn ($q) => $q->whereNull('quantity')->orWhere('quantity', '<=', 0))
+            ->delete();
     }
 }

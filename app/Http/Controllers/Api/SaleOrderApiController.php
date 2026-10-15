@@ -332,6 +332,7 @@ class SaleOrderApiController extends Controller
             'header.currency_id' => 'required|exists:currencies,id',
             'header.exchange_rate' => 'nullable|numeric|min:0',
             'header.tempo_pembayaran' => 'nullable|integer|min:0',
+            'header.shipping_cost' => 'nullable|numeric|min:0',
             'header.quotation_id' => 'nullable|exists:quotations,id',
             'header.notes' => 'nullable|string',
             'header.status' => 'nullable|string|in:draft,request_approve',
@@ -364,7 +365,7 @@ class SaleOrderApiController extends Controller
         foreach ($itemsData as $idx => $item) {
             $product = Product::find($item['product_id']);
             if ($product) {
-                $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price'], (float) ($item['discount'] ?? 0));
                 if ($priceErr) {
                     return response()->json([
                         'success' => false,
@@ -434,6 +435,7 @@ class SaleOrderApiController extends Controller
                     'currency_id' => $currencyId,
                     'exchange_rate' => $exchangeRate,
                     'tempo_pembayaran' => $tempoPembayaran,
+                    'shipping_cost' => (float) ($headerData['shipping_cost'] ?? 0),
                     'notes' => $headerData['notes'] ?? null,
                     'status' => 'draft',
                     'created_by' => Auth::id(),
@@ -548,6 +550,7 @@ class SaleOrderApiController extends Controller
                         $saleOrder->quotation?->exists ? $saleOrder->quotation : null
                     ),
                     'notes' => $saleOrder->notes,
+                    'shipping_cost' => (float) ($saleOrder->shipping_cost ?? 0),
                     'status' => $saleOrder->status,
                     'total_amount' => (float) ($saleOrder->total_amount ?? 0),
                 ],
@@ -610,6 +613,7 @@ class SaleOrderApiController extends Controller
             'header.currency_id' => 'required|exists:currencies,id',
             'header.exchange_rate' => 'nullable|numeric|min:0',
             'header.tempo_pembayaran' => 'nullable|integer|min:0',
+            'header.shipping_cost' => 'nullable|numeric|min:0',
             'header.quotation_id' => 'nullable|exists:quotations,id',
             'header.status' => 'nullable|string|in:draft,request_approve',
             'header.notes' => 'nullable|string',
@@ -630,7 +634,7 @@ class SaleOrderApiController extends Controller
         foreach ($itemsData as $idx => $item) {
             $product = Product::find($item['product_id']);
             if ($product) {
-                $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price']);
+                $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, (float) $item['unit_price'], (float) ($item['discount'] ?? 0));
                 if ($priceErr) {
                     return response()->json([
                         'success' => false,
@@ -700,6 +704,8 @@ class SaleOrderApiController extends Controller
                     'currency_id' => $currencyId,
                     'exchange_rate' => $exchangeRate,
                     'tempo_pembayaran' => $tempoPembayaran,
+                    // Jangan menimpa ongkir lama bila klien tidak mengirim field shipping_cost.
+                    'shipping_cost' => array_key_exists('shipping_cost', $headerData) ? (float) ($headerData['shipping_cost'] ?? 0) : (float) $saleOrder->shipping_cost,
                     // Jangan menimpa catatan lama bila klien tidak mengirim field notes.
                     'notes' => array_key_exists('notes', $headerData) ? $headerData['notes'] : $saleOrder->notes,
                     // Status tidak diubah dari payload; pengajuan persetujuan lewat SalesOrderService::requestApprove().

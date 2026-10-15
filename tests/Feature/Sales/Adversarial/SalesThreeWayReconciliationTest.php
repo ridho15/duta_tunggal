@@ -217,6 +217,7 @@ it('SALES-RC-03: rekonsiliasi tiga arah sub-ledger AR bernilai tepat terhadap ag
         'product_id' => $ctx['product']->id,
         'quantity' => 2,
         'decision' => CustomerReturnItem::DECISION_CREDIT,
+        'qc_result' => CustomerReturnItem::QC_RESULT_PASS,
     ]);
 
     app(CustomerReturnService::class)->processCompletion($returnB->fresh());

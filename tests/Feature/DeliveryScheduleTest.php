@@ -415,6 +415,7 @@ class DeliveryScheduleTest extends TestCase
             'status' => 'approved',
         ]);
 
+        stkEnsureStockForDo($deliveryOrder, $product);
         DeliveryOrderItem::factory()->create([
             'delivery_order_id' => $deliveryOrder->id,
             'product_id' => $product->id,
@@ -432,7 +433,9 @@ class DeliveryScheduleTest extends TestCase
 
         $suratJalan->deliveryOrder()->attach([$deliveryOrder->id]);
 
-        $this->assertSame(0, JournalEntry::count());
+        $journalCountBeforeSchedule = JournalEntry::where('source_type', DeliveryOrder::class)
+            ->where('source_id', $deliveryOrder->id)
+            ->count();
 
         $schedule = DeliverySchedule::create([
             'schedule_number' => 'SCH-JOURNAL-0001',
@@ -449,20 +452,19 @@ class DeliveryScheduleTest extends TestCase
         $schedule->update(['status' => 'on_the_way']);
 
         $this->assertSame('sent', $deliveryOrder->fresh()->status);
-        $this->assertSame(0, JournalEntry::where('source_type', DeliveryOrder::class)
-            ->where('source_id', $deliveryOrder->id)
-            ->count());
-
+        // Jurnal terbit saat jadwal mulai berangkat (DO Dikirim), bukan saat DO dibuat.
+        $this->assertSame(0, $journalCountBeforeSchedule);
         $journalCountAfterOnTheWay = JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
             ->count();
+        $this->assertGreaterThan(0, $journalCountAfterOnTheWay);
 
         $schedule->update(['status' => 'delivered']);
 
         $this->assertSame('completed', $deliveryOrder->fresh()->status);
-        $this->assertGreaterThan($journalCountAfterOnTheWay, JournalEntry::where('source_type', DeliveryOrder::class)
+        $this->assertSame($journalCountAfterOnTheWay, JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
-            ->count());
+            ->count(), 'Selesai kirim tidak membuat jurnal ganda');
     }
 
     #[Test]

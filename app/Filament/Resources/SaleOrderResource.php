@@ -455,7 +455,7 @@ class SaleOrderResource extends Resource
             if (! empty($item['product_id'])) {
                 $product = \App\Models\Product::find($item['product_id']);
                 if ($product) {
-                    $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPrice);
+                    $priceErr = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPrice, $discount);
                     if ($priceErr) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'saleOrderItem' => $priceErr,
@@ -508,6 +508,15 @@ class SaleOrderResource extends Resource
         }
 
         return static::formatCurrencyPreviewState($amount, $currencyId ?? static::resolveDefaultCurrencyId());
+    }
+
+    /**
+     * Nominal rupiah untuk teks modal aksi (Ajukan Persetujuan, Setujui, Verifikasi Kasir). Dipanggil sebagai self::formatMoneyPreviewState()
+     * oleh deskripsi modal; sebelumnya TIDAK ADA sehingga membuka modal-modal itu menghasilkan error 500.
+     */
+    protected static function formatMoneyPreviewState(mixed $amount): string
+    {
+        return static::formatMoneyState($amount ?? 0);
     }
 
     protected static function getWarehouseAllocationOptions(?int $productId, ?int $selectedWarehouseId = null): array
@@ -945,6 +954,12 @@ class SaleOrderResource extends Resource
                             ->nullable()
                             ->helperText('Diisi otomatis dari data customer (tempo kredit). Dapat diubah bila perlu.')
                             ->suffix('Hari'),
+                        TextInput::make('shipping_cost')
+                            ->label('Ongkos Kirim')
+                            ->indonesianMoney()
+                            ->default(0)
+                            ->dehydrateStateUsing(fn ($state) => max(0.0, (float) \App\Helpers\MoneyHelper::safeParse($state ?? 0)))
+                            ->helperText('Biaya pengiriman yang ditagihkan ke customer. Di luar Total Amount barang; ikut dihitung pada limit kredit dan ditagihkan pada invoice DO pertama.'),
                         TextInput::make('total_amount')
                             ->label('Total Amount')
                             ->required()
@@ -1308,7 +1323,7 @@ class SaleOrderResource extends Resource
                                                 return;
                                             }
                                             $unitPriceNumeric = (float) static::parseCurrencyState($value ?? 0);
-                                            $error = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPriceNumeric);
+                                            $error = \App\Support\ProductPriceLimitation::validatePrice($product, $unitPriceNumeric, (float) ($get('discount') ?? 0));
                                             if ($error) {
                                                 $fail($error);
                                             }
@@ -1872,6 +1887,29 @@ class SaleOrderResource extends Resource
                                 HelperController::sendNotification(isSuccess: false, title: "Gagal Menyetujui Sales Order", message: $messages ?: 'Validasi approval gagal.');
                             }
                         }),
+                    // Kasir yang tidak boleh menyetujui karena harga di bawah batas harga master produk: tombol Setujui tersembunyi,
+                    // jadi tampilkan aksi penjelas agar jelas SO ini perlu atasan (UAT B5).
+                    Action::make('needs_supervisor')
+                        ->label('Perlu Atasan (harga di bawah batas)')
+                        ->icon('heroicon-o-exclamation-triangle')
+                        ->color('warning')
+                        ->visible(function ($record) {
+                            $user = Auth::user();
+                            if (! $user || $record->status !== 'request_approve' || ! $user->hasRole(\App\Services\ApprovalControlService::CASHIER_ROLE)) {
+                                return false;
+                            }
+                            $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder($user, $record);
+
+                            return ! $check['allowed'] && str_contains((string) $check['reason'], 'di bawah batas harga');
+                        })
+                        ->action(function ($record) {
+                            $check = app(\App\Services\ApprovalControlService::class)->canApproveSaleOrder(Auth::user(), $record);
+                            HelperController::sendNotification(
+                                isSuccess: false,
+                                title: 'Perlu Persetujuan Atasan',
+                                message: $check['reason'] ?? 'Harga di bawah batas harga master produk.'
+                            );
+                        }),
                     Action::make('verify_cashier')
                         ->label('Verifikasi Kasir (COD)')
                         ->icon('heroicon-o-check-badge')
@@ -1880,29 +1918,33 @@ class SaleOrderResource extends Resource
                         ->modalHeading('Verifikasi Kasir untuk Sales Order COD')
                         ->modalDescription(function ($record) {
                             $cust = $record->customer?->perusahaan ?: $record->customer?->name ?: 'Customer';
-                            $total = 'Rp ' . self::formatMoneyPreviewState($record->total_amount ?? 0);
-                            $depositBalance = (float) ($record->customer?->deposit?->remaining_amount ?? 0);
-                            $depositBalanceStr = 'Rp ' . self::formatMoneyPreviewState($depositBalance);
-                            $description = "Konfirmasi penerimaan titipan/pembayaran COD untuk SO {$record->so_number} ({$cust} - {$total}). Saldo Titip Customer saat ini: {$depositBalanceStr}.";
-                            if ($depositBalance < (float) ($record->total_amount ?? 0)) {
-                                $description .= ' ⚠️ Saldo titip customer LEBIH KECIL dari total SO ini — pastikan titipan/pembayaran benar-benar sudah diterima sebelum verifikasi.';
+                            $required = $record->grandTotal();
+                            $balance = (float) ($record->customer?->deposit?->remaining_amount ?? 0);
+                            $description = "Verifikasi SO {$record->so_number} ({$cust}). Total yang harus tertutup Saldo Titip Customer: Rp " . self::formatMoneyPreviewState($required)
+                                . ' (barang + ongkos kirim). Saldo Titip saat ini: Rp ' . self::formatMoneyPreviewState($balance) . '.';
+                            if ($balance + 0.005 < $required) {
+                                $description .= ' ⚠️ Saldo KURANG Rp ' . self::formatMoneyPreviewState($required - $balance) . ' — tambahkan Saldo Titip Customer lebih dulu (aksi "Saldo Titip Customer").';
+                            } else {
+                                $description .= ' Total SO akan otomatis dipotong dari Saldo Titip.';
                             }
-                            return $description . ' Setelah diverifikasi oleh Kasir, Delivery Order (DO) baru dapat diterbitkan.';
+
+                            return $description . ' Setelah diverifikasi, Delivery Order (DO) baru dapat diterbitkan.';
                         })
-                        ->modalSubmitActionLabel('Verifikasi & Setujui')
+                        ->modalSubmitActionLabel('Verifikasi & Potong Saldo Titip')
                         ->form(function ($record) {
-                            $depositBalance = (float) ($record->customer?->deposit?->remaining_amount ?? 0);
-                            return [
+                            $canOverride = Auth::user()?->hasRole(\App\Services\SaleOrderCashierVerification::OVERRIDE_ROLES) ?? false;
+                            $short = ((float) ($record->customer?->deposit?->remaining_amount ?? 0)) + 0.005 < $record->grandTotal();
+
+                            return array_values(array_filter([
                                 \Filament\Forms\Components\Textarea::make('cashier_note')
                                     ->label('Catatan Kasir')
-                                    ->placeholder('Contoh: DP / Titipan pembayaran tunai/transfer telah diterima kasir')
+                                    ->placeholder('Contoh: Titipan pembayaran tunai/transfer telah diterima kasir')
                                     ->rows(2),
-                                \Filament\Forms\Components\Toggle::make('use_deposit')
-                                    ->label('Pakai Saldo Titip Customer untuk transaksi ini')
-                                    ->helperText("Saldo tersedia saat ini: Rp " . self::formatMoneyPreviewState($depositBalance) . '. Saldo akan dikurangi sebesar total SO (atau sisa saldo, mana yang lebih kecil).')
-                                    ->default($depositBalance > 0)
-                                    ->visible($depositBalance > 0),
-                            ];
+                                ($canOverride && $short) ? \Filament\Forms\Components\Textarea::make('override_reason')
+                                    ->label('Alasan pengecualian saldo kurang (Owner / Super Admin / Finance Manager)')
+                                    ->helperText('Kosongkan untuk menolak. Bila diisi (min. 10 karakter), SO diverifikasi dengan saldo yang ada dan tercatat sebagai pengecualian.')
+                                    ->rows(2) : null,
+                            ]));
                         })
                         ->visible(function ($record) {
                             if (! $record->isCod() || $record->isCashierApproved()) {
@@ -1916,37 +1958,27 @@ class SaleOrderResource extends Resource
                                 || $user->hasPermissionTo('update sales order');
                         })
                         ->action(function ($record, array $data = []) {
-                            DB::transaction(function () use ($record, $data) {
-                                $record->update([
-                                    'cashier_approved_by' => Auth::id(),
-                                    'cashier_approved_at' => now(),
-                                    'cashier_note' => $data['cashier_note'] ?? null,
-                                ]);
+                            try {
+                                $result = app(\App\Services\SaleOrderCashierVerification::class)->verify(
+                                    $record,
+                                    $data['cashier_note'] ?? null,
+                                    $data['override_reason'] ?? null,
+                                );
+                            } catch (ValidationException $e) {
+                                HelperController::sendNotification(
+                                    isSuccess: false,
+                                    title: 'Verifikasi Kasir Ditolak',
+                                    message: collect($e->errors())->flatten()->implode(' ')
+                                );
 
-                                $deposit = $record->customer?->deposit;
-                                if (($data['use_deposit'] ?? false) && $deposit && $deposit->id && (float) $deposit->remaining_amount > 0) {
-                                    $useAmount = min((float) $deposit->remaining_amount, (float) ($record->total_amount ?? 0));
-                                    if ($useAmount > 0) {
-                                        $deposit->update([
-                                            'used_amount' => (float) $deposit->used_amount + $useAmount,
-                                            'remaining_amount' => (float) $deposit->remaining_amount - $useAmount,
-                                        ]);
-                                        $deposit->depositLog()->create([
-                                            'type' => 'use',
-                                            'reference_type' => \App\Models\SaleOrder::class,
-                                            'reference_id' => $record->id,
-                                            'amount' => $useAmount,
-                                            'note' => "Dipakai untuk verifikasi kasir COD SO {$record->so_number}" . (filled($data['cashier_note'] ?? null) ? " ({$data['cashier_note']})" : ''),
-                                            'created_by' => Auth::id(),
-                                        ]);
-                                    }
-                                }
-                            });
+                                return;
+                            }
 
                             HelperController::sendNotification(
                                 isSuccess: true,
-                                title: "Verifikasi Kasir Berhasil",
-                                message: "Sales Order {$record->so_number} telah diverifikasi oleh Kasir. Delivery Order sekarang dapat diterbitkan."
+                                title: 'Verifikasi Kasir Berhasil',
+                                message: "Sales Order {$record->so_number} diverifikasi. Saldo Titip dipotong Rp " . self::formatMoneyPreviewState($result['used'])
+                                    . ($result['overridden'] ? ' (pengecualian saldo kurang tercatat).' : '.') . ' Delivery Order sekarang dapat diterbitkan.'
                             );
                         }),
                     \App\Filament\Support\SaleOrderStockActions::backorder(Action::make('approve_backorder')),
@@ -2358,6 +2390,12 @@ class SaleOrderResource extends Resource
                         \Filament\Infolists\Components\TextEntry::make('total_amount')
                             ->label('Total Amount')
                             ->getStateUsing(fn($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->total_amount)),
+                        \Filament\Infolists\Components\TextEntry::make('shipping_cost')
+                            ->label('Ongkos Kirim')
+                            ->getStateUsing(fn($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->shipping_cost ?? 0)),
+                        \Filament\Infolists\Components\TextEntry::make('grand_total')
+                            ->label('Total + Ongkos Kirim')
+                            ->getStateUsing(fn($record) => static::formatCurrencyAmount(static::resolveDefaultCurrencyId(), $record?->grandTotal() ?? 0)),
                         \Filament\Infolists\Components\TextEntry::make('tipe_pengiriman')
                             ->label('Tipe Pengiriman')
                             ->placeholder('-'),

@@ -151,6 +151,12 @@ class Tahap5SalesInvoiceTest extends TestCase
         );
     }
 
+    /** SO milik Surat Jalan (langkah 2 form invoice, B24). */
+    protected function soOf(SuratJalan $sj): ?int
+    {
+        return $sj->deliveryOrder()->first()?->salesOrders()->first()?->id;
+    }
+
     protected function createCustomer(array $attributes = []): Customer
     {
         return Customer::create(array_merge([
@@ -269,6 +275,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sj),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sj->id],
                 'invoice_number' => $invNumber,
                 'invoice_date' => now()->toDateString(),
@@ -334,6 +341,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sjDraft),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sjDraft->id],
                 'invoice_number' => 'INV-DRAFT-FAIL',
                 'invoice_date' => now()->toDateString(),
@@ -357,6 +365,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sjCancelled),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sjCancelled->id],
                 'invoice_number' => 'INV-CANCEL-FAIL',
                 'invoice_date' => now()->toDateString(),
@@ -377,9 +386,10 @@ class Tahap5SalesInvoiceTest extends TestCase
      */
     public function test_multi_surat_jalan_consolidation_into_single_sales_invoice(): void
     {
-        // SO 1 dan DO 1
+        // B24: SJ yang digabung dalam satu invoice harus dari SO yang SAMA → satu SO dengan dua item, dua DO, dua SJ
         $so1 = $this->createSaleOrder($this->customerA, $this->cabang1, [
             ['product_id' => $this->product1->id, 'quantity' => 10, 'unit_price' => 250000],
+            ['product_id' => $this->product2->id, 'quantity' => 5, 'unit_price' => 150000],
         ]);
         $soItem1 = $so1->saleOrderItem()->first();
         $do1 = $this->createApprovedDeliveryOrder($so1, [
@@ -387,11 +397,9 @@ class Tahap5SalesInvoiceTest extends TestCase
         ]);
         $sj1 = $this->createSuratJalan([$do1], ['sj_number' => 'SJ-MULTI-001']);
 
-        // SO 2 dan DO 2
-        $so2 = $this->createSaleOrder($this->customerA, $this->cabang1, [
-            ['product_id' => $this->product2->id, 'quantity' => 5, 'unit_price' => 150000],
-        ]);
-        $soItem2 = $so2->saleOrderItem()->first();
+        // DO 2 dari SO yang sama
+        $so2 = $so1;
+        $soItem2 = $so1->saleOrderItem()->where('product_id', $this->product2->id)->first();
         $do2 = $this->createApprovedDeliveryOrder($so2, [
             ['product_id' => $this->product2->id, 'quantity' => 5, 'sale_order_item_id' => $soItem2->id],
         ]);
@@ -403,6 +411,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sj1),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sj1->id, $sj2->id],
                 'invoice_number' => $invNumber,
                 'invoice_date' => now()->toDateString(),
@@ -463,6 +472,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sjA),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sjA->id, $sjB->id],
                 'invoice_number' => 'INV-DIFF-CUST',
                 'invoice_date' => now()->toDateString(),
@@ -504,6 +514,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sjSby),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sjSby->id, $sjMlg->id],
                 'invoice_number' => 'INV-DIFF-BRANCH',
                 'invoice_date' => now()->toDateString(),
@@ -555,6 +566,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sj),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sj->id],
                 'invoice_number' => 'INV-SECOND-FAIL',
                 'invoice_date' => now()->toDateString(),
@@ -586,6 +598,7 @@ class Tahap5SalesInvoiceTest extends TestCase
         Livewire::test(CreateSalesInvoice::class)
             ->fillForm([
                 'selected_customer' => $this->customerA->id,
+                'filter_sale_order' => $this->soOf($sj),   // B24: urutan Customer → SO → SJ
                 'selected_surat_jalans' => [$sj->id],
                 'invoice_number' => 'INV-ZERO-FAIL',
                 'invoice_date' => now()->toDateString(),

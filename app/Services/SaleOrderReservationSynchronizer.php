@@ -12,8 +12,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Per item SO:
  *   kebutuhan = qty − terkirim (Σ DO sent/received/completed)               ← SaleOrderDeliveryProgress::remaining
- *   ditahan DO = Σ reservasi baris DO terbuka (DO Siap Kirim) untuk item ini
- *   target SO  = kebutuhan − ditahan DO                                     ← total tertahan per item ≤ kebutuhan
+ *   di luar gudang oleh DO terbuka = max(Σ kuantitas DO terbuka (in_process), Σ reservasi baris DO)
+ *       — sejak Tahap 3 stok fisik terpotong begitu DO dibuat, jadi kuantitas DO terbuka SUDAH keluar dari gudang dan tidak
+ *       boleh ditahan lagi lewat reservasi SO (jika tidak, stok ditahan dua kali dan stok bebas semu nol)
+ *   target SO  = kebutuhan − di luar gudang oleh DO terbuka                 ← total tertahan per item ≤ kebutuhan
  * Reservasi SO ditempatkan: alokasi gudang item → gudang item → (D22) gudang cabang dengan stok bebas terbesar, dan DIBATASI stok bebas
  * yang ada (D21: parsial bila stok kurang; kekurangan = backorder, diisi ulang FIFO saat stok masuk — `sales:top-up-reservations`).
  *
@@ -65,7 +67,14 @@ class SaleOrderReservationSynchronizer
                 $needed = (float) ($progress[$item->id]['remaining'] ?? 0.0);
                 $heldByDo = (float) StockReservation::query()
                     ->where('sale_order_item_id', $item->id)->whereNotNull('delivery_order_id')->sum('quantity');
-                $target = max(0.0, $needed - $heldByDo);
+                $inProcess = (float) ($progress[$item->id]['in_process'] ?? 0.0);
+                // DO DITOLAK (reject) masih memegang kuantitas SO (bisa diajukan ulang) tetapi stok fisiknya sudah dikembalikan,
+                // jadi kuantitas itu tidak "di luar gudang": SO tetap harus menahan stoknya.
+                $rejectedQty = (float) DB::table('delivery_order_items as doi')
+                    ->join('delivery_orders as d', 'd.id', '=', 'doi.delivery_order_id')
+                    ->where('doi.sale_order_item_id', $item->id)->where('d.status', 'reject')
+                    ->whereNull('doi.deleted_at')->whereNull('d.deleted_at')->sum('doi.quantity');
+                $target = max(0.0, $needed - max(max(0.0, $inProcess - $rejectedQty), $heldByDo));
 
                 $existing = StockReservation::query()
                     ->where('sale_order_id', $so->id)->where('sale_order_item_id', $item->id)->whereNull('delivery_order_id')

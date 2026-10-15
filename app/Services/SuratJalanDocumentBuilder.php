@@ -34,6 +34,8 @@ class SuratJalanDocumentBuilder
         'deliveryOrder.vehicle',
         'deliveryOrder.salesOrders.customer',
         'deliveryOrder.deliveryOrderItem.product.uom',
+        'deliveryOrder.deliveryOrderItem.warehouseSources.warehouse',
+        'deliveryOrder.warehouse',
         'deliverySchedules.driver',
         'deliverySchedules.vehicle',
     ];
@@ -174,6 +176,7 @@ class SuratJalanDocumentBuilder
                     'quantity' => $this->formatQuantity($sendNow),
                     'remaining_quantity' => $this->formatQuantity($remaining),
                     'unit' => $item->product->uom->abbreviation ?: ($item->product->uom->name ?: '-'),
+                    'warehouse' => $this->warehouseLabel($item),
                     'note' => $item->reason ?: '',
                 ];
             })
@@ -191,6 +194,29 @@ class SuratJalanDocumentBuilder
                 ->filter()->unique()->values()->all(),
             'items' => $items,
         ];
+    }
+
+    /**
+     * B23: gudang asal tiap barang. Satu gudang → nama gudang; beberapa gudang → "Gudang A (6), Gudang B (4)";
+     * tanpa sumber gudang → gudang header DO bila ada.
+     */
+    protected function warehouseLabel(DeliveryOrderItem $item): string
+    {
+        $sources = $item->warehouseSources->filter(fn ($source) => (float) $source->quantity > 0);
+
+        if ($sources->isEmpty()) {
+            return $item->deliveryOrder?->warehouse?->name ?: '-';
+        }
+
+        $byWarehouse = $sources->groupBy('warehouse_id');
+        $labels = $byWarehouse->map(function ($rows) {
+            $name = $rows->first()->warehouse?->name ?: '-';
+            $qty = $this->formatQuantity((float) $rows->sum('quantity'));
+
+            return $name.' ('.$qty.')';
+        })->values();
+
+        return $byWarehouse->count() === 1 ? (string) ($sources->first()->warehouse?->name ?: '-') : $labels->implode(', ');
     }
 
     protected function customerNames(Collection $salesOrders): array

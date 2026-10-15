@@ -35,6 +35,9 @@ use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
+// B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+beforeEach(fn () => config(['sales.invoice.auto_on_do_complete' => true]));
+
 function tnContext(array $permissions = ['view any invoice', 'view invoice', 'update invoice', 'create invoice', 'view any customer']): array
 {
     $cabang = Cabang::factory()->create(['kode' => 'TN-'.strtoupper(substr(uniqid(), -5)), 'nama' => 'Cabang TN', 'status' => 1]);
@@ -83,6 +86,7 @@ function tnAutoInvoice(array $ctx, float $tax = 11): Invoice
         'do_number' => 'DO-TN-'.strtoupper(substr(uniqid(), -6)), 'delivery_date' => now(), 'status' => 'sent', 'cabang_id' => $ctx['cabang']->id, 'warehouse_id' => $ctx['warehouse']->id,
     ]);
     $deliveryOrder->salesOrders()->attach($saleOrder->id);
+    stkSetStock($ctx['product'], $ctx['warehouse'], 100000); // Tahap 3: DO memotong stok saat item dibuat
     DeliveryOrderItem::create(['delivery_order_id' => $deliveryOrder->id, 'sale_order_item_id' => $item->id, 'product_id' => $ctx['product']->id, 'quantity' => 12]);
 
     $deliveryOrder->update(['status' => 'completed']);

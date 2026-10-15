@@ -342,6 +342,12 @@ class RoleSeeder extends Seeder
                 }
             }
 
+            // Kasir: hanya boleh MELIHAT dan MENYETUJUI Sales Order (UAT B2) — bukan membuat/mengubah/menghapus.
+            // Syarat harga sesuai batas harga master produk ditegakkan di ApprovalControlService.
+            if ($roleName === 'Kasir') {
+                array_push($permsToAssign, 'view any sales order', 'view sales order', 'response sales order');
+            }
+
             // Sync unique permissions that exist in DB
             $permsToAssign = array_unique($permsToAssign);
             $existingPerms = Permission::whereIn('name', $permsToAssign)->get();

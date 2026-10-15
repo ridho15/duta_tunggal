@@ -21,12 +21,17 @@ class WarehouseStockOptions
      *                                         sehingga Super Admin pun dibatasi ke cabang ini.
      *                                         Bila null, perilaku lama berlaku (filter per cabang user
      *                                         atau semua gudang untuk manage_type = all).
+     * @param  bool      $excludeZeroStock     Sembunyikan gudang dengan stok bebas 0 dari opsi (dipakai
+     *                                         gudang SUMBER pengiriman, bukan gudang tujuan). Gudang yang
+     *                                         sudah tersimpan sebelumnya ($selectedWarehouseId) tetap selalu
+     *                                         disertakan meski stoknya 0, supaya alur Edit tidak rusak.
      */
     public static function forProduct(
         ?int $productId,
         ?int $selectedWarehouseId = null,
         bool $includeStockLabel = true,
         ?int $cabangId = null,
+        bool $excludeZeroStock = false,
     ): array {
         $user = Auth::user();
         $manageType = $user?->manage_type ?? [];
@@ -42,7 +47,8 @@ class WarehouseStockOptions
                 ->keyBy('warehouse_id');
         }
 
-        $query = Warehouse::query()->where('status', 1);
+        // Gudang karantina/rusak (retur DO yang reject) bukan sumber stok jual: tidak ditawarkan, kecuali sudah terpilih.
+        $query = Warehouse::query()->where('status', 1)->where(fn ($q) => $q->where('is_quarantine', false)->orWhereNull('is_quarantine'));
 
         if ($cabangId) {
             // Filter eksplisit dari parameter (prioritas utama — misalnya cabang SO).
@@ -63,6 +69,13 @@ class WarehouseStockOptions
         // Jika ada filter cabang eksplisit ($cabangId), JANGAN fallback ke cabang lain!
         if (! $cabangId && $warehouses->isEmpty()) {
             $warehouses = Warehouse::query()->where('status', 1)->orderBy('name')->get();
+        }
+
+        if ($excludeZeroStock) {
+            $warehouses = $warehouses->filter(function (Warehouse $warehouse) use ($stockByWarehouse) {
+                $freeQty = (float) ($stockByWarehouse[$warehouse->id]->free_qty ?? 0);
+                return $freeQty > 0;
+            })->values();
         }
 
         // Selalu sertakan gudang yang sudah terpilih meski di luar filter cabang,

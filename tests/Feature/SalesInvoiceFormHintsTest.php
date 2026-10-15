@@ -30,24 +30,14 @@ function hintContext(): array
     return ['cabang' => $cabang, 'user' => $user, 'customer' => Customer::factory()->create(['cabang_id' => $cabang->id])];
 }
 
-it('pilihan SO menjelaskan bahwa hanya SO Selesai yang muncul dan invoice bertahap terbit otomatis per DO', function () {
+// B24/B25: invoice baru hanya dari Surat Jalan (Customer → SO → centang SJ); invoice otomatis per DO dan jalur SO langsung sudah tidak ada.
+it('form invoice baru menuntun urutan Customer → Sales Order → Surat Jalan', function () {
     $ctx = hintContext();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateSalesInvoice::class)
-        ->assertSee('Hanya SO berstatus Selesai yang muncul di sini')
-        ->assertSee('invoice terbit OTOMATIS per Delivery Order');
-});
-
-it('bila customer belum punya SO Selesai, teks bantu menyatakannya secara eksplisit', function () {
-    $ctx = hintContext();
-    SaleOrder::create([
-        'customer_id' => $ctx['customer']->id, 'cabang_id' => $ctx['cabang']->id, 'so_number' => 'SO-HINT-1', 'order_date' => now(),
-        'status' => 'partially_delivered', 'tipe_pengiriman' => 'Kirim Langsung', 'exchange_rate' => 1.0, 'tempo_pembayaran' => 30, 'shipped_to' => 'x',
-    ]);
 
     Livewire::actingAs($ctx['user'])
         ->test(CreateSalesInvoice::class)
         ->fillForm(['selected_customer' => $ctx['customer']->id])
-        ->assertSee('Belum ada SO Selesai untuk customer ini');
+        ->assertSee('Hanya Sales Order milik customer yang sudah punya Surat Jalan terbit')
+        ->assertSee('Surat Jalan yang digabung dalam satu invoice harus dari SO yang sama')
+        ->assertDontSee('Sumber Penjualan Langsung');
 });

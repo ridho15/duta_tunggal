@@ -138,6 +138,9 @@ class SalesOrderService
             }
 
             $salesOrder->update(['status' => 'canceled']);
+
+            // B11: saldo titip yang dipakai verifikasi kasir COD dikembalikan ke customer
+            app(SaleOrderCashierVerification::class)->refund($salesOrder);
         });
 
         return true;
@@ -189,7 +192,7 @@ class SalesOrderService
         $saleOrder->loadMissing('customer');
         if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
             $creditService = app(CreditValidationService::class);
-            $check = $creditService->canCustomerMakePurchase($saleOrder->customer, (float) $saleOrder->total_amount);
+            $check = $creditService->canCustomerMakePurchase($saleOrder->customer, $saleOrder->grandTotal());   // barang + ongkos kirim
             if (! $check['can_purchase'] && ! $this->creditOverrideGranted($saleOrder, $options, $check['messages'])) {
                 $messages = implode('; ', $check['messages']);
                 if ($creditService->policyEnabled()) {

@@ -69,7 +69,7 @@ class ReturnProductResource extends Resource
                                 ->tooltip('Generate Return Number')
                                 ->action(function ($set, $get, $state) {
                                     $returnProductService = app(ReturnProductService::class);
-                                    $set('return_number', $returnProductService->generateReturnNumber());
+                                    $set('return_number', $returnProductService->generateReturnNumber($get('from_model_type'), $get('from_model_id')));
                                 }))
                             ->unique(ignoreRecord: true)
                             ->maxLength(255)
@@ -659,7 +659,7 @@ class ReturnProductResource extends Resource
                                 HelperController::sendNotification(
                                     isSuccess: true, 
                                     title: "Return Product Approved", 
-                                    message: "Return product {$record->return_number} berhasil diapprove. Stok fisik telah dikembalikan ke inventori gudang dan jurnal pembalik berhasil dicatat."
+                                    message: "Return product {$record->return_number} berhasil diapprove. Stok fisik telah dikembalikan ke inventori gudang dan jurnal pembalik berhasil dicatat. " . ReturnProductService::approvalSummaryText()
                                 );
                             } catch (\Exception $e) {
                                 HelperController::sendNotification(

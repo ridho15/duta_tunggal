@@ -26,6 +26,9 @@ use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
+// B25: invoice otomatis saat DO selesai kini mati secara default; berkas ini menguji perilaku jalur lama tersebut (flag dinyalakan).
+beforeEach(fn () => config(['sales.invoice.auto_on_do_complete' => true]));
+
 function setupSalesUatContext(): array
 {
     $cabang = Cabang::factory()->create([
@@ -122,6 +125,7 @@ it('Bug 1 & 5: partial delivery of 12 pcs from 20 pcs keeps SO partially_deliver
     ]);
     $deliveryOrder->salesOrders()->attach($saleOrder->id);
 
+    stkEnsureStockForDo($deliveryOrder, $ctx['product']);
     $doItem = DeliveryOrderItem::create([
         'delivery_order_id' => $deliveryOrder->id,
         'sale_order_item_id' => $soItem->id,
@@ -290,7 +294,7 @@ it('Bug 6: warehouse stock options shows 0 stock warehouse instead of empty arra
     // Must NOT be empty
     expect($options)->not->toBeEmpty();
     expect($options)->toHaveKey($ctx['warehouse']->id);
-    expect($options[$ctx['warehouse']->id])->toContain('Stok: 0');
+    expect($options[$ctx['warehouse']->id])->toContain('Stok Bebas: 0');
 
     // Create DO and verify warehouse confirmation has product_id and valid product details
     $deliveryOrder = DeliveryOrder::create([
@@ -301,6 +305,7 @@ it('Bug 6: warehouse stock options shows 0 stock warehouse instead of empty arra
         'warehouse_id' => $ctx['warehouse']->id,
     ]);
 
+    stkEnsureStockForDo($deliveryOrder, $ctx['product']);
     $doItem = DeliveryOrderItem::create([
         'delivery_order_id' => $deliveryOrder->id,
         'product_id' => $ctx['product']->id,
@@ -314,7 +319,7 @@ it('Bug 6: warehouse stock options shows 0 stock warehouse instead of empty arra
     ]);
 
     $doService = new DeliveryOrderService();
-    $confirmations = $doService->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);
+    $confirmations = $doService->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder->fresh());
 
     expect($confirmations)->toHaveCount(1);
     $conf = $confirmations[0];

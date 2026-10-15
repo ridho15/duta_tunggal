@@ -57,6 +57,7 @@ it('RET-BV-01: menolak kuantitas retur pelanggan yang melebihi jumlah pembelian 
         'product_id' => $ctx['product']->id,
         'quantity' => 8,
         'decision' => CustomerReturnItem::DECISION_REPLACE,
+        'qc_result' => CustomerReturnItem::QC_RESULT_PASS,
     ]);
 
     $service = app(CustomerReturnService::class);
@@ -113,6 +114,7 @@ it('RET-BV-02: proteksi anti-double execution menolak pemrosesan ulang pada retu
         'product_id' => $ctx['product']->id,
         'quantity' => 2,
         'decision' => CustomerReturnItem::DECISION_REPLACE,
+        'qc_result' => CustomerReturnItem::QC_RESULT_PASS,
     ]);
 
     $service = app(CustomerReturnService::class);
@@ -172,6 +174,7 @@ it('RET-BV-03: pemrosesan retur pelanggan dengan keputusan credit memotong saldo
         'product_id' => $ctx['product']->id,
         'quantity' => 2,
         'decision' => CustomerReturnItem::DECISION_CREDIT, // goods returned & credited against AR
+        'qc_result' => CustomerReturnItem::QC_RESULT_PASS,
     ]);
 
     $service = app(CustomerReturnService::class);

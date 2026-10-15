@@ -11,6 +11,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['sales.stock' => [
+        'require_surat_jalan' => false,
         'ledger' => false,
         'strict_dispatch' => true,
         'reserve_on_so_approve' => false,

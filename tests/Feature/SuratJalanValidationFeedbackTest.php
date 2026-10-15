@@ -99,12 +99,16 @@ class SuratJalanValidationFeedbackTest extends TestCase
             'delivery_date' => now(),
         ]);
 
+        $approvedDo->salesOrders()->attach($so->id);
+
         $sjNumber = 'SJ-TEST-' . uniqid();
 
         $component = Livewire::test(CreateSuratJalan::class)
             ->fillForm([
                 'sj_number' => $sjNumber,
                 'issued_at' => now()->toDateTimeString(),
+                'filter_customer_id' => $customer->id,
+                'filter_sale_order_id' => $so->id,   // B18: urutan Customer → SO → centang DO
                 'deliveryOrder' => [$approvedDo->id],
                 'cabang_id' => $cabang->id,
             ])
