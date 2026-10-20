@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Auth;
 
 class ProductCategoryResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = ProductCategory::class;
 
     protected static bool $shouldRegisterNavigation = false;

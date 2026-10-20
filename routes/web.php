@@ -12,41 +12,32 @@ use App\Http\Controllers\Reports\CogmPreviewController;
 use App\Http\Controllers\InventoryCardController;
 use App\Http\Controllers\PdfPreviewController;
 
+use App\Http\Controllers\DashboardController;
+
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('settings/profile', Profile::class)->name('settings.profile');
     Route::get('settings/password', Password::class)->name('settings.password');
     Route::get('settings/appearance', Appearance::class)->name('settings.appearance');
 });
 
-// Add home route for authenticated users
-Route::middleware('auth')->group(function () {
-    Route::get('/', function () {
-        // Redirect authenticated users to the Filament admin dashboard by default.
-        // Use the dashboard page class to derive the current route name so
-        // production changes (slug overrides) won't break the redirect.
-        return redirect()->route(
-            \App\Filament\Pages\MyDashboard::getRouteName()
-        );
-    })->name('home');
+use App\Http\Controllers\Auth\LoginController;
+
+// Rute Autentikasi Pengguna
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:10,1');
 });
 
-// Provide a small compatibility route named 'login' so framework helpers
-// and third-party packages that call route('login') can redirect guests
-// to the Filament admin sign-in page. This route simply redirects to
-// the Filament admin base path which serves the login UI.
-Route::middleware('throttle:login')->get('/login', function () {
-    return redirect('/admin');
-})->name('login');
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->middleware('auth');
 
-// Provide a logout route for testing compatibility
-Route::post('/logout', function () {
-    Auth::logout();
-    return redirect('/admin');
-})->name('logout');
+// Rute Home untuk Pengguna Terotentikasi
+Route::middleware('auth')->group(function () {
+    Route::get('/', function () {
+        return redirect()->route('dashboard');
+    })->name('home');
+});
 
 // Local-only route to serve temporary exported files (used by Filament/Livewire JSON flow)
 Route::get('exports/download/{filename}', function ($filename) {
@@ -93,6 +84,14 @@ if (app()->environment('local')) {
             \Illuminate\Support\Facades\Auth::login($user);
         }
         return redirect('/admin/sale-orders/create');
+    });
+
+    Route::get('/dev-login', function () {
+        $user = \App\Models\User::first();
+        if ($user) {
+            \Illuminate\Support\Facades\Auth::login($user);
+        }
+        return redirect()->route('dashboard');
     });
 }
 
@@ -156,4 +155,124 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         ])->setPaper('a4', 'portrait');
         return $pdf->stream("CustomerReturn_{$return->return_number}.pdf");
     })->name('pdf-customer-return');
+
+    // Tahap 3 — picking list per gudang (PDF)
+    Route::get('/pdf/picking-list', \App\Http\Controllers\Hp\PickingListController::class)->name('pdf.picking-list');
+
+    // ==========================================
+    // RUTE WEB MODUL ERP (Custom Blade + Tailwind)
+    // ==========================================
+
+    // Modul Penjualan
+    Route::prefix('penjualan')->name('penjualan.')->group(function () {
+        Route::get('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'index'])->name('so.index');
+        Route::get('/so/create', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'create'])->name('so.create');
+        Route::post('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'store'])->name('so.store');
+        Route::get('/so/{saleOrder}', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'show'])->name('so.show');
+        Route::post('/so/{saleOrder}/approve', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'approve'])->name('so.approve');
+        Route::post('/so/{saleOrder}/reject', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'reject'])->name('so.reject');
+
+        Route::get('/do/create', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'create'])->name('do.create');
+        Route::post('/do', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'store'])->name('do.store');
+        Route::get('/do', function () { return redirect()->route('penjualan.so.index'); })->name('do.index');
+
+        // Surat Jalan
+        Route::get('/surat-jalan', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'index'])->name('sj.index');
+        Route::get('/surat-jalan/create', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'create'])->name('sj.create');
+        Route::post('/surat-jalan', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'store'])->name('sj.store');
+        Route::get('/surat-jalan/{suratJalan}', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'show'])->name('sj.show');
+        Route::get('/surat-jalan/{suratJalan}/pdf', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'pdf'])->name('sj.pdf');
+        Route::post('/surat-jalan/{suratJalan}/cancel', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'cancel'])->name('sj.cancel');
+
+        // Faktur Penjualan (Sales Invoice)
+        Route::get('/invoice', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoice/create', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'create'])->name('invoices.create');
+        Route::post('/invoice', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'store'])->name('invoices.store');
+        Route::get('/invoice/{invoice}', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('/invoice/{invoice}/pdf', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'pdf'])->name('invoices.pdf');
+
+        // Aliases for plural URL compatibility
+        Route::get('/invoices', function () { return redirect()->route('penjualan.invoices.index'); });
+        Route::get('/invoices/create', function () { return redirect()->route('penjualan.invoices.create', request()->query()); });
+        Route::get('/invoices/{invoice}', function ($invoice) { return redirect()->route('penjualan.invoices.show', $invoice); });
+
+        // Terima Pembayaran Customer (Pelunasan Piutang)
+        Route::get('/terima-pembayaran', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'index'])->name('receipts.index');
+        Route::get('/terima-pembayaran/create', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'create'])->name('receipts.create');
+        Route::get('/terima-pembayaran/customer-invoices/{customer}', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'customerInvoices'])->name('receipts.customerInvoices');
+        Route::post('/terima-pembayaran', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'store'])->name('receipts.store');
+        Route::get('/terima-pembayaran/{customerReceipt}', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'show'])->name('receipts.show');
+        Route::get('/terima-pembayaran/{customerReceipt}/pdf', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'pdf'])->name('receipts.pdf');
+        Route::post('/terima-pembayaran/{customerReceipt}/cancel', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'cancel'])->name('receipts.cancel');
+
+        // Aliases for plural URL compatibility
+        Route::get('/receipts', function () { return redirect()->route('penjualan.receipts.index'); });
+        Route::get('/receipts/create', function () { return redirect()->route('penjualan.receipts.create', request()->query()); });
+        Route::get('/receipts/{customerReceipt}', function ($customerReceipt) { return redirect()->route('penjualan.receipts.show', $customerReceipt); });
+
+        Route::get('/retur', function () { return redirect()->route('dashboard'); })->name('returns.index');
+        Route::get('/penawaran', function () { return redirect()->route('dashboard'); })->name('quotations.index');
+    });
+
+    // Modul Gudang & Stok
+    Route::prefix('gudang')->name('gudang.')->group(function () {
+        Route::get('/kiriman', [\App\Http\Controllers\Gudang\KirimanController::class, 'index'])->name('kiriman.index');
+        Route::get('/kiriman/picking-list', [\App\Http\Controllers\Gudang\KirimanController::class, 'pickingList'])->name('kiriman.pickingList');
+        Route::get('/kiriman/{deliveryOrder}/check', [\App\Http\Controllers\Gudang\KirimanController::class, 'check'])->name('kiriman.check');
+        Route::post('/kiriman/{deliveryOrder}/check', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitCheck'])->name('kiriman.submitCheck');
+        Route::get('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'retur'])->name('kiriman.retur');
+        Route::post('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitRetur'])->name('kiriman.submitRetur');
+
+        Route::get('/penerimaan', function () { return redirect()->route('dashboard'); })->name('penerimaan.index');
+        Route::get('/stok', function () { return redirect()->route('dashboard'); })->name('stok.index');
+        Route::get('/transfer', function () { return redirect()->route('dashboard'); })->name('transfer.index');
+        Route::get('/opname', function () { return redirect()->route('dashboard'); })->name('opname.index');
+    });
+
+    // Modul Pembelian
+    Route::prefix('pembelian')->name('pembelian.')->group(function () {
+        Route::get('/permintaan', function () { return redirect()->route('dashboard'); })->name('or.index');
+        Route::get('/po', function () { return redirect()->route('dashboard'); })->name('po.index');
+        Route::get('/invoice', function () { return redirect()->route('dashboard'); })->name('invoices.index');
+    });
+
+    // Modul Keuangan & Akuntansi
+    Route::prefix('keuangan')->name('keuangan.')->group(function () {
+        Route::get('/kas-bank', function () { return redirect()->route('dashboard'); })->name('cashbank.index');
+        Route::get('/jurnal', function () { return redirect()->route('dashboard'); })->name('journal.index');
+    });
+
+    // Modul Laporan
+    Route::prefix('laporan')->name('laporan.')->group(function () {
+        Route::get('/keuangan', function () { return redirect()->route('dashboard'); })->name('financial.index');
+    });
+
+    // Master Data
+    Route::prefix('master')->name('master.')->group(function () {
+        Route::get('/produk', function () { return redirect()->route('dashboard'); })->name('products.index');
+        Route::get('/customer', function () { return redirect()->route('dashboard'); })->name('customers.index');
+        Route::get('/supplier', function () { return redirect()->route('dashboard'); })->name('suppliers.index');
+    });
+
+    // Pengaturan
+    Route::prefix('pengaturan')->name('settings.')->group(function () {
+        Route::get('/pengguna', function () { return redirect()->route('dashboard'); })->name('users.index');
+    });
+
+    // Backward-compatibility redirects for eliminated Hub pages
+    Route::redirect('/admin/sales-hub', '/admin/sale-orders', 301);
+    Route::redirect('/admin/purchase-hub', '/admin/purchase-orders', 301);
+    Route::redirect('/admin/delivery-hub', '/admin/delivery-orders', 301);
+    Route::redirect('/admin/accounting-hub', '/admin/journal-entries', 301);
+    Route::redirect('/admin/inventory-hub', '/admin/inventory-stocks', 301);
+    Route::redirect('/admin/master-data-hub', '/admin/products', 301);
+    Route::redirect('/admin/user-roles-management-hub', '/admin/users', 301);
+    Route::redirect('/admin/manufacturing-hub', '/admin', 301);
+    Route::redirect('/admin/finance-sales-hub', '/admin/sales-invoices', 301);
+    Route::redirect('/admin/finance-purchase-hub', '/admin/purchase-invoices', 301);
+    Route::redirect('/admin/payment-hub', '/admin/customer-receipts', 301);
+    Route::redirect('/admin/finance-reports', '/admin/financial-statement', 301);
+    Route::redirect('/admin/asset-management-hub', '/admin/assets', 301);
+    Route::redirect('/admin/warehouse-hub', '/admin/warehouse-confirmations', 301);
+    Route::redirect('/admin/dashboard-hub', '/admin', 301);
 });

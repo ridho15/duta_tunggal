@@ -26,13 +26,15 @@ use Throwable;
 
 class MaterialIssueResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = MaterialIssue::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Manufaktur';
+    protected static ?string $navigationGroup = 'PRODUKSI';
 
-    protected static ?string $navigationLabel = 'Pengambilan Bahan Baku';
+    protected static ?string $navigationLabel = 'Pengeluaran Bahan';
 
     protected static ?string $modelLabel = 'Pengambilan Bahan Baku';
 

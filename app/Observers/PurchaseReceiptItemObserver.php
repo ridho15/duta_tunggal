@@ -68,31 +68,55 @@ class PurchaseReceiptItemObserver
         Log::info("PurchaseReceiptItemObserver: createPurchaseReturnForRejectedItem() STARTED for item {$receiptItem->id}");
 
         try {
+            $qc = $receiptItem->resolvedQualityControl();
+
+            // If this item comes from a QC inspection, check if the action is NOT to return to supplier
+            if ($qc && $qc->exists && !empty($qc->failed_qc_action) && $qc->failed_qc_action !== PurchaseReturn::QC_ACTION_RETURN_SUPPLIER) {
+                Log::info("PurchaseReceiptItemObserver: QC failed action is '{$qc->failed_qc_action}', skipping PurchaseReturn creation");
+                return;
+            }
+
             Log::info("PurchaseReceiptItemObserver: About to check existing return for receipt {$receiptItem->purchase_receipt_id}");
 
-            // Check if PurchaseReturn already exists for this receipt
-            $existingReturn = PurchaseReturn::where('purchase_receipt_id', $receiptItem->purchase_receipt_id)->first();
+            // Check if PurchaseReturn already exists for this receipt OR for this QC
+            $existingReturn = PurchaseReturn::where('purchase_receipt_id', $receiptItem->purchase_receipt_id)
+                ->when($qc && $qc->exists, fn ($q) => $q->orWhere('quality_control_id', $qc->id))
+                ->first();
+
             Log::info("PurchaseReceiptItemObserver: Existing return check result: " . ($existingReturn ? "Found ID {$existingReturn->id}" : "Not found"));
 
             if ($existingReturn) {
                 Log::info("PurchaseReceiptItemObserver: PurchaseReturn already exists for receipt {$receiptItem->purchase_receipt_id}, adding item to existing return");
 
-                // Add item to existing return
-                PurchaseReturnItem::create([
-                    'purchase_return_id' => $existingReturn->id,
-                    'purchase_receipt_item_id' => $receiptItem->id,
-                    'product_id' => $receiptItem->product_id,
-                    'qty_returned' => $receiptItem->qty_rejected,
-                    'unit_price' => $receiptItem->purchaseOrderItem->unit_price ?? 0,
-                    'reason' => 'Rejected during receiving: ' . ($receiptItem->reason_rejected ?? 'Quality issues')
-                ]);
+                if (!$existingReturn->purchase_receipt_id && $receiptItem->purchase_receipt_id) {
+                    $existingReturn->update(['purchase_receipt_id' => $receiptItem->purchase_receipt_id]);
+                }
 
-                Log::info("PurchaseReceiptItemObserver: Added rejected item to existing PurchaseReturn {$existingReturn->nota_retur}");
+                // Add item to existing return if not already present
+                $alreadyHasItem = PurchaseReturnItem::where('purchase_return_id', $existingReturn->id)
+                    ->where(function ($q) use ($receiptItem) {
+                        $q->where('purchase_receipt_item_id', $receiptItem->id)
+                          ->orWhere('product_id', $receiptItem->product_id);
+                    })
+                    ->exists();
+
+                if (!$alreadyHasItem) {
+                    PurchaseReturnItem::create([
+                        'purchase_return_id' => $existingReturn->id,
+                        'purchase_receipt_item_id' => $receiptItem->id,
+                        'product_id' => $receiptItem->product_id,
+                        'qty_returned' => $receiptItem->qty_rejected,
+                        'unit_price' => $receiptItem->purchaseOrderItem->unit_price ?? 0,
+                        'reason' => 'Rejected during receiving: ' . ($receiptItem->reason_rejected ?? 'Quality issues')
+                    ]);
+                    Log::info("PurchaseReceiptItemObserver: Added rejected item to existing PurchaseReturn {$existingReturn->nota_retur}");
+                } else {
+                    Log::info("PurchaseReceiptItemObserver: Item already exists in PurchaseReturn {$existingReturn->nota_retur}, skipping");
+                }
             } else {
                 Log::info("PurchaseReceiptItemObserver: Creating new PurchaseReturn for receipt {$receiptItem->purchase_receipt_id}");
 
                 // Create PurchaseReturn header
-                $qc = $receiptItem->resolvedQualityControl();
                 $purchaseReturn = PurchaseReturn::create([
                     'purchase_receipt_id' => $receiptItem->purchase_receipt_id,
                     'quality_control_id' => $qc?->exists ? $qc->id : null,
@@ -219,22 +243,44 @@ class PurchaseReceiptItemObserver
                     // Create new PurchaseReturnItem
                     Log::info("PurchaseReceiptItemObserver: Creating new PurchaseReturnItem for receipt item {$receiptItem->id}");
 
-                    // Check if PurchaseReturn already exists for this receipt
-                    $existingReturn = \App\Models\PurchaseReturn::where('purchase_receipt_id', $receiptItem->purchase_receipt_id)->first();
+                    $qc = $receiptItem->resolvedQualityControl();
+
+                    // If this item comes from a QC inspection, check if the action is NOT to return to supplier
+                    if ($qc && $qc->exists && !empty($qc->failed_qc_action) && $qc->failed_qc_action !== \App\Models\PurchaseReturn::QC_ACTION_RETURN_SUPPLIER) {
+                        Log::info("PurchaseReceiptItemObserver: QC failed action is '{$qc->failed_qc_action}', skipping PurchaseReturn creation on update");
+                        return;
+                    }
+
+                    // Check if PurchaseReturn already exists for this receipt OR for this QC
+                    $existingReturn = \App\Models\PurchaseReturn::where('purchase_receipt_id', $receiptItem->purchase_receipt_id)
+                        ->when($qc && $qc->exists, fn ($q) => $q->orWhere('quality_control_id', $qc->id))
+                        ->first();
 
                     if ($existingReturn) {
-                        // Add to existing return
-                        \App\Models\PurchaseReturnItem::create([
-                            'purchase_return_id' => $existingReturn->id,
-                            'purchase_receipt_item_id' => $receiptItem->id,
-                            'product_id' => $receiptItem->product_id,
-                            'qty_returned' => $newQtyRejected,
-                            'unit_price' => $receiptItem->purchaseOrderItem->unit_price ?? 0,
-                            'reason' => 'Rejected during receiving: ' . ($receiptItem->reason_rejected ?? 'Quality issues - Updated')
-                        ]);
+                        if (!$existingReturn->purchase_receipt_id && $receiptItem->purchase_receipt_id) {
+                            $existingReturn->update(['purchase_receipt_id' => $receiptItem->purchase_receipt_id]);
+                        }
+
+                        // Add to existing return if not already present
+                        $alreadyHasItem = \App\Models\PurchaseReturnItem::where('purchase_return_id', $existingReturn->id)
+                            ->where(function ($q) use ($receiptItem) {
+                                $q->where('purchase_receipt_item_id', $receiptItem->id)
+                                  ->orWhere('product_id', $receiptItem->product_id);
+                            })
+                            ->exists();
+
+                        if (!$alreadyHasItem) {
+                            \App\Models\PurchaseReturnItem::create([
+                                'purchase_return_id' => $existingReturn->id,
+                                'purchase_receipt_item_id' => $receiptItem->id,
+                                'product_id' => $receiptItem->product_id,
+                                'qty_returned' => $newQtyRejected,
+                                'unit_price' => $receiptItem->purchaseOrderItem->unit_price ?? 0,
+                                'reason' => 'Rejected during receiving: ' . ($receiptItem->reason_rejected ?? 'Quality issues - Updated')
+                            ]);
+                        }
                     } else {
                         // Create new PurchaseReturn
-                        $qc = $receiptItem->resolvedQualityControl();
                         $purchaseReturn = \App\Models\PurchaseReturn::create([
                             'purchase_receipt_id' => $receiptItem->purchase_receipt_id,
                             'quality_control_id' => $qc?->exists ? $qc->id : null,

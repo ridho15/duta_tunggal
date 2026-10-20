@@ -1,31 +1,40 @@
 <?php
 
 use App\Filament\Pages\AccountingHubPage;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\DashboardHubPage;
-use App\Filament\Pages\ArApManagementPage;
 use App\Filament\Pages\DeliveryHubPage;
 use App\Filament\Pages\FinancePurchaseHubPage;
+use App\Filament\Pages\FinanceReportHubPage;
 use App\Filament\Pages\FinanceSalesHubPage;
-use App\Filament\Pages\MyDashboard;
+use App\Filament\Pages\FinancialStatementPage;
 use App\Filament\Pages\InventoryHubPage;
 use App\Filament\Pages\InventoryReportPage;
+use App\Filament\Pages\ManufacturingHubPage;
+use App\Filament\Pages\MasterDataHubPage;
+use App\Filament\Pages\MyDashboard;
 use App\Filament\Pages\PaymentHubPage;
 use App\Filament\Pages\PurchaseHubPage;
+use App\Filament\Pages\PurchaseReportPage;
 use App\Filament\Pages\SalesHubPage;
+use App\Filament\Pages\SalesReportPage;
+use App\Filament\Pages\UserRolesManagementHubPage;
 use App\Filament\Pages\WarehouseHubPage;
-use App\Filament\Resources\AccountPayableResource;
+use App\Filament\Pages\AssetManagementHubPage;
 use App\Filament\Resources\AccountReceivableResource;
-use App\Filament\Resources\DeliveryOrderResource;
-use App\Filament\Resources\DeliveryScheduleResource;
-use App\Filament\Resources\AgeingScheduleResource;
+use App\Filament\Resources\AccountingPeriodResource;
+use App\Filament\Resources\ApprovalRuleResource;
+use App\Filament\Resources\AssetResource;
 use App\Filament\Resources\BankReconciliationResource;
 use App\Filament\Resources\BillOfMaterialResource;
+use App\Filament\Resources\CabangResource;
 use App\Filament\Resources\CashBankTransactionResource;
-use App\Filament\Resources\CashBankTransferResource;
-use App\Filament\Resources\Reports\InventoryCardResource;
-use App\Filament\Resources\CustomerReturnResource;
+use App\Filament\Resources\ChartOfAccountResource;
 use App\Filament\Resources\CustomerReceiptResource;
-use App\Filament\Resources\DepositResource;
+use App\Filament\Resources\CustomerResource;
+use App\Filament\Resources\CustomerReturnResource;
+use App\Filament\Resources\DeliveryOrderResource;
+use App\Filament\Resources\DeliveryScheduleResource;
 use App\Filament\Resources\InventoryStockResource;
 use App\Filament\Resources\JournalEntryResource;
 use App\Filament\Resources\ManufacturingOrderResource;
@@ -33,205 +42,219 @@ use App\Filament\Resources\MaterialIssueResource;
 use App\Filament\Resources\OrderRequestResource;
 use App\Filament\Resources\OtherSaleResource;
 use App\Filament\Resources\PaymentRequestResource;
+use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductionPlanResource;
 use App\Filament\Resources\ProductionResource;
-use App\Filament\Resources\PurchaseOrderResource;
 use App\Filament\Resources\PurchaseInvoiceResource;
+use App\Filament\Resources\PurchaseOrderResource;
 use App\Filament\Resources\PurchaseReceiptResource;
 use App\Filament\Resources\PurchaseReturnResource;
 use App\Filament\Resources\QualityControlManufactureResource;
-use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Filament\Resources\QuotationResource;
-use App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries;
 use App\Filament\Resources\ReturnProductResource;
 use App\Filament\Resources\SaleOrderResource;
 use App\Filament\Resources\SalesInvoiceResource;
 use App\Filament\Resources\StockAdjustmentResource;
-use App\Filament\Resources\StockMovementResource;
 use App\Filament\Resources\StockOpnameResource;
 use App\Filament\Resources\StockTransferResource;
+use App\Filament\Resources\SupplierResource;
 use App\Filament\Resources\SuratJalanResource;
+use App\Filament\Resources\UserResource;
+use App\Filament\Resources\VehicleResource;
 use App\Filament\Resources\VendorPaymentResource;
-use App\Filament\Resources\VoucherRequestResource;
 use App\Filament\Resources\WarehouseConfirmationResource;
+use App\Filament\Resources\WarehouseResource;
 
-function sidebarStaticProperty(string $class, string $property): mixed
-{
-    $reflection = new ReflectionClass($class);
-    $prop = $reflection->getProperty($property);
-    $prop->setAccessible(true);
 
-    return $prop->getValue();
+if (! function_exists('sidebarStaticProperty')) {
+    function sidebarStaticProperty(string $class, string $property): mixed
+    {
+        $reflection = new ReflectionClass($class);
+        $prop = $reflection->getProperty($property);
+        $prop->setAccessible(true);
+
+        return $prop->getValue();
+    }
 }
 
-test('dashboard hub page is configured as the visible dashboard menu entry', function () {
-    expect(sidebarStaticProperty(DashboardHubPage::class, 'navigationGroup'))->toBe('Dashboard')
-        ->and(sidebarStaticProperty(DashboardHubPage::class, 'navigationLabel'))->toBe('Dashboard')
-        ->and(DashboardHubPage::getUrl())->toContain('/admin/dashboard-hub');
-});
+test('all 15 legacy hub pages are hidden from navigation', function () {
+    $hubPages = [
+        DashboardHubPage::class,
+        SalesHubPage::class,
+        PurchaseHubPage::class,
+        DeliveryHubPage::class,
+        AccountingHubPage::class,
+        InventoryHubPage::class,
+        MasterDataHubPage::class,
+        UserRolesManagementHubPage::class,
+        ManufacturingHubPage::class,
+        FinanceSalesHubPage::class,
+        FinancePurchaseHubPage::class,
+        PaymentHubPage::class,
+        FinanceReportHubPage::class,
+        AssetManagementHubPage::class,
+        WarehouseHubPage::class,
+    ];
 
-test('finance dashboard page is hidden and only exposed through the dashboard hub', function () {
-    expect(MyDashboard::shouldRegisterNavigation())->toBeFalse();
-});
-
-test('accounting hub page is configured as the visible accounting menu entry', function () {
-    expect(sidebarStaticProperty(AccountingHubPage::class, 'navigationGroup'))->toBe('Akuntansi')
-    ->and(sidebarStaticProperty(AccountingHubPage::class, 'navigationLabel'))->toBe('Akuntansi')
-        ->and(AccountingHubPage::getUrl())->toContain('/admin/accounting-hub');
-});
-
-test('inventory hub page is configured as the visible inventory menu entry', function () {
-    expect(sidebarStaticProperty(InventoryHubPage::class, 'navigationGroup'))->toBe('Inventory')
-    ->and(sidebarStaticProperty(InventoryHubPage::class, 'navigationLabel'))->toBe('Inventory')
-        ->and(InventoryHubPage::getUrl())->toContain('/admin/inventory-hub');
-});
-
-test('warehouse and inventory detail hubs are hidden and only exposed through the inventory hub', function () {
-    expect(WarehouseHubPage::shouldRegisterNavigation())->toBeFalse()
-        ->and(InventoryCardResource::shouldRegisterNavigation())->toBeFalse()
-        ->and(InventoryReportPage::shouldRegisterNavigation())->toBeFalse();
-});
-
-test('purchase hub page is configured as the visible purchase menu entry', function () {
-    expect(sidebarStaticProperty(PurchaseHubPage::class, 'navigationGroup'))->toBe('Pembelian')
-    ->and(sidebarStaticProperty(PurchaseHubPage::class, 'navigationLabel'))->toBe('Pembelian')
-        ->and(PurchaseHubPage::getUrl())->toContain('/admin/purchase-hub');
-});
-
-test('delivery hub page is configured as the visible delivery menu entry', function () {
-    expect(sidebarStaticProperty(DeliveryHubPage::class, 'navigationGroup'))->toBe('Pengiriman')
-    ->and(sidebarStaticProperty(DeliveryHubPage::class, 'navigationLabel'))->toBe('Pengiriman')
-        ->and(DeliveryHubPage::getUrl())->toContain('/admin/delivery-hub');
-});
-
-test('sales hub page is configured as the visible sales menu entry', function () {
-    expect(sidebarStaticProperty(SalesHubPage::class, 'navigationGroup'))->toBe('Penjualan')
-    ->and(sidebarStaticProperty(SalesHubPage::class, 'navigationLabel'))->toBe('Penjualan')
-        ->and(SalesHubPage::getUrl())->toContain('/admin/sales-hub');
-});
-
-test('finance sales, purchase, and payment hubs are hidden and only exposed through their parent hubs', function () {
-    expect(FinanceSalesHubPage::shouldRegisterNavigation())->toBeFalse()
-        ->and(FinanceSalesHubPage::getUrl())->toContain('/admin/finance-sales-hub')
-        ->and(FinancePurchaseHubPage::shouldRegisterNavigation())->toBeFalse()
-        ->and(FinancePurchaseHubPage::getUrl())->toContain('/admin/finance-purchase-hub')
-        ->and(PaymentHubPage::shouldRegisterNavigation())->toBeFalse()
-        ->and(PaymentHubPage::getUrl())->toContain('/admin/payment-hub');
-});
-
-test('detailed accounting sidebar items are hidden and only exposed through the accounting hub', function () {
-    expect(ArApManagementPage::shouldRegisterNavigation())->toBeFalse();
-
-    foreach ([
-        JournalEntryResource::class,
-        GroupedJournalEntries::class,
-        VoucherRequestResource::class,
-        BankReconciliationResource::class,
-        AgeingScheduleResource::class,
-    ] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
+    foreach ($hubPages as $hubPage) {
+        expect($hubPage::shouldRegisterNavigation())
+            ->toBeFalse("Expected {$hubPage} to be hidden from navigation");
     }
 });
 
-test('detailed warehouse sidebar items are hidden and only exposed through the warehouse hub', function () {
-    foreach ([
-        StockTransferResource::class,
-        StockAdjustmentResource::class,
-        StockOpnameResource::class,
-        InventoryStockResource::class,
-        StockMovementResource::class,
-        ReturnProductResource::class,
-        WarehouseConfirmationResource::class,
-    ] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
+test('group 1 BERANDA has exactly 1 menu: Tugas Saya', function () {
+    expect(Dashboard::shouldRegisterNavigation())->toBeTrue()
+        ->and(sidebarStaticProperty(Dashboard::class, 'navigationGroup'))->toBe('BERANDA')
+        ->and(sidebarStaticProperty(Dashboard::class, 'navigationLabel'))->toBe('Tugas Saya')
+        ->and(sidebarStaticProperty(Dashboard::class, 'navigationSort'))->toBe(1)
+        ->and(sidebarStaticProperty(Dashboard::class, 'navigationIcon'))->toBe('heroicon-o-home');
+});
+
+test('group 2 PENJUALAN has 8 active menus with proper labels and sort', function () {
+    $expected = [
+        QuotationResource::class => ['Penawaran Harga', 1, 'heroicon-o-tag'],
+        SaleOrderResource::class => ['Pesanan Penjualan (SO)', 2, 'heroicon-o-shopping-bag'],
+        DeliveryOrderResource::class => ['Perintah Kirim (DO)', 3, 'heroicon-o-clipboard-document-check'],
+        SuratJalanResource::class => ['Surat Jalan', 4, 'heroicon-o-truck'],
+        SalesInvoiceResource::class => ['Invoice Penjualan', 5, 'heroicon-o-document-text'],
+        CustomerReceiptResource::class => ['Terima Pembayaran', 6, 'heroicon-o-banknotes'],
+        CustomerReturnResource::class => ['Retur Penjualan', 7, 'heroicon-o-arrow-uturn-left'],
+        ReturnProductResource::class => ['Retur DO', 8, 'heroicon-o-arrow-path'],
+    ];
+
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect(sidebarStaticProperty($class, 'shouldRegisterNavigation'))->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('PENJUALAN')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
     }
 });
 
-test('detailed purchase sidebar items are hidden and only exposed through the purchase hub', function () {
-    foreach ([
-        OrderRequestResource::class,
-        PurchaseOrderResource::class,
-        QualityControlPurchaseResource::class,
-        PurchaseReceiptResource::class,
-        PurchaseReturnResource::class,
-    ] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
+test('group 3 GUDANG has 6 active menus with proper labels and sort', function () {
+    $expected = [
+        WarehouseConfirmationResource::class => ['Siapkan & Kirim', 1, 'heroicon-o-clipboard-document-list'],
+        PurchaseReceiptResource::class => ['Terima Barang', 2, 'heroicon-o-inbox-arrow-down'],
+        InventoryStockResource::class => ['Cek Stok', 3, 'heroicon-o-circle-stack'],
+        StockTransferResource::class => ['Pindah Stok', 4, 'heroicon-o-arrows-right-left'],
+        StockOpnameResource::class => ['Stock Opname', 5, 'heroicon-o-document-magnifying-glass'],
+        StockAdjustmentResource::class => ['Penyesuaian Stok', 6, 'heroicon-o-adjustments-horizontal'],
+    ];
+
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect(sidebarStaticProperty($class, 'shouldRegisterNavigation'))->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('GUDANG')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
     }
 });
 
-test('detailed delivery sidebar items are hidden and only exposed through the delivery hub', function () {
-    foreach ([
-        DeliveryOrderResource::class,
-        DeliveryScheduleResource::class,
-        SuratJalanResource::class,
-    ] as $resourceClass) {
-        if ($resourceClass === SuratJalanResource::class) {
-            expect(SuratJalanResource::shouldRegisterNavigation())->toBeFalse();
-            continue;
-        }
+test('group 4 PEMBELIAN has 5 active menus with proper labels and sort', function () {
+    $expected = [
+        OrderRequestResource::class => ['Permintaan Pembelian', 1, 'heroicon-o-document-plus'],
+        PurchaseOrderResource::class => ['Pesanan Pembelian (PO)', 2, 'heroicon-o-shopping-cart'],
+        PurchaseInvoiceResource::class => ['Invoice Pembelian', 3, 'heroicon-o-receipt-percent'],
+        VendorPaymentResource::class => ['Bayar Supplier', 4, 'heroicon-o-credit-card'],
+        PurchaseReturnResource::class => ['Retur Pembelian', 5, 'heroicon-o-arrow-uturn-left'],
+    ];
 
-        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect(sidebarStaticProperty($class, 'shouldRegisterNavigation'))->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('PEMBELIAN')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
     }
 });
 
-test('detailed finance sales and purchase sidebar items are hidden and only exposed through their hubs', function () {
-    foreach ([
-        SaleOrderResource::class,
-        QuotationResource::class,
-        AccountReceivableResource::class,
-        SalesInvoiceResource::class,
-        OtherSaleResource::class,
-        AccountPayableResource::class,
-        PurchaseInvoiceResource::class,
-    ] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
+test('group 5 KEUANGAN has 7 active menus with proper labels and sort', function () {
+    $expected = [
+        CashBankTransactionResource::class => ['Kas & Bank', 1, 'heroicon-o-banknotes'],
+        AccountReceivableResource::class => ['Piutang & Hutang', 2, 'heroicon-o-scale'],
+        PaymentRequestResource::class => ['Pengajuan Dana', 3, 'heroicon-o-document-currency-dollar'],
+        JournalEntryResource::class => ['Jurnal', 4, 'heroicon-o-book-open'],
+        BankReconciliationResource::class => ['Rekonsiliasi Bank', 5, 'heroicon-o-arrow-path-rounded-square'],
+        AssetResource::class => ['Aset Tetap', 6, 'heroicon-o-building-office-2'],
+        AccountingPeriodResource::class => ['Tutup Buku', 7, 'heroicon-o-lock-closed'],
+    ];
+
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect(sidebarStaticProperty($class, 'shouldRegisterNavigation'))->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('KEUANGAN')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
     }
 });
 
-test('detailed payment sidebar items are hidden and only exposed through the payment hub', function () {
-    foreach ([
-        PaymentRequestResource::class,
-        CustomerReceiptResource::class,
-        VendorPaymentResource::class,
-        CashBankTransactionResource::class,
-        DepositResource::class,
-    ] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
-    }
+test('group 6 LAPORAN has 5 active menus with proper labels and sort', function () {
+    $expected = [
+        MyDashboard::class => ['Dashboard Owner', 1, 'heroicon-o-chart-pie'],
+        SalesReportPage::class => ['Penjualan', 2, 'heroicon-o-chart-bar'],
+        PurchaseReportPage::class => ['Pembelian', 3, 'heroicon-o-arrow-trending-up'],
+        InventoryReportPage::class => ['Stok', 4, 'heroicon-o-cube-transparent'],
+        FinancialStatementPage::class => ['Laporan Keuangan', 5, 'heroicon-o-document-chart-bar'],
+    ];
 
-    expect(CashBankTransferResource::shouldRegisterNavigation())->toBeFalse();
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect($class::shouldRegisterNavigation())->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('LAPORAN')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
+    }
 });
 
-test('sales and manufacturing groups use consistent Indonesian labels', function () {
-    foreach ([SaleOrderResource::class, QuotationResource::class] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'navigationGroup'))->toBe('Penjualan');
-    }
+test('group 7 DATA MASTER has 7 active menus with proper labels and sort', function () {
+    $expected = [
+        ProductResource::class => ['Produk', 1, 'heroicon-o-cube'],
+        CustomerResource::class => ['Customer', 2, 'heroicon-o-user-group'],
+        SupplierResource::class => ['Supplier', 3, 'heroicon-o-building-storefront'],
+        WarehouseResource::class => ['Gudang & Rak', 4, 'heroicon-o-building-office'],
+        CabangResource::class => ['Cabang', 5, 'heroicon-o-map-pin'],
+        VehicleResource::class => ['Kendaraan & Driver', 6, 'heroicon-o-truck'],
+        ChartOfAccountResource::class => ['Akun & Pajak', 7, 'heroicon-o-calculator'],
+    ];
 
-    foreach ([
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect(sidebarStaticProperty($class, 'shouldRegisterNavigation'))->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('DATA MASTER')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
+    }
+});
+
+test('group 8 PENGATURAN has 2 active menus with proper labels and sort', function () {
+    $expected = [
+        UserResource::class => ['Pengguna & Hak Akses', 1, 'heroicon-o-shield-check'],
+        ApprovalRuleResource::class => ['Aturan Persetujuan', 2, 'heroicon-o-adjustments-vertical'],
+    ];
+
+    foreach ($expected as $class => [$label, $sort, $icon]) {
+        expect(sidebarStaticProperty($class, 'shouldRegisterNavigation'))->toBeTrue()
+            ->and(sidebarStaticProperty($class, 'navigationGroup'))->toBe('PENGATURAN')
+            ->and(sidebarStaticProperty($class, 'navigationLabel'))->toBe($label)
+            ->and(sidebarStaticProperty($class, 'navigationSort'))->toBe($sort)
+            ->and(sidebarStaticProperty($class, 'navigationIcon'))->toBe($icon);
+    }
+});
+
+test('manufacturing and secondary modules are hidden from navigation', function () {
+    $hiddenResources = [
         BillOfMaterialResource::class,
+        ProductionPlanResource::class,
         ManufacturingOrderResource::class,
         MaterialIssueResource::class,
-        ProductionPlanResource::class,
         ProductionResource::class,
         QualityControlManufactureResource::class,
-    ] as $resourceClass) {
-        expect(sidebarStaticProperty($resourceClass, 'navigationGroup'))->toBe('Manufaktur');
-    }
-});
+        DeliveryScheduleResource::class,
+        OtherSaleResource::class,
+    ];
 
-test('child menu labels use Indonesian wording in the refactored sections', function () {
-    expect(sidebarStaticProperty(SaleOrderResource::class, 'navigationLabel'))->toBe('Pesanan Penjualan')
-        ->and(sidebarStaticProperty(OrderRequestResource::class, 'navigationLabel'))->toBe('Permintaan Pembelian')
-        ->and(sidebarStaticProperty(PurchaseOrderResource::class, 'navigationLabel'))->toBe('Pesanan Pembelian')
-        ->and(sidebarStaticProperty(PurchaseReceiptResource::class, 'navigationLabel'))->toBe('Penerimaan Pembelian')
-        ->and(sidebarStaticProperty(PurchaseReturnResource::class, 'navigationLabel'))->toBe('Retur Pembelian')
-        ->and(sidebarStaticProperty(PaymentRequestResource::class, 'navigationLabel'))->toBe('Permintaan Pembayaran')
-        ->and(sidebarStaticProperty(CustomerReceiptResource::class, 'navigationLabel'))->toBe('Penerimaan Pelanggan')
-        ->and(sidebarStaticProperty(VendorPaymentResource::class, 'navigationLabel'))->toBe('Pembayaran Vendor')
-        ->and(sidebarStaticProperty(QualityControlPurchaseResource::class, 'navigationLabel'))->toBe('Kontrol Kualitas Pembelian')
-        ->and(sidebarStaticProperty(QualityControlManufactureResource::class, 'navigationLabel'))->toBe('Kontrol Kualitas Produksi')
-        ->and(sidebarStaticProperty(ManufacturingOrderResource::class, 'navigationLabel'))->toBe('Perintah Produksi')
-        ->and(sidebarStaticProperty(BillOfMaterialResource::class, 'navigationLabel'))->toBe('Daftar Material')
-        ->and(sidebarStaticProperty(DeliveryOrderResource::class, 'navigationLabel'))->toBe('Perintah Pengiriman')
-        ->and(sidebarStaticProperty(CustomerReturnResource::class, 'navigationGroup'))->toBe('Retur Pelanggan');
+    foreach ($hiddenResources as $resourceClass) {
+        expect(sidebarStaticProperty($resourceClass, 'shouldRegisterNavigation'))
+            ->toBeFalse("Expected {$resourceClass} to be hidden from navigation");
+    }
 });

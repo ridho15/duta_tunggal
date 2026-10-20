@@ -30,6 +30,8 @@ use Illuminate\Support\Facades\Auth;
 
 class PurchaseReceiptItemResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = PurchaseReceiptItem::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-chevron-up-down';

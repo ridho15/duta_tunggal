@@ -279,7 +279,7 @@ it('Isu 9: opsi status dari konstanta model — semua status nyata SO tersedia, 
     expect(array_keys($orderOptions))->toBe(array_keys(SaleOrder::STATUS_LABELS))
         ->and($orderOptions)->toHaveKeys(['approved', 'partially_delivered', 'request_approve', 'closed', 'reject', 'canceled'])
         ->and($orderOptions)->not->toHaveKeys(['processing', 'cancelled'])
-        ->and($orderOptions['approved'])->toBe('Disetujui');
+        ->and($orderOptions['approved'])->toBe('Siap dibuatkan DO');
 
     expect(SalesReportService::statusOptions('delivery'))->toBe(DeliveryOrder::STATUS_LABELS)
         ->and(array_keys(SalesReportService::statusOptions('invoice')))->toBe(['belum', 'sebagian', 'lunas', 'jatuh_tempo']);
@@ -490,7 +490,7 @@ it('Isu 9: mode Pengiriman di halaman menampilkan DO, HPP stok, dan margin', fun
         ->set('mode', 'delivery')
         ->assertSee($do->do_number)
         ->assertSee('HPP (Stok)')
-        ->assertSee('Sedang Dikirim');
+        ->assertSee('Dalam pengiriman');
 });
 
 // ───────────────────────────── Widget SO Belum Selesai ─────────────────────────────

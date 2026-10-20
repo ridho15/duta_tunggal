@@ -22,6 +22,8 @@ use Carbon\Carbon;
 
 class ArApManagementPage extends Page implements HasTable
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';
@@ -36,18 +38,18 @@ class ArApManagementPage extends Page implements HasTable
 
     // Add this to make sure it's accessible
     protected static ?string $slug = 'ar-ap-management';
-    
-    // Make sure the page is always visible (remove any permission restrictions)
-    public static function canAccess(): bool
-    {
-        return true;
-    }
-    
-    // Add this to help with debugging
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;
     }
+    
+    // Make sure the page is always visible (remove any permission restrictions)
+    public static function canAccess(): bool
+    {
+        return \App\Support\MenuAccess::allows(static::class);
+    }
+    
 
     public string $activeTab = 'ar';
 

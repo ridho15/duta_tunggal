@@ -14,6 +14,13 @@ class ListStockOpnames extends ListRecords
     {
         return [
             Actions\CreateAction::make()->icon('heroicon-o-plus'),
+            // Tahap 3: hitung fisik di HP (blind count)
+            Actions\Action::make('hitung_hp')
+                ->label('Hitung di HP')
+                ->icon('heroicon-o-device-phone-mobile')
+                ->color('gray')
+                ->url(fn () => \App\Filament\Pages\Hp\OpnameHpPage::getUrl())
+                ->visible(fn () => \App\Filament\Pages\Hp\OpnameHpPage::canAccess()),
         ];
     }
 }

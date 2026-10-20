@@ -36,11 +36,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class CabangResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Cabang::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-building-office';
+    protected static ?string $navigationIcon = 'heroicon-o-map-pin';
 
     protected static ?string $navigationLabel = 'Cabang';
 
@@ -48,9 +50,9 @@ class CabangResource extends Resource
 
     protected static ?string $modelLabel = 'Cabang';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

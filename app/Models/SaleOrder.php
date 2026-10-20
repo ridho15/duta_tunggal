@@ -40,8 +40,9 @@ class SaleOrder extends Model
 
     public const STATUS_LABELS = [
         'draft' => 'Draft',
-        'request_approve' => 'Menunggu Persetujuan',
-        'approved' => 'Disetujui',
+        // Label tampil mengikuti Spesifikasi UI/UX 7.2
+        'request_approve' => 'Menunggu approve kasir',
+        'approved' => 'Siap dibuatkan DO',
         'confirmed' => 'Dikonfirmasi',
         'partial_confirmed' => 'Dikonfirmasi Sebagian',
         'partially_delivered' => 'Dikirim Sebagian',

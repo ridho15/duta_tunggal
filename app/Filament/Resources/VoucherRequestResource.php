@@ -27,6 +27,8 @@ use Throwable;
 
 class VoucherRequestResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = VoucherRequest::class;
 
     protected static bool $shouldRegisterNavigation = false;

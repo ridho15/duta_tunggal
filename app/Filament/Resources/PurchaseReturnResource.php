@@ -41,14 +41,15 @@ use Throwable;
 
 class PurchaseReturnResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = PurchaseReturn::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-up-on-square-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-uturn-left';
 
-    // Group updated to the standardized Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian';
+    protected static ?string $navigationGroup = 'PEMBELIAN';
 
     protected static ?string $navigationLabel = 'Retur Pembelian';
 

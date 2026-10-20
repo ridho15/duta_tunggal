@@ -22,12 +22,16 @@ use Illuminate\Support\Facades\Auth;
 
 class BankReconciliationResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = BankReconciliation::class;
-    protected static bool $shouldRegisterNavigation = false;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
+    protected static bool $shouldRegisterNavigation = true;
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
+    protected static ?string $navigationGroup = 'KEUANGAN';
+    protected static ?string $navigationLabel = 'Rekonsiliasi Bank';
     protected static ?string $modelLabel = 'Rekonsiliasi Bank';
-    protected static ?int $navigationSort = 2;
+    protected static ?string $pluralModelLabel = 'Rekonsiliasi Bank';
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

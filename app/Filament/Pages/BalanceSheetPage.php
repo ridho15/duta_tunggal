@@ -12,6 +12,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class BalanceSheetPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static string $view = 'filament.pages.balance-sheet-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';

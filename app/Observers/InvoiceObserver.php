@@ -441,7 +441,10 @@ class InvoiceObserver
             );
         }
 
-        $invoice->loadMissing('invoiceItem.product', 'fromModel.saleOrderItem.product', 'fromModel.saleOrderItem.currency');
+        $invoice->loadMissing('invoiceItem.product');
+        if ($invoice->from_model_type === 'App\\Models\\SaleOrder') {
+            $invoice->loadMissing('fromModel.saleOrderItem.product', 'fromModel.saleOrderItem.currency');
+        }
 
         $invoiceItems = $invoice->invoiceItem;
         if ($invoiceItems->isEmpty() && $invoice->from_model_type === 'App\\Models\\SaleOrder') {
@@ -655,9 +658,13 @@ class InvoiceObserver
         $invoice->loadMissing([
             'invoiceItem.product.cogsCoa',
             'invoiceItem.product.goodsDeliveryCoa',
-            'fromModel.saleOrderItem.product.cogsCoa',
-            'fromModel.saleOrderItem.product.goodsDeliveryCoa',
         ]);
+        if ($invoice->from_model_type === 'App\\Models\\SaleOrder') {
+            $invoice->loadMissing([
+                'fromModel.saleOrderItem.product.cogsCoa',
+                'fromModel.saleOrderItem.product.goodsDeliveryCoa',
+            ]);
+        }
 
         $invoiceItems = $invoice->invoiceItem;
         if ($invoiceItems->isEmpty() && $invoice->from_model_type === 'App\\Models\\SaleOrder') {

@@ -346,11 +346,11 @@ it('Isu 5: scope deliverable menyaring SO tanpa sisa dan mengikutkan SO yang sud
 
 it('Isu 5: label status berbahasa Indonesia untuk SO, DO, dan item DO', function () {
     expect(SaleOrder::statusLabel('partially_delivered'))->toBe('Dikirim Sebagian')
-        ->and(SaleOrder::statusLabel('approved'))->toBe('Disetujui')
+        ->and(SaleOrder::statusLabel('approved'))->toBe('Siap dibuatkan DO')
         ->and(SaleOrder::statusColor('partially_delivered'))->toBe('warning')
         ->and(DeliveryOrder::statusLabel('request_stock'))->toBe('Menunggu Konfirmasi Stok')
-        ->and(DeliveryOrder::statusLabel('approved'))->toBe('Disetujui')
-        ->and(DeliveryOrder::statusLabel('sent'))->toBe('Sedang Dikirim')
+        ->and(DeliveryOrder::statusLabel('approved'))->toBe('Siap dicek & dikirim')
+        ->and(DeliveryOrder::statusLabel('sent'))->toBe('Dalam pengiriman')
         ->and(\App\Models\DeliveryOrderItem::statusLabel('requested'))->toBe('Menunggu Konfirmasi Gudang')
         ->and(SaleOrder::statusLabel('status_baru_x'))->toBe('Status baru x');   // fallback tetap terbaca
 

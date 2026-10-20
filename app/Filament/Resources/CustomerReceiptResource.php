@@ -51,21 +51,23 @@ use Illuminate\Support\Collection;
 
 class CustomerReceiptResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = CustomerReceipt::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
 
-    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
+    protected static ?string $navigationGroup = 'PENJUALAN';
 
-    protected static ?string $navigationLabel = 'Penerimaan Pelanggan';
+    protected static ?string $navigationLabel = 'Terima Pembayaran';
 
-    protected static ?string $modelLabel = 'Penerimaan Pelanggan';
+    protected static ?string $modelLabel = 'Terima Pembayaran';
 
-    protected static ?string $pluralModelLabel = 'Penerimaan Pelanggan';
+    protected static ?string $pluralModelLabel = 'Terima Pembayaran';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 6;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static function getPaymentMethodOptions(): array
     {

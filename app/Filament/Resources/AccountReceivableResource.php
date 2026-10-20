@@ -31,19 +31,21 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AccountReceivableResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = AccountReceivable::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    protected static ?string $navigationIcon = 'heroicon-o-scale';
 
-    protected static ?string $navigationGroup = 'Keuangan Penjualan';
+    protected static ?string $navigationGroup = 'KEUANGAN';
 
-    protected static ?string $navigationLabel = 'Piutang Usaha';
+    protected static ?string $navigationLabel = 'Piutang & Hutang';
 
-    protected static ?string $modelLabel = 'Piutang Usaha';
+    protected static ?string $modelLabel = 'Piutang & Hutang';
 
-    protected static ?string $pluralModelLabel = 'Piutang Usaha';
+    protected static ?string $pluralModelLabel = 'Piutang & Hutang';
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?int $navigationSort = 2;
 

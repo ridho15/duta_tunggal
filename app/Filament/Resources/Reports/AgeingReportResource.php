@@ -25,6 +25,8 @@ use Carbon\Carbon;
 
 class AgeingReportResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $model = AccountReceivable::class;

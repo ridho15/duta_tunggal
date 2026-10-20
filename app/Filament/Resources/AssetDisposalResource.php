@@ -17,6 +17,8 @@ use Illuminate\Support\HtmlString;
 
 class AssetDisposalResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = AssetDisposal::class;
 
     protected static bool $shouldRegisterNavigation = false;

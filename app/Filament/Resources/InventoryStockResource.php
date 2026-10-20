@@ -29,16 +29,23 @@ use Illuminate\Support\Facades\Auth;
 
 class InventoryStockResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = InventoryStock::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
+    protected static ?string $navigationIcon = 'heroicon-o-circle-stack';
 
-    protected static ?string $navigationGroup = 'Gudang';
+    protected static ?string $navigationGroup = 'GUDANG';
 
-    // Position Gudang as the 6th group
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Cek Stok';
+
+    protected static ?string $modelLabel = 'Cek Stok';
+
+    protected static ?string $pluralModelLabel = 'Cek Stok';
+
+    protected static ?int $navigationSort = 3;
 
     public static function canCreate(): bool
     {

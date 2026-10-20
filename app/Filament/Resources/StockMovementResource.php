@@ -30,6 +30,8 @@ use Illuminate\Support\Facades\Auth;
 
 class StockMovementResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = StockMovement::class;
 
     protected static bool $shouldRegisterNavigation = false;

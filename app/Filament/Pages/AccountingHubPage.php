@@ -34,6 +34,13 @@ class AccountingHubPage extends Page
 
     protected static ?string $slug = 'accounting-hub';
 
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static function getHubClasses(): array
     {
         return [

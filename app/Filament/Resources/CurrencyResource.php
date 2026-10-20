@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CurrencyResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Currency::class;
 
     protected static bool $shouldRegisterNavigation = false;

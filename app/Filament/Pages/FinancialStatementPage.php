@@ -8,24 +8,25 @@ use Filament\Pages\Page;
 
 class FinancialStatementPage extends Page
 {
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
+    use \App\Filament\Concerns\HasMenuAccess;
+
 
     protected static string $view = 'filament.pages.financial-statement-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
 
-    protected static ?string $navigationGroup = 'Laporan Keuangan';
+    protected static ?string $navigationGroup = 'LAPORAN';
 
-    protected static ?string $navigationLabel = 'Financial Statement';
+    protected static ?string $navigationLabel = 'Laporan Keuangan';
 
-    protected static ?string $navigationParentItem = 'Laporan Keuangan';
-
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $slug = 'financial-statement';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return true;
+    }
 
     // Filter state
     public bool $showPreview = false;

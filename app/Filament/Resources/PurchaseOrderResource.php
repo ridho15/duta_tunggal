@@ -71,22 +71,23 @@ use Saade\FilamentAutograph\Forms\Components\SignaturePad as ComponentsSignature
 
 class PurchaseOrderResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     public const RESOURCE_PO_EXCLUDED_STATUSES = ['closed', 'cancelled', 'canceled', 'rejected'];
 
     protected static ?string $model = PurchaseOrder::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
 
-    // Group label updated to include English hint per request
-    protected static ?string $navigationGroup = 'Pembelian';
+    protected static ?string $navigationGroup = 'PEMBELIAN';
 
-    protected static ?string $navigationLabel = 'Pesanan Pembelian';
+    protected static ?string $navigationLabel = 'Pesanan Pembelian (PO)';
 
     protected static ?string $modelLabel = 'Pesanan Pembelian';
 
-    protected static ?string $pluralModelLabel = 'Pesanan Pembelian';
+    protected static ?string $pluralModelLabel = 'Pesanan Pembelian (PO)';
 
     protected static ?int $navigationSort = 2;
 
@@ -1581,6 +1582,18 @@ class PurchaseOrderResource extends Resource
                                     ->label('Tempo Hutang (hari)')
                                     ->numeric()
                                     ->default(0),
+                                Forms\Components\TextInput::make('nama_bank')
+                                    ->label('Nama Bank')
+                                    ->placeholder('Contoh: BCA, Mandiri, BRI')
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('nomor_rekening')
+                                    ->label('Nomor Rekening')
+                                    ->placeholder('Contoh: 1234567890')
+                                    ->maxLength(100),
+                                Forms\Components\TextInput::make('nama_rekening')
+                                    ->label('Atas Nama Rekening')
+                                    ->placeholder('Contoh: PT Supplier Makmur')
+                                    ->maxLength(150),
                                 Forms\Components\Select::make('cabang_id')
                                     ->label('Cabang')
                                     ->options(\App\Models\Cabang::pluck('nama', 'id'))
@@ -1591,6 +1604,27 @@ class PurchaseOrderResource extends Resource
                                 return Supplier::create($data)->id;
                             })
                             ->required(),
+                        Placeholder::make('supplier_bank_info')
+                            ->label('Informasi Rekening Bank Supplier')
+                            ->content(function (Get $get) {
+                                $supplierId = $get('supplier_id');
+                                if (! $supplierId) {
+                                    return 'Pilih supplier terlebih dahulu untuk melihat informasi rekening bank tujuan transfer.';
+                                }
+                                $supplier = Supplier::find($supplierId);
+                                if (! $supplier) {
+                                    return '-';
+                                }
+                                $bank = $supplier->nama_bank ?: null;
+                                $norek = $supplier->nomor_rekening ?: null;
+                                $an = $supplier->nama_rekening ?: null;
+
+                                if (! $bank && ! $norek && ! $an) {
+                                    return '⚠️ Rekening bank belum tercatat pada master supplier ini. Silakan lengkapi di Master Data Supplier.';
+                                }
+
+                                return ($bank ?: '-') . ' — No. Rek: ' . ($norek ?: '-') . ' a/n ' . ($an ?: '-');
+                            }),
                         Select::make('cabang_id')
                             ->label('Cabang Akuntansi (Pusat)')
                             ->options(function () {
@@ -2975,19 +3009,19 @@ class PurchaseOrderResource extends Resource
                         '</div>' .
                         '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
                         '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
-                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Approved)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO sudah disetujui</span></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Disetujui)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO sudah disetujui</span></div>' .
                         '</div>' .
                         '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
                         '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
-                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partially Received)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO diterima sebagian</span></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Diterima sebagian)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO diterima sebagian</span></div>' .
                         '</div>' .
                         '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
                         '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
-                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Request Close/Closed)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Diminta tutup / ditutup</span></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Minta ditutup/Ditutup)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Diminta tutup / ditutup</span></div>' .
                         '</div>' .
                         '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
                         '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
-                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Completed/Paid)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / dibayar</span></div>' .
+                        '<div class="leading-tight"><span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Selesai/Lunas)</span><span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / dibayar</span></div>' .
                         '</div>' .
                         '</div>' .
                         '</div>' .

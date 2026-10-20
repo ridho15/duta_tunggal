@@ -42,6 +42,8 @@ use Illuminate\Support\Facades\Auth;
 
 class DepositResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Deposit::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-currency-pound';

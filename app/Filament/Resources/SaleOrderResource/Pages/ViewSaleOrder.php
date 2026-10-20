@@ -329,10 +329,10 @@ class ViewSaleOrder extends ViewRecord
                                     ->required()
                                     ->default(0),
                                 Select::make('coa_id')
-                                    ->label('COA')
+                                    ->label('COA (Kas/Bank)')
                                     ->preload()
                                     ->searchable()
-                                    ->options(ChartOfAccount::where('is_cash_bank', true)->orderBy('code')->get()->mapWithKeys(function ($coa) {
+                                    ->options(ChartOfAccount::cashBank()->orderBy('code')->get()->mapWithKeys(function ($coa) {
                                         return [$coa->id => "({$coa->code}) {$coa->name}"];
                                     }))
                                     ->required(),

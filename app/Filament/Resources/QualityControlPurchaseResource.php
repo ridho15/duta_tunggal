@@ -55,6 +55,8 @@ use Throwable;
 
 class QualityControlPurchaseResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = QualityControl::class;
 
     protected static bool $shouldRegisterNavigation = false;
@@ -626,8 +628,12 @@ class QualityControlPurchaseResource extends Resource
             ->with('qualityControl')
             ->get();
 
-        $processedCount = $qcItems->filter(fn ($item) => (int) ($item->qualityControl?->status ?? 0) === 1)->count();
-        $pendingCount   = $qcItems->filter(fn ($item) => (int) ($item->qualityControl?->status ?? 0) !== 1)->count();
+        $directQcs = $purchaseOrderItem->qualityControls ?? collect();
+        $directProcessed = $directQcs->filter(fn ($qc) => (int) ($qc->status ?? 0) === 1)->count();
+        $directPending   = $directQcs->filter(fn ($qc) => (int) ($qc->status ?? 0) !== 1)->count();
+
+        $processedCount = $qcItems->filter(fn ($item) => (int) ($item->qualityControl?->status ?? 0) === 1)->count() + $directProcessed;
+        $pendingCount   = $qcItems->filter(fn ($item) => (int) ($item->qualityControl?->status ?? 0) !== 1)->count() + $directPending;
 
         $remaining = static::purchaseOrderItemQcRemaining($purchaseOrderItem)['remaining'];
 

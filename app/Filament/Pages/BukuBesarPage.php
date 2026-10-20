@@ -10,6 +10,8 @@ use Illuminate\Support\Collection;
 
 class BukuBesarPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static string $view = 'filament.pages.buku-besar-page';
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
@@ -23,6 +25,11 @@ class BukuBesarPage extends Page
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'buku-besar-page';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public $coa_ids = [];
     public $start_date = null;
@@ -176,10 +183,5 @@ class BukuBesarPage extends Page
         }
 
         return $normalized;
-    }
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
     }
 }

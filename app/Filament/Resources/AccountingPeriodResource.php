@@ -21,21 +21,23 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AccountingPeriodResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = AccountingPeriod::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
 
-    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
+    protected static ?string $navigationGroup = 'KEUANGAN';
 
-    protected static ?string $navigationLabel = 'Tutup Buku & Periode';
+    protected static ?string $navigationLabel = 'Tutup Buku';
 
-    protected static ?string $modelLabel = 'Periode Akuntansi';
+    protected static ?string $modelLabel = 'Tutup Buku';
 
-    protected static ?string $pluralModelLabel = 'Periode Akuntansi';
+    protected static ?string $pluralModelLabel = 'Tutup Buku';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 7;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     public static function form(Form $form): Form
     {

@@ -223,4 +223,10 @@ class CreateSalesInvoice extends CreateRecord
             'total' => round((float) $items->sum('total') + $otherFees, 2),
         ]);
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return static::getResource()::getUrl('index');
+    }
 }
+

@@ -43,15 +43,17 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class QualityControlManufactureResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = QualityControl::class;
 
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationGroup = 'Manufaktur';
+    protected static ?string $navigationGroup = 'PRODUKSI';
 
-    protected static ?string $navigationLabel = 'Kontrol Kualitas Produksi';
+    protected static ?string $navigationLabel = 'QC Produksi';
 
     protected static ?string $modelLabel = 'Kontrol Kualitas Produksi';
 

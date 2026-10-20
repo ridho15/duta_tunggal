@@ -20,6 +20,8 @@ use Illuminate\Support\Collection;
 
 class ProfitAndLossResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
     protected static ?string $navigationLabel = 'Laporan Laba Rugi (P&L)';
     protected static bool $shouldRegisterNavigation = false;

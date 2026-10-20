@@ -12,8 +12,8 @@ class ArApChart extends ChartWidget
 
     protected function getData(): array
     {
-        $startDate = Carbon::parse($this->filter['tanggalMulai'])->startOfDay();
-        $endDate = Carbon::parse($this->filter['tanggalAkhir'])->endOfDay();
+        $startDate = Carbon::parse($this->filter['tanggalMulai'] ?? Carbon::now()->subDays(7))->startOfDay();
+        $endDate = Carbon::parse($this->filter['tanggalAkhir'] ?? Carbon::now())->endOfDay();
         // Query AR per tanggal
         $arQuery = DB::table('account_receivables')
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('SUM(tostal) as total_ar'))

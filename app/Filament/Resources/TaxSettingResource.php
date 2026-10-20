@@ -22,6 +22,8 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class TaxSettingResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = TaxSetting::class;
 
     protected static bool $shouldRegisterNavigation = false;

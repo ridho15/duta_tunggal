@@ -16,6 +16,8 @@ use App\Models\Cabang;
 
 class TrialBalancePage extends Page implements HasForms
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithForms;
 
     public static function shouldRegisterNavigation(): bool
@@ -36,6 +38,7 @@ class TrialBalancePage extends Page implements HasForms
     protected static ?int $navigationSort = 3;
 
     protected static ?string $slug = 'trial-balance';
+
 
     // Filter state
     public ?string $start_date = null;

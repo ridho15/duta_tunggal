@@ -20,6 +20,8 @@ use Throwable;
 
 class OtherSaleResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = OtherSale::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
@@ -30,9 +32,9 @@ class OtherSaleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Penjualan Lainnya';
 
-    protected static ?string $navigationGroup = 'Keuangan Penjualan';
+    protected static ?string $navigationGroup = 'KEUANGAN';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 9;
 
     protected static bool $shouldRegisterNavigation = false;
 

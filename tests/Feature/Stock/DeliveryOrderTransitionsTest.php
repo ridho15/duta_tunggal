@@ -101,7 +101,7 @@ it('transisi di luar matriks ditolak dengan pesan berbahasa Indonesia dan status
         app(DeliveryOrderTransitions::class)->to($do, 'received');   // Siap Kirim tidak boleh loncat ke Diterima
         $this->fail('seharusnya ditolak');
     } catch (DeliveryOrderTransitionException $e) {
-        expect($e->getMessage())->toContain('tidak dapat diubah dari "Siap Kirim" ke "Diterima"')
+        expect($e->getMessage())->toContain('tidak dapat diubah dari "Siap Kirim" ke "Diterima customer"')
             ->and($e->getMessage())->toContain('Langkah yang diizinkan');
     }
 
@@ -116,8 +116,8 @@ it('label "Siap Kirim" hanya saat alur ketat aktif', function () {
 
     config(['sales.stock.strict_dispatch' => false]);
 
-    expect(DeliveryOrder::statusLabel('approved'))->toBe('Disetujui')
-        ->and(DeliveryOrder::statusLabel('sent'))->toBe('Sedang Dikirim');
+    expect(DeliveryOrder::statusLabel('approved'))->toBe('Siap dicek & dikirim')
+        ->and(DeliveryOrder::statusLabel('sent'))->toBe('Dalam pengiriman');
 });
 
 // ------------------------------------------------------------------ Kirim: stok, idempotensi, log, item

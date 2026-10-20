@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Auth;
 
 class RakResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Rak::class;
 
     protected static bool $shouldRegisterNavigation = false;

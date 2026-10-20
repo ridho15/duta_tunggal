@@ -54,6 +54,25 @@ use Filament\View\PanelsRenderHook;
 
 class AdminPanelProvider extends PanelProvider
 {
+    public const THEME = 'resources/css/filament/admin/theme.css';
+
+    /**
+     * Tema Vite hanya dipasang bila sudah di-build (`npm run build`). Tanpa ini, deploy yang
+     * melewati build frontend (update.sh --quick) akan membuat panel error "Vite manifest not found".
+     */
+    public static function hasViteTheme(): bool
+    {
+        $manifest = public_path('build/manifest.json');
+
+        if (! is_file($manifest)) {
+            return false;
+        }
+
+        $entries = json_decode((string) file_get_contents($manifest), true);
+
+        return is_array($entries) && array_key_exists(static::THEME, $entries);
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
@@ -64,8 +83,22 @@ class AdminPanelProvider extends PanelProvider
             ->profile()
             ->defaultThemeMode(ThemeMode::Light)
             ->darkMode(false)
+            ->font('Plus Jakarta Sans')
+            ->brandName('Duta Tunggal ERP')
+            // Spesifikasi UI/UX 3.2: teks "DUTA TUNGGAL" 15/800 + badge "ERP" hijau
+            ->brandLogo(fn () => new \Illuminate\Support\HtmlString(
+                '<span style="display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:800;letter-spacing:.3px;color:#111827;">'
+                . 'DUTA TUNGGAL'
+                . '<span style="font-size:9px;font-weight:700;color:#15803D;border:1px solid #BBF7D0;background:#F0FDF4;border-radius:6px;padding:1px 5px;line-height:14px;">ERP</span>'
+                . '</span>'
+            ))
+            ->brandLogoHeight('1.25rem')
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::Green,
+                'warning' => Color::Amber,
+                'danger' => Color::Red,
+                'info' => Color::Blue,
+                'gray' => Color::Gray,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->resources([
@@ -74,22 +107,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             // ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages') // Commented out to avoid Livewire component conflicts
             ->pages([
-                DashboardHubPage::class,
-                SalesHubPage::class,
-                PurchaseHubPage::class,
-                DeliveryHubPage::class,
-                AccountingHubPage::class,
-                InventoryHubPage::class,
-                MasterDataHubPage::class,
-                UserRolesManagementHubPage::class,
-                ManufacturingHubPage::class,
+                \App\Filament\Pages\Dashboard::class,
                 MyDashboard::class,
-                FinanceSalesHubPage::class,
-                FinancePurchaseHubPage::class,
-                PaymentHubPage::class,
-                FinanceReportHubPage::class,
-                AssetManagementHubPage::class,
-                WarehouseHubPage::class,
                 InventoryReportPage::class,
                 ArApManagementPage::class,
                 BalanceSheetPage::class,
@@ -106,6 +125,14 @@ class AdminPanelProvider extends PanelProvider
                 PurchaseReportPage::class,
                 ViewAgeingReport::class,
                 GroupedJournalEntries::class,
+                \App\Filament\Pages\ModulAktifPage::class,
+                // Tahap 3 — layar HP
+                \App\Filament\Pages\Hp\KirimanPage::class,
+                \App\Filament\Pages\Hp\KirimanDetailPage::class,
+                \App\Filament\Pages\Hp\ReturDoPage::class,
+                \App\Filament\Pages\Hp\OpnameHpPage::class,
+                \App\Filament\Pages\Hp\CekStokHpPage::class,
+                \App\Filament\Pages\BantuanPage::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
@@ -124,32 +151,67 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            ->sidebarCollapsibleOnDesktop()
+            ->when(
+                static::hasViteTheme(),
+                // Tema Spesifikasi UI/UX Bagian 2 (warna, radius, sidebar 240px, header 50px)
+                fn (Panel $panel) => $panel->viteTheme(static::THEME),
+            )
+            ->sidebarCollapsibleOnDesktop(false)
             ->navigationGroups([
-                \Filament\Navigation\NavigationGroup::make('Dashboard')->icon('heroicon-o-home'),
-                \Filament\Navigation\NavigationGroup::make('Penjualan')->icon('heroicon-o-shopping-cart'),
-                \Filament\Navigation\NavigationGroup::make('Pembelian')->icon('heroicon-o-shopping-bag'),
-                \Filament\Navigation\NavigationGroup::make('Pengiriman')->icon('heroicon-o-truck'),
-                \Filament\Navigation\NavigationGroup::make('Akuntansi')->icon('heroicon-o-calculator'),
-                \Filament\Navigation\NavigationGroup::make('Inventory')->icon('heroicon-o-archive-box'),
-                \Filament\Navigation\NavigationGroup::make('Master Data')->icon('heroicon-o-circle-stack'),
-                \Filament\Navigation\NavigationGroup::make('Manajemen User dan Role')->icon('heroicon-o-users'),
-                \Filament\Navigation\NavigationGroup::make('Manufaktur')->icon('heroicon-o-cog-6-tooth'),
+                \Filament\Navigation\NavigationGroup::make('BERANDA'),
+                \Filament\Navigation\NavigationGroup::make('PENJUALAN'),
+                \Filament\Navigation\NavigationGroup::make('GUDANG'),
+                \Filament\Navigation\NavigationGroup::make('PEMBELIAN'),
+                \Filament\Navigation\NavigationGroup::make('KEUANGAN'),
+                \Filament\Navigation\NavigationGroup::make('LAPORAN'),
+                \Filament\Navigation\NavigationGroup::make('DATA MASTER'),
+                \Filament\Navigation\NavigationGroup::make('PENGATURAN'),
+                // Hanya tampil bila modul Produksi diaktifkan di PENGATURAN → Modul Aktif
+                \Filament\Navigation\NavigationGroup::make('PRODUKSI'),
             ])
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->assets([
+            ->sidebarWidth('15rem')
+            ->assets(array_filter([
                 // Custom CSS for sale orders
-                \Filament\Support\Assets\Css::make('custom-sale-order', secure_asset('css/custom-sale-order.css')),
-                // Custom CSS for filament sidebar
-                \Filament\Support\Assets\Css::make('filament-sidebar', secure_asset('css/filament-sidebar.css')),
-            ])
+                \Filament\Support\Assets\Css::make('custom-sale-order', asset('css/custom-sale-order.css')),
+                // CSS sidebar lama hanya dipakai bila tema Vite belum di-build (lihat hasViteTheme()).
+                static::hasViteTheme()
+                    ? null
+                    : \Filament\Support\Assets\Css::make('filament-sidebar', asset('css/filament-sidebar.css')),
+            ]))
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => view('filament.hooks.anti-double-click'),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('filament.hooks.livewire-error-handler'),
+            )
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn () => view('filament.hooks.topbar-user-info'),
+            )
+            // Tahap 3 — tampilan HP: gaya, pemindai barcode, navigasi bawah (Spesifikasi UI/UX 6.8)
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn () => view('filament.hooks.hp-styles'),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('filament.hooks.hp-scripts'),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('filament.hooks.mobile-bottom-nav'),
+            )
+            // Tahap 3 — banner mode latihan (hanya bila APP_TRAINING_MODE=true)
+            ->renderHook(
+                PanelsRenderHook::BODY_START,
+                fn () => view('filament.hooks.training-banner'),
             );
     }
 }

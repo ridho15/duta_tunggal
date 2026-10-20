@@ -51,16 +51,18 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseInvoiceResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Invoice::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static ?string $navigationIcon = 'heroicon-o-receipt-percent';
     protected static ?string $navigationLabel = 'Invoice Pembelian';
     protected static ?string $modelLabel = 'Invoice Pembelian';
     protected static ?string $pluralModelLabel = 'Invoice Pembelian';
-    protected static ?string $navigationGroup = 'Keuangan Pembelian';
-    protected static ?int $navigationSort = 9;
+    protected static ?string $navigationGroup = 'PEMBELIAN';
+    protected static ?int $navigationSort = 3;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static function formatMoneyState(mixed $value): string
     {

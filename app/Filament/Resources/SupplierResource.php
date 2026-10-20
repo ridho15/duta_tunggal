@@ -25,19 +25,27 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Filament\Tables\Enums\ActionsPosition;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class SupplierResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Supplier::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
+
+    protected static ?string $navigationLabel = 'Supplier';
+
+    protected static ?string $modelLabel = 'Supplier';
+
+    protected static ?string $pluralModelLabel = 'Supplier';
 
     protected static ?int $navigationSort = 3;
 
@@ -78,12 +86,30 @@ class SupplierResource extends Resource
                         TextInput::make('perusahaan')
                             ->label('Nama Perusahaan Supplier')
                             ->string()
+                            ->live(debounce: 500)
                             ->validationMessages([
                                 'required' => 'Nama perusahaan supplier tidak boleh kosong',
                                 'max' => 'Nama perusahaan supplier terlalu panjang'
                             ])
                             ->maxLength(255)
-                            ->required(),
+                            ->required()
+                            ->helperText(function ($state, $record) {
+                                if (blank($state) || strlen(trim((string) $state)) < 3) {
+                                    return null;
+                                }
+                                $query = Supplier::query()
+                                    ->where('perusahaan', 'like', '%' . trim((string) $state) . '%');
+                                if ($record?->id) {
+                                    $query->where('id', '!=', $record->id);
+                                }
+                                $matches = $query->limit(3)->pluck('perusahaan')->filter()->values();
+                                if ($matches->isNotEmpty()) {
+                                    return new HtmlString(
+                                        '<span class="text-amber-600 font-medium text-xs">⚠️ Perhatian: Ditemukan nama supplier/perusahaan serupa: <strong>' . e($matches->join(', ')) . '</strong>. Pastikan tidak membuat data ganda.</span>'
+                                    );
+                                }
+                                return null;
+                            }),
                         TextInput::make('kontak_person')
                             ->label('Nama Contact Person')
                             ->string()

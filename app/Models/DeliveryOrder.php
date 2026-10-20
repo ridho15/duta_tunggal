@@ -26,20 +26,21 @@ class DeliveryOrder extends Model
     public const RELEASED_STATUSES = ['closed'];
 
     public const STATUS_LABELS = [
-        'draft' => 'Draf',
+        // Label tampil mengikuti Spesifikasi UI/UX 7.2
+        'draft' => 'Draft',
         'request_stock' => 'Menunggu Konfirmasi Stok',
-        'request_approve' => 'Menunggu Persetujuan',
-        'approved' => 'Disetujui',
+        'request_approve' => 'Menunggu konfirmasi gudang',
+        'approved' => 'Siap dicek & dikirim',
         'confirmed' => 'Dikonfirmasi',
         'partial' => 'Sebagian',
-        'sent' => 'Sedang Dikirim',
-        'received' => 'Diterima',
+        'sent' => 'Dalam pengiriman',
+        'received' => 'Diterima customer',
         'completed' => 'Selesai',
         'supplier' => 'Dari Supplier',
         'request_close' => 'Minta Ditutup',
         'closed' => 'Ditutup',
         'reject' => 'Ditolak',
-        'delivery_failed' => 'Pengiriman Gagal',
+        'delivery_failed' => 'Gagal kirim',
     ];
 
     public const STATUS_COLORS = [

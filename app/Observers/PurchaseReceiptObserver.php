@@ -70,8 +70,19 @@ class PurchaseReceiptObserver
         }
 
         try {
-            // Create PurchaseReturn header
             $qc = $purchaseReceipt->purchaseOrder?->qualityControl ?? null;
+
+            // Check if return already exists for this receipt or QC
+            $existingReturn = PurchaseReturn::where('purchase_receipt_id', $purchaseReceipt->id)
+                ->when($qc && $qc->exists, fn ($q) => $q->orWhere('quality_control_id', $qc->id))
+                ->first();
+
+            if ($existingReturn) {
+                Log::info("PurchaseReceiptObserver: PurchaseReturn already exists for receipt {$purchaseReceipt->id}, skipping header creation");
+                return;
+            }
+
+            // Create PurchaseReturn header
             $purchaseReturn = PurchaseReturn::create([
                 'purchase_receipt_id' => $purchaseReceipt->id,
                 'quality_control_id' => $qc?->exists ? $qc->id : null,

@@ -72,8 +72,8 @@ test('quotation resource includes a status color legend', function () {
     expect($resource)->toContain('Legenda Warna Status Baris Data')
         ->and($resource)->toContain('Putih (Draft)')
         ->and($resource)->toContain('Abu-abu (Request Approve)')
-        ->and($resource)->toContain('Biru (Approved)')
-        ->and($resource)->toContain('Merah (Reject)');
+        ->and($resource)->toContain('Biru (Disetujui)')
+        ->and($resource)->toContain('Merah (Ditolak)');
 });
 
 test('order request index renders status row classes', function () {

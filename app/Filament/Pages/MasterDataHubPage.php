@@ -34,6 +34,13 @@ class MasterDataHubPage extends Page
 
     protected static ?string $slug = 'master-data-hub';
 
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static function getHubClasses(): array
     {
         return [

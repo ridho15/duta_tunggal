@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class StockReportResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = InventoryStock::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
@@ -22,6 +24,13 @@ class StockReportResource extends Resource
     protected static ?string $slug = 'reports/stock-report';
 
     protected static ?string $navigationLabel = 'Laporan Stok';
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function form(Form $form): Form
     {

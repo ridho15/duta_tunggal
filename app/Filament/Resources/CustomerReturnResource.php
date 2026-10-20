@@ -30,25 +30,27 @@ use Throwable;
 
 class CustomerReturnResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = CustomerReturn::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-uturn-left';
 
-    protected static ?string $navigationGroup = 'Retur Pelanggan';
+    protected static ?string $navigationGroup = 'PENJUALAN';
 
-    protected static ?string $navigationLabel = 'Retur Pelanggan';
+    protected static ?string $navigationLabel = 'Retur Penjualan';
 
-    protected static ?string $modelLabel = 'Retur Pelanggan';
+    protected static ?string $modelLabel = 'Retur Penjualan';
 
-    protected static ?string $pluralModelLabel = 'Retur Pelanggan';
+    protected static ?string $pluralModelLabel = 'Retur Penjualan';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 7;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     // ------------------------------------------------------------------

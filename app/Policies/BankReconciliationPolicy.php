@@ -9,11 +9,17 @@ class BankReconciliationPolicy
 {
     private function canFinance(User $user): bool
     {
-        return $user->hasRole(['Finance Manager', 'Accounting', 'Super Admin']);
+        return $user->hasRole(['Finance Manager', 'Accounting', 'Super Admin', 'Owner', 'Admin']);
     }
 
-    public function viewAny(User $user): bool { return $this->canFinance($user); }
-    public function view(User $user, BankReconciliation $model): bool { return $this->canFinance($user); }
+    /** Admin Keuangan boleh MELIHAT Rekonsiliasi Bank (Spesifikasi UI/UX 5.2). */
+    private function canView(User $user): bool
+    {
+        return $this->canFinance($user) || $user->hasRole('Admin Keuangan');
+    }
+
+    public function viewAny(User $user): bool { return $this->canView($user); }
+    public function view(User $user, BankReconciliation $model): bool { return $this->canView($user); }
     public function create(User $user): bool { return $this->canFinance($user); }
     public function update(User $user, BankReconciliation $model): bool { return $this->canFinance($user); }
     public function delete(User $user, BankReconciliation $model): bool { return $user->hasRole(['Super Admin', 'Finance Manager']); }

@@ -29,19 +29,23 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class AssetResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Asset::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
-    protected static ?string $navigationGroup = 'Asset Management';
+    protected static ?string $navigationGroup = 'KEUANGAN';
 
     protected static ?string $navigationLabel = 'Aset Tetap';
 
     protected static ?string $modelLabel = 'Aset Tetap';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?string $pluralModelLabel = 'Aset Tetap';
+
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {

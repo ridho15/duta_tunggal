@@ -56,16 +56,17 @@ use Illuminate\Validation\ValidationException;
 
 class OrderRequestResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static array $currencyCache = [];
 
     protected static ?string $model = OrderRequest::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-archive-box-arrow-down';
+    protected static ?string $navigationIcon = 'heroicon-o-document-plus';
 
-    // Part of the Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian';
+    protected static ?string $navigationGroup = 'PEMBELIAN';
 
     protected static ?string $navigationLabel = 'Permintaan Pembelian';
 
@@ -2373,7 +2374,7 @@ class OrderRequestResource extends Resource
                             <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">
                                 <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>
                                 <div class="leading-tight">
-                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Approved)</span>
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Disetujui)</span>
                                     <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Request disetujui</span>
                                 </div>
                             </div>
@@ -2381,7 +2382,7 @@ class OrderRequestResource extends Resource
                             <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">
                                 <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>
                                 <div class="leading-tight">
-                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Partial)</span>
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Sebagian)</span>
                                     <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO sebagian</span>
                                 </div>
                             </div>
@@ -2389,7 +2390,7 @@ class OrderRequestResource extends Resource
                             <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">
                                 <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>
                                 <div class="leading-tight">
-                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Complete)</span>
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Selesai)</span>
                                     <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">PO lengkap selesai</span>
                                 </div>
                             </div>
@@ -2397,7 +2398,7 @@ class OrderRequestResource extends Resource
                             <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">
                                 <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>
                                 <div class="leading-tight">
-                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Closed/Rejected)</span>
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Ditutup/Ditolak)</span>
                                     <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Ditolak / ditutup</span>
                                 </div>
                             </div>
@@ -2405,7 +2406,7 @@ class OrderRequestResource extends Resource
                             <div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(243, 244, 246, 0.6); border: 1px solid rgba(229, 231, 235, 0.9);">
                                 <div style="width: 16px; height: 16px; border-radius: 4px; background-color: #6b7280; box-shadow: 0 1px 3px rgba(107, 114, 128, 0.4); flex-shrink: 0;"></div>
                                 <div class="leading-tight">
-                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #374151;">Abu (Req Approve)</span>
+                                    <span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #374151;">Abu (Menunggu approve)</span>
                                     <span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Menunggu review</span>
                                 </div>
                             </div>

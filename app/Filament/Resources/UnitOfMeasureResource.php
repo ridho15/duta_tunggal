@@ -23,6 +23,8 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class UnitOfMeasureResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = UnitOfMeasure::class;
 
     protected static bool $shouldRegisterNavigation = false;

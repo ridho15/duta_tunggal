@@ -225,6 +225,6 @@ test('warehouse confirmation view shows material issue items per bahan', functio
 
     Livewire::actingAs($user)
         ->test(ListWarehouseConfirmations::class)
-        ->assertSee('Qty Request')
+        ->assertSee('Qty Diminta')
         ->assertSee('2 baris / qty 110');
 });

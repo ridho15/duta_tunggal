@@ -87,7 +87,7 @@ function phase5Context(bool $allBranches = true): array
 }
 
 /** Invoice penjualan (AR otomatis dibuat oleh observer) untuk customer pada cabang tertentu. */
-function phase5Invoice(array $ctx, Cabang $cabang, float $total = 100000, ?Customer $customer = null, string $number = null): Invoice
+function phase5Invoice(array $ctx, Cabang $cabang, float $total = 100000, ?Customer $customer = null, ?string $number = null): Invoice
 {
     $customer ??= $ctx['customer'];
     $order = SaleOrder::create([

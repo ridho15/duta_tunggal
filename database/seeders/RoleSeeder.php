@@ -67,6 +67,14 @@ class RoleSeeder extends Seeder
             'description' => $roleDescriptions['Kasir'] ?? null,
         ]);
 
+        $adminPengiriman = Role::updateOrCreate([
+            'name' => 'Admin Pengiriman',
+        ], [
+            'name' => 'Admin Pengiriman',
+            'guard_name' => 'web',
+            'description' => $roleDescriptions['Admin Pengiriman'] ?? null,
+        ]);
+
         $inventoryManager = Role::updateOrCreate([
             'name' => 'Inventory Manager',
         ], [
@@ -252,6 +260,7 @@ class RoleSeeder extends Seeder
                 'customer', 'quotation', 'sales order', 'delivery order',
                 'surat jalan', 'delivery schedule', 'customer return',
             ],
+            'Admin Pengiriman' => [], // izin rinci di blok khusus di bawah (tanpa hapus & tanpa konfirmasi DO)
             'Delivery Driver' => [
                 'delivery order', 'delivery order item', 'vehicle', 'surat jalan', 'delivery schedule',
             ],
@@ -347,6 +356,26 @@ class RoleSeeder extends Seeder
             if ($roleName === 'Kasir') {
                 array_push($permsToAssign, 'view any sales order', 'view sales order', 'response sales order');
             }
+
+            // Admin Pengiriman (Spesifikasi UI/UX Bagian 5, kode ADP) — daftar sama dengan migrasi 2026_10_19_090000.
+            if ($roleName === 'Admin Pengiriman') {
+                array_push($permsToAssign,
+                    'view any sales order', 'view sales order',
+                    'view any delivery order', 'view delivery order', 'create delivery order', 'update delivery order', 'request delivery order',
+                    'view any delivery order item', 'view delivery order item', 'create delivery order item', 'update delivery order item',
+                    'view any surat jalan', 'view surat jalan', 'create surat jalan', 'update surat jalan', 'request surat jalan',
+                    'view any invoice', 'view invoice', 'create invoice', 'update invoice',
+                    'view any return product', 'view return product', 'create return product', 'update return product',
+                    'view any return product item', 'view return product item', 'create return product item', 'update return product item',
+                    'view any vehicle', 'view vehicle', 'create vehicle', 'update vehicle',
+                    'view any driver', 'view driver', 'create driver', 'update driver',
+                    'view any delivery schedule', 'view delivery schedule', 'create delivery schedule', 'update delivery schedule', 'update status delivery schedule',
+                    'view any inventory stock', 'view inventory stock',
+                );
+            }
+
+            // Izin LIHAT agar menu sesuai matriks Spesifikasi UI/UX 5.2 (sama dengan migrasi 2026_10_19_100000).
+            array_push($permsToAssign, ...(\App\Support\MenuViewPermissions::permissionsByRole()[$roleName] ?? []));
 
             // Sync unique permissions that exist in DB
             $permsToAssign = array_unique($permsToAssign);

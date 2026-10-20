@@ -9,7 +9,7 @@ class CashBankTransferPolicy
 {
     private function canFinance(User $user): bool
     {
-        return $user->hasRole(['Finance Manager', 'Accounting', 'Super Admin']);
+        return $user->hasRole(['Finance Manager', 'Accounting', 'Super Admin', 'Owner', 'Admin']);
     }
 
     public function viewAny(User $user): bool { return $this->canFinance($user); }

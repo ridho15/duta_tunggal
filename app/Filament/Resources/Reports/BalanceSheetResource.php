@@ -9,6 +9,8 @@ use Filament\Tables\Table;
 
 class BalanceSheetResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';

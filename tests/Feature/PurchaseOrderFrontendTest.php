@@ -277,10 +277,10 @@ test('purchase order table uses latest created sorting and status color legend',
         ->and($resource)->not->toContain("orderByDesc('order_date')")
         ->and($resource)->toContain('width: 100%; min-width: 100%; max-width: none; box-sizing: border-box;')
         ->and($resource)->toContain('Legenda Warna Status Baris Data')
-        ->and($resource)->toContain('Biru (Approved)')
-        ->and($resource)->toContain('Kuning (Partially Received)')
-        ->and($resource)->toContain('Hijau (Completed/Paid)')
-        ->and($resource)->toContain('Merah (Request Close/Closed)');
+        ->and($resource)->toContain('Biru (Disetujui)')
+        ->and($resource)->toContain('Kuning (Diterima sebagian)')
+        ->and($resource)->toContain('Hijau (Selesai/Lunas)')
+        ->and($resource)->toContain('Merah (Minta ditutup/Ditutup)');
 });
 
 test('purchase order form uses collapsed product item repeater and disabled field styling', function () {

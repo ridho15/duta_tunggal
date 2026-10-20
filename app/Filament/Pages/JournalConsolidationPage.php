@@ -22,6 +22,8 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class JournalConsolidationPage extends Page implements HasForms
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithForms;
 
     public static function shouldRegisterNavigation(): bool

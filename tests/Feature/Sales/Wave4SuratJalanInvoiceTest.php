@@ -11,6 +11,7 @@ use App\Models\DeliveryOrderItemWarehouseSource;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\Invoice;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\StockMovement;
@@ -27,7 +28,8 @@ use App\Services\SuratJalanDocumentBuilder;
 use App\Services\DeliveryOrderReturnProcessor;
 use App\Services\ReturnProductService;
 use App\Models\StockAdjustment;
-use App\Services\StockAvailability;
+use App\Filament\Resources\SalesInvoiceResource;
+use App\Filament\Resources\SalesInvoiceResource\Pages\EditSalesInvoice;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
 use App\Services\DeliveryOrderTransitions;
@@ -504,5 +506,53 @@ class Wave4SuratJalanInvoiceTest extends TestCase
             ->assertHasFormErrors(['selected_surat_jalans']);
 
         $this->assertSame(0, \App\Models\Invoice::count());
+    }
+
+    // ---------------------------------------------------------------- B26 invoice non-draft dikunci
+
+    public function test_posted_invoice_fields_are_locked_and_redirects_to_view(): void
+    {
+        $this->newUser();
+        [$so] = $this->approvedSo(2, 'SO-W4-LOCK');
+        $invoice = Invoice::create([
+            'invoice_number' => 'INV-W4-LOCKED',
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $so->id,
+            'customer_id' => $this->customer->id,
+            'cabang_id' => $this->cabang->id,
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(30)->toDateString(),
+            'status' => 'unpaid',
+            'subtotal' => 150000,
+            'total' => 150000,
+        ]);
+
+        $this->assertTrue(SalesInvoiceResource::isInvoiceFieldLocked($invoice));
+
+        Livewire::test(EditSalesInvoice::class, ['record' => $invoice->getKey()])
+            ->assertRedirect(SalesInvoiceResource::getUrl('view', ['record' => $invoice]));
+    }
+
+    public function test_draft_invoice_is_not_locked_and_can_be_edited(): void
+    {
+        $this->newUser();
+        [$so] = $this->approvedSo(2, 'SO-W4-DRF');
+        $invoice = Invoice::create([
+            'invoice_number' => 'INV-W4-DRAFT',
+            'from_model_type' => SaleOrder::class,
+            'from_model_id' => $so->id,
+            'customer_id' => $this->customer->id,
+            'cabang_id' => $this->cabang->id,
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(30)->toDateString(),
+            'status' => 'draft',
+            'subtotal' => 150000,
+            'total' => 150000,
+        ]);
+
+        $this->assertFalse(SalesInvoiceResource::isInvoiceFieldLocked($invoice));
+
+        Livewire::test(EditSalesInvoice::class, ['record' => $invoice->getKey()])
+            ->assertSuccessful();
     }
 }

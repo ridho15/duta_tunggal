@@ -20,10 +20,18 @@ use Illuminate\Support\Facades\Auth;
  */
 class AppSettingsPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $navigationIcon   = 'heroicon-o-cog-6-tooth';
     protected static ?string $navigationLabel  = 'Pengaturan Aplikasi';
     protected static ?string $navigationGroup  = 'Pengaturan';
     protected static ?int    $navigationSort   = 99;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string  $view             = 'filament.pages.app-settings';
 
     public bool $do_approval_required = true;
@@ -40,7 +48,8 @@ class AppSettingsPage extends Page
 
     public static function canAccess(): bool
     {
-        return Auth::user()?->hasRole('Super Admin') === true;
+        return \App\Support\MenuAccess::allows(static::class)
+            && Auth::user()?->hasRole('Super Admin') === true;
     }
 
     public function mount(): void

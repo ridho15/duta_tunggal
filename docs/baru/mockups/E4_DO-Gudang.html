@@ -1,0 +1,102 @@
+<!doctype html><html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>E4. Buat DO – pilih qty per gudang</title></head><body>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#15803d}a:hover{color:#14532d}
+</style>
+
+<div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #111827; background: #f6f7f8; min-height: 1060px; display: flex; flex-wrap: wrap">
+
+<nav aria-label="Menu utama" style="flex: 1 1 220px; max-width: 240px; background: #ffffff; border-right: 1px solid #e5e7eb; box-sizing: border-box; display: flex; flex-direction: column">
+<div style="height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid #eef0f2">
+<span style="font-weight: 800; font-size: 15px; letter-spacing: .5px">DUTA TUNGGAL</span>
+<span style="font-size: 9px; font-weight: 700; color: #15803d; border: 1px solid #86efac; background: #f0fdf4; border-radius: 4px; padding: 1px 5px">ERP</span>
+</div>
+<div style="padding: 6px 8px; display: flex; flex-direction: column; gap: 2px">
+<div style="font-size: 10.5px; letter-spacing: 1px; color: #6b7280; font-weight: 600; padding: 14px 10px 6px">PENGIRIMAN</div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"></path></svg><span style="flex-grow: 1">Beranda</span><span style="font-size: 11px; font-weight: 700; background: #15803d; color: #ffffff; border-radius: 10px; padding: 1px 7px">6</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; background: #ecfdf3; border: 1px solid #bbf7d0; color: #14532d; font-weight: 600; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"></path><circle cx="7" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>Perintah Kirim (DO)</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6M8 13h8M8 17h5"></path></svg>Surat Jalan</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>Invoice Penjualan</a>
+<div style="font-size: 10.5px; letter-spacing: 1px; color: #6b7280; font-weight: 600; padding: 14px 10px 6px">LAINNYA</div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="M3 8l9 5 9-5M12 13v8"></path></svg>Cek Stok</a>
+</div>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="height: 50px; background: #ffffff; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; font-size: 14px">
+<div><a href="SO-Detail.dc.html" style="color: #6b7280; text-decoration: none">SO-00007</a><span style="color: #d1d5db; padding: 0 8px">/</span><b>Buat Perintah Kirim</b></div>
+<div style="display: flex; align-items: center; gap: 10px; color: #374151">Admin Pengiriman · DUTA KENARI <span style="width: 30px; height: 30px; border-radius: 15px; background: #111827; color: #ffffff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center">AP</span></div>
+</header>
+
+<main style="padding: 26px 28px 40px; box-sizing: border-box; width: 100%; max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px">
+<div style="padding-bottom: 20px; border-bottom: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 6px">
+<span style="align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #15803d; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 4px 9px">DARI SO-00007 · DAYA TEKNIK MEDIKA</span>
+<h1 style="margin: 0; font-size: 28px; font-weight: 800">Buat Perintah Kirim</h1>
+<div style="font-size: 14px; color: #6b7280">Barang diambil otomatis dari SO. Isi qty di gudang yang dipakai.</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+<div style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-labelledby="p1" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eef0f2">
+<span style="width: 34px; height: 34px; border-radius: 9px; background: #ecfdf3; color: #15803d; display: inline-flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="M3 8l9 5 9-5M12 13v8"></path></svg></span>
+<div style="flex-grow: 1">
+<h2 id="p1" style="margin: 0; font-size: 16px; font-weight: 700">COPPER ELBO 1/2''</h2>
+<div style="font-size: 12px; color: #6b7280">ETBG000013 · hanya gudang yang punya stok</div>
+</div>
+<span style="font-size: 12px; font-weight: 600; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 12px; padding: 3px 10px">Sisa SO 6 pcs</span>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #6b7280; font-size: 12px">
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600">Gudang</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; text-align: right">Stok bebas</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; width: 150px">Qty dikirim</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding: 10px 6px; border-bottom: 1px solid #f3f4f6; font-weight: 600">KENARI 11 LT 4</td>
+<td style="padding: 10px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">4</td>
+<td style="padding: 10px 6px; border-bottom: 1px solid #f3f4f6"><input type="text" aria-label="Qty dari KENARI 11 LT 4" value="4" style="font-family: inherit; font-size: 14px; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 10px; width: 100%; box-sizing: border-box"></td>
+</tr>
+<tr>
+<td style="padding: 10px 6px; border-bottom: 1px solid #f3f4f6; font-weight: 600">DUTA-K01.2</td>
+<td style="padding: 10px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">2</td>
+<td style="padding: 10px 6px; border-bottom: 1px solid #f3f4f6"><input type="text" aria-label="Qty dari DUTA-K01.2" value="2" style="font-family: inherit; font-size: 14px; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 10px; width: 100%; box-sizing: border-box"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div style="align-self: flex-end; font-size: 13px; font-weight: 700; color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 4px 10px">Terisi 6 dari 6 pcs ✓</div>
+</section>
+
+<section aria-label="Barang sudah lengkap" style="background: #ffffff; border: 1px dashed #d1d5db; border-radius: 16px; padding: 16px 22px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-size: 14px; color: #6b7280">
+<span><b style="color: #111827">COPPER ELBO 5/8''</b> · ETBG000016</span>
+<span>Sudah dibuat DO semua (5 dari 5 pcs)</span>
+</section>
+</div>
+
+<aside aria-labelledby="hasil" style="flex: 1 1 280px; min-width: 0; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 id="hasil" style="margin: 0 0 4px; font-size: 16px; font-weight: 700">Yang akan dibuat</h2>
+<div style="border: 1px solid #eef0f2; border-radius: 10px; padding: 11px 13px">
+<div style="font-weight: 700; font-size: 14px">DO-0007-03 · KENARI 11 LT 4</div>
+<div style="font-size: 12px; color: #6b7280">COPPER ELBO 1/2'' · 4 pcs</div>
+</div>
+<div style="border: 1px solid #eef0f2; border-radius: 10px; padding: 11px 13px">
+<div style="font-weight: 700; font-size: 14px">DO-0007-04 · DUTA-K01.2</div>
+<div style="font-size: 12px; color: #6b7280">COPPER ELBO 1/2'' · 2 pcs</div>
+</div>
+<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 11px 13px; font-size: 13px; color: #14532d">DO otomatis dipisah per gudang. Stok langsung dikunci saat DO dibuat.</div>
+<button type="button" style="font-family: inherit; font-size: 15px; font-weight: 700; padding: 13px; border-radius: 10px; border: none; background: #15803d; color: #ffffff; min-height: 48px; margin-top: 4px">Buat 2 DO</button>
+<a href="SO-Detail.dc.html" style="text-align: center; font-size: 14px; padding: 8px; color: #4b5563">Batal, kembali ke SO</a>
+</aside>
+</div>
+</main>
+</div>
+</div>
+</body></html>

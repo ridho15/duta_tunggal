@@ -24,21 +24,23 @@ use Filament\Tables\Actions\ActionGroup;
 
 class JournalEntryResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = JournalEntry::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    // Show Journal Entries in sidebar and expose the Profit & Loss page under it
-    protected static ?string $navigationLabel = 'Journal Entry';
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationGroup = 'KEUANGAN';
 
-    protected static ?string $modelLabel = 'Journal Entry';
+    protected static ?string $navigationLabel = 'Jurnal';
 
-    protected static ?string $pluralModelLabel = 'Journal Entries';
+    protected static ?string $modelLabel = 'Jurnal';
 
-    protected static ?string $navigationGroup = 'Akuntansi Keuangan';
+    protected static ?string $pluralModelLabel = 'Jurnal';
 
-    protected static ?int $navigationSort = 1;
+    protected static bool $shouldRegisterNavigation = true;
+
+    protected static ?int $navigationSort = 4;
 
     public static function getEloquentQuery(): Builder
     {

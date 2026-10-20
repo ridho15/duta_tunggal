@@ -830,6 +830,7 @@ class HelperController extends Controller
             'Sales Manager'    => 'Mengawasi tim penjualan dan memiliki akses ke data sales order, quotation, dan invoice.',
             'Sales'            => 'Staf penjualan yang membuat dan melihat sales order serta quotation pelanggan.',
             'Kasir'            => 'Bertanggung jawab mencatat penerimaan pembayaran pelanggan dan membuat invoice.',
+            'Admin Pengiriman' => 'Admin pengiriman: membuat DO dari SO, Surat Jalan, invoice, serta mengelola kendaraan & driver.',
             'Inventory Manager'=> 'Mengelola persediaan, gudang, transfer stok, dan konfigurasi produk.',
             'Admin Inventory'  => 'Role pendukung di departemen inventaris dengan akses terbatas tetapi luas ke modul gudang.',
             'Checker'          => 'Memeriksa konfirmasi gudang, kontrol kualitas, dan stok.',

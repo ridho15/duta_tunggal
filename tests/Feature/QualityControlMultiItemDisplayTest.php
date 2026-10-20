@@ -195,7 +195,7 @@ class QualityControlMultiItemDisplayTest extends TestCase
             ->get('/admin/quality-control-purchases/' . $single->id)
             ->assertOk()
             ->assertSee('PO-SINGLE-003')
-            ->assertSee('Unit Price');
+            ->assertSee('Harga Satuan');
     }
 
     public function test_resolver_and_ordered_quantity_cover_all_qc_shapes(): void

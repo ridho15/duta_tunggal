@@ -18,56 +18,40 @@ use App\Filament\Resources\Reports\HppResource;
 use App\Filament\Resources\Reports\ProfitAndLossResource;
 use App\Filament\Resources\Reports\StockMutationReportResource;
 
-function staticPropertyValue(string $class, string $property): mixed
-{
-    $reflection = new ReflectionClass($class);
-    $prop = $reflection->getProperty($property);
-    $prop->setAccessible(true);
+if (! function_exists('staticPropertyValue')) {
+    function staticPropertyValue(string $class, string $property): mixed
+    {
+        $reflection = new ReflectionClass($class);
+        $prop = $reflection->getProperty($property);
+        $prop->setAccessible(true);
 
-    return $prop->getValue();
+        return $prop->getValue();
+    }
 }
 
-test('finance report hub page is configured as the parent menu', function () {
-    expect(staticPropertyValue(FinanceReportHubPage::class, 'navigationGroup'))->toBe('Laporan Keuangan')
-        ->and(staticPropertyValue(FinanceReportHubPage::class, 'navigationLabel'))->toBe('Laporan Keuangan')
-        ->and(FinanceReportHubPage::getUrl())->toContain('/admin/finance-reports');
+test('finance report hub page is hidden from navigation in Tahap 1', function () {
+    expect(FinanceReportHubPage::shouldRegisterNavigation())->toBeFalse();
 });
 
-test('finance report navigation items are nested under the finance hub', function () {
-    $children = [
-        BukuBesarPage::class,
-        TrialBalancePage::class,
-        FinancialStatementPage::class,
-        DrillDownFinancialReportPage::class,
-        ProfitLossMultiDivisionPage::class,
-        CostOfGoodsManufacturingPage::class,
-        AlkGraficPage::class,
-        JournalConsolidationPage::class,
-        BalanceSheetResource::class,
-        ProfitAndLossResource::class,
-        CashFlowResource::class,
-        HppResource::class,
-        AgeingReportResource::class,
-        StockMutationReportResource::class,
-    ];
-
-    foreach ($children as $child) {
-        expect(staticPropertyValue($child, 'navigationParentItem'))->toBe('Laporan Keuangan');
-    }
+test('financial statement page is registered under LAPORAN group', function () {
+    expect(FinancialStatementPage::shouldRegisterNavigation())->toBeTrue()
+        ->and(staticPropertyValue(FinancialStatementPage::class, 'navigationGroup'))->toBe('LAPORAN')
+        ->and(staticPropertyValue(FinancialStatementPage::class, 'navigationLabel'))->toBe('Laporan Keuangan')
+        ->and(staticPropertyValue(FinancialStatementPage::class, 'navigationSort'))->toBe(5)
+        ->and(staticPropertyValue(FinancialStatementPage::class, 'navigationIcon'))->toBe('heroicon-o-document-chart-bar');
 });
 
-test('detailed finance reports are hidden from sidebar and only exposed through the finance hub', function () {
+test('detailed finance sub-reports are hidden from sidebar navigation', function () {
     foreach ([
         BukuBesarPage::class,
         TrialBalancePage::class,
-        FinancialStatementPage::class,
         DrillDownFinancialReportPage::class,
         ProfitLossMultiDivisionPage::class,
         CostOfGoodsManufacturingPage::class,
         AlkGraficPage::class,
         JournalConsolidationPage::class,
     ] as $pageClass) {
-        expect($pageClass::shouldRegisterNavigation())->toBeFalse();
+        expect($pageClass::shouldRegisterNavigation())->toBeFalse("Expected {$pageClass} to be hidden from navigation");
     }
 
     foreach ([
@@ -78,7 +62,8 @@ test('detailed finance reports are hidden from sidebar and only exposed through 
         AgeingReportResource::class,
         StockMutationReportResource::class,
     ] as $resourceClass) {
-        expect(staticPropertyValue($resourceClass, 'shouldRegisterNavigation'))->toBeFalse();
+        expect(staticPropertyValue($resourceClass, 'shouldRegisterNavigation'))
+            ->toBeFalse("Expected {$resourceClass} to be hidden from navigation");
     }
 });
 

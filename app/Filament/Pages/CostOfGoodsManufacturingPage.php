@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
 
 class CostOfGoodsManufacturingPage extends Page implements HasForms
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithForms;
 
     public static function shouldRegisterNavigation(): bool

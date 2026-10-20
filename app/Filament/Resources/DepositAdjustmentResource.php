@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Auth;
 
 class DepositAdjustmentResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Deposit::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
@@ -52,7 +54,7 @@ class DepositAdjustmentResource extends Resource
     // Only accessible by Finance role
     public static function canAccess(): bool
     {
-        return Auth::check() && (
+        return Auth::check() && \App\Support\MenuAccess::allows(static::class) && (
             Auth::user()->hasRole('Super Admin') || 
             Auth::user()->hasRole('Finance') ||
             Auth::user()->hasRole('Administrator')
@@ -116,10 +118,10 @@ class DepositAdjustmentResource extends Resource
                             ]),
                             
                         Select::make('coa_id')
-                            ->label('Chart Of Account')
+                            ->label('Chart Of Account (Kas/Bank)')
                             ->required()
                             ->searchable(['code', 'name'])
-                            ->relationship('coa', 'code')
+                            ->relationship('coa', 'code', fn (\Illuminate\Database\Eloquent\Builder $query) => $query->cashBank())
                             ->getOptionLabelFromRecordUsing(function (ChartOfAccount $chartOfAccount) {
                                 return "({$chartOfAccount->code}) {$chartOfAccount->name}";
                             }),

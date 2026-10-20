@@ -12,6 +12,8 @@ use Filament\Tables\Columns\TextColumn;
 
 class CashBankAccountResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = CashBankAccount::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';

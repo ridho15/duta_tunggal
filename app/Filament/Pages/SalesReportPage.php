@@ -29,21 +29,23 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class SalesReportPage extends Page implements HasTable
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithTable;
 
     protected static string $view = 'filament.pages.sales-report-page';
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-chart-bar';
+    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationGroup = 'Reports';
+    protected static ?string $navigationGroup = 'LAPORAN';
 
-    protected static ?string $navigationLabel = 'Laporan Penjualan';
+    protected static ?string $navigationLabel = 'Penjualan';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     public ?string $mode = SalesReportService::DEFAULT_MODE;

@@ -81,10 +81,10 @@ class GroupedJournalEntriesAccessTest extends TestCase
         
         Livewire::test(\App\Filament\Resources\JournalEntryResource\Pages\GroupedJournalEntries::class)
             ->assertOk()
-            ->assertSee('Start Date')
-            ->assertSee('End Date')
-            ->assertSee('Journal Type')
-            ->assertSee('Branch');
+            ->assertSee('Tanggal Mulai')
+            ->assertSee('Tanggal Akhir')
+            ->assertSee('Jenis Jurnal')
+            ->assertSee('Cabang');
     }
 
     #[Test]

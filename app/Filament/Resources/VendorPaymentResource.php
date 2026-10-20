@@ -39,21 +39,23 @@ use Filament\Tables\Actions\ActionGroup;
 
 class VendorPaymentResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = VendorPayment::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    protected static ?string $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
+    protected static ?string $navigationGroup = 'PEMBELIAN';
 
-    protected static ?string $navigationLabel = 'Pembayaran Vendor';
+    protected static ?string $navigationLabel = 'Bayar Supplier';
 
-    protected static ?string $modelLabel = 'Pembayaran Vendor';
+    protected static ?string $modelLabel = 'Bayar Supplier';
 
-    protected static ?string $pluralModelLabel = 'Pembayaran Vendor';
+    protected static ?string $pluralModelLabel = 'Bayar Supplier';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 4;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     public static function form(Form $form): Form
     {

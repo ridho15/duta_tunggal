@@ -25,6 +25,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class IncomeStatementPage extends Page implements HasForms, HasTable
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithForms, InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
@@ -36,6 +38,11 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
     protected static ?string $navigationGroup = 'Laporan Keuangan';
 
     protected static ?int $navigationSort = 2;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public ?string $start_date = null;
     public ?string $end_date = null;
@@ -388,10 +395,6 @@ class IncomeStatementPage extends Page implements HasForms, HasTable
         ]);
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
 
     public function getTitle(): string
     {

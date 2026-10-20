@@ -40,16 +40,18 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class SalesInvoiceResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Invoice::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
     protected static ?string $navigationLabel = 'Invoice Penjualan';
     protected static ?string $modelLabel = 'Invoice Penjualan';
     protected static ?string $pluralModelLabel = 'Invoice Penjualan';
-    protected static ?string $navigationGroup = 'Keuangan Penjualan';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationGroup = 'PENJUALAN';
+    protected static ?int $navigationSort = 5;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static function readonlyInputAttributes(): array
     {

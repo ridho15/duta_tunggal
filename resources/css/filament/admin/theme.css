@@ -1,0 +1,265 @@
+@import '/vendor/filament/filament/resources/css/theme.css';
+
+@config 'tailwind.config.js';
+
+/*
+ * Tema ERP Duta Tunggal — Spesifikasi UI/UX v1.1 Bagian 2 (design token) & 3.2 (komponen).
+ * Gaya HRIS HR Group: putih bersih, aksen hijau, kartu rounded, garis tipis, tanpa bayangan.
+ * Warna utama (primary = Green) diatur di AdminPanelProvider::colors().
+ */
+
+:root {
+    --dt-bg-page: #F6F7F8;
+    --dt-bg-surface: #FFFFFF;
+    --dt-border: #E5E7EB;
+    --dt-border-subtle: #EEF0F2;
+    --dt-border-dashed: #D1D5DB;
+    --dt-text-primary: #111827;
+    --dt-text-body: #374151;
+    --dt-text-muted: #6B7280;
+    --dt-text-disabled: #9CA3AF;
+    --dt-primary-600: #15803D;
+    --dt-primary-900: #14532D;
+    --dt-primary-50: #F0FDF4;
+    --dt-primary-200: #BBF7D0;
+    --dt-radius-card: 16px;
+    --dt-radius-control: 10px;
+}
+
+/* ── Kerangka halaman ─────────────────────────────────────── */
+
+body.fi-body {
+    background: var(--dt-bg-page);
+    color: var(--dt-text-primary);
+}
+
+.fi-main {
+    max-width: 1080px;
+    padding-top: 26px;
+    padding-bottom: 26px;
+}
+
+@media (min-width: 768px) {
+    .fi-main {
+        padding-left: 28px;
+        padding-right: 28px;
+    }
+}
+
+/* ── Sidebar (240px, selalu terbuka, ikon + teks) ─────────── */
+
+.fi-sidebar {
+    background: var(--dt-bg-surface);
+    border-right: 1px solid var(--dt-border);
+    box-shadow: none;
+}
+
+.fi-sidebar-header {
+    height: 50px;
+    border-bottom: 1px solid var(--dt-border);
+    box-shadow: none;
+    background: var(--dt-bg-surface);
+}
+
+.fi-sidebar-nav {
+    padding: 8px 10px 24px;
+    gap: 2px;
+}
+
+.fi-sidebar-nav-groups {
+    gap: 2px;
+}
+
+/* Label grup: kapital 10.5px, muted, padding 14px 10px 6px */
+.fi-sidebar-group-button {
+    padding: 14px 10px 6px;
+    background: transparent;
+}
+
+.fi-sidebar-group-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--dt-text-muted);
+}
+
+.fi-sidebar-group-items {
+    gap: 2px;
+}
+
+/* Item menu: ikon 18px + label 14/500, padding 9px 10px, radius 10px */
+.fi-sidebar-item-button {
+    padding: 9px 10px;
+    border-radius: var(--dt-radius-control);
+    border: 1px solid transparent;
+    gap: 10px;
+}
+
+.fi-sidebar-item-button:hover {
+    background: #F9FAFB;
+}
+
+.fi-sidebar-item-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--dt-text-muted);
+}
+
+.fi-sidebar-item-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dt-text-body);
+}
+
+/* Item aktif: bg primary.50, border primary.200, teks primary.900 600 */
+.fi-sidebar-item-active .fi-sidebar-item-button,
+.fi-sidebar-item.fi-active .fi-sidebar-item-button {
+    background: var(--dt-primary-50);
+    border-color: var(--dt-primary-200);
+}
+
+.fi-sidebar-item-active .fi-sidebar-item-label,
+.fi-sidebar-item.fi-active .fi-sidebar-item-label {
+    color: var(--dt-primary-900);
+    font-weight: 600;
+}
+
+.fi-sidebar-item-active .fi-sidebar-item-icon,
+.fi-sidebar-item.fi-active .fi-sidebar-item-icon {
+    color: var(--dt-primary-600);
+}
+
+/* Garis vertikal bawaan Filament untuk item dalam grup tidak dipakai */
+.fi-sidebar-item-grouped-border {
+    display: none;
+}
+
+/* Badge jumlah tugas: bg primary.600, teks putih 11px */
+.fi-sidebar-item .fi-badge {
+    background: var(--dt-primary-600);
+    color: #fff;
+    font-size: 11px;
+    border-radius: 10px;
+    --tw-ring-color: transparent;
+}
+
+/* ── Header 50px ──────────────────────────────────────────── */
+
+.fi-topbar > nav {
+    height: 50px;
+    background: var(--dt-bg-surface);
+    border-bottom: 1px solid var(--dt-border);
+    box-shadow: none;
+    --tw-ring-color: transparent;
+}
+
+/* ── Judul halaman 28/800, deskripsi muted ────────────────── */
+
+.fi-header-heading {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--dt-text-primary);
+}
+
+.fi-header-subheading {
+    font-size: 14px;
+    color: var(--dt-text-muted);
+}
+
+/* ── Kartu: putih, border, radius 16, tanpa bayangan ─────── */
+
+.fi-section,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-fo-tabs,
+.fi-in-tabs {
+    border-radius: var(--dt-radius-card);
+    box-shadow: none;
+    --tw-ring-color: var(--dt-border);
+}
+
+.fi-section-header {
+    border-bottom-color: var(--dt-border-subtle);
+}
+
+.fi-section-header-heading {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.fi-section-header-description {
+    font-size: 12px;
+    color: var(--dt-text-muted);
+}
+
+/* ── Tombol: radius 10, min-h 44, 14/600 ──────────────────── */
+
+.fi-btn {
+    border-radius: var(--dt-radius-control);
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.fi-btn.fi-btn-size-xs,
+.fi-btn.fi-btn-size-sm,
+.fi-ta .fi-btn,
+.fi-ac-btn-group .fi-btn {
+    min-height: 0; /* tombol kecil di tabel/aksi baris tetap ringkas */
+}
+
+/* Tombol nonaktif: border dashed, bg #F9FAFB, teks disabled */
+.fi-btn[disabled],
+.fi-btn.fi-disabled {
+    background: #F9FAFB;
+    color: var(--dt-text-disabled);
+    border: 1px dashed var(--dt-border-dashed);
+    opacity: 1;
+}
+
+/* ── Input: radius 10, border #D1D5DB, label 13/600 ───────── */
+
+.fi-input-wrp {
+    border-radius: var(--dt-radius-control);
+    --tw-ring-color: var(--dt-border-dashed);
+    box-shadow: none;
+}
+
+.fi-fo-field-wrp-label span {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dt-text-body);
+}
+
+.fi-fo-field-wrp-helper-text {
+    font-size: 12px;
+    color: var(--dt-text-muted);
+}
+
+/* ── Pill / badge status: radius 6 ────────────────────────── */
+
+.fi-badge {
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+/* ── Tabel ─────────────────────────────────────────────────── */
+
+.fi-ta-header-cell-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dt-text-muted);
+}
+
+/* ── Modal & notifikasi tanpa bayangan berat ──────────────── */
+
+.fi-modal-window {
+    border-radius: var(--dt-radius-card);
+}
+
+.fi-no-notification {
+    border-radius: 12px;
+}

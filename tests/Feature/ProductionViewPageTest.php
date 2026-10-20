@@ -214,7 +214,7 @@ test('production list shows a view action and the view page shows material requi
         ->assertSee('Jurnal Produksi In Progress')
         ->assertSee('Baris Jurnal')
         ->assertSee('Total Debit')
-        ->assertSee('Total Credit')
+        ->assertSee('Total Kredit')
         ->assertSee('Selisih')
         ->assertSee('Total bahan 2 | Available 0 | Partial 0 | Unavailable 2 | Issued 0 | Ready No')
         ->assertSee('Material')

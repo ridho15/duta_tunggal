@@ -14,8 +14,8 @@ class AccountReceivablePayableChart extends ChartWidget
 
     protected function getData(): array
     {
-        $startDate = Carbon::parse($this->filters['tanggalMulai'])->startOfDay();
-        $endDate = Carbon::parse($this->filters['tanggalAkhir'])->endOfDay();
+        $startDate = Carbon::parse($this->filters['tanggalMulai'] ?? Carbon::now()->subDays(7))->startOfDay();
+        $endDate = Carbon::parse($this->filters['tanggalAkhir'] ?? Carbon::now())->endOfDay();
         // Query AR per tanggal
         $arQuery = DB::table('account_receivables')
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('SUM(total) as total_ar'))

@@ -55,3 +55,12 @@ Schedule::command('sales:top-up-reservations')
 //     ->name('inventory-consistency-audit')
 //     ->withoutOverlapping()
 //     ->runInBackground();
+
+// Tahap 3 — mode latihan: reset database latihan setiap malam (hanya bila APP_TRAINING_MODE=true;
+// perintahnya sendiri menolak berjalan bila nama database tidak mengandung "latihan").
+if (config('training.enabled') && config('training.reset_daily')) {
+    Schedule::command('latihan:reset --force')
+        ->dailyAt((string) config('training.reset_at', '02:00'))
+        ->name('training-reset')
+        ->withoutOverlapping();
+}

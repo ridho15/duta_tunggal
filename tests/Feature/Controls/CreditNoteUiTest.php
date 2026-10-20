@@ -66,7 +66,7 @@ it('flag hidup: opsi keputusan menyertakan "Refund / Nota Kredit"; Invoice draf/
 
 it('pengguna tanpa izin membuat Nota Kredit tidak melihat aksinya', function () {
     $ctx = stkContext();
-    $user = uiUser($ctx, 'Sales', ['view any invoice', 'view invoice']);
+    $user = uiUser($ctx, 'Kasir', ['view any invoice', 'view invoice']);
     [$invoice] = ctlCreditInvoice($ctx);
 
     expect(\App\Filament\Support\CreditNoteActions::canCreateFor($invoice))->toBeFalse();
@@ -151,7 +151,7 @@ it('draf dapat dihapus lewat aksi; policy: yang terbit final (tanpa update/delet
     expect(CreditNote::find($draft->id))->toBeNull();
 
     $issued = $service->issue($service->draft($invoice, CreditNote::TYPE_RETURN, [$item->id => 2], 'Draf yang akan diterbitkan', actor: $user), uiUser($ctx));
-    $viewer = uiUser($ctx, 'Sales', ['view any credit note', 'view credit note', 'delete credit note']);
+    $viewer = uiUser($ctx, 'Accounting', ['view any credit note', 'view credit note', 'delete credit note']);
 
     expect($user->can('update', $issued))->toBeFalse()->and($user->can('delete', $issued))->toBeFalse()
         ->and($user->can('view', $issued))->toBeTrue()
@@ -167,7 +167,7 @@ it('"Terbitkan" tersembunyi bagi pengguna tanpa izin approve; No. Nota Retur Paj
     [$invoice, $item] = ctlCreditInvoice($ctx);
     $service = app(CreditNoteService::class);
     $draft = $service->draft($invoice, CreditNote::TYPE_RETURN, [$item->id => 2], 'Draf untuk uji visibilitas terbitkan', actor: $creator);
-    $noApprove = uiUser($ctx, 'Sales', ['view any credit note', 'view credit note', 'create credit note', 'delete credit note']);
+    $noApprove = uiUser($ctx, 'Accounting', ['view any credit note', 'view credit note', 'create credit note', 'delete credit note']);
 
     Livewire::actingAs($noApprove)->test(ViewCreditNote::class, ['record' => $draft->id])->assertActionHidden('issue');
     expect(fn () => $service->issue($draft, $noApprove))->toThrow(\Illuminate\Validation\ValidationException::class, 'hak akses');

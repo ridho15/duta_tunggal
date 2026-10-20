@@ -115,7 +115,7 @@ class UATUIUXAuditVerificationTest extends TestCase
     public function test_sale_order_table_legend_corrected()
     {
         $soResourceCode = file_get_contents(app_path('Filament/Resources/SaleOrderResource.php'));
-        $this->assertStringContainsString('Kuning (Partially Delivered)', $soResourceCode);
+        $this->assertStringContainsString('Kuning (Dikirim sebagian)', $soResourceCode);
         $this->assertStringContainsString('SO terkirim sebagian', $soResourceCode);
     }
 

@@ -39,15 +39,17 @@ use Illuminate\Support\Facades\Auth;
 
 class BillOfMaterialResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = BillOfMaterial::class;
 
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
-    protected static ?string $navigationGroup = 'Manufaktur';
+    protected static ?string $navigationGroup = 'PRODUKSI';
 
-    protected static ?string $navigationLabel = 'Daftar Material';
+    protected static ?string $navigationLabel = 'Bill of Material';
 
     protected static ?string $modelLabel = 'Daftar Material';
 

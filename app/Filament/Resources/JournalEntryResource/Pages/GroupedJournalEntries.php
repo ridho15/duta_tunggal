@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Log;
 
 class GroupedJournalEntries extends Page implements HasForms
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithForms;
 
     protected static string $resource = JournalEntryResource::class;

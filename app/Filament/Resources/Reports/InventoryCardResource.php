@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class InventoryCardResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = StockMovement::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';

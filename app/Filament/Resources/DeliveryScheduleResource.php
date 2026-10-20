@@ -46,21 +46,23 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class DeliveryScheduleResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = DeliverySchedule::class;
 
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $navigationGroup = 'Pengiriman';
+    protected static ?string $navigationGroup = 'PENJUALAN';
 
-    protected static ?string $navigationLabel = 'Penjadwalan Pengiriman';
+    protected static ?string $navigationLabel = 'Jadwal Kirim';
 
     protected static ?string $modelLabel = 'Jadwal Pengiriman';
 
     protected static ?string $pluralModelLabel = 'Jadwal Pengiriman';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 8;
 
     // ── Permission checks ──────────────────────────────────────────────
 
@@ -540,7 +542,7 @@ class DeliveryScheduleResource extends Resource
                 '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
                 '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Pending)</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Menunggu)</span>' .
                 '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Menunggu keberangkatan</span>' .
                 '</div>' .
                 '</div>' .
@@ -548,7 +550,7 @@ class DeliveryScheduleResource extends Resource
                 '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
                 '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (On The Way)</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Dalam perjalanan)</span>' .
                 '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Sedang dalam perjalanan</span>' .
                 '</div>' .
                 '</div>' .
@@ -556,7 +558,7 @@ class DeliveryScheduleResource extends Resource
                 '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
                 '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Delivered)</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Terkirim)</span>' .
                 '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai / terkirim</span>' .
                 '</div>' .
                 '</div>' .
@@ -564,7 +566,7 @@ class DeliveryScheduleResource extends Resource
                 '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
                 '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Failed)</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Gagal)</span>' .
                 '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Pengiriman gagal</span>' .
                 '</div>' .
                 '</div>' .
@@ -572,7 +574,7 @@ class DeliveryScheduleResource extends Resource
                 '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(243, 244, 246, 0.6); border: 1px solid rgba(229, 231, 235, 0.9);">' .
                 '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #6b7280; box-shadow: 0 1px 3px rgba(107, 114, 128, 0.4); flex-shrink: 0;"></div>' .
                 '<div class="leading-tight">' .
-                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #374151;">Abu (Cancelled)</span>' .
+                '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #374151;">Abu (Dibatalkan)</span>' .
                 '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Jadwal dibatalkan</span>' .
                 '</div>' .
                 '</div>' .

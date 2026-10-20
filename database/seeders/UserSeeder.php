@@ -92,6 +92,7 @@ class UserSeeder extends Seeder
             ['email' => 'sales_manager@example.com', 'username' => 'sales_manager', 'name' => 'Sales Manager', 'role' => 'Sales Manager'],
             ['email' => 'sales@example.com', 'username' => 'sales', 'name' => 'Sales', 'role' => 'Sales'],
             ['email' => 'kasir@example.com', 'username' => 'kasir', 'name' => 'Kasir', 'role' => 'Kasir'],
+            ['email' => 'admin_pengiriman@example.com', 'username' => 'admin_pengiriman', 'name' => 'Admin Pengiriman', 'role' => 'Admin Pengiriman'],
             ['email' => 'customer_service@example.com', 'username' => 'customer_service', 'name' => 'Customer Service', 'role' => 'Customer Service'],
             ['email' => 'delivery_driver@example.com', 'username' => 'delivery_driver', 'name' => 'Delivery Driver', 'role' => 'Delivery Driver'],
             ['email' => 'auditor@example.com', 'username' => 'auditor', 'name' => 'Auditor', 'role' => 'Auditor'],

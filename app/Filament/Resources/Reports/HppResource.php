@@ -10,6 +10,8 @@ use Filament\Tables\Table;
 
 class HppResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $model = JournalEntry::class;

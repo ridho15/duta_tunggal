@@ -1135,31 +1135,56 @@ class QualityControlService
             }
         }
 
-        // If any items are to be returned to supplier, create draft PurchaseReturn document
+        // If any items are to be returned to supplier, create or update draft PurchaseReturn document
         if (!empty($returnSupplierItems)) {
-            $purchaseReturn = \App\Models\PurchaseReturn::create([
-                'quality_control_id'  => $qualityControl->id,
-                'purchase_receipt_id' => $purchaseReceipt->id,
-                'failed_qc_action'    => \App\Models\PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
-                'nota_retur'          => $purchaseReturnService->generateNotaRetur(),
-                'return_date'         => now(),
-                'created_by'          => Auth::id() ?? 1,
-                'status'              => 'draft',
-                'cabang_id'           => $purchaseOrder->cabang_id,
-                'notes'               => "Retur otomatis dari QC #{$qualityControl->qc_number} untuk penerimaan #{$purchaseReceipt->receipt_number}.",
-            ]);
+            $existingReturn = \App\Models\PurchaseReturn::where('quality_control_id', $qualityControl->id)
+                ->orWhere(function ($q) use ($purchaseReceipt) {
+                    if ($purchaseReceipt && $purchaseReceipt->id) {
+                        $q->where('purchase_receipt_id', $purchaseReceipt->id);
+                    }
+                })
+                ->first();
+
+            if ($existingReturn) {
+                $purchaseReturn = $existingReturn;
+                if (!$purchaseReturn->purchase_receipt_id && $purchaseReceipt) {
+                    $purchaseReturn->update(['purchase_receipt_id' => $purchaseReceipt->id]);
+                }
+            } else {
+                $purchaseReturn = \App\Models\PurchaseReturn::create([
+                    'quality_control_id'  => $qualityControl->id,
+                    'purchase_receipt_id' => $purchaseReceipt->id,
+                    'failed_qc_action'    => \App\Models\PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
+                    'nota_retur'          => $purchaseReturnService->generateNotaRetur(),
+                    'return_date'         => now(),
+                    'created_by'          => Auth::id() ?? 1,
+                    'status'              => 'draft',
+                    'cabang_id'           => $purchaseOrder->cabang_id,
+                    'notes'               => "Retur otomatis dari QC #{$qualityControl->qc_number} untuk penerimaan #{$purchaseReceipt->receipt_number}.",
+                ]);
+            }
 
             foreach ($returnSupplierItems as $retItem) {
                 $qItem = $retItem['qc_item'];
                 $poItem = $qItem->purchaseOrderItem;
-                \App\Models\PurchaseReturnItem::create([
-                    'purchase_return_id'       => $purchaseReturn->id,
-                    'purchase_receipt_item_id' => $retItem['receipt_item']->id,
-                    'product_id'               => $qItem->product_id,
-                    'qty_returned'             => $retItem['qty_rejected'],
-                    'unit_price'               => $poItem?->unit_price ?? 0,
-                    'reason'                   => $qItem->reason_reject ?? 'Rejected in QC: ' . $qualityControl->qc_number,
-                ]);
+
+                $hasItem = \App\Models\PurchaseReturnItem::where('purchase_return_id', $purchaseReturn->id)
+                    ->where(function ($q) use ($retItem, $qItem) {
+                        $q->where('purchase_receipt_item_id', $retItem['receipt_item']->id)
+                          ->orWhere('product_id', $qItem->product_id);
+                    })
+                    ->exists();
+
+                if (!$hasItem) {
+                    \App\Models\PurchaseReturnItem::create([
+                        'purchase_return_id'       => $purchaseReturn->id,
+                        'purchase_receipt_item_id' => $retItem['receipt_item']->id,
+                        'product_id'               => $qItem->product_id,
+                        'qty_returned'             => $retItem['qty_rejected'],
+                        'unit_price'               => $poItem?->unit_price ?? 0,
+                        'reason'                   => $qItem->reason_reject ?? 'Rejected in QC: ' . $qualityControl->qc_number,
+                    ]);
+                }
             }
 
             $qualityControl->update(['purchase_return_processed' => now()]);

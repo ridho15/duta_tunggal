@@ -22,7 +22,7 @@ it('label per domain: konstanta model + tambahan; tidak dikenal → judul (bukan
         ->and(StatusLabels::label('warehouse_confirmation', 'partial_confirmed'))->toBe('Dikonfirmasi Sebagian')
         ->and(StatusLabels::label('other_sale', 'posted'))->toBe('Diposting')
         ->and(StatusLabels::label('deposit', 'active'))->toBe('Aktif')
-        ->and(StatusLabels::label('sale_order', 'request_approve'))->toBe('Menunggu Persetujuan')
+        ->and(StatusLabels::label('sale_order', 'request_approve'))->toBe('Menunggu approve kasir')
         ->and(StatusLabels::label('delivery_order', 'request_stock'))->toBe('Menunggu Konfirmasi Stok')
         ->and(StatusLabels::label('credit_note', 'issued'))->toBe('Terbit')
         ->and(StatusLabels::label('customer_return', 'qc_inspection'))->toBe('Inspeksi QC')

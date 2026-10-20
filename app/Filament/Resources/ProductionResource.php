@@ -33,13 +33,15 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class ProductionResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Production::class;
 
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-pointing-in';
 
-    protected static ?string $navigationGroup = 'Manufaktur';
+    protected static ?string $navigationGroup = 'PRODUKSI';
 
     protected static ?string $navigationLabel = 'Produksi';
 

@@ -33,6 +33,13 @@ class PurchaseHubPage extends Page
 
     protected static ?string $slug = 'purchase-hub';
 
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static function getHubClasses(): array
     {
         return [

@@ -272,8 +272,8 @@
         <tr>
             <td class="label">Tipe Order</td>
             <td>: {{ $purchaseOrder->is_asset ? 'Asset' : 'Non Asset' }}</td>
-            <td></td>
-            <td></td>
+            <td class="label">Rekening Supplier</td>
+            <td>: {{ ($purchaseOrder->supplier && ($purchaseOrder->supplier->nama_bank || $purchaseOrder->supplier->nomor_rekening)) ? trim(($purchaseOrder->supplier->nama_bank ?? '') . ' - ' . ($purchaseOrder->supplier->nomor_rekening ?? '') . ($purchaseOrder->supplier->nama_rekening ? ' (a/n ' . $purchaseOrder->supplier->nama_rekening . ')' : '')) : '-' }}</td>
         </tr>
     </table>
 

@@ -29,16 +29,18 @@ use Illuminate\Support\Facades\Auth;
 
 class PaymentRequestResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = PaymentRequest::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationLabel = 'Permintaan Pembayaran';
-    protected static ?string $modelLabel = 'Permintaan Pembayaran';
-    protected static ?string $pluralModelLabel = 'Permintaan Pembayaran';
-    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationIcon = 'heroicon-o-document-currency-dollar';
+    protected static ?string $navigationLabel = 'Pengajuan Dana';
+    protected static ?string $modelLabel = 'Pengajuan Dana';
+    protected static ?string $pluralModelLabel = 'Pengajuan Dana';
+    protected static ?string $navigationGroup = 'KEUANGAN';
+    protected static ?int $navigationSort = 3;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     public static function form(Form $form): Form
     {

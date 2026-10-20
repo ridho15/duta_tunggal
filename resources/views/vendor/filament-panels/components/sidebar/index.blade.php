@@ -118,7 +118,9 @@
 
         <ul class="fi-sidebar-nav-groups -mx-2 flex flex-col gap-y-7">
             @foreach ($navigation as $group)
-                @if (filled($group->getLabel()) && count($group->getItems()) === 1)
+                {{-- Hanya grup BERANDA (satu menu "Tugas Saya") yang ditampilkan tanpa judul grup.
+                     Grup lain tetap berjudul walau isinya satu menu, agar menu tidak terlihat masuk grup di atasnya. --}}
+                @if (filled($group->getLabel()) && count($group->getItems()) === 1 && $group->getLabel() === 'BERANDA')
                     @php
                         $singleItem = \Illuminate\Support\Arr::first($group->getItems());
                         $itemIcon = $singleItem->getIcon() ?? $group->getIcon();

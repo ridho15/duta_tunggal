@@ -96,7 +96,21 @@ class StockOpname extends Model
 
     protected static function booted()
     {
-        static::addGlobalScope(new CabangScope);
+        // Tabel stock_opnames tidak punya kolom cabang_id (CabangScope bawaan memicu galat SQL untuk user
+        // yang dibatasi cabang). Batasi lewat cabang gudang opname — hasilnya sama dengan maksud CabangScope.
+        static::addGlobalScope('cabang', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            $user = \Illuminate\Support\Facades\Auth::user();
+            if (! $user || ! $user->cabang_id) {
+                return;
+            }
+
+            $manageType = $user->manage_type ?? [];
+            if (is_array($manageType) && in_array('all', $manageType)) {
+                return;
+            }
+
+            $builder->whereHas('warehouse', fn ($q) => $q->where('warehouses.cabang_id', $user->cabang_id));
+        });
 
         // Sync journal entries when relevant data changes
         static::updated(function ($stockOpname) {

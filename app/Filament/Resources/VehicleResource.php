@@ -27,19 +27,23 @@ use Illuminate\Support\Facades\Auth;
 
 class VehicleResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Vehicle::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
 
-    protected static ?string $modelLabel = 'Kendaraan';
+    protected static ?string $navigationLabel = 'Kendaraan & Driver';
 
-    protected static ?string $pluralModelLabel = 'Kendaraan';
+    protected static ?string $modelLabel = 'Kendaraan & Driver';
 
-    protected static ?int $navigationSort = 8;
+    protected static ?string $pluralModelLabel = 'Kendaraan & Driver';
+
+    protected static ?int $navigationSort = 6;
     public static function form(Form $form): Form
     {
         return $form

@@ -35,6 +35,11 @@ class VendorCustomerSummaryPage extends Page
 
     protected static ?int $navigationSort = 4;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public function mount(): void
     {
         // Simple mount method

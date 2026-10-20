@@ -34,6 +34,8 @@ use Filament\Infolists\Components\RepeatableEntry;
 
 class CashBankTransferResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = CashBankTransfer::class;
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
     protected static ?string $navigationGroup = 'Pembayaran Keuangan';

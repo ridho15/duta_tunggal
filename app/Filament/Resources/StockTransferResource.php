@@ -37,17 +37,23 @@ use Illuminate\Validation\ValidationException;
 
 class StockTransferResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = StockTransfer::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrows-up-down';
+    protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
 
-    protected static ?string $modelLabel = 'Transfer Stock';
+    protected static ?string $navigationGroup = 'GUDANG';
 
-    protected static ?string $navigationGroup = 'Gudang';
+    protected static ?string $navigationLabel = 'Pindah Stok';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?string $modelLabel = 'Pindah Stok';
+
+    protected static ?string $pluralModelLabel = 'Pindah Stok';
+
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {

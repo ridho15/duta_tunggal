@@ -32,19 +32,27 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class CustomerResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Customer::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
 
-    // Position Master Data as the 7th group
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Customer';
+
+    protected static ?string $modelLabel = 'Customer';
+
+    protected static ?string $pluralModelLabel = 'Customer';
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -85,17 +93,53 @@ class CustomerResource extends Resource
                             ->unique(ignoreRecord: true),
                         TextInput::make('name')
                             ->required()
+                            ->live(debounce: 500)
                             ->validationMessages([
                                 'required' => 'Nama customer tidak boleh kosong',
                             ])
                             ->label('Nama Customer')
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->helperText(function ($state, $record) {
+                                if (blank($state) || strlen(trim((string) $state)) < 3) {
+                                    return null;
+                                }
+                                $query = Customer::query()
+                                    ->where('name', 'like', '%' . trim((string) $state) . '%');
+                                if ($record?->id) {
+                                    $query->where('id', '!=', $record->id);
+                                }
+                                $matches = $query->limit(3)->pluck('name')->filter()->values();
+                                if ($matches->isNotEmpty()) {
+                                    return new HtmlString(
+                                        '<span class="text-amber-600 font-medium text-xs">⚠️ Perhatian: Ditemukan nama customer serupa: <strong>' . e($matches->join(', ')) . '</strong>. Pastikan tidak membuat data ganda.</span>'
+                                    );
+                                }
+                                return null;
+                            }),
                         TextInput::make('perusahaan')
                             ->label('Perusahaan')
+                            ->live(debounce: 500)
                             ->validationMessages([
                                 'required' => 'Perusahaan tidak boleh kosong',
                             ])
-                            ->required(),
+                            ->required()
+                            ->helperText(function ($state, $record) {
+                                if (blank($state) || strlen(trim((string) $state)) < 3) {
+                                    return null;
+                                }
+                                $query = Customer::query()
+                                    ->where('perusahaan', 'like', '%' . trim((string) $state) . '%');
+                                if ($record?->id) {
+                                    $query->where('id', '!=', $record->id);
+                                }
+                                $matches = $query->limit(3)->pluck('perusahaan')->filter()->values();
+                                if ($matches->isNotEmpty()) {
+                                    return new HtmlString(
+                                        '<span class="text-amber-600 font-medium text-xs">⚠️ Perhatian: Ditemukan perusahaan serupa: <strong>' . e($matches->join(', ')) . '</strong>. Pastikan tidak membuat data ganda.</span>'
+                                    );
+                                }
+                                return null;
+                            }),
                         TextInput::make('nik_npwp')
                             ->label('NIK / NPWP')
                             ->required()

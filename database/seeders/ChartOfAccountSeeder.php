@@ -359,6 +359,11 @@ class ChartOfAccountSeeder extends Seeder
             return isset($createdAccounts[$parentCode]) ? $createdAccounts[$parentCode] : null;
         }
 
+        // Special case: 1121 and 1122 belong directly under 1100 so 1120 (Piutang Dagang) remains a transaction leaf account
+        if ($code === '1121' || $code === '1122') {
+            return $createdAccounts['1100'] ?? null;
+        }
+
         // For 4-digit codes, find parent by changing trailing digits to 0 progressively
         // This ensures proper hierarchy: 1111 -> 1110 -> 1100 -> 1000
         $length = strlen($code);

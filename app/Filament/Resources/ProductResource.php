@@ -48,13 +48,17 @@ use Illuminate\Support\Facades\Auth;
 
 class ProductResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Product::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
+    protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
+
+    protected static ?string $navigationLabel = 'Produk';
 
     protected static ?string $modelLabel = 'Produk';
 

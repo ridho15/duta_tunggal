@@ -42,22 +42,23 @@ use Illuminate\Validation\Rule;
 
 class PurchaseReceiptResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = PurchaseReceipt::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-right-circle';
+    protected static ?string $navigationIcon = 'heroicon-o-inbox-arrow-down';
 
-    // Group label updated to indicate Purchase Order group
-    protected static ?string $navigationGroup = 'Pembelian';
+    protected static ?string $navigationGroup = 'GUDANG';
 
-    protected static ?string $navigationLabel = 'Penerimaan Pembelian';
+    protected static ?string $navigationLabel = 'Terima Barang';
 
-    protected static ?string $modelLabel = 'Penerimaan Pembelian';
+    protected static ?string $modelLabel = 'Terima Barang';
 
-    protected static ?string $pluralModelLabel = 'Penerimaan Pembelian';
+    protected static ?string $pluralModelLabel = 'Terima Barang';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     /**
      * Purchase Receipt hanya dibuat otomatis dari hasil Quality Control.

@@ -179,7 +179,7 @@ test('quality control manufacture view page shows from production information cl
         ->assertSee('PRD-QCM-001 / MO-QCM-001')
         ->assertSee('(FG-QCM-001) Produk QC Manufacture')
         ->assertSee('Passed Quantity')
-        ->assertSee('Rejected Quantity')
+        ->assertSee('Qty Ditolak')
         ->assertSee('Minor defect');
 });
 

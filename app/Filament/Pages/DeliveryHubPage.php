@@ -24,6 +24,13 @@ class DeliveryHubPage extends Page
 
     protected static ?string $slug = 'delivery-hub';
 
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static function getHubClasses(): array
     {
         return [

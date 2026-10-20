@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\DB;
 
 class AgeingScheduleResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = AgeingSchedule::class;
 
     protected static bool $shouldRegisterNavigation = false;

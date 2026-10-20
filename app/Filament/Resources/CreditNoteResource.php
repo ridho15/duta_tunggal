@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class CreditNoteResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = CreditNote::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-receipt-refund';

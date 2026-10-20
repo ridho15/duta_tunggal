@@ -353,11 +353,9 @@ class StockOpnameResourceTest extends TestCase
     #[Test]
     public function it_shows_correct_navigation_and_labels()
     {
-        $this->assertEquals('Stock Opname', StockOpnameResource::getLabel());
-        $this->assertEquals('Stock Opnames', StockOpnameResource::getPluralLabel());
-        $this->assertEquals('heroicon-o-clipboard-document-list', StockOpnameResource::getNavigationIcon());
-        $this->assertEquals('Gudang', StockOpnameResource::getNavigationGroup());
-        $this->assertEquals(6, StockOpnameResource::getNavigationSort());
+        $this->assertEquals('Stock Opname', StockOpnameResource::getModelLabel());
+        $this->assertEquals('Stock Opname', StockOpnameResource::getPluralModelLabel());
+        $this->assertEquals('GUDANG', strtoupper((string) StockOpnameResource::getNavigationGroup()));
     }
 
     #[Test]

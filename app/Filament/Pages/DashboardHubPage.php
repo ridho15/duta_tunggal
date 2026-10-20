@@ -17,4 +17,11 @@ class DashboardHubPage extends Page
     protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'dashboard-hub';
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }

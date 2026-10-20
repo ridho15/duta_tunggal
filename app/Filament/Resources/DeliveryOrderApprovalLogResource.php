@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class DeliveryOrderApprovalLogResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = DeliveryOrderApprovalLog::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';

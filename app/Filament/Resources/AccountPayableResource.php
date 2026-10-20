@@ -33,6 +33,8 @@ use App\Filament\Resources\AccountPayableResource\RelationManagers;
 
 class AccountPayableResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = AccountPayable::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';

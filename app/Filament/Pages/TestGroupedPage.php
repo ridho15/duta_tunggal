@@ -22,6 +22,11 @@ class TestGroupedPage extends Page
 
     protected static ?string $slug = 'buku-besar-page';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public $coa_ids = [];
     public $start_date = null;
     public $end_date = null;
@@ -135,8 +140,4 @@ class TestGroupedPage extends Page
         return $normalized;
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return true;
-    }
 }

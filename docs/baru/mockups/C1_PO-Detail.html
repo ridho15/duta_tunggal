@@ -1,0 +1,132 @@
+<!doctype html><html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>C1. Detail Pesanan Pembelian – desktop</title></head><body>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#15803d}a:hover{color:#14532d}
+</style>
+
+<div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #111827; background: #f6f7f8; min-height: 1000px; display: flex; flex-wrap: wrap">
+
+<nav aria-label="Menu utama" style="flex: 1 1 220px; max-width: 240px; background: #ffffff; border-right: 1px solid #e5e7eb; box-sizing: border-box; display: flex; flex-direction: column">
+<div style="height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid #eef0f2">
+<span style="font-weight: 800; font-size: 15px; letter-spacing: .5px">DUTA TUNGGAL</span>
+<span style="font-size: 9px; font-weight: 700; color: #15803d; border: 1px solid #86efac; background: #f0fdf4; border-radius: 4px; padding: 1px 5px">ERP</span>
+</div>
+<div style="padding: 10px 8px; display: flex; flex-direction: column; gap: 2px">
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"></path></svg><span style="flex-grow: 1">Beranda</span><span style="font-size: 11px; font-weight: 700; background: #15803d; color: #ffffff; border-radius: 10px; padding: 1px 7px">3</span></a>
+<div style="font-size: 10.5px; letter-spacing: 1px; color: #6b7280; font-weight: 600; padding: 16px 10px 6px">PEMBELIAN</div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M14 3v6h6M12 12v6M9 15h6"></path></svg><span style="flex-grow: 1">Permintaan Pembelian</span><span style="font-size: 11px; font-weight: 700; background: #f3f4f6; color: #374151; border-radius: 10px; padding: 1px 7px">2</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; background: #ecfdf3; border: 1px solid #bbf7d0; color: #14532d; font-weight: 600; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7z"></path><path d="M9 7a3 3 0 0 1 6 0"></path></svg>Pesanan Pembelian (PO)</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>Invoice Pembelian</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5"></path><path d="M20 9H10a6 6 0 0 0 0 12h3"></path></svg>Retur Pembelian</a>
+<div style="font-size: 10.5px; letter-spacing: 1px; color: #6b7280; font-weight: 600; padding: 16px 10px 6px">GUDANG</div>
+<a href="Terima-HP.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"></path></svg>Terima Barang</a>
+<a href="Stok.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"></path><path d="M3 8l9 5 9-5M12 13v8"></path></svg>Cek Stok</a>
+<div style="font-size: 10.5px; letter-spacing: 1px; color: #6b7280; font-weight: 600; padding: 16px 10px 6px">DATA</div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #374151; font-weight: 500; font-size: 14px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"></path><path d="M4 9v11h16V9M9 20v-6h6v6"></path></svg>Supplier</a>
+</div>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="height: 50px; background: #ffffff; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; font-size: 14px">
+<div><a href="#" style="color: #6b7280; text-decoration: none">Pesanan Pembelian</a><span style="color: #d1d5db; padding: 0 8px">/</span><b>PO-2026-0041</b></div>
+<div style="display: flex; align-items: center; gap: 10px; color: #374151">Purchasing · DUTA KENARI <span style="width: 30px; height: 30px; border-radius: 15px; background: #111827; color: #ffffff; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center">PU</span></div>
+</header>
+
+<main style="padding: 26px 28px 40px; box-sizing: border-box; width: 100%; max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 4px 9px">SEBAGIAN DITERIMA · TERLAMBAT 2 HARI</span>
+<h1 style="margin: 0; font-size: 28px; font-weight: 800">PO-2026-0041</h1>
+<div style="font-size: 14px; color: #6b7280">Abdi Karya (A001) · dipesan 1 Okt · janji tiba 11 Okt · tempo 30 hari</div>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<button type="button" style="font-family: inherit; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 1px solid #d1d5db; background: #ffffff; color: #374151; min-height: 44px">Kirim ke supplier (WA/PDF)</button>
+<button type="button" style="font-family: inherit; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 1px solid #d1d5db; background: #ffffff; color: #374151; min-height: 44px">Lainnya ▾</button>
+</div>
+</div>
+
+<section aria-label="Progres pembelian" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 16px">
+<ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px">
+<li style="border-top: 3px solid #16a34a; padding-top: 8px; font-size: 13px; font-weight: 700; color: #14532d">✓ Permintaan<div style="font-weight: 400; color: #6b7280; font-size: 12px">PR-0033 · Gudang</div></li>
+<li style="border-top: 3px solid #16a34a; padding-top: 8px; font-size: 13px; font-weight: 700; color: #14532d">✓ PO disetujui<div style="font-weight: 400; color: #6b7280; font-size: 12px">1 Okt · Owner</div></li>
+<li style="border-top: 3px solid #111827; padding-top: 8px; font-size: 13px; font-weight: 700">Terima barang<div style="font-weight: 400; color: #6b7280; font-size: 12px">60 dari 100 pcs</div></li>
+<li style="border-top: 3px solid #16a34a; padding-top: 8px; font-size: 13px; font-weight: 700; color: #14532d">✓ QC<div style="font-weight: 400; color: #6b7280; font-size: 12px">58 bagus · 2 reject</div></li>
+<li style="border-top: 3px solid #e5e7eb; padding-top: 8px; font-size: 13px; color: #9ca3af">Invoice</li>
+<li style="border-top: 3px solid #e5e7eb; padding-top: 8px; font-size: 13px; color: #9ca3af">Dibayar</li>
+</ol>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 18px">
+<div style="flex: 1 1 320px">
+<div style="font-size: 11px; color: #15803d; font-weight: 700; letter-spacing: .6px">LANGKAH BERIKUTNYA</div>
+<div style="font-size: 16px; font-weight: 700; margin-top: 2px">Masukkan invoice supplier untuk 58 pcs yang diterima bagus</div>
+<div style="font-size: 13px; color: #4b5563">2 pcs reject sudah otomatis dibuatkan 1 retur pembelian dan tidak ditagihkan.</div>
+</div>
+<a href="#" style="background: #15803d; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 20px; border-radius: 10px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">+ Buat Invoice Pembelian</a>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<a href="Terima-HP.dc.html" style="font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 1px solid #d1d5db; background: #ffffff; color: #374151; text-decoration: none">Terima sisa 40 pcs</a>
+<button type="button" style="font-family: inherit; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 1px solid #d1d5db; background: #ffffff; color: #374151; min-height: 44px">Tanya supplier soal keterlambatan</button>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+<section aria-labelledby="brg" style="flex: 2 1 480px; min-width: 0; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 22px">
+<h2 id="brg" style="margin: 0 0 10px; font-size: 16px; font-weight: 700">Barang</h2>
+<div style="overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #6b7280; font-size: 12px">
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600">Produk</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; text-align: right">Dipesan</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; text-align: right">Diterima</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; text-align: right">Reject</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; text-align: right">Sisa</th>
+<th style="padding: 8px 6px; border-bottom: 1px solid #eef0f2; font-weight: 600; text-align: right">Subtotal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6"><b>COPPER ELBO 5/8''</b><div style="font-size: 12px; color: #6b7280">ETBG000016 · Rp5.667</div></td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">50</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">50</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right; color: #b91c1c; font-weight: 700">2</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right; color: #15803d; font-weight: 700">0 ✓</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">Rp283.350</td>
+</tr>
+<tr>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6"><b>COPPER ELBO 1/2''</b><div style="font-size: 12px; color: #6b7280">ETBG000013 · Rp3.600</div></td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">50</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">10</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">0</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right; color: #b45309; font-weight: 700">40</td>
+<td style="padding: 11px 6px; border-bottom: 1px solid #f3f4f6; text-align: right">Rp180.000</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div style="display: flex; justify-content: flex-end; gap: 24px; font-size: 14px; margin-top: 12px; flex-wrap: wrap; color: #4b5563">
+<span>Total PO <b style="color: #111827; font-size: 16px">Rp463.350</b></span>
+</div>
+</section>
+
+<div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-labelledby="sup" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px">
+<h2 id="sup" style="margin: 0 0 4px; font-size: 16px; font-weight: 700">Supplier</h2>
+<b style="font-size: 14px">Abdi Karya</b>
+<span style="color: #6b7280">Kode A001 · tempo 30 hari</span>
+<div style="border: 1px dashed #d1d5db; border-radius: 10px; padding: 10px 12px; margin-top: 4px"><div style="font-size: 12px; color: #6b7280">Rekening pembayaran</div><b>[Bank] · [No. rekening] · a.n. [Nama]</b></div>
+</section>
+<section aria-labelledby="dok" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px">
+<h2 id="dok" style="margin: 0; font-size: 16px; font-weight: 700">Dokumen terkait</h2>
+<a href="#" style="display: block; text-decoration: none; color: #111827; border: 1px solid #eef0f2; border-radius: 10px; padding: 10px 12px"><div style="font-weight: 600; font-size: 14px">PR-0033</div><div style="font-size: 12px; color: #6b7280">Permintaan dari Gudang · 30 Sep</div></a>
+<a href="#" style="display: block; text-decoration: none; color: #111827; border: 1px solid #eef0f2; border-radius: 10px; padding: 10px 12px"><div style="font-weight: 600; font-size: 14px">Terima Barang TB-0058</div><div style="font-size: 12px; color: #6b7280">13 Okt · 60 pcs · QC selesai</div></a>
+<a href="#" style="display: block; text-decoration: none; color: #111827; border: 1px solid #eef0f2; border-radius: 10px; padding: 10px 12px"><div style="font-weight: 600; font-size: 14px">Retur RB-0012 (otomatis)</div><div style="font-size: 12px; color: #6b7280">2 pcs reject QC · satu dokumen saja</div></a>
+</section>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

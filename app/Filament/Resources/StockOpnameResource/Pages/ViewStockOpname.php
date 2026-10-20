@@ -10,6 +10,16 @@ class ViewStockOpname extends ViewRecord
 {
     protected static string $resource = StockOpnameResource::class;
 
+    public function hasCombinedRelationManagerTabsWithContent(): bool
+    {
+        return true;
+    }
+
+    public function getContentTabLabel(): ?string
+    {
+        return 'Informasi Opname';
+    }
+
     protected function getHeaderActions(): array
     {
         return [

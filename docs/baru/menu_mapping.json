@@ -1,0 +1,1702 @@
+{
+  "proyek": "ERP Duta Tunggal",
+  "versi": "1.0",
+  "tanggal": "2026-10-13",
+  "peran": {
+    "OWN": "Owner / Super Admin / Admin",
+    "SM": "Sales Manager",
+    "SLS": "Sales / Toko",
+    "KSR": "Kasir (peran baru)",
+    "ADP": "Admin Pengiriman",
+    "GDG": "Admin Gudang / Checker",
+    "PUR": "Purchasing",
+    "FIN": "Finance / Akunting (Finance Manager)"
+  },
+  "grup_navigasi": [
+    {
+      "grup": "BERANDA",
+      "urutan": 0,
+      "ikon": "heroicon-o-home",
+      "keterangan": "Halaman tugas per peran"
+    },
+    {
+      "grup": "PENJUALAN",
+      "urutan": 1,
+      "ikon": "heroicon-o-shopping-cart",
+      "keterangan": "Alur SO > DO > SJ > Invoice > Pembayaran"
+    },
+    {
+      "grup": "GUDANG",
+      "urutan": 2,
+      "ikon": "heroicon-o-cube",
+      "keterangan": "Pekerjaan fisik gudang & stok"
+    },
+    {
+      "grup": "PEMBELIAN",
+      "urutan": 3,
+      "ikon": "heroicon-o-truck",
+      "keterangan": "Alur PR > PO > Terima Barang > Invoice > Bayar"
+    },
+    {
+      "grup": "KEUANGAN",
+      "urutan": 4,
+      "ikon": "heroicon-o-banknotes",
+      "keterangan": "Kas, bank, piutang, hutang, jurnal"
+    },
+    {
+      "grup": "LAPORAN",
+      "urutan": 5,
+      "ikon": "heroicon-o-chart-bar",
+      "keterangan": "Semua laporan, read-only"
+    },
+    {
+      "grup": "DATA MASTER",
+      "urutan": 6,
+      "ikon": "heroicon-o-circle-stack",
+      "keterangan": "Data referensi"
+    },
+    {
+      "grup": "PENGATURAN",
+      "urutan": 7,
+      "ikon": "heroicon-o-cog-6-tooth",
+      "keterangan": "Hanya Owner/Admin"
+    }
+  ],
+  "sidebar_baru": [
+    {
+      "grup": "BERANDA",
+      "menu": [
+        {
+          "label": "Tugas Saya",
+          "urutan": 1,
+          "ikon": "heroicon-o-home",
+          "peran": [
+            "OWN",
+            "SM",
+            "SLS",
+            "KSR",
+            "ADP",
+            "GDG",
+            "PUR",
+            "FIN"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "PENJUALAN",
+      "menu": [
+        {
+          "label": "Penawaran Harga",
+          "urutan": 1,
+          "ikon": "heroicon-o-tag",
+          "peran": [
+            "OWN",
+            "SM",
+            "SLS"
+          ]
+        },
+        {
+          "label": "Pesanan Penjualan (SO)",
+          "urutan": 2,
+          "ikon": "heroicon-o-document-text",
+          "peran": [
+            "OWN",
+            "SM",
+            "SLS",
+            "KSR",
+            "ADP"
+          ]
+        },
+        {
+          "label": "Perintah Kirim (DO)",
+          "urutan": 3,
+          "ikon": "heroicon-o-truck",
+          "peran": [
+            "OWN",
+            "ADP",
+            "SLS",
+            "KSR"
+          ]
+        },
+        {
+          "label": "Surat Jalan",
+          "urutan": 4,
+          "ikon": "heroicon-o-clipboard-document-check",
+          "peran": [
+            "OWN",
+            "ADP"
+          ]
+        },
+        {
+          "label": "Invoice Penjualan",
+          "urutan": 5,
+          "ikon": "heroicon-o-receipt-percent",
+          "peran": [
+            "OWN",
+            "KSR",
+            "ADP",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Terima Pembayaran",
+          "urutan": 6,
+          "ikon": "heroicon-o-credit-card",
+          "peran": [
+            "OWN",
+            "KSR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Retur",
+          "urutan": 7,
+          "ikon": "heroicon-o-arrow-uturn-left",
+          "peran": [
+            "OWN",
+            "SM",
+            "SLS",
+            "GDG",
+            "ADP",
+            "FIN"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "GUDANG",
+      "menu": [
+        {
+          "label": "Siapkan & Kirim",
+          "urutan": 1,
+          "ikon": "heroicon-o-clipboard-document-list",
+          "peran": [
+            "OWN",
+            "GDG"
+          ]
+        },
+        {
+          "label": "Terima Barang",
+          "urutan": 2,
+          "ikon": "heroicon-o-inbox-arrow-down",
+          "peran": [
+            "OWN",
+            "GDG",
+            "PUR"
+          ]
+        },
+        {
+          "label": "Cek Stok",
+          "urutan": 3,
+          "ikon": "heroicon-o-cube",
+          "peran": [
+            "OWN",
+            "SM",
+            "SLS",
+            "KSR",
+            "ADP",
+            "GDG",
+            "PUR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Pindah Stok",
+          "urutan": 4,
+          "ikon": "heroicon-o-arrows-right-left",
+          "peran": [
+            "OWN",
+            "GDG"
+          ]
+        },
+        {
+          "label": "Stock Opname",
+          "urutan": 5,
+          "ikon": "heroicon-o-clipboard-document",
+          "peran": [
+            "OWN",
+            "GDG"
+          ]
+        },
+        {
+          "label": "Penyesuaian Stok",
+          "urutan": 6,
+          "ikon": "heroicon-o-adjustments-horizontal",
+          "peran": [
+            "OWN",
+            "GDG",
+            "FIN"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "PEMBELIAN",
+      "menu": [
+        {
+          "label": "Permintaan Pembelian",
+          "urutan": 1,
+          "ikon": "heroicon-o-document-plus",
+          "peran": [
+            "OWN",
+            "PUR",
+            "GDG",
+            "SLS"
+          ]
+        },
+        {
+          "label": "Pesanan Pembelian (PO)",
+          "urutan": 2,
+          "ikon": "heroicon-o-shopping-bag",
+          "peran": [
+            "OWN",
+            "PUR"
+          ]
+        },
+        {
+          "label": "Invoice Pembelian",
+          "urutan": 3,
+          "ikon": "heroicon-o-receipt-refund",
+          "peran": [
+            "OWN",
+            "PUR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Bayar Supplier",
+          "urutan": 4,
+          "ikon": "heroicon-o-banknotes",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Retur Pembelian",
+          "urutan": 5,
+          "ikon": "heroicon-o-arrow-uturn-right",
+          "peran": [
+            "OWN",
+            "PUR",
+            "GDG"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "KEUANGAN",
+      "menu": [
+        {
+          "label": "Kas & Bank",
+          "urutan": 1,
+          "ikon": "heroicon-o-building-library",
+          "peran": [
+            "OWN",
+            "FIN",
+            "KSR"
+          ]
+        },
+        {
+          "label": "Piutang & Hutang",
+          "urutan": 2,
+          "ikon": "heroicon-o-scale",
+          "peran": [
+            "OWN",
+            "FIN",
+            "KSR"
+          ]
+        },
+        {
+          "label": "Pengajuan Dana",
+          "urutan": 3,
+          "ikon": "heroicon-o-document-currency-dollar",
+          "peran": [
+            "OWN",
+            "FIN",
+            "PUR"
+          ]
+        },
+        {
+          "label": "Jurnal",
+          "urutan": 4,
+          "ikon": "heroicon-o-book-open",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Rekonsiliasi Bank",
+          "urutan": 5,
+          "ikon": "heroicon-o-check-badge",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Aset Tetap",
+          "urutan": 6,
+          "ikon": "heroicon-o-building-office",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Tutup Buku",
+          "urutan": 7,
+          "ikon": "heroicon-o-lock-closed",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "LAPORAN",
+      "menu": [
+        {
+          "label": "Dashboard Owner",
+          "urutan": 1,
+          "ikon": "heroicon-o-presentation-chart-line",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Penjualan",
+          "urutan": 2,
+          "ikon": "heroicon-o-chart-bar",
+          "peran": [
+            "OWN",
+            "SM",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Pembelian",
+          "urutan": 3,
+          "ikon": "heroicon-o-chart-bar-square",
+          "peran": [
+            "OWN",
+            "PUR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Stok",
+          "urutan": 4,
+          "ikon": "heroicon-o-chart-pie",
+          "peran": [
+            "OWN",
+            "GDG",
+            "PUR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Laporan Keuangan",
+          "urutan": 5,
+          "ikon": "heroicon-o-document-chart-bar",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "DATA MASTER",
+      "menu": [
+        {
+          "label": "Produk",
+          "urutan": 1,
+          "ikon": "heroicon-o-squares-2x2",
+          "peran": [
+            "OWN",
+            "PUR"
+          ]
+        },
+        {
+          "label": "Customer",
+          "urutan": 2,
+          "ikon": "heroicon-o-users",
+          "peran": [
+            "OWN",
+            "SM",
+            "SLS",
+            "KSR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Supplier",
+          "urutan": 3,
+          "ikon": "heroicon-o-building-storefront",
+          "peran": [
+            "OWN",
+            "PUR",
+            "FIN"
+          ]
+        },
+        {
+          "label": "Gudang & Rak",
+          "urutan": 4,
+          "ikon": "heroicon-o-home-modern",
+          "peran": [
+            "OWN"
+          ]
+        },
+        {
+          "label": "Cabang",
+          "urutan": 5,
+          "ikon": "heroicon-o-map-pin",
+          "peran": [
+            "OWN"
+          ]
+        },
+        {
+          "label": "Kendaraan & Driver",
+          "urutan": 6,
+          "ikon": "heroicon-o-truck",
+          "peran": [
+            "OWN",
+            "ADP"
+          ]
+        },
+        {
+          "label": "Akun & Pajak",
+          "urutan": 7,
+          "ikon": "heroicon-o-calculator",
+          "peran": [
+            "OWN",
+            "FIN"
+          ]
+        }
+      ]
+    },
+    {
+      "grup": "PENGATURAN",
+      "menu": [
+        {
+          "label": "Pengguna & Hak Akses",
+          "urutan": 1,
+          "ikon": "heroicon-o-user-group",
+          "peran": [
+            "OWN"
+          ]
+        },
+        {
+          "label": "Aturan Persetujuan",
+          "urutan": 2,
+          "ikon": "heroicon-o-shield-check",
+          "peran": [
+            "OWN"
+          ]
+        },
+        {
+          "label": "Modul Aktif",
+          "urutan": 3,
+          "ikon": "heroicon-o-puzzle-piece",
+          "peran": [
+            "OWN"
+          ]
+        }
+      ]
+    }
+  ],
+  "pemetaan_menu_lama": [
+    {
+      "hub_lama": "Dashboard Hub",
+      "menu_lama": "Finance Dashboard",
+      "route_lama": "/admin (dashboard)",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Dashboard Owner",
+      "tab": null,
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": "Beranda default untuk Owner. Staf mendapat Beranda Tugas Saya."
+    },
+    {
+      "hub_lama": "Dashboard Hub",
+      "menu_lama": "Laporan Penjualan",
+      "route_lama": "/sales-report-page",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Penjualan",
+      "tab": null,
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "SM",
+        "FIN"
+      ],
+      "catatan": "Digabung dengan Sales Report (Sales Hub)."
+    },
+    {
+      "hub_lama": "Dashboard Hub",
+      "menu_lama": "Laporan Pembelian",
+      "route_lama": "/purchase-report-page",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Pembelian",
+      "tab": null,
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "PUR",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "(ikon sidebar)",
+      "menu_lama": "Stock Report",
+      "route_lama": "/reports/stock-report",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Stok",
+      "tab": "Posisi Stok",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "GDG",
+        "PUR",
+        "FIN"
+      ],
+      "catatan": "Ikon sidebar sendiri dihapus."
+    },
+    {
+      "hub_lama": "(ikon sidebar)",
+      "menu_lama": "Aturan Persetujuan",
+      "route_lama": "/approval-rules",
+      "grup_baru": "PENGATURAN",
+      "menu_baru": "Aturan Persetujuan",
+      "tab": null,
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": "Tambahkan peran Kasir pada aturan approve Sales Order."
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Quotations",
+      "route_lama": "/quotations",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Penawaran Harga",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "SM",
+        "SLS"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Sale Orders",
+      "route_lama": "/sale-orders",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Pesanan Penjualan (SO)",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "SM",
+        "SLS",
+        "KSR",
+        "ADP"
+      ],
+      "catatan": "ADP hanya lihat."
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Retur Pelanggan",
+      "route_lama": "/customer-returns",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Retur",
+      "tab": "Retur Penjualan (setelah invoice)",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "SM",
+        "SLS",
+        "GDG",
+        "FIN"
+      ],
+      "catatan": "Satu menu Retur dengan 2 tab."
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Piutang Usaha",
+      "route_lama": "/account-receivables",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Piutang & Hutang",
+      "tab": "Piutang",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN",
+        "KSR"
+      ],
+      "catatan": "KSR hanya lihat."
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Invoice Penjualan",
+      "route_lama": "/sales-invoices",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Invoice Penjualan",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "KSR",
+        "ADP",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Penerimaan Pelanggan",
+      "route_lama": "/customer-receipts",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Terima Pembayaran",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "KSR",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Penjualan Lainnya",
+      "route_lama": "/other-sales",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Penjualan Lainnya",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": "Tampil hanya jika modul diaktifkan / memang dipakai."
+    },
+    {
+      "hub_lama": "Sales Hub",
+      "menu_lama": "Sales Report",
+      "route_lama": "/sales-report-page",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Penjualan",
+      "tab": null,
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "SM",
+        "FIN"
+      ],
+      "catatan": "Duplikat Laporan Penjualan."
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Permintaan Pembelian",
+      "route_lama": "/order-requests",
+      "grup_baru": "PEMBELIAN",
+      "menu_baru": "Permintaan Pembelian",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "PUR",
+        "GDG",
+        "SLS"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Pesanan Pembelian",
+      "route_lama": "/purchase-orders",
+      "grup_baru": "PEMBELIAN",
+      "menu_baru": "Pesanan Pembelian (PO)",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "PUR"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Kontrol Kualitas Pembelian",
+      "route_lama": "/quality-control-purchases",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Terima Barang",
+      "tab": "Langkah QC di form yang sama",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "GDG",
+        "PUR"
+      ],
+      "catatan": "Qty bagus / qty reject diisi di form Terima Barang."
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Penerimaan Pembelian",
+      "route_lama": "/purchase-receipts",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Terima Barang",
+      "tab": null,
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "GDG",
+        "PUR"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Retur Pembelian",
+      "route_lama": "/purchase-returns",
+      "grup_baru": "PEMBELIAN",
+      "menu_baru": "Retur Pembelian",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "PUR",
+        "GDG"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Utang Usaha",
+      "route_lama": "/account-payables",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Piutang & Hutang",
+      "tab": "Hutang",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Invoice Pembelian",
+      "route_lama": "/purchase-invoices",
+      "grup_baru": "PEMBELIAN",
+      "menu_baru": "Invoice Pembelian",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "PUR",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Permintaan Pembayaran",
+      "route_lama": "/payment-requests",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Pengajuan Dana",
+      "tab": "Permintaan Pembayaran",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN",
+        "PUR"
+      ],
+      "catatan": "Perlu konfirmasi beda fungsi dengan Pengajuan Voucher."
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Pembayaran Vendor",
+      "route_lama": "/vendor-payments",
+      "grup_baru": "PEMBELIAN",
+      "menu_baru": "Bayar Supplier",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Transaksi Kas & Bank",
+      "route_lama": "/cash-bank-transactions",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Kas & Bank",
+      "tab": "Transaksi",
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "FIN",
+        "KSR"
+      ],
+      "catatan": "Salah tempat (sebelumnya di Pembelian)."
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Deposit",
+      "route_lama": "/deposits",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Kas & Bank",
+      "tab": "Deposit / Uang Muka",
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "FIN",
+        "KSR"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Purchase Hub",
+      "menu_lama": "Transfer Kas & Bank",
+      "route_lama": "/cash-bank-transfers",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Kas & Bank",
+      "tab": "Transfer",
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Delivery Hub",
+      "menu_lama": "Perintah Pengiriman",
+      "route_lama": "/delivery-orders",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Perintah Kirim (DO)",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "ADP",
+        "SLS",
+        "KSR"
+      ],
+      "catatan": "SLS & KSR hanya lihat."
+    },
+    {
+      "hub_lama": "Delivery Hub",
+      "menu_lama": "Surat Jalan",
+      "route_lama": "/surat-jalans",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Surat Jalan",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "ADP"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Delivery Hub",
+      "menu_lama": "Penjadwalan Pengiriman",
+      "route_lama": "/delivery-schedules",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Jadwal Kirim",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN",
+        "ADP"
+      ],
+      "catatan": "Aktifkan bila Duta Tunggal memakai jadwal/rute."
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Journal Entries",
+      "route_lama": "/journal-entries",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Jurnal",
+      "tab": "Per baris",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Journal Entries (Grouped)",
+      "route_lama": "/journal-entries/grouped",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Jurnal",
+      "tab": "Per transaksi",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": "Jadi toggle tampilan, bukan menu terpisah."
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Tutup Buku & Periode",
+      "route_lama": "/accounting-periods",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Tutup Buku",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "AR & AP Management",
+      "route_lama": "/ar-ap-management",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Piutang & Hutang",
+      "tab": "Ringkasan",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Rekonsiliasi Bank",
+      "route_lama": "/bank-reconciliations",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Rekonsiliasi Bank",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Ageing Schedule",
+      "route_lama": "/ageing-schedules",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Piutang & Hutang",
+      "tab": "Umur Piutang & Hutang",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Pengajuan Voucher",
+      "route_lama": "/voucher-requests",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Pengajuan Dana",
+      "tab": "Voucher Kas/Biaya",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Neraca (Balance Sheet)",
+      "route_lama": "/reports/balance-sheets",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Neraca",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Laporan Laba Rugi (P&L)",
+      "route_lama": "/reports/profit-and-losses",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Laba Rugi",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Neraca Saldo (Trial Balance)",
+      "route_lama": "/trial-balance",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Neraca Saldo",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Buku Besar",
+      "route_lama": "/buku-besar-page",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Buku Besar",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Laporan Arus Kas",
+      "route_lama": "/reports/cash-flow",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Arus Kas",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "HPP / Cost of Goods Sold",
+      "route_lama": "/reports/hpp",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "HPP",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Cost of Goods Manufacturing",
+      "route_lama": "/cost-of-goods-manufacturing",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Lanjutan: HPP Produksi",
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": "Ikut modul Manufaktur."
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Aging Report (AR/AP)",
+      "route_lama": "/reports/ageing-reports",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Piutang & Hutang",
+      "tab": "Umur Piutang & Hutang",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": "Duplikat Ageing Schedule."
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Profit per Divisi",
+      "route_lama": "/profit-loss-multi-division",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Lanjutan: Laba per Divisi",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Drill Down Financial Report",
+      "route_lama": "/drill-down-financial-report",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Lanjutan: Drill Down",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Financial Statement",
+      "route_lama": "/financial-statement",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Lanjutan: Laporan Gabungan",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "ALK Grafik",
+      "route_lama": "/alk-grafik",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Lanjutan: Grafik Analisis",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Journal Consolidation",
+      "route_lama": "/journal-consolidation",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Laporan Keuangan",
+      "tab": "Lanjutan: Konsolidasi",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Aset Tetap",
+      "route_lama": "/assets",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Aset Tetap",
+      "tab": "Daftar Aset",
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Transfer Aset",
+      "route_lama": "/asset-transfers",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Aset Tetap",
+      "tab": "Transfer",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Accounting Hub",
+      "menu_lama": "Disposal Aset",
+      "route_lama": "/asset-disposals",
+      "grup_baru": "KEUANGAN",
+      "menu_baru": "Aset Tetap",
+      "tab": "Penghapusan",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Stock Transfer",
+      "route_lama": "/stock-transfers",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Pindah Stok",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "GDG"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Stock Adjustment",
+      "route_lama": "/stock-adjustments",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Penyesuaian Stok",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "GDG",
+        "FIN"
+      ],
+      "catatan": "Retur DO yang disetujui juga tercatat di sini."
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Stock Opname",
+      "route_lama": "/stock-opnames",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Stock Opname",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "GDG"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Return Product",
+      "route_lama": "/return-products",
+      "grup_baru": "PENJUALAN",
+      "menu_baru": "Retur",
+      "tab": "Retur DO (sebelum Surat Jalan)",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "SLS",
+        "GDG",
+        "ADP"
+      ],
+      "catatan": "Penomoran DO.000xR / DO.000xC."
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Inventory Stock",
+      "route_lama": "/inventory-stocks",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Cek Stok",
+      "tab": null,
+      "aksi": "GANTI NAMA",
+      "peran": [
+        "OWN",
+        "SM",
+        "SLS",
+        "KSR",
+        "ADP",
+        "GDG",
+        "PUR"
+      ],
+      "catatan": "Semua peran boleh lihat."
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Stock Movement",
+      "route_lama": "/stock-movements",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Stok",
+      "tab": "Riwayat Keluar-Masuk",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "GDG",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Konfirmasi Gudang",
+      "route_lama": "/warehouse-confirmations",
+      "grup_baru": "GUDANG",
+      "menu_baru": "Siapkan & Kirim",
+      "tab": null,
+      "aksi": "PINDAH",
+      "peran": [
+        "OWN",
+        "GDG"
+      ],
+      "catatan": "Satu daftar: DO yang perlu dikonfirmasi, dicek checker, dan dikirim."
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Kartu Persediaan",
+      "route_lama": "/reports/inventory-card",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Stok",
+      "tab": "Kartu Stok",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "GDG",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Inventory Hub",
+      "menu_lama": "Laporan Stok",
+      "route_lama": "/inventory-report-page",
+      "grup_baru": "LAPORAN",
+      "menu_baru": "Stok",
+      "tab": "Laporan & Umur Stok",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "GDG",
+        "PUR",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Produk",
+      "route_lama": "/products",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Produk",
+      "tab": "Produk",
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "PUR"
+      ],
+      "catatan": "Label 'Harga Batas (%)' diperbaiki sesuai isi (nominal)."
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Kategori Produk",
+      "route_lama": "/product-categories",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Produk",
+      "tab": "Kategori",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Satuan",
+      "route_lama": "/unit-of-measures",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Produk",
+      "tab": "Satuan",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Rak",
+      "route_lama": "/raks",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Gudang & Rak",
+      "tab": "Rak",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Gudang",
+      "route_lama": "/warehouses",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Gudang & Rak",
+      "tab": "Gudang",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Cabang",
+      "route_lama": "/cabangs",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Cabang",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Customer",
+      "route_lama": "/customers",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Customer",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "SM",
+        "SLS",
+        "KSR",
+        "FIN"
+      ],
+      "catatan": "Peringatan nama mirip saat input (cegah dobel)."
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Supplier",
+      "route_lama": "/suppliers",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Supplier",
+      "tab": null,
+      "aksi": "TETAP",
+      "peran": [
+        "OWN",
+        "PUR",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Chart of Account",
+      "route_lama": "/chart-of-accounts",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Akun & Pajak",
+      "tab": "Akun (COA)",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Mata Uang",
+      "route_lama": "/currencies",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Akun & Pajak",
+      "tab": "Mata Uang",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Setting Pajak",
+      "route_lama": "/tax-settings",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Akun & Pajak",
+      "tab": "Pajak",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "FIN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Kendaraan",
+      "route_lama": "/vehicles",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Kendaraan & Driver",
+      "tab": "Kendaraan",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "ADP"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Master Data Hub",
+      "menu_lama": "Driver",
+      "route_lama": "/drivers",
+      "grup_baru": "DATA MASTER",
+      "menu_baru": "Kendaraan & Driver",
+      "tab": "Driver",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN",
+        "ADP"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "User & Roles Hub",
+      "menu_lama": "User",
+      "route_lama": "/users",
+      "grup_baru": "PENGATURAN",
+      "menu_baru": "Pengguna & Hak Akses",
+      "tab": "Pengguna",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "User & Roles Hub",
+      "menu_lama": "Role",
+      "route_lama": "/roles",
+      "grup_baru": "PENGATURAN",
+      "menu_baru": "Pengguna & Hak Akses",
+      "tab": "Peran",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "User & Roles Hub",
+      "menu_lama": "Permission",
+      "route_lama": "/permissions",
+      "grup_baru": "PENGATURAN",
+      "menu_baru": "Pengguna & Hak Akses",
+      "tab": "Hak Akses",
+      "aksi": "GABUNG",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Manufacturing Hub",
+      "menu_lama": "Bill of Material",
+      "route_lama": "/bill-of-materials",
+      "grup_baru": "PRODUKSI (nonaktif)",
+      "menu_baru": "Bill of Material",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": "Seluruh modul Manufaktur disembunyikan via PENGATURAN > Modul Aktif."
+    },
+    {
+      "hub_lama": "Manufacturing Hub",
+      "menu_lama": "Production Plan",
+      "route_lama": "/production-plans",
+      "grup_baru": "PRODUKSI (nonaktif)",
+      "menu_baru": "Rencana Produksi",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Manufacturing Hub",
+      "menu_lama": "Manufacturing Order",
+      "route_lama": "/manufacturing-orders",
+      "grup_baru": "PRODUKSI (nonaktif)",
+      "menu_baru": "Perintah Produksi",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Manufacturing Hub",
+      "menu_lama": "Material Issue",
+      "route_lama": "/material-issues",
+      "grup_baru": "PRODUKSI (nonaktif)",
+      "menu_baru": "Pengeluaran Bahan",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Manufacturing Hub",
+      "menu_lama": "Production",
+      "route_lama": "/productions",
+      "grup_baru": "PRODUKSI (nonaktif)",
+      "menu_baru": "Produksi",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    },
+    {
+      "hub_lama": "Manufacturing Hub",
+      "menu_lama": "QC Manufacture",
+      "route_lama": "/quality-control-manufactures",
+      "grup_baru": "PRODUKSI (nonaktif)",
+      "menu_baru": "QC Produksi",
+      "tab": null,
+      "aksi": "SEMBUNYIKAN",
+      "peran": [
+        "OWN"
+      ],
+      "catatan": ""
+    }
+  ],
+  "hub_dihapus": [
+    "dashboard-hub",
+    "sales-hub",
+    "purchase-hub",
+    "delivery-hub",
+    "accounting-hub",
+    "inventory-hub",
+    "master-data-hub",
+    "user-roles-management-hub",
+    "manufacturing-hub"
+  ]
+}

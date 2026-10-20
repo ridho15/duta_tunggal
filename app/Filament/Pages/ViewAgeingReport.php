@@ -25,6 +25,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use Tables\Concerns\InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
@@ -37,6 +39,11 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
 
     protected static ?int $navigationSort = 8;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public ?string $report_type = 'both';
     public ?string $cabang_id = null;
     public ?string $as_of_date = null;
@@ -47,10 +54,6 @@ class ViewAgeingReport extends Page implements Tables\Contracts\HasTable
         $this->as_of_date = now()->format('Y-m-d');
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
 
     public function form(Form $form): Form
     {

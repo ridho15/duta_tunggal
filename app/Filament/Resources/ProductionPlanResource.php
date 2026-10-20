@@ -40,11 +40,13 @@ use Illuminate\Support\Str;
 
 class ProductionPlanResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = ProductionPlan::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $navigationGroup = 'Manufaktur';
+    protected static ?string $navigationGroup = 'PRODUKSI';
 
     protected static ?string $navigationLabel = 'Rencana Produksi';
 

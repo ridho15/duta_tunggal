@@ -29,16 +29,23 @@ use Filament\Tables\Filters\SelectFilter;
 
 class ChartOfAccountResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = ChartOfAccount::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
+    protected static ?string $navigationIcon = 'heroicon-o-calculator';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
 
-    // Position Finance group as the 6th group
-    protected static ?int $navigationSort = 12;
+    protected static ?string $navigationLabel = 'Akun & Pajak';
+
+    protected static ?string $modelLabel = 'Akun & Pajak';
+
+    protected static ?string $pluralModelLabel = 'Akun & Pajak';
+
+    protected static ?int $navigationSort = 7;
 
     public static function form(Form $form): Form
     {

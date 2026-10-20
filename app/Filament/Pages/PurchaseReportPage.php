@@ -20,21 +20,23 @@ use Illuminate\Support\Facades\Auth;
 
 class PurchaseReportPage extends Page implements HasTable
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithTable;
 
     protected static string $view = 'filament.pages.purchase-report-page';
 
-    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-up';
 
-    protected static ?string $navigationGroup = 'Reports';
+    protected static ?string $navigationGroup = 'LAPORAN';
 
-    protected static ?string $navigationLabel = 'Laporan Pembelian';
+    protected static ?string $navigationLabel = 'Pembelian';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     public ?string $start_date = null;

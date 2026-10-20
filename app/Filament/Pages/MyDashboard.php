@@ -35,17 +35,33 @@ use Illuminate\Support\Facades\Auth;
 
 class MyDashboard extends Dashboard
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use HasFiltersForm;
 
-    protected static ?string $navigationGroup = 'Dashboard';
-    protected static ?string $navigationLabel = 'Finance Dashboard';
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
-    protected static ?int $navigationSort = 2;
-    protected static ?string $slug = 'finance-dashboard';
+    protected static ?string $navigationGroup = 'LAPORAN';
+    protected static ?string $navigationLabel = 'Dashboard Owner';
+    protected static ?string $navigationIcon = 'heroicon-o-chart-pie';
+    protected static ?int $navigationSort = 1;
+    protected static ?string $slug = 'dashboard-owner';
+
+    public static function getRoutePath(): string
+    {
+        return '/dashboard-owner';
+    }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        if (! app()->bound('auth')) {
+            return true;
+        }
+
+        if (! Auth::check()) {
+            return true;
+        }
+
+        // Spesifikasi UI/UX 5.2: Dashboard Owner untuk OWN + FIN
+        return Auth::user()?->hasAnyRole(['Owner', 'Super Admin', 'Admin', 'Finance Manager', 'Finance', 'Accounting', 'Admin Keuangan', 'Auditor']) ?? false;
     }
 
     public function getWidgets(): array
@@ -63,7 +79,7 @@ class MyDashboard extends Dashboard
             $listWidgets[] = TopCustomerChart::class;
             $listWidgets[] = TopTagihanOutstanding::class;
         }
-        if (Auth::user()->hasRole(['Accounting', 'Super Admin', 'Finance Manager'])) {
+        if (Auth::user()->hasRole(['Accounting', 'Super Admin', 'Finance Manager', 'Admin Keuangan', 'Admin', 'Auditor'])) {
             $listWidgets[] = SaldoStatsOverview::class;
             $listWidgets[] = ArApSummaryWidget::class;
             $listWidgets[] = TotalPenjualanPembelianStats::class;

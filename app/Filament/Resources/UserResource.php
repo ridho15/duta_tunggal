@@ -32,16 +32,22 @@ use Illuminate\Support\Str;
 
 class UserResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = User::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-circle';
+    protected static ?string $navigationIcon = 'heroicon-o-shield-check';
 
-    // Use the user-friendly group name
-    protected static ?string $navigationGroup = 'User Roles Management';
+    protected static ?string $navigationGroup = 'PENGATURAN';
 
-    // Order similarly with other role/permission resources
+    protected static ?string $navigationLabel = 'Pengguna & Hak Akses';
+
+    protected static ?string $modelLabel = 'Pengguna';
+
+    protected static ?string $pluralModelLabel = 'Pengguna & Hak Akses';
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form

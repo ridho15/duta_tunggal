@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Auth;
 
 class DriverResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Driver::class;
 
     protected static bool $shouldRegisterNavigation = false;

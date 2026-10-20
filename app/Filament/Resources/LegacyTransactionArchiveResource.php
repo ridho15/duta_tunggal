@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class LegacyTransactionArchiveResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     private const TRANSACTION_TYPES = [
         'sale' => 'sale',
         'purchase' => 'purchase',

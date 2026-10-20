@@ -44,15 +44,23 @@ use Illuminate\Support\Str;
 
 class ReturnProductResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = ReturnProduct::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-archive-box-x-mark';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
 
-    protected static ?string $navigationGroup = 'Gudang';
+    protected static ?string $navigationGroup = 'PENJUALAN';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?string $navigationLabel = 'Retur DO';
+
+    protected static ?string $modelLabel = 'Retur DO';
+
+    protected static ?string $pluralModelLabel = 'Retur DO';
+
+    protected static ?int $navigationSort = 8;
 
     public static function form(Form $form): Form
     {

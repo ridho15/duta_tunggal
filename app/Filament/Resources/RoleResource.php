@@ -16,6 +16,8 @@ use Filament\Tables\Table;
 
 class RoleResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Role::class;
 
     protected static bool $shouldRegisterNavigation = false;

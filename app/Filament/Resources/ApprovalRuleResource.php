@@ -20,25 +20,28 @@ use Spatie\Permission\Models\Role;
 
 /**
  * Aturan Persetujuan (T3.1, D6): ambang nominal & peran penyetuju Quotation / Sales Order yang dapat diubah tanpa deploy.
- * Hanya Super Admin dan Finance Manager; setiap perubahan tercatat (activity log).
+ * Hanya Owner / Super Admin / Admin (Spesifikasi UI/UX 5.2); setiap perubahan tercatat (activity log).
  */
 class ApprovalRuleResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = ApprovalRule::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shield-check';
+    protected static ?string $navigationIcon = 'heroicon-o-adjustments-vertical';
 
-    protected static ?string $navigationGroup = 'Pengaturan';
+    protected static ?string $navigationGroup = 'PENGATURAN';
 
     protected static ?string $navigationLabel = 'Aturan Persetujuan';
 
     protected static ?string $modelLabel = 'Aturan Persetujuan';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 2;
 
     private static function allowed(): bool
     {
-        return (bool) Auth::user()?->hasRole(['Super Admin', 'Finance Manager']);
+        // Spesifikasi UI/UX 5.2: Aturan Persetujuan hanya untuk Owner / Super Admin / Admin.
+        return (bool) Auth::user()?->hasRole(['Super Admin', 'Owner', 'Admin']);
     }
 
     public static function canViewAny(): bool

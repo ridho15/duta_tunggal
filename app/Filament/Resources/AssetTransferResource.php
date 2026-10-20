@@ -20,6 +20,8 @@ use Illuminate\Support\HtmlString;
 
 class AssetTransferResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = AssetTransfer::class;
 
     protected static bool $shouldRegisterNavigation = false;

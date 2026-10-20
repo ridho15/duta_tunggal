@@ -83,6 +83,12 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         if (is_array($value)) {
             return $value;
         }
+        if (is_string($value) && str_starts_with(trim($value), '[')) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
         return explode(',', $value ?? '');
     }
 

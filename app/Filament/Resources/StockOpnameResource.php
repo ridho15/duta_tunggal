@@ -29,19 +29,23 @@ use Illuminate\Validation\ValidationException;
 
 class StockOpnameResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = StockOpname::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static ?string $navigationIcon = 'heroicon-o-document-magnifying-glass';
 
-    protected static ?string $navigationGroup = 'Gudang';
+    protected static ?string $navigationGroup = 'GUDANG';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?string $navigationLabel = 'Stock Opname';
 
-    protected static ?string $label = 'Stock Opname';
+    protected static ?string $modelLabel = 'Stock Opname';
 
-    protected static ?string $pluralLabel = 'Stock Opnames';
+    protected static ?string $pluralModelLabel = 'Stock Opname';
+
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {
@@ -372,6 +376,16 @@ class StockOpnameResource extends Resource
                     '</div>' .
                 '</details>'
             ));
+    }
+
+    public static function hasCombinedRelationManagerTabsWithContent(): bool
+    {
+        return true;
+    }
+
+    public static function getContentTabLabel(): ?string
+    {
+        return 'Informasi Opname';
     }
 
     public static function getRelations(): array

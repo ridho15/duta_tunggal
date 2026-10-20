@@ -45,17 +45,27 @@ use App\Models\SaleOrder;
 
 class SuratJalanResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = SuratJalan::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationGroup = 'Pengiriman';
+    protected static ?string $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?string $navigationGroup = 'PENJUALAN';
+
+    protected static ?string $navigationLabel = 'Surat Jalan';
+
+    protected static ?string $modelLabel = 'Surat Jalan';
+
+    protected static ?string $pluralModelLabel = 'Surat Jalan';
+
+    protected static ?int $navigationSort = 4;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     public static function form(Form $form): Form

@@ -41,11 +41,13 @@ use Illuminate\Support\Str;
 
 class ManufacturingOrderResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = ManufacturingOrder::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static ?string $navigationGroup = 'Manufaktur';
+    protected static ?string $navigationGroup = 'PRODUKSI';
 
     protected static ?string $navigationLabel = 'Perintah Produksi';
 

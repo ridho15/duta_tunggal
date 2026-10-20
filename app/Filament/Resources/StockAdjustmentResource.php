@@ -36,19 +36,23 @@ use Illuminate\Validation\ValidationException;
 
 class StockAdjustmentResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = StockAdjustment::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Gudang';
+    protected static ?string $navigationGroup = 'GUDANG';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?string $navigationLabel = 'Penyesuaian Stok';
 
-    protected static ?string $label = 'Stock Adjustment';
+    protected static ?string $modelLabel = 'Penyesuaian Stok';
 
-    protected static ?string $pluralLabel = 'Stock Adjustments';
+    protected static ?string $pluralModelLabel = 'Penyesuaian Stok';
+
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {

@@ -39,6 +39,8 @@ use Illuminate\Support\Str;
 
 class InvoiceResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Invoice::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
@@ -431,8 +433,21 @@ class InvoiceResource extends Resource
                         return $record->customer_name_display;
                     })
                     ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->whereHas('fromModel.customer', function (Builder $query) use ($search) {
-                            $query->where('perusahaan', 'like', "%{$search}%");
+                        return $query->where(function (Builder $sub) use ($search) {
+                            $sub->where('customer_name', 'like', "%{$search}%")
+                                ->orWhere('supplier_name', 'like', "%{$search}%")
+                                ->orWhereHasMorph('fromModel', [\App\Models\SaleOrder::class], function (Builder $q) use ($search) {
+                                    $q->whereHas('customer', function (Builder $cq) use ($search) {
+                                        $cq->where('perusahaan', 'like', "%{$search}%")
+                                           ->orWhere('name', 'like', "%{$search}%");
+                                    });
+                                })
+                                ->orWhereHasMorph('fromModel', [\App\Models\PurchaseOrder::class], function (Builder $q) use ($search) {
+                                    $q->whereHas('supplier', function (Builder $sq) use ($search) {
+                                        $sq->where('perusahaan', 'like', "%{$search}%")
+                                           ->orWhere('name', 'like', "%{$search}%");
+                                    });
+                                });
                         });
                     }),
                 TextColumn::make('subtotal')

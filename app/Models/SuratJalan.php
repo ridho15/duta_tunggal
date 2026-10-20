@@ -203,6 +203,12 @@ class SuratJalan extends Model
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
+    public function getCustomerIdAttribute(): ?int
+    {
+        return $this->deliveryOrder->flatMap->salesOrders->pluck('customer_id')->first()
+            ?? $this->customers()->value('customers.id');
+    }
+
     // Helper method to get customers through delivery orders and sales orders
     public function customers()
     {

@@ -184,13 +184,16 @@ it('[flag mati] service tidak menegakkan aturan dan tidak butuh alasan override 
     expect($so->fresh()->status)->toBe('approved')->and($quotation->fresh()->status)->toBe('approve')->and(ApprovalOverride::count())->toBe(0);
 });
 
-it('halaman Aturan Persetujuan hanya untuk Super Admin dan Finance Manager', function () {
+it('halaman Aturan Persetujuan hanya untuk Owner / Super Admin / Admin (Spesifikasi UI/UX 5.2)', function () {
     $ctx = stkContext();
 
     Auth::login(ctlUser($ctx, 'Sales Manager'));
     expect(\App\Filament\Resources\ApprovalRuleResource::canViewAny())->toBeFalse();
 
     Auth::login(ctlUser($ctx, 'Finance Manager'));
+    expect(\App\Filament\Resources\ApprovalRuleResource::canViewAny())->toBeFalse();
+
+    Auth::login(ctlUser($ctx, 'Owner'));
     expect(\App\Filament\Resources\ApprovalRuleResource::canViewAny())->toBeTrue();
 
     Auth::login(ctlUser($ctx, 'Super Admin'));

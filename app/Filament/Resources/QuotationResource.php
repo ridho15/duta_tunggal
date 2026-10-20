@@ -63,13 +63,21 @@ use Illuminate\Support\Str;
 
 class QuotationResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Quotation::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-check';
+    protected static ?string $navigationIcon = 'heroicon-o-tag';
 
-    protected static ?string $navigationGroup = 'Penjualan';
+    protected static ?string $navigationGroup = 'PENJUALAN';
+
+    protected static ?string $navigationLabel = 'Penawaran Harga';
+
+    protected static ?string $modelLabel = 'Penawaran Harga';
+
+    protected static ?string $pluralModelLabel = 'Penawaran Harga';
 
     protected static ?int $navigationSort = 1;
 
@@ -507,7 +515,7 @@ class QuotationResource extends Resource
             '</div>' .
             '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(219,234,254,0.4);border:1px solid rgba(191,219,254,0.8);">' .
             '<div style="width:16px;height:16px;border-radius:4px;background-color:#3b82f6;box-shadow:0 1px 3px rgba(59,130,246,0.4);flex-shrink:0;"></div>' .
-            '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#1e40af;">Biru (Approved)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Quotation sudah disetujui</span></div>' .
+            '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#1e40af;">Biru (Disetujui)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Quotation sudah disetujui</span></div>' .
             '</div>' .
             '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(229,231,235,0.45);border:1px solid rgba(209,213,219,0.85);">' .
             '<div style="width:16px;height:16px;border-radius:4px;background-color:#6b7280;box-shadow:0 1px 3px rgba(107,114,128,0.4);flex-shrink:0;"></div>' .
@@ -515,7 +523,7 @@ class QuotationResource extends Resource
             '</div>' .
             '<div class="flex items-center gap-3 p-2 rounded-lg" style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:8px;background-color:rgba(254,226,226,0.4);border:1px solid rgba(254,202,202,0.8);">' .
             '<div style="width:16px;height:16px;border-radius:4px;background-color:#ef4444;box-shadow:0 1px 3px rgba(239,68,68,0.4);flex-shrink:0;"></div>' .
-            '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#991b1b;">Merah (Reject)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Quotation ditolak</span></div>' .
+            '<div class="leading-tight"><span class="block text-xs font-bold" style="display:block;font-size:11px;font-weight:700;color:#991b1b;">Merah (Ditolak)</span><span class="text-[10px] text-gray-500" style="font-size:9px;color:#6b7280;">Quotation ditolak</span></div>' .
             '</div>' .
             '</div>' .
             '</div>' .

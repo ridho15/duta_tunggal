@@ -10,6 +10,8 @@ use Filament\Pages\Page;
 
 class ProfitLossMultiDivisionPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;

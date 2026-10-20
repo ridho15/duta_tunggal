@@ -78,10 +78,10 @@ test('page shows filter labels after form is enabled', function () {
 
     Livewire::test(GroupedJournalEntries::class)
         ->assertOk()
-        ->assertSee('Start Date')
-        ->assertSee('End Date')
-        ->assertSee('Journal Type')
-        ->assertSee('Branch');
+        ->assertSee('Tanggal Mulai')
+        ->assertSee('Tanggal Akhir')
+        ->assertSee('Jenis Jurnal')
+        ->assertSee('Cabang');
 });
 
 test('page shows grouped view heading', function () {

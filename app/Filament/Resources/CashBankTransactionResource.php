@@ -41,13 +41,17 @@ use Filament\Infolists\Components\RepeatableEntry;
 
 class CashBankTransactionResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = CashBankTransaction::class;
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationGroup = 'Pembayaran Keuangan';
-    protected static ?string $modelLabel = 'Transaksi Kas & Bank';
-    protected static ?int $navigationSort = 6;
+    protected static ?string $navigationGroup = 'KEUANGAN';
+    protected static ?string $navigationLabel = 'Kas & Bank';
+    protected static ?string $modelLabel = 'Kas & Bank';
+    protected static ?string $pluralModelLabel = 'Kas & Bank';
+    protected static ?int $navigationSort = 1;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     public static function form(Form $form): Form
     {

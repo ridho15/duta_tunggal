@@ -11,6 +11,8 @@ use Filament\Pages\Page;
  */
 class AlkGraficPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;

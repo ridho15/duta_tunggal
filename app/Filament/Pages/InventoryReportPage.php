@@ -24,21 +24,23 @@ use Throwable;
 
 class InventoryReportPage extends Page implements HasTable
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     use InteractsWithTable;
 
     protected static string $view = 'filament.pages.inventory-report-page';
 
-    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
+    protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
 
-    protected static ?string $navigationGroup = 'Reports';
+    protected static ?string $navigationGroup = 'LAPORAN';
 
-    protected static ?string $navigationLabel = 'Laporan Inventori';
+    protected static ?string $navigationLabel = 'Stok';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     public ?string $start_date = null;

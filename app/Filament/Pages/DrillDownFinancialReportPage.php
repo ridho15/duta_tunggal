@@ -9,6 +9,8 @@ use Filament\Pages\Page;
 
 class DrillDownFinancialReportPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;

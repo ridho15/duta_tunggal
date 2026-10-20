@@ -57,22 +57,23 @@ use Filament\Infolists\Components\RepeatableEntry;
 
 class DeliveryOrderResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = DeliveryOrder::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationGroup = 'Pengiriman';
+    protected static ?string $navigationGroup = 'PENJUALAN';
 
-    protected static ?string $navigationLabel = 'Perintah Pengiriman';
+    protected static ?string $navigationLabel = 'Perintah Kirim (DO)';
 
-    protected static ?string $modelLabel = 'Perintah Pengiriman';
+    protected static ?string $modelLabel = 'Perintah Kirim (DO)';
 
-    protected static ?string $pluralModelLabel = 'Perintah Pengiriman';
+    protected static ?string $pluralModelLabel = 'Perintah Kirim (DO)';
 
-    // Position Delivery Order after Penjualan groups
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     /**
      * ID DO yang sedang diedit (null di halaman Create).
@@ -1535,7 +1536,7 @@ class DeliveryOrderResource extends Resource
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 243, 199, 0.4); border: 1px solid rgba(253, 230, 138, 0.8);">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #eab308; box-shadow: 0 1px 3px rgba(234, 179, 8, 0.4); flex-shrink: 0;"></div>' .
                     '<div class="leading-tight">' .
-                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Request Stock)</span>' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #854d0e;">Kuning (Menunggu stok)</span>' .
                     '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Menunggu stock</span>' .
                     '</div>' .
                     '</div>' .
@@ -1543,7 +1544,7 @@ class DeliveryOrderResource extends Resource
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(219, 234, 254, 0.4); border: 1px solid rgba(191, 219, 254, 0.8);">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #3b82f6; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.4); flex-shrink: 0;"></div>' .
                     '<div class="leading-tight">' .
-                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Sent/Approved)</span>' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #1e40af;">Biru (Disetujui/Dikirim)</span>' .
                     '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Disetujui/dikirim</span>' .
                     '</div>' .
                     '</div>' .
@@ -1551,7 +1552,7 @@ class DeliveryOrderResource extends Resource
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(220, 252, 231, 0.4); border: 1px solid rgba(187, 247, 208, 0.8);">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #22c55e; box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4); flex-shrink: 0;"></div>' .
                     '<div class="leading-tight">' .
-                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Completed)</span>' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #166534;">Hijau (Selesai)</span>' .
                     '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Selesai diterima</span>' .
                     '</div>' .
                     '</div>' .
@@ -1559,7 +1560,7 @@ class DeliveryOrderResource extends Resource
                     '<div class="flex items-center gap-3 p-2 rounded-lg" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background-color: rgba(254, 226, 226, 0.4); border: 1px solid rgba(254, 202, 202, 0.8);">' .
                     '<div style="width: 16px; height: 16px; border-radius: 4px; background-color: #ef4444; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4); flex-shrink: 0;"></div>' .
                     '<div class="leading-tight">' .
-                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Closed/Reject)</span>' .
+                    '<span class="block text-xs font-bold" style="display: block; font-size: 11px; font-weight: 700; color: #991b1b;">Merah (Ditutup/Ditolak)</span>' .
                     '<span class="text-[10px] text-gray-500" style="font-size: 9px; color: #6b7280;">Ditolak/ditutup</span>' .
                     '</div>' .
                     '</div>' .

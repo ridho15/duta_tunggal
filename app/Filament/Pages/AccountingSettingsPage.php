@@ -19,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  */
 class AccountingSettingsPage extends Page
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $navigationIcon = 'heroicon-o-calculator';
 
     protected static ?string $navigationLabel = 'Pengaturan Akuntansi';
@@ -29,6 +31,11 @@ class AccountingSettingsPage extends Page
 
     protected static ?int $navigationSort = 91;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string $view = 'filament.pages.accounting-settings';
 
     /** @var array<string, int|null> */
@@ -36,7 +43,8 @@ class AccountingSettingsPage extends Page
 
     public static function canAccess(): bool
     {
-        return (bool) Auth::user()?->hasRole(['Super Admin', 'Finance Manager']);
+        return \App\Support\MenuAccess::allows(static::class)
+            && (bool) Auth::user()?->hasRole(['Super Admin', 'Finance Manager']);
     }
 
     public function getFlagEnabledProperty(): bool

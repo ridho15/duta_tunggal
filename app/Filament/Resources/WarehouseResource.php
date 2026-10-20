@@ -36,19 +36,23 @@ use Illuminate\Support\Facades\Auth;
 
 class WarehouseResource extends Resource
 {
+    use \App\Filament\Concerns\HasMenuAccess;
+
     protected static ?string $model = Warehouse::class;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
-    protected static ?string $navigationIcon = 'heroicon-o-home-modern';
+    protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'DATA MASTER';
 
-    protected static ?string $navigationLabel = 'Gudang';
+    protected static ?string $navigationLabel = 'Gudang & Rak';
 
-    protected static ?string $modelLabel = 'Gudang';
+    protected static ?string $modelLabel = 'Gudang & Rak';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?string $pluralModelLabel = 'Gudang & Rak';
+
+    protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
     {
