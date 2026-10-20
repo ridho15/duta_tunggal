@@ -210,7 +210,25 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/receipts/create', function () { return redirect()->route('penjualan.receipts.create', request()->query()); });
         Route::get('/receipts/{customerReceipt}', function ($customerReceipt) { return redirect()->route('penjualan.receipts.show', $customerReceipt); });
 
-        Route::get('/retur', function () { return redirect()->route('dashboard'); })->name('returns.index');
+        // Retur Penjualan (Customer Return)
+        Route::get('/retur', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'index'])->name('returns.index');
+        Route::get('/retur/create', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'create'])->name('returns.create');
+        Route::get('/retur/customer-invoices/{customer}', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'customerInvoices'])->name('returns.customerInvoices');
+        Route::post('/retur', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'store'])->name('returns.store');
+        Route::get('/retur/{customerReturn}', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'show'])->name('returns.show');
+        Route::get('/retur/{customerReturn}/pdf', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'pdf'])->name('returns.pdf');
+        Route::post('/retur/{customerReturn}/mark-received', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'markReceived'])->name('returns.markReceived');
+        Route::post('/retur/{customerReturn}/start-qc', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'startQc'])->name('returns.startQc');
+        Route::post('/retur/{customerReturn}/save-qc', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'saveQc'])->name('returns.saveQc');
+        Route::post('/retur/{customerReturn}/approve', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'approve'])->name('returns.approve');
+        Route::post('/retur/{customerReturn}/reject', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'reject'])->name('returns.reject');
+        Route::post('/retur/{customerReturn}/complete', [\App\Http\Controllers\Penjualan\CustomerReturnController::class, 'complete'])->name('returns.complete');
+
+        // Aliases for plural URL compatibility
+        Route::get('/returns', function () { return redirect()->route('penjualan.returns.index'); });
+        Route::get('/returns/create', function () { return redirect()->route('penjualan.returns.create', request()->query()); });
+        Route::get('/returns/{customerReturn}', function ($customerReturn) { return redirect()->route('penjualan.returns.show', $customerReturn); });
+
         Route::get('/penawaran', function () { return redirect()->route('dashboard'); })->name('quotations.index');
     });
 
