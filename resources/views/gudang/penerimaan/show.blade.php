@@ -448,14 +448,25 @@
                     <span>Langkah Selanjutnya</span>
                 </div>
                 <p class="text-xs text-blue-800/80 leading-relaxed">
-                    Setelah barang resmi diterima di gudang, dokumen ini dapat langsung ditagihkan melalui modul <strong>Faktur Pembelian (Purchase Invoice)</strong> pada Fase 3.
+                    Setelah barang resmi diterima di gudang, dokumen ini dapat langsung ditagihkan melalui modul <strong>Faktur Pembelian (Purchase Invoice)</strong>.
                 </p>
-                <div class="pt-2">
+                <div class="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    @if (in_array(strtolower((string)$receipt->status), ['partial', 'completed']))
+                        <a
+                            href="{{ route('pembelian.invoices.create', ['receipt_id' => $receipt->id, 'supplier_id' => $receipt->purchaseOrder?->supplier_id]) }}"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                            </svg>
+                            + Buat Faktur Pembelian
+                        </a>
+                    @endif
                     <a
                         href="{{ route('pembelian.po.show', $receipt->purchase_order_id) }}"
-                        class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline"
+                        class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline py-1.5"
                     >
-                        <span>Kembali ke Halaman Purchase Order</span>
+                        <span>Halaman Purchase Order</span>
                         <span>&rarr;</span>
                     </a>
                 </div>

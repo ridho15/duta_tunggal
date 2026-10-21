@@ -304,7 +304,19 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/penerimaan/create', function () { return redirect()->route('gudang.penerimaan.create', request()->query()); })->name('receipts.create');
         Route::get('/penerimaan/{penerimaan}', function ($penerimaan) { return redirect()->route('gudang.penerimaan.show', $penerimaan); })->name('receipts.show');
 
-        Route::get('/invoice', function () { return redirect()->route('dashboard'); })->name('invoices.index');
+        // Faktur Pembelian (Purchase Invoice / AP)
+        Route::get('/invoice', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoice/create', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'create'])->name('invoices.create');
+        Route::post('/invoice', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'store'])->name('invoices.store');
+        Route::get('/invoice/{invoice}', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('/invoice/{invoice}/edit', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'edit'])->name('invoices.edit');
+        Route::put('/invoice/{invoice}', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'update'])->name('invoices.update');
+        Route::delete('/invoice/{invoice}', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'destroy'])->name('invoices.destroy');
+        Route::post('/invoice/{invoice}/post', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'post'])->name('invoices.post');
+        Route::post('/invoice/{invoice}/cancel', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'cancel'])->name('invoices.cancel');
+        Route::get('/invoice/{invoice}/pdf', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'pdf'])->name('invoices.pdf');
+        Route::get('/invoice-available-receipts/{supplier}', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'availableReceipts'])->name('invoices.available-receipts');
+        Route::get('/invoice-receipt-details', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'receiptDetails'])->name('invoices.receipt-details');
     });
 
     // Modul Keuangan & Akuntansi
