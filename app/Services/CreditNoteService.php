@@ -353,11 +353,15 @@ class CreditNoteService
     }
 
     /** Biaya pengiriman invoice yang belum dikreditkan. */
-    private function creditableShipping(Invoice $invoice): float
+    public function creditableShipping(Invoice $invoice): float
     {
         $creditedFee = (float) CreditNote::query()->where('invoice_id', $invoice->id)->whereIn('status', [CreditNote::STATUS_DRAFT, CreditNote::STATUS_ISSUED])->sum('other_fee_amount');
+        $baseFee = (float) ($invoice->other_fee_total ?? 0);
+        if ($baseFee <= 0 && (float) ($invoice->shipping_cost ?? 0) > 0) {
+            $baseFee = (float) $invoice->shipping_cost;
+        }
 
-        return max(0.0, round((float) $invoice->other_fee_total - $creditedFee, 2));
+        return max(0.0, round($baseFee - $creditedFee, 2));
     }
 
     /**

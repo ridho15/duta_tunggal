@@ -130,6 +130,11 @@ class CustomerReturn extends Model
         return $this->belongsTo(User::class, 'rejected_by')->withDefault();
     }
 
+    public function creditNotes()
+    {
+        return $this->hasMany(CreditNote::class, 'customer_return_id');
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

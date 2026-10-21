@@ -144,6 +144,16 @@
                         <span>Retur Penjualan</span>
                     </a>
                 @endif
+
+                @if ($canSee(['OWN', 'SM', 'KSR', 'FIN']))
+                    <a href="{{ route('penjualan.credit-notes.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/nota-kredit*') || request()->is('penjualan/credit-notes*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M16 15v-1a4 4 0 0 0-4-4H4m0 0l3-3m-3 3l3 3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <rect x="2" y="4" width="20" height="16" rx="2" stroke-width="1.8"></rect>
+                        </svg>
+                        <span>Nota Kredit</span>
+                    </a>
+                @endif
             </div>
         @endif
 

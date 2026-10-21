@@ -61,6 +61,20 @@
                     <span>Terima Pembayaran</span>
                 </a>
             @endif
+
+            @if(!in_array(strtolower((string) $invoice->status), ['draft', 'cancelled', 'canceled']))
+                <a
+                    href="{{ route('penjualan.credit-notes.create', ['invoice_id' => $invoice->id]) }}"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs shadow-xs transition"
+                    title="Buat Nota Kredit untuk koreksi atau pembatalan faktur ini"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 0 0-4-4H4m0 0l3-3m-3 3l3 3"></path>
+                        <rect x="2" y="4" width="20" height="16" rx="2" stroke-width="2"></rect>
+                    </svg>
+                    <span>Buat Nota Kredit</span>
+                </a>
+            @endif
         </div>
     </div>
 

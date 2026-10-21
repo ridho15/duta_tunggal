@@ -229,6 +229,24 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/returns/create', function () { return redirect()->route('penjualan.returns.create', request()->query()); });
         Route::get('/returns/{customerReturn}', function ($customerReturn) { return redirect()->route('penjualan.returns.show', $customerReturn); });
 
+        // Nota Kredit (Credit Note)
+        Route::get('/nota-kredit', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'index'])->name('credit-notes.index');
+        Route::get('/nota-kredit/create', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'create'])->name('credit-notes.create');
+        Route::get('/nota-kredit/customer-invoices/{customer}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'customerInvoices'])->name('credit-notes.customerInvoices');
+        Route::get('/nota-kredit/invoice-details/{invoice}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'invoiceDetails'])->name('credit-notes.invoiceDetails');
+        Route::post('/nota-kredit', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'store'])->name('credit-notes.store');
+        Route::post('/nota-kredit/from-return/{customerReturn}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'storeFromReturn'])->name('credit-notes.fromReturn');
+        Route::get('/nota-kredit/{creditNote}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'show'])->name('credit-notes.show');
+        Route::post('/nota-kredit/{creditNote}/issue', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'issue'])->name('credit-notes.issue');
+        Route::post('/nota-kredit/{creditNote}/tax-document', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'updateTaxDocument'])->name('credit-notes.updateTaxDocument');
+        Route::delete('/nota-kredit/{creditNote}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'destroy'])->name('credit-notes.destroy');
+        Route::get('/nota-kredit/{creditNote}/pdf', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'pdf'])->name('credit-notes.pdf');
+
+        // Aliases for English / plural URL compatibility
+        Route::get('/credit-notes', function () { return redirect()->route('penjualan.credit-notes.index'); });
+        Route::get('/credit-notes/create', function () { return redirect()->route('penjualan.credit-notes.create', request()->query()); });
+        Route::get('/credit-notes/{creditNote}', function ($creditNote) { return redirect()->route('penjualan.credit-notes.show', $creditNote); });
+
         Route::get('/penawaran', function () { return redirect()->route('dashboard'); })->name('quotations.index');
     });
 

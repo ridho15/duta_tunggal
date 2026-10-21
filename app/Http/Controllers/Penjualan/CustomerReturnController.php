@@ -400,6 +400,7 @@ class CustomerReturnController extends Controller
             'approvedBy',
             'rejectedBy',
             'stockMovements.warehouse',
+            'creditNotes',
         ]);
 
         // Jurnal Akuntansi terkait (jika retur sudah selesai diproses)
@@ -424,6 +425,9 @@ class CustomerReturnController extends Controller
             }
         }
 
+        $existingCreditNote = $customerReturn->creditNotes->first();
+        $hasCreditDecision = $customerReturn->customerReturnItems->contains('decision', CustomerReturnItem::DECISION_CREDIT);
+
         $decisionOptions = CustomerReturnItem::decisionOptions();
         $doc = $this->docBuilder->customerReturn($customerReturn);
 
@@ -433,7 +437,9 @@ class CustomerReturnController extends Controller
             'totalHppRestored',
             'totalFinancial',
             'decisionOptions',
-            'doc'
+            'doc',
+            'existingCreditNote',
+            'hasCreditDecision'
         ));
     }
 
