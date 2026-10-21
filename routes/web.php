@@ -388,9 +388,15 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/jurnal/{reference}/pdf', [\App\Http\Controllers\Keuangan\JournalController::class, 'pdf'])->name('journal.pdf');
     });
 
-    // Modul Laporan
+    // Modul Laporan Keuangan
     Route::prefix('laporan')->name('laporan.')->group(function () {
-        Route::get('/keuangan', function () { return redirect()->route('dashboard'); })->name('financial.index');
+        Route::get('/keuangan', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'index'])->name('financial.index');
+        Route::get('/keuangan/neraca-saldo', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'trialBalance'])->name('financial.trial-balance');
+        Route::get('/keuangan/neraca-saldo/pdf', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'trialBalancePdf'])->name('financial.trial-balance.pdf');
+        Route::get('/keuangan/laba-rugi', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'incomeStatement'])->name('financial.income-statement');
+        Route::get('/keuangan/laba-rugi/pdf', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'incomeStatementPdf'])->name('financial.income-statement.pdf');
+        Route::get('/keuangan/neraca', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'balanceSheet'])->name('financial.balance-sheet');
+        Route::get('/keuangan/neraca/pdf', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'balanceSheetPdf'])->name('financial.balance-sheet.pdf');
     });
 
     // Master Data
