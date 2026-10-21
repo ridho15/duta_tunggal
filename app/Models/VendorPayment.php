@@ -18,17 +18,20 @@ class VendorPayment extends Model
     public const STATUS_DRAFT = 'Draft';
     public const STATUS_PARTIAL = 'Partial';
     public const STATUS_PAID = 'Paid';
+    public const STATUS_CANCELLED = 'Cancelled';
 
     public const STATUS_LABELS = [
         self::STATUS_DRAFT => 'Draft',
         self::STATUS_PARTIAL => 'Partial',
         self::STATUS_PAID => 'Paid',
+        self::STATUS_CANCELLED => 'Dibatalkan',
     ];
 
     public const STATUS_COLORS = [
         self::STATUS_DRAFT => 'gray',
         self::STATUS_PARTIAL => 'warning',
         self::STATUS_PAID => 'success',
+        self::STATUS_CANCELLED => 'danger',
     ];
 
     protected $fillable = [
@@ -109,6 +112,7 @@ class VendorPayment extends Model
             'draft' => self::STATUS_DRAFT,
             'partial' => self::STATUS_PARTIAL,
             'paid' => self::STATUS_PAID,
+            'cancelled', 'canceled' => self::STATUS_CANCELLED,
             default => $value,
         };
     }
@@ -126,6 +130,7 @@ class VendorPayment extends Model
             'draft' => self::STATUS_DRAFT,
             'partial' => self::STATUS_PARTIAL,
             'paid' => self::STATUS_PAID,
+            'cancelled', 'canceled' => self::STATUS_CANCELLED,
             default => $value,
         };
     }

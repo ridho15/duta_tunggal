@@ -33,6 +33,9 @@ class VendorPaymentDetailObserver
     public function created(VendorPaymentDetail $vendorPaymentDetail): void
     {
         $vendorPayment = $vendorPaymentDetail->vendorPayment;
+        if (!$vendorPayment || in_array(strtolower((string) $vendorPayment->status), ['draft', 'cancelled'])) {
+            return;
+        }
 
         $detailMethod = strtolower($vendorPaymentDetail->method ?? $vendorPayment->payment_method ?? '');
         if ($detailMethod === 'deposit') {

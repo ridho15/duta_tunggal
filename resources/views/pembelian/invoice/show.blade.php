@@ -105,6 +105,20 @@
                 </button>
             @endif
 
+            {{-- Tombol Bayar Tagihan Ini --}}
+            @if (!$isDraft && !$isCancelled && $remaining > 0)
+                <a
+                    href="{{ route('pembelian.payments.create', ['supplier_id' => $invoice->supplier_id ?: $invoice->purchaseOrder?->supplier_id, 'invoice_id' => $invoice->id]) }}"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="6" width="18" height="14" rx="2" stroke-width="2"></rect>
+                        <path d="M3 10h18M16 15h2" stroke-width="2" stroke-linecap="round"></path>
+                    </svg>
+                    + Bayar Tagihan Ini
+                </a>
+            @endif
+
             {{-- Tombol Batalkan Faktur --}}
             @if (!$isDraft && !$isCancelled && $remaining > 0)
                 <button
@@ -398,10 +412,18 @@
                     </div>
                 </div>
 
-                <div class="p-4 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 flex items-center justify-between">
+                <div class="p-4 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        Pembayaran tagihan ini dicatat melalui modul <strong>Keuangan &gt; Pengeluaran Kas/Bank (Vendor Payment)</strong>.
+                        Pembayaran tagihan ini dicatat melalui modul <strong>Pembelian &gt; Pembayaran Hutang (Vendor Payment)</strong>.
                     </div>
+                    @if ($invoice->accountPayable->remaining > 0)
+                        <a
+                            href="{{ route('pembelian.payments.create', ['supplier_id' => $invoice->supplier_id ?: $invoice->purchaseOrder?->supplier_id, 'invoice_id' => $invoice->id]) }}"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition self-start sm:self-auto"
+                        >
+                            + Catat Pembayaran Tagihan Ini
+                        </a>
+                    @endif
                 </div>
             @else
                 <div class="py-8 text-center text-gray-400 text-xs">

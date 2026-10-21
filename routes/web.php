@@ -317,6 +317,24 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/invoice/{invoice}/pdf', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'pdf'])->name('invoices.pdf');
         Route::get('/invoice-available-receipts/{supplier}', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'availableReceipts'])->name('invoices.available-receipts');
         Route::get('/invoice-receipt-details', [\App\Http\Controllers\Pembelian\PurchaseInvoiceController::class, 'receiptDetails'])->name('invoices.receipt-details');
+
+        // Pembayaran Hutang Vendor (Vendor Payment / AP Settlement)
+        Route::get('/pembayaran', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'index'])->name('payments.index');
+        Route::get('/pembayaran/create', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'create'])->name('payments.create');
+        Route::post('/pembayaran', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'store'])->name('payments.store');
+        Route::get('/pembayaran/{payment}', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'show'])->name('payments.show');
+        Route::get('/pembayaran/{payment}/edit', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'edit'])->name('payments.edit');
+        Route::put('/pembayaran/{payment}', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'update'])->name('payments.update');
+        Route::delete('/pembayaran/{payment}', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'destroy'])->name('payments.destroy');
+        Route::post('/pembayaran/{payment}/post', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'post'])->name('payments.post');
+        Route::post('/pembayaran/{payment}/cancel', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'cancel'])->name('payments.cancel');
+        Route::get('/pembayaran/{payment}/pdf', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'pdf'])->name('payments.pdf');
+        Route::get('/pembayaran-supplier-invoices/{supplier}', [\App\Http\Controllers\Pembelian\VendorPaymentController::class, 'supplierInvoices'])->name('payments.supplier-invoices');
+
+        // Aliases for vendor payments
+        Route::get('/vendor-payments', function () { return redirect()->route('pembelian.payments.index'); });
+        Route::get('/vendor-payments/create', function () { return redirect()->route('pembelian.payments.create', request()->query()); });
+        Route::get('/vendor-payments/{payment}', function ($payment) { return redirect()->route('pembelian.payments.show', $payment); });
     });
 
     // Modul Keuangan & Akuntansi

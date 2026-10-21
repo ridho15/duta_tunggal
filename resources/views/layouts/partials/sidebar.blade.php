@@ -259,6 +259,14 @@
                         </svg>
                         <span>Invoice Pembelian</span>
                     </a>
+
+                    <a href="{{ route('pembelian.payments.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/pembayaran*') || request()->is('pembelian/vendor-payments*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="3" y="6" width="18" height="14" rx="2" stroke-width="1.8"></rect>
+                            <path d="M3 10h18M16 15h2" stroke-width="1.8" stroke-linecap="round"></path>
+                        </svg>
+                        <span>Pembayaran Hutang</span>
+                    </a>
                 @endif
             </div>
         @endif
