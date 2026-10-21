@@ -378,8 +378,14 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         // Aliases for compatibility
         Route::get('/kas-bank-transfer/create', function () { return redirect()->route('keuangan.cashbank.transfer.create'); });
 
-        // Buku Besar & Jurnal (Akan dikembangkan pada fase berikutnya)
-        Route::get('/jurnal', function () { return redirect()->route('dashboard'); })->name('journal.index');
+        // Buku Besar & Jurnal Umum
+        Route::get('/jurnal', [\App\Http\Controllers\Keuangan\JournalController::class, 'index'])->name('journal.index');
+        Route::get('/jurnal/buku-besar', [\App\Http\Controllers\Keuangan\JournalController::class, 'ledger'])->name('journal.ledger');
+        Route::get('/jurnal/create', [\App\Http\Controllers\Keuangan\JournalController::class, 'create'])->name('journal.create');
+        Route::post('/jurnal', [\App\Http\Controllers\Keuangan\JournalController::class, 'store'])->name('journal.store');
+        Route::get('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'show'])->name('journal.show');
+        Route::delete('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'destroy'])->name('journal.destroy');
+        Route::get('/jurnal/{reference}/pdf', [\App\Http\Controllers\Keuangan\JournalController::class, 'pdf'])->name('journal.pdf');
     });
 
     // Modul Laporan
