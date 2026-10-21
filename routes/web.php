@@ -270,7 +270,14 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/penerimaan/{penerimaan}/pdf', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'pdf'])->name('penerimaan.pdf');
         Route::get('/penerimaan-po-items/{purchaseOrder}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'poItems'])->name('penerimaan.po-items');
 
-        Route::get('/stok', function () { return redirect()->route('dashboard'); })->name('stok.index');
+        // Cek Stok Real-Time & Kartu Persediaan
+        Route::get('/stok', [\App\Http\Controllers\Gudang\StockController::class, 'index'])->name('stok.index');
+        Route::get('/stok/kartu-persediaan', [\App\Http\Controllers\Gudang\StockController::class, 'inventoryCardReport'])->name('stok.inventory-card');
+        Route::get('/stok/kartu-persediaan/pdf', [\App\Http\Controllers\Gudang\StockController::class, 'inventoryCardReportPdf'])->name('stok.inventory-card.pdf');
+        Route::get('/stok/{product}/kartu', [\App\Http\Controllers\Gudang\StockController::class, 'stockCard'])->name('stok.card');
+        Route::get('/stok/{product}/kartu/pdf', [\App\Http\Controllers\Gudang\StockController::class, 'stockCardPdf'])->name('stok.card.pdf');
+        Route::get('/stok/{product}/kartu/excel', [\App\Http\Controllers\Gudang\StockController::class, 'stockCardExcel'])->name('stok.card.excel');
+
         Route::get('/transfer', function () { return redirect()->route('dashboard'); })->name('transfer.index');
         Route::get('/opname', function () { return redirect()->route('dashboard'); })->name('opname.index');
     });
