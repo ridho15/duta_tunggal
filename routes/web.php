@@ -278,8 +278,34 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/stok/{product}/kartu/pdf', [\App\Http\Controllers\Gudang\StockController::class, 'stockCardPdf'])->name('stok.card.pdf');
         Route::get('/stok/{product}/kartu/excel', [\App\Http\Controllers\Gudang\StockController::class, 'stockCardExcel'])->name('stok.card.excel');
 
-        Route::get('/transfer', function () { return redirect()->route('dashboard'); })->name('transfer.index');
-        Route::get('/opname', function () { return redirect()->route('dashboard'); })->name('opname.index');
+        // Pindah Stok / Transfer Antar Gudang
+        Route::get('/transfer', [\App\Http\Controllers\Gudang\StockTransferController::class, 'index'])->name('transfer.index');
+        Route::get('/transfer/create', [\App\Http\Controllers\Gudang\StockTransferController::class, 'create'])->name('transfer.create');
+        Route::post('/transfer', [\App\Http\Controllers\Gudang\StockTransferController::class, 'store'])->name('transfer.store');
+        Route::get('/transfer/{transfer}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'show'])->name('transfer.show');
+        Route::get('/transfer/{transfer}/edit', [\App\Http\Controllers\Gudang\StockTransferController::class, 'edit'])->name('transfer.edit');
+        Route::put('/transfer/{transfer}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'update'])->name('transfer.update');
+        Route::delete('/transfer/{transfer}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'destroy'])->name('transfer.destroy');
+        Route::post('/transfer/{transfer}/request', [\App\Http\Controllers\Gudang\StockTransferController::class, 'requestTransfer'])->name('transfer.request');
+        Route::post('/transfer/{transfer}/approve', [\App\Http\Controllers\Gudang\StockTransferController::class, 'approve'])->name('transfer.approve');
+        Route::post('/transfer/{transfer}/reject', [\App\Http\Controllers\Gudang\StockTransferController::class, 'reject'])->name('transfer.reject');
+        Route::get('/transfer/{transfer}/pdf', [\App\Http\Controllers\Gudang\StockTransferController::class, 'pdf'])->name('transfer.pdf');
+        Route::get('/transfer-available-products/{warehouse}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'availableProducts'])->name('transfer.available-products');
+        Route::get('/warehouse-raks/{warehouse}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'warehouseRaks'])->name('warehouse-raks');
+
+        // Stock Opname & Penyesuaian Persediaan
+        Route::get('/opname', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'index'])->name('opname.index');
+        Route::get('/opname/create', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'create'])->name('opname.create');
+        Route::post('/opname', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'store'])->name('opname.store');
+        Route::get('/opname/{opname}', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'show'])->name('opname.show');
+        Route::delete('/opname/{opname}', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'destroy'])->name('opname.destroy');
+        Route::post('/opname/{opname}/start', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'startCount'])->name('opname.start');
+        Route::post('/opname/{opname}/save-progress', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'saveProgress'])->name('opname.save-progress');
+        Route::post('/opname/{opname}/complete', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'completeCount'])->name('opname.complete');
+        Route::post('/opname/{opname}/recount', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'recount'])->name('opname.recount');
+        Route::post('/opname/{opname}/approve', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'approve'])->name('opname.approve');
+        Route::get('/opname/{opname}/pdf', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'pdf'])->name('opname.pdf');
+        Route::get('/opname/{opname}/excel', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'excel'])->name('opname.excel');
     });
 
     // Modul Pembelian
