@@ -129,9 +129,11 @@
                         class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                         <option value="">-- Pilih Supplier --</option>
-                        <template x-for="s in suppliers" :key="s.id">
-                            <option :value="s.id" x-text="s.perusahaan + ' (' + s.code + ')'"></option>
-                        </template>
+                        @foreach ($suppliers as $s)
+                            <option value="{{ $s->id }}" {{ old('supplier_id', $purchaseOrder->supplier_id) == $s->id ? 'selected' : '' }}>
+                                {{ $s->perusahaan }} ({{ $s->code ?? 'SUP' }})
+                            </option>
+                        @endforeach
                     </select>
 
                     {{-- Supplier Quick Info Box --}}
@@ -247,9 +249,11 @@
                             @change="onCurrencyChange()"
                             class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
-                            <template x-for="c in currencies" :key="c.id">
-                                <option :value="c.id" x-text="c.code + ' - ' + c.name"></option>
-                            </template>
+                            @foreach ($currencies as $c)
+                                <option value="{{ $c->id }}" {{ old('currency_id', $purchaseOrder->purchaseOrderCurrency?->first()?->currency_id ?? 1) == $c->id ? 'selected' : '' }}>
+                                    {{ $c->code }} - {{ $c->name }}
+                                </option>
+                            @endforeach
                         </select>
 
                         <div x-show="isForeignCurrency" class="w-32 flex-shrink-0">
@@ -318,9 +322,9 @@
                                         class="w-full py-1.5 px-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
                                     >
                                         <option value="">-- Pilih Produk --</option>
-                                        <template x-for="p in products" :key="p.id">
-                                            <option :value="p.id" x-text="p.name + ' (' + p.sku + ')'"></option>
-                                        </template>
+                                        @foreach ($products as $p)
+                                            <option value="{{ $p->id }}">{{ $p->name }} ({{ $p->sku ?? '-' }})</option>
+                                        @endforeach
                                     </select>
                                     <input type="hidden" :name="'items[' + index + '][currency_id]'" :value="currencyId">
                                     <input type="hidden" :name="'items[' + index + '][tax]'" value="11">
