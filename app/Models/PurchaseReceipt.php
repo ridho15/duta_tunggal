@@ -36,6 +36,19 @@ class PurchaseReceipt extends Model
         'cabang_id'
     ];
 
+    public function getSupplierDeliveryNoteNumberAttribute(): ?string
+    {
+        if (preg_match('/\[SJ Vendor:\s*([^\]]+)\]/i', $this->notes ?? '', $matches)) {
+            return trim($matches[1]);
+        }
+        return null;
+    }
+
+    public function getCleanNotesAttribute(): string
+    {
+        return trim(preg_replace('/\[SJ Vendor:\s*[^\]]+\]\s*/i', '', $this->notes ?? ''));
+    }
+
     public function purchaseOrder()
     {
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id')->withDefault();

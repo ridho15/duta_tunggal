@@ -258,8 +258,18 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/kiriman/{deliveryOrder}/check', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitCheck'])->name('kiriman.submitCheck');
         Route::get('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'retur'])->name('kiriman.retur');
         Route::post('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitRetur'])->name('kiriman.submitRetur');
+        // Penerimaan Barang (Goods Receipt / Surat Jalan Masuk)
+        Route::get('/penerimaan', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'index'])->name('penerimaan.index');
+        Route::get('/penerimaan/create', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'create'])->name('penerimaan.create');
+        Route::post('/penerimaan', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'store'])->name('penerimaan.store');
+        Route::get('/penerimaan/{penerimaan}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'show'])->name('penerimaan.show');
+        Route::get('/penerimaan/{penerimaan}/edit', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'edit'])->name('penerimaan.edit');
+        Route::put('/penerimaan/{penerimaan}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'update'])->name('penerimaan.update');
+        Route::delete('/penerimaan/{penerimaan}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'destroy'])->name('penerimaan.destroy');
+        Route::post('/penerimaan/{penerimaan}/confirm', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'confirm'])->name('penerimaan.confirm');
+        Route::get('/penerimaan/{penerimaan}/pdf', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'pdf'])->name('penerimaan.pdf');
+        Route::get('/penerimaan-po-items/{purchaseOrder}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'poItems'])->name('penerimaan.po-items');
 
-        Route::get('/penerimaan', function () { return redirect()->route('dashboard'); })->name('penerimaan.index');
         Route::get('/stok', function () { return redirect()->route('dashboard'); })->name('stok.index');
         Route::get('/transfer', function () { return redirect()->route('dashboard'); })->name('transfer.index');
         Route::get('/opname', function () { return redirect()->route('dashboard'); })->name('opname.index');
@@ -288,6 +298,11 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/purchase-orders', function () { return redirect()->route('pembelian.po.index'); });
         Route::get('/purchase-orders/create', function () { return redirect()->route('pembelian.po.create', request()->query()); });
         Route::get('/purchase-orders/{purchaseOrder}', function ($purchaseOrder) { return redirect()->route('pembelian.po.show', $purchaseOrder); });
+
+        // Aliases for Penerimaan Pembelian
+        Route::get('/penerimaan', function () { return redirect()->route('gudang.penerimaan.index', request()->query()); })->name('receipts.index');
+        Route::get('/penerimaan/create', function () { return redirect()->route('gudang.penerimaan.create', request()->query()); })->name('receipts.create');
+        Route::get('/penerimaan/{penerimaan}', function ($penerimaan) { return redirect()->route('gudang.penerimaan.show', $penerimaan); })->name('receipts.show');
 
         Route::get('/invoice', function () { return redirect()->route('dashboard'); })->name('invoices.index');
     });

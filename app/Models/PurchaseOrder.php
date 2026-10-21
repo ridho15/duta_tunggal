@@ -87,6 +87,18 @@ class PurchaseOrder extends Model
         return $this->hasMany(PurchaseOrderCurrency::class, 'purchase_order_id');
     }
 
+    public function currency()
+    {
+        return $this->hasOneThrough(
+            Currency::class,
+            PurchaseOrderCurrency::class,
+            'purchase_order_id',
+            'id',
+            'id',
+            'currency_id'
+        )->withDefault();
+    }
+
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault();

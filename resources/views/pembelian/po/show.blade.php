@@ -104,6 +104,15 @@
             @endif
 
             @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
+                <a
+                    href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
+                    class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    + Terima Barang (GRN)
+                </a>
                 <button
                     type="button"
                     @click="requestCloseModalOpen = true"
@@ -407,7 +416,22 @@
         </div>
 
         {{-- Tab 2: Penerimaan Gudang --}}
-        <div x-show="activeTab === 'receipts'" class="p-4">
+        <div x-show="activeTab === 'receipts'" class="p-4 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+                <div class="text-xs text-gray-500 font-semibold">Riwayat Surat Jalan Masuk & Penerimaan Fisik Gudang</div>
+                @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
+                    <a
+                        href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg transition"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>+ Catat Penerimaan Baru</span>
+                    </a>
+                @endif
+            </div>
+
             @if ($purchaseOrder->purchaseReceipt->count() > 0)
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-gray-600">
@@ -418,19 +442,39 @@
                                 <th class="py-2.5 px-3">No. SJ Vendor</th>
                                 <th class="py-2.5 px-3">Penerima Gudang</th>
                                 <th class="py-2.5 px-3 text-center">Status</th>
+                                <th class="py-2.5 px-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach ($purchaseOrder->purchaseReceipt as $receipt)
-                                <tr class="hover:bg-gray-50/50">
-                                    <td class="py-2.5 px-3 font-semibold text-gray-900">{{ $receipt->receipt_number ?? ('RCV-' . $receipt->id) }}</td>
+                                <tr class="hover:bg-blue-50/20 transition">
+                                    <td class="py-2.5 px-3 font-semibold text-gray-900">
+                                        <a href="{{ route('gudang.penerimaan.show', $receipt) }}" class="text-blue-600 hover:underline">
+                                            {{ $receipt->receipt_number ?? ('GRN-' . $receipt->id) }}
+                                        </a>
+                                    </td>
                                     <td class="py-2.5 px-3">{{ optional($receipt->receipt_date)->format('d/m/Y') ?? '-' }}</td>
-                                    <td class="py-2.5 px-3">{{ $receipt->supplier_delivery_note_number ?? '-' }}</td>
+                                    <td class="py-2.5 px-3 font-mono text-xs">{{ $receipt->supplier_delivery_note_number ?: '-' }}</td>
                                     <td class="py-2.5 px-3">{{ $receipt->receivedBy->name ?? '-' }}</td>
                                     <td class="py-2.5 px-3 text-center">
-                                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                            {{ ucfirst($receipt->status ?? 'Received') }}
-                                        </span>
+                                        @if ($receipt->status === 'completed')
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                                Selesai Masuk Stok
+                                            </span>
+                                        @elseif ($receipt->status === 'partial')
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                                Sebagian Diterima
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                                                Draf
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="py-2.5 px-3 text-right">
+                                        <a href="{{ route('gudang.penerimaan.show', $receipt) }}" class="text-xs text-blue-600 hover:underline font-semibold">
+                                            Detail &rarr;
+                                        </a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -444,6 +488,19 @@
                     </svg>
                     <div class="text-sm font-semibold text-gray-600">Belum Ada Riwayat Penerimaan Gudang</div>
                     <div class="text-xs text-gray-400 mt-0.5">Barang pesanan belum diterima di gudang atau belum dibuatkan dokumen Goods Receipt.</div>
+                    @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
+                        <div class="mt-3">
+                            <a
+                                href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
+                                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>+ Catat Penerimaan Barang Sekarang</span>
+                            </a>
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
