@@ -360,7 +360,25 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
 
     // Modul Keuangan & Akuntansi
     Route::prefix('keuangan')->name('keuangan.')->group(function () {
-        Route::get('/kas-bank', function () { return redirect()->route('dashboard'); })->name('cashbank.index');
+        // Kas & Bank (Mutasi Masuk & Keluar)
+        Route::get('/kas-bank', [\App\Http\Controllers\Keuangan\CashBankController::class, 'index'])->name('cashbank.index');
+        Route::get('/kas-bank/create', [\App\Http\Controllers\Keuangan\CashBankController::class, 'create'])->name('cashbank.create');
+        Route::post('/kas-bank', [\App\Http\Controllers\Keuangan\CashBankController::class, 'store'])->name('cashbank.store');
+        Route::get('/kas-bank/{transaction}', [\App\Http\Controllers\Keuangan\CashBankController::class, 'show'])->name('cashbank.show');
+        Route::delete('/kas-bank/{transaction}', [\App\Http\Controllers\Keuangan\CashBankController::class, 'destroy'])->name('cashbank.destroy');
+        Route::get('/kas-bank/{transaction}/pdf', [\App\Http\Controllers\Keuangan\CashBankController::class, 'pdf'])->name('cashbank.pdf');
+
+        // Transfer Antar Kas & Bank
+        Route::get('/transfer/create', [\App\Http\Controllers\Keuangan\CashBankController::class, 'createTransfer'])->name('cashbank.transfer.create');
+        Route::post('/transfer', [\App\Http\Controllers\Keuangan\CashBankController::class, 'storeTransfer'])->name('cashbank.transfer.store');
+        Route::get('/transfer/{transfer}', [\App\Http\Controllers\Keuangan\CashBankController::class, 'showTransfer'])->name('cashbank.transfer.show');
+        Route::delete('/transfer/{transfer}', [\App\Http\Controllers\Keuangan\CashBankController::class, 'destroyTransfer'])->name('cashbank.transfer.destroy');
+        Route::get('/transfer/{transfer}/pdf', [\App\Http\Controllers\Keuangan\CashBankController::class, 'pdfTransfer'])->name('cashbank.transfer.pdf');
+
+        // Aliases for compatibility
+        Route::get('/kas-bank-transfer/create', function () { return redirect()->route('keuangan.cashbank.transfer.create'); });
+
+        // Buku Besar & Jurnal (Akan dikembangkan pada fase berikutnya)
         Route::get('/jurnal', function () { return redirect()->route('dashboard'); })->name('journal.index');
     });
 
