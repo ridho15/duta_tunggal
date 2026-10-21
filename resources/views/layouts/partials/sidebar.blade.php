@@ -267,6 +267,14 @@
                         </svg>
                         <span>Pembayaran Hutang</span>
                     </a>
+
+                    <a href="{{ route('pembelian.returns.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/retur*') || request()->is('pembelian/purchase-returns*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 14 4 9l5-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <path d="M4 9h10a6 6 0 0 1 0 12h-3" stroke-width="1.8" stroke-linecap="round"></path>
+                        </svg>
+                        <span>Retur Pembelian</span>
+                    </a>
                 @endif
             </div>
         @endif

@@ -649,8 +649,8 @@ class PurchaseReturnService
         $purchaseReceipt = $purchaseReturn->purchaseReceipt;
         $poId = $purchaseReceipt?->purchase_order_id ?? $purchaseReturn->qualityControl?->purchase_order_id;
 
-        if ($purchaseReceipt) {
-            $invoice = \App\Models\Invoice::where(function ($q) use ($purchaseReceipt) {
+        if ($purchaseReceipt && $purchaseReceipt->id) {
+            $invoice = \App\Models\Invoice::withoutGlobalScopes()->where(function ($q) use ($purchaseReceipt) {
                     $q->where(function ($m) use ($purchaseReceipt) {
                         $m->where('from_model_type', \App\Models\PurchaseReceipt::class)
                           ->where('from_model_id', $purchaseReceipt->id);
@@ -662,18 +662,18 @@ class PurchaseReturnService
                 ->first();
 
             if ($invoice) {
-                return AccountPayable::where('invoice_id', $invoice->id)->first();
+                return AccountPayable::withoutGlobalScopes()->where('invoice_id', $invoice->id)->first();
             }
         }
 
         if ($poId) {
-            $invoice = \App\Models\Invoice::where('from_model_type', \App\Models\PurchaseOrder::class)
+            $invoice = \App\Models\Invoice::withoutGlobalScopes()->where('from_model_type', \App\Models\PurchaseOrder::class)
                 ->where('from_model_id', $poId)
                 ->where('status', '!=', \App\Models\Invoice::STATUS_CANCELLED)
                 ->first();
 
             if ($invoice) {
-                return AccountPayable::where('invoice_id', $invoice->id)->first();
+                return AccountPayable::withoutGlobalScopes()->where('invoice_id', $invoice->id)->first();
             }
         }
 

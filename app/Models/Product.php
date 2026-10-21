@@ -177,6 +177,11 @@ class Product extends Model
         return $this->uom();
     }
 
+    public function unitOfMeasure()
+    {
+        return $this->uom();
+    }
+
     public function inventoryCoa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'inventory_coa_id')->withDefault();

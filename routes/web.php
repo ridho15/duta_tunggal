@@ -335,6 +335,27 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/vendor-payments', function () { return redirect()->route('pembelian.payments.index'); });
         Route::get('/vendor-payments/create', function () { return redirect()->route('pembelian.payments.create', request()->query()); });
         Route::get('/vendor-payments/{payment}', function ($payment) { return redirect()->route('pembelian.payments.show', $payment); });
+
+        // Retur Pembelian & Debit Note (Purchase Return & Debit Note)
+        Route::get('/retur', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'index'])->name('returns.index');
+        Route::get('/retur/create', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'create'])->name('returns.create');
+        Route::post('/retur', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'store'])->name('returns.store');
+        Route::get('/retur/{return}', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'show'])->name('returns.show');
+        Route::get('/retur/{return}/edit', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'edit'])->name('returns.edit');
+        Route::put('/retur/{return}', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'update'])->name('returns.update');
+        Route::delete('/retur/{return}', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'destroy'])->name('returns.destroy');
+        Route::post('/retur/{return}/submit', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'submit'])->name('returns.submit');
+        Route::post('/retur/{return}/approve', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'approve'])->name('returns.approve');
+        Route::post('/retur/{return}/reject', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'reject'])->name('returns.reject');
+        Route::post('/retur/{return}/resolution', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'updateResolution'])->name('returns.resolution');
+        Route::get('/retur/{return}/pdf', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'pdf'])->name('returns.pdf');
+        Route::get('/retur-supplier-receipts/{supplier}', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'supplierReceipts'])->name('returns.supplier-receipts');
+        Route::get('/retur-receipt-items/{receipt}', [\App\Http\Controllers\Pembelian\PurchaseReturnController::class, 'receiptItems'])->name('returns.receipt-items');
+
+        // Aliases for English / plural URL compatibility
+        Route::get('/purchase-returns', function () { return redirect()->route('pembelian.returns.index'); });
+        Route::get('/purchase-returns/create', function () { return redirect()->route('pembelian.returns.create', request()->query()); });
+        Route::get('/purchase-returns/{return}', function ($return) { return redirect()->route('pembelian.returns.show', $return); });
     });
 
     // Modul Keuangan & Akuntansi

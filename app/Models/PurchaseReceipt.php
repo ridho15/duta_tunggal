@@ -59,6 +59,11 @@ class PurchaseReceipt extends Model
         return $this->hasMany(PurchaseReceiptItem::class, 'purchase_receipt_id');
     }
 
+    public function purchaseReceiptItems()
+    {
+        return $this->hasMany(PurchaseReceiptItem::class, 'purchase_receipt_id');
+    }
+
     public function receivedBy()
     {
         return $this->belongsTo(User::class, 'received_by')->withDefault();
@@ -236,5 +241,15 @@ class PurchaseReceipt extends Model
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    public function supplier()
+    {
+        return $this->hasOneThrough(Supplier::class, PurchaseOrder::class, 'id', 'id', 'purchase_order_id', 'supplier_id');
+    }
+
+    public function warehouse()
+    {
+        return $this->hasOneThrough(Warehouse::class, PurchaseOrder::class, 'id', 'id', 'purchase_order_id', 'warehouse_id');
     }
 }

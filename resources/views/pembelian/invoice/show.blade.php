@@ -132,6 +132,21 @@
                     Batalkan Faktur
                 </button>
             @endif
+
+            {{-- Shortcut Retur Pembelian --}}
+            @if (!$isCancelled && $invoice->supplier_id)
+                <a
+                    href="{{ route('pembelian.returns.create', ['supplier_id' => $invoice->supplier_id]) }}"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 text-amber-800 bg-amber-50 hover:bg-amber-100 text-xs font-semibold rounded-lg transition"
+                    title="Buat Retur Pembelian ke Vendor ini"
+                >
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 14 4 9l5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M4 9h10a6 6 0 0 1 0 12h-3" stroke-width="2" stroke-linecap="round"></path>
+                    </svg>
+                    + Buat Retur
+                </a>
+            @endif
         </div>
     </div>
 
