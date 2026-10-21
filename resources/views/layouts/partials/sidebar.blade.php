@@ -53,13 +53,24 @@
     {{-- Menu Scroll Container --}}
     <div class="flex-1 overflow-y-auto px-2 py-3 space-y-4 custom-scrollbar">
 
-        {{-- BERANDA --}}
+        {{-- BERANDA / DASHBOARD --}}
+        @php
+            $isExecutiveNav = $isSuper || in_array('OWN', $codes) || in_array('FIN', $codes);
+        @endphp
         <div class="space-y-0.5">
             <a href="{{ route('dashboard') }}" class="{{ $itemClass(request()->routeIs('dashboard')) }}">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <span class="flex-1">Beranda</span>
+                @if ($isExecutiveNav)
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 3v18h18" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M7 15l4-4 3 3 5-6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span class="flex-1">Dashboard</span>
+                @else
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span class="flex-1">Beranda</span>
+                @endif
                 @if (isset($tugasCount) && $tugasCount > 0)
                     <span class="text-[11px] font-bold bg-[#15803d] text-white rounded-full px-2 py-0.2">
                         {{ $tugasCount }}

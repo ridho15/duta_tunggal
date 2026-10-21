@@ -81,3 +81,39 @@ if (!function_exists('userHasPermission')) {
         return $user && $user->hasPermissionTo($permission);
     }
 }
+
+if (!function_exists('formatShortCurrency')) {
+    /**
+     * Format nominal besar disingkat (Rp24,3 jt, Rp1,24 M, dst)
+     *
+     * @param float|int|string|null $amount
+     * @param bool $withPrefix
+     * @return string
+     */
+    function formatShortCurrency($amount, bool $withPrefix = true): string
+    {
+        if ($amount === null || (float)$amount == 0.0) {
+            return $withPrefix ? 'Rp0' : '0';
+        }
+
+        $amount = (float) $amount;
+        $isNegative = $amount < 0;
+        $absAmount = abs($amount);
+
+        if ($absAmount >= 1_000_000_000) {
+            $val = round($absAmount / 1_000_000_000, 2);
+            $formatted = number_format($val, $val == floor($val) ? 0 : ($val * 10 == floor($val * 10) ? 1 : 2), ',', '.') . ' M';
+        } elseif ($absAmount >= 1_000_000) {
+            $val = round($absAmount / 1_000_000, 1);
+            $formatted = number_format($val, $val == floor($val) ? 0 : 1, ',', '.') . ' jt';
+        } else {
+            $formatted = number_format($absAmount, 0, ',', '.');
+        }
+
+        $sign = $isNegative ? '-' : '';
+        $prefix = $withPrefix ? 'Rp' : '';
+
+        return $sign . $prefix . $formatted;
+    }
+}
+

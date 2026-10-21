@@ -36,6 +36,10 @@ class PurchaseOrderItem extends Model
     protected static function booted()
     {
         static::saving(function (PurchaseOrderItem $purchaseOrderItem) {
+            if (empty($purchaseOrderItem->currency_id)) {
+                $purchaseOrderItem->currency_id = \App\Models\Currency::where('code', 'IDR')->value('id') ?? 1;
+            }
+
             if (
                 $purchaseOrderItem->refer_item_model_type === OrderRequestItem::class
                 && ! empty($purchaseOrderItem->refer_item_model_id)

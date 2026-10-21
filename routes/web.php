@@ -268,7 +268,27 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     // Modul Pembelian
     Route::prefix('pembelian')->name('pembelian.')->group(function () {
         Route::get('/permintaan', function () { return redirect()->route('dashboard'); })->name('or.index');
-        Route::get('/po', function () { return redirect()->route('dashboard'); })->name('po.index');
+
+        // Pesanan Pembelian (Purchase Order / PO)
+        Route::get('/po', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'index'])->name('po.index');
+        Route::get('/po/create', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'create'])->name('po.create');
+        Route::post('/po', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'store'])->name('po.store');
+        Route::get('/po/{purchaseOrder}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'show'])->name('po.show');
+        Route::get('/po/{purchaseOrder}/edit', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'edit'])->name('po.edit');
+        Route::put('/po/{purchaseOrder}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'update'])->name('po.update');
+        Route::delete('/po/{purchaseOrder}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'destroy'])->name('po.destroy');
+        Route::post('/po/{purchaseOrder}/approve', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'approve'])->name('po.approve');
+        Route::post('/po/{purchaseOrder}/request-close', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'requestClose'])->name('po.request-close');
+        Route::post('/po/{purchaseOrder}/close', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'close'])->name('po.close');
+        Route::get('/po/{purchaseOrder}/pdf', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'pdf'])->name('po.pdf');
+        Route::get('/supplier-details/{supplier}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'supplierDetails'])->name('supplier-details');
+        Route::get('/product-details/{product}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'productDetails'])->name('product-details');
+
+        // Aliases for English / plural URL compatibility
+        Route::get('/purchase-orders', function () { return redirect()->route('pembelian.po.index'); });
+        Route::get('/purchase-orders/create', function () { return redirect()->route('pembelian.po.create', request()->query()); });
+        Route::get('/purchase-orders/{purchaseOrder}', function ($purchaseOrder) { return redirect()->route('pembelian.po.show', $purchaseOrder); });
+
         Route::get('/invoice', function () { return redirect()->route('dashboard'); })->name('invoices.index');
     });
 
