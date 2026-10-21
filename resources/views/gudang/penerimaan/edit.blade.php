@@ -91,7 +91,7 @@
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h2 class="text-base font-bold text-gray-900">Pesanan Pembelian Terkait</h2>
-                <span class="px-2.5 py-0.5 bg-blue-100 text-blue-800 font-bold text-xs rounded-full">
+                <span class="px-2.5 py-0.5 bg-emerald-50 text-[#15803d] border border-emerald-200 font-bold text-xs rounded-full">
                     No. Dokumen: {{ $receipt->receipt_number }}
                 </span>
             </div>
@@ -328,7 +328,7 @@
                 <button
                     type="submit"
                     @click="formAction = 'save_and_confirm'"
-                    class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition active:scale-[0.98]"
+                    class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg shadow-sm transition active:scale-[0.98]"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />

@@ -17,9 +17,9 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                <a href="{{ route('pembelian.po.index') }}" class="hover:text-blue-600 transition">Pesanan Pembelian</a>
+                <a href="{{ route('pembelian.po.index') }}" class="hover:text-[#15803d] transition">Pesanan Pembelian</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-blue-600 font-bold">{{ $purchaseOrder->po_number }}</span>
+                <span class="text-[#15803d] font-bold">{{ $purchaseOrder->po_number }}</span>
             </div>
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight">{{ $purchaseOrder->po_number }}</h1>
@@ -27,7 +27,7 @@
                     $statusBadge = match($purchaseOrder->status) {
                         'draft' => ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'label' => 'Draf'],
                         'request_approve' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-800', 'label' => 'Menunggu Approval'],
-                        'approved' => ['bg' => 'bg-blue-100', 'text' => 'text-blue-800', 'label' => 'Disetujui'],
+                        'approved' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Disetujui'],
                         'partially_received' => ['bg' => 'bg-purple-100', 'text' => 'text-purple-800', 'label' => 'Diterima Sebagian'],
                         'completed' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Selesai'],
                         'closed' => ['bg' => 'bg-red-100', 'text' => 'text-red-800', 'label' => 'Ditutup'],
@@ -73,7 +73,7 @@
                 <button
                     type="button"
                     @click="approveModalOpen = true"
-                    class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
+                    class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -94,7 +94,7 @@
                 <button
                     type="button"
                     @click="approveModalOpen = true"
-                    class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
+                    class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -106,7 +106,7 @@
             @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
                 <a
                     href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
-                    class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
+                    class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] inline-flex items-center gap-1.5"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -158,8 +158,8 @@
         <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">Alur Pemrosesan Pesanan (Workflow)</h3>
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
             {{-- Step 1 --}}
-            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $currentStep >= 1 ? 'bg-blue-50/70 border border-blue-200' : 'bg-gray-50 text-gray-400' }}">
-                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500' }}">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $currentStep >= 1 ? 'bg-emerald-50/70 border border-emerald-200' : 'bg-gray-50 text-gray-400' }}">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $currentStep >= 1 ? 'bg-[#15803d] text-white' : 'bg-gray-200 text-gray-500' }}">
                     1
                 </div>
                 <div class="text-xs">
@@ -169,8 +169,8 @@
             </div>
 
             {{-- Step 2 --}}
-            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $currentStep >= 2 ? 'bg-blue-50/70 border border-blue-200' : 'bg-gray-50 text-gray-400' }}">
-                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $currentStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500' }}">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $currentStep >= 2 ? 'bg-emerald-50/70 border border-emerald-200' : 'bg-gray-50 text-gray-400' }}">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $currentStep >= 2 ? 'bg-[#15803d] text-white' : 'bg-gray-200 text-gray-500' }}">
                     2
                 </div>
                 <div class="text-xs">
@@ -182,8 +182,8 @@
             </div>
 
             {{-- Step 3 --}}
-            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $currentStep >= 3 ? 'bg-blue-50/70 border border-blue-200' : 'bg-gray-50 text-gray-400' }}">
-                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $currentStep >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500' }}">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $currentStep >= 3 ? 'bg-emerald-50/70 border border-emerald-200' : 'bg-gray-50 text-gray-400' }}">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $currentStep >= 3 ? 'bg-[#15803d] text-white' : 'bg-gray-200 text-gray-500' }}">
                     3
                 </div>
                 <div class="text-xs">
@@ -193,8 +193,8 @@
             </div>
 
             {{-- Step 4 --}}
-            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $purchaseOrder->invoice->count() > 0 ? 'bg-blue-50/70 border border-blue-200' : 'bg-gray-50 text-gray-400' }}">
-                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $purchaseOrder->invoice->count() > 0 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500' }}">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-lg {{ $purchaseOrder->invoice->count() > 0 ? 'bg-emerald-50/70 border border-emerald-200' : 'bg-gray-50 text-gray-400' }}">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $purchaseOrder->invoice->count() > 0 ? 'bg-[#15803d] text-white' : 'bg-gray-200 text-gray-500' }}">
                     4
                 </div>
                 <div class="text-xs">
@@ -281,7 +281,7 @@
                 <div class="flex justify-between items-baseline">
                     <span class="text-gray-400 text-xs">Grand Total PO:</span>
                     <div class="text-right">
-                        <span class="font-extrabold text-xl text-blue-600">
+                        <span class="font-extrabold text-xl text-[#15803d]">
                             Rp {{ number_format((float)$purchaseOrder->total_amount, 2, ',', '.') }}
                         </span>
                         @if ($purchaseOrder->purchaseOrderCurrency->count() > 0 && $purchaseOrder->purchaseOrderCurrency->first()->currency->code !== 'IDR')
@@ -304,7 +304,7 @@
                             : 0;
                     @endphp
                     <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                        <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: {{ $pct }}%"></div>
+                        <div class="bg-[#15803d] h-2.5 rounded-full transition-all duration-300" style="width: {{ $pct }}%"></div>
                     </div>
                     <div class="flex justify-between text-[11px] text-gray-400 mt-1">
                         <span>{{ $pct }}% Diterima Lengkap</span>
@@ -321,7 +321,7 @@
             <button
                 type="button"
                 @click="activeTab = 'items'"
-                :class="activeTab === 'items' ? 'border-blue-600 text-blue-600 font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
+                :class="activeTab === 'items' ? 'border-[#15803d] text-[#15803d] font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
                 class="py-3 px-4 border-b-2 transition"
             >
                 Rincian Barang Pesanan ({{ $purchaseOrder->purchaseOrderItem->count() }})
@@ -329,7 +329,7 @@
             <button
                 type="button"
                 @click="activeTab = 'receipts'"
-                :class="activeTab === 'receipts' ? 'border-blue-600 text-blue-600 font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
+                :class="activeTab === 'receipts' ? 'border-[#15803d] text-[#15803d] font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
                 class="py-3 px-4 border-b-2 transition flex items-center gap-1.5"
             >
                 <span>Penerimaan Gudang</span>
@@ -338,7 +338,7 @@
             <button
                 type="button"
                 @click="activeTab = 'qc'"
-                :class="activeTab === 'qc' ? 'border-blue-600 text-blue-600 font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
+                :class="activeTab === 'qc' ? 'border-[#15803d] text-[#15803d] font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
                 class="py-3 px-4 border-b-2 transition flex items-center gap-1.5"
             >
                 <span>Inspeksi QC</span>
@@ -347,7 +347,7 @@
             <button
                 type="button"
                 @click="activeTab = 'invoices'"
-                :class="activeTab === 'invoices' ? 'border-blue-600 text-blue-600 font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
+                :class="activeTab === 'invoices' ? 'border-[#15803d] text-[#15803d] font-bold border-b-2' : 'border-transparent hover:text-gray-700'"
                 class="py-3 px-4 border-b-2 transition flex items-center gap-1.5"
             >
                 <span>Tagihan Supplier</span>
@@ -617,7 +617,7 @@
     >
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-gray-100" @click.away="approveModalOpen = false">
             <div class="flex items-center gap-3">
-                <div class="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <div class="p-2 bg-emerald-50 text-[#15803d] rounded-xl">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -635,7 +635,7 @@
                 <button type="button" @click="approveModalOpen = false" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition">
                     Batal
                 </button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
+                <button type="submit" class="px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white rounded-lg text-xs font-bold shadow-sm transition">
                     Ya, Setujui Sekarang
                 </button>
             </form>

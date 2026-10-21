@@ -19,7 +19,7 @@
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 <span>Gudang & Stok</span>
                 <span class="text-gray-300">/</span>
-                <span class="text-blue-600 font-bold">Penerimaan Barang (GRN)</span>
+                <span class="text-[#15803d] font-bold">Penerimaan Barang (GRN)</span>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Penerimaan Barang Pembelian</h1>
             <p class="text-sm text-gray-500 mt-0.5">Pencatatan surat jalan masuk dari supplier, verifikasi fisik barang gudang, dan pembaruan stok persediaan.</p>
@@ -27,7 +27,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('gudang.penerimaan.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -125,7 +125,7 @@
             @endphp
             <a
                 href="{{ $tabUrl('all') }}"
-                class="px-3.5 py-1.5 rounded-lg transition {{ $status === 'all' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-lg transition {{ $status === 'all' ? 'bg-[#f0fdf4] text-[#15803d] font-bold border border-[#bbf7d0]' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
             >
                 Semua
                 <span class="ml-1 px-1.5 py-0.2 bg-gray-100 text-gray-600 rounded-full text-xs">{{ $counts['total'] ?? 0 }}</span>
@@ -166,7 +166,7 @@
                         name="q"
                         value="{{ $search }}"
                         placeholder="No. GRN, PO, Supplier, No. SJ..."
-                        class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     />
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -179,7 +179,7 @@
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Gudang Penyimpanan</label>
                 <select
                     name="warehouse_id"
-                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                 >
                     <option value="">Semua Gudang</option>
                     @foreach ($warehouses as $wh)
@@ -197,7 +197,7 @@
                     type="date"
                     name="start_date"
                     value="{{ $startDate }}"
-                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                 />
             </div>
 
@@ -208,7 +208,7 @@
                     type="date"
                     name="end_date"
                     value="{{ $endDate }}"
-                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                 />
             </div>
 
@@ -261,10 +261,10 @@
                             $totalRejectedQty = $receipt->purchaseReceiptItem->sum('qty_rejected');
                             $po = $receipt->purchaseOrder;
                         @endphp
-                        <tr class="hover:bg-blue-50/30 transition">
+                        <tr class="hover:bg-emerald-50/30 transition">
                             {{-- No. Penerimaan --}}
                             <td class="py-3.5 px-4 font-bold text-gray-900 whitespace-nowrap">
-                                <a href="{{ route('gudang.penerimaan.show', $receipt) }}" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                <a href="{{ route('gudang.penerimaan.show', $receipt) }}" class="text-[#15803d] hover:text-[#14532d] hover:underline">
                                     {{ $receipt->receipt_number ?? ('GRN-' . $receipt->id) }}
                                 </a>
                             </td>
@@ -277,7 +277,7 @@
                             {{-- PO Terkait --}}
                             <td class="py-3.5 px-4 whitespace-nowrap">
                                 @if ($po && $po->exists)
-                                    <a href="{{ route('pembelian.po.show', $po) }}" class="font-medium text-gray-900 hover:text-blue-600">
+                                    <a href="{{ route('pembelian.po.show', $po) }}" class="font-medium text-gray-900 hover:text-[#15803d]">
                                         {{ $po->po_number }}
                                     </a>
                                 @else
@@ -344,7 +344,7 @@
                                     {{-- Detail --}}
                                     <a
                                         href="{{ route('gudang.penerimaan.show', $receipt) }}"
-                                        class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                        class="p-1.5 text-gray-500 hover:text-[#15803d] hover:bg-emerald-50 rounded-lg transition"
                                         title="Lihat Detail Penerimaan"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -403,7 +403,7 @@
                                 <div class="mt-4">
                                     <a
                                         href="{{ route('gudang.penerimaan.create') }}"
-                                        class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                                        class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
                                     >
                                         + Terima Barang Baru
                                     </a>

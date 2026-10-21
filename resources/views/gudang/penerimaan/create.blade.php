@@ -14,7 +14,7 @@
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 <a href="{{ route('gudang.penerimaan.index') }}" class="hover:underline">Penerimaan Barang</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-blue-600 font-bold">Surat Jalan Masuk Baru</span>
+                <span class="text-[#15803d] font-bold">Surat Jalan Masuk Baru</span>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Pencatatan Penerimaan Barang</h1>
             <p class="text-sm text-gray-500 mt-0.5">Catat kedatangan fisik barang dari supplier berdasarkan nomor PO resmi, periksa kuantitas, dan terima ke gudang.</p>
@@ -62,7 +62,7 @@
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
             <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2">
-                    <span class="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                    <span class="p-1.5 bg-emerald-50 text-[#15803d] rounded-lg">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -72,8 +72,8 @@
                         <p class="text-xs text-gray-500">Pilih dokumen PO supplier yang barang fisiknya sedang diterima.</p>
                     </div>
                 </div>
-                <div x-show="loadingPo" class="flex items-center gap-2 text-xs text-blue-600 font-semibold">
-                    <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <div x-show="loadingPo" class="flex items-center gap-2 text-xs text-[#15803d] font-semibold">
+                    <svg class="animate-spin w-4 h-4 text-[#15803d]" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                     </svg>
@@ -84,23 +84,20 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {{-- Select PO --}}
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Pilih Dokumen PO <span class="text-red-500">*</span>
-                    </label>
-                    <select
-                        name="purchase_order_id"
-                        x-model="selectedPoId"
-                        @change="handlePoSelection($event.target.value)"
-                        class="w-full py-2.5 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
-                        required
-                    >
-                        <option value="">-- Pilih Purchase Order yang Disetujui --</option>
-                        @foreach ($purchaseOrders as $po)
-                            <option value="{{ $po->id }}" {{ (string)old('purchase_order_id', $selectedPoId) === (string)$po->id ? 'selected' : '' }}>
-                                {{ $po->po_number }} &mdash; {{ $po->supplier->name ?? 'Supplier' }} ({{ optional($po->order_date)->format('d/m/Y') }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <div @change="selectedPoId = $event.detail; handlePoSelection($event.detail)">
+                        <x-searchable-select
+                            name="purchase_order_id"
+                            label="Pilih Dokumen PO"
+                            :options="$purchaseOrders->map(fn($po) => [
+                                'id' => $po->id,
+                                'label' => $po->po_number,
+                                'subtext' => ($po->supplier->perusahaan ?? $po->supplier->name ?? 'Supplier') . ' (' . optional($po->order_date)->format('d/m/Y') . ')'
+                            ])"
+                            :value="old('purchase_order_id', $selectedPoId)"
+                            placeholder="-- Cari atau Pilih Purchase Order yang Disetujui --"
+                            :required="true"
+                        />
+                    </div>
                     <span class="text-[11px] text-gray-400 mt-1 block">Hanya menampilkan PO berstatus Approved atau Sebagian Diterima.</span>
                 </div>
 
@@ -392,7 +389,7 @@
                 <button
                     type="submit"
                     @click="formAction = 'save_and_confirm'"
-                    class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition active:scale-[0.98]"
+                    class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg shadow-sm transition active:scale-[0.98]"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />

@@ -39,9 +39,9 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                <a href="{{ route('pembelian.po.index') }}" class="hover:text-blue-600 transition">Pesanan Pembelian</a>
+                <a href="{{ route('pembelian.po.index') }}" class="hover:text-[#15803d] transition">Pesanan Pembelian</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-blue-600 font-bold">Buat Baru</span>
+                <span class="text-[#15803d] font-bold">Buat Baru</span>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Buat Pesanan Pembelian (Purchase Order)</h1>
             <p class="text-sm text-gray-500 mt-0.5">Input order pembelian resmi kepada supplier untuk kebutuhan persediaan stok atau operasional.</p>
@@ -86,11 +86,11 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <label class="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
-                        <input type="checkbox" name="is_asset" value="1" {{ old('is_asset') ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox" name="is_asset" value="1" {{ old('is_asset') ? 'checked' : '' }} class="rounded border-gray-300 text-[#15803d] focus:ring-[#15803d]">
                         <span>Pembelian Aset</span>
                     </label>
                     <label class="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
-                        <input type="checkbox" name="is_import" value="1" {{ old('is_import') ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox" name="is_import" value="1" {{ old('is_import') ? 'checked' : '' }} class="rounded border-gray-300 text-[#15803d] focus:ring-[#15803d]">
                         <span>Pengadaan Impor</span>
                     </label>
                 </div>
@@ -99,35 +99,32 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {{-- Supplier --}}
                 <div class="md:col-span-1">
-                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                        Supplier <span class="text-red-500">*</span>
-                    </label>
-                    <select 
-                        name="supplier_id" 
-                        x-model="supplierId" 
-                        @change="onSupplierChange()" 
-                        required 
-                        class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="">-- Pilih Supplier --</option>
-                        @foreach ($suppliers as $s)
-                            <option value="{{ $s->id }}" {{ old('supplier_id', $selectedSupplier?->id) == $s->id ? 'selected' : '' }}>
-                                {{ $s->perusahaan }} ({{ $s->code ?? 'SUP' }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <div @change="supplierId = $event.detail; onSupplierChange()">
+                        <x-searchable-select
+                            name="supplier_id"
+                            label="Supplier"
+                            :options="$suppliers->map(fn($s) => [
+                                'id' => $s->id,
+                                'label' => $s->perusahaan,
+                                'subtext' => $s->code ?? 'SUP'
+                            ])"
+                            :value="old('supplier_id', $selectedSupplier?->id)"
+                            placeholder="-- Cari atau Pilih Supplier --"
+                            :required="true"
+                        />
+                    </div>
 
                     {{-- Supplier Quick Info Box --}}
-                    <div x-show="selectedSupplierInfo" class="mt-2.5 p-3 rounded-lg bg-blue-50/60 border border-blue-100 text-xs text-gray-600 space-y-1">
-                        <div class="font-bold text-blue-900" x-text="selectedSupplierInfo.perusahaan"></div>
+                    <div x-show="selectedSupplierInfo" class="mt-2.5 p-3 rounded-lg bg-emerald-50/60 border border-emerald-100 text-xs text-gray-600 space-y-1">
+                        <div class="font-bold text-[#14532d]" x-text="selectedSupplierInfo ? selectedSupplierInfo.perusahaan : ''"></div>
                         <div class="flex items-center gap-1 text-[11px] text-gray-500">
                             <span>U.p:</span>
-                            <span class="font-medium text-gray-700" x-text="selectedSupplierInfo.kontak_person"></span>
+                            <span class="font-medium text-gray-700" x-text="selectedSupplierInfo ? selectedSupplierInfo.kontak_person : '-'"></span>
                             <span class="text-gray-300">|</span>
                             <span>Telp:</span>
-                            <span class="font-medium text-gray-700" x-text="selectedSupplierInfo.phone"></span>
+                            <span class="font-medium text-gray-700" x-text="selectedSupplierInfo ? selectedSupplierInfo.phone : '-'"></span>
                         </div>
-                        <div class="text-[11px] text-gray-500 truncate" x-text="selectedSupplierInfo.address"></div>
+                        <div class="text-[11px] text-gray-500 truncate" x-text="selectedSupplierInfo ? selectedSupplierInfo.address : '-'"></div>
                     </div>
                 </div>
 
@@ -264,12 +261,12 @@
                 <button
                     type="button"
                     @click="addRow()"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold rounded-lg transition active:scale-[0.98]"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-[#15803d] hover:bg-emerald-100 text-xs font-bold rounded-lg transition active:scale-[0.98]"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    Tambah Baris Barang
+                    + Tambah Baris Barang
                 </button>
             </div>
 
@@ -447,7 +444,7 @@
                         type="submit"
                         name="action"
                         value="save_and_approve"
-                        class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-1.5"
+                        class="w-full py-2.5 px-4 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98] flex items-center justify-center gap-1.5"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />

@@ -225,6 +225,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Pagination\Paginator::defaultView('vendor.pagination.tailwind');
+
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->input('email', 'guest');
             return Limit::perMinute(5)->by(strtolower($email) . '|' . $request->ip());

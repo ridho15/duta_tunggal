@@ -7,10 +7,18 @@
     approveModalOpen: false, 
     approveActionUrl: '', 
     approvePoNumber: '',
+    deleteModalOpen: false,
+    deleteActionUrl: '',
+    deletePoNumber: '',
     confirmApprove(url, number) {
         this.approveActionUrl = url;
         this.approvePoNumber = number;
         this.approveModalOpen = true;
+    },
+    confirmDelete(url, number) {
+        this.deleteActionUrl = url;
+        this.deletePoNumber = number;
+        this.deleteModalOpen = true;
     }
 }">
     {{-- Header Halaman --}}
@@ -19,7 +27,7 @@
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 <span>Pembelian</span>
                 <span class="text-gray-300">/</span>
-                <span class="text-blue-600 font-bold">Pesanan Pembelian (PO)</span>
+                <span class="text-[#15803d] font-bold">Pesanan Pembelian (PO)</span>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Pesanan Pembelian (Purchase Order)</h1>
             <p class="text-sm text-gray-500 mt-0.5">Kelola komitmen pesanan barang/jasa ke supplier, otorisasi approval, dan pantau status pemenuhan gudang.</p>
@@ -27,12 +35,12 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('pembelian.po.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                Buat PO Baru
+                + Buat PO Baru
             </a>
         </div>
     </div>
@@ -126,10 +134,10 @@
             @foreach ($tabs as $key => $tabInfo)
                 <a
                     href="{{ route('pembelian.po.index', array_merge(request()->query(), ['tab' => $key, 'page' => 1])) }}"
-                    class="flex items-center gap-2 py-3 px-3.5 border-b-2 font-medium transition whitespace-nowrap {{ $activeTab === $key ? 'border-blue-600 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+                    class="flex items-center gap-2 py-3 px-3.5 border-b-2 font-medium transition whitespace-nowrap {{ $activeTab === $key ? 'border-[#15803d] text-[#15803d] font-bold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
                 >
                     <span>{{ $tabInfo['label'] }}</span>
-                    <span class="px-2 py-0.5 text-xs rounded-full {{ $activeTab === $key ? 'bg-blue-100 text-blue-700 font-bold' : 'bg-gray-100 text-gray-600' }}">
+                    <span class="px-2 py-0.5 text-xs rounded-full {{ $activeTab === $key ? 'bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0] font-bold' : 'bg-gray-100 text-gray-600' }}">
                         {{ $tabInfo['count'] }}
                     </span>
                 </a>
@@ -148,7 +156,7 @@
                         name="search"
                         value="{{ $search }}"
                         placeholder="Cari nomor PO, supplier, atau catatan..."
-                        class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     />
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -157,7 +165,7 @@
 
                 {{-- Filter Supplier --}}
                 <div class="lg:col-span-3">
-                    <select name="supplier_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <select name="supplier_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]">
                         <option value="">-- Semua Supplier --</option>
                         @foreach ($suppliers as $s)
                             <option value="{{ $s->id }}" {{ (string) $supplierFilter === (string) $s->id ? 'selected' : '' }}>
@@ -169,7 +177,7 @@
 
                 {{-- Filter Cabang --}}
                 <div class="lg:col-span-2">
-                    <select name="cabang_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <select name="cabang_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]">
                         <option value="">-- Semua Cabang --</option>
                         @foreach ($cabangs as $c)
                             <option value="{{ $c->id }}" {{ (string) $cabangFilter === (string) $c->id ? 'selected' : '' }}>
@@ -185,7 +193,7 @@
                         type="date"
                         name="date_from"
                         value="{{ $dateFrom }}"
-                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                         title="Dari Tanggal Order"
                     />
                     <span class="text-gray-400 text-xs">-</span>
@@ -193,7 +201,7 @@
                         type="date"
                         name="date_to"
                         value="{{ $dateTo }}"
-                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                         title="Sampai Tanggal Order"
                     />
                 </div>
@@ -240,7 +248,7 @@
                             $statusBadge = match($po->status) {
                                 'draft' => ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'label' => 'Draf'],
                                 'request_approve' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-800', 'label' => 'Menunggu Approval'],
-                                'approved' => ['bg' => 'bg-blue-100', 'text' => 'text-blue-800', 'label' => 'Disetujui'],
+                                'approved' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Disetujui'],
                                 'partially_received' => ['bg' => 'bg-purple-100', 'text' => 'text-purple-800', 'label' => 'Diterima Sebagian'],
                                 'completed' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Selesai'],
                                 'closed' => ['bg' => 'bg-red-100', 'text' => 'text-red-800', 'label' => 'Ditutup'],
@@ -256,14 +264,14 @@
                             $fulfillPct = $totalQty > 0 ? min(100, round(($receivedQty / $totalQty) * 100)) : 0;
                             $barColor = match(true) {
                                 $fulfillPct >= 100 => 'bg-emerald-500',
-                                $fulfillPct > 0 => 'bg-blue-500',
+                                $fulfillPct > 0 => 'bg-[#15803d]',
                                 default => 'bg-gray-300',
                             };
                         @endphp
-                        <tr class="hover:bg-blue-50/30 transition">
+                        <tr class="hover:bg-emerald-50/30 transition">
                             {{-- Nomor PO --}}
                             <td class="py-3.5 px-4 font-semibold text-gray-900 whitespace-nowrap">
-                                <a href="{{ route('pembelian.po.show', $po) }}" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                <a href="{{ route('pembelian.po.show', $po) }}" class="text-[#15803d] hover:text-[#14532d] hover:underline">
                                     {{ $po->po_number }}
                                 </a>
                                 @if ($po->is_asset)
@@ -333,7 +341,7 @@
                                 <div class="inline-flex items-center gap-1">
                                     <a
                                         href="{{ route('pembelian.po.show', $po) }}"
-                                        class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                        class="p-1.5 text-gray-500 hover:text-[#15803d] hover:bg-emerald-50 rounded-lg transition"
                                         title="Lihat Detail PO"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -363,12 +371,23 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                             </svg>
                                         </button>
+
+                                        <button
+                                            type="button"
+                                            @click="confirmDelete('{{ route('pembelian.po.destroy', $po) }}', '{{ $po->po_number }}')"
+                                            class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                            title="Hapus PO (Draf)"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
                                     @endif
 
                                     <a
                                         href="{{ route('pembelian.po.pdf', $po) }}"
                                         target="_blank"
-                                        class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                        class="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
                                         title="Unduh / Cetak PDF"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -382,7 +401,7 @@
                         <tr>
                             <td colspan="8" class="py-12 text-center text-gray-400">
                                 <div class="flex flex-col items-center justify-center">
-                                    <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mb-3">
+                                    <div class="w-16 h-16 bg-emerald-50 text-[#15803d] rounded-2xl flex items-center justify-center mb-3">
                                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
@@ -393,12 +412,12 @@
                                     </span>
                                     <a
                                         href="{{ route('pembelian.po.create') }}"
-                                        class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                                        class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                         </svg>
-                                        Buat PO Pertama
+                                        + Buat PO Baru
                                     </a>
                                 </div>
                             </td>
@@ -440,7 +459,7 @@
             </div>
 
             <p class="text-xs text-gray-600 leading-relaxed">
-                Apakah Anda yakin ingin menyetujui <span class="font-bold text-gray-900" x-text="approvePoNumber"></span>? Status akan berubah menjadi <span class="font-semibold text-blue-700">Disetujui</span> dan siap menerima barang.
+                Apakah Anda yakin ingin menyetujui <span class="font-bold text-gray-900" x-text="approvePoNumber"></span>? Status akan berubah menjadi <span class="font-semibold text-emerald-700">Disetujui</span> dan siap menerima barang.
             </p>
 
             <form :action="approveActionUrl" method="POST" class="pt-2 flex justify-end gap-2">
@@ -454,9 +473,56 @@
                 </button>
                 <button
                     type="submit"
-                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition"
+                    class="px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white rounded-lg text-xs font-bold shadow-sm transition"
                 >
                     Ya, Setujui Sekarang
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal Konfirmasi Hapus Draf PO --}}
+    <div
+        x-show="deleteModalOpen"
+        x-cloak
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        @keydown.escape.window="deleteModalOpen = false"
+    >
+        <div 
+            class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-gray-100"
+            @click.away="deleteModalOpen = false"
+        >
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-red-50 text-red-600 rounded-xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-900">Hapus Pesanan Pembelian</h3>
+                    <p class="text-xs text-gray-500">Tindakan ini tidak dapat dibatalkan</p>
+                </div>
+            </div>
+
+            <p class="text-xs text-gray-600 leading-relaxed">
+                Apakah Anda yakin ingin menghapus dokumen PO <span class="font-bold text-gray-900" x-text="deletePoNumber"></span>?
+            </p>
+
+            <form :action="deleteActionUrl" method="POST" class="pt-2 flex justify-end gap-2">
+                @csrf
+                @method('DELETE')
+                <button
+                    type="button"
+                    @click="deleteModalOpen = false"
+                    class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                >
+                    Batal
+                </button>
+                <button
+                    type="submit"
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-sm transition"
+                >
+                    Ya, Hapus PO
                 </button>
             </form>
         </div>

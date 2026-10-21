@@ -23,11 +23,6 @@
         </div>
     </div>
 
-    @if(session('error'))
-        <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800 font-semibold">
-            {{ session('error') }}
-        </div>
-    @endif
 
     <form method="POST" action="{{ route('penjualan.do.store') }}" id="doForm" class="flex flex-wrap lg:flex-nowrap gap-5 items-start">
         @csrf

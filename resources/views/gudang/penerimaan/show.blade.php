@@ -15,7 +15,7 @@
             <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 <a href="{{ route('gudang.penerimaan.index') }}" class="hover:underline">Penerimaan Barang</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-blue-600 font-bold font-mono">{{ $receipt->receipt_number ?: ('GRN-' . $receipt->id) }}</span>
+                <span class="text-[#15803d] font-bold font-mono">{{ $receipt->receipt_number ?: ('GRN-' . $receipt->id) }}</span>
             </div>
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-mono">
@@ -84,7 +84,7 @@
                 <button
                     type="button"
                     @click="confirmModalOpen = true"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -104,11 +104,11 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
             {{-- Step 1: Draf Penerimaan Fisik --}}
             <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center flex-shrink-0 text-sm shadow">
+                <div class="w-8 h-8 rounded-full bg-[#15803d] text-white font-bold flex items-center justify-center flex-shrink-0 text-sm shadow">
                     ✓
                 </div>
                 <div>
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Tahap 1</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-[#15803d]">Tahap 1</span>
                     <h4 class="text-sm font-bold text-gray-900 leading-tight">Draf Penerimaan Fisik</h4>
                     <p class="text-[11px] text-gray-500 mt-0.5">Surat jalan dicatat petugas gudang</p>
                 </div>
@@ -116,11 +116,11 @@
 
             {{-- Step 2: Pemeriksaan & Verifikasi --}}
             <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-full font-bold flex items-center justify-center flex-shrink-0 text-sm {{ $isCompleted ? 'bg-blue-600 text-white shadow' : 'bg-blue-100 text-blue-800 ring-2 ring-blue-400' }}">
+                <div class="w-8 h-8 rounded-full font-bold flex items-center justify-center flex-shrink-0 text-sm {{ $isCompleted ? 'bg-[#15803d] text-white shadow' : 'bg-emerald-100 text-[#15803d] ring-2 ring-[#15803d]/30' }}">
                     {{ $isCompleted ? '✓' : '2' }}
                 </div>
                 <div>
-                    <span class="text-xs font-bold uppercase tracking-wider {{ $isCompleted ? 'text-blue-600' : 'text-blue-600' }}">Tahap 2</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-[#15803d]">Tahap 2</span>
                     <h4 class="text-sm font-bold text-gray-900 leading-tight">Pemeriksaan Barang</h4>
                     <p class="text-[11px] text-gray-500 mt-0.5">Pemeriksaan kondisi & kuantitas</p>
                 </div>
@@ -532,7 +532,7 @@
                 </button>
                 <button
                     type="submit"
-                    class="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition"
+                    class="px-4 py-2 text-sm font-bold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg shadow-sm transition"
                 >
                     Ya, Konfirmasi & Masuk Stok
                 </button>
