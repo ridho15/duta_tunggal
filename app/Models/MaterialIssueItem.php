@@ -44,6 +44,15 @@ class MaterialIssueItem extends Model
         return $this->belongsTo(MaterialIssue::class, 'material_issue_id')->withDefault();
     }
 
+    protected static function booted()
+    {
+        static::creating(function (MaterialIssueItem $item) {
+            if (empty($item->warehouse_id) && $item->material_issue_id) {
+                $item->warehouse_id = $item->materialIssue?->warehouse_id;
+            }
+        });
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id')->withDefault();

@@ -542,6 +542,90 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
             ->parameters(['pengguna' => 'user']);
     });
 
+    // Modul Manufaktur & Produksi
+    Route::prefix('manufaktur')->name('manufaktur.')->group(function () {
+        // Resep Produksi (Bill of Material / BOM)
+        Route::prefix('bom')->name('bom.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'store'])->name('store');
+            Route::get('/api/generate-code', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'generateCode'])->name('generate-code');
+            Route::get('/api/product-details/{product}', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'productDetails'])->name('product-details');
+            Route::get('/{billOfMaterial}', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'show'])->name('show');
+            Route::get('/{billOfMaterial}/edit', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'edit'])->name('edit');
+            Route::put('/{billOfMaterial}', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'update'])->name('update');
+            Route::delete('/{billOfMaterial}', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'destroy'])->name('destroy');
+            Route::post('/{billOfMaterial}/toggle-active', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'toggleActive'])->name('toggle-active');
+            Route::get('/{billOfMaterial}/pdf', [\App\Http\Controllers\Manufaktur\BillOfMaterialController::class, 'pdf'])->name('pdf');
+        });
+
+        // Surat Perintah Kerja (SPK / Manufacturing Order)
+        Route::prefix('spk')->name('spk.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'store'])->name('store');
+            Route::get('/api/bom-details/{billOfMaterial}', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'bomDetails'])->name('bom-details');
+            Route::get('/{manufacturingOrder}', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'show'])->name('show');
+            Route::get('/{manufacturingOrder}/edit', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'edit'])->name('edit');
+            Route::put('/{manufacturingOrder}', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'update'])->name('update');
+            Route::delete('/{manufacturingOrder}', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'destroy'])->name('destroy');
+            Route::post('/{manufacturingOrder}/start', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'start'])->name('start');
+            Route::post('/{manufacturingOrder}/cancel', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'cancel'])->name('cancel');
+            Route::get('/{manufacturingOrder}/pdf', [\App\Http\Controllers\Manufaktur\ManufacturingOrderController::class, 'pdf'])->name('pdf');
+        });
+
+        // Pengeluaran & Retur Bahan Baku (Material Issue & Return)
+        Route::prefix('material-issue')->name('material-issue.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'store'])->name('store');
+            Route::get('/api/spk-materials/{manufacturingOrder}', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'apiSpkMaterials'])->name('spk-materials');
+            Route::get('/api/product-details/{product}', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'apiProductDetails'])->name('product-details');
+            Route::get('/{materialIssue}', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'show'])->name('show');
+            Route::get('/{materialIssue}/edit', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'edit'])->name('edit');
+            Route::put('/{materialIssue}', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'update'])->name('update');
+            Route::delete('/{materialIssue}', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'destroy'])->name('destroy');
+            Route::post('/{materialIssue}/submit-approval', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'submitApproval'])->name('submit-approval');
+            Route::post('/{materialIssue}/confirm-warehouse', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'confirmWarehouse'])->name('confirm-warehouse');
+            Route::post('/{materialIssue}/complete', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'complete'])->name('complete');
+            Route::post('/{materialIssue}/reject', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'reject'])->name('reject');
+            Route::get('/{materialIssue}/pdf', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'pdf'])->name('pdf');
+        });
+
+        // Hasil Produksi (Production Output)
+        Route::prefix('production')->name('production.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'store'])->name('store');
+            Route::get('/api/spk-details', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'apiSpkDetails'])->name('spk-details');
+            Route::get('/{production}', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'show'])->name('show');
+            Route::get('/{production}/edit', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'edit'])->name('edit');
+            Route::put('/{production}', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'update'])->name('update');
+            Route::delete('/{production}', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'destroy'])->name('destroy');
+            Route::post('/{production}/finish', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'finish'])->name('finish');
+            Route::get('/{production}/pdf', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'pdf'])->name('pdf');
+        });
+
+        // Quality Control Manufacture (QC Pabrik)
+        Route::prefix('qc')->name('qc.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'store'])->name('store');
+            Route::get('/api/raks', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'apiRaks'])->name('raks');
+            Route::get('/{qc}', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'show'])->name('show');
+            Route::get('/{qc}/process', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'processForm'])->name('process-form');
+            Route::post('/{qc}/process', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'process'])->name('process');
+            Route::get('/{qc}/pdf', [\App\Http\Controllers\Manufaktur\QualityControlManufactureController::class, 'pdf'])->name('pdf');
+        });
+
+        // Aliases for compatibility
+        Route::get('/manufacturing-orders', function () { return redirect()->route('manufaktur.spk.index'); });
+        Route::get('/bill-of-materials', function () { return redirect()->route('manufaktur.bom.index'); });
+        Route::get('/material-issues', function () { return redirect()->route('manufaktur.material-issue.index'); });
+        Route::get('/productions', function () { return redirect()->route('manufaktur.production.index'); });
+        Route::get('/quality-controls', function () { return redirect()->route('manufaktur.qc.index'); });
+    });
+
     // Backward-compatibility redirects for eliminated Hub pages
     Route::redirect('/admin/sales-hub', '/admin/sale-orders', 301);
     Route::redirect('/admin/purchase-hub', '/admin/purchase-orders', 301);

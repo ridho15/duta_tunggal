@@ -105,6 +105,14 @@ class ProductionPlan extends Model
             if (empty($model->created_by)) {
                 $model->created_by = Auth::id() ?: \App\Models\User::first()?->id;
             }
+
+            if (empty($model->start_date)) {
+                $model->start_date = now();
+            }
+
+            if (empty($model->end_date)) {
+                $model->end_date = now()->addDays(3);
+            }
         });
     }
 

@@ -118,7 +118,7 @@ class ManufacturingService
                 'product_name' => $item->product?->name ?? 'Unknown Product',
                 'requested_qty' => $item->quantity,
                 'confirmed_qty' => $sourceConfirmationItem?->confirmed_qty ?? $item->quantity,
-                'warehouse_id' => $item->warehouse_id,
+                'warehouse_id' => $item->warehouse_id ?: $materialIssue->warehouse_id,
                 'rak_id' => $item->rak_id,
                 'status' => $itemStatus,
             ];

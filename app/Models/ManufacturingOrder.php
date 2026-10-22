@@ -18,7 +18,6 @@ class ManufacturingOrder extends Model
     protected $fillable = [
         'mo_number',
         'production_plan_id',
-        'quantity',
         'status', // draft, in_progress, completed
         'start_date',
         'end_date',
@@ -34,9 +33,13 @@ class ManufacturingOrder extends Model
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
-        'quantity' => 'decimal:2',
         'items' => 'array',
     ];
+
+    public function getQuantityAttribute(): float
+    {
+        return (float) ($this->productionPlan?->quantity ?? 0);
+    }
 
     protected function items(): Attribute
     {
@@ -64,6 +67,11 @@ class ManufacturingOrder extends Model
     public function productionPlan()
     {
         return $this->belongsTo(ProductionPlan::class, 'production_plan_id')->withDefault();
+    }
+
+    public function warehouse()
+    {
+        return $this->hasOneThrough(Warehouse::class, ProductionPlan::class, 'id', 'id', 'production_plan_id', 'warehouse_id')->withDefault();
     }
 
     public function resolveMaterialItemsFallback(): array

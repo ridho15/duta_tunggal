@@ -101,6 +101,11 @@ class QualityControl extends Model
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
     }
 
+    public function production()
+    {
+        return $this->belongsTo(Production::class, 'from_model_id');
+    }
+
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');

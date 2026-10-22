@@ -1,0 +1,273 @@
+@extends('layouts.app')
+
+@section('title', 'Terbitkan QC Pabrik Manual – Duta Tunggal ERP')
+
+@section('content')
+<div class="space-y-6 max-w-4xl mx-auto">
+    {{-- Header --}}
+    <div class="flex items-center justify-between">
+        <div>
+            <div class="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                <a href="{{ route('manufaktur.qc.index') }}" class="hover:text-gray-700">QC Pabrik</a>
+                <span class="text-gray-300">/</span>
+                <span class="text-[#15803d] font-bold">Terbitkan Manual</span>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Terbitkan Quality Control Pabrik</h1>
+            <p class="text-sm text-gray-500 mt-0.5">Menerbitkan lembar inspeksi mutu untuk hasil produksi yang belum memiliki QC.</p>
+        </div>
+        <a
+            href="{{ route('manufaktur.qc.index') }}"
+            class="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl transition"
+        >
+            Kembali
+        </a>
+    </div>
+
+    @if ($errors->any())
+        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1">
+            <div class="font-bold flex items-center gap-1.5 text-sm">
+                <svg class="w-4 h-4 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Terdapat kesalahan input:
+            </div>
+            <ul class="list-disc pl-5 space-y-0.5 text-rose-700">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('manufaktur.qc.store') }}" class="space-y-6">
+        @csrf
+
+        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+            <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
+                Identitas Dokumen Quality Control
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Nomor QC <span class="text-rose-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="qc_number"
+                        value="{{ old('qc_number', $defaultNumber) }}"
+                        required
+                        class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                    <p class="text-[11px] text-gray-400 mt-1">Format otomatis QC-M-YYYYMMDD-XXXX</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Petugas Inspeksi (Inspected By) <span class="text-rose-500">*</span>
+                    </label>
+                    <select
+                        name="inspected_by"
+                        required
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                        @foreach ($inspectors as $inspector)
+                            <option value="{{ $inspector->id }}" {{ old('inspected_by', auth()->id()) == $inspector->id ? 'selected' : '' }}>
+                                {{ $inspector->name }} ({{ $inspector->email }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Pilih Dokumen Hasil Produksi <span class="text-rose-500">*</span>
+                    </label>
+                    <select
+                        name="from_model_id"
+                        id="from_model_id"
+                        required
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                        <option value="">-- Pilih Dokumen Produksi Selesai --</option>
+                        @foreach ($availableProductions as $prod)
+                            @php
+                                $spk = $prod->manufacturingOrder;
+                                $plan = $spk?->productionPlan;
+                                $product = $plan?->product;
+                            @endphp
+                            <option
+                                value="{{ $prod->id }}"
+                                data-warehouse-id="{{ $prod->warehouse_id ?? $plan?->warehouse_id }}"
+                                data-qty="{{ (float) ($prod->quantity_produced ?? $plan?->quantity ?? 0) }}"
+                                {{ old('from_model_id') == $prod->id ? 'selected' : '' }}
+                            >
+                                {{ $prod->production_number }} — {{ $product?->name }} (Hasil: {{ number_format((float)($prod->quantity_produced ?? $plan?->quantity ?? 0), 2) }} {{ $product?->uom?->name ?? 'Pcs' }}) [SPK: {{ $spk?->mo_number }}]
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Gudang Tujuan Masuk Barang Jadi <span class="text-rose-500">*</span>
+                    </label>
+                    <select
+                        name="warehouse_id"
+                        id="warehouse_id"
+                        required
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                        <option value="">-- Pilih Gudang Tujuan --</option>
+                        @foreach ($warehouses as $wh)
+                            <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
+                                ({{ $wh->kode }}) {{ $wh->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Rak Penyimpanan (Opsional)
+                    </label>
+                    <select
+                        name="rak_id"
+                        id="rak_id"
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                        <option value="">-- Pilih Rak (Bila Ada) --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                <div>
+                    <label class="block text-xs font-semibold text-emerald-800 mb-1">
+                        Kuantitas Lolos (Passed Quantity) <span class="text-rose-500">*</span>
+                    </label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="passed_quantity"
+                        id="passed_quantity"
+                        value="{{ old('passed_quantity', 0) }}"
+                        required
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-mono font-bold text-emerald-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-rose-800 mb-1">
+                        Kuantitas Ditolak (Rejected Quantity) <span class="text-rose-500">*</span>
+                    </label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="rejected_quantity"
+                        id="rejected_quantity"
+                        value="{{ old('rejected_quantity', 0) }}"
+                        required
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-mono font-bold text-rose-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Alasan Penolakan / Reject (Wajib jika ada reject)
+                    </label>
+                    <textarea
+                        name="reason_reject"
+                        rows="2"
+                        placeholder="Contoh: Keretakan bodi, cacat toleransi dimensi, dll..."
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >{{ old('reason_reject') }}</textarea>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Catatan Pemeriksaan (Notes)
+                    </label>
+                    <textarea
+                        name="notes"
+                        rows="2"
+                        placeholder="Catatan inspeksi mutu..."
+                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                    >{{ old('notes') }}</textarea>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <a
+                    href="{{ route('manufaktur.qc.index') }}"
+                    class="px-4 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl transition"
+                >
+                    Batal
+                </a>
+                <button
+                    type="submit"
+                    class="px-5 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
+                >
+                    Terbitkan Dokumen QC
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const fromSelect = document.getElementById('from_model_id');
+    const whSelect = document.getElementById('warehouse_id');
+    const rakSelect = document.getElementById('rak_id');
+    const passedInput = document.getElementById('passed_quantity');
+
+    fromSelect.addEventListener('change', function () {
+        const opt = fromSelect.options[fromSelect.selectedIndex];
+        if (opt && opt.value) {
+            const whId = opt.getAttribute('data-warehouse-id');
+            const qty = opt.getAttribute('data-qty');
+            if (whId) {
+                whSelect.value = whId;
+                loadRaks(whId);
+            }
+            if (qty && (!passedInput.value || parseFloat(passedInput.value) <= 0)) {
+                passedInput.value = qty;
+            }
+        }
+    });
+
+    whSelect.addEventListener('change', function () {
+        loadRaks(whSelect.value);
+    });
+
+    function loadRaks(whId) {
+        if (!whId) {
+            rakSelect.innerHTML = '<option value="">-- Pilih Rak (Bila Ada) --</option>';
+            return;
+        }
+
+        fetch(`{{ route('manufaktur.qc.raks') }}?warehouse_id=${whId}`)
+            .then(res => res.json())
+            .then(data => {
+                rakSelect.innerHTML = '<option value="">-- Pilih Rak (Bila Ada) --</option>';
+                data.forEach(r => {
+                    const option = document.createElement('option');
+                    option.value = r.id;
+                    option.textContent = r.label;
+                    rakSelect.appendChild(option);
+                });
+            })
+            .catch(() => {});
+    }
+
+    if (whSelect.value) {
+        loadRaks(whSelect.value);
+    }
+});
+</script>
+@endsection

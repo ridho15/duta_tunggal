@@ -27,6 +27,15 @@ class BillOfMaterialItem extends Model
         'subtotal' => 'string',
     ];
 
+    protected static function booted()
+    {
+        static::creating(function ($item) {
+            if (empty($item->uom_id) && ! empty($item->product_id)) {
+                $item->uom_id = $item->product?->uom_id;
+            }
+        });
+    }
+
     public function billOfMaterial()
     {
         return $this->belongsTo(BillOfMaterial::class, 'bill_of_material_id')->withDefault();
