@@ -514,7 +514,11 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
 
     // Pengaturan
     Route::prefix('pengaturan')->name('settings.')->group(function () {
-        Route::get('/pengguna', function () { return redirect()->route('dashboard'); })->name('users.index');
+        Route::post('/pengguna/{user}/toggle-active', [\App\Http\Controllers\Pengaturan\UserController::class, 'toggleActive'])->name('users.toggle-active');
+        Route::post('/pengguna/{user}/reset-password', [\App\Http\Controllers\Pengaturan\UserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::resource('pengguna', \App\Http\Controllers\Pengaturan\UserController::class)
+            ->names('users')
+            ->parameters(['pengguna' => 'user']);
     });
 
     // Backward-compatibility redirects for eliminated Hub pages
