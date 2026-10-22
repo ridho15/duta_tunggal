@@ -86,6 +86,18 @@
                     Penjualan
                 </div>
 
+                @if ($canSee(['OWN', 'SM', 'KSR', 'SLS', 'ADP']))
+                    <a href="{{ route('kasir.pos.index') }}" class="{{ $itemClass(request()->is('kasir*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="2" y="3" width="20" height="14" rx="2" stroke-width="1.8"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21" stroke-width="1.8" stroke-linecap="round"></line>
+                            <line x1="12" y1="17" x2="12" y2="21" stroke-width="1.8" stroke-linecap="round"></line>
+                        </svg>
+                        <span class="flex-1">Kasir (POS Ritel)</span>
+                        <span class="text-[9.5px] font-bold text-emerald-700 bg-emerald-100 rounded px-1.5 py-0.5">Ritel</span>
+                    </a>
+                @endif
+
                 @if ($canSee(['OWN', 'SM', 'SLS']))
                     <a href="{{ route('penjualan.quotations.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/penawaran*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

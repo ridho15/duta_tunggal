@@ -189,7 +189,7 @@ class StockMovementObserver
 
             // Proteksi stok minus untuk pergerakan keluar operasional
             $allowNegative = (bool) data_get($meta, 'allow_negative_stock', false);
-            if ($delta < 0 && $newQty < -0.0001 && ! $allowNegative && in_array($type, ['sales', 'transfer_out', 'manufacture_out', 'purchase_return', 'return_out', 'purchase_return_out'])) {
+            if ($delta < 0 && $newQty < -0.0001 && ! $allowNegative && in_array($type, ['sales', 'pos_sale', 'transfer_out', 'manufacture_out', 'purchase_return', 'return_out', 'purchase_return_out'])) {
                 $productName = \App\Models\Product::find($productId)?->name ?? "Produk #{$productId}";
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'quantity' => "Stok persediaan tidak mencukupi untuk {$productName}. Stok saat ini: {$inventoryStock->qty_available}, diminta: " . abs($delta) . ".",

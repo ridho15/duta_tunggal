@@ -279,6 +279,23 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/quotations/{quotation}', function ($quotation) { return redirect()->route('penjualan.quotations.show', $quotation); });
     });
 
+    // Modul Kasir / Point of Sale (POS)
+    Route::prefix('kasir')->name('kasir.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Kasir\PosController::class, 'index'])->name('pos.index');
+        Route::get('/cari-produk', [\App\Http\Controllers\Kasir\PosController::class, 'searchProduct'])->name('pos.search');
+        Route::post('/transaksi', [\App\Http\Controllers\Kasir\PosController::class, 'store'])->name('pos.store');
+        Route::get('/struk/{posOrder}', [\App\Http\Controllers\Kasir\PosController::class, 'receipt'])->name('pos.receipt');
+        Route::get('/riwayat', [\App\Http\Controllers\Kasir\PosController::class, 'history'])->name('pos.history');
+        Route::get('/detail/{posOrder}', [\App\Http\Controllers\Kasir\PosController::class, 'show'])->name('pos.show');
+
+        // Shift Kasir
+        Route::post('/shift/buka', [\App\Http\Controllers\Kasir\PosShiftController::class, 'open'])->name('shift.open');
+        Route::post('/shift/tutup', [\App\Http\Controllers\Kasir\PosShiftController::class, 'close'])->name('shift.close');
+        Route::get('/shift/{posShift}/rekap', [\App\Http\Controllers\Kasir\PosShiftController::class, 'summary'])->name('shift.summary');
+    });
+
+    Route::get('/pos', function () { return redirect()->route('kasir.pos.index'); });
+
     // Modul Gudang & Stok
     Route::prefix('gudang')->name('gudang.')->group(function () {
         Route::get('/kiriman', [\App\Http\Controllers\Gudang\KirimanController::class, 'index'])->name('kiriman.index');

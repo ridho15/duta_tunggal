@@ -23,7 +23,7 @@ class StockMovement extends Model
     /**
      * Movement types that decrease InventoryStock.qty_available.
      */
-    public const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'purchase_return', 'return_out', 'purchase_return_out'];
+    public const OUT_TYPES = ['sales', 'pos_sale', 'transfer_out', 'manufacture_out', 'adjustment_out', 'purchase_return', 'return_out', 'purchase_return_out'];
 
     protected $table = 'stock_movements';
     protected $fillable = [
