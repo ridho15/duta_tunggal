@@ -136,7 +136,16 @@
                         </svg>
                         <span>Surat Jalan</span>
                     </a>
+
+                    <a href="{{ route('penjualan.schedules.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/jadwal-kirim*') || request()->is('penjualan/delivery-schedules*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="3" y="4" width="18" height="18" rx="2" stroke-width="1.8"></rect>
+                            <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" stroke-width="1.8" stroke-linecap="round"></path>
+                        </svg>
+                        <span>Jadwal Kirim</span>
+                    </a>
                 @endif
+
 
                 @if ($canSee(['OWN', 'KSR', 'ADP', 'FIN']))
                     <a href="{{ route('penjualan.invoices.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/invoice*')) }}">

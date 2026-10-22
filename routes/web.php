@@ -193,6 +193,27 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/surat-jalan/{suratJalan}/pdf', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'pdf'])->name('sj.pdf');
         Route::post('/surat-jalan/{suratJalan}/cancel', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'cancel'])->name('sj.cancel');
 
+        // Jadwal Pengiriman Armada (Delivery Schedule)
+        Route::get('/jadwal-kirim', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'index'])->name('schedules.index');
+        Route::get('/jadwal-kirim/create', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'create'])->name('schedules.create');
+        Route::post('/jadwal-kirim', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'store'])->name('schedules.store');
+        Route::post('/jadwal-kirim/quick-driver', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'storeDriver'])->name('schedules.quickDriver');
+        Route::post('/jadwal-kirim/quick-vehicle', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'storeVehicle'])->name('schedules.quickVehicle');
+        Route::get('/jadwal-kirim/{deliverySchedule}', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'show'])->name('schedules.show');
+        Route::get('/jadwal-kirim/{deliverySchedule}/edit', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'edit'])->name('schedules.edit');
+        Route::put('/jadwal-kirim/{deliverySchedule}', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'update'])->name('schedules.update');
+        Route::delete('/jadwal-kirim/{deliverySchedule}', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'destroy'])->name('schedules.destroy');
+        Route::post('/jadwal-kirim/{deliverySchedule}/start', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'start'])->name('schedules.start');
+        Route::post('/jadwal-kirim/{deliverySchedule}/complete', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'complete'])->name('schedules.complete');
+        Route::post('/jadwal-kirim/{deliverySchedule}/fail', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'fail'])->name('schedules.fail');
+        Route::post('/jadwal-kirim/{deliverySchedule}/cancel', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'cancel'])->name('schedules.cancel');
+        Route::get('/jadwal-kirim/{deliverySchedule}/pdf', [\App\Http\Controllers\Penjualan\DeliveryScheduleController::class, 'pdf'])->name('schedules.pdf');
+
+        // Aliases for English / plural URL compatibility
+        Route::get('/delivery-schedules', function () { return redirect()->route('penjualan.schedules.index'); });
+        Route::get('/delivery-schedules/create', function () { return redirect()->route('penjualan.schedules.create', request()->query()); });
+        Route::get('/delivery-schedules/{deliverySchedule}', function ($deliverySchedule) { return redirect()->route('penjualan.schedules.show', $deliverySchedule); });
+
         // Faktur Penjualan (Sales Invoice)
         Route::get('/invoice', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoice/create', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'create'])->name('invoices.create');

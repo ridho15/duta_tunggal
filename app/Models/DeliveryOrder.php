@@ -133,6 +133,11 @@ class DeliveryOrder extends Model
         return $this->hasMany(DeliveryOrderItem::class, 'delivery_order_id');
     }
 
+    public function items()
+    {
+        return $this->deliveryOrderItem();
+    }
+
     public function salesOrders()
     {
         return $this->belongsToMany(SaleOrder::class, 'delivery_sales_orders', 'delivery_order_id', 'sales_order_id');
