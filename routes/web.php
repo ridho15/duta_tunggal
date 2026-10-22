@@ -330,7 +330,21 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
 
     // Modul Pembelian
     Route::prefix('pembelian')->name('pembelian.')->group(function () {
-        Route::get('/permintaan', function () { return redirect()->route('dashboard'); })->name('or.index');
+        // Permintaan Pembelian (Order Request / OR)
+        Route::prefix('permintaan')->name('or.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'store'])->name('store');
+            Route::get('/{orderRequest}', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'show'])->name('show');
+            Route::get('/{orderRequest}/edit', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'edit'])->name('edit');
+            Route::put('/{orderRequest}', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'update'])->name('update');
+            Route::delete('/{orderRequest}', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'destroy'])->name('destroy');
+            Route::post('/{orderRequest}/request-approve', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'requestApprove'])->name('request-approve');
+            Route::post('/{orderRequest}/approve', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'approve'])->name('approve');
+            Route::post('/{orderRequest}/reject', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'reject'])->name('reject');
+            Route::post('/{orderRequest}/close', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'close'])->name('close');
+            Route::get('/{orderRequest}/pdf', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'pdf'])->name('pdf');
+        });
 
         // Pesanan Pembelian (Purchase Order / PO)
         Route::get('/po', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'index'])->name('po.index');

@@ -8,6 +8,8 @@ use App\Http\Requests\Pembelian\StorePurchaseOrderRequest;
 use App\Http\Requests\Pembelian\UpdatePurchaseOrderRequest;
 use App\Models\Cabang;
 use App\Models\Currency;
+use App\Models\OrderRequest;
+use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderCurrency;
@@ -180,6 +182,42 @@ class PurchaseOrderController extends Controller
         $selectedSupplierId = $request->query('supplier_id');
         $selectedSupplier = $selectedSupplierId ? Supplier::find($selectedSupplierId) : null;
 
+        $selectedOrderRequestId = $request->query('order_request_id');
+        $selectedOrderRequest = null;
+        $initialPoItems = [];
+
+        if ($selectedOrderRequestId) {
+            $selectedOrderRequest = OrderRequest::with([
+                'orderRequestItem.product.uom',
+                'orderRequestItem.supplier',
+            ])->find($selectedOrderRequestId);
+
+            if ($selectedOrderRequest) {
+                if ($selectedOrderRequest->cabang_id) {
+                    $defaultCabangId = $selectedOrderRequest->cabang_id;
+                }
+                foreach ($selectedOrderRequest->orderRequestItem as $orItem) {
+                    $remainingQty = max(0, (float)$orItem->quantity - (float)($orItem->fulfilled_quantity ?? 0));
+                    if ($remainingQty > 0 || (float)($orItem->fulfilled_quantity ?? 0) === 0.0) {
+                        $initialPoItems[] = [
+                            'product_id' => $orItem->product_id,
+                            'order_request_item_id' => $orItem->id,
+                            'quantity' => $remainingQty > 0 ? $remainingQty : (float)$orItem->quantity,
+                            'unit_price' => (float)($orItem->unit_price > 0 ? $orItem->unit_price : ($orItem->product?->cost_price ?? 0)),
+                            'discount' => (float)($orItem->discount ?? 0),
+                            'tipe_pajak' => $orItem->tipe_pajak ?? 'none',
+                            'tax' => (float)($orItem->tax ?? 0),
+                            'currency_id' => $orItem->currency_id ?? null,
+                        ];
+                    }
+                }
+
+                if (!$selectedSupplier && $selectedOrderRequest->orderRequestItem->first()?->supplier_id) {
+                    $selectedSupplier = $selectedOrderRequest->orderRequestItem->first()->supplier;
+                }
+            }
+        }
+
         return view('pembelian.po.create', compact(
             'suppliers',
             'warehouses',
@@ -190,7 +228,9 @@ class PurchaseOrderController extends Controller
             'defaultDate',
             'defaultCabangId',
             'defaultCurrency',
-            'selectedSupplier'
+            'selectedSupplier',
+            'selectedOrderRequest',
+            'initialPoItems'
         ));
     }
 
@@ -220,6 +260,8 @@ class PurchaseOrderController extends Controller
 
         try {
             $po = DB::transaction(function () use ($validated, $cabangId, $poNumber, $status, $user) {
+                $orderRequestId = !empty($validated['order_request_id']) ? (int) $validated['order_request_id'] : null;
+
                 $poRecord = PurchaseOrder::create([
                     'supplier_id' => $validated['supplier_id'],
                     'cabang_id' => $cabangId,
@@ -237,6 +279,8 @@ class PurchaseOrderController extends Controller
                     'total_amount' => 0,
                     'date_approved' => $status === 'approved' ? Carbon::now() : null,
                     'approved_by' => $status === 'approved' ? ($user?->id ?? 1) : null,
+                    'refer_model_type' => $orderRequestId ? OrderRequest::class : null,
+                    'refer_model_id' => $orderRequestId,
                 ]);
 
                 // Simpan item-item PO
@@ -247,6 +291,7 @@ class PurchaseOrderController extends Controller
                     $tax = (float) ($item['tax'] ?? 0);
                     $tipePajak = TaxTypeHelper::normalize($item['tipe_pajak'] ?? 'eklusif');
                     $currencyId = !empty($item['currency_id']) ? (int) $item['currency_id'] : (!empty($validated['currency_id']) ? (int) $validated['currency_id'] : null);
+                    $orItemId = !empty($item['order_request_item_id']) ? (int) $item['order_request_item_id'] : null;
 
                     PurchaseOrderItem::create([
                         'purchase_order_id' => $poRecord->id,
@@ -258,7 +303,23 @@ class PurchaseOrderController extends Controller
                         'tax' => $tax,
                         'tipe_pajak' => $tipePajak,
                         'currency_id' => $currencyId,
+                        'refer_item_model_type' => $orItemId ? OrderRequestItem::class : null,
+                        'refer_item_model_id' => $orItemId,
                     ]);
+
+                    if ($orItemId) {
+                        $orItem = OrderRequestItem::find($orItemId);
+                        if ($orItem) {
+                            $orItem->addFulfilledQuantity($qty);
+                        }
+                    }
+                }
+
+                if ($orderRequestId) {
+                    $orderRequest = OrderRequest::find($orderRequestId);
+                    if ($orderRequest) {
+                        $orderRequest->syncFulfillmentStatus();
+                    }
                 }
 
                 // Simpan currency PO jika ditentukan

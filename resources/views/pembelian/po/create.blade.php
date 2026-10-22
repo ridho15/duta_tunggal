@@ -32,7 +32,7 @@
         ])) }},
         initialSupplierId: '{{ old('supplier_id', $selectedSupplier?->id ?? '') }}',
         initialCurrencyId: '{{ old('currency_id', $defaultCurrency?->id ?? 1) }}',
-        oldItems: {{ Js::from(old('items', [])) }}
+        oldItems: {{ Js::from(old('items', $initialPoItems ?? [])) }}
     })"
 >
     {{-- Header --}}
@@ -73,9 +73,32 @@
         </div>
     @endif
 
+    {{-- Banner Konversi dari Order Request --}}
+    @if (!empty($selectedOrderRequest))
+        <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-bold">Menerbitkan PO dari Permintaan: {{ $selectedOrderRequest->request_number }}</div>
+                    <div class="text-xs text-blue-700">Item barang dan kuantitas telah dimuat otomatis dari Order Request.</div>
+                </div>
+            </div>
+            <a href="{{ route('pembelian.or.show', $selectedOrderRequest) }}" class="text-xs font-semibold text-blue-700 hover:text-blue-900 underline">
+                Lihat Dokumen OR &rarr;
+            </a>
+        </div>
+    @endif
+
     {{-- Form PO --}}
     <form action="{{ route('pembelian.po.store') }}" method="POST" id="poForm" class="space-y-6">
         @csrf
+        @if (!empty($selectedOrderRequest))
+            <input type="hidden" name="order_request_id" value="{{ $selectedOrderRequest->id }}">
+        @endif
 
         {{-- Card 1: Informasi Header & Supplier --}}
         <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
@@ -304,6 +327,7 @@
                                             <option value="{{ $p->id }}">{{ $p->name }} ({{ $p->sku ?? '-' }})</option>
                                         @endforeach
                                     </select>
+                                    <input type="hidden" :name="'items[' + index + '][order_request_item_id]'" :value="item.orderRequestItemId || ''">
                                     <input type="hidden" :name="'items[' + index + '][currency_id]'" :value="currencyId">
                                     <input type="hidden" :name="'items[' + index + '][tax]'" value="11">
                                 </td>
@@ -494,6 +518,7 @@ function purchaseOrderForm(config) {
             if (config.oldItems && config.oldItems.length > 0) {
                 this.items = config.oldItems.map(item => ({
                     productId: item.product_id || '',
+                    orderRequestItemId: item.order_request_item_id || '',
                     quantity: parseFloat(item.quantity) || 1,
                     unitPrice: parseFloat(item.unit_price) || 0,
                     discount: parseFloat(item.discount) || 0,
@@ -568,6 +593,7 @@ function purchaseOrderForm(config) {
         addRow() {
             this.items.push({
                 productId: '',
+                orderRequestItemId: '',
                 quantity: 1,
                 unitPrice: 0,
                 discount: 0,
