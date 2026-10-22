@@ -468,9 +468,22 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
 
     // Master Data
     Route::prefix('master')->name('master.')->group(function () {
-        Route::get('/produk', function () { return redirect()->route('dashboard'); })->name('products.index');
-        Route::get('/customer', function () { return redirect()->route('dashboard'); })->name('customers.index');
-        Route::get('/supplier', function () { return redirect()->route('dashboard'); })->name('suppliers.index');
+        // Master Produk
+        Route::get('/produk/api/generate-sku', [\App\Http\Controllers\Master\ProductController::class, 'generateSku'])->name('products.generate-sku');
+        Route::post('/produk/{product}/toggle-active', [\App\Http\Controllers\Master\ProductController::class, 'toggleActive'])->name('products.toggle-active');
+        Route::resource('produk', \App\Http\Controllers\Master\ProductController::class)
+            ->names('products')
+            ->parameters(['produk' => 'product']);
+
+        // Master Customer
+        Route::get('/customer/api/generate-code', [\App\Http\Controllers\Master\CustomerController::class, 'generateCode'])->name('customers.generate-code');
+        Route::get('/customer/api/check-duplicates', [\App\Http\Controllers\Master\CustomerController::class, 'checkDuplicates'])->name('customers.check-duplicates');
+        Route::resource('customer', \App\Http\Controllers\Master\CustomerController::class)->names('customers');
+
+        // Master Supplier
+        Route::get('/supplier/api/generate-code', [\App\Http\Controllers\Master\SupplierController::class, 'generateCode'])->name('suppliers.generate-code');
+        Route::get('/supplier/api/check-duplicates', [\App\Http\Controllers\Master\SupplierController::class, 'checkDuplicates'])->name('suppliers.check-duplicates');
+        Route::resource('supplier', \App\Http\Controllers\Master\SupplierController::class)->names('suppliers');
     });
 
     // Pengaturan
