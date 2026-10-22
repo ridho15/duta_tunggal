@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Penjualan;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cabang;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryOrderItemWarehouseSource;
 use App\Models\InventoryStock;
 use App\Models\SaleOrder;
+use App\Models\SuratJalan;
+use App\Models\Warehouse;
 use App\Observers\DeliveryOrderObserver;
 use App\Services\DeliveryOrderService;
 use App\Services\DeliveryOrderSplitter;
 use App\Services\SaleOrderDeliveryProgress;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +36,117 @@ class DeliveryOrderController extends Controller
         $this->deliveryOrderService = $deliveryOrderService;
         $this->deliveryOrderSplitter = $deliveryOrderSplitter;
         $this->deliveryProgressService = $deliveryProgressService;
+    }
+
+    /**
+     * Menampilkan daftar Perintah Kirim (Delivery Order / DO).
+     */
+    public function index(Request $request): View
+    {
+        $tab = $request->query('tab', 'semua');
+        $search = $request->query('q');
+        $cabangId = $request->query('cabang_id');
+        $warehouseId = $request->query('warehouse_id');
+
+        $kpiBase = DeliveryOrder::query();
+        if ($cabangId) {
+            $kpiBase->where('cabang_id', $cabangId);
+        }
+        if ($warehouseId) {
+            $kpiBase->where('warehouse_id', $warehouseId);
+        }
+
+        // Live counter per status tab
+        $counts = [
+            'semua' => (clone $kpiBase)->count(),
+            'menunggu_gudang' => (clone $kpiBase)->whereIn('status', ['draft', 'request_stock', 'request_approve'])->count(),
+            'siap_dicek' => (clone $kpiBase)->where('status', 'approved')->whereNull('returned_at')->count(),
+            'siap_sj' => (clone $kpiBase)->where('status', 'confirmed')->whereNull('returned_at')->whereDoesntHave('suratJalan', function ($q) {
+                $q->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES);
+            })->count(),
+            'terkirim' => (clone $kpiBase)->where(function ($q) {
+                $q->whereIn('status', DeliveryOrder::DELIVERED_STATUSES)
+                  ->orWhereHas('suratJalan', function ($sjQ) {
+                      $sjQ->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES);
+                  });
+            })->count(),
+            'diretur' => (clone $kpiBase)->where(function ($q) {
+                $q->whereNotNull('returned_at')->orWhereIn('status', ['returned', 'closed', 'reject']);
+            })->count(),
+        ];
+
+        // Query utama dengan eager loading lengkap
+        $query = DeliveryOrder::with([
+            'cabang',
+            'warehouse',
+            'salesOrders.customer',
+            'deliveryOrderItem.product.uom',
+            'suratJalan',
+            'createdBy',
+        ])->latest('id');
+
+        if ($cabangId) {
+            $query->where('cabang_id', $cabangId);
+        }
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        // Filter tab
+        if ($tab === 'menunggu_gudang') {
+            $query->whereIn('status', ['draft', 'request_stock', 'request_approve']);
+        } elseif ($tab === 'siap_dicek') {
+            $query->where('status', 'approved')->whereNull('returned_at');
+        } elseif ($tab === 'siap_sj') {
+            $query->where('status', 'confirmed')->whereNull('returned_at')->whereDoesntHave('suratJalan', function ($q) {
+                $q->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES);
+            });
+        } elseif ($tab === 'terkirim') {
+            $query->where(function ($q) {
+                $q->whereIn('status', DeliveryOrder::DELIVERED_STATUSES)
+                  ->orWhereHas('suratJalan', function ($sjQ) {
+                      $sjQ->whereIn('surat_jalans.status', SuratJalan::ACTIVE_STATUSES);
+                  });
+            });
+        } elseif ($tab === 'diretur') {
+            $query->where(function ($q) {
+                $q->whereNotNull('returned_at')->orWhereIn('status', ['returned', 'closed', 'reject']);
+            });
+        }
+
+        // Pencarian multi-kolom
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('do_number', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhereHas('salesOrders', function ($soQ) use ($search) {
+                      $soQ->where('so_number', 'like', "%{$search}%")
+                          ->orWhereHas('customer', function ($cQ) use ($search) {
+                              $cQ->where('name', 'like', "%{$search}%")
+                                 ->orWhere('code', 'like', "%{$search}%");
+                          });
+                  })
+                  ->orWhereHas('warehouse', function ($wQ) use ($search) {
+                      $wQ->where('name', 'like', "%{$search}%")
+                         ->orWhere('kode', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $deliveryOrders = $query->paginate(15)->withQueryString();
+        $cabangs = Cabang::where('status', true)->get();
+        $warehouses = Warehouse::where('status', true)->get();
+
+        return view('penjualan.do.index', compact(
+            'deliveryOrders',
+            'counts',
+            'tab',
+            'search',
+            'cabangs',
+            'warehouses',
+            'cabangId',
+            'warehouseId'
+        ));
     }
 
     /**
@@ -237,5 +352,109 @@ class DeliveryOrderController extends Controller
             : "Perintah Kirim {$orderNumbers} berhasil diterbitkan.";
 
         return redirect()->route('penjualan.so.show', $saleOrder->id)->with('success', $msg);
+    }
+
+    /**
+     * Menampilkan detail Perintah Kirim (Delivery Order / DO).
+     */
+    public function show(DeliveryOrder $deliveryOrder): View
+    {
+        $deliveryOrder->loadMissing([
+            'cabang',
+            'warehouse',
+            'salesOrders.customer',
+            'salesOrders.saleOrderItem',
+            'deliveryOrderItem.product.uom',
+            'deliveryOrderItem.warehouseSources.warehouse',
+            'deliveryOrderItem.itemCheck.checker',
+            'suratJalan.cabang',
+            'suratJalan.deliverySchedules.driver',
+            'suratJalan.deliverySchedules.vehicle',
+            'replacementFor',
+            'replacements',
+            'createdBy',
+        ]);
+
+        $breakdown = $deliveryOrder->valueBreakdown();
+        $canCreateSj = $deliveryOrder->status === 'confirmed'
+            && empty($deliveryOrder->returned_at)
+            && ! $deliveryOrder->hasIssuedSuratJalan();
+
+        $canCancel = empty($deliveryOrder->returned_at)
+            && ! in_array($deliveryOrder->status, ['closed', 'returned', 'sent', 'received', 'completed'], true)
+            && ! $deliveryOrder->hasIssuedSuratJalan();
+
+        return view('penjualan.do.show', compact('deliveryOrder', 'breakdown', 'canCreateSj', 'canCancel'));
+    }
+
+    /**
+     * Cetak dokumen PDF Delivery Order / Perintah Pengeluaran Barang.
+     */
+    public function pdf(DeliveryOrder $deliveryOrder)
+    {
+        $deliveryOrder->loadMissing([
+            'cabang',
+            'warehouse',
+            'salesOrders.customer',
+            'deliveryOrderItem.product.uom',
+            'deliveryOrderItem.itemCheck.checker',
+            'createdBy',
+        ]);
+
+        $pdf = Pdf::loadView('pdf.delivery-order', [
+            'deliveryOrder' => $deliveryOrder,
+            'doc' => app(\App\Services\DocumentPrintBuilder::class)->deliveryOrder($deliveryOrder),
+            'so' => $deliveryOrder->salesOrders->first(),
+            'customer' => $deliveryOrder->salesOrders->first()?->customer,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->stream("Perintah_Kirim_{$deliveryOrder->do_number}.pdf");
+    }
+
+    /**
+     * Batalkan Perintah Kirim yang belum diterbitkan Surat Jalan dan kembalikan stok.
+     */
+    public function cancel(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
+    {
+        if ($deliveryOrder->hasIssuedSuratJalan()) {
+            return redirect()->back()->with('error', "Perintah Kirim {$deliveryOrder->do_number} tidak dapat dibatalkan karena sudah memiliki Surat Jalan aktif.");
+        }
+
+        if (in_array($deliveryOrder->status, ['closed', 'returned', 'sent', 'received', 'completed'], true)) {
+            return redirect()->back()->with('error', "Perintah Kirim dengan status '{$deliveryOrder->status}' tidak dapat dibatalkan.");
+        }
+
+        $reason = $request->input('reason', 'Dibatalkan oleh staf.');
+
+        DB::transaction(function () use ($deliveryOrder, $reason) {
+            // 1. Lepas reservasi stok fisik jika ada
+            $this->deliveryOrderService->releaseStockReservations($deliveryOrder);
+
+            // 2. Kembalikan pemotongan stok fisik jika ada
+            if (class_exists(\App\Services\DeliveryShipments::class)) {
+                app(\App\Services\DeliveryShipments::class)->reverse($deliveryOrder, "DO {$deliveryOrder->do_number} dibatalkan: {$reason}");
+            }
+
+            // 3. Update status DO ke closed
+            $this->deliveryOrderService->updateStatus(
+                deliveryOrder: $deliveryOrder,
+                status: 'closed',
+                comments: $reason,
+                action: 'cancelled'
+            );
+
+            // 4. Sinkronisasi reservasi level SO jika service tersedia
+            if (class_exists(\App\Services\SaleOrderReservationSynchronizer::class)) {
+                app(\App\Services\SaleOrderReservationSynchronizer::class)->syncForDeliveryOrder($deliveryOrder, "DO {$deliveryOrder->do_number} dibatalkan");
+            }
+
+            // 5. Update progres pengiriman SO
+            foreach ($deliveryOrder->salesOrders as $so) {
+                $this->deliveryProgressService->forSaleOrder($so);
+            }
+        });
+
+        return redirect()->route('penjualan.do.index')
+            ->with('success', "Perintah Kirim {$deliveryOrder->do_number} berhasil dibatalkan. Alokasi stok persediaan telah dikembalikan.");
     }
 }

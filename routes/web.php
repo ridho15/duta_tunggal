@@ -172,9 +172,18 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/so/{saleOrder}/approve', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'approve'])->name('so.approve');
         Route::post('/so/{saleOrder}/reject', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'reject'])->name('so.reject');
 
+        // Perintah Kirim (Delivery Order / DO)
+        Route::get('/do', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'index'])->name('do.index');
         Route::get('/do/create', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'create'])->name('do.create');
         Route::post('/do', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'store'])->name('do.store');
-        Route::get('/do', function () { return redirect()->route('penjualan.so.index'); })->name('do.index');
+        Route::get('/do/{deliveryOrder}', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'show'])->name('do.show');
+        Route::get('/do/{deliveryOrder}/pdf', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'pdf'])->name('do.pdf');
+        Route::post('/do/{deliveryOrder}/cancel', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'cancel'])->name('do.cancel');
+
+        // Aliases for English / plural URL compatibility
+        Route::get('/delivery-orders', function () { return redirect()->route('penjualan.do.index'); });
+        Route::get('/delivery-orders/create', function () { return redirect()->route('penjualan.do.create', request()->query()); });
+        Route::get('/delivery-orders/{deliveryOrder}', function ($deliveryOrder) { return redirect()->route('penjualan.do.show', $deliveryOrder); });
 
         // Surat Jalan
         Route::get('/surat-jalan', [\App\Http\Controllers\Penjualan\SuratJalanController::class, 'index'])->name('sj.index');

@@ -81,6 +81,11 @@ class DeliveryOrderItem extends Model
         return $this->hasMany(DeliveryOrderItemWarehouseSource::class, 'delivery_order_item_id');
     }
 
+    public function itemCheck()
+    {
+        return $this->hasOne(DeliveryOrderItemCheck::class, 'delivery_order_item_id');
+    }
+
     protected static function booted()
     {
         static::updated(function ($deliveryOrderItem) {

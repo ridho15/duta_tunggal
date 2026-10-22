@@ -41,6 +41,7 @@ class BladeStockTransferWorkflowTest extends TestCase
             ?? Warehouse::create([
                 'kode' => 'WH-ORIGIN',
                 'name' => 'Gudang Asal Test',
+                'location' => 'Area Gudang Asal',
                 'cabang_id' => $this->cabang->id,
                 'status' => true,
             ]);
@@ -49,6 +50,7 @@ class BladeStockTransferWorkflowTest extends TestCase
             ?? Warehouse::create([
                 'kode' => 'WH-DEST',
                 'name' => 'Gudang Tujuan Test',
+                'location' => 'Area Gudang Tujuan',
                 'cabang_id' => $this->cabang->id,
                 'status' => true,
             ]);

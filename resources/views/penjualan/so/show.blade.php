@@ -177,7 +177,9 @@
                     @forelse($saleOrder->deliveryOrder as $do)
                         <div class="border border-gray-200 hover:border-emerald-600 rounded-xl p-3 bg-gray-50/50 transition-colors">
                             <div class="flex justify-between items-center">
-                                <span class="font-bold text-sm text-gray-900">{{ $do->do_number }}</span>
+                                <a href="{{ route('penjualan.do.show', $do->id) }}" class="font-bold text-sm text-gray-900 hover:text-emerald-700 transition">
+                                    {{ $do->do_number }}
+                                </a>
                                 <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
                                     {{ \App\Models\DeliveryOrder::statusLabel($do->status) }}
                                 </span>
