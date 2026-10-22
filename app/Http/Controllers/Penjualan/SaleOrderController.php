@@ -217,6 +217,14 @@ class SaleOrderController extends Controller
             ->limit(50)
             ->get(['id', 'quotation_number', 'customer_id', 'total_amount']);
 
+        $selectedQuotationId = $request->query('quotation_id');
+        $selectedQuotation = null;
+        if ($selectedQuotationId) {
+            $selectedQuotation = Quotation::query()
+                ->with(['customer', 'quotationItem.product.uom'])
+                ->find($selectedQuotationId);
+        }
+
         $nextSoNumber = $this->salesOrderService->generateSoNumber($canAccessAll ? null : $user?->cabang_id);
 
         return view('penjualan.so.create', [
@@ -227,6 +235,8 @@ class SaleOrderController extends Controller
             'customers' => $customers,
             'products' => $products,
             'quotations' => $quotations,
+            'selectedQuotation' => $selectedQuotation,
+            'selectedQuotationId' => $selectedQuotationId,
             'user' => $user,
         ]);
     }

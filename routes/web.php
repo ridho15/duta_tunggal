@@ -247,7 +247,27 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/credit-notes/create', function () { return redirect()->route('penjualan.credit-notes.create', request()->query()); });
         Route::get('/credit-notes/{creditNote}', function ($creditNote) { return redirect()->route('penjualan.credit-notes.show', $creditNote); });
 
-        Route::get('/penawaran', function () { return redirect()->route('dashboard'); })->name('quotations.index');
+        // Penawaran Harga (Quotation)
+        Route::prefix('penawaran')->name('quotations.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Penjualan\QuotationController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Penjualan\QuotationController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Penjualan\QuotationController::class, 'store'])->name('store');
+            Route::get('/{quotation}', [\App\Http\Controllers\Penjualan\QuotationController::class, 'show'])->name('show');
+            Route::get('/{quotation}/edit', [\App\Http\Controllers\Penjualan\QuotationController::class, 'edit'])->name('edit');
+            Route::put('/{quotation}', [\App\Http\Controllers\Penjualan\QuotationController::class, 'update'])->name('update');
+            Route::delete('/{quotation}', [\App\Http\Controllers\Penjualan\QuotationController::class, 'destroy'])->name('destroy');
+            Route::post('/{quotation}/request-approve', [\App\Http\Controllers\Penjualan\QuotationController::class, 'requestApprove'])->name('requestApprove');
+            Route::post('/{quotation}/approve', [\App\Http\Controllers\Penjualan\QuotationController::class, 'approve'])->name('approve');
+            Route::post('/{quotation}/reject', [\App\Http\Controllers\Penjualan\QuotationController::class, 'reject'])->name('reject');
+            Route::post('/{quotation}/revision', [\App\Http\Controllers\Penjualan\QuotationController::class, 'createRevision'])->name('revision');
+            Route::get('/{quotation}/convert-so', [\App\Http\Controllers\Penjualan\QuotationController::class, 'convertToSaleOrder'])->name('convertToSaleOrder');
+            Route::get('/{quotation}/pdf', [\App\Http\Controllers\Penjualan\QuotationController::class, 'pdf'])->name('pdf');
+        });
+
+        // Aliases for English / plural URL compatibility
+        Route::get('/quotations', function () { return redirect()->route('penjualan.quotations.index'); });
+        Route::get('/quotations/create', function () { return redirect()->route('penjualan.quotations.create', request()->query()); });
+        Route::get('/quotations/{quotation}', function ($quotation) { return redirect()->route('penjualan.quotations.show', $quotation); });
     });
 
     // Modul Gudang & Stok

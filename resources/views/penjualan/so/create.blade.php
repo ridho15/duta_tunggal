@@ -40,6 +40,27 @@
                     <h2 class="m-0 text-base font-bold text-gray-900">Customer & Pengiriman</h2>
                 </div>
 
+                @if(isset($quotations) && $quotations->isNotEmpty())
+                    <div class="flex flex-col gap-1.5 pb-2 border-b border-gray-100">
+                        <label class="text-xs font-semibold text-gray-700 flex items-center justify-between">
+                            <span>Berdasarkan Penawaran Harga (Quotation)</span>
+                            <span class="text-[11px] text-gray-400 font-normal">Opsional</span>
+                        </label>
+                        <select name="quotation_id" id="quotationSelect" class="border border-gray-300 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-emerald-600 bg-emerald-50/20">
+                            <option value="">-- Tanpa Penawaran (SO Langsung) --</option>
+                            @foreach($quotations as $qo)
+                                <option value="{{ $qo->id }}"
+                                        data-customer="{{ $qo->customer_id }}"
+                                        {{ (old('quotation_id', $selectedQuotationId ?? null) == $qo->id) ? 'selected' : '' }}>
+                                    {{ $qo->quotation_number }} – {{ $qo->customer->name ?? '-' }} (Rp {{ number_format($qo->total_amount, 0, ',', '.') }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    <input type="hidden" name="quotation_id" value="{{ old('quotation_id', $selectedQuotationId ?? '') }}">
+                @endif
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div class="flex flex-col gap-1.5">
                         <label class="text-xs font-semibold text-gray-700">Customer <span class="text-red-500">*</span></label>
@@ -52,7 +73,7 @@
                                         data-tempo="{{ (int)$c->tempo_kredit }}"
                                         data-address="{{ $c->address }}"
                                         data-deposit="{{ (float)($c->deposit?->remaining_amount ?? 0) }}"
-                                        {{ old('customer_id') == $c->id ? 'selected' : '' }}>
+                                        {{ old('customer_id', $selectedQuotation->customer_id ?? null) == $c->id ? 'selected' : '' }}>
                                     {{ $c->name }} ({{ $c->code }})
                                 </option>
                             @endforeach
