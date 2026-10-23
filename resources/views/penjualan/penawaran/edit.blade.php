@@ -56,19 +56,24 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {{-- Cabang --}}
                 <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">
-                        Cabang Penjual <span class="text-red-500">*</span>
-                    </label>
                     @if($canAccessAll)
-                        <select name="cabang_id" id="cabang_id" required
-                                class="w-full py-2 px-3 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600">
-                            @foreach($cabangs as $cb)
-                                <option value="{{ $cb->id }}" {{ old('cabang_id', $quotation->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                    {{ $cb->kode }} – {{ $cb->nama }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select
+                            name="cabang_id"
+                            label="Cabang Penjual"
+                            :options="$cabangs->map(fn($cb) => [
+                                'id' => $cb->id,
+                                'label' => $cb->nama,
+                                'subtext' => $cb->kode ?? '',
+                                'badge' => $cb->kode ?? ''
+                            ])"
+                            :value="old('cabang_id', $quotation->cabang_id)"
+                            placeholder="-- Pilih Cabang --"
+                            :required="true"
+                        />
                     @else
+                        <label class="block text-xs font-bold text-gray-700 mb-1">
+                            Cabang Penjual <span class="text-red-500">*</span>
+                        </label>
                         <input type="hidden" name="cabang_id" value="{{ $quotation->cabang_id }}">
                         <input type="text" readonly
                                value="{{ $quotation->cabang->nama ?? 'Cabang Terpilih' }}"
@@ -77,23 +82,21 @@
                 </div>
 
                 {{-- Pelanggan --}}
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">
-                        Pelanggan (Customer) <span class="text-red-500">*</span>
-                    </label>
-                    <select name="customer_id" id="customer_id" required
-                            class="w-full py-2 px-3 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600">
-                        <option value="">-- Pilih Pelanggan --</option>
-                        @foreach($customers as $c)
-                            <option value="{{ $c->id }}"
-                                    data-address="{{ $c->address }}"
-                                    data-phone="{{ $c->phone ?? $c->telephone }}"
-                                    data-tempo="{{ $c->tempo_kredit ?? 30 }}"
-                                    {{ old('customer_id', $quotation->customer_id) == $c->id ? 'selected' : '' }}>
-                                {{ $c->name }} {{ $c->perusahaan ? "— {$c->perusahaan}" : '' }}
-                            </option>
-                        @endforeach
-                    </select>
+                <div class="md:col-span-2" @change="if ($event.detail) handleCustomerChange($event.detail)">
+                    <x-searchable-select
+                        name="customer_id"
+                        id="customer_id"
+                        label="Pelanggan (Customer)"
+                        :options="$customers->map(fn($c) => [
+                            'id' => $c->id,
+                            'label' => $c->name . ($c->perusahaan ? ' — ' . $c->perusahaan : ''),
+                            'subtext' => ($c->address ? \Illuminate\Support\Str::limit($c->address, 35) : '') . ($c->phone ?? $c->telephone ? ' | Telp: ' . ($c->phone ?? $c->telephone) : '') . ' | Tempo: ' . ($c->tempo_kredit ?? 30) . ' hari',
+                            'badge' => $c->tipe_pembayaran ?? 'Customer'
+                        ])"
+                        :value="old('customer_id', $quotation->customer_id)"
+                        placeholder="-- Cari atau Pilih Pelanggan --"
+                        :required="true"
+                    />
                 </div>
 
                 {{-- Nomor Penawaran (Readonly) --}}
@@ -135,21 +138,21 @@
 
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {{-- Mata Uang --}}
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">
-                        Mata Uang <span class="text-red-500">*</span>
-                    </label>
-                    <select name="currency_id" id="currency_id" required
-                            class="w-full py-2 px-3 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600">
-                        @foreach($currencies as $curr)
-                            <option value="{{ $curr->id }}"
-                                    data-rate="{{ $curr->to_rupiah ?? 1 }}"
-                                    data-code="{{ $curr->code }}"
-                                    {{ old('currency_id', $quotation->currency_id) == $curr->id ? 'selected' : '' }}>
-                                {{ $curr->code }} – {{ $curr->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                <div @change="if ($event.detail) handleCurrencyChange($event.detail)">
+                    <x-searchable-select
+                        name="currency_id"
+                        id="currency_id"
+                        label="Mata Uang"
+                        :options="$currencies->map(fn($curr) => [
+                            'id' => $curr->id,
+                            'label' => $curr->code . ' – ' . $curr->name,
+                            'subtext' => 'Simbol: ' . ($curr->symbol ?? '') . ($curr->to_rupiah > 1 ? ' | Kurs: ' . number_format($curr->to_rupiah, 2, ',', '.') : ''),
+                            'badge' => $curr->code
+                        ])"
+                        :value="old('currency_id', $quotation->currency_id)"
+                        placeholder="-- Pilih Mata Uang --"
+                        :required="true"
+                    />
                 </div>
 
                 {{-- Kurs --}}
@@ -456,6 +459,52 @@
         document.getElementById('txtTotalTax').innerText = 'Rp ' + formatNumber(totalTax);
         document.getElementById('txtGrandTotal').innerText = 'Rp ' + formatNumber(grandTotal);
     }
+
+    const customersData = {
+        @foreach($customers as $c)
+            "{{ $c->id }}": {
+                address: "{{ addslashes($c->address ?? '') }}",
+                tempo: {{ (int)($c->tempo_kredit ?? 30) }}
+            },
+        @endforeach
+    };
+
+    const currenciesData = {
+        @foreach($currencies as $curr)
+            "{{ $curr->id }}": {
+                rate: {{ (float)($curr->to_rupiah ?? 1) }},
+                code: "{{ $curr->code }}"
+            },
+        @endforeach
+    };
+
+    function handleCustomerChange(custId) {
+        const c = customersData[custId];
+        if (c) {
+            const shippedTo = document.getElementById('shipped_to');
+            if (shippedTo && c.address) {
+                shippedTo.value = c.address;
+            }
+            const tempoEl = document.getElementById('tempo_pembayaran');
+            if (tempoEl && c.tempo) {
+                tempoEl.value = c.tempo;
+            }
+        }
+    }
+
+    function handleCurrencyChange(currId) {
+        const curr = currenciesData[currId];
+        if (curr) {
+            const rateInput = document.getElementById('exchange_rate');
+            if (rateInput) {
+                rateInput.value = curr.rate || 1;
+            }
+        }
+    }
+
+    document.getElementById('customer_id')?.addEventListener('change', function() {
+        handleCustomerChange(this.value);
+    });
 
     document.getElementById('btnAddRow').addEventListener('click', () => addRow());
 

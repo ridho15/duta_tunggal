@@ -45,7 +45,7 @@
 @endphp
 
 <div
-    class="w-full relative"
+    {{ $attributes->merge(['class' => 'w-full relative']) }}
     x-data="searchableSelect({
         name: '{{ $name }}',
         options: {{ Js::from($normalizedOptions) }},

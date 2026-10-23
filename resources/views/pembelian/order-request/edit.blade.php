@@ -151,21 +151,20 @@
                 </div>
 
                 {{-- Mata Uang Utama --}}
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                        Mata Uang Dokumen
-                    </label>
-                    <select 
-                        name="currency_id" 
-                        x-model="headerCurrencyId"
-                        class="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition font-medium text-gray-800"
-                    >
-                        @foreach ($currencies as $c)
-                            <option value="{{ $c->id }}" {{ old('currency_id', $orderRequest->currency_id) == $c->id ? 'selected' : '' }}>
-                                {{ $c->name }} ({{ $c->symbol }})
-                            </option>
-                        @endforeach
-                    </select>
+                <div @change="if ($event.detail !== undefined) { headerCurrencyId = $event.detail; }">
+                    <x-searchable-select
+                        name="currency_id"
+                        label="Mata Uang Dokumen"
+                        :options="$currencies->map(fn($c) => [
+                            'id' => $c->id,
+                            'label' => $c->code . ' - ' . $c->name,
+                            'subtext' => 'Simbol: ' . $c->symbol . ($c->to_rupiah > 1 ? ' | Kurs: ' . number_format($c->to_rupiah, 2, ',', '.') : ''),
+                            'badge' => $c->code
+                        ])"
+                        :value="old('currency_id', $orderRequest->currency_id)"
+                        placeholder="-- Pilih Mata Uang Dokumen --"
+                        :required="true"
+                    />
                 </div>
 
                 {{-- Keperluan / Divisi --}}

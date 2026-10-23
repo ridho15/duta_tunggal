@@ -42,53 +42,57 @@
 
                 @if(isset($quotations) && $quotations->isNotEmpty())
                     <div class="flex flex-col gap-1.5 pb-2 border-b border-gray-100">
-                        <label class="text-xs font-semibold text-gray-700 flex items-center justify-between">
-                            <span>Berdasarkan Penawaran Harga (Quotation)</span>
-                            <span class="text-[11px] text-gray-400 font-normal">Opsional</span>
-                        </label>
-                        <select name="quotation_id" id="quotationSelect" class="border border-gray-300 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-emerald-600 bg-emerald-50/20">
-                            <option value="">-- Tanpa Penawaran (SO Langsung) --</option>
-                            @foreach($quotations as $qo)
-                                <option value="{{ $qo->id }}"
-                                        data-customer="{{ $qo->customer_id }}"
-                                        {{ (old('quotation_id', $selectedQuotationId ?? null) == $qo->id) ? 'selected' : '' }}>
-                                    {{ $qo->quotation_number }} – {{ $qo->customer->name ?? '-' }} (Rp {{ number_format($qo->total_amount, 0, ',', '.') }})
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select
+                            name="quotation_id"
+                            id="quotationSelect"
+                            label="Berdasarkan Penawaran Harga (Quotation) - Opsional"
+                            :options="$quotations->map(fn($qo) => [
+                                'id' => $qo->id,
+                                'label' => $qo->quotation_number . ' – ' . ($qo->customer->name ?? '-'),
+                                'subtext' => 'Total: Rp ' . number_format($qo->total_amount, 0, ',', '.'),
+                                'badge' => 'Penawaran'
+                            ])"
+                            :value="old('quotation_id', $selectedQuotationId ?? null)"
+                            placeholder="-- Tanpa Penawaran (SO Langsung) --"
+                            :required="false"
+                        />
                     </div>
                 @else
                     <input type="hidden" name="quotation_id" value="{{ old('quotation_id', $selectedQuotationId ?? '') }}">
                 @endif
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-semibold text-gray-700">Customer <span class="text-red-500">*</span></label>
-                        <select name="customer_id" id="customerSelect" required class="border border-gray-300 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-800 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white">
-                            <option value="">-- Pilih Customer --</option>
-                            @foreach($customers as $c)
-                                <option value="{{ $c->id }}"
-                                        data-tipe="{{ $c->tipe_pembayaran }}"
-                                        data-limit="{{ (float)$c->kredit_limit }}"
-                                        data-tempo="{{ (int)$c->tempo_kredit }}"
-                                        data-address="{{ $c->address }}"
-                                        data-deposit="{{ (float)($c->deposit?->remaining_amount ?? 0) }}"
-                                        {{ old('customer_id', $selectedQuotation->customer_id ?? null) == $c->id ? 'selected' : '' }}>
-                                    {{ $c->name }} ({{ $c->code }})
-                                </option>
-                            @endforeach
-                        </select>
+                    <div class="flex flex-col gap-1.5" @change="if ($event.detail !== undefined) handleCustomerSelectChange($event.detail)">
+                        <x-searchable-select
+                            name="customer_id"
+                            id="customerSelect"
+                            label="Customer"
+                            :options="$customers->map(fn($c) => [
+                                'id' => $c->id,
+                                'label' => $c->name . ($c->code ? ' (' . $c->code . ')' : ''),
+                                'subtext' => ($c->address ? \Illuminate\Support\Str::limit($c->address, 35) : '') . ' | Limit: Rp ' . number_format($c->kredit_limit, 0, ',', '.') . ' | Tipe: ' . $c->tipe_pembayaran,
+                                'badge' => $c->tipe_pembayaran ?? 'Customer'
+                            ])"
+                            :value="old('customer_id', $selectedQuotation->customer_id ?? null)"
+                            placeholder="-- Pilih Customer --"
+                            :required="true"
+                        />
                     </div>
 
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-semibold text-gray-700">Cabang <span class="text-red-500">*</span></label>
-                        <select name="cabang_id" required class="border border-gray-300 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-800 focus:outline-none focus:border-emerald-600 bg-white">
-                            @foreach($cabangs as $cb)
-                                <option value="{{ $cb->id }}" {{ old('cabang_id', $user?->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                    {{ $cb->kode }} - {{ $cb->nama }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select
+                            name="cabang_id"
+                            label="Cabang"
+                            :options="$cabangs->map(fn($cb) => [
+                                'id' => $cb->id,
+                                'label' => $cb->nama,
+                                'subtext' => $cb->kode ?? '',
+                                'badge' => $cb->kode ?? ''
+                            ])"
+                            :value="old('cabang_id', $user?->cabang_id)"
+                            placeholder="-- Pilih Cabang --"
+                            :required="true"
+                        />
                     </div>
                 </div>
 
@@ -159,14 +163,17 @@
                         <input type="number" name="shipping_cost" id="shippingCostInput" value="{{ old('shipping_cost', 0) }}" min="0" step="1000" class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-600">
                     </div>
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-semibold text-gray-700">Mata Uang</label>
-                        <select name="currency_id" class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-emerald-600 bg-white">
-                            @foreach($currencies as $curr)
-                                <option value="{{ $curr->id }}" {{ $curr->id == $defaultCurrencyId ? 'selected' : '' }}>
-                                    {{ $curr->code }} - {{ $curr->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select
+                            name="currency_id"
+                            label="Mata Uang"
+                            :options="$currencies->map(fn($curr) => [
+                                'id' => $curr->id,
+                                'label' => $curr->code . ' - ' . $curr->name,
+                                'badge' => $curr->code
+                            ])"
+                            :value="old('currency_id', $defaultCurrencyId)"
+                            placeholder="-- Pilih Mata Uang --"
+                        />
                     </div>
                 </div>
 
@@ -397,14 +404,14 @@
         }
 
         // Cek Limit Kredit
-        const custSelect = document.getElementById('customerSelect');
-        const custOpt = custSelect?.selectedOptions[0];
+        const custId = document.getElementById('customerSelect')?.value;
+        const cust = customersData[custId];
         const creditAlert = document.getElementById('creditStatusAlert');
 
-        if (custOpt && custOpt.value) {
-            const tipe = custOpt.getAttribute('data-tipe');
-            const limit = parseFloat(custOpt.getAttribute('data-limit') || 0);
-            const deposit = parseFloat(custOpt.getAttribute('data-deposit') || 0);
+        if (cust) {
+            const tipe = cust.tipe;
+            const limit = cust.limit;
+            const deposit = cust.deposit;
 
             if (tipe === 'Kredit' && limit > 0) {
                 if (grandTotal > limit) {
@@ -421,33 +428,50 @@
                 creditAlert.className = 'bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-700';
                 creditAlert.innerText = `Tipe Pembayaran: ${tipe || 'Cash'}.`;
             }
+        } else {
+            creditAlert.className = 'bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 font-medium';
+            creditAlert.innerText = 'Pilih customer untuk melihat status limit kredit.';
         }
     }
 
-    document.getElementById('customerSelect').addEventListener('change', function () {
-        const opt = this.selectedOptions[0];
-        if (!opt || !opt.value) {
+    const customersData = {
+        @foreach($customers as $c)
+            "{{ $c->id }}": {
+                id: "{{ $c->id }}",
+                name: "{{ addslashes($c->name) }}",
+                tipe: "{{ $c->tipe_pembayaran ?? 'Tunai' }}",
+                limit: {{ (float)$c->kredit_limit }},
+                tempo: {{ (int)$c->tempo_kredit }},
+                address: "{{ addslashes($c->address ?? '') }}",
+                deposit: {{ (float)($c->deposit?->remaining_amount ?? 0) }}
+            },
+        @endforeach
+    };
+
+    function handleCustomerSelectChange(custId) {
+        const cust = customersData[custId];
+        if (!cust) {
             document.getElementById('valKreditLimit').innerText = 'Rp 0';
             document.getElementById('valDepositBalance').innerText = 'Rp 0';
             document.getElementById('valTipePembayaran').innerText = '-';
+            calculateTotals();
             return;
         }
 
-        const limit = parseFloat(opt.getAttribute('data-limit') || 0);
-        const deposit = parseFloat(opt.getAttribute('data-deposit') || 0);
-        const tipe = opt.getAttribute('data-tipe') || 'Tunai';
-        const address = opt.getAttribute('data-address') || '';
-
-        document.getElementById('valKreditLimit').innerText = formatRupiah(limit);
-        document.getElementById('valDepositBalance').innerText = formatRupiah(deposit);
-        document.getElementById('valTipePembayaran').innerText = tipe;
+        document.getElementById('valKreditLimit').innerText = formatRupiah(cust.limit);
+        document.getElementById('valDepositBalance').innerText = formatRupiah(cust.deposit);
+        document.getElementById('valTipePembayaran').innerText = cust.tipe;
 
         const shippedInput = document.getElementById('shippedToInput');
-        if (!shippedInput.value) {
-            shippedInput.value = address;
+        if (shippedInput && !shippedInput.value) {
+            shippedInput.value = cust.address;
         }
 
         calculateTotals();
+    }
+
+    document.getElementById('customerSelect')?.addEventListener('change', function () {
+        handleCustomerSelectChange(this.value);
     });
 
     document.getElementById('shippingCostInput').addEventListener('input', calculateTotals);
@@ -458,9 +482,27 @@
         document.getElementById('soForm').submit();
     }
 
-    // Buat 1 baris item awal saat halaman pertama kali dibuka
+    @php
+        $qoItemsData = $selectedQuotation ? $selectedQuotation->quotationItem->map(fn($item) => [
+            'product_id' => $item->product_id,
+            'quantity' => (float)$item->quantity,
+            'unit_price' => (float)$item->unit_price,
+        ])->values()->all() : [];
+    @endphp
+    const quotationItems = @json($qoItemsData);
+
+    // Buat item awal saat halaman pertama kali dibuka
     window.addEventListener('DOMContentLoaded', () => {
-        createItemRow();
+        const initialCustId = document.getElementById('customerSelect')?.value;
+        if (initialCustId) {
+            handleCustomerSelectChange(initialCustId);
+        }
+
+        if (quotationItems && quotationItems.length > 0) {
+            quotationItems.forEach(item => createItemRow(item));
+        } else {
+            createItemRow();
+        }
     });
 </script>
 @endsection

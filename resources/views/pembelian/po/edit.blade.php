@@ -16,7 +16,7 @@
             'top_type' => $s->top_type ?? 'cod',
             'tempo_hutang' => (int)($s->tempo_hutang ?? 0)
         ])) }},
-        warehouses: {{ Js::from($warehouses->map(fn($w) => ['id' => $w->id, 'name' => $w->name, 'code' => $w->code])) }},
+        warehouses: {{ Js::from($warehouses->map(fn($w) => ['id' => $w->id, 'name' => $w->name, 'code' => $w->kode ?? 'GDG'])) }},
         cabangs: {{ Js::from($cabangs->map(fn($c) => ['id' => $c->id, 'nama' => $c->nama, 'kode' => $c->kode ?? ''])) }},
         currencies: {{ Js::from($currencies->map(fn($c) => [
             'id' => $c->id,
@@ -80,7 +80,7 @@
     </div>
 
     {{-- Error Banner --}}
-    @if ($errors->any())
+    @if (isset($errors) && $errors->any())
         <div class="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm space-y-1 shadow-sm">
             <div class="font-bold flex items-center gap-2">
                 <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,22 +131,20 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {{-- Supplier Selector --}}
-                        <div class="md:col-span-1">
-                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                                Supplier / Vendor Rekanan <span class="text-red-500">*</span>
-                            </label>
-                            <select 
-                                name="supplier_id" 
-                                x-model="supplierId" 
-                                @change="onSupplierChange()"
-                                required
-                                class="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition font-medium text-gray-800"
-                            >
-                                <option value="">-- Pilih Supplier --</option>
-                                <template x-for="s in suppliers" :key="s.id">
-                                    <option :value="s.id" x-text="(s.code ? '(' + s.code + ') ' : '') + s.perusahaan" :selected="s.id == supplierId"></option>
-                                </template>
-                            </select>
+                        <div class="md:col-span-1" @change="if ($event.detail !== undefined) { supplierId = $event.detail; onSupplierChange(); }">
+                            <x-searchable-select
+                                name="supplier_id"
+                                label="Supplier / Vendor Rekanan"
+                                :options="$suppliers->map(fn($s) => [
+                                    'id' => $s->id,
+                                    'label' => ($s->code ? '(' . $s->code . ') ' : '') . $s->perusahaan,
+                                    'subtext' => ($s->kontak_person ? 'U.p: ' . $s->kontak_person : '') . ($s->phone ? ' | Telp: ' . $s->phone : ''),
+                                    'badge' => $s->code ?? 'SUP'
+                                ])"
+                                :value="old('supplier_id', $purchaseOrder->supplier_id)"
+                                placeholder="-- Cari / Pilih Rekanan Vendor --"
+                                :required="true"
+                            />
 
                             {{-- Supplier Quick Info Box --}}
                             <div x-show="selectedSupplierInfo" class="mt-2.5 p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 text-xs text-gray-600 space-y-1">
@@ -167,27 +165,36 @@
 
                         {{-- Cabang --}}
                         <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">Cabang Operasional</label>
-                            <select name="cabang_id" class="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition font-medium text-gray-800">
-                                @foreach ($cabangs as $c)
-                                    <option value="{{ $c->id }}" {{ old('cabang_id', $purchaseOrder->cabang_id) == $c->id ? 'selected' : '' }}>
-                                        {{ $c->nama }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select
+                                name="cabang_id"
+                                label="Cabang Operasional"
+                                :options="$cabangs->map(fn($c) => [
+                                    'id' => $c->id,
+                                    'label' => $c->nama,
+                                    'subtext' => $c->kode ?? '',
+                                    'badge' => $c->kode ?? ''
+                                ])"
+                                :value="old('cabang_id', $purchaseOrder->cabang_id)"
+                                placeholder="-- Cari / Pilih Cabang --"
+                                :required="true"
+                            />
                         </div>
 
                         {{-- Gudang Tujuan --}}
                         <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">Gudang Penerimaan</label>
-                            <select name="warehouse_id" class="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition font-medium text-gray-800">
-                                <option value="">-- Pilih Gudang Tujuan --</option>
-                                @foreach ($warehouses as $w)
-                                    <option value="{{ $w->id }}" {{ old('warehouse_id', $purchaseOrder->warehouse_id) == $w->id ? 'selected' : '' }}>
-                                        {{ $w->name }} ({{ $w->code ?? 'GDG' }})
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select
+                                name="warehouse_id"
+                                label="Gudang Penerimaan"
+                                :options="$warehouses->map(fn($w) => [
+                                    'id' => $w->id,
+                                    'label' => $w->name,
+                                    'subtext' => 'Kode: ' . ($w->kode ?? 'GDG'),
+                                    'badge' => $w->kode ?? 'GDG'
+                                ])"
+                                :value="old('warehouse_id', $purchaseOrder->warehouse_id)"
+                                placeholder="-- Cari / Pilih Gudang Tujuan --"
+                                :required="false"
+                            />
                         </div>
 
                         {{-- Nomor PO --}}
@@ -255,34 +262,35 @@
                         </div>
 
                         {{-- Mata Uang & Kurs --}}
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">Mata Uang Transaksi</label>
-                            <div class="flex gap-2">
-                                <select 
-                                    name="currency_id" 
-                                    x-model="currencyId" 
-                                    @change="onCurrencyChange()"
-                                    class="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition font-medium text-gray-800"
-                                >
-                                    @foreach ($currencies as $c)
-                                        <option value="{{ $c->id }}" {{ old('currency_id', $purchaseOrder->purchaseOrderCurrency?->first()?->currency_id ?? 1) == $c->id ? 'selected' : '' }}>
-                                            {{ $c->code }} - {{ $c->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                        <div @change="if ($event.detail !== undefined) { currencyId = $event.detail; onCurrencyChange(); }">
+                            <x-searchable-select
+                                name="currency_id"
+                                label="Mata Uang Transaksi"
+                                :options="$currencies->map(fn($c) => [
+                                    'id' => $c->id,
+                                    'label' => $c->code . ' - ' . $c->name,
+                                    'subtext' => 'Simbol: ' . $c->symbol . ($c->to_rupiah > 1 ? ' | Kurs: ' . number_format($c->to_rupiah, 2, ',', '.') : ''),
+                                    'badge' => $c->code
+                                ])"
+                                :value="old('currency_id', $purchaseOrder->purchaseOrderCurrency?->first()?->currency_id ?? 1)"
+                                placeholder="-- Cari / Pilih Mata Uang --"
+                                :required="true"
+                            />
 
-                                <div x-show="isForeignCurrency" class="w-32 flex-shrink-0">
-                                    <input
-                                        type="number"
-                                        name="exchange_rate"
-                                        x-model="exchangeRate"
-                                        step="any"
-                                        min="0.0001"
-                                        placeholder="Kurs"
-                                        title="Kurs ke Rupiah"
-                                        class="w-full py-2.5 px-2 border border-gray-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
-                                    />
-                                </div>
+                            <div x-show="isForeignCurrency" class="mt-2">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                                    Kurs ke Rupiah <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    name="exchange_rate"
+                                    x-model="exchangeRate"
+                                    step="any"
+                                    min="0.0001"
+                                    placeholder="Kurs ke Rupiah"
+                                    title="Kurs ke Rupiah"
+                                    class="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-sm text-right font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
+                                />
                             </div>
                         </div>
                     </div>

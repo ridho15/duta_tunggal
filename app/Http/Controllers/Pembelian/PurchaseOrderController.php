@@ -18,6 +18,7 @@ use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\PurchaseOrderService;
 use App\Support\TaxTypeHelper;
+use App\Support\CurrencyConversionResolver;
 use App\Support\OrderRequestQuantityLock;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -166,9 +167,9 @@ class PurchaseOrderController extends Controller
         $defaultCabangId = $user?->cabang_id ?? Cabang::first()?->id;
 
         $suppliers = Supplier::orderBy('perusahaan')->get([
-            'id', 'perusahaan', 'code', 'top_type', 'tempo_hutang', 'telepon', 'phone', 'address', 'alamat', 'kontak_person'
+            'id', 'perusahaan', 'code', 'tempo_hutang', 'phone', 'address', 'kontak_person'
         ]);
-        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get(['id', 'name', 'code']);
+        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get(['id', 'name', 'kode']);
         $cabangs = Cabang::orderBy('nama')->get(['id', 'nama', 'kode']);
         $currencies = Currency::orderBy('code')->get(['id', 'code', 'name', 'symbol', 'to_rupiah']);
 
@@ -232,6 +233,8 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        $products = $preloadedProducts;
+
         return view('pembelian.po.create', compact(
             'suppliers',
             'warehouses',
@@ -244,7 +247,8 @@ class PurchaseOrderController extends Controller
             'selectedSupplier',
             'selectedOrderRequest',
             'initialPoItems',
-            'preloadedProducts'
+            'preloadedProducts',
+            'products'
         ));
     }
 
@@ -340,13 +344,28 @@ class PurchaseOrderController extends Controller
                     }
                 }
 
-                // Simpan currency PO jika ditentukan
-                if (!empty($validated['currency_id'])) {
-                    $exchangeRate = (float) ($validated['exchange_rate'] ?? 1);
+                // Simpan currency PO dari header dan per-item
+                $headerCurrencyId = !empty($validated['currency_id']) ? (int) $validated['currency_id'] : null;
+                $headerRate = !empty($validated['exchange_rate']) && (float) $validated['exchange_rate'] > 0 ? (float) $validated['exchange_rate'] : null;
+
+                $allCurrencyIds = collect($validated['items'])
+                    ->pluck('currency_id')
+                    ->filter()
+                    ->map(fn($id) => (int) $id)
+                    ->push($headerCurrencyId)
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                foreach ($allCurrencyIds as $cId) {
+                    $rate = ($cId === $headerCurrencyId && $headerRate)
+                        ? $headerRate
+                        : CurrencyConversionResolver::resolveRate($cId);
+
                     PurchaseOrderCurrency::create([
                         'purchase_order_id' => $poRecord->id,
-                        'currency_id' => (int) $validated['currency_id'],
-                        'nominal' => $exchangeRate > 0 ? $exchangeRate : 1.0,
+                        'currency_id' => $cId,
+                        'nominal' => $rate > 0 ? $rate : 1.0,
                     ]);
                 }
 
@@ -426,9 +445,9 @@ class PurchaseOrderController extends Controller
         ]);
 
         $suppliers = Supplier::orderBy('perusahaan')->get([
-            'id', 'perusahaan', 'code', 'top_type', 'tempo_hutang', 'telepon', 'phone', 'address', 'alamat', 'kontak_person'
+            'id', 'perusahaan', 'code', 'tempo_hutang', 'phone', 'address', 'kontak_person'
         ]);
-        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get(['id', 'name', 'code']);
+        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get(['id', 'name', 'kode']);
         $cabangs = Cabang::orderBy('nama')->get(['id', 'nama', 'kode']);
         $currencies = Currency::orderBy('code')->get(['id', 'code', 'name', 'symbol', 'to_rupiah']);
 
@@ -575,18 +594,31 @@ class PurchaseOrderController extends Controller
                     $or?->syncFulfillmentStatus();
                 }
 
-                // Update currency rate jika ditentukan
-                if (!empty($validated['currency_id'])) {
-                    $exchangeRate = (float) ($validated['exchange_rate'] ?? 1);
-                    PurchaseOrderCurrency::updateOrCreate(
-                        ['purchase_order_id' => $purchaseOrder->id],
-                        [
-                            'currency_id' => (int) $validated['currency_id'],
-                            'nominal' => $exchangeRate > 0 ? $exchangeRate : 1.0,
-                        ]
-                    );
-                } else {
-                    $purchaseOrder->purchaseOrderCurrency()->delete();
+                // Update currency PO dari header dan per-item
+                $purchaseOrder->purchaseOrderCurrency()->delete();
+
+                $headerCurrencyId = !empty($validated['currency_id']) ? (int) $validated['currency_id'] : null;
+                $headerRate = !empty($validated['exchange_rate']) && (float) $validated['exchange_rate'] > 0 ? (float) $validated['exchange_rate'] : null;
+
+                $allCurrencyIds = collect($validated['items'])
+                    ->pluck('currency_id')
+                    ->filter()
+                    ->map(fn($id) => (int) $id)
+                    ->push($headerCurrencyId)
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                foreach ($allCurrencyIds as $cId) {
+                    $rate = ($cId === $headerCurrencyId && $headerRate)
+                        ? $headerRate
+                        : CurrencyConversionResolver::resolveRate($cId);
+
+                    PurchaseOrderCurrency::create([
+                        'purchase_order_id' => $purchaseOrder->id,
+                        'currency_id' => $cId,
+                        'nominal' => $rate > 0 ? $rate : 1.0,
+                    ]);
                 }
 
                 // Kalkulasi ulang total amount

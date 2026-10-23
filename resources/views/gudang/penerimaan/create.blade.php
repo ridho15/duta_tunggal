@@ -134,7 +134,7 @@
                         type="date"
                         name="receipt_date"
                         value="{{ old('receipt_date', date('Y-m-d')) }}"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                         required
                     />
                 </div>
@@ -149,7 +149,7 @@
                         name="supplier_delivery_note_number"
                         value="{{ old('supplier_delivery_note_number') }}"
                         placeholder="Contoh: SJ-VENDOR-9988"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white font-mono"
+                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white font-mono"
                     />
                 </div>
 
@@ -160,7 +160,7 @@
                     </label>
                     <select
                         name="received_by"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                         required
                     >
                         @foreach ($users as $user)
@@ -179,7 +179,7 @@
                     <select
                         name="warehouse_id"
                         x-model="defaultWarehouseId"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                     >
                         @foreach ($warehouses as $wh)
                             <option value="{{ $wh->id }}" {{ (string)old('warehouse_id', $selectedPo->warehouse_id ?? '') === (string)$wh->id ? 'selected' : '' }}>
@@ -198,7 +198,7 @@
                         name="notes"
                         rows="2"
                         placeholder="Kondisi kemasan saat tiba, armada pengangkut, plat nomor truk, atau catatan khusus lainnya..."
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >{{ old('notes') }}</textarea>
                 </div>
 
@@ -212,7 +212,7 @@
                         name="photos[]"
                         multiple
                         accept="image/png,image/jpeg,image/webp"
-                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-[#15803d] hover:file:bg-emerald-100"
                     />
                     <span class="text-[10px] text-gray-400 mt-1 block">JPG/PNG/WebP maks 2MB per foto.</span>
                 </div>
@@ -264,7 +264,7 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <template x-for="(item, idx) in items" :key="item.purchase_order_item_id">
-                            <tr class="hover:bg-blue-50/20 transition">
+                            <tr class="hover:bg-emerald-50/20 transition">
                                 {{-- Produk Info --}}
                                 <td class="py-3 px-3">
                                     <input type="hidden" :name="'items[' + idx + '][purchase_order_item_id]'" :value="item.purchase_order_item_id">
@@ -281,7 +281,7 @@
 
                                 {{-- Sisa PO --}}
                                 <td class="py-3 px-3 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-xs" x-text="item.remaining_received"></span>
+                                    <span class="px-2 py-0.5 bg-emerald-100 text-[#14532d] rounded font-bold text-xs" x-text="item.remaining_received"></span>
                                 </td>
 
                                 {{-- Input Qty Tiba Fisik --}}
@@ -293,7 +293,7 @@
                                         :name="'items[' + idx + '][qty_received]'"
                                         x-model.number="item.qty_received"
                                         @input="handleQtyReceivedChange(idx)"
-                                        class="w-full py-1.5 px-2.5 text-sm font-bold text-gray-900 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                                        class="w-full py-1.5 px-2.5 text-sm font-bold text-gray-900 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                                         :class="{ 'border-red-500 bg-red-50': item.qty_received > item.remaining_received }"
                                         required
                                     />
@@ -337,7 +337,7 @@
                                     <select
                                         :name="'items[' + idx + '][warehouse_id]'"
                                         x-model="item.warehouse_id"
-                                        class="w-full py-1.5 px-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                                        class="w-full py-1.5 px-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
                                         required
                                     >
                                         @foreach ($warehouses as $wh)
