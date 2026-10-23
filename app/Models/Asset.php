@@ -14,6 +14,11 @@ class Asset extends Model
 {
     use HasFactory, SoftDeletes, LogsGlobalActivity, CascadesJournalEntries;
 
+    /**
+     * Temporary funding COA ID for acquisition journal posting (not stored in assets table)
+     */
+    public ?int $credit_coa_id = null;
+
     protected $fillable = [
         'code',
         'name',

@@ -39,10 +39,13 @@ class UpdateOrderRequestRequest extends FormRequest
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.cabang_id' => 'nullable|exists:cabangs,id',
             'items.*.supplier_id' => 'nullable|exists:suppliers,id',
+            'items.*.currency_id' => 'nullable|exists:currencies,id',
+            'items.*.original_price' => 'nullable|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0|max:100',
             'items.*.tax' => 'nullable|numeric|min:0|max:100',
-            'items.*.tipe_pajak' => 'nullable|string',
+            'items.*.tipe_pajak' => 'nullable|string|in:none,inklusif,eklusif',
             'items.*.note' => 'nullable|string|max:500',
         ];
     }
@@ -66,7 +69,11 @@ class UpdateOrderRequestRequest extends FormRequest
             'items.*.product_id' => 'Produk',
             'items.*.quantity' => 'Kuantitas',
             'items.*.unit_price' => 'Estimasi Harga Satuan',
+            'items.*.cabang_id' => 'Cabang Item',
             'items.*.supplier_id' => 'Supplier Rekomendasi',
+            'items.*.discount' => 'Diskon Item',
+            'items.*.tipe_pajak' => 'Tipe Pajak Item',
+            'items.*.tax' => 'Tarif Pajak Item',
         ];
     }
 

@@ -407,6 +407,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/po/{purchaseOrder}/pdf', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'pdf'])->name('po.pdf');
         Route::get('/supplier-details/{supplier}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'supplierDetails'])->name('supplier-details');
         Route::get('/product-details/{product}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'productDetails'])->name('product-details');
+        Route::get('/products/search', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'searchProducts'])->name('products.search');
+        Route::get('/suppliers/search', [\App\Http\Controllers\Pembelian\OrderRequestController::class, 'searchSuppliers'])->name('suppliers.search');
 
         // Aliases for English / plural URL compatibility
         Route::get('/purchase-orders', function () { return redirect()->route('pembelian.po.index'); });
@@ -500,6 +502,51 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'show'])->name('journal.show');
         Route::delete('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'destroy'])->name('journal.destroy');
         Route::get('/jurnal/{reference}/pdf', [\App\Http\Controllers\Keuangan\JournalController::class, 'pdf'])->name('journal.pdf');
+
+        // Manajemen Aset Tetap
+        Route::prefix('aset')->name('asset.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Keuangan\AssetController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Keuangan\AssetController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Keuangan\AssetController::class, 'store'])->name('store');
+
+            // Pusat Depresiasi Bulanan (Harus didefinisikan sebelum /{asset})
+            Route::prefix('depresiasi')->name('depreciation.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Keuangan\AssetDepreciationController::class, 'index'])->name('index');
+                Route::post('/process-monthly', [\App\Http\Controllers\Keuangan\AssetDepreciationController::class, 'processMonthly'])->name('process-monthly');
+                Route::post('/{asset}/process-single', [\App\Http\Controllers\Keuangan\AssetDepreciationController::class, 'processSingle'])->name('process-single');
+                Route::post('/{depreciation}/reverse', [\App\Http\Controllers\Keuangan\AssetDepreciationController::class, 'reverse'])->name('reverse');
+                Route::get('/pdf', [\App\Http\Controllers\Keuangan\AssetDepreciationController::class, 'pdf'])->name('pdf');
+            });
+
+            // Mutasi Transfer Aset Antar Cabang
+            Route::prefix('transfer')->name('transfer.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'index'])->name('index');
+                Route::get('/create', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'create'])->name('create');
+                Route::post('/', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'store'])->name('store');
+                Route::get('/{transfer}', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'show'])->name('show');
+                Route::post('/{transfer}/approve', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'approve'])->name('approve');
+                Route::post('/{transfer}/complete', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'complete'])->name('complete');
+                Route::post('/{transfer}/cancel', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'cancel'])->name('cancel');
+                Route::get('/{transfer}/pdf', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'pdf'])->name('pdf');
+            });
+
+            // Pelepasan / Disposal Aset Tetap
+            Route::prefix('disposal')->name('disposal.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'index'])->name('index');
+                Route::get('/create', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'create'])->name('create');
+                Route::post('/', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'store'])->name('store');
+                Route::get('/{disposal}', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'show'])->name('show');
+                Route::get('/{disposal}/pdf', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'pdf'])->name('pdf');
+            });
+
+            Route::get('/{asset}', [\App\Http\Controllers\Keuangan\AssetController::class, 'show'])->name('show');
+            Route::get('/{asset}/edit', [\App\Http\Controllers\Keuangan\AssetController::class, 'edit'])->name('edit');
+            Route::put('/{asset}', [\App\Http\Controllers\Keuangan\AssetController::class, 'update'])->name('update');
+            Route::delete('/{asset}', [\App\Http\Controllers\Keuangan\AssetController::class, 'destroy'])->name('destroy');
+            Route::get('/{asset}/pdf', [\App\Http\Controllers\Keuangan\AssetController::class, 'pdf'])->name('pdf');
+            Route::post('/{asset}/post-acquisition-journal', [\App\Http\Controllers\Keuangan\AssetController::class, 'postAcquisitionJournal'])->name('post-acquisition-journal');
+            Route::post('/{asset}/calculate-depreciation', [\App\Http\Controllers\Keuangan\AssetController::class, 'calculateDepreciation'])->name('calculate-depreciation');
+        });
     });
 
     // Modul Laporan Keuangan

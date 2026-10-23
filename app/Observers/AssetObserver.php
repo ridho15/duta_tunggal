@@ -40,7 +40,8 @@ class AssetObserver
             $assetService = app(AssetService::class);
 
             if (!$assetService->hasPostedJournals($asset)) {
-                $assetService->postAssetAcquisitionJournal($asset);
+                $creditCoaId = $asset->credit_coa_id ?? null;
+                $assetService->postAssetAcquisitionJournal($asset, $creditCoaId ? (int) $creditCoaId : null);
             }
         } catch (\Throwable $e) {
             Log::warning('AssetObserver: automatic asset journal posting skipped', [

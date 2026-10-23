@@ -152,14 +152,7 @@ class OrderRequestController extends Controller
         $user = Auth::user();
         $defaultCabangId = $user?->cabang_id ?? Cabang::first()?->id ?? 1;
 
-        $cabangs = Cabang::orderBy('nama')->get(['id', 'nama']);
-        $products = Product::with(['uom', 'productCategory'])
-            ->where(function ($q) {
-                $q->where('is_active', true)->orWhereNull('is_active');
-            })
-            ->orderBy('name')
-            ->get();
-        $suppliers = Supplier::orderBy('perusahaan')->get(['id', 'perusahaan', 'code']);
+        $cabangs = Cabang::orderBy('nama')->get(['id', 'nama', 'kode']);
         $currencies = Currency::orderBy('code')->get();
 
         $defaultRequestNumber = HelperController::generateRequestNumber();
@@ -168,8 +161,6 @@ class OrderRequestController extends Controller
 
         return view('pembelian.order-request.create', compact(
             'cabangs',
-            'products',
-            'suppliers',
             'currencies',
             'defaultRequestNumber',
             'defaultDate',
@@ -214,18 +205,23 @@ class OrderRequestController extends Controller
                 foreach ($validated['items'] as $item) {
                     $qty = (float) $item['quantity'];
                     $unitPrice = (float) ($item['unit_price'] ?? 0);
+                    $originalPrice = (float) (!empty($item['original_price']) ? $item['original_price'] : $unitPrice);
                     $discount = (float) ($item['discount'] ?? 0);
                     $tax = (float) ($item['tax'] ?? 0);
                     $tipePajak = TaxTypeHelper::normalize($item['tipe_pajak'] ?? 'none');
+                    $itemCabangId = !empty($item['cabang_id']) ? (int) $item['cabang_id'] : $cabangId;
+                    $itemCurrencyId = !empty($item['currency_id']) ? (int) $item['currency_id'] : ($record->currency_id ?? null);
 
                     OrderRequestItem::create([
                         'order_request_id' => $record->id,
                         'product_id' => (int) $item['product_id'],
                         'supplier_id' => !empty($item['supplier_id']) ? (int) $item['supplier_id'] : null,
-                        'cabang_id' => $cabangId,
+                        'cabang_id' => $itemCabangId,
+                        'currency_id' => $itemCurrencyId,
                         'quantity' => $qty,
                         'fulfilled_quantity' => 0,
                         'unit_price' => $unitPrice,
+                        'original_price' => $originalPrice,
                         'discount' => $discount,
                         'tax' => $tax,
                         'tipe_pajak' => $tipePajak,
@@ -298,24 +294,58 @@ class OrderRequestController extends Controller
                 ->with('error', 'Hanya permintaan pembelian berstatus Draf atau Ditolak yang dapat diubah.');
         }
 
-        $orderRequest->load(['orderRequestItem.product.uom', 'orderRequestItem.supplier']);
+        $orderRequest->load([
+            'orderRequestItem.product.uom',
+            'orderRequestItem.supplier',
+            'orderRequestItem.cabang',
+            'orderRequestItem.currency'
+        ]);
 
-        $cabangs = Cabang::orderBy('nama')->get(['id', 'nama']);
-        $products = Product::with(['uom', 'productCategory'])
-            ->where(function ($q) {
-                $q->where('is_active', true)->orWhereNull('is_active');
-            })
-            ->orderBy('name')
-            ->get();
-        $suppliers = Supplier::orderBy('perusahaan')->get(['id', 'perusahaan', 'code']);
+        $cabangs = Cabang::orderBy('nama')->get(['id', 'nama', 'kode']);
         $currencies = Currency::orderBy('code')->get();
+
+        // Preload ONLY specific products linked to this order request's items
+        $existingProductIds = $orderRequest->orderRequestItem->pluck('product_id')->filter()->unique();
+        $preloadedProducts = Product::withoutGlobalScope('product_cabang')
+            ->whereIn('id', $existingProductIds)
+            ->with([
+                'uom:id,name,abbreviation',
+                'suppliers' => function ($q) {
+                    $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')
+                      ->withPivot('supplier_price');
+                }
+            ])
+            ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak'])
+            ->map(function ($p) {
+                $cheapest = $p->suppliers
+                    ->filter(fn($s) => $s->pivot && $s->pivot->supplier_price !== null)
+                    ->sortBy(fn($s) => (float) $s->pivot->supplier_price)
+                    ->first();
+
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'sku' => $p->sku ?? '-',
+                    'label' => $p->sku && $p->sku !== '-' ? "({$p->sku}) {$p->name}" : $p->name,
+                    'cost_price' => (float) ($p->cost_price ?? 0),
+                    'uom' => $p->uom?->abbreviation ?? $p->uom?->name ?? 'Pcs',
+                    'cabang_id' => $p->cabang_id,
+                    'default_tax_rate' => (float) ($p->pajak ?? 11.0),
+                    'recommended_supplier' => $cheapest ? [
+                        'id' => $cheapest->id,
+                        'perusahaan' => $cheapest->perusahaan,
+                        'price' => (float) $cheapest->pivot->supplier_price,
+                        'label' => "{$cheapest->perusahaan} (Rp " . number_format((float) $cheapest->pivot->supplier_price, 0, ',', '.') . ")"
+                    ] : null,
+                ];
+            })
+            ->keyBy('id');
 
         return view('pembelian.order-request.edit', compact(
             'orderRequest',
             'cabangs',
-            'products',
-            'suppliers',
-            'currencies'
+            'currencies',
+            'preloadedProducts'
         ));
     }
 
@@ -353,18 +383,23 @@ class OrderRequestController extends Controller
                 foreach ($validated['items'] as $item) {
                     $qty = (float) $item['quantity'];
                     $unitPrice = (float) ($item['unit_price'] ?? 0);
+                    $originalPrice = (float) (!empty($item['original_price']) ? $item['original_price'] : $unitPrice);
                     $discount = (float) ($item['discount'] ?? 0);
                     $tax = (float) ($item['tax'] ?? 0);
                     $tipePajak = TaxTypeHelper::normalize($item['tipe_pajak'] ?? 'none');
+                    $itemCabangId = !empty($item['cabang_id']) ? (int) $item['cabang_id'] : $cabangId;
+                    $itemCurrencyId = !empty($item['currency_id']) ? (int) $item['currency_id'] : ($orderRequest->currency_id ?? null);
 
                     OrderRequestItem::create([
                         'order_request_id' => $orderRequest->id,
                         'product_id' => (int) $item['product_id'],
                         'supplier_id' => !empty($item['supplier_id']) ? (int) $item['supplier_id'] : null,
-                        'cabang_id' => $cabangId,
+                        'cabang_id' => $itemCabangId,
+                        'currency_id' => $itemCurrencyId,
                         'quantity' => $qty,
                         'fulfilled_quantity' => 0,
                         'unit_price' => $unitPrice,
+                        'original_price' => $originalPrice,
                         'discount' => $discount,
                         'tax' => $tax,
                         'tipe_pajak' => $tipePajak,
@@ -527,5 +562,158 @@ class OrderRequestController extends Controller
         ])->setPaper('a4', 'landscape');
 
         return $pdf->stream("Order_Request_{$orderRequest->request_number}.pdf");
+    }
+
+    /**
+     * Pencarian produk secara server-side via AJAX (Limit 25-50 item, cepat dan hemat memori)
+     */
+    public function searchProducts(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $search = trim((string) $request->query('q', ''));
+        $cabangId = $request->query('cabang_id');
+        $limit = min(max((int) $request->query('limit', 25), 5), 50);
+
+        $query = Product::withoutGlobalScope('product_cabang')
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            });
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        if ($cabangId) {
+            $query->where(function ($q) use ($cabangId) {
+                $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId);
+            });
+        }
+
+        $activeTaxRate = (float) (\App\Models\TaxSetting::activeRate('PPN') ?? 11.0);
+
+        $products = $query->with([
+                'uom:id,name,abbreviation',
+                'suppliers' => function ($q) {
+                    $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')
+                      ->withPivot('supplier_price');
+                }
+            ])
+            ->orderBy('name')
+            ->limit($limit)
+            ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak'])
+            ->map(function ($p) use ($activeTaxRate) {
+                $productTax = (float) ($p->pajak ?? 0);
+                $defaultTax = $productTax > 0 ? $productTax : $activeTaxRate;
+
+                // Cari supplier termurah dari pivot product_supplier
+                $cheapestSupplier = $p->suppliers
+                    ->filter(fn($s) => $s->pivot && $s->pivot->supplier_price !== null)
+                    ->sortBy(fn($s) => (float) $s->pivot->supplier_price)
+                    ->first();
+
+                $recommended = null;
+                if ($cheapestSupplier) {
+                    $price = (float) $cheapestSupplier->pivot->supplier_price;
+                    $recommended = [
+                        'id' => $cheapestSupplier->id,
+                        'perusahaan' => $cheapestSupplier->perusahaan,
+                        'price' => $price,
+                        'label' => "{$cheapestSupplier->perusahaan} (Rp " . number_format($price, 0, ',', '.') . ")"
+                    ];
+                } elseif ($p->suppliers->isNotEmpty()) {
+                    $first = $p->suppliers->first();
+                    $recommended = [
+                        'id' => $first->id,
+                        'perusahaan' => $first->perusahaan,
+                        'price' => (float) ($p->cost_price ?? 0),
+                        'label' => $first->perusahaan
+                    ];
+                }
+
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'sku' => $p->sku ?? '-',
+                    'label' => $p->sku && $p->sku !== '-' ? "({$p->sku}) {$p->name}" : $p->name,
+                    'cost_price' => (float) ($p->cost_price ?? 0),
+                    'uom' => $p->uom?->abbreviation ?? $p->uom?->name ?? 'Pcs',
+                    'cabang_id' => $p->cabang_id,
+                    'default_tax_rate' => $defaultTax,
+                    'recommended_supplier' => $recommended,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'products' => $products
+        ]);
+    }
+
+    /**
+     * Pencarian supplier yang diprioritaskan berdasarkan relasi pivot produk terkait
+     */
+    public function searchSuppliers(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $productId = $request->query('product_id');
+        $search = trim((string) $request->query('q', ''));
+        $limit = min(max((int) $request->query('limit', 25), 5), 50);
+
+        $linkedSupplierIds = [];
+        $linkedPriceMap = [];
+
+        if ($productId) {
+            $linkedRows = DB::table('product_supplier')
+                ->where('product_id', $productId)
+                ->get(['supplier_id', 'supplier_price']);
+
+            foreach ($linkedRows as $row) {
+                $sId = (int) $row->supplier_id;
+                $linkedSupplierIds[] = $sId;
+                $linkedPriceMap[$sId] = $row->supplier_price !== null ? (float) $row->supplier_price : null;
+            }
+        }
+
+        $query = Supplier::query();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('perusahaan', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($linkedSupplierIds)) {
+            $placeholders = implode(',', array_fill(0, count($linkedSupplierIds), '?'));
+            $query->orderByRaw("CASE WHEN id IN ({$placeholders}) THEN 0 ELSE 1 END", $linkedSupplierIds);
+        }
+
+        $query->orderBy('perusahaan');
+
+        $suppliers = $query->limit($limit)->get(['id', 'code', 'perusahaan'])
+            ->map(function ($s) use ($linkedPriceMap) {
+                $isLinked = array_key_exists($s->id, $linkedPriceMap);
+                $price = $isLinked ? $linkedPriceMap[$s->id] : null;
+
+                $label = "({$s->code}) {$s->perusahaan}";
+                if ($price !== null) {
+                    $label .= " - Rp " . number_format($price, 0, ',', '.');
+                }
+
+                return [
+                    'id' => $s->id,
+                    'code' => $s->code,
+                    'perusahaan' => $s->perusahaan,
+                    'supplier_price' => $price,
+                    'label' => $label,
+                    'is_linked' => $isLinked
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'suppliers' => $suppliers
+        ]);
     }
 }

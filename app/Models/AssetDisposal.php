@@ -43,6 +43,11 @@ class AssetDisposal extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
+    }
+
     // Accessors
     public function getGainLossTypeAttribute()
     {

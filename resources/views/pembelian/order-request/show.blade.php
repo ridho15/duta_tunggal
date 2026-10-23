@@ -313,8 +313,29 @@
                             <td class="py-3 px-3 font-semibold text-gray-900">
                                 <div>{{ $item->product?->name ?? 'Produk Tidak Ditemukan' }}</div>
                                 <div class="text-[10.5px] text-gray-400 font-normal">SKU: {{ $item->product?->sku ?? '-' }}</div>
+                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                    @if ($item->cabang)
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">
+                                            Cabang: {{ $item->cabang->nama }}
+                                        </span>
+                                    @endif
+                                    @if ($item->tipe_pajak && $item->tipe_pajak !== 'none')
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700">
+                                            {{ ucfirst($item->tipe_pajak) }} ({{ (float)$item->tax }}%)
+                                        </span>
+                                    @else
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                            Non PPN
+                                        </span>
+                                    @endif
+                                    @if ((float)$item->discount > 0)
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700">
+                                            Disc {{ (float)$item->discount }}%
+                                        </span>
+                                    @endif
+                                </div>
                                 @if ($item->note)
-                                    <div class="text-[10.5px] text-blue-600 font-normal italic mt-0.5">Catatan: {{ $item->note }}</div>
+                                    <div class="text-[10.5px] text-blue-600 font-normal italic mt-1">Catatan: {{ $item->note }}</div>
                                 @endif
                             </td>
 
@@ -340,7 +361,10 @@
                             </td>
 
                             <td class="py-3 px-3 text-right text-gray-700 font-mono">
-                                Rp {{ number_format($item->unit_price, 0, ',', '.') }}
+                                <div>Rp {{ number_format($item->unit_price, 0, ',', '.') }}</div>
+                                @if ((float)$item->original_price > 0 && (float)$item->original_price !== (float)$item->unit_price)
+                                    <div class="text-[10px] text-gray-400 line-through">Acuan: Rp {{ number_format($item->original_price, 0, ',', '.') }}</div>
+                                @endif
                             </td>
 
                             <td class="py-3 px-3 text-right font-bold text-gray-900 font-mono">
