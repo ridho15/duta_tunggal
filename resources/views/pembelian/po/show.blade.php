@@ -390,7 +390,12 @@
                             <tr class="hover:bg-emerald-50/20 transition">
                                 <td class="py-3 px-4 text-center text-xs text-gray-400 font-mono">{{ $idx + 1 }}</td>
                                 <td class="py-3 px-4 font-semibold text-gray-900">
-                                    <div>{{ $item->product->name ?? 'Produk #' . $item->product_id }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <span>{{ $item->product->name ?? 'Produk #' . $item->product_id }}</span>
+                                        @if ($item->refer_item_model_type === \App\Models\OrderRequestItem::class && $item->refer_item_model_id)
+                                            <span class="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200">Ref OR Item #{{ $item->refer_item_model_id }}</span>
+                                        @endif
+                                    </div>
                                     <div class="text-xs text-gray-400 font-normal font-mono">SKU: {{ $item->product->sku ?? '-' }}</div>
                                 </td>
                                 <td class="py-3 px-4 text-center text-xs font-medium">
@@ -403,7 +408,7 @@
                                 <td class="py-3 px-4 text-right font-medium {{ $remaining > 0 ? 'text-amber-700 font-semibold' : 'text-gray-400' }}">
                                     {{ number_format($remaining, 2, ',', '.') }}
                                 </td>
-                                <td class="py-3 px-4 text-right">Rp {{ number_format((float)$item->unit_price, 2, ',', '.') }}</td>
+                                <td class="py-3 px-4 text-right">{{ $item->currency?->symbol ?? 'Rp' }} {{ number_format((float)$item->unit_price, 2, ',', '.') }}</td>
                                 <td class="py-3 px-4 text-right">{{ $item->discount > 0 ? $item->discount . '%' : '-' }}</td>
                                 <td class="py-3 px-4 text-center text-xs">
                                     <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700">
@@ -411,7 +416,7 @@
                                     </span>
                                 </td>
                                 <td class="py-3 px-4 text-right font-extrabold text-[#15803d] whitespace-nowrap">
-                                    Rp {{ number_format((float)$sub, 2, ',', '.') }}
+                                    {{ $item->currency?->symbol ?? 'Rp' }} {{ number_format((float)$sub, 2, ',', '.') }}
                                 </td>
                             </tr>
                         @endforeach
@@ -452,7 +457,7 @@
                             </div>
                             <div>
                                 <span class="text-gray-400">Harga Satuan:</span>
-                                <div class="font-medium text-gray-800">Rp {{ number_format((float)$item->unit_price, 0, ',', '.') }}</div>
+                                <div class="font-medium text-gray-800">{{ $item->currency?->symbol ?? 'Rp' }} {{ number_format((float)$item->unit_price, 2, ',', '.') }}</div>
                             </div>
                             <div>
                                 <span class="text-gray-400">Sisa Belum Diterima:</span>
@@ -461,7 +466,7 @@
                         </div>
                         <div class="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
                             <span class="text-gray-500">Subtotal:</span>
-                            <span class="font-extrabold text-sm text-[#15803d]">Rp {{ number_format((float)$sub, 2, ',', '.') }}</span>
+                            <span class="font-extrabold text-sm text-[#15803d]">{{ $item->currency?->symbol ?? 'Rp' }} {{ number_format((float)$sub, 2, ',', '.') }}</span>
                         </div>
                     </div>
                 @endforeach

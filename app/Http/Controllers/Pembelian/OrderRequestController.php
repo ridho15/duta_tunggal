@@ -571,6 +571,7 @@ class OrderRequestController extends Controller
     {
         $search = trim((string) $request->query('q', ''));
         $cabangId = $request->query('cabang_id');
+        $supplierId = $request->query('supplier_id');
         $limit = min(max((int) $request->query('limit', 25), 5), 50);
 
         $query = Product::withoutGlobalScope('product_cabang')
@@ -602,8 +603,8 @@ class OrderRequestController extends Controller
             ])
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak'])
-            ->map(function ($p) use ($activeTaxRate) {
+            ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak'])
+            ->map(function ($p) use ($activeTaxRate, $supplierId) {
                 $productTax = (float) ($p->pajak ?? 0);
                 $defaultTax = $productTax > 0 ? $productTax : $activeTaxRate;
 
@@ -632,16 +633,32 @@ class OrderRequestController extends Controller
                     ];
                 }
 
+                // Cek harga dari supplier spesifik jika diminta (untuk PO)
+                $supplierPrice = null;
+                if ($supplierId) {
+                    $matched = $p->suppliers->firstWhere('id', (int) $supplierId);
+                    if ($matched && $matched->pivot && $matched->pivot->supplier_price !== null) {
+                        $supplierPrice = (float) $matched->pivot->supplier_price;
+                    }
+                }
+
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
                     'sku' => $p->sku ?? '-',
                     'label' => $p->sku && $p->sku !== '-' ? "({$p->sku}) {$p->name}" : $p->name,
                     'cost_price' => (float) ($p->cost_price ?? 0),
+                    'supplier_price' => $supplierPrice,
+                    'tipe_pajak' => $p->tipe_pajak ?? 'inklusif',
                     'uom' => $p->uom?->abbreviation ?? $p->uom?->name ?? 'Pcs',
                     'cabang_id' => $p->cabang_id,
                     'default_tax_rate' => $defaultTax,
                     'recommended_supplier' => $recommended,
+                    'suppliers' => $p->suppliers->map(fn($s) => [
+                        'id' => $s->id,
+                        'perusahaan' => $s->perusahaan,
+                        'price' => $s->pivot?->supplier_price !== null ? (float) $s->pivot->supplier_price : null
+                    ])->values()->all(),
                 ];
             });
 

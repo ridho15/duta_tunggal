@@ -18,6 +18,7 @@ use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Services\PurchaseOrderService;
 use App\Support\TaxTypeHelper;
+use App\Support\OrderRequestQuantityLock;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -164,16 +165,12 @@ class PurchaseOrderController extends Controller
         $user = Auth::user();
         $defaultCabangId = $user?->cabang_id ?? Cabang::first()?->id;
 
-        $suppliers = Supplier::orderBy('perusahaan')->get();
-        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get();
-        $cabangs = Cabang::orderBy('nama')->get();
-        $products = Product::with(['uom', 'productCategory'])
-            ->where(function ($q) {
-                $q->where('is_active', true)->orWhereNull('is_active');
-            })
-            ->orderBy('name')
-            ->get();
-        $currencies = Currency::orderBy('code')->get();
+        $suppliers = Supplier::orderBy('perusahaan')->get([
+            'id', 'perusahaan', 'code', 'top_type', 'tempo_hutang', 'telepon', 'phone', 'address', 'alamat', 'kontak_person'
+        ]);
+        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get(['id', 'name', 'code']);
+        $cabangs = Cabang::orderBy('nama')->get(['id', 'nama', 'kode']);
+        $currencies = Currency::orderBy('code')->get(['id', 'code', 'name', 'symbol', 'to_rupiah']);
 
         $defaultPoNumber = HelperController::generatePoNumber();
         $defaultDate = Carbon::now()->format('Y-m-d');
@@ -185,6 +182,7 @@ class PurchaseOrderController extends Controller
         $selectedOrderRequestId = $request->query('order_request_id');
         $selectedOrderRequest = null;
         $initialPoItems = [];
+        $preloadedProducts = collect([]);
 
         if ($selectedOrderRequestId) {
             $selectedOrderRequest = OrderRequest::with([
@@ -196,18 +194,34 @@ class PurchaseOrderController extends Controller
                 if ($selectedOrderRequest->cabang_id) {
                     $defaultCabangId = $selectedOrderRequest->cabang_id;
                 }
+
+                $orProductIds = $selectedOrderRequest->orderRequestItem->pluck('product_id')->filter()->unique();
+                $preloadedProducts = Product::with([
+                    'uom:id,name,abbreviation',
+                    'suppliers' => function ($q) {
+                        $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')->withPivot('supplier_price');
+                    }
+                ])->whereIn('id', $orProductIds)->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak']);
+
                 foreach ($selectedOrderRequest->orderRequestItem as $orItem) {
-                    $remainingQty = max(0, (float)$orItem->quantity - (float)($orItem->fulfilled_quantity ?? 0));
+                    $limit = OrderRequestQuantityLock::orderRequestItemLimit($orItem->id);
+                    $remainingQty = (float) $limit['remaining_for_po'];
+
                     if ($remainingQty > 0 || (float)($orItem->fulfilled_quantity ?? 0) === 0.0) {
+                        $qty = $remainingQty > 0 ? $remainingQty : (float)$orItem->quantity;
                         $initialPoItems[] = [
                             'product_id' => $orItem->product_id,
                             'order_request_item_id' => $orItem->id,
-                            'quantity' => $remainingQty > 0 ? $remainingQty : (float)$orItem->quantity,
+                            'product_name' => $orItem->product?->name ?? 'Produk #' . $orItem->product_id,
+                            'sku' => $orItem->product?->sku ?? '-',
+                            'uom' => $orItem->product?->uom?->abbreviation ?? $orItem->product?->uom?->name ?? 'Pcs',
+                            'quantity' => $qty,
+                            'max_quantity' => $remainingQty > 0 ? $remainingQty : (float)$orItem->quantity,
                             'unit_price' => (float)($orItem->unit_price > 0 ? $orItem->unit_price : ($orItem->product?->cost_price ?? 0)),
                             'discount' => (float)($orItem->discount ?? 0),
-                            'tipe_pajak' => $orItem->tipe_pajak ?? 'none',
-                            'tax' => (float)($orItem->tax ?? 0),
-                            'currency_id' => $orItem->currency_id ?? null,
+                            'tipe_pajak' => $orItem->tipe_pajak ?? 'eklusif',
+                            'tax' => (float)($orItem->tax > 0 ? $orItem->tax : 11),
+                            'currency_id' => $orItem->currency_id ?? $defaultCurrency->id,
                         ];
                     }
                 }
@@ -222,7 +236,6 @@ class PurchaseOrderController extends Controller
             'suppliers',
             'warehouses',
             'cabangs',
-            'products',
             'currencies',
             'defaultPoNumber',
             'defaultDate',
@@ -230,7 +243,8 @@ class PurchaseOrderController extends Controller
             'defaultCurrency',
             'selectedSupplier',
             'selectedOrderRequest',
-            'initialPoItems'
+            'initialPoItems',
+            'preloadedProducts'
         ));
     }
 
@@ -310,6 +324,10 @@ class PurchaseOrderController extends Controller
                     if ($orItemId) {
                         $orItem = OrderRequestItem::find($orItemId);
                         if ($orItem) {
+                            $limit = OrderRequestQuantityLock::orderRequestItemLimit($orItemId);
+                            if ($qty > $limit['remaining_for_po']) {
+                                throw new \Exception("Kuantitas produk '{$orItem->product?->name}' ({$qty}) melebihi sisa permintaan pada Order Request (Maks: {$limit['remaining_for_po']}).");
+                            }
                             $orItem->addFulfilledQuantity($qty);
                         }
                     }
@@ -399,30 +417,60 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrder->loadMissing([
             'supplier',
+            'supplier',
             'cabang',
             'warehouse',
             'purchaseOrderItem.product.uom',
+            'purchaseOrderItem.currency',
             'purchaseOrderCurrency',
         ]);
 
-        $suppliers = Supplier::orderBy('perusahaan')->get();
-        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get();
-        $cabangs = Cabang::orderBy('nama')->get();
-        $products = Product::with(['uom', 'productCategory'])
-            ->where(function ($q) {
-                $q->where('is_active', true)->orWhereNull('is_active');
-            })
-            ->orderBy('name')
-            ->get();
-        $currencies = Currency::orderBy('code')->get();
+        $suppliers = Supplier::orderBy('perusahaan')->get([
+            'id', 'perusahaan', 'code', 'top_type', 'tempo_hutang', 'telepon', 'phone', 'address', 'alamat', 'kontak_person'
+        ]);
+        $warehouses = Warehouse::where('status', 'active')->orWhereNull('status')->orderBy('name')->get(['id', 'name', 'code']);
+        $cabangs = Cabang::orderBy('nama')->get(['id', 'nama', 'kode']);
+        $currencies = Currency::orderBy('code')->get(['id', 'code', 'name', 'symbol', 'to_rupiah']);
+
+        $itemProductIds = $purchaseOrder->purchaseOrderItem->pluck('product_id')->filter()->unique();
+        $preloadedProducts = Product::with([
+            'uom:id,name,abbreviation',
+            'suppliers' => function ($q) {
+                $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')->withPivot('supplier_price');
+            }
+        ])->whereIn('id', $itemProductIds)->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak']);
+
+        $existingItems = $purchaseOrder->purchaseOrderItem->map(function ($item) {
+            $maxQty = null;
+            if ($item->refer_item_model_type === OrderRequestItem::class && $item->refer_item_model_id) {
+                $limit = OrderRequestQuantityLock::orderRequestItemLimit($item->refer_item_model_id, $item->id);
+                $maxQty = (float) ($item->quantity + $limit['remaining_for_po']);
+            }
+            return [
+                'id' => $item->id,
+                'product_id' => $item->product_id,
+                'order_request_item_id' => $item->refer_item_model_type === OrderRequestItem::class ? $item->refer_item_model_id : null,
+                'product_name' => $item->product?->name ?? 'Produk #' . $item->product_id,
+                'sku' => $item->product?->sku ?? '-',
+                'uom' => $item->product?->uom?->abbreviation ?? $item->product?->uom?->name ?? 'Pcs',
+                'quantity' => (float)$item->quantity,
+                'max_quantity' => $maxQty,
+                'unit_price' => (float)$item->unit_price,
+                'discount' => (float)$item->discount,
+                'tax' => (float)$item->tax,
+                'tipe_pajak' => $item->tipe_pajak ?? 'eklusif',
+                'currency_id' => $item->currency_id,
+            ];
+        });
 
         return view('pembelian.po.edit', compact(
             'purchaseOrder',
             'suppliers',
             'warehouses',
             'cabangs',
-            'products',
-            'currencies'
+            'currencies',
+            'preloadedProducts',
+            'existingItems'
         ));
     }
 
@@ -465,6 +513,13 @@ class PurchaseOrderController extends Controller
                     'approved_by' => $status === 'approved' ? ($user?->id ?? 1) : null,
                 ]);
 
+                // Kumpulkan affected OR item IDs sebelum delete untuk di-resync
+                $affectedOrItemIds = $purchaseOrder->purchaseOrderItem()
+                    ->where('refer_item_model_type', OrderRequestItem::class)
+                    ->pluck('refer_item_model_id')
+                    ->filter()
+                    ->all();
+
                 // Hapus item-item lama dan gantikan dengan item-item baru
                 $purchaseOrder->purchaseOrderItem()->forceDelete();
 
@@ -475,6 +530,11 @@ class PurchaseOrderController extends Controller
                     $tax = (float) ($item['tax'] ?? 0);
                     $tipePajak = TaxTypeHelper::normalize($item['tipe_pajak'] ?? 'eklusif');
                     $currencyId = !empty($item['currency_id']) ? (int) $item['currency_id'] : (!empty($validated['currency_id']) ? (int) $validated['currency_id'] : null);
+                    $orItemId = !empty($item['order_request_item_id']) ? (int) $item['order_request_item_id'] : null;
+
+                    if ($orItemId) {
+                        $affectedOrItemIds[] = $orItemId;
+                    }
 
                     PurchaseOrderItem::create([
                         'purchase_order_id' => $purchaseOrder->id,
@@ -486,7 +546,33 @@ class PurchaseOrderController extends Controller
                         'tax' => $tax,
                         'tipe_pajak' => $tipePajak,
                         'currency_id' => $currencyId,
+                        'refer_item_model_type' => $orItemId ? OrderRequestItem::class : null,
+                        'refer_item_model_id' => $orItemId,
                     ]);
+                }
+
+                // Resync fulfillment untuk OR items yang terpengaruh
+                $affectedOrIds = [];
+                if ($purchaseOrder->refer_model_type === OrderRequest::class && $purchaseOrder->refer_model_id) {
+                    $affectedOrIds[] = $purchaseOrder->refer_model_id;
+                }
+                foreach (array_unique($affectedOrItemIds) as $affectedOrItemId) {
+                    $orItem = OrderRequestItem::find($affectedOrItemId);
+                    if ($orItem) {
+                        $totalActiveQty = PurchaseOrderItem::where('refer_item_model_type', OrderRequestItem::class)
+                            ->where('refer_item_model_id', $affectedOrItemId)
+                            ->whereHas('purchaseOrder', function($q) {
+                                $q->whereNotIn('status', ['cancelled', 'rejected']);
+                            })
+                            ->sum('quantity');
+                        $orItem->fulfilled_quantity = $totalActiveQty;
+                        $orItem->save();
+                        $affectedOrIds[] = $orItem->order_request_id;
+                    }
+                }
+                foreach (array_unique(array_filter($affectedOrIds)) as $orId) {
+                    $or = OrderRequest::find($orId);
+                    $or?->syncFulfillmentStatus();
                 }
 
                 // Update currency rate jika ditentukan

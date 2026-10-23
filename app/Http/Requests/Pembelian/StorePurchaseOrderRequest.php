@@ -44,7 +44,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0|max:100',
             'items.*.tax' => 'nullable|numeric|min:0|max:100',
-            'items.*.tipe_pajak' => 'nullable|string',
+            'items.*.tipe_pajak' => 'nullable|string|in:none,inklusif,eklusif',
             'items.*.currency_id' => 'nullable|exists:currencies,id',
         ];
     }

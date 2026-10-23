@@ -48,11 +48,12 @@ class UpdatePurchaseOrderRequest extends FormRequest
             'items' => 'required|array|min:1',
             'items.*.id' => 'nullable|integer',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.order_request_item_id' => 'nullable|exists:order_request_items,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0|max:100',
             'items.*.tax' => 'nullable|numeric|min:0|max:100',
-            'items.*.tipe_pajak' => 'nullable|string',
+            'items.*.tipe_pajak' => 'nullable|string|in:none,inklusif,eklusif',
             'items.*.currency_id' => 'nullable|exists:currencies,id',
         ];
     }
