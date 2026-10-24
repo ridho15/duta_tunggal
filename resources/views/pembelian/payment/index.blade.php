@@ -27,7 +27,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('pembelian.payments.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -40,7 +40,7 @@
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total Pembayaran Aktif --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Total Pembayaran (Aktif)</span>
                 <span class="p-2 bg-emerald-50 text-[#15803d] rounded-lg">
@@ -56,7 +56,7 @@
         </div>
 
         {{-- Dibayar Bulan Ini --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Dibayar Bulan Ini</span>
                 <span class="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -72,7 +72,7 @@
         </div>
 
         {{-- Draft / Belum Diposting --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Draft / Menunggu Posting</span>
                 <span class="p-2 bg-amber-50 text-amber-600 rounded-lg">
@@ -89,7 +89,7 @@
         </div>
 
         {{-- Total Sisa Hutang Dagang --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Total Sisa Hutang (AP)</span>
                 <span class="p-2 bg-purple-50 text-purple-600 rounded-lg">
@@ -106,7 +106,7 @@
     </div>
 
     {{-- Main Container Card --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Status Filter Tabs --}}
         <div class="border-b border-gray-200 px-4 sm:px-6 pt-3 bg-gray-50/50">
             <div class="flex items-center gap-2 overflow-x-auto pb-3 text-xs sm:text-sm font-semibold scrollbar-none">
@@ -164,17 +164,7 @@
                 {{-- Supplier Filter --}}
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Supplier / Vendor</label>
-                    <select
-                        name="supplier_id"
-                        class="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition"
-                    >
-                        <option value="">-- Semua Supplier --</option>
-                        @foreach ($suppliers as $s)
-                            <option value="{{ $s->id }}" {{ (string)$supplierId === (string)$s->id ? 'selected' : '' }}>
-                                {{ $s->perusahaan }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierId" placeholder="-- Semua Supplier --" size="xs" :auto-submit="true" />
                 </div>
 
                 {{-- Payment Method Filter --}}
@@ -217,8 +207,8 @@
 
         {{-- Data Table --}}
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-left text-xs">
-                <thead class="bg-gray-50/75 text-gray-600 font-bold uppercase tracking-wider">
+            <table class="min-w-full divide-y divide-gray-100 text-left text-xs">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     <tr>
                         <th class="px-4 py-3">No. Pembayaran</th>
                         <th class="px-4 py-3">Tanggal</th>
@@ -230,9 +220,9 @@
                         <th class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 bg-white text-gray-800">
+                <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
                     @forelse ($payments as $payment)
-                        <tr class="hover:bg-gray-50/80 transition group">
+                        <tr class="hover:bg-gray-50/60 transition group">
                             {{-- No. Pembayaran --}}
                             <td class="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                                 <a href="{{ route('pembelian.payments.show', $payment->id) }}" class="text-[#15803d] hover:text-[#14532d] hover:underline flex items-center gap-1.5 font-bold">
@@ -301,28 +291,32 @@
                             <td class="px-4 py-3 text-center whitespace-nowrap">
                                 @php
                                     $st = strtolower((string)$payment->status);
+                                    $badgeClass = match($st) {
+                                        'paid' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                        'partial' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                        'draft' => 'bg-gray-50 text-gray-700 border-gray-200',
+                                        'cancelled' => 'bg-rose-50 text-rose-700 border-rose-200',
+                                        default => 'bg-gray-50 text-gray-700 border-gray-200',
+                                    };
+                                    $dotClass = match($st) {
+                                        'paid' => 'bg-emerald-500',
+                                        'partial' => 'bg-amber-500',
+                                        'draft' => 'bg-gray-400',
+                                        'cancelled' => 'bg-rose-500',
+                                        default => 'bg-gray-400',
+                                    };
+                                    $label = match($st) {
+                                        'paid' => 'Lunas',
+                                        'partial' => 'Sebagian',
+                                        'draft' => 'Draft',
+                                        'cancelled' => 'Dibatalkan',
+                                        default => ucfirst($payment->status ?? '-'),
+                                    };
                                 @endphp
-                                @if ($st === 'paid')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                                        Lunas
-                                    </span>
-                                @elseif ($st === 'partial')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
-                                        Sebagian
-                                    </span>
-                                @elseif ($st === 'draft')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-700">
-                                        Draft
-                                    </span>
-                                @elseif ($st === 'cancelled')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
-                                        Dibatalkan
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-700">
-                                        {{ $payment->status }}
-                                    </span>
-                                @endif
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $badgeClass }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $dotClass }}"></span>
+                                    {{ $label }}
+                                </span>
                             </td>
 
                             {{-- Aksi --}}
@@ -407,7 +401,7 @@
 
         {{-- Pagination --}}
         @if ($payments->hasPages())
-            <div class="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50/50">
+            <div class="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $payments->links() }}
             </div>
         @endif

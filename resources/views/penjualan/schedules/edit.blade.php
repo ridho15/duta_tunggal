@@ -88,13 +88,7 @@
                 {{-- Cabang --}}
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Cabang Operasional <span class="text-red-500">*</span></label>
-                    <select name="cabang_id" required class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#15803d] bg-white">
-                        @foreach($cabangs as $c)
-                            <option value="{{ $c->id }}" {{ old('cabang_id', $deliverySchedule->cabang_id) == $c->id ? 'selected' : '' }}>
-                                {{ $c->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="(old('cabang_id', $deliverySchedule->cabang_id)) ?: collect($cabangs)->first()?->id" :required="true" size="sm" />
                 </div>
             </div>
         </div>
@@ -157,28 +151,14 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Driver / Pengemudi <span class="text-red-500">*</span>
                     </label>
-                    <select id="driver_id_select" name="driver_id" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#15803d] bg-white">
-                        <option value="">-- Pilih Driver Master --</option>
-                        @foreach($drivers as $d)
-                            <option value="{{ $d->id }}" {{ old('driver_id', $deliverySchedule->driver_id) == $d->id ? 'selected' : '' }}>
-                                {{ $d->name }} {{ $d->phone ? "({$d->phone})" : '' }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="driver_id" id="driver_id_select" :options="collect($drivers)->map(fn ($d) => ['id' => $d->id, 'label' => trim($d->name . ($d->phone ? ' (' . $d->phone . ')' : ''))])->values()" :value="old('driver_id', $deliverySchedule->driver_id)" placeholder="-- Pilih Driver Master --" size="sm" />
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Kendaraan / Nomor Polisi <span class="text-red-500">*</span>
                     </label>
-                    <select id="vehicle_id_select" name="vehicle_id" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#15803d] bg-white">
-                        <option value="">-- Pilih Kendaraan Master --</option>
-                        @foreach($vehicles as $v)
-                            <option value="{{ $v->id }}" {{ old('vehicle_id', $deliverySchedule->vehicle_id) == $v->id ? 'selected' : '' }}>
-                                {{ $v->plate }} ({{ $v->type ?? 'Armada' }}) {{ $v->capacity ? "- Kap: {$v->capacity}" : '' }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="vehicle_id" id="vehicle_id_select" :options="collect($vehicles)->map(fn ($v) => ['id' => $v->id, 'label' => $v->plate . ' (' . ($v->type ?? 'Armada') . ')' . ($v->capacity ? ' - Kap: ' . $v->capacity : '')])->values()" :value="old('vehicle_id', $deliverySchedule->vehicle_id)" placeholder="-- Pilih Kendaraan Master --" size="sm" />
                 </div>
             </div>
 
@@ -496,12 +476,9 @@ function submitQuickDriver() {
     .then(res => res.json())
     .then(data => {
         if (data.success && data.driver) {
-            const select = document.getElementById('driver_id_select');
-            const opt = document.createElement('option');
-            opt.value = data.driver.id;
-            opt.text = data.driver.name + (data.driver.phone ? ' (' + data.driver.phone + ')' : '');
-            opt.selected = true;
-            select.appendChild(opt);
+            const cmp = Alpine.$data(document.getElementById('driver_id_select').closest('[x-data]'));
+            cmp.options.push({ id: String(data.driver.id), label: data.driver.name + (data.driver.phone ? ' (' + data.driver.phone + ')' : '') });
+            cmp.selected = String(data.driver.id);
             closeQuickDriverModal();
             document.getElementById('quick_driver_name').value = '';
             document.getElementById('quick_driver_phone').value = '';
@@ -544,12 +521,9 @@ function submitQuickVehicle() {
     .then(res => res.json())
     .then(data => {
         if (data.success && data.vehicle) {
-            const select = document.getElementById('vehicle_id_select');
-            const opt = document.createElement('option');
-            opt.value = data.vehicle.id;
-            opt.text = data.vehicle.plate + ' (' + (data.vehicle.type || 'Armada') + ')';
-            opt.selected = true;
-            select.appendChild(opt);
+            const cmp = Alpine.$data(document.getElementById('vehicle_id_select').closest('[x-data]'));
+            cmp.options.push({ id: String(data.vehicle.id), label: data.vehicle.plate + ' (' + (data.vehicle.type || 'Armada') + ')' });
+            cmp.selected = String(data.vehicle.id);
             closeQuickVehicleModal();
             document.getElementById('quick_vehicle_plate').value = '';
             document.getElementById('quick_vehicle_capacity').value = '';

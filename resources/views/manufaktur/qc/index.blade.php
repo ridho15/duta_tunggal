@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- 5 KPI Cards --}}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -136,17 +114,7 @@
             </div>
 
             <div class="sm:col-span-3">
-                <select
-                    name="warehouse_id"
-                    class="w-full px-3 py-2 bg-gray-50/70 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                >
-                    <option value="">-- Semua Gudang Tujuan --</option>
-                    @foreach ($warehouses as $w)
-                        <option value="{{ $w->id }}" {{ request('warehouse_id') == $w->id ? 'selected' : '' }}>
-                            {{ $w->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($w) => ['id' => $w->id, 'label' => $w->name])->values()" :value="request('warehouse_id')" placeholder="-- Semua Gudang Tujuan --" size="sm" />
             </div>
 
             <div class="sm:col-span-2">

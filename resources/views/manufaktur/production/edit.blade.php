@@ -84,7 +84,7 @@
                         name="production_number"
                         value="{{ old('production_number', $production->production_number) }}"
                         required
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                        class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-mono font-bold text-gray-800 focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                     >
                 </div>
 
@@ -97,7 +97,7 @@
                         name="production_date"
                         value="{{ old('production_date', $production->production_date ? $production->production_date->toDateString() : now()->toDateString()) }}"
                         required
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                        class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                     >
                 </div>
 
@@ -113,7 +113,7 @@
                             name="quantity_produced"
                             value="{{ old('quantity_produced', $production->quantity_produced) }}"
                             required
-                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-mono font-bold text-gray-900 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                            class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-mono font-bold text-gray-900 focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                         >
                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold">
                             {{ $product?->uom?->name ?? 'Pcs' }}

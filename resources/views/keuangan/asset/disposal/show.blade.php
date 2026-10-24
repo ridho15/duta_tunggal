@@ -47,15 +47,6 @@
         </div>
     </div>
 
-    {{-- Alert Flash --}}
-    @if (session('success'))
-        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm">
-            <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('success') }}</span>
-        </div>
-    @endif
 
     {{-- 4 Kartu Ringkasan Finansial Pelepasan --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -78,7 +69,7 @@
         </div>
 
         {{-- Kas Diterima --}}
-        <div class="bg-white p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
+        <div class="p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
             <p class="text-xs font-semibold text-[#15803d] uppercase tracking-wider">Kas Penjualan</p>
             <h3 class="text-2xl font-bold text-[#15803d] mt-1 font-mono">
                 {{ $disposal->sale_price > 0 ? \App\Helpers\MoneyHelper::rupiah($disposal->sale_price) : '-' }}

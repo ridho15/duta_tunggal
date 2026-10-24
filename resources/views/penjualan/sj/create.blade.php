@@ -54,7 +54,7 @@
                         <label class="block text-xs font-semibold text-gray-700 mb-1.5">
                             Pilih Transaksi SO <span class="text-red-500">*</span>
                         </label>
-                        <select
+                        <select data-searchable
                             id="soSelect"
                             class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] bg-white"
                             onchange="selectSO(this.value)"
@@ -99,7 +99,7 @@
                         <div class="so-do-group space-y-3" id="so-group-{{ $soData['so_id'] }}" style="display: none;">
                             @foreach($soData['delivery_orders'] as $do)
                                 <label
-                                    class="flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/20 cursor-pointer transition has-checked:border-emerald-600 has-checked:bg-emerald-50/40"
+                                    class="flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/20 cursor-pointer transition has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/40"
                                 >
                                     <input
                                         type="checkbox"
@@ -175,11 +175,11 @@
                             Metode Pengiriman <span class="text-red-500">*</span>
                         </label>
                         <div class="grid grid-cols-2 gap-2">
-                            <label class="flex items-center gap-2 p-2 border border-gray-200 rounded-xl cursor-pointer has-checked:border-emerald-600 has-checked:bg-emerald-50/40 text-xs font-semibold">
+                            <label class="flex items-center gap-2 p-2 border border-gray-200 rounded-xl cursor-pointer has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/40 text-xs font-semibold">
                                 <input type="radio" name="delivery_method" value="internal" checked onchange="toggleDeliveryMethod('internal')" class="text-[#15803d] focus:ring-[#15803d]">
                                 <span>Kurir Internal</span>
                             </label>
-                            <label class="flex items-center gap-2 p-2 border border-gray-200 rounded-xl cursor-pointer has-checked:border-emerald-600 has-checked:bg-emerald-50/40 text-xs font-semibold">
+                            <label class="flex items-center gap-2 p-2 border border-gray-200 rounded-xl cursor-pointer has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/40 text-xs font-semibold">
                                 <input type="radio" name="delivery_method" value="ekspedisi" onchange="toggleDeliveryMethod('ekspedisi')" class="text-[#15803d] focus:ring-[#15803d]">
                                 <span>Ekspedisi / Kargo</span>
                             </label>
@@ -190,22 +190,12 @@
                     <div id="internalGroup" class="contents">
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1.5">Driver / Supir</label>
-                            <select name="driver_id" class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:border-[#15803d] bg-white">
-                                <option value="">-- Pilih Driver (Opsional) --</option>
-                                @foreach($drivers as $d)
-                                    <option value="{{ $d->id }}">{{ $d->name }} ({{ $d->phone ?? '-' }})</option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select name="driver_id" :options="collect($drivers)->map(fn ($d) => ['id' => $d->id, 'label' => $d->name . ' (' . ($d->phone ?? '-') . ')'])->values()" placeholder="-- Pilih Driver (Opsional) --" />
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1.5">Kendaraan Armada</label>
-                            <select name="vehicle_id" class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:border-[#15803d] bg-white">
-                                <option value="">-- Pilih Kendaraan (Opsional) --</option>
-                                @foreach($vehicles as $v)
-                                    <option value="{{ $v->id }}">{{ $v->plate }} · {{ $v->type }}</option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select name="vehicle_id" :options="collect($vehicles)->map(fn ($v) => ['id' => $v->id, 'label' => $v->plate . ' · ' . $v->type])->values()" placeholder="-- Pilih Kendaraan (Opsional) --" />
                         </div>
                     </div>
 

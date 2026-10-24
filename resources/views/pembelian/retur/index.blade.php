@@ -15,13 +15,13 @@
                     </svg>
                 </span>
                 <div>
-                    <h1 class="text-xl font-bold text-gray-900 tracking-tight">Retur Pembelian &amp; Debit Note</h1>
-                    <p class="text-xs text-gray-500">Kelola pengembalian barang rusak/tidak sesuai ke vendor, pemotongan stok fisik, dan nota debit hutang dagang.</p>
+                    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Retur Pembelian &amp; Debit Note</h1>
+                    <p class="text-sm text-gray-500 mt-0.5">Kelola pengembalian barang rusak/tidak sesuai ke vendor, pemotongan stok fisik, dan nota debit hutang dagang.</p>
                 </div>
             </div>
         </div>
         <div class="flex items-center gap-2">
-            <a href="{{ route('pembelian.returns.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition">
+            <a href="{{ route('pembelian.returns.create') }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -98,9 +98,9 @@
     </div>
 
     {{-- Card Utama Konten --}}
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Status Tabs --}}
-        <div class="border-b border-gray-200 bg-gray-50/50 px-4 pt-2">
+        <div class="border-b border-gray-100 bg-gray-50/50 px-4 pt-2">
             <nav class="flex space-x-2 sm:space-x-4 overflow-x-auto text-xs font-semibold">
                 @php
                     $tabs = [
@@ -126,7 +126,7 @@
         </div>
 
         {{-- Filter & Pencarian Bar --}}
-        <div class="p-4 bg-white border-b border-gray-200">
+        <div class="p-4 bg-white border-b border-gray-100">
             <form method="GET" action="{{ route('pembelian.returns.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                 <input type="hidden" name="tab" value="{{ $tab }}">
 
@@ -150,14 +150,7 @@
                 {{-- Filter Supplier --}}
                 <div>
                     <label class="block text-[11px] font-medium text-gray-600 mb-1">Supplier / Vendor</label>
-                    <select name="supplier_id" class="w-full py-1.5 px-2.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition">
-                        <option value="">Semua Supplier</option>
-                        @foreach ($suppliers as $s)
-                            <option value="{{ $s->id }}" {{ (string)$supplierId === (string)$s->id ? 'selected' : '' }}>
-                                {{ $s->perusahaan }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierId" placeholder="Semua Supplier" size="xs" :auto-submit="true" />
                 </div>
 
                 {{-- Rentang Tanggal Dari --}}
@@ -200,7 +193,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="border-b border-gray-200 bg-gray-50 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="px-4 py-3">No. Nota Retur</th>
                         <th class="px-4 py-3">Tanggal</th>
                         <th class="px-4 py-3">Supplier / Vendor</th>
@@ -211,13 +204,13 @@
                         <th class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 bg-white text-gray-800">
+                <tbody class="divide-y divide-gray-100 bg-white text-gray-800">
                     @forelse ($returns as $ret)
                         @php
                             $totalVal = $ret->purchaseReturnItem->sum(fn ($i) => (float) $i->qty_returned * (float) $i->unit_price);
                             $supplier = $ret->purchaseReceipt?->supplier ?? $ret->purchaseReceipt?->purchaseOrder?->supplier;
                         @endphp
-                        <tr class="hover:bg-gray-50/80 transition group">
+                        <tr class="hover:bg-gray-50/60 transition group">
                             {{-- No. Nota Retur --}}
                             <td class="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                                 <a href="{{ route('pembelian.returns.show', $ret->id) }}" class="text-[#15803d] hover:text-[#14532d] hover:underline font-bold">
@@ -275,14 +268,15 @@
                             <td class="px-4 py-3 text-center whitespace-nowrap">
                                 @php
                                     $statusMap = [
-                                        'draft' => ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'label' => 'Draft'],
-                                        'pending_approval' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'label' => 'Menunggu Approval'],
-                                        'approved' => ['bg' => 'bg-emerald-50', 'text' => 'text-[#15803d]', 'border' => 'border-emerald-200', 'label' => 'Disetujui'],
-                                        'rejected' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'border' => 'border-red-200', 'label' => 'Ditolak'],
+                                        'draft' => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => 'Draft'],
+                                        'pending_approval' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Menunggu Approval'],
+                                        'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Disetujui'],
+                                        'rejected' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak'],
                                     ];
-                                    $st = $statusMap[$ret->status] ?? ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'label' => ucfirst($ret->status)];
+                                    $st = $statusMap[$ret->status] ?? ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($ret->status)];
                                 @endphp
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border {{ $st['bg'] }} {{ $st['text'] }} {{ $st['border'] }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $st['badge'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $st['dot'] }}"></span>
                                     {{ $st['label'] }}
                                 </span>
                             </td>
@@ -312,16 +306,14 @@
 
                                     {{-- Ajukan (Submit for approval) --}}
                                     @if ($ret->status === 'draft')
-                                        <form method="POST" action="{{ route('pembelian.returns.submit', $ret->id) }}" class="inline" onsubmit="return confirm('Ajukan retur pembelian {{ $ret->nota_retur }} untuk persetujuan?')">
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded text-[11px] transition"
-                                                title="Ajukan Persetujuan"
-                                            >
-                                                Ajukan
-                                            </button>
-                                        </form>
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-submit-return', { action: '{{ route('pembelian.returns.submit', $ret->id) }}', nota: '{{ $ret->nota_retur }}' })"
+                                            class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded text-[11px] transition"
+                                            title="Ajukan Persetujuan"
+                                        >
+                                            Ajukan
+                                        </button>
                                     @endif
 
                                     {{-- Approve Button (Modal) --}}
@@ -395,7 +387,7 @@
 
         {{-- Paginasi Standar Indonesia --}}
         @if ($returns->hasPages())
-            <div class="p-4 border-t border-gray-200 bg-gray-50/50">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $returns->links('vendor.pagination.tailwind') }}
             </div>
         @endif
@@ -547,4 +539,18 @@
     }
 </script>
 @endpush
+
+    {{-- Modal Konfirmasi Ajukan Retur Pembelian --}}
+    <x-confirmation-modal
+        name="submit-return"
+        title="Ajukan Retur Pembelian"
+        type="info"
+        confirm-text="Ya, Ajukan Retur"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Ajukan dokumen retur pembelian <span class="font-bold text-gray-900 font-mono" x-text="data.nota"></span> untuk persetujuan manajer?
+        </p>
+    </x-confirmation-modal>
 @endsection

@@ -7,24 +7,12 @@ use App\Models\Rak;
 
 class SupplierService
 {
+    /**
+     * @deprecated Use \App\Services\RakService::generateKodeRak() instead.
+     */
     public function generateKodeRak($warehouseId = null)
     {
-        $prefix = 'RAK-';
-
-        // build query optionally filtering by warehouse
-        $query = Rak::where('code', 'like', $prefix . '%');
-        if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
-        }
-
-        do {
-            $random = str_pad(rand(0, 999), 3, '0', STR_PAD_LEFT);
-            $candidate = $prefix . $random;
-            $existsQuery = $query->where('code', $candidate);
-            $exists = $existsQuery->exists();
-        } while ($exists);
-
-        return $candidate;
+        return app(RakService::class)->generateKodeRak($warehouseId);
     }
 
     public function generateCode()

@@ -28,39 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('warning'))
-        <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>{{ session('warning') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -130,9 +97,9 @@
     </div>
 
     {{-- Tabs & Filters Card --}}
-    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Segmented Tabs --}}
-        <div class="border-b border-gray-200 px-4 sm:px-6 pt-3 flex flex-wrap gap-2">
+        <div class="border-b border-gray-100 px-4 sm:px-6 pt-3 flex flex-wrap gap-2">
             @php
                 $tabs = [
                     'semua' => 'Semua Dokumen',
@@ -156,7 +123,7 @@
         </div>
 
         {{-- Filter Form --}}
-        <form method="GET" action="{{ route('manufaktur.material-issue.index') }}" class="p-4 sm:p-6 bg-gray-50/50 border-b border-gray-200">
+        <form method="GET" action="{{ route('manufaktur.material-issue.index') }}" class="p-4 sm:p-6 bg-gray-50/50 border-b border-gray-100">
             <input type="hidden" name="tab" value="{{ $tab }}">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
                 <div class="lg:col-span-5 relative">
@@ -175,17 +142,7 @@
                 </div>
 
                 <div class="lg:col-span-3">
-                    <select
-                        name="warehouse_id"
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
-                    >
-                        <option value="">Semua Gudang</option>
-                        @foreach ($warehouses as $wh)
-                            <option value="{{ $wh->id }}" {{ (string)$warehouseId === (string)$wh->id ? 'selected' : '' }}>
-                                {{ $wh->kode }} - {{ $wh->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->kode . ' - ' . $wh->name])->values()" :value="$warehouseId" placeholder="Semua Gudang" size="sm" />
                 </div>
 
                 <div class="lg:col-span-2">
@@ -231,7 +188,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider text-[11px]">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider text-[11px]">
                         <th class="py-3 px-4 sm:px-6">Bukti & Tipe</th>
                         <th class="py-3 px-4">Ref. SPK & Produksi</th>
                         <th class="py-3 px-4">Gudang</th>
@@ -243,7 +200,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-gray-700">
                     @forelse ($materialIssues as $issue)
-                        <tr class="hover:bg-gray-50/75 transition">
+                        <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3.5 px-4 sm:px-6">
                                 <div class="flex items-center gap-2">
                                     <a
@@ -296,18 +253,19 @@
                                 <span class="font-bold text-gray-900">Rp {{ number_format($issue->total_cost, 0, ',', '.') }}</span>
                             </td>
 
-                            <td class="py-3.5 px-4 text-center">
+                            <td class="py-3.5 px-4 text-center whitespace-nowrap">
                                 @php
                                     $statusConfig = [
-                                        'draft' => ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'label' => 'Draft'],
-                                        'pending_approval' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-800', 'label' => 'Menunggu Gudang'],
-                                        'approved' => ['bg' => 'bg-blue-100', 'text' => 'text-blue-800', 'label' => 'Disetujui'],
-                                        'completed' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Selesai'],
-                                        'rejected' => ['bg' => 'bg-rose-100', 'text' => 'text-rose-800', 'label' => 'Ditolak'],
+                                        'draft' => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => 'Draft'],
+                                        'pending_approval' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Menunggu Gudang'],
+                                        'approved' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Disetujui'],
+                                        'completed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai'],
+                                        'rejected' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak'],
                                     ];
-                                    $st = $statusConfig[$issue->status] ?? ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'label' => ucfirst($issue->status)];
+                                    $st = $statusConfig[$issue->status] ?? ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($issue->status)];
                                 @endphp
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {{ $st['bg'] }} {{ $st['text'] }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $st['badge'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $st['dot'] }}"></span>
                                     {{ $st['label'] }}
                                 </span>
                             </td>
@@ -347,24 +305,16 @@
                                             </svg>
                                         </a>
 
-                                        <form
-                                            action="{{ route('manufaktur.material-issue.destroy', $issue) }}"
-                                            method="POST"
-                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus draft dokumen {{ $issue->issue_number }}?');"
-                                            class="inline"
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-delete-material-issue', { action: '{{ route('manufaktur.material-issue.destroy', $issue) }}', number: '{{ $issue->issue_number }}' })"
+                                            class="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-gray-100 rounded-lg transition"
+                                            title="Hapus Draft"
                                         >
-                                            @csrf
-                                            @method('DELETE')
-                                            <button
-                                                type="submit"
-                                                class="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-gray-100 rounded-lg transition"
-                                                title="Hapus Draft"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        </form>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
                                     @endif
                                 </div>
                             </td>
@@ -386,10 +336,27 @@
 
         {{-- Pagination --}}
         @if ($materialIssues->hasPages())
-            <div class="p-4 border-t border-gray-200">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $materialIssues->links() }}
             </div>
         @endif
     </div>
+
+    {{-- Modal Konfirmasi Hapus Draft Dokumen --}}
+    <x-confirmation-modal
+        name="delete-material-issue"
+        title="Hapus Draft Dokumen Pengeluaran Bahan"
+        variant="danger"
+        confirm-text="Ya, Hapus Draft"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus draft dokumen <strong class="text-gray-900" x-text="data.number"></strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Tindakan ini tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

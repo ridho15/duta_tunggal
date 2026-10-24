@@ -21,4 +21,15 @@ class ProductCategory extends Model
     {
         return $this->hasMany(Product::class, 'product_category_id');
     }
+
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        if ($this->product()->exists()) {
+            $blockers[] = 'sedang digunakan oleh ' . $this->product()->count() . ' produk';
+        }
+
+        return $blockers;
+    }
 }

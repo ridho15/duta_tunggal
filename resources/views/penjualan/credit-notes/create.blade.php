@@ -70,7 +70,7 @@
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
                         Customer (Pelanggan) <span class="text-rose-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         class="w-full text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
                         x-model="customerId"
                         @change="onCustomerChange()"
@@ -88,7 +88,7 @@
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
                         Faktur Penjualan (Invoice) <span class="text-rose-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         name="invoice_id"
                         class="w-full text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
                         x-model="invoiceId"

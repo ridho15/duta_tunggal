@@ -56,25 +56,20 @@
                     Edit Draft
                 </a>
 
-                <form action="{{ route('gudang.transfer.request', $transfer) }}" method="POST" onsubmit="return confirm('Ajukan transfer stok ini untuk persetujuan?')">
-                    @csrf
-                    <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition shadow-2xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                        <span>Ajukan Transfer</span>
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-request-transfer')"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition shadow-2xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span>Ajukan Transfer</span>
+                </button>
 
-                <form action="{{ route('gudang.transfer.destroy', $transfer) }}" method="POST" onsubmit="return confirm('Hapus dokumen draft transfer ini?')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit"
-                            class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition">
-                        Hapus
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-delete-transfer')"
+                        class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition">
+                    Hapus
+                </button>
             @endif
 
             @if (in_array($transfer->status, ['Request', 'Pending']))
@@ -84,16 +79,14 @@
                     Tolak
                 </button>
 
-                <form action="{{ route('gudang.transfer.approve', $transfer) }}" method="POST" onsubmit="return confirm('Setujui transfer stok ini? Stok di gudang asal akan berkurang dan stok di gudang tujuan akan bertambah.')">
-                    @csrf
-                    <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                        <span>Setujui & Mutasi Stok</span>
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-approve-transfer')"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg transition shadow-2xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span>Setujui & Mutasi Stok</span>
+                </button>
             @endif
 
             @if (in_array($transfer->status, ['Approved', 'completed']))
@@ -109,30 +102,6 @@
         </div>
     </div>
 
-    {{-- Alert Notifikasi --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700">✕</button>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" stroke-width="2"></circle>
-                    <path d="M12 8v4m0 4h.01" stroke-width="2" stroke-linecap="round"></path>
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700">✕</button>
-        </div>
-    @endif
 
     {{-- Banner Status Approved --}}
     @if (in_array($transfer->status, ['Approved', 'completed']))
@@ -312,4 +281,51 @@
         document.getElementById('rejectModal').classList.add('hidden');
     }
 </script>
+    {{-- Modal Konfirmasi Ajukan Transfer --}}
+    <x-confirmation-modal
+        name="request-transfer"
+        title="Ajukan Transfer Stok"
+        variant="warning"
+        confirm-text="Ya, Ajukan Transfer"
+        cancel-text="Batal"
+        action="{{ route('gudang.transfer.request', $transfer) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin mengajukan transfer stok <strong>{{ $transfer->transfer_number }}</strong> untuk persetujuan supervisor/manajer gudang?
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Hapus Transfer --}}
+    <x-confirmation-modal
+        name="delete-transfer"
+        title="Hapus Dokumen Transfer Stok"
+        variant="danger"
+        confirm-text="Ya, Hapus Dokumen"
+        cancel-text="Batal"
+        action="{{ route('gudang.transfer.destroy', $transfer) }}"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus draft transfer stok <strong>{{ $transfer->transfer_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Setujui Transfer --}}
+    <x-confirmation-modal
+        name="approve-transfer"
+        title="Setujui Transfer Stok Antar Gudang"
+        variant="success"
+        confirm-text="Ya, Setujui &amp; Mutasi Stok"
+        cancel-text="Batal"
+        action="{{ route('gudang.transfer.approve', $transfer) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Setujui transfer stok <strong>{{ $transfer->transfer_number }}</strong>?
+        </p>
+        <p class="text-xs text-[#15803d] mt-2 font-medium">
+            Stok barang di gudang asal akan langsung berkurang dan dialokasikan/ditambahkan ke gudang tujuan sesuai surat jalan transfer.
+        </p>
+    </x-confirmation-modal>
 @endsection

@@ -67,7 +67,10 @@ class SupplierController extends Controller
         $baseQuery = Supplier::query()->with('cabang');
 
         if (! $canAccessAll && $userCabangId) {
-            $baseQuery->where('cabang_id', $userCabangId);
+            $baseQuery->where(function ($q) use ($userCabangId) {
+                $q->where('cabang_id', $userCabangId)
+                    ->orWhereNull('cabang_id');
+            });
         }
 
         // KPI Counts
@@ -244,10 +247,12 @@ class SupplierController extends Controller
         $this->authorizeAccess('delete supplier');
 
         try {
-            // Cek apakah supplier memiliki PO aktif
-            $hasActiveOrders = $supplier->purchaseOrder()->whereIn('status', ['draft', 'approved', 'process'])->exists();
-            if ($hasActiveOrders) {
-                return back()->with('error', "Supplier '{$supplier->perusahaan}' tidak dapat dihapus karena masih memiliki pesanan pembelian aktif.");
+            // Cek apakah supplier memiliki PO aktif atau kewajiban hutang belum lunas
+            $blockers = $supplier->getDeletionBlockers();
+            if ($blockers !== []) {
+                $reason = implode(', ', $blockers);
+
+                return back()->with('error', "Supplier '{$supplier->perusahaan}' tidak dapat dihapus karena {$reason}.");
             }
 
             $name = $supplier->perusahaan;

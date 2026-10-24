@@ -12,7 +12,7 @@
                 Semua SO cabang <span class="font-semibold text-gray-700">{{ $cabangNama }}</span>. Klik baris untuk melihat detail dan langkah berikutnya.
             </div>
         </div>
-        <a href="{{ route('penjualan.so.create') }}" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm px-4 py-2.5 rounded-xl min-h-[44px] inline-flex items-center gap-2 shadow-sm transition-colors">
+        <a href="{{ route('penjualan.so.create') }}" class="bg-[#15803d] hover:bg-[#166534] text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl min-h-[44px] inline-flex items-center gap-2 shadow-sm transition active:scale-[0.98]">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             Buat SO
         </a>
@@ -46,7 +46,7 @@
     </div>
 
     <!-- Card Wrapper Tabel & Filter Bar -->
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+    <div class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
         <!-- Filter Controls -->
         <form method="GET" action="{{ route('penjualan.so.index') }}" class="flex flex-wrap gap-2.5 items-center p-3.5 sm:p-4 border-b border-gray-100 bg-gray-50/50">
             <input type="hidden" name="tab" value="{{ $activeTab }}">
@@ -64,12 +64,16 @@
             </select>
 
             <!-- Filter Sales -->
-            <select name="sales" onchange="this.form.submit()" class="text-xs sm:text-[13px] font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:border-emerald-600 cursor-pointer">
-                <option value="semua">Sales: Semua</option>
-                @foreach($salesUsers as $sales)
-                    <option value="{{ $sales->id }}" {{ request('sales') == $sales->id ? 'selected' : '' }}>{{ $sales->name }}</option>
-                @endforeach
-            </select>
+            <div class="min-w-[170px]">
+                <x-searchable-select
+                    name="sales"
+                    :options="collect($salesUsers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->name])->values()"
+                    :value="(request('sales') && request('sales') !== 'semua') ? request('sales') : null"
+                    placeholder="Sales: Semua"
+                    :auto-submit="true"
+                    size="sm"
+                />
+            </div>
 
             <button type="submit" class="hidden">Cari</button>
         </form>
@@ -78,7 +82,7 @@
         <div class="hidden md:block overflow-x-auto">
             <table class="w-full border-collapse text-sm min-w-[760px]">
                 <thead>
-                    <tr class="text-left text-gray-500 text-xs bg-gray-50/80 border-b border-gray-100">
+                    <tr class="text-left text-gray-500 text-[11px] font-semibold uppercase tracking-wider bg-gray-50/80 border-b border-gray-100">
                         <th class="py-2.5 px-4 font-semibold">No. SO</th>
                         <th class="py-2.5 px-3 font-semibold">Customer</th>
                         <th class="py-2.5 px-3 font-semibold text-right">Total</th>
@@ -96,28 +100,19 @@
                             $available = (float) $prog['available'];
                             $pct = $ordered > 0 ? min(100, round(($ordered - $available) / $ordered * 100)) : 0;
 
-                            // Tentukan label status & style
-                            $statusStyle = match($so->status) {
-                                'request_approve' => 'text-amber-800 bg-amber-50 border-amber-300',
-                                'approved', 'confirmed' => 'text-emerald-800 bg-emerald-50 border-emerald-300',
-                                'partially_delivered' => 'text-blue-800 bg-blue-50 border-blue-300',
-                                'received' => 'text-indigo-800 bg-indigo-50 border-indigo-300',
-                                'completed' => 'text-emerald-900 bg-emerald-100 border-emerald-400',
-                                'reject' => 'text-red-800 bg-red-50 border-red-300',
-                                default => 'text-gray-700 bg-gray-100 border-gray-200',
-                            };
-                            $statusLabel = match($so->status) {
-                                'request_approve' => 'Perlu atasan · approval',
-                                'draft' => 'Draft',
-                                'approved' => 'Siap buat DO',
-                                'partially_delivered' => 'Sebagian DO',
-                                'received' => 'Diterima customer',
-                                'completed' => 'Selesai',
-                                'reject' => 'Ditolak · revisi',
-                                default => ucfirst($so->status),
+                            // Tentukan status badge berstandar dot indicator
+                            $statusConfig = match($so->status) {
+                                'request_approve' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Perlu Approval'],
+                                'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Siap buat DO'],
+                                'confirmed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Dikonfirmasi'],
+                                'partially_delivered' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Sebagian DO'],
+                                'received' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Diterima Customer'],
+                                'completed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai'],
+                                'reject' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak · Revisi'],
+                                default => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($so->status)],
                             };
                         @endphp
-                        <tr class="hover:bg-gray-50/70 transition-colors">
+                        <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3 px-4">
                                 <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold text-gray-900 hover:text-emerald-700 transition-colors">
                                     {{ $so->so_number }}
@@ -132,9 +127,10 @@
                             <td class="py-3 px-3 text-right font-semibold text-gray-900">
                                 Rp {{ number_format($so->grandTotal(), 0, ',', '.') }}
                             </td>
-                            <td class="py-3 px-3">
-                                <span class="inline-block text-[11.5px] font-bold border rounded-md px-2 py-0.5 {{ $statusStyle }}">
-                                    {{ $statusLabel }}
+                            <td class="py-3 px-3 whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusConfig['badge'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusConfig['dot'] }}"></span>
+                                    {{ $statusConfig['label'] }}
                                 </span>
                             </td>
                             <td class="py-3 px-3 text-xs text-gray-600 min-w-[110px]">
@@ -204,24 +200,15 @@
                     $available = (float) $prog['available'];
                     $pct = $ordered > 0 ? min(100, round(($ordered - $available) / $ordered * 100)) : 0;
 
-                    $statusStyle = match($so->status) {
-                        'request_approve' => 'text-amber-800 bg-amber-50 border-amber-300',
-                        'approved', 'confirmed' => 'text-emerald-800 bg-emerald-50 border-emerald-300',
-                        'partially_delivered' => 'text-blue-800 bg-blue-50 border-blue-300',
-                        'received' => 'text-indigo-800 bg-indigo-50 border-indigo-300',
-                        'completed' => 'text-emerald-900 bg-emerald-100 border-emerald-400',
-                        'reject' => 'text-red-800 bg-red-50 border-red-300',
-                        default => 'text-gray-700 bg-gray-100 border-gray-200',
-                    };
-                    $statusLabel = match($so->status) {
-                        'request_approve' => 'Perlu atasan',
-                        'draft' => 'Draft',
-                        'approved' => 'Siap DO',
-                        'partially_delivered' => 'Sebagian DO',
-                        'received' => 'Diterima',
-                        'completed' => 'Selesai',
-                        'reject' => 'Ditolak',
-                        default => ucfirst($so->status),
+                    $statusConfigMob = match($so->status) {
+                        'request_approve' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Perlu atasan'],
+                        'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Siap DO'],
+                        'confirmed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Dikonfirmasi'],
+                        'partially_delivered' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Sebagian DO'],
+                        'received' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Diterima'],
+                        'completed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai'],
+                        'reject' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak'],
+                        default => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($so->status)],
                     };
                 @endphp
                 <div class="p-4 hover:bg-gray-50/80 transition-colors">
@@ -229,8 +216,9 @@
                         <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold text-gray-900 text-base">
                             {{ $so->so_number }}
                         </a>
-                        <span class="text-[11px] font-bold border rounded-md px-2 py-0.5 {{ $statusStyle }}">
-                            {{ $statusLabel }}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $statusConfigMob['badge'] }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $statusConfigMob['dot'] }}"></span>
+                            {{ $statusConfigMob['label'] }}
                         </span>
                     </div>
                     <div class="text-xs text-gray-600 mt-1">

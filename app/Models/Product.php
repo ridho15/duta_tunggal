@@ -52,6 +52,7 @@ class Product extends Model
         'cost_price' => 'decimal:2',
         'sell_price' => 'decimal:2',
         'biaya' => 'decimal:2',
+        'pajak' => 'decimal:2',
     ];
 
     public function getCodeAttribute(): ?string
@@ -341,6 +342,65 @@ class Product extends Model
         return self::resolveDefaultProductCoaId('inventory_coa_id', $isManufacture, $isRawMaterial);
     }
 
+    public function saleOrderItems()
+    {
+        return $this->hasMany(SaleOrderItem::class, 'product_id');
+    }
+
+    public function deliveryOrderItems()
+    {
+        return $this->hasMany(DeliveryOrderItem::class, 'product_id');
+    }
+
+    public function quotationItems()
+    {
+        return $this->hasMany(QuotationItem::class, 'product_id');
+    }
+
+    /**
+     * Cek apakah produk memiliki relasi atau transaksi aktif yang memblokir penghapusan.
+     *
+     * @return array<int, string>
+     */
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        $hasStock = $this->inventoryStock()
+            ->where(function ($q) {
+                $q->where('qty_available', '>', 0)
+                    ->orWhere('qty_reserved', '>', 0);
+            })->exists();
+
+        if ($hasStock) {
+            $blockers[] = 'masih memiliki saldo stok fisik atau stok terpesan di gudang';
+        }
+
+        $hasActiveSales = $this->saleOrderItems()
+            ->whereHas('saleOrder', function ($q) {
+                $q->whereIn('status', ['draft', 'approved', 'process', 'partially_delivered']);
+            })->exists();
+
+        if ($hasActiveSales) {
+            $blockers[] = 'tercantum dalam pesanan penjualan (Sales Order) yang masih aktif';
+        }
+
+        $hasActivePurchases = $this->purchaseOrderItem()
+            ->whereHas('purchaseOrder', function ($q) {
+                $q->whereIn('status', ['draft', 'approved', 'process']);
+            })->exists();
+
+        if ($hasActivePurchases) {
+            $blockers[] = 'tercantum dalam pesanan pembelian (Purchase Order) yang masih aktif';
+        }
+
+        if ($this->billOfMaterial()->exists() || $this->billOfMaterialItem()->exists()) {
+            $blockers[] = 'digunakan dalam formula perakitan atau Bill of Materials (BOM)';
+        }
+
+        return $blockers;
+    }
+
     protected static function booted()
     {
         static::addGlobalScope('product_cabang', function (Builder $builder) {
@@ -361,22 +421,16 @@ class Product extends Model
         static::deleting(function ($product) {
             if ($product->isForceDeleting()) {
                 $product->purchaseOrderItem()->forceDelete();
-                $product->purchaseReceiptItem()->forceDelete();
                 $product->inventoryStock()->forceDelete();
-                $product->stockMovement()->forceDelete();
             } else {
                 $product->purchaseOrderItem()->delete();
-                $product->purchaseReceiptItem()->delete();
                 $product->inventoryStock()->delete();
-                $product->stockMovement()->delete();
             }
         });
 
         static::restoring(function ($product) {
             $product->purchaseOrderItem()->restore();
-            $product->purchaseReceiptItem()->restore();
             $product->inventoryStock()->restore();
-            $product->stockMovement()->restore();
         });
 
         static::created(function ($product) {

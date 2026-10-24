@@ -265,7 +265,7 @@
                         Surat Jalan Masuk / Penerimaan Barang (GRN) <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
-                        <select
+                        <select data-searchable
                             name="purchase_receipt_id"
                             x-model="receiptId"
                             @change="onReceiptChange($event.target.value)"
@@ -332,7 +332,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Cabang / Unit Kerja <span class="text-red-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         name="cabang_id"
                         x-model="cabangId"
                         required

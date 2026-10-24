@@ -38,26 +38,26 @@
             <div role="group" aria-label="Periode" class="inline-flex bg-white border border-gray-200 rounded-xl p-1 shadow-2xs">
                 <a
                     href="?periode=today{{ $filterCabangId ? '&cabang_id='.$filterCabangId : '' }}"
-                    class="text-xs sm:text-sm font-bold rounded-lg px-3 py-1.5 transition text-decoration-none {{ $filterPeriode === 'today' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
+                    class="text-xs sm:text-sm font-bold rounded-lg px-3 py-1.5 transition no-underline {{ $filterPeriode === 'today' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
                 >
                     Hari ini
                 </a>
                 <a
                     href="?periode=7d{{ $filterCabangId ? '&cabang_id='.$filterCabangId : '' }}"
-                    class="text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 transition text-decoration-none {{ $filterPeriode === '7d' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
+                    class="text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 transition no-underline {{ $filterPeriode === '7d' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
                 >
                     7 hari
                 </a>
                 <a
                     href="?periode=month{{ $filterCabangId ? '&cabang_id='.$filterCabangId : '' }}"
-                    class="text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 transition text-decoration-none {{ $filterPeriode === 'month' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
+                    class="text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 transition no-underline {{ $filterPeriode === 'month' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
                 >
                     Bulan ini
                 </a>
                 <button
                     type="button"
                     @click="showCustomDateModal = true"
-                    class="text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 transition text-decoration-none {{ $filterPeriode === 'custom' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
+                    class="text-xs sm:text-sm font-semibold rounded-lg px-3 py-1.5 transition no-underline {{ $filterPeriode === 'custom' ? 'bg-[#15803d] text-white shadow-xs' : 'text-gray-700 hover:text-gray-900' }}"
                 >
                     {{ $filterPeriode === 'custom' ? $periodeLabel : 'Pilih…' }}
                 </button>
@@ -110,7 +110,7 @@
         {{-- KPI 1: Penjualan --}}
         <a
             href="{{ route('penjualan.so.index') }}"
-            class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 text-decoration-none text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
+            class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 no-underline text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
         >
             <span class="text-xs sm:text-[13px] text-gray-500 font-semibold">Penjualan {{ $periodeLabel }}</span>
             <span class="text-xl sm:text-[26px] font-extrabold tracking-tight" title="{{ formatCurrency($kpi['penjualan']['nominal']) }}">
@@ -124,7 +124,7 @@
         {{-- KPI 2: Kas & Bank --}}
         <a
             href="{{ route('keuangan.cashbank.index') }}"
-            class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 text-decoration-none text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
+            class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 no-underline text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
         >
             <span class="text-xs sm:text-[13px] text-gray-500 font-semibold">Kas &amp; Bank</span>
             <span class="text-xl sm:text-[26px] font-extrabold tracking-tight" title="{{ formatCurrency($kpi['kas_bank']['saldo']) }}">
@@ -138,7 +138,7 @@
         {{-- KPI 3: Piutang Lewat Jatuh Tempo (Kuning Peringatan) --}}
         <a
             href="{{ route('keuangan.cashbank.index') }}"
-            class="bg-[#fffbeb] border border-[#fcd34d] rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 text-decoration-none text-gray-900 hover:border-amber-400 hover:shadow-xs transition"
+            class="bg-[#fffbeb] border border-[#fcd34d] rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 no-underline text-gray-900 hover:border-amber-400 hover:shadow-xs transition"
         >
             <span class="text-xs sm:text-[13px] text-[#92400e] font-semibold">Piutang lewat jatuh tempo</span>
             <span class="text-xl sm:text-[26px] font-extrabold tracking-tight" title="{{ formatCurrency($kpi['piutang_overdue']['nominal']) }}">
@@ -152,7 +152,7 @@
         {{-- KPI 4: Hutang Jatuh Tempo <= 7 Hari --}}
         <a
             href="{{ route('pembelian.po.index') }}"
-            class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 text-decoration-none text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
+            class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 no-underline text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
         >
             <span class="text-xs sm:text-[13px] text-gray-500 font-semibold">Hutang jatuh tempo ≤ 7 hari</span>
             <span class="text-xl sm:text-[26px] font-extrabold tracking-tight" title="{{ formatCurrency($kpi['hutang_due_soon']['nominal']) }}">
@@ -200,14 +200,14 @@
                             </button>
                             <a
                                 href="{{ $item['view_url'] }}"
-                                class="text-xs font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg px-3.5 py-2 min-h-[38px] inline-flex items-center justify-center text-decoration-none transition"
+                                class="text-xs font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg px-3.5 py-2 min-h-[38px] inline-flex items-center justify-center no-underline transition"
                             >
                                 Lihat
                             </a>
                         @else
                             <a
                                 href="{{ $item['view_url'] }}"
-                                class="text-xs font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg px-3.5 py-2 min-h-[38px] inline-flex items-center justify-center text-decoration-none transition"
+                                class="text-xs font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg px-3.5 py-2 min-h-[38px] inline-flex items-center justify-center no-underline transition"
                             >
                                 Periksa
                             </a>
@@ -230,7 +230,7 @@
                 <a
                     href="{{ $stage['url'] }}"
                     style="border-top: 3px solid {{ $stage['border_color'] }}; background: {{ $stage['bg_color'] }};"
-                    class="flex-1 min-w-[140px] md:min-w-0 rounded-b-xl p-3 flex flex-col gap-1 text-decoration-none text-gray-900 hover:opacity-90 transition"
+                    class="flex-1 min-w-[140px] md:min-w-0 rounded-b-xl p-3 flex flex-col gap-1 no-underline text-gray-900 hover:opacity-90 transition"
                 >
                     <div class="text-xl sm:text-[22px] font-extrabold tracking-tight">{{ $stage['count'] }}</div>
                     <div class="text-xs text-gray-600 leading-snug">
@@ -308,7 +308,7 @@
                 @endforeach
             </div>
 
-            <a href="{{ route('penjualan.so.index') }}" class="text-xs font-semibold text-[#15803d] hover:text-[#14532d] mt-auto pt-2 text-decoration-none">
+            <a href="{{ route('penjualan.so.index') }}" class="text-xs font-semibold text-[#15803d] hover:text-[#14532d] mt-auto pt-2 no-underline">
                 Laporan penjualan lengkap ›
             </a>
         </section>
@@ -355,7 +355,7 @@
 
             <a
                 href="{{ route('pembelian.or.index') }}"
-                class="self-start text-xs font-bold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] hover:bg-[#dcfce7] rounded-xl px-3.5 py-2 text-decoration-none mt-auto transition"
+                class="self-start text-xs font-bold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] hover:bg-[#dcfce7] rounded-xl px-3.5 py-2 no-underline mt-auto transition"
             >
                 + Buat Permintaan Pembelian dari stok menipis
             </a>
@@ -368,21 +368,21 @@
             <div class="grid grid-cols-3 gap-2.5">
                 <a
                     href="{{ route('pembelian.or.index') }}"
-                    class="border border-dashed border-gray-300 rounded-xl p-3 flex flex-col gap-1 text-decoration-none text-gray-900 hover:bg-gray-50 transition"
+                    class="border border-dashed border-gray-300 rounded-xl p-3 flex flex-col gap-1 no-underline text-gray-900 hover:bg-gray-50 transition"
                 >
                     <div class="text-lg sm:text-xl font-extrabold">{{ $purchase_summary['pr_new'] }}</div>
                     <div class="text-xs text-gray-500">Permintaan baru</div>
                 </a>
                 <a
                     href="{{ route('pembelian.po.index') }}"
-                    class="border border-dashed border-gray-300 rounded-xl p-3 flex flex-col gap-1 text-decoration-none text-gray-900 hover:bg-gray-50 transition"
+                    class="border border-dashed border-gray-300 rounded-xl p-3 flex flex-col gap-1 no-underline text-gray-900 hover:bg-gray-50 transition"
                 >
                     <div class="text-lg sm:text-xl font-extrabold">{{ $purchase_summary['po_waiting'] }}</div>
                     <div class="text-xs text-gray-500">PO menunggu barang</div>
                 </a>
                 <a
                     href="{{ route('pembelian.po.index') }}"
-                    class="border border-[#bbf7d0] bg-[#f0fdf4] rounded-xl p-3 flex flex-col gap-1 text-decoration-none text-gray-900 hover:bg-[#dcfce7] transition"
+                    class="border border-[#bbf7d0] bg-[#f0fdf4] rounded-xl p-3 flex flex-col gap-1 no-underline text-gray-900 hover:bg-[#dcfce7] transition"
                 >
                     <div class="text-lg sm:text-xl font-extrabold text-[#14532d]">{{ $purchase_summary['arriving_today'] }}</div>
                     <div class="text-xs text-[#15803d] font-medium">Tiba hari ini</div>

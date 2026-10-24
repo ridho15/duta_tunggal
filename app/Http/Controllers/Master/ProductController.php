@@ -313,6 +313,13 @@ class ProductController extends Controller
     {
         $this->authorizeAccess('delete product');
 
+        $blockers = $product->getDeletionBlockers();
+        if ($blockers !== []) {
+            $reason = implode(', ', $blockers);
+
+            return back()->with('error', "Produk '{$product->name}' (SKU: {$product->sku}) tidak dapat dihapus karena {$reason}.");
+        }
+
         try {
             $name = $product->name;
             $sku = $product->sku;

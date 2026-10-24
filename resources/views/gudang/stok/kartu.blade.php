@@ -118,14 +118,7 @@
             {{-- Filter Gudang --}}
             <div>
                 <label for="warehouse_id" class="block text-xs font-medium text-gray-700 mb-1">Gudang</label>
-                <select name="warehouse_id" id="warehouse_id" class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white">
-                    <option value="">Semua Gudang (Konsolidasian)</option>
-                    @foreach ($warehouses as $wh)
-                        <option value="{{ $wh->id }}" {{ $filters['warehouse_id'] == $wh->id ? 'selected' : '' }}>
-                            {{ $wh->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name])->values()" :value="$filters['warehouse_id']" placeholder="Semua Gudang (Konsolidasian)" size="sm" id="warehouse_id" />
             </div>
 
             {{-- Submit & Reset Buttons --}}

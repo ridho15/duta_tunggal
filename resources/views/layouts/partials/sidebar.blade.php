@@ -32,7 +32,7 @@
 >
     {{-- Header Logo --}}
     <div class="h-[50px] flex items-center justify-between px-4 border-b border-[#eef0f2] flex-shrink-0">
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-2 text-decoration-none">
+        <a href="{{ route('dashboard') }}" class="flex items-center gap-2 no-underline">
             <span class="font-extrabold text-[15px] tracking-wide text-gray-900">DUTA TUNGGAL</span>
             <span class="text-[9px] font-bold text-[#15803d] border border-[#86efac] bg-[#f0fdf4] rounded px-1.5 py-0.2">ERP</span>
         </a>
@@ -367,6 +367,13 @@
                         <span>Buku Besar & Jurnal</span>
                     </a>
 
+                    <a href="{{ route('master.coa.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/coa*') || request()->is('keuangan/coa*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" stroke-width="1.8" stroke-linecap="round"></path>
+                        </svg>
+                        <span>Bagan Akun (COA)</span>
+                    </a>
+
                     <a href="{{ route('keuangan.asset.index') ?? '#' }}" class="{{ $itemClass(request()->is('keuangan/aset*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -386,7 +393,7 @@
         @endif
 
         {{-- MASTER DATA --}}
-        @if ($canSee(['OWN', 'PUR', 'FIN', 'SM', 'SLS', 'KSR']))
+        @if ($canSee(['OWN', 'PUR', 'FIN', 'SM', 'SLS', 'KSR', 'GDG', 'ADP', 'IT']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Master Data
@@ -420,6 +427,67 @@
                             <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="1.8"></path>
                         </svg>
                         <span>Supplier</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'FIN', 'IT']))
+                    <a href="{{ route('master.cabang.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/cabang*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3M9 11h2M13 11h2M9 15h2M13 15h2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                        <span>Cabang</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'GDG', 'ADP', 'PUR', 'IT']))
+                    <a href="{{ route('master.gudang.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/gudang*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <span>Gudang & Rak</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'PUR', 'SM', 'SLS', 'IT']))
+                    <a href="{{ route('master.kategori.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/kategori*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                        <span>Kategori</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'PUR', 'GDG', 'IT']))
+                    <a href="{{ route('master.satuan.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/satuan*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                        </svg>
+                        <span>Satuan</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'ADP', 'GDG', 'IT']))
+                    <a href="{{ route('master.kendaraan.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/kendaraan*') || request()->is('master/driver*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8m-8 4h8m-8 4h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
+                        </svg>
+                        <span>Armada & Driver</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'FIN', 'IT']))
+                    <a href="{{ route('master.mata-uang.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/mata-uang*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Mata Uang & Kurs</span>
+                    </a>
+
+                    <a href="{{ route('master.pajak.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/pajak*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path>
+                        </svg>
+                        <span>Tarif Pajak</span>
                     </a>
                 @endif
             </div>

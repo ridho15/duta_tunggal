@@ -80,17 +80,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Gudang Asal <span class="text-rose-500">*</span>
                     </label>
-                    <select name="from_warehouse_id"
-                            id="fromWarehouseSelect"
-                            required
-                            onchange="onWarehouseChange()"
-                            class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800 font-medium">
-                        @foreach ($warehouses as $wh)
-                            <option value="{{ $wh->id }}" {{ old('from_warehouse_id', $transfer->from_warehouse_id) == $wh->id ? 'selected' : '' }}>
-                                {{ $wh->name }} ({{ $wh->kode ?? 'WH' }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="from_warehouse_id" id="fromWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="(old('from_warehouse_id', $transfer->from_warehouse_id)) ?: collect($warehouses)->first()?->id" :required="true" size="sm" />
                 </div>
 
                 {{-- Gudang Tujuan --}}
@@ -98,17 +88,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Gudang Tujuan <span class="text-rose-500">*</span>
                     </label>
-                    <select name="to_warehouse_id"
-                            id="toWarehouseSelect"
-                            required
-                            onchange="onDestinationWarehouseChange()"
-                            class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800 font-medium">
-                        @foreach ($warehouses as $wh)
-                            <option value="{{ $wh->id }}" {{ old('to_warehouse_id', $transfer->to_warehouse_id) == $wh->id ? 'selected' : '' }}>
-                                {{ $wh->name }} ({{ $wh->kode ?? 'WH' }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="to_warehouse_id" id="toWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="(old('to_warehouse_id', $transfer->to_warehouse_id)) ?: collect($warehouses)->first()?->id" :required="true" size="sm" />
                 </div>
             </div>
         </div>
@@ -256,7 +236,7 @@
         tr.className = 'hover:bg-gray-50/60 transition';
         tr.innerHTML = `
             <td class="py-2.5 px-3">
-                <select name="items[${idx}][product_id]"
+                <select data-searchable name="items[${idx}][product_id]"
                         id="prod-select-${idx}"
                         required
                         onchange="onProductSelectChange(${idx})"
@@ -269,14 +249,14 @@
                 <span id="uom-display-${idx}" class="text-[10px] text-gray-400 ml-0.5"></span>
             </td>
             <td class="py-2.5 px-3">
-                <select name="items[${idx}][from_rak_id]"
+                <select data-searchable name="items[${idx}][from_rak_id]"
                         id="from-rak-${idx}"
                         class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 text-gray-700">
                     ${fromRakOptions}
                 </select>
             </td>
             <td class="py-2.5 px-3">
-                <select name="items[${idx}][to_rak_id]"
+                <select data-searchable name="items[${idx}][to_rak_id]"
                         id="to-rak-${idx}"
                         class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 text-gray-700">
                     ${toRakOptions}
@@ -376,6 +356,10 @@
             }
         }
     }
+
+    // Komponen x-searchable-select memicu event 'change' pada input tersembunyi
+    document.getElementById('fromWarehouseSelect').addEventListener('change', onWarehouseChange);
+    document.getElementById('toWarehouseSelect').addEventListener('change', onDestinationWarehouseChange);
 
     document.addEventListener('DOMContentLoaded', async () => {
         const fromWh = document.getElementById('fromWarehouseSelect').value;

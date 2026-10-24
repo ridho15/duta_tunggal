@@ -79,6 +79,33 @@ class Supplier extends Model
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
     }
 
+    public function accountPayables()
+    {
+        return $this->hasMany(AccountPayable::class, 'supplier_id');
+    }
+
+    /**
+     * Cek apakah supplier memiliki transaksi aktif atau kewajiban hutang yang memblokir penghapusan.
+     *
+     * @return array<int, string>
+     */
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        // 1. Pesanan pembelian aktif
+        if ($this->purchaseOrder()->whereIn('status', ['draft', 'approved', 'process'])->exists()) {
+            $blockers[] = 'masih memiliki pesanan pembelian (Purchase Order) yang aktif';
+        }
+
+        // 2. Hutang belum lunas
+        if ($this->accountPayables()->where('status', 'Belum Lunas')->where('remaining', '>', 0)->exists()) {
+            $blockers[] = 'masih memiliki kewajiban hutang usaha yang belum lunas';
+        }
+
+        return $blockers;
+    }
+
     public function getAtasNamaAttribute()
     {
         return $this->nama_rekening;

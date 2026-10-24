@@ -27,7 +27,7 @@
         <div class="flex items-center gap-2.5">
             <a
                 href="{{ route('keuangan.journal.ledger') }}"
-                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -36,7 +36,7 @@
             </a>
             <a
                 href="{{ route('keuangan.journal.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d]/30"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -49,10 +49,10 @@
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total Mutasi Debit --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Total Debit (Bulan Ini)</span>
-                <span class="p-2 bg-emerald-50 text-[#15803d] rounded-lg">
+                <span class="p-2 bg-emerald-50 text-[#15803d] rounded-xl">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" />
                     </svg>
@@ -65,10 +65,10 @@
         </div>
 
         {{-- Total Mutasi Kredit --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Total Kredit (Bulan Ini)</span>
-                <span class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                <span class="p-2 bg-blue-50 text-blue-600 rounded-xl">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
                     </svg>
@@ -81,10 +81,10 @@
         </div>
 
         {{-- Total Voucher Transaksi --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Voucher Transaksi</span>
-                <span class="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                <span class="p-2 bg-purple-50 text-purple-600 rounded-xl">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -98,10 +98,10 @@
         </div>
 
         {{-- Status Balance --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Integritas Jurnal</span>
-                <span class="p-2 {{ $balanceDifference < 0.01 ? 'bg-emerald-50 text-[#15803d]' : 'bg-rose-50 text-rose-600' }} rounded-lg">
+                <span class="p-2 {{ $balanceDifference < 0.01 ? 'bg-emerald-50 text-[#15803d]' : 'bg-rose-50 text-rose-600' }} rounded-xl">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -119,9 +119,9 @@
     </div>
 
     {{-- Main Container Card --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Status / Module Tabs --}}
-        <div class="border-b border-gray-200 px-4 sm:px-6 pt-3 bg-gray-50/50">
+        <div class="border-b border-gray-100 px-4 sm:px-6 pt-3 bg-gray-50/50">
             <div class="flex items-center gap-2 overflow-x-auto pb-3 text-xs sm:text-sm font-semibold scrollbar-none">
                 @php
                     $tabs = [
@@ -154,7 +154,7 @@
         </div>
 
         {{-- Filter & Search Bar --}}
-        <div class="p-4 sm:px-6 border-b border-gray-200 bg-white">
+        <div class="p-4 sm:px-6 border-b border-gray-100 bg-white">
             <form method="GET" action="{{ route('keuangan.journal.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
                 <input type="hidden" name="tab" value="{{ $tab }}">
 
@@ -176,17 +176,7 @@
 
                 {{-- Filter Akun COA --}}
                 <div class="lg:col-span-3">
-                    <select
-                        name="coa_id"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 bg-white"
-                    >
-                        <option value="">-- Semua Akun COA --</option>
-                        @foreach ($chartOfAccounts as $acc)
-                            <option value="{{ $acc->id }}" {{ $coaId == $acc->id ? 'selected' : '' }}>
-                                {{ $acc->code }} - {{ $acc->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="coa_id" :options="collect($chartOfAccounts)->map(fn ($acc) => ['id' => $acc->id, 'label' => $acc->code . ' - ' . $acc->name])->values()" :value="$coaId" placeholder="-- Semua Akun COA --" size="sm" :auto-submit="true" />
                 </div>
 
                 {{-- Tanggal Dari --}}
@@ -258,11 +248,13 @@
                                 {{ str_replace('_', ' ', $voucher->journal_type) }}
                             </span>
                             @if ($isBalanced)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                     Balanced
                                 </span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                     Unbalanced
                                 </span>
                             @endif
@@ -308,14 +300,14 @@
                     @endif
 
                     {{-- Sub-tabel Baris Jurnal (Double-Entry Legs) --}}
-                    <div class="mt-3 overflow-x-auto rounded-lg border border-gray-100 bg-white">
+                    <div class="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
                         <table class="w-full text-left text-xs">
-                            <thead class="bg-gray-50/75 text-gray-500 font-bold uppercase text-[10.5px] border-b border-gray-100">
+                            <thead class="bg-gray-50/80 text-gray-500 font-semibold uppercase text-[11px] border-b border-gray-100">
                                 <tr>
-                                    <th class="py-2 px-3 w-1/4">Kode &amp; Nama Akun COA</th>
-                                    <th class="py-2 px-3">Keterangan Baris</th>
-                                    <th class="py-2 px-3 w-36 text-right">Debit (Rp)</th>
-                                    <th class="py-2 px-3 w-36 text-right">Kredit (Rp)</th>
+                                    <th class="py-2.5 px-3 w-1/4">Kode &amp; Nama Akun COA</th>
+                                    <th class="py-2.5 px-3">Keterangan Baris</th>
+                                    <th class="py-2.5 px-3 w-36 text-right">Debit (Rp)</th>
+                                    <th class="py-2.5 px-3 w-36 text-right">Kredit (Rp)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
@@ -359,7 +351,7 @@
         </div>
 
         @if ($groupedVouchers && $groupedVouchers->hasPages())
-            <div class="px-4 sm:px-6 py-3 border-t border-gray-200 bg-gray-50/50">
+            <div class="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50/50">
                 {{ $groupedVouchers->links('components.pagination-clean') }}
             </div>
         @endif

@@ -111,14 +111,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Kategori Produk <span class="text-rose-500">*</span>
                     </label>
-                    <select name="product_category_id" required class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Pilih Kategori Produk</option>
-                        @foreach ($categories as $cat)
-                            <option value="{{ $cat->id }}" {{ old('product_category_id') == $cat->id ? 'selected' : '' }}>
-                                {{ $cat->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="product_category_id" :options="collect($categories)->map(fn ($cat) => ['id' => $cat->id, 'label' => $cat->name])->values()" :value="old('product_category_id')" placeholder="Pilih Kategori Produk" :required="true" />
                 </div>
 
                 {{-- Satuan Utama (UOM) --}}
@@ -126,14 +119,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Satuan Dasar (UOM) <span class="text-rose-500">*</span>
                     </label>
-                    <select name="uom_id" required class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Pilih Satuan</option>
-                        @foreach ($uoms as $uom)
-                            <option value="{{ $uom->id }}" {{ old('uom_id') == $uom->id ? 'selected' : '' }}>
-                                {{ $uom->name }} ({{ $uom->abbreviation }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="uom_id" :options="collect($uoms)->map(fn ($uom) => ['id' => $uom->id, 'label' => $uom->name . ' (' . $uom->abbreviation . ')'])->values()" :value="old('uom_id')" placeholder="Pilih Satuan" :required="true" />
                 </div>
 
                 {{-- Kode Merk --}}
@@ -156,14 +142,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Cabang Kepemilikan
                     </label>
-                    <select name="cabang_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Semua Cabang (Global)</option>
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ old('cabang_id') == $cb->id ? 'selected' : '' }}>
-                                ({{ $cb->kode }}) {{ $cb->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => '(' . $cb->kode . ') ' . $cb->nama])->values()" :value="old('cabang_id')" placeholder="Semua Cabang (Global)" />
                     <p class="text-[11px] text-gray-500 mt-1">Kosongkan jika produk dapat diperdagangkan di seluruh cabang.</p>
                 </div>
             </div>
@@ -356,50 +335,22 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Akun Persediaan (Inventory)</label>
-                    <select name="inventory_coa_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Gunakan Akun Default Persediaan</option>
-                        @foreach ($coas as $coa)
-                            <option value="{{ $coa->id }}" {{ old('inventory_coa_id') == $coa->id ? 'selected' : '' }}>
-                                {{ $coa->code }} - {{ $coa->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="inventory_coa_id" :options="collect($coas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="old('inventory_coa_id')" placeholder="Gunakan Akun Default Persediaan" />
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Akun Penjualan (Revenue)</label>
-                    <select name="sales_coa_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Gunakan Akun Default Penjualan</option>
-                        @foreach ($coas as $coa)
-                            <option value="{{ $coa->id }}" {{ old('sales_coa_id') == $coa->id ? 'selected' : '' }}>
-                                {{ $coa->code }} - {{ $coa->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="sales_coa_id" :options="collect($coas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="old('sales_coa_id')" placeholder="Gunakan Akun Default Penjualan" />
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Akun Harga Pokok Penjualan (HPP / COGS)</label>
-                    <select name="cogs_coa_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Gunakan Akun Default HPP</option>
-                        @foreach ($coas as $coa)
-                            <option value="{{ $coa->id }}" {{ old('cogs_coa_id') == $coa->id ? 'selected' : '' }}>
-                                {{ $coa->code }} - {{ $coa->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cogs_coa_id" :options="collect($coas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="old('cogs_coa_id')" placeholder="Gunakan Akun Default HPP" />
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Akun Retur Penjualan</label>
-                    <select name="sales_return_coa_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Gunakan Akun Default Retur</option>
-                        @foreach ($coas as $coa)
-                            <option value="{{ $coa->id }}" {{ old('sales_return_coa_id') == $coa->id ? 'selected' : '' }}>
-                                {{ $coa->code }} - {{ $coa->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="sales_return_coa_id" :options="collect($coas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="old('sales_return_coa_id')" placeholder="Gunakan Akun Default Retur" />
                 </div>
             </div>
         </div>
@@ -476,7 +427,7 @@
         row.innerHTML = `
             <div class="sm:col-span-6">
                 <label class="block text-[11px] font-semibold text-gray-600 mb-0.5">Satuan Konversi</label>
-                <select name="unit_conversions[${convIndex}][uom_id]" required class="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white">
+                <select data-searchable name="unit_conversions[${convIndex}][uom_id]" required class="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg bg-white">
                     ${optionsHtml}
                 </select>
             </div>

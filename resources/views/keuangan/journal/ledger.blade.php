@@ -18,7 +18,7 @@
         <div>
             <a
                 href="{{ route('keuangan.journal.index') }}"
-                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg shadow-sm transition"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 &larr; Kembali ke Jurnal Umum
             </a>
@@ -26,25 +26,14 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         <form method="GET" action="{{ route('keuangan.journal.ledger') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-end">
             {{-- Pilih Akun COA --}}
             <div class="lg:col-span-5">
                 <label for="coa_id" class="block text-xs font-semibold text-gray-700 mb-1">
                     Pilih Akun Chart of Account (COA) <span class="text-rose-500">*</span>
                 </label>
-                <select
-                    name="coa_id"
-                    id="coa_id"
-                    required
-                    class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 bg-white"
-                >
-                    @foreach ($chartOfAccounts as $acc)
-                        <option value="{{ $acc->id }}" {{ $coaId == $acc->id ? 'selected' : '' }}>
-                            {{ $acc->code }} - {{ $acc->name }} ({{ $acc->type }})
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="coa_id" :options="collect($chartOfAccounts)->map(fn ($acc) => ['id' => $acc->id, 'label' => $acc->code . ' - ' . $acc->name . ' (' . $acc->type . ')'])->values()" :value="($coaId) ?: collect($chartOfAccounts)->first()?->id" :required="true" size="sm" id="coa_id" />
             </div>
 
             {{-- Tanggal Mulai --}}
@@ -80,25 +69,14 @@
                 <label for="cabang_id" class="block text-xs font-semibold text-gray-700 mb-1">
                     Cabang
                 </label>
-                <select
-                    name="cabang_id"
-                    id="cabang_id"
-                    class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-gray-900 bg-white"
-                >
-                    <option value="">Semua Cabang</option>
-                    @foreach ($cabangs as $cabang)
-                        <option value="{{ $cabang->id }}" {{ $cabangId == $cabang->id ? 'selected' : '' }}>
-                            {{ $cabang->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" id="cabang_id" />
             </div>
 
             {{-- Tombol Terapkan --}}
             <div class="lg:col-span-1">
                 <button
                     type="submit"
-                    class="w-full px-3 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                    class="w-full px-3 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
                 >
                     Tampilkan
                 </button>
@@ -108,7 +86,7 @@
 
     {{-- Ringkasan Saldo Akun --}}
     @if ($selectedCoa)
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-6 space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-4">
                 <div>
                     <div class="flex items-center gap-2">
@@ -134,25 +112,25 @@
 
             {{-- 4 Mini Stat Box --}}
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
                     <span class="text-[10.5px] uppercase font-bold text-gray-400 block">Saldo Awal</span>
                     <span class="text-sm font-bold text-gray-900 block mt-1">
                         {{ \App\Helpers\MoneyHelper::rupiah($openingBalance) }}
                     </span>
                 </div>
-                <div class="p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                <div class="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
                     <span class="text-[10.5px] uppercase font-bold text-emerald-700 block">Total Mutasi Debit</span>
                     <span class="text-sm font-bold text-emerald-800 block mt-1">
                         + {{ \App\Helpers\MoneyHelper::rupiah($totalDebitPeriod) }}
                     </span>
                 </div>
-                <div class="p-3 bg-rose-50/50 rounded-lg border border-rose-100">
+                <div class="p-3 bg-rose-50/50 rounded-xl border border-rose-100">
                     <span class="text-[10.5px] uppercase font-bold text-rose-700 block">Total Mutasi Kredit</span>
                     <span class="text-sm font-bold text-rose-800 block mt-1">
                         - {{ \App\Helpers\MoneyHelper::rupiah($totalCreditPeriod) }}
                     </span>
                 </div>
-                <div class="p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                <div class="p-3 bg-blue-50/50 rounded-xl border border-blue-100">
                     <span class="text-[10.5px] uppercase font-bold text-blue-700 block">Jumlah Mutasi</span>
                     <span class="text-sm font-bold text-blue-900 block mt-1">
                         {{ $ledgerEntries->count() }} Baris Transaksi
@@ -162,15 +140,15 @@
         </div>
 
         {{-- Tabel Mutasi Buku Pembantu --}}
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-gray-200 bg-gray-50/75 flex items-center justify-between">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
                 <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Histori Mutasi &amp; Saldo Berjalan</h3>
                 <span class="text-xs text-gray-500 font-mono">{{ $selectedCoa->code }}</span>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-gray-700">
-                    <thead class="bg-gray-50 text-gray-500 font-bold uppercase text-[10.5px] border-b border-gray-200">
+                    <thead class="bg-gray-50/80 text-gray-500 font-semibold uppercase text-[11px] border-b border-gray-100 tracking-wider">
                         <tr>
                             <th class="py-3 px-4 w-28">Tanggal</th>
                             <th class="py-3 px-4 w-36">No. Referensi</th>
@@ -196,7 +174,7 @@
                         </tr>
 
                         @forelse ($ledgerEntries as $entry)
-                            <tr class="hover:bg-gray-50/70 transition">
+                            <tr class="hover:bg-gray-50/60 transition">
                                 <td class="py-2.5 px-4 whitespace-nowrap text-gray-600 font-mono">
                                     {{ \Carbon\Carbon::parse($entry->date)->format('d/m/Y') }}
                                 </td>

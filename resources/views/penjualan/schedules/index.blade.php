@@ -177,12 +177,7 @@
             {{-- Cabang Filter --}}
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Cabang</label>
-                <select name="cabang_id" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#15803d] bg-white">
-                    <option value="">Semua Cabang</option>
-                    @foreach($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ $cabangId == $c->id ? 'selected' : '' }}>{{ $c->nama }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Metode Filter --}}
@@ -199,12 +194,7 @@
             {{-- Driver Filter --}}
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Driver Master</label>
-                <select name="driver_id" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#15803d] bg-white">
-                    <option value="">Semua Driver</option>
-                    @foreach($drivers as $d)
-                        <option value="{{ $d->id }}" {{ $driverId == $d->id ? 'selected' : '' }}>{{ $d->name }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="driver_id" :options="collect($drivers)->map(fn ($d) => ['id' => $d->id, 'label' => $d->name])->values()" :value="$driverId" placeholder="Semua Driver" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Actions --}}
@@ -222,10 +212,10 @@
     </div>
 
     {{-- Jadwal Table --}}
-    <div class="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-gray-700">
-                <thead class="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold text-[11px]">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-gray-500 uppercase tracking-wider font-semibold text-[11px]">
                     <tr>
                         <th class="px-4 py-3.5">Nomor Jadwal</th>
                         <th class="px-4 py-3.5">Tanggal Berangkat</th>
@@ -238,13 +228,13 @@
                 <tbody class="divide-y divide-gray-100">
                     @forelse($schedules as $schedule)
                         @php
-                            $badgeColor = match($schedule->status) {
-                                'pending' => 'bg-amber-50 text-amber-700 border-amber-200',
-                                'on_the_way' => 'bg-blue-50 text-blue-700 border-blue-200',
-                                'delivered' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                'failed' => 'bg-rose-50 text-rose-700 border-rose-200',
-                                'cancelled' => 'bg-gray-100 text-gray-600 border-gray-200',
-                                default => 'bg-gray-50 text-gray-700 border-gray-200'
+                            $statusConfig = match($schedule->status) {
+                                'pending' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'dot' => 'bg-amber-500'],
+                                'on_the_way' => ['bg' => 'bg-blue-50', 'text' => 'text-blue-700', 'border' => 'border-blue-200', 'dot' => 'bg-blue-500 animate-pulse'],
+                                'delivered' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'dot' => 'bg-emerald-500'],
+                                'failed' => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'border' => 'border-rose-200', 'dot' => 'bg-rose-500'],
+                                'cancelled' => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400'],
+                                default => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400']
                             };
                             $methodBadge = match($schedule->delivery_method) {
                                 'internal' => 'bg-purple-50 text-purple-700 border-purple-200',
@@ -318,8 +308,8 @@
 
                             {{-- Status Badge --}}
                             <td class="px-4 py-3">
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border {{ $badgeColor }}">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $schedule->status === 'on_the_way' ? 'bg-blue-600 animate-pulse' : ($schedule->status === 'delivered' ? 'bg-emerald-600' : ($schedule->status === 'pending' ? 'bg-amber-500' : 'bg-gray-400')) }}"></span>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusConfig['bg'] }} {{ $statusConfig['text'] }} {{ $statusConfig['border'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusConfig['dot'] }}"></span>
                                     {{ $schedule->status_label }}
                                 </span>
                             </td>
@@ -354,19 +344,17 @@
 
                                     @if($schedule->status === 'pending')
                                         {{-- Mulai Kirim --}}
-                                        <form method="POST" action="{{ route('penjualan.schedules.start', $schedule->id) }}" class="inline" onsubmit="return confirm('Mulai pengiriman armada? DO terkait akan ditandai terkirim dan stok keluar dari gudang.');">
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
-                                                title="Mulai Keberangkatan"
-                                            >
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
-                                                </svg>
-                                                <span>Berangkat</span>
-                                            </button>
-                                        </form>
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-start-schedule', { action: '{{ route('penjualan.schedules.start', $schedule->id) }}', number: '{{ $schedule->schedule_number }}' })"
+                                            class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                                            title="Mulai Keberangkatan"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
+                                            </svg>
+                                            <span>Berangkat</span>
+                                        </button>
 
                                         {{-- Edit --}}
                                         <a
@@ -394,19 +382,17 @@
                                         </button>
                                     @elseif($schedule->status === 'on_the_way')
                                         {{-- Selesaikan Kirim --}}
-                                        <form method="POST" action="{{ route('penjualan.schedules.complete', $schedule->id) }}" class="inline" onsubmit="return confirm('Tandai jadwal selesai? Seluruh DO terkait akan ditandai selesai dan jurnal akuntansi dibukukan.');">
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
-                                                title="Tandai Selesai & Diterima"
-                                            >
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path d="m5 13 4 4L19 7" stroke-width="2.5" stroke-linecap="round"></path>
-                                                </svg>
-                                                <span>Selesai</span>
-                                            </button>
-                                        </form>
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-complete-schedule', { action: '{{ route('penjualan.schedules.complete', $schedule->id) }}', number: '{{ $schedule->schedule_number }}' })"
+                                            class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                                            title="Tandai Selesai & Diterima"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path d="m5 13 4 4L19 7" stroke-width="2.5" stroke-linecap="round"></path>
+                                            </svg>
+                                            <span>Selesai</span>
+                                        </button>
 
                                         {{-- Tandai Gagal --}}
                                         <button
@@ -560,4 +546,38 @@ function closeCancelModal() {
     document.getElementById('cancelModal').classList.add('hidden');
 }
 </script>
+
+    {{-- Modal Konfirmasi Mulai Pengiriman --}}
+    <x-confirmation-modal
+        name="start-schedule"
+        title="Mulai Pengiriman Armada"
+        type="info"
+        confirm-text="Ya, Mulai Pengiriman"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin memberangkatkan armada untuk jadwal <span class="font-bold text-gray-900 font-mono" x-text="data.number"></span>?
+        </p>
+        <p class="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg p-2.5 mt-2">
+            Seluruh Surat Jalan dan Delivery Order terkait akan ditandai terkirim dan stok fisik resmi dikeluarkan dari gudang.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Selesai Pengiriman --}}
+    <x-confirmation-modal
+        name="complete-schedule"
+        title="Tandai Jadwal Pengiriman Selesai"
+        type="success"
+        confirm-text="Ya, Selesaikan Jadwal"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin jadwal pengiriman <span class="font-bold text-gray-900 font-mono" x-text="data.number"></span> telah selesai dan diterima dengan baik oleh pelanggan?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Status seluruh DO terkait akan ditandai selesai dan jurnal akuntansi pengiriman barang akan dibukukan secara otomatis.
+        </p>
+    </x-confirmation-modal>
 @endsection

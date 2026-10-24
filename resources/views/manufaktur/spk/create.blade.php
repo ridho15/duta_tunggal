@@ -79,56 +79,40 @@
                                 id="moNumberInput"
                                 value="{{ old('mo_number', $defaultMoNumber) }}"
                                 required
-                                class="w-full text-xs rounded-xl border-gray-300 font-mono uppercase focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                         </div>
 
                         {{-- Cabang Pabrik --}}
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Cabang / Pabrik <span class="text-rose-500">*</span>
-                            </label>
-                            <select
+                            <x-searchable-select
                                 name="cabang_id"
                                 id="cabangSelect"
-                                required
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
-                            >
-                                @foreach ($cabangs as $cb)
-                                    <option value="{{ $cb->id }}" {{ old('cabang_id', auth()->user()?->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                        ({{ $cb->kode }}) {{ $cb->nama }}
-                                    </option>
-                                @endforeach
-                            </select>
+                                label="Cabang / Pabrik"
+                                :options="$cabangs->map(fn($cb) => ['id' => $cb->id, 'label' => $cb->nama, 'subtext' => $cb->kode])->all()"
+                                :value="old('cabang_id', auth()->user()?->cabang_id)"
+                                placeholder="-- Pilih Cabang --"
+                                :required="true"
+                            />
                         </div>
 
                         {{-- Sumber Resep BOM --}}
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Pilih Resep Formula (BOM) <span class="text-rose-500">*</span>
-                            </label>
-                            <select
+                            <x-searchable-select
                                 name="bill_of_material_id"
                                 id="bomSelect"
-                                required
-                                onchange="onBomChange(this)"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
-                            >
-                                <option value="">-- Pilih Resep Produksi Aktif --</option>
-                                @foreach ($boms as $b)
-                                    <option
-                                        value="{{ $b->id }}"
-                                        data-product-name="{{ $b->product?->name }}"
-                                        data-product-sku="{{ $b->product?->sku }}"
-                                        data-uom-name="{{ $b->uom?->name ?? 'Pcs' }}"
-                                        data-base-qty="{{ $b->quantity }}"
-                                        {{ (old('bill_of_material_id', $selectedBomId) == $b->id) ? 'selected' : '' }}
-                                    >
-                                        {{ $b->code }} — {{ $b->nama_bom }} (Hasil: {{ rtrim(rtrim((string)$b->quantity, '0'), '.') }} {{ $b->uom?->name ?? 'Pcs' }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-[11px] text-gray-400 mt-1">Formula acuan kebutuhan bahan baku dan kalkulasi biaya standar.</p>
+                                label="Pilih Resep Formula (BOM)"
+                                :options="$boms->map(fn($b) => [
+                                    'id' => $b->id,
+                                    'label' => $b->code . ' — ' . $b->nama_bom,
+                                    'subtext' => ($b->product?->name ? 'Hasil: ' . $b->product->name . ' • ' : '') . rtrim(rtrim((string)$b->quantity, '0'), '.') . ' ' . ($b->uom?->name ?? 'Pcs'),
+                                    'badge' => $b->code
+                                ])->all()"
+                                :value="old('bill_of_material_id', $selectedBomId)"
+                                placeholder="-- Pilih Resep Produksi Aktif --"
+                                :required="true"
+                                hint="Formula acuan kebutuhan bahan baku dan kalkulasi biaya standar."
+                            />
                         </div>
 
                         {{-- Kuantitas Target --}}
@@ -136,7 +120,7 @@
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                                 Kuantitas Target Dibuat <span class="text-rose-500">*</span>
                             </label>
-                            <div class="relative rounded-xl shadow-sm">
+                            <div class="relative rounded-lg shadow-xs">
                                 <input
                                     type="number"
                                     step="any"
@@ -146,7 +130,7 @@
                                     value="{{ old('quantity', '1.00') }}"
                                     required
                                     oninput="recalculateMaterialNeeds()"
-                                    class="w-full text-xs rounded-xl border-gray-300 pr-16 focus:ring-[#15803d] focus:border-[#15803d] font-bold text-gray-900"
+                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 pr-16 bg-white font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                                 >
                                 <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 text-xs font-semibold" id="targetUomLabel">
                                     Pcs
@@ -156,21 +140,15 @@
 
                         {{-- Gudang Bahan Baku --}}
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Gudang Pengambilan Bahan <span class="text-rose-500">*</span>
-                            </label>
-                            <select
+                            <x-searchable-select
                                 name="warehouse_id"
                                 id="warehouseSelect"
-                                onchange="recalculateMaterialNeeds()"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
-                            >
-                                @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}" {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                        {{ $wh->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                                label="Gudang Pengambilan Bahan"
+                                :options="$warehouses->map(fn($wh) => ['id' => $wh->id, 'label' => $wh->name])->all()"
+                                :value="old('warehouse_id')"
+                                placeholder="-- Pilih Gudang --"
+                                :required="true"
+                            />
                         </div>
 
                         {{-- Tanggal Mulai & Selesai --}}
@@ -182,7 +160,7 @@
                                 type="date"
                                 name="start_date"
                                 value="{{ old('start_date', date('Y-m-d')) }}"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                         </div>
 
@@ -194,7 +172,7 @@
                                 type="date"
                                 name="end_date"
                                 value="{{ old('end_date', date('Y-m-d', strtotime('+3 days'))) }}"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                         </div>
 
@@ -206,7 +184,7 @@
                             <textarea
                                 name="notes"
                                 rows="2"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                                 placeholder="Misal: Penugasan Shift Pagi, Mesin Line 2, Prioritaskan pesanan SO..."
                             >{{ old('notes') }}</textarea>
                         </div>
@@ -312,14 +290,9 @@
 <script>
     let currentBomData = null;
 
-    function onBomChange(select) {
-        const bomId = select.value;
-        const selectedOption = select.options[select.selectedIndex];
-
-        if (selectedOption && selectedOption.dataset.uomName) {
-            document.getElementById('targetUomLabel').innerText = selectedOption.dataset.uomName;
-            document.getElementById('summaryProductName').innerText = selectedOption.dataset.productName || '-';
-        }
+    function onBomChange(el) {
+        const bomSelect = document.getElementById('bomSelect');
+        const bomId = el ? el.value : (bomSelect ? bomSelect.value : '');
 
         if (!bomId) {
             currentBomData = null;
@@ -332,16 +305,25 @@
             `;
             document.getElementById('readinessBadge').className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600';
             document.getElementById('readinessBadge').innerText = 'Pilih Resep';
+            document.getElementById('targetUomLabel').innerText = 'Pcs';
+            document.getElementById('summaryProductName').innerText = '-';
             return;
         }
 
-        const warehouseId = document.getElementById('warehouseSelect').value;
+        const warehouseInput = document.getElementById('warehouseSelect');
+        const warehouseId = warehouseInput ? warehouseInput.value : '';
         const url = `{{ url('manufaktur/spk/api/bom-details') }}/${bomId}?warehouse_id=${warehouseId}`;
 
         fetch(url)
             .then(res => res.json())
             .then(data => {
                 currentBomData = data;
+                if (data.uom_name) {
+                    document.getElementById('targetUomLabel').innerText = data.uom_name;
+                }
+                if (data.product_name) {
+                    document.getElementById('summaryProductName').innerText = data.product_name;
+                }
                 recalculateMaterialNeeds();
             })
             .catch(err => {
@@ -410,13 +392,29 @@
         document.getElementById('summaryTargetQty').innerText = `${targetQty} ${currentBomData.uom_name || 'Pcs'}`;
 
         const whSelect = document.getElementById('warehouseSelect');
-        document.getElementById('summaryWarehouseName').innerText = whSelect.options[whSelect.selectedIndex]?.text || '-';
+        const whOption = whSelect ? (whSelect.closest('[x-data]')?._x_dataStack?.[0]?.selectedOption || null) : null;
+        document.getElementById('summaryWarehouseName').innerText = whOption ? whOption.label : (whSelect?.value ? 'Gudang #' + whSelect.value : '-');
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         const bomSelect = document.getElementById('bomSelect');
-        if (bomSelect.value) {
-            onBomChange(bomSelect);
+        const whSelect = document.getElementById('warehouseSelect');
+
+        if (bomSelect) {
+            bomSelect.addEventListener('change', function () {
+                onBomChange(this);
+            });
+            if (bomSelect.value) {
+                onBomChange(bomSelect);
+            }
+        }
+
+        if (whSelect) {
+            whSelect.addEventListener('change', function () {
+                if (bomSelect && bomSelect.value) {
+                    onBomChange(bomSelect);
+                }
+            });
         }
     });
 </script>

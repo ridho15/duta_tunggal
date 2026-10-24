@@ -259,32 +259,12 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Cabang Penugasan</label>
-                    <select
-                        name="cabang_id"
-                        class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
-                    >
-                        <option value="">Pilih Cabang (Opsional jika Semua Cabang)</option>
-                        @foreach ($cabangs as $c)
-                            <option value="{{ $c->id }}" {{ old('cabang_id', $user->cabang_id) == $c->id ? 'selected' : '' }}>
-                                ({{ $c->kode }}) {{ $c->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => '(' . $c->kode . ') ' . $c->nama])->values()" :value="old('cabang_id', $user->cabang_id)" placeholder="Pilih Cabang (Opsional jika Semua Cabang)" />
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Gudang Penugasan</label>
-                    <select
-                        name="warehouse_id"
-                        class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
-                    >
-                        <option value="">Pilih Gudang (Opsional)</option>
-                        @foreach ($warehouses as $w)
-                            <option value="{{ $w->id }}" {{ old('warehouse_id', $user->warehouse_id) == $w->id ? 'selected' : '' }}>
-                                ({{ $w->kode }}) {{ $w->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($w) => ['id' => $w->id, 'label' => '(' . $w->kode . ') ' . $w->name])->values()" :value="old('warehouse_id', $user->warehouse_id)" placeholder="Pilih Gudang (Opsional)" />
                 </div>
             </div>
         </div>

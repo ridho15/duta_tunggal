@@ -163,4 +163,31 @@ class Customer extends Model
         }
         return $label;
     }
+
+    /**
+     * Cek apakah customer memiliki transaksi aktif atau saldo piutang/deposit yang memblokir penghapusan.
+     *
+     * @return array<int, string>
+     */
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        // 1. Pesanan penjualan aktif
+        if ($this->sales()->whereIn('status', ['draft', 'approved', 'process', 'partially_delivered'])->exists()) {
+            $blockers[] = 'masih memiliki pesanan penjualan (Sales Order) yang aktif';
+        }
+
+        // 2. Piutang belum lunas
+        if ($this->accountReceivables()->where('status', 'Belum Lunas')->where('remaining', '>', 0)->exists()) {
+            $blockers[] = 'masih memiliki tagihan piutang usaha yang belum lunas';
+        }
+
+        // 3. Saldo deposit aktif
+        if ($this->deposit && (float) $this->deposit->remaining_amount > 0) {
+            $blockers[] = 'masih memiliki saldo deposit aktif';
+        }
+
+        return $blockers;
+    }
 }

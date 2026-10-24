@@ -59,7 +59,7 @@ if (app()->environment('local')) {
         if ($user) {
             \Illuminate\Support\Facades\Auth::login($user);
         }
-        return redirect('/admin/order-requests/create');
+        return redirect()->route('pembelian.order-request.create');
     });
 
     Route::get('/dev-autologin-po', function () {
@@ -67,7 +67,7 @@ if (app()->environment('local')) {
         if ($user) {
             \Illuminate\Support\Facades\Auth::login($user);
         }
-        return redirect('/admin/purchase-orders/create');
+        return redirect()->route('pembelian.po.create');
     });
 
     Route::get('/dev-autologin-qo', function () {
@@ -75,7 +75,7 @@ if (app()->environment('local')) {
         if ($user) {
             \Illuminate\Support\Facades\Auth::login($user);
         }
-        return redirect('/admin/quotations/create');
+        return redirect()->route('penjualan.penawaran.create');
     });
 
     Route::get('/dev-autologin-so', function () {
@@ -83,7 +83,7 @@ if (app()->environment('local')) {
         if ($user) {
             \Illuminate\Support\Facades\Auth::login($user);
         }
-        return redirect('/admin/sale-orders/create');
+        return redirect()->route('penjualan.so.create');
     });
 
     Route::get('/dev-login', function () {
@@ -503,6 +503,9 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::delete('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'destroy'])->name('journal.destroy');
         Route::get('/jurnal/{reference}/pdf', [\App\Http\Controllers\Keuangan\JournalController::class, 'pdf'])->name('journal.pdf');
 
+        // Bagan Akun (COA) Alias
+        Route::get('/coa', function () { return redirect()->route('master.coa.index'); })->name('coa.index');
+
         // Manajemen Aset Tetap
         Route::prefix('aset')->name('asset.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Keuangan\AssetController::class, 'index'])->name('index');
@@ -578,6 +581,55 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/supplier/api/generate-code', [\App\Http\Controllers\Master\SupplierController::class, 'generateCode'])->name('suppliers.generate-code');
         Route::get('/supplier/api/check-duplicates', [\App\Http\Controllers\Master\SupplierController::class, 'checkDuplicates'])->name('suppliers.check-duplicates');
         Route::resource('supplier', \App\Http\Controllers\Master\SupplierController::class)->names('suppliers');
+
+        // Master Bagan Akun (COA)
+        Route::resource('coa', \App\Http\Controllers\Master\ChartOfAccountController::class)
+            ->names('coa')
+            ->parameters(['coa' => 'coa']);
+
+        // Master Cabang
+        Route::resource('cabang', \App\Http\Controllers\Master\CabangController::class)
+            ->names('cabang')
+            ->parameters(['cabang' => 'cabang']);
+
+        // Master Gudang & Rak
+        Route::resource('gudang', \App\Http\Controllers\Master\WarehouseController::class)
+            ->names('gudang')
+            ->parameters(['gudang' => 'gudang']);
+
+        Route::resource('rak', \App\Http\Controllers\Master\RakController::class)
+            ->only(['store', 'update', 'destroy'])
+            ->names('rak')
+            ->parameters(['rak' => 'rak']);
+
+        // Master Satuan (UOM)
+        Route::resource('satuan', \App\Http\Controllers\Master\UnitOfMeasureController::class)
+            ->names('satuan')
+            ->parameters(['satuan' => 'satuan']);
+
+        // Master Kategori Produk
+        Route::resource('kategori', \App\Http\Controllers\Master\ProductCategoryController::class)
+            ->names('kategori')
+            ->parameters(['kategori' => 'kategori']);
+
+        // Master Armada: Kendaraan & Driver
+        Route::resource('kendaraan', \App\Http\Controllers\Master\VehicleController::class)
+            ->names('kendaraan')
+            ->parameters(['kendaraan' => 'kendaraan']);
+
+        Route::resource('driver', \App\Http\Controllers\Master\DriverController::class)
+            ->names('driver')
+            ->parameters(['driver' => 'driver']);
+
+        // Master Mata Uang & Valuta
+        Route::resource('mata-uang', \App\Http\Controllers\Master\CurrencyController::class)
+            ->names('mata-uang')
+            ->parameters(['mata-uang' => 'mata_uang']);
+
+        // Master Pengaturan Pajak
+        Route::resource('pajak', \App\Http\Controllers\Master\TaxSettingController::class)
+            ->names('pajak')
+            ->parameters(['pajak' => 'pajak']);
     });
 
     // Pengaturan
@@ -673,20 +725,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/quality-controls', function () { return redirect()->route('manufaktur.qc.index'); });
     });
 
-    // Backward-compatibility redirects for eliminated Hub pages
-    Route::redirect('/admin/sales-hub', '/admin/sale-orders', 301);
-    Route::redirect('/admin/purchase-hub', '/admin/purchase-orders', 301);
-    Route::redirect('/admin/delivery-hub', '/admin/delivery-orders', 301);
-    Route::redirect('/admin/accounting-hub', '/admin/journal-entries', 301);
-    Route::redirect('/admin/inventory-hub', '/admin/inventory-stocks', 301);
-    Route::redirect('/admin/master-data-hub', '/admin/products', 301);
-    Route::redirect('/admin/user-roles-management-hub', '/admin/users', 301);
-    Route::redirect('/admin/manufacturing-hub', '/admin', 301);
-    Route::redirect('/admin/finance-sales-hub', '/admin/sales-invoices', 301);
-    Route::redirect('/admin/finance-purchase-hub', '/admin/purchase-invoices', 301);
-    Route::redirect('/admin/payment-hub', '/admin/customer-receipts', 301);
-    Route::redirect('/admin/finance-reports', '/admin/financial-statement', 301);
-    Route::redirect('/admin/asset-management-hub', '/admin/assets', 301);
-    Route::redirect('/admin/warehouse-hub', '/admin/warehouse-confirmations', 301);
-    Route::redirect('/admin/dashboard-hub', '/admin', 301);
+    // Redirect Lockdown Filament: Seluruh lalu lintas /admin dialihkan langsung ke /dashboard Blade Native
+    Route::any('/admin/{any?}', function () {
+        return redirect()->route('dashboard');
+    })->where('any', '.*')->name('admin.lockdown');
 });

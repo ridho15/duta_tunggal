@@ -68,19 +68,16 @@
 
             {{-- Tombol Otorisasi Persetujuan / Penolakan --}}
             @if (in_array($orderRequest->status, ['draft', 'request_approve'], true))
-                <form action="{{ route('pembelian.or.approve', $orderRequest) }}" method="POST" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        onclick="return confirm('Apakah Anda yakin menyetujui permintaan pembelian ini?')"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        Setujui Permintaan
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-approve-or', { action: '{{ route('pembelian.or.approve', $orderRequest) }}' })"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Setujui Permintaan
+                </button>
 
                 <button
                     type="button"
@@ -121,41 +118,20 @@
 
             {{-- Tombol Hapus (Draf) --}}
             @if ($orderRequest->status === 'draft')
-                <form action="{{ route('pembelian.or.destroy', $orderRequest) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus draf permintaan pembelian ini?')">
-                    @csrf
-                    @method('DELETE')
-                    <button
-                        type="submit"
-                        class="p-2 border border-gray-300 bg-white hover:bg-rose-50 text-rose-600 rounded-lg shadow-sm transition"
-                        title="Hapus Draf"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-delete-or', { action: '{{ route('pembelian.or.destroy', $orderRequest) }}' })"
+                    class="p-2 border border-gray-300 bg-white hover:bg-rose-50 text-rose-600 rounded-lg shadow-sm transition"
+                    title="Hapus Draf"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             @endif
         </div>
     </div>
 
-    {{-- Flash Notifications --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-2 font-medium shadow-sm">
-            <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{{ session('success') }}</span>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center gap-2 font-medium shadow-sm">
-            <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{{ session('error') }}</span>
-        </div>
-    @endif
 
     {{-- Status Stepper --}}
     <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -520,5 +496,39 @@
             </form>
         </div>
     </div>
+
+    {{-- Modal Konfirmasi Setujui Permintaan Pembelian --}}
+    <x-confirmation-modal
+        name="approve-or"
+        title="Setujui Permintaan Pembelian"
+        type="success"
+        confirm-text="Ya, Setujui Permintaan"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menyetujui permintaan pembelian <span class="font-bold text-gray-900 font-mono">{{ $orderRequest->request_number }}</span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Permintaan yang disetujui dapat segera diproses lebih lanjut menjadi Purchase Order (PO).
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Hapus Draf Permintaan Pembelian --}}
+    <x-confirmation-modal
+        name="delete-or"
+        title="Hapus Draf Permintaan Pembelian"
+        type="danger"
+        confirm-text="Ya, Hapus Draf"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus draf permintaan pembelian <span class="font-bold text-gray-900 font-mono">{{ $orderRequest->request_number }}</span>?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Tindakan ini permanen dan tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

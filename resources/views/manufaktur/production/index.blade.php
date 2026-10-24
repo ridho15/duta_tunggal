@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -207,7 +185,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-gray-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3 px-4">No. Bukti Produksi</th>
                         <th class="py-3 px-4">Referensi SPK / Produk Jadi</th>
                         <th class="py-3 px-4 text-right">Target SPK</th>
@@ -265,14 +243,14 @@
 
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 @if ($item->status === 'finished')
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                        Selesai (Finished)
+                                        Selesai
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                        Draft Produksi
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                        Draft
                                     </span>
                                 @endif
                             </td>
@@ -280,22 +258,18 @@
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 @if ($qc && $qc->exists)
                                     @if ($qc->status == 1)
-                                        <a href="{{ route('manufaktur.qc.show', $qc) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition">
-                                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                            </svg>
+                                        <a href="{{ route('manufaktur.qc.show', $qc) }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                             QC Lolos: {{ number_format((float)$qc->passed_quantity, 0) }}
                                         </a>
                                     @else
-                                        <a href="{{ route('manufaktur.qc.process-form', $qc) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">
-                                            <svg class="w-3 h-3 text-blue-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
-                                            </svg>
+                                        <a href="{{ route('manufaktur.qc.process-form', $qc) }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                                             Menunggu QC
                                         </a>
                                     @endif
                                 @else
-                                    <span class="text-gray-400 text-[11px] italic">Belum Ada QC</span>
+                                    <span class="text-gray-400 text-xs italic">Belum Ada QC</span>
                                 @endif
                             </td>
 
@@ -334,42 +308,27 @@
                                             </svg>
                                         </a>
 
-                                        <form
-                                            method="POST"
-                                            action="{{ route('manufaktur.production.finish', $item) }}"
-                                            class="inline"
-                                            onsubmit="return confirm('Selesaikan produksi ini? Status akan menjadi Finished dan Quality Control akan diterbitkan secara otomatis.')"
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-finish-production', { action: '{{ route('manufaktur.production.finish', $item) }}', number: '{{ $item->production_number }}' })"
+                                            class="p-1.5 text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
+                                            title="Selesaikan Produksi & Terbitkan QC"
                                         >
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="p-1.5 text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition"
-                                                title="Selesaikan Produksi & Terbitkan QC"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </button>
-                                        </form>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
 
-                                        <form
-                                            method="POST"
-                                            action="{{ route('manufaktur.production.destroy', $item) }}"
-                                            class="inline"
-                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus draft hasil produksi ini?')"
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-delete-production', { action: '{{ route('manufaktur.production.destroy', $item) }}', number: '{{ $item->production_number }}' })"
+                                            class="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                            title="Hapus Draft"
                                         >
-                                            @csrf
-                                            @method('DELETE')
-                                            <button
-                                                type="submit"
-                                                class="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                                                title="Hapus Draft"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        </form>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
                                     @endif
                                 </div>
                             </td>
@@ -397,5 +356,39 @@
             </div>
         @endif
     </div>
+
+    {{-- Modal Konfirmasi Selesai Produksi --}}
+    <x-confirmation-modal
+        name="finish-production"
+        title="Selesaikan Produksi & Terbitkan QC"
+        type="success"
+        confirm-text="Ya, Selesaikan Produksi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menyelesaikan proses produksi <span class="font-bold text-gray-900 font-mono" x-text="data.number"></span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Status produksi akan berubah menjadi <strong>Finished</strong> dan pemeriksaan Quality Control (QC) akan diterbitkan secara otomatis.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Hapus Draft Produksi --}}
+    <x-confirmation-modal
+        name="delete-production"
+        title="Hapus Draft Bukti Produksi"
+        type="danger"
+        confirm-text="Ya, Hapus Draft"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus dokumen draft produksi <span class="font-bold text-gray-900 font-mono" x-text="data.number"></span>?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Dokumen draft yang dihapus tidak dapat dipulihkan kembali.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

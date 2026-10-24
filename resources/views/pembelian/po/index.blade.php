@@ -35,7 +35,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('pembelian.po.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -116,9 +116,9 @@
     </div>
 
     {{-- Filter Tabs & Pencarian --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Tabs Status --}}
-        <div class="flex border-b border-gray-200 overflow-x-auto text-sm font-medium text-gray-600 px-4 pt-2">
+        <div class="flex border-b border-gray-100 overflow-x-auto text-sm font-medium text-gray-600 px-4 pt-2">
             @php
                 $tabs = [
                     'semua' => ['label' => 'Semua PO', 'count' => $counts['semua'] ?? 0],
@@ -145,7 +145,7 @@
         </div>
 
         {{-- Baris Filter Terpadu --}}
-        <div class="p-4 bg-gray-50/50 border-b border-gray-200">
+        <div class="p-4 bg-gray-50/50 border-b border-gray-100">
             <form action="{{ route('pembelian.po.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
                 <input type="hidden" name="tab" value="{{ $activeTab }}">
 
@@ -165,26 +165,12 @@
 
                 {{-- Filter Supplier --}}
                 <div class="lg:col-span-3">
-                    <select name="supplier_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]">
-                        <option value="">-- Semua Supplier --</option>
-                        @foreach ($suppliers as $s)
-                            <option value="{{ $s->id }}" {{ (string) $supplierFilter === (string) $s->id ? 'selected' : '' }}>
-                                {{ $s->perusahaan }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierFilter" placeholder="-- Semua Supplier --" size="sm" :auto-submit="true" />
                 </div>
 
                 {{-- Filter Cabang --}}
                 <div class="lg:col-span-2">
-                    <select name="cabang_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]">
-                        <option value="">-- Semua Cabang --</option>
-                        @foreach ($cabangs as $c)
-                            <option value="{{ $c->id }}" {{ (string) $cabangFilter === (string) $c->id ? 'selected' : '' }}>
-                                {{ $c->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangFilter" placeholder="-- Semua Cabang --" size="sm" :auto-submit="true" />
                 </div>
 
                 {{-- Rentang Tanggal --}}
@@ -230,7 +216,7 @@
         {{-- Tabel Data --}}
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-50 text-xs uppercase font-bold text-gray-500 tracking-wider border-b border-gray-200">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     <tr>
                         <th class="py-3 px-4">Nomor PO</th>
                         <th class="py-3 px-4">Tanggal Order</th>
@@ -246,14 +232,14 @@
                     @forelse ($purchaseOrders as $po)
                         @php
                             $statusBadge = match($po->status) {
-                                'draft' => ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'label' => 'Draf'],
-                                'request_approve' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-800', 'label' => 'Menunggu Approval'],
-                                'approved' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Disetujui'],
-                                'partially_received' => ['bg' => 'bg-purple-100', 'text' => 'text-purple-800', 'label' => 'Diterima Sebagian'],
-                                'completed' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'label' => 'Selesai'],
-                                'closed' => ['bg' => 'bg-red-100', 'text' => 'text-red-800', 'label' => 'Ditutup'],
-                                'request_close' => ['bg' => 'bg-rose-100', 'text' => 'text-rose-800', 'label' => 'Request Close'],
-                                default => ['bg' => 'bg-gray-100', 'text' => 'text-gray-700', 'label' => ucfirst($po->status)],
+                                'draft' => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => 'Draf'],
+                                'request_approve' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Menunggu Approval'],
+                                'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Disetujui'],
+                                'partially_received' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Diterima Sebagian'],
+                                'completed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai'],
+                                'closed' => ['badge' => 'bg-slate-50 text-slate-700 border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Ditutup'],
+                                'request_close' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Request Close'],
+                                default => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($po->status)],
                             };
 
                             // Hitung rasio pemenuhan gudang langsung dari item eager-loaded
@@ -268,7 +254,7 @@
                                 default => 'bg-gray-300',
                             };
                         @endphp
-                        <tr class="hover:bg-emerald-50/30 transition">
+                        <tr class="hover:bg-gray-50/60 transition">
                             {{-- Nomor PO --}}
                             <td class="py-3.5 px-4 font-semibold text-gray-900 whitespace-nowrap">
                                 <a href="{{ route('pembelian.po.show', $po) }}" class="text-[#15803d] hover:text-[#14532d] hover:underline">
@@ -331,7 +317,8 @@
 
                             {{-- Status Badge --}}
                             <td class="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $statusBadge['bg'] }} {{ $statusBadge['text'] }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusBadge['badge'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusBadge['dot'] }}"></span>
                                     {{ $statusBadge['label'] }}
                                 </span>
                             </td>
@@ -429,7 +416,7 @@
 
         {{-- Pagination --}}
         @if ($purchaseOrders->hasPages())
-            <div class="p-4 border-t border-gray-200">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $purchaseOrders->links() }}
             </div>
         @endif

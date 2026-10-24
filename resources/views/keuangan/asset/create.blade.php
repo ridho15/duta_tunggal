@@ -97,19 +97,7 @@
                     <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                         Lokasi Cabang <span class="text-rose-500">*</span>
                     </label>
-                    <select
-                        name="cabang_id"
-                        id="cabang_id"
-                        required
-                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                    >
-                        <option value="">-- Pilih Cabang Penempatan --</option>
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ old('cabang_id', Auth::user()?->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                {{ $cb->kode }} - {{ $cb->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->kode . ' - ' . $cb->nama])->values()" :value="old('cabang_id', Auth::user()?->cabang_id)" placeholder="-- Pilih Cabang Penempatan --" :required="true" id="cabang_id" />
                 </div>
 
                 {{-- Link ke Master Produk (Opsional) --}}
@@ -117,7 +105,7 @@
                     <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                         Tautkan Master Produk (Opsional)
                     </label>
-                    <select
+                    <select data-searchable
                         name="product_id"
                         id="product_id"
                         class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
@@ -292,7 +280,7 @@
                         <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                             Akun Aset Tetap (Debit) <span class="text-rose-500">*</span>
                         </label>
-                        <select
+                        <select data-searchable
                             name="asset_coa_id"
                             id="asset_coa_id"
                             required
@@ -313,7 +301,7 @@
                             <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                                 Akumulasi Penyusutan (Kredit) <span class="text-rose-500">*</span>
                             </label>
-                            <select
+                            <select data-searchable
                                 name="accumulated_depreciation_coa_id"
                                 id="accumulated_depreciation_coa_id"
                                 required
@@ -332,7 +320,7 @@
                             <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                                 Beban Penyusutan (Debit) <span class="text-rose-500">*</span>
                             </label>
-                            <select
+                            <select data-searchable
                                 name="depreciation_expense_coa_id"
                                 id="depreciation_expense_coa_id"
                                 required
@@ -353,18 +341,7 @@
                         <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                             Sumber Pendanaan Akuisisi (Akun Kredit Jurnal)
                         </label>
-                        <select
-                            name="credit_coa_id"
-                            id="credit_coa_id"
-                            class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                        >
-                            <option value="">-- Otomatis: Hutang Usaha (AP 2110.01) --</option>
-                            @foreach ($fundingCoas as $coa)
-                                <option value="{{ $coa->id }}" {{ old('credit_coa_id') == $coa->id ? 'selected' : '' }}>
-                                    {{ $coa->code }} - {{ $coa->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select name="credit_coa_id" :options="collect($fundingCoas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="old('credit_coa_id')" placeholder="-- Otomatis: Hutang Usaha (AP 2110.01) --" id="credit_coa_id" />
                         <span class="text-[11px] text-gray-400 mt-1 block">Pilih Kas/Bank jika dibayar tunai saat perolehan, atau biarkan kosong untuk Hutang Usaha (AP).</span>
                     </div>
                 </div>

@@ -11,8 +11,8 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-700 font-semibold">Perintah Kirim (DO)</span>
             </nav>
-            <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Perintah Kirim (Delivery Order)</h1>
-            <p class="text-xs text-gray-500 mt-0.5">
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Perintah Kirim (Delivery Order)</h1>
+            <p class="text-sm text-gray-500 mt-0.5">
                 Dokumen alokasi dan pengeluaran barang dari gudang berdasarkan Surat Pesanan Penjualan (SO).
             </p>
         </div>
@@ -20,7 +20,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('gudang.kiriman.index') }}"
-                class="inline-flex items-center gap-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-3.5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition"
+                class="inline-flex items-center gap-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-3.5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.8"></path>
@@ -32,7 +32,7 @@
 
             <a
                 href="{{ route('penjualan.so.index', ['status' => 'approved']) }}"
-                class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition"
+                class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4v16m8-8H4" stroke-width="2.2" stroke-linecap="round"></path>
@@ -44,25 +44,25 @@
 
     {{-- KPI Cards Ringkasan --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total DO</div>
             <div class="text-2xl font-extrabold text-gray-900 mt-1">{{ number_format($counts['semua']) }}</div>
             <div class="text-[11px] text-gray-500 mt-0.5">Seluruh pesanan pengiriman</div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <div class="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Siap Dicek Gudang</div>
             <div class="text-2xl font-extrabold text-blue-700 mt-1">{{ number_format($counts['siap_dicek']) }}</div>
             <div class="text-[11px] text-gray-500 mt-0.5">Menunggu checklist checker</div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <div class="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Siap Terbit SJ</div>
             <div class="text-2xl font-extrabold text-amber-700 mt-1">{{ number_format($counts['siap_sj']) }}</div>
             <div class="text-[11px] text-gray-500 mt-0.5">Pengecekan fisik selesai</div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <div class="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Terkirim / Ada SJ</div>
             <div class="text-2xl font-extrabold text-[#15803d] mt-1">{{ number_format($counts['terkirim']) }}</div>
             <div class="text-[11px] text-gray-500 mt-0.5">Surat Jalan telah terbit</div>
@@ -117,7 +117,7 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white border border-gray-200 rounded-2xl p-3 shadow-xs">
+    <div class="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
         <form method="GET" action="{{ route('penjualan.do.index') }}" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
 
@@ -140,34 +140,12 @@
 
             {{-- Cabang Filter --}}
             <div class="sm:w-48">
-                <select
-                    name="cabang_id"
-                    onchange="this.form.submit()"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-[#15803d]"
-                >
-                    <option value="">Semua Cabang</option>
-                    @foreach($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ $cabangId == $c->id ? 'selected' : '' }}>
-                            {{ $c->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" :auto-submit="true" size="sm" />
             </div>
 
             {{-- Warehouse Filter --}}
             <div class="sm:w-48">
-                <select
-                    name="warehouse_id"
-                    onchange="this.form.submit()"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-[#15803d]"
-                >
-                    <option value="">Semua Gudang</option>
-                    @foreach($warehouses as $w)
-                        <option value="{{ $w->id }}" {{ $warehouseId == $w->id ? 'selected' : '' }}>
-                            {{ $w->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($w) => ['id' => $w->id, 'label' => $w->name])->values()" :value="$warehouseId" placeholder="Semua Gudang" :auto-submit="true" size="sm" />
             </div>
 
             <button
@@ -190,11 +168,11 @@
     </div>
 
     {{-- Tabel Delivery Order --}}
-    <div class="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3.5 px-4">No. DO & Tanggal</th>
                         <th class="py-3.5 px-4">Pesanan (SO) & Customer</th>
                         <th class="py-3.5 px-4">Asal Gudang</th>
@@ -268,27 +246,33 @@
                             {{-- Status Pengiriman --}}
                             <td class="py-3.5 px-4">
                                 @if($do->returned_at || $do->status === 'returned')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
-                                        DIRETUR
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                        Diretur
                                     </span>
                                 @elseif($do->status === 'confirmed')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                        SIAP BUAT SJ
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        Siap Buat SJ
                                     </span>
                                 @elseif($do->status === 'approved')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                                        SIAP CEK GUDANG
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                        Siap Cek Gudang
                                     </span>
                                 @elseif(in_array($do->status, \App\Models\DeliveryOrder::DELIVERED_STATUSES) || $hasIssuedSj)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        TERKIRIM
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Terkirim
                                     </span>
                                 @elseif($do->status === 'closed')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                                        DITUTUP
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                        Ditutup
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         {{ \App\Models\DeliveryOrder::statusLabel($do->status) }}
                                     </span>
                                 @endif
@@ -376,7 +360,7 @@
 
         {{-- Pagination --}}
         @if($deliveryOrders->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $deliveryOrders->links() }}
             </div>
         @endif

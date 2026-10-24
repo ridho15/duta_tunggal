@@ -61,24 +61,6 @@
         </div>
     </div>
 
-    {{-- Alert Flash --}}
-    @if (session('success'))
-        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm">
-            <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('success') }}</span>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-sm">
-            <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('error') }}</span>
-        </div>
-    @endif
 
     {{-- Visual Timeline Alur Mutasi --}}
     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -137,25 +119,27 @@
                 </div>
                 <div class="flex items-center gap-2">
                     @if ($transfer->status === 'pending')
-                        <form action="{{ route('keuangan.asset.transfer.approve', $transfer) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menyetujui mutasi aset ini?');">
-                            @csrf
-                            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-emerald-800 text-white font-semibold text-xs rounded-xl shadow-sm transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Setujui Mutasi (Approve)
-                            </button>
-                        </form>
+                        <button
+                            type="button"
+                            @click="$dispatch('open-modal-approve-transfer', { action: '{{ route('keuangan.asset.transfer.approve', $transfer) }}' })"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-emerald-800 text-white font-semibold text-xs rounded-xl shadow-sm transition"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Setujui Mutasi (Approve)
+                        </button>
                     @elseif ($transfer->status === 'approved')
-                        <form action="{{ route('keuangan.asset.transfer.complete', $transfer) }}" method="POST" onsubmit="return confirm('Apakah fisik aset telah diterima di cabang tujuan? Lokasi aset akan resmi dipindahkan.');">
-                            @csrf
-                            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Konfirmasi Selesai Serah Terima (Complete)
-                            </button>
-                        </form>
+                        <button
+                            type="button"
+                            @click="$dispatch('open-modal-complete-transfer', { action: '{{ route('keuangan.asset.transfer.complete', $transfer) }}' })"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Konfirmasi Selesai Serah Terima (Complete)
+                        </button>
                     @endif
 
                     {{-- Tombol Batal --}}
@@ -314,4 +298,38 @@
         </form>
     </div>
 </div>
+
+    {{-- Modal Konfirmasi Setujui Mutasi --}}
+    <x-confirmation-modal
+        name="approve-transfer"
+        title="Setujui Mutasi Aset"
+        type="success"
+        confirm-text="Ya, Setujui Mutasi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menyetujui mutasi aset <span class="font-bold text-gray-900 font-mono">{{ $transfer->transfer_number }}</span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Status mutasi akan menjadi <strong>Disetujui</strong> dan proses pengiriman/serah terima fisik aset dapat dilakukan.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Selesai Serah Terima --}}
+    <x-confirmation-modal
+        name="complete-transfer"
+        title="Selesaikan Mutasi & Serah Terima Aset"
+        type="success"
+        confirm-text="Ya, Selesaikan Mutasi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Konfirmasi bahwa fisik aset <span class="font-bold text-gray-900">{{ $transfer->asset->name ?? 'Aset' }}</span> telah diterima dengan baik di cabang tujuan?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Lokasi cabang operasional aset akan resmi diperbarui ke cabang tujuan.
+        </p>
+    </x-confirmation-modal>
 @endsection

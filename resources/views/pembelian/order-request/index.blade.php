@@ -18,7 +18,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('pembelian.or.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Alert Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -115,9 +93,9 @@
     </div>
 
     {{-- Main Card: Tabs, Filter & Table --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Status Tabs --}}
-        <div class="border-b border-gray-200 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div class="border-b border-gray-100 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
             @php
                 $tabs = [
                     'semua' => ['label' => 'Semua', 'count' => $counts['semua']],
@@ -143,7 +121,7 @@
         </div>
 
         {{-- Filters Toolbar --}}
-        <form method="GET" action="{{ route('pembelian.or.index') }}" class="p-4 bg-gray-50/60 border-b border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <form method="GET" action="{{ route('pembelian.or.index') }}" class="p-4 bg-gray-50/60 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <input type="hidden" name="tab" value="{{ $activeTab }}">
 
             {{-- Pencarian --}}
@@ -162,12 +140,18 @@
 
             {{-- Cabang --}}
             <div>
-                <select name="cabang_id" class="w-full py-2 px-3 border border-gray-300 rounded-lg text-xs focus:ring-1 focus:ring-[#15803d]">
-                    <option value="">Semua Cabang</option>
-                    @foreach ($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ $cabangFilter == $c->id ? 'selected' : '' }}>{{ $c->nama }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    name="cabang_id"
+                    size="sm"
+                    :auto-submit="true"
+                    :options="$cabangs->map(fn($c) => [
+                        'id' => (string)$c->id,
+                        'label' => $c->nama,
+                        'subtext' => $c->kode ?? ''
+                    ])->prepend(['id' => '', 'label' => 'Semua Cabang', 'subtext' => ''])"
+                    :value="(string)$cabangFilter"
+                    placeholder="Semua Cabang"
+                />
             </div>
 
             {{-- Tanggal Permintaan Dari - Sampai --}}
@@ -213,7 +197,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 font-bold uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider text-[11px]">
                         <th class="py-3 px-4">No. Request</th>
                         <th class="py-3 px-3">Tgl Request</th>
                         <th class="py-3 px-3">Tgl Dibutuhkan</th>
@@ -291,17 +275,18 @@
                             <td class="py-3 px-3 text-center whitespace-nowrap">
                                 @php
                                     $statusConfig = match ($or->status) {
-                                        'draft' => ['bg' => 'bg-gray-100 text-gray-700 border-gray-200', 'label' => 'Draf'],
-                                        'request_approve' => ['bg' => 'bg-amber-100 text-amber-800 border-amber-200', 'label' => 'Menunggu Approval'],
-                                        'approved' => ['bg' => 'bg-emerald-100 text-emerald-800 border-emerald-200', 'label' => 'Disetujui'],
-                                        'partial' => ['bg' => 'bg-sky-100 text-sky-800 border-sky-200', 'label' => 'Diproses Sebagian'],
-                                        'complete' => ['bg' => 'bg-purple-100 text-purple-800 border-purple-200', 'label' => 'Selesai Terpenuhi'],
-                                        'rejected' => ['bg' => 'bg-rose-100 text-rose-800 border-rose-200', 'label' => 'Ditolak'],
-                                        'closed' => ['bg' => 'bg-slate-100 text-slate-700 border-slate-200', 'label' => 'Ditutup'],
-                                        default => ['bg' => 'bg-gray-100 text-gray-700 border-gray-200', 'label' => ucfirst($or->status)],
+                                        'draft' => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400', 'label' => 'Draf'],
+                                        'request_approve' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'dot' => 'bg-amber-500 animate-pulse', 'label' => 'Menunggu Approval'],
+                                        'approved' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Disetujui'],
+                                        'partial' => ['bg' => 'bg-sky-50', 'text' => 'text-sky-700', 'border' => 'border-sky-200', 'dot' => 'bg-sky-500', 'label' => 'Diproses Sebagian'],
+                                        'complete' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai Terpenuhi'],
+                                        'rejected' => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'border' => 'border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak'],
+                                        'closed' => ['bg' => 'bg-slate-50', 'text' => 'text-slate-700', 'border' => 'border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Ditutup'],
+                                        default => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($or->status)],
                                     };
                                 @endphp
-                                <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold border {{ $statusConfig['bg'] }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusConfig['bg'] }} {{ $statusConfig['text'] }} {{ $statusConfig['border'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusConfig['dot'] }}"></span>
                                     {{ $statusConfig['label'] }}
                                 </span>
                             </td>
@@ -362,7 +347,7 @@
 
         {{-- Pagination --}}
         @if ($orderRequests->hasPages())
-            <div class="p-4 border-t border-gray-200">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $orderRequests->links() }}
             </div>
         @endif

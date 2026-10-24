@@ -18,7 +18,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('master.suppliers.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Alerts --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -143,14 +121,7 @@
 
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Cabang</label>
-                <select name="cabang_id" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                    <option value="">Semua Cabang</option>
-                    @foreach ($cabangs as $cb)
-                        <option value="{{ $cb->id }}" {{ (string)$cabangId === (string)$cb->id ? 'selected' : '' }}>
-                            {{ $cb->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
 
             <div class="flex items-end gap-2">
@@ -172,11 +143,11 @@
     </div>
 
     {{-- Data Table --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3 px-4">Kode & Perusahaan</th>
                         <th class="py-3 px-4">Kontak Person</th>
                         <th class="py-3 px-4">Kontak (Telp / Email)</th>
@@ -210,7 +181,7 @@
                             <td class="py-3 px-4">
                                 @if ($s->nomor_rekening)
                                     <div class="flex items-center gap-1.5 font-medium text-gray-900 text-xs">
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                                             {{ $s->nama_bank ?: 'Bank' }}
                                         </span>
                                         <span class="font-mono">{{ $s->nomor_rekening }}</span>
@@ -221,7 +192,8 @@
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-center">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-800">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $s->tempo_hutang > 0 ? 'bg-indigo-500' : 'bg-gray-400' }}"></span>
                                     {{ $s->tempo_hutang }} Hari
                                 </span>
                             </td>
@@ -246,24 +218,16 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
-                                    <form
-                                        method="POST"
-                                        action="{{ route('master.suppliers.destroy', $s) }}"
-                                        class="inline"
-                                        onsubmit="return confirm('Apakah Anda yakin ingin menghapus supplier {{ $s->perusahaan }}?');"
+                                    <button
+                                        type="button"
+                                        @click="$dispatch('open-modal-delete-supplier', { action: '{{ route('master.suppliers.destroy', $s) }}', name: '{{ addslashes($s->perusahaan) }}' })"
+                                        class="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition"
+                                        title="Hapus Supplier"
                                     >
-                                        @csrf
-                                        @method('DELETE')
-                                        <button
-                                            type="submit"
-                                            class="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition"
-                                            title="Hapus Supplier"
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </form>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -283,10 +247,27 @@
         </div>
 
         @if ($suppliers->hasPages())
-            <div class="p-4 border-t border-gray-200">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $suppliers->links() }}
             </div>
         @endif
     </div>
+
+    {{-- Modal Konfirmasi Hapus Supplier --}}
+    <x-confirmation-modal
+        name="delete-supplier"
+        title="Hapus Data Supplier"
+        variant="danger"
+        confirm-text="Ya, Hapus Supplier"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus data supplier <strong class="text-gray-900" x-text="data.name"></strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Tindakan ini tidak dapat dibatalkan dan akan mempengaruhi riwayat pengadaan / PO terkait.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

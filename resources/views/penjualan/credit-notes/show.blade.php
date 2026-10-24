@@ -79,24 +79,16 @@
                 </button>
 
                 {{-- Hapus Draf --}}
-                <form
-                    method="POST"
-                    action="{{ route('penjualan.credit-notes.destroy', $creditNote->id) }}"
-                    onsubmit="return confirm('Apakah Anda yakin ingin menghapus draf Nota Kredit ini? Tindakan ini tidak dapat dibatalkan.');"
-                    class="inline-block"
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-delete-credit-note', { action: '{{ route('penjualan.credit-notes.destroy', $creditNote->id) }}' })"
+                    class="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                    title="Hapus Draf"
                 >
-                    @csrf
-                    @method('DELETE')
-                    <button
-                        type="submit"
-                        class="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                        title="Hapus Draf"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </form>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             @else
                 {{-- Tombol Ubah Faktur Pajak Retur --}}
                 <button
@@ -627,5 +619,22 @@
             </form>
         </div>
     </div>
+
+    {{-- Modal Konfirmasi Hapus Draf Nota Kredit --}}
+    <x-confirmation-modal
+        name="delete-credit-note"
+        title="Hapus Draf Nota Kredit"
+        type="danger"
+        confirm-text="Ya, Hapus Draf"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus draf Nota Kredit <span class="font-bold text-gray-900 font-mono">{{ $creditNote->credit_note_number }}</span>?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Tindakan ini tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

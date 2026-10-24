@@ -24,6 +24,7 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -148,21 +149,20 @@ class SupplierResource extends Resource
                             ->label('Handphone')
                             ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->validationMessages([
-                                'required' => 'Nomor Handphone tidak boleh kosong',
                                 'max' => 'Nomor handphone terlalu panjang'
                             ])
-                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890')
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 812 3456 7890, 081234567890 (Opsional)')
                             ->rules([new InternationalPhoneNumber()])
-                            ->required()
+                            ->nullable()
                             ->maxLength(50),
                         TextInput::make('email')
                             ->email()
+                            ->nullable()
+                            ->helperText('Alamat email pengiriman PO (Opsional)')
                             ->validationMessages([
-                                'required' => 'Email tidak boleh kosong',
                                 'email' => 'Email tidak valid !',
                                 'max' => 'Email terlalu panjang'
                             ])
-                            ->required()
                             ->maxLength(255),
                         TextInput::make('fax')
                             ->label('Fax')
@@ -170,11 +170,10 @@ class SupplierResource extends Resource
                             ->telRegex('/^[0-9+\s().-]*$/')
                             ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->rules([new InternationalPhoneNumber()])
-                            ->required()
-                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789')
+                            ->nullable()
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789 (Opsional)')
                             ->maxLength(50)
                             ->validationMessages([
-                                'required' => 'Fax tidak boleh kosong',
                                 'max' => 'Fax terlalu panjang'
                             ]),
                         TextInput::make('tempo_hutang')
@@ -282,12 +281,51 @@ class SupplierResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->before(function (Supplier $record, DeleteAction $action) {
+                            $blockers = $record->getDeletionBlockers();
+                            if ($blockers !== []) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Supplier Tidak Dapat Dihapus')
+                                    ->body("Supplier '{$record->perusahaan}' ({$record->code}) tidak dapat dihapus karena " . implode(', ', $blockers) . '.')
+                                    ->danger()
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        }),
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $deleted = 0;
+                            $failed = 0;
+                            foreach ($records as $record) {
+                                $blockers = $record->getDeletionBlockers();
+                                if ($blockers !== []) {
+                                    $failed++;
+                                    continue;
+                                }
+                                $record->delete();
+                                $deleted++;
+                            }
+
+                            if ($failed > 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Sebagian Supplier Tidak Dapat Dihapus')
+                                    ->body("{$deleted} supplier berhasil dihapus, {$failed} supplier dilewati karena memiliki pesanan pembelian aktif atau hutang belum lunas.")
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Supplier Terpilih Dihapus')
+                                    ->body("{$deleted} supplier berhasil dihapus.")
+                                    ->success()
+                                    ->send();
+                            }
+                        }),
                 ]),
             ]);
     }

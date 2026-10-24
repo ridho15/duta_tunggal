@@ -110,18 +110,7 @@
                     <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                         Lokasi Cabang <span class="text-rose-500">*</span>
                     </label>
-                    <select
-                        name="cabang_id"
-                        id="cabang_id"
-                        required
-                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                    >
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ old('cabang_id', $asset->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                {{ $cb->kode }} - {{ $cb->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->kode . ' - ' . $cb->nama])->values()" :value="(old('cabang_id', $asset->cabang_id)) ?: collect($cabangs)->first()?->id" :required="true" id="cabang_id" />
                 </div>
 
                 {{-- Status --}}
@@ -275,18 +264,7 @@
                         <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                             Akun Aset Tetap (Debit) <span class="text-rose-500">*</span>
                         </label>
-                        <select
-                            name="asset_coa_id"
-                            id="asset_coa_id"
-                            required
-                            class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                        >
-                            @foreach ($assetCoas as $coa)
-                                <option value="{{ $coa->id }}" {{ old('asset_coa_id', $asset->asset_coa_id) == $coa->id ? 'selected' : '' }}>
-                                    {{ $coa->code }} - {{ $coa->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select name="asset_coa_id" :options="collect($assetCoas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="(old('asset_coa_id', $asset->asset_coa_id)) ?: collect($assetCoas)->first()?->id" :required="true" id="asset_coa_id" />
                     </div>
 
                     {{-- Akun Akumulasi & Beban Penyusutan --}}
@@ -295,36 +273,14 @@
                             <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                                 Akumulasi Penyusutan (Kredit) <span class="text-rose-500">*</span>
                             </label>
-                            <select
-                                name="accumulated_depreciation_coa_id"
-                                id="accumulated_depreciation_coa_id"
-                                required
-                                class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                            >
-                                @foreach ($accumulatedCoas as $coa)
-                                    <option value="{{ $coa->id }}" {{ old('accumulated_depreciation_coa_id', $asset->accumulated_depreciation_coa_id) == $coa->id ? 'selected' : '' }}>
-                                        {{ $coa->code }} - {{ $coa->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select name="accumulated_depreciation_coa_id" :options="collect($accumulatedCoas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="(old('accumulated_depreciation_coa_id', $asset->accumulated_depreciation_coa_id)) ?: collect($accumulatedCoas)->first()?->id" :required="true" size="sm" id="accumulated_depreciation_coa_id" />
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">
                                 Beban Penyusutan (Debit) <span class="text-rose-500">*</span>
                             </label>
-                            <select
-                                name="depreciation_expense_coa_id"
-                                id="depreciation_expense_coa_id"
-                                required
-                                class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                            >
-                                @foreach ($expenseCoas as $coa)
-                                    <option value="{{ $coa->id }}" {{ old('depreciation_expense_coa_id', $asset->depreciation_expense_coa_id) == $coa->id ? 'selected' : '' }}>
-                                        {{ $coa->code }} - {{ $coa->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <x-searchable-select name="depreciation_expense_coa_id" :options="collect($expenseCoas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="(old('depreciation_expense_coa_id', $asset->depreciation_expense_coa_id)) ?: collect($expenseCoas)->first()?->id" :required="true" size="sm" id="depreciation_expense_coa_id" />
                         </div>
                     </div>
                 </div>

@@ -73,25 +73,19 @@
                         name="mo_number"
                         value="{{ old('mo_number', $manufacturingOrder->mo_number) }}"
                         required
-                        class="w-full text-xs rounded-xl border-gray-300 font-mono uppercase focus:ring-[#15803d] focus:border-[#15803d]"
+                        class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                        Cabang Pabrik <span class="text-rose-500">*</span>
-                    </label>
-                    <select
+                    <x-searchable-select
                         name="cabang_id"
-                        required
-                        class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
-                    >
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ old('cabang_id', $manufacturingOrder->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                ({{ $cb->kode }}) {{ $cb->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                        label="Cabang Pabrik"
+                        :options="$cabangs->map(fn($cb) => ['id' => $cb->id, 'label' => $cb->nama, 'subtext' => $cb->kode])->all()"
+                        :value="old('cabang_id', $manufacturingOrder->cabang_id)"
+                        placeholder="-- Pilih Cabang --"
+                        :required="true"
+                    />
                 </div>
 
                 <div>
@@ -105,7 +99,7 @@
                         name="quantity"
                         value="{{ old('quantity', rtrim(rtrim((string)$manufacturingOrder->quantity, '0'), '.')) }}"
                         required
-                        class="w-full text-xs rounded-xl border-gray-300 font-bold focus:ring-[#15803d] focus:border-[#15803d]"
+                        class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >
                 </div>
 
@@ -117,7 +111,7 @@
                         type="text"
                         disabled
                         value="{{ $manufacturingOrder->productionPlan?->product?->name }} ({{ $manufacturingOrder->productionPlan?->uom?->name ?? 'Pcs' }})"
-                        class="w-full text-xs rounded-xl border-gray-200 bg-gray-50 text-gray-600"
+                        class="w-full text-sm rounded-lg border border-gray-200 py-2.5 px-3 bg-gray-50 text-gray-600 cursor-not-allowed"
                     >
                 </div>
 
@@ -129,7 +123,7 @@
                         type="date"
                         name="start_date"
                         value="{{ old('start_date', $manufacturingOrder->start_date ? $manufacturingOrder->start_date->format('Y-m-d') : '') }}"
-                        class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                        class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >
                 </div>
 
@@ -141,7 +135,7 @@
                         type="date"
                         name="end_date"
                         value="{{ old('end_date', $manufacturingOrder->end_date ? $manufacturingOrder->end_date->format('Y-m-d') : '') }}"
-                        class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                        class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >
                 </div>
 
@@ -152,7 +146,7 @@
                     <textarea
                         name="notes"
                         rows="2"
-                        class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                        class="w-full text-sm rounded-lg border border-gray-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >{{ old('notes', $manufacturingOrder->productionPlan?->notes) }}</textarea>
                 </div>
             </div>

@@ -308,7 +308,7 @@
 
         tr.innerHTML = `
             <td class="py-2.5 px-3">
-                <select name="items[${idx}][product_id]" class="w-full py-1.5 px-2 text-xs bg-white border border-gray-300 rounded focus:ring-1 focus:ring-emerald-600 product-select" required onchange="onProductChange(${idx})">
+                <select data-searchable name="items[${idx}][product_id]" class="w-full py-1.5 px-2 text-xs bg-white border border-gray-300 rounded focus:ring-1 focus:ring-emerald-600 product-select" required onchange="onProductChange(${idx})">
                     ${productOptions}
                 </select>
                 <input type="text" name="items[${idx}][notes]" value="${data.notes || ''}" placeholder="Catatan item (opsional)" class="w-full mt-1 py-1 px-2 text-[10px] bg-gray-50 border border-gray-200 rounded placeholder-gray-400">

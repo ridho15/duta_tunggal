@@ -21,7 +21,7 @@
         </div>
         <div class="flex items-center gap-2.5">
             <a href="{{ route('gudang.stok.index') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs">
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M21 8 12 3 3 8v8l9 5 9-5z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     <path d="M3 8l9 5 9-5M12 13v8" stroke-width="1.8" stroke-linecap="round"></path>
@@ -29,7 +29,7 @@
                 <span>Cek Saldo Stok</span>
             </a>
             <a href="{{ route('gudang.transfer.create') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+               class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4v16m8-8H4" stroke-width="2" stroke-linecap="round"></path>
                 </svg>
@@ -38,30 +38,6 @@
         </div>
     </div>
 
-    {{-- Alert Notifikasi --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700">✕</button>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" stroke-width="2"></circle>
-                    <path d="M12 8v4m0 4h.01" stroke-width="2" stroke-linecap="round"></path>
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700">✕</button>
-        </div>
-    @endif
 
     {{-- KPI Stat Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -152,29 +128,13 @@
             {{-- Filter Gudang Asal --}}
             <div class="md:col-span-2">
                 <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Gudang Asal</label>
-                <select name="from_warehouse_id"
-                        class="w-full px-2.5 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800">
-                    <option value="">Semua Gudang Asal</option>
-                    @foreach ($warehouses as $wh)
-                        <option value="{{ $wh->id }}" {{ $fromWarehouseId == $wh->id ? 'selected' : '' }}>
-                            {{ $wh->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="from_warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name])->values()" :value="$fromWarehouseId" placeholder="Semua Gudang Asal" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Filter Gudang Tujuan --}}
             <div class="md:col-span-2">
                 <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Gudang Tujuan</label>
-                <select name="to_warehouse_id"
-                        class="w-full px-2.5 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800">
-                    <option value="">Semua Gudang Tujuan</option>
-                    @foreach ($warehouses as $wh)
-                        <option value="{{ $wh->id }}" {{ $toWarehouseId == $wh->id ? 'selected' : '' }}>
-                            {{ $wh->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="to_warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name])->values()" :value="$toWarehouseId" placeholder="Semua Gudang Tujuan" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Filter Status --}}
@@ -211,11 +171,11 @@
     </div>
 
     {{-- Tabel Dokumen Transfer --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="bg-gray-50/80 border-b border-gray-200 text-gray-500 uppercase tracking-wider text-[11px] font-semibold">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-gray-500 uppercase tracking-wider text-[11px] font-semibold">
                         <th class="py-3 px-4">No. Dokumen</th>
                         <th class="py-3 px-4">Tanggal Transfer</th>
                         <th class="py-3 px-4">Gudang Asal</th>
@@ -226,7 +186,7 @@
                         <th class="py-3 px-4 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 text-gray-700">
+                <tbody class="divide-y divide-gray-100 text-gray-700">
                     @forelse ($transfers as $tf)
                         <tr class="hover:bg-gray-50/80 transition">
                             {{-- No. Dokumen --}}
@@ -269,22 +229,22 @@
                             {{-- Status Badge --}}
                             <td class="py-3 px-4 text-center">
                                 @if (in_array($tf->status, ['Approved', 'completed']))
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Disetujui
                                     </span>
                                 @elseif (in_array($tf->status, ['Request', 'Pending']))
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                                         Menunggu Approval
                                     </span>
                                 @elseif (in_array($tf->status, ['Reject', 'cancelled']))
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Ditolak
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         Draft
                                     </span>
@@ -340,7 +300,7 @@
 
         {{-- Pagination --}}
         @if ($transfers->hasPages())
-            <div class="p-4 border-t border-gray-200 bg-gray-50/50">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $transfers->links() }}
             </div>
         @endif

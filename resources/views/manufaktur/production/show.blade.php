@@ -51,23 +51,16 @@
                     Ubah
                 </a>
 
-                <form
-                    method="POST"
-                    action="{{ route('manufaktur.production.finish', $production) }}"
-                    class="inline"
-                    onsubmit="return confirm('Selesaikan produksi ini? Status akan menjadi Finished dan Quality Control akan diterbitkan secara otomatis.')"
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-finish-production', { action: '{{ route('manufaktur.production.finish', $production) }}' })"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
                 >
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Selesaikan Produksi
-                    </button>
-                </form>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Selesaikan Produksi
+                </button>
             @endif
 
             @php
@@ -99,17 +92,6 @@
         </div>
     </div>
 
-    {{-- Flash Notifications --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- Stepper Lifecycle Visual --}}
     <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
@@ -434,6 +416,21 @@
                 </p>
             </div>
         </div>
-    </div>
+    {{-- Modal Konfirmasi Selesai Produksi --}}
+    <x-confirmation-modal
+        name="finish-production"
+        title="Selesaikan Produksi & Terbitkan QC"
+        type="success"
+        confirm-text="Ya, Selesaikan Produksi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menyelesaikan proses produksi <span class="font-bold text-gray-900 font-mono">{{ $production->production_number }}</span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Status produksi akan menjadi <strong>Finished</strong> dan dokumen Quality Control (QC) akan diterbitkan secara otomatis.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

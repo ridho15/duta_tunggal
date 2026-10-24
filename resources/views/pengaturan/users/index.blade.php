@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Alerts --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-xs">
-            <div class="flex items-center gap-2.5 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-xs">
-            <div class="flex items-center gap-2.5 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -148,17 +126,7 @@
 
             <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Cabang</label>
-                <select
-                    name="cabang_id"
-                    class="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
-                >
-                    <option value="all">Semua Cabang</option>
-                    @foreach ($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ (string)$cabangId === (string)$c->id ? 'selected' : '' }}>
-                            {{ $c->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId === 'all' ? null : $cabangId" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
 
             <div class="flex items-end gap-2">
@@ -195,10 +163,10 @@
     </div>
 
     {{-- Tabel Daftar Pengguna --}}
-    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-gray-700">
-                <thead class="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                     <tr>
                         <th class="px-5 py-3.5">Pengguna</th>
                         <th class="px-4 py-3.5">Kontak</th>
@@ -292,7 +260,7 @@
                                         type="submit"
                                         title="{{ $u->id === auth()->id() ? 'Tidak dapat mengubah akun sendiri' : 'Klik untuk mengubah status' }}"
                                         {{ $u->id === auth()->id() ? 'disabled' : '' }}
-                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition {{ $u->status ? 'bg-emerald-50 text-[#15803d] border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200' }} {{ $u->id === auth()->id() ? 'opacity-70 cursor-not-allowed' : '' }}"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition {{ $u->status ? 'bg-emerald-50 text-[#15803d] border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200' }} {{ $u->id === auth()->id() ? 'opacity-70 cursor-not-allowed' : '' }}"
                                     >
                                         <span class="w-1.5 h-1.5 rounded-full {{ $u->status ? 'bg-[#15803d]' : 'bg-gray-400' }}"></span>
                                         {{ $u->status ? 'Aktif' : 'Nonaktif' }}
@@ -340,24 +308,16 @@
 
                                     {{-- Hapus (Protected) --}}
                                     @if ($u->id !== auth()->id())
-                                        <form
-                                            method="POST"
-                                            action="{{ route('settings.users.destroy', $u) }}"
-                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus akun {{ addslashes($u->name) }}? Tindakan ini tidak dapat dibatalkan.');"
-                                            class="inline-block"
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-delete-user', { action: '{{ route('settings.users.destroy', $u) }}', name: '{{ addslashes($u->name) }}' })"
+                                            class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                                            title="Hapus Pengguna"
                                         >
-                                            @csrf
-                                            @method('DELETE')
-                                            <button
-                                                type="submit"
-                                                class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
-                                                title="Hapus Pengguna"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        </form>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
                                     @endif
                                 </div>
                             </td>
@@ -378,7 +338,7 @@
         </div>
 
         @if ($users->hasPages())
-            <div class="px-5 py-4 border-t border-gray-100">
+            <div class="px-5 py-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $users->links() }}
             </div>
         @endif
@@ -464,4 +424,21 @@
         modal.classList.add('hidden');
     }
 </script>
+
+    {{-- Modal Konfirmasi Hapus User --}}
+    <x-confirmation-modal
+        name="delete-user"
+        title="Hapus Akun Pengguna"
+        variant="danger"
+        confirm-text="Ya, Hapus Pengguna"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus akun pengguna <strong class="text-gray-900" x-text="data.name"></strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Tindakan ini tidak dapat dibatalkan. Seluruh akses login untuk akun ini akan langsung dinonaktifkan secara permanen.
+        </p>
+    </x-confirmation-modal>
 @endsection

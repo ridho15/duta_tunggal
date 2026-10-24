@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -115,7 +93,7 @@
     </div>
 
     {{-- Filter Bar & Table Card --}}
-    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Navigation Tabs --}}
         <div class="border-b border-gray-100 px-4 pt-3 flex flex-wrap items-center justify-between gap-4 bg-gray-50/50">
             <div class="flex items-center gap-2 overflow-x-auto pb-2">
@@ -150,18 +128,7 @@
                 <input type="hidden" name="tab" value="{{ $tab }}">
 
                 @if ($cabangs->count() > 1)
-                    <select
-                        name="cabang_id"
-                        onchange="this.form.submit()"
-                        class="text-xs rounded-xl border-gray-300 py-1.5 pl-3 pr-8 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
-                    >
-                        <option value="">Semua Cabang</option>
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ $cabangId == $cb->id ? 'selected' : '' }}>
-                                {{ $cb->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" :auto-submit="true" size="xs" />
                 @endif
 
                 <div class="relative">
@@ -199,7 +166,7 @@
         {{-- Tabel SPK --}}
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-gray-600">
-                <thead class="bg-gray-50/75 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                <thead class="bg-gray-50/75 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     <tr>
                         <th class="py-3 px-4">Nomor SPK / MO</th>
                         <th class="py-3 px-4">Produk Jadi Target</th>
@@ -258,24 +225,28 @@
                             </td>
                             <td class="py-3 px-4 text-center">
                                 @if ($order->status === 'draft')
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         Draft
                                     </span>
                                 @elseif ($order->status === 'in_progress')
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                                         In Progress
                                     </span>
                                 @elseif ($order->status === 'completed')
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Selesai
                                     </span>
                                 @elseif ($order->status === 'cancelled')
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Dibatalkan
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         {{ strtoupper($order->status) }}
                                     </span>
                                 @endif
@@ -315,20 +286,17 @@
                                             </svg>
                                         </a>
 
-                                        <form method="POST" action="{{ route('manufaktur.spk.start', $order) }}" class="inline">
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                onclick="return confirm('Mulai produksi untuk SPK {{ $order->mo_number }}?');"
-                                                class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition"
-                                                title="Mulai Produksi (In Progress)"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </button>
-                                        </form>
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-start-spk', { action: '{{ route('manufaktur.spk.start', $order) }}', number: '{{ $order->mo_number }}' })"
+                                            class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition"
+                                            title="Mulai Produksi (In Progress)"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
                                     @endif
                                 </div>
                             </td>
@@ -365,5 +333,22 @@
             </div>
         @endif
     </div>
+
+    {{-- Modal Konfirmasi Mulai Produksi --}}
+    <x-confirmation-modal
+        name="start-spk"
+        title="Mulai Proses Produksi"
+        variant="success"
+        confirm-text="Ya, Mulai Produksi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin memulai proses produksi untuk SPK <strong class="text-gray-900" x-text="data.number"></strong>?
+        </p>
+        <p class="text-xs text-[#15803d] mt-2 font-medium">
+            Status SPK akan berubah menjadi In Progress dan siap untuk pencatatan output/inspeksi.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

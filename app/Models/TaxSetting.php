@@ -35,4 +35,15 @@ class TaxSetting extends Model
             ->orderByDesc('effective_date')
             ->value('rate') ?? 0.0;
     }
+
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        if ($this->status && static::where('type', $this->type)->where('status', true)->count() <= 1) {
+            $blockers[] = 'merupakan satu-satunya tarif pajak aktif untuk tipe ' . $this->type;
+        }
+
+        return $blockers;
+    }
 }

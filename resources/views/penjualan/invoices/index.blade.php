@@ -111,18 +111,7 @@
             </div>
 
             <div class="sm:w-56">
-                <select
-                    name="cabang_id"
-                    onchange="this.form.submit()"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-[#15803d]"
-                >
-                    <option value="">Semua Cabang</option>
-                    @foreach($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ $cabangId == $c->id ? 'selected' : '' }}>
-                            {{ $c->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" :auto-submit="true" size="sm" />
             </div>
 
             <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-black transition">
@@ -132,11 +121,11 @@
     </div>
 
     {{-- Desktop Table View --}}
-    <div class="hidden md:block bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="hidden md:block bg-white border border-gray-100 rounded-2xl shadow-xs overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="px-5 py-3.5">No. Faktur</th>
                         <th class="px-4 py-3.5">Customer & Cabang</th>
                         <th class="px-4 py-3.5">Tanggal & Jatuh Tempo</th>
@@ -195,18 +184,20 @@
                             </td>
 
                             {{-- Status --}}
-                            <td class="px-4 py-4">
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 @if($inv->status === \App\Models\Invoice::STATUS_PAID)
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Lunas
                                     </span>
                                 @elseif($isOverdue)
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Terlambat
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                         Menunggu Bayar
                                     </span>
                                 @endif
@@ -248,7 +239,7 @@
         </div>
 
         @if($invoices->hasPages())
-            <div class="px-5 py-3 border-t border-gray-100">
+            <div class="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
                 {{ $invoices->links() }}
             </div>
         @endif
@@ -268,15 +259,18 @@
                         </div>
                     </div>
                     @if($inv->status === \App\Models\Invoice::STATUS_PAID)
-                        <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Lunas
                         </span>
                     @elseif($inv->due_date && $inv->due_date < today())
-                        <span class="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-md px-2 py-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Terlambat
                         </span>
                     @else
-                        <span class="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                             Menunggu Bayar
                         </span>
                     @endif

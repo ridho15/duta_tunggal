@@ -3,32 +3,6 @@
 @section('content')
 <div class="space-y-4">
 
-    {{-- Alert Messages --}}
-    @if(session('success'))
-        <div class="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-center justify-between text-sm shadow-xs">
-            <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700">✕</button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-center justify-between text-sm shadow-xs">
-            <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12" stroke-width="2"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"></line>
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700">✕</button>
-        </div>
-    @endif
 
     @if($errors->any())
         <div class="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm shadow-xs">
@@ -183,7 +157,7 @@
                         <button
                             type="button"
                             onclick="addToCart({{ json_encode($prod) }})"
-                            class="text-left p-3 rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition group flex flex-col justify-between h-28 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                            class="text-left p-3 rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition group flex flex-col justify-between h-28 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         >
                             <div>
                                 <div class="text-xs font-bold text-gray-900 line-clamp-2 group-hover:text-emerald-700 transition">
@@ -251,7 +225,7 @@
                     </div>
                     <div>
                         <label class="block text-[10.5px] font-bold text-gray-500 uppercase mb-1">Pelanggan Terdaftar</label>
-                        <select
+                        <select data-searchable
                             id="customerSelect"
                             onchange="selectCustomer(this)"
                             class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-gray-700"
@@ -434,11 +408,7 @@
 
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Gudang Pengeluaran Barang</label>
-                <select name="warehouse_id" class="w-full px-3 py-2 text-xs border border-gray-300 rounded-xl focus:border-emerald-500">
-                    @foreach($warehouses as $w)
-                        <option value="{{ $w->id }}">{{ $w->name }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($w) => ['id' => $w->id, 'label' => $w->name])->values()" :value="collect($warehouses)->first()?->id" size="sm" />
             </div>
 
             <div>

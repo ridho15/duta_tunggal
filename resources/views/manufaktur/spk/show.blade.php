@@ -63,46 +63,29 @@
                     Ubah SPK
                 </a>
 
-                <form method="POST" action="{{ route('manufaktur.spk.start', $manufacturingOrder) }}" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        onclick="return confirm('Mulai proses produksi sekarang?');"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Mulai Produksi
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-start-spk')"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Mulai Produksi
+                </button>
 
-                <form method="POST" action="{{ route('manufaktur.spk.cancel', $manufacturingOrder) }}" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        onclick="return confirm('Batalkan SPK ini?');"
-                        class="px-3 py-2 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition"
-                    >
-                        Batalkan SPK
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-cancel-spk')"
+                    class="px-3 py-2 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition"
+                >
+                    Batalkan SPK
+                </button>
             @endif
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- Stepper Alur Kerja Manufaktur --}}
     <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
@@ -300,16 +283,13 @@
                         SPK saat ini berstatus <strong>Draft</strong>. Silakan cetak lembar kerja untuk mandor pabrik, pastikan stok bahan baku di gudang sudah siap, lalu klik tombol di bawah untuk memulai pengerjaan.
                     </p>
                     <div class="pt-2">
-                        <form method="POST" action="{{ route('manufaktur.spk.start', $manufacturingOrder) }}">
-                            @csrf
-                            <button
-                                type="submit"
-                                onclick="return confirm('Mulai produksi untuk SPK {{ $manufacturingOrder->mo_number }}?');"
-                                class="w-full py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] text-center"
-                            >
-                                Mulai Produksi (In Progress)
-                            </button>
-                        </form>
+                        <button
+                            type="button"
+                            @click="$dispatch('open-modal-start-spk')"
+                            class="w-full py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] text-center"
+                        >
+                            Mulai Produksi (In Progress)
+                        </button>
                     </div>
                 @elseif ($manufacturingOrder->status === 'in_progress')
                     <p class="text-xs text-gray-600 leading-relaxed">
@@ -354,5 +334,41 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal Konfirmasi Mulai Produksi SPK --}}
+    <x-confirmation-modal
+        name="start-spk"
+        title="Mulai Proses Produksi"
+        variant="success"
+        confirm-text="Ya, Mulai Produksi"
+        cancel-text="Batal"
+        action="{{ route('manufaktur.spk.start', $manufacturingOrder) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin memulai proses produksi sekarang untuk SPK <strong>{{ $manufacturingOrder->mo_number }}</strong>?
+        </p>
+        <p class="text-xs text-[#15803d] mt-2 font-medium">
+            Status SPK akan berpindah ke In Progress dan alur pengeluaran bahan serta pencatatan hasil produksi dapat dilakukan.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Batalkan SPK --}}
+    <x-confirmation-modal
+        name="cancel-spk"
+        title="Batalkan SPK Manufaktur"
+        variant="danger"
+        confirm-text="Ya, Batalkan SPK"
+        cancel-text="Kembali"
+        action="{{ route('manufaktur.spk.cancel', $manufacturingOrder) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin membatalkan SPK <strong>{{ $manufacturingOrder->mo_number }}</strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            SPK yang dibatalkan tidak dapat diproses lagi untuk produksi atau pengeluaran bahan baku.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

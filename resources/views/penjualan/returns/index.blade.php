@@ -142,32 +142,12 @@
 
             {{-- Filter Cabang --}}
             <div>
-                <select
-                    name="cabang_id"
-                    class="w-full py-2 px-3 border border-gray-300 rounded-xl text-xs focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
-                >
-                    <option value="">Semua Cabang</option>
-                    @foreach($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ (string)$cabangId === (string)$c->id ? 'selected' : '' }}>
-                            {{ $c->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Filter Gudang --}}
             <div>
-                <select
-                    name="warehouse_id"
-                    class="w-full py-2 px-3 border border-gray-300 rounded-xl text-xs focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
-                >
-                    <option value="">Semua Gudang</option>
-                    @foreach($warehouses as $wh)
-                        <option value="{{ $wh->id }}" {{ (string)$warehouseId === (string)$wh->id ? 'selected' : '' }}>
-                            ({{ $wh->kode }}) {{ $wh->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => '(' . $wh->kode . ') ' . $wh->name])->values()" :value="$warehouseId" placeholder="Semua Gudang" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Tombol Terapkan & Reset --}}
@@ -195,10 +175,10 @@
     </div>
 
     {{-- Tabel Retur Penjualan --}}
-    <div class="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-                <thead class="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-[11px] text-gray-500 font-semibold uppercase tracking-wider">
                     <tr>
                         <th class="py-3 px-4">No. Return & Tanggal</th>
                         <th class="py-3 px-4">Pelanggan</th>
@@ -212,14 +192,14 @@
                 <tbody class="divide-y divide-gray-100">
                     @forelse($returns as $item)
                         @php
-                            $badgeClasses = match($item->status) {
-                                \App\Models\CustomerReturn::STATUS_PENDING       => 'bg-amber-50 text-amber-700 border-amber-200',
-                                \App\Models\CustomerReturn::STATUS_RECEIVED      => 'bg-blue-50 text-blue-700 border-blue-200',
-                                \App\Models\CustomerReturn::STATUS_QC_INSPECTION => 'bg-purple-50 text-purple-700 border-purple-200',
-                                \App\Models\CustomerReturn::STATUS_APPROVED      => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                \App\Models\CustomerReturn::STATUS_COMPLETED     => 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black',
-                                \App\Models\CustomerReturn::STATUS_REJECTED      => 'bg-rose-50 text-rose-700 border-rose-200',
-                                default                                          => 'bg-gray-50 text-gray-700 border-gray-200',
+                            $statusConfig = match($item->status) {
+                                \App\Models\CustomerReturn::STATUS_PENDING       => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'dot' => 'bg-amber-500'],
+                                \App\Models\CustomerReturn::STATUS_RECEIVED      => ['bg' => 'bg-blue-50', 'text' => 'text-blue-700', 'border' => 'border-blue-200', 'dot' => 'bg-blue-500'],
+                                \App\Models\CustomerReturn::STATUS_QC_INSPECTION => ['bg' => 'bg-purple-50', 'text' => 'text-purple-700', 'border' => 'border-purple-200', 'dot' => 'bg-purple-500 animate-pulse'],
+                                \App\Models\CustomerReturn::STATUS_APPROVED      => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'dot' => 'bg-emerald-500'],
+                                \App\Models\CustomerReturn::STATUS_COMPLETED     => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-800', 'border' => 'border-emerald-300', 'dot' => 'bg-emerald-600'],
+                                \App\Models\CustomerReturn::STATUS_REJECTED      => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'border' => 'border-rose-200', 'dot' => 'bg-rose-500'],
+                                default                                          => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400'],
                             };
                             $totalItemsCount = $item->customerReturnItems->sum('quantity');
                         @endphp
@@ -280,7 +260,8 @@
 
                             {{-- Status Badge --}}
                             <td class="py-3 px-4 text-center">
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border {{ $badgeClasses }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusConfig['bg'] }} {{ $statusConfig['text'] }} {{ $statusConfig['border'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusConfig['dot'] }}"></span>
                                     {{ $item->status_label }}
                                 </span>
                             </td>

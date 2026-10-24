@@ -98,7 +98,7 @@
                         id="issue_number"
                         value="{{ old('issue_number', $materialIssue->issue_number) }}"
                         required
-                        class="w-full py-2 px-3 text-xs sm:text-sm font-mono border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                        class="w-full py-2.5 px-3 text-sm font-mono border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >
                 </div>
 
@@ -114,59 +114,43 @@
                         value="{{ old('issue_date', $materialIssue->issue_date?->format('Y-m-d')) }}"
                         required
                         max="{{ now()->format('Y-m-d') }}"
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                        class="w-full py-2.5 px-3 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >
                 </div>
 
                 {{-- Gudang Utama --}}
                 <div>
-                    <label for="warehouse_id" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Gudang Pengeluaran/Penerimaan <span class="text-rose-500">*</span>
-                    </label>
-                    <select
+                    <x-searchable-select
                         name="warehouse_id"
                         id="warehouse_id"
-                        required
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
-                    >
-                        <option value="">-- Pilih Gudang --</option>
-                        @foreach ($warehouses as $wh)
-                            <option
-                                value="{{ $wh->id }}"
-                                {{ old('warehouse_id', $materialIssue->warehouse_id) == $wh->id ? 'selected' : '' }}
-                            >
-                                ({{ $wh->kode }}) {{ $wh->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                        label="Gudang Pengeluaran/Penerimaan"
+                        :options="$warehouses->map(fn($wh) => ['id' => $wh->id, 'label' => $wh->name, 'subtext' => $wh->kode])->all()"
+                        :value="old('warehouse_id', $materialIssue->warehouse_id)"
+                        placeholder="-- Pilih Gudang --"
+                        :required="true"
+                    />
                 </div>
 
                 {{-- Pilihan SPK (Manufacturing Order) --}}
                 <div class="sm:col-span-2">
-                    <label for="manufacturing_order_id" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Perintah Kerja (SPK / MO)
-                    </label>
-                    <select
+                    <x-searchable-select
                         name="manufacturing_order_id"
                         id="manufacturing_order_id"
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
-                    >
-                        <option value="">-- Pilih SPK Terkait (Opsional) --</option>
-                        @foreach ($manufacturingOrders as $mo)
-                            @php
-                                $pp = $mo->productionPlan;
-                                $productName = $pp?->product?->name ?? 'Produk';
-                                $targetQty = $pp?->quantity ?? $mo->quantity;
-                                $uomName = $pp?->product?->uom?->name ?? 'Unit';
-                            @endphp
-                            <option
-                                value="{{ $mo->id }}"
-                                {{ old('manufacturing_order_id', $materialIssue->manufacturing_order_id) == $mo->id ? 'selected' : '' }}
-                            >
-                                {{ $mo->mo_number }} – {{ $productName }} (Target: {{ number_format($targetQty, 0, ',', '.') }} {{ $uomName }})
-                            </option>
-                        @endforeach
-                    </select>
+                        label="Perintah Kerja (SPK / MO)"
+                        :options="$manufacturingOrders->map(function($mo) {
+                            $pp = $mo->productionPlan;
+                            $productName = $pp?->product?->name ?? 'Produk';
+                            $targetQty = $pp?->quantity ?? $mo->quantity;
+                            $uomName = $pp?->product?->uom?->name ?? 'Unit';
+                            return [
+                                'id' => $mo->id,
+                                'label' => $mo->mo_number . ' – ' . $productName,
+                                'subtext' => 'Target: ' . number_format($targetQty, 0, ',', '.') . ' ' . $uomName,
+                            ];
+                        })->all()"
+                        :value="old('manufacturing_order_id', $materialIssue->manufacturing_order_id)"
+                        placeholder="-- Pilih SPK Terkait (Opsional) --"
+                    />
                 </div>
 
                 {{-- Catatan Umum --}}
@@ -178,7 +162,7 @@
                         name="notes"
                         id="notes"
                         rows="2"
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                     >{{ old('notes', $materialIssue->notes) }}</textarea>
                 </div>
             </div>
@@ -318,7 +302,7 @@
         return `
             <tr id="row-${idx}" class="hover:bg-gray-50/75 transition item-row">
                 <td class="py-2 px-3">
-                    <select
+                    <select data-searchable
                         name="items[${idx}][product_id]"
                         class="w-full py-1.5 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]"
                         required

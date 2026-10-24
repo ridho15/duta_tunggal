@@ -249,7 +249,7 @@
             <div class="flex justify-between items-start gap-2">
                 <div class="flex-1">
                     <label class="text-[11px] font-semibold text-gray-500">Produk</label>
-                    <select name="items[${idx}][product_id]" required onchange="handleProductChange(${idx})" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-gray-800 mt-0.5 focus:outline-none focus:border-emerald-600 bg-white">
+                    <select data-searchable name="items[${idx}][product_id]" required onchange="handleProductChange(${idx})" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-gray-800 mt-0.5 focus:outline-none focus:border-emerald-600 bg-white">
                         ${productOptions}
                     </select>
                 </div>

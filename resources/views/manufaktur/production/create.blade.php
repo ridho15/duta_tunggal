@@ -40,6 +40,28 @@
         </div>
     @endif
 
+    @php
+        $spkOptions = $availableSpk->map(fn($spk) => [
+            'id' => $spk->id,
+            'label' => $spk->mo_number . ' — ' . ($spk->productionPlan?->product?->name ?? 'Produk'),
+            'subtext' => 'Target: ' . number_format((float)($spk->productionPlan?->quantity ?? 0), 2) . ' ' . ($spk->productionPlan?->product?->uom?->name ?? 'Pcs') . ' • Gudang: ' . ($spk->productionPlan?->warehouse?->name ?? 'Gudang Utama'),
+            'badge' => strtoupper($spk->status),
+        ])->values()->all();
+
+        $availableSpkMap = $availableSpk->keyBy('id')->map(function($spk) {
+            $plan = $spk->productionPlan;
+            $prod = $plan?->product;
+            return [
+                'id' => $spk->id,
+                'product_name' => $prod?->name ?? '-',
+                'product_sku' => $prod?->sku ?? '-',
+                'product_uom' => $prod?->uom?->name ?? 'Pcs',
+                'planned_qty' => (float) ($plan?->quantity ?? 0),
+                'warehouse_name' => $plan?->warehouse?->name ?? 'Gudang Utama',
+            ];
+        })->all();
+    @endphp
+
     <form method="POST" action="{{ route('manufaktur.production.store') }}" id="productionForm" class="space-y-6">
         @csrf
 
@@ -63,7 +85,7 @@
                                 id="production_number"
                                 value="{{ old('production_number', $defaultNumber) }}"
                                 required
-                                class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                                class="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm font-mono font-bold text-gray-800 focus:bg-white focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                             >
                             <p class="text-[11px] text-gray-400 mt-1">Dihasilkan otomatis berformat PRO-YYYYMMDD-XXXX</p>
                         </div>
@@ -78,42 +100,22 @@
                                 id="production_date"
                                 value="{{ old('production_date', now()->toDateString()) }}"
                                 required
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                                class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                             >
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-700 mb-1">
-                            Pilih Surat Perintah Kerja (SPK) <span class="text-rose-500">*</span>
-                        </label>
-                        <select
+                        <x-searchable-select
                             name="manufacturing_order_id"
                             id="manufacturing_order_id"
-                            required
-                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                        >
-                            <option value="">-- Pilih SPK yang Sedang Berjalan --</option>
-                            @foreach ($availableSpk as $spk)
-                                @php
-                                    $plan = $spk->productionPlan;
-                                    $prod = $plan?->product;
-                                    $selected = (old('manufacturing_order_id', $selectedSpkId) == $spk->id);
-                                @endphp
-                                <option
-                                    value="{{ $spk->id }}"
-                                    data-product-name="{{ $prod?->name }}"
-                                    data-product-sku="{{ $prod?->sku }}"
-                                    data-product-uom="{{ $prod?->uom?->name ?? 'Pcs' }}"
-                                    data-planned-qty="{{ (float) ($plan?->quantity ?? 0) }}"
-                                    data-warehouse-name="{{ $plan?->warehouse?->name ?? 'Gudang Utama' }}"
-                                    {{ $selected ? 'selected' : '' }}
-                                >
-                                    {{ $spk->mo_number }} — {{ $prod?->name }} (Rencana: {{ number_format((float)($plan?->quantity ?? 0), 2) }} {{ $prod?->uom?->name ?? 'Pcs' }}) [{{ strtoupper($spk->status) }}]
-                                </option>
-                            @endforeach
-                        </select>
-                        <p class="text-[11px] text-gray-400 mt-1">Hanya SPK dengan status In Progress yang dapat dicatat hasil akhirnya.</p>
+                            label="Pilih Surat Perintah Kerja (SPK)"
+                            :options="$spkOptions"
+                            :value="old('manufacturing_order_id', $selectedSpkId)"
+                            placeholder="-- Pilih SPK yang Sedang Berjalan --"
+                            :required="true"
+                            hint="Hanya SPK dengan status In Progress yang dapat dicatat hasil akhirnya."
+                        />
                     </div>
                 </div>
 
@@ -152,7 +154,7 @@
                                     value="{{ old('quantity_produced') }}"
                                     required
                                     placeholder="0.00"
-                                    class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-mono font-bold text-gray-900 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                                    class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-mono font-bold text-gray-900 focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                                 >
                                 <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400 font-bold" id="inputUom">
                                     Pcs
@@ -169,7 +171,7 @@
                                 name="status"
                                 id="status"
                                 required
-                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                                class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-800 focus:border-[#15803d] focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 transition"
                             >
                                 <option value="finished" {{ old('status', 'finished') === 'finished' ? 'selected' : '' }}>
                                     Selesai (Finished) — Otomatis Terbitkan QC
@@ -227,6 +229,8 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const AVAILABLE_SPK = @json($availableSpkMap);
+
     const spkSelect = document.getElementById('manufacturing_order_id');
     const infoProductName = document.getElementById('infoProductName');
     const infoSku = document.getElementById('infoSku');
@@ -237,8 +241,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const qtyInput = document.getElementById('quantity_produced');
 
     function updateSpkDisplay() {
-        const selected = spkSelect.options[spkSelect.selectedIndex];
-        if (!selected || !selected.value) {
+        const spkId = spkSelect ? spkSelect.value : '';
+        const spk = spkId ? AVAILABLE_SPK[spkId] : null;
+
+        if (!spk) {
             infoProductName.textContent = 'Silahkan pilih SPK terlebih dahulu';
             infoSku.textContent = '-';
             infoPlannedQty.textContent = '0';
@@ -248,27 +254,23 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const name = selected.getAttribute('data-product-name') || '-';
-        const sku = selected.getAttribute('data-product-sku') || '-';
-        const uom = selected.getAttribute('data-product-uom') || 'Pcs';
-        const planned = parseFloat(selected.getAttribute('data-planned-qty') || '0');
-        const warehouse = selected.getAttribute('data-warehouse-name') || '-';
-
-        infoProductName.textContent = name;
-        infoSku.textContent = 'SKU: ' + sku;
-        infoPlannedQty.textContent = planned.toLocaleString('id-ID');
-        infoUom.textContent = uom;
-        inputUom.textContent = uom;
-        infoWarehouse.textContent = warehouse;
+        infoProductName.textContent = spk.product_name;
+        infoSku.textContent = 'SKU: ' + spk.product_sku;
+        infoPlannedQty.textContent = spk.planned_qty.toLocaleString('id-ID');
+        infoUom.textContent = spk.product_uom;
+        inputUom.textContent = spk.product_uom;
+        infoWarehouse.textContent = spk.warehouse_name;
 
         if (!qtyInput.value || parseFloat(qtyInput.value) <= 0) {
-            qtyInput.value = planned;
+            qtyInput.value = spk.planned_qty;
         }
     }
 
-    spkSelect.addEventListener('change', updateSpkDisplay);
-    if (spkSelect.value) {
-        updateSpkDisplay();
+    if (spkSelect) {
+        spkSelect.addEventListener('change', updateSpkDisplay);
+        if (spkSelect.value) {
+            updateSpkDisplay();
+        }
     }
 });
 </script>

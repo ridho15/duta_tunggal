@@ -18,7 +18,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('master.customers.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -28,28 +28,6 @@
         </div>
     </div>
 
-    {{-- Flash Alerts --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -112,7 +90,7 @@
 
     {{-- Filter & Search Bar --}}
     <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <form method="GET" action="{{ route('master.customers.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <form method="GET" action="{{ route('master.customers.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div class="lg:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Cari Customer</label>
                 <div class="relative">
@@ -127,6 +105,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Cabang</label>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
 
             <div>
@@ -167,11 +150,11 @@
     </div>
 
     {{-- Data Table --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-gray-50/80 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3 px-4">Kode & Customer</th>
                         <th class="py-3 px-4">Perusahaan / NIK</th>
                         <th class="py-3 px-4 text-center">Legalitas</th>
@@ -191,7 +174,10 @@
                                 <div class="text-xs font-mono text-gray-500 mt-0.5 flex items-center gap-1.5">
                                     <span>{{ $c->getDisplayCode() }}</span>
                                     @if ($c->isSpecial)
-                                        <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">⭐ Spesial</span>
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span class="w-1 h-1 rounded-full bg-amber-500"></span>
+                                            Spesial
+                                        </span>
                                     @endif
                                 </div>
                             </td>
@@ -200,20 +186,41 @@
                                 <div class="text-xs text-gray-500 font-mono">{{ $c->nik_npwp ?: 'Tanpa NIK/NPWP' }}</div>
                             </td>
                             <td class="py-3 px-4 text-center">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold {{ $c->tipe === 'PKP' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-gray-100 text-gray-600' }}">
-                                    {{ $c->tipe }}
-                                </span>
+                                @if ($c->tipe === 'PKP')
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                        PKP
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-600 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                        PRI
+                                    </span>
+                                @endif
                             </td>
                             <td class="py-3 px-4">
                                 <div class="text-gray-900 text-xs font-mono">{{ $c->phone ?: '-' }}</div>
                                 <div class="text-[11px] text-gray-500 font-mono">{{ $c->telephone ?: '' }}</div>
                             </td>
                             <td class="py-3 px-4">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $c->tipe_pembayaran === 'Kredit' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-700' }}">
-                                    {{ $c->tipe_pembayaran }}
-                                </span>
-                                @if ($c->tipe_pembayaran === 'Kredit' && $c->tempo_kredit > 0)
-                                    <div class="text-[11px] text-gray-500 mt-0.5">{{ $c->tempo_kredit }} Hari</div>
+                                @if ($c->tipe_pembayaran === 'Kredit')
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        Kredit
+                                    </span>
+                                    @if ($c->tempo_kredit > 0)
+                                        <div class="text-[11px] text-gray-500 font-medium mt-1">{{ $c->tempo_kredit }} Hari</div>
+                                    @endif
+                                @elseif ($c->tipe_pembayaran === 'COD (Bayar Lunas)')
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        COD
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                        {{ $c->tipe_pembayaran }}
+                                    </span>
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-right">
@@ -246,24 +253,16 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
-                                    <form
-                                        method="POST"
-                                        action="{{ route('master.customers.destroy', $c) }}"
-                                        class="inline"
-                                        onsubmit="return confirm('Apakah Anda yakin ingin menghapus customer {{ $c->name }}?');"
+                                    <button
+                                        type="button"
+                                        @click="$dispatch('open-modal-delete-customer', { action: '{{ route('master.customers.destroy', $c) }}', name: '{{ addslashes($c->name) }}' })"
+                                        class="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition"
+                                        title="Hapus Customer"
                                     >
-                                        @csrf
-                                        @method('DELETE')
-                                        <button
-                                            type="submit"
-                                            class="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition"
-                                            title="Hapus Customer"
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </form>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -283,10 +282,27 @@
         </div>
 
         @if ($customers->hasPages())
-            <div class="p-4 border-t border-gray-200">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $customers->links() }}
             </div>
         @endif
     </div>
+
+    {{-- Modal Konfirmasi Hapus Customer --}}
+    <x-confirmation-modal
+        name="delete-customer"
+        title="Hapus Data Customer"
+        variant="danger"
+        confirm-text="Ya, Hapus Customer"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus data customer <strong class="text-gray-900" x-text="data.name"></strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Tindakan ini tidak dapat dibatalkan dan akan mempengaruhi riwayat transaksi terkait.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

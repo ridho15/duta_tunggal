@@ -106,17 +106,7 @@
                     <label for="cabang_id" class="block text-xs font-semibold text-gray-700 mb-1">
                         Cabang Operasional
                     </label>
-                    <select
-                        name="cabang_id"
-                        id="cabang_id"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-gray-900 bg-white"
-                    >
-                        @foreach ($cabangs as $cabang)
-                            <option value="{{ $cabang->id }}" {{ old('cabang_id', Auth::user()?->cabang_id) == $cabang->id ? 'selected' : '' }}>
-                                {{ $cabang->nama }} ({{ $cabang->kode }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama . ' (' . $cabang->kode . ')'])->values()" :value="(old('cabang_id', Auth::user()?->cabang_id)) ?: collect($cabangs)->first()?->id" size="sm" id="cabang_id" />
                 </div>
 
                 {{-- Keterangan / Deskripsi Umum --}}
@@ -178,7 +168,7 @@
                             <tr class="hover:bg-gray-50/60">
                                 {{-- Pilih Akun COA --}}
                                 <td class="py-2 px-3">
-                                    <select
+                                    <select data-searchable
                                         :name="'entries[' + index + '][coa_id]'"
                                         x-model="line.coa_id"
                                         required

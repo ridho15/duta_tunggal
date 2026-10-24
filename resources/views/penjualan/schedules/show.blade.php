@@ -50,18 +50,16 @@
 
             @if($deliverySchedule->status === 'pending')
                 {{-- Mulai Kirim (Berangkat) --}}
-                <form method="POST" action="{{ route('penjualan.schedules.start', $deliverySchedule->id) }}" class="inline" onsubmit="return confirm('Mulai pengiriman armada? DO terkait akan ditandai terkirim dan stok fisik dikeluarkan dari gudang.');">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
-                        </svg>
-                        <span>Mulai Pengiriman</span>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-start-schedule', { action: '{{ route('penjualan.schedules.start', $deliverySchedule->id) }}' })"
+                    class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"></polygon>
+                    </svg>
+                    <span>Mulai Pengiriman</span>
+                </button>
 
                 {{-- Edit --}}
                 <a
@@ -89,18 +87,16 @@
                 </button>
             @elseif($deliverySchedule->status === 'on_the_way')
                 {{-- Selesaikan Kirim --}}
-                <form method="POST" action="{{ route('penjualan.schedules.complete', $deliverySchedule->id) }}" class="inline" onsubmit="return confirm('Tandai jadwal selesai? Seluruh DO terkait akan ditandai selesai dan jurnal akuntansi dibukukan otomatis.');">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="m5 13 4 4L19 7" stroke-width="2.5" stroke-linecap="round"></path>
-                        </svg>
-                        <span>Tandai Selesai & Diterima</span>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-complete-schedule', { action: '{{ route('penjualan.schedules.complete', $deliverySchedule->id) }}' })"
+                    class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="m5 13 4 4L19 7" stroke-width="2.5" stroke-linecap="round"></path>
+                    </svg>
+                    <span>Tandai Selesai & Diterima</span>
+                </button>
 
                 {{-- Tandai Gagal --}}
                 <button
@@ -344,13 +340,13 @@
 
                 @if(in_array($deliverySchedule->status, ['pending', 'cancelled']))
                     <div class="pt-3 border-t border-gray-100">
-                        <form method="POST" action="{{ route('penjualan.schedules.destroy', $deliverySchedule->id) }}" onsubmit="return confirm('Apakah Anda yakin ingin menghapus jadwal pengiriman ini?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="w-full text-center px-4 py-2 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl text-xs font-bold transition">
-                                Hapus Jadwal Ini
-                            </button>
-                        </form>
+                        <button
+                            type="button"
+                            @click="$dispatch('open-modal-delete-schedule', { action: '{{ route('penjualan.schedules.destroy', $deliverySchedule->id) }}' })"
+                            class="w-full text-center px-4 py-2 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-xl text-xs font-bold transition"
+                        >
+                            Hapus Jadwal Ini
+                        </button>
                     </div>
                 @endif
             </div>
@@ -465,4 +461,55 @@ function closeCancelModal() {
     document.getElementById('cancelModal').classList.add('hidden');
 }
 </script>
+
+    {{-- Modal Konfirmasi Mulai Pengiriman --}}
+    <x-confirmation-modal
+        name="start-schedule"
+        title="Mulai Pengiriman Armada"
+        type="info"
+        confirm-text="Ya, Mulai Pengiriman"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin memberangkatkan armada untuk jadwal <span class="font-bold text-gray-900 font-mono">{{ $deliverySchedule->schedule_number }}</span>?
+        </p>
+        <p class="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg p-2.5 mt-2">
+            Seluruh Surat Jalan dan Delivery Order terkait akan ditandai terkirim dan stok fisik resmi dikeluarkan dari gudang.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Selesai Pengiriman --}}
+    <x-confirmation-modal
+        name="complete-schedule"
+        title="Tandai Jadwal Pengiriman Selesai"
+        type="success"
+        confirm-text="Ya, Selesaikan Jadwal"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin jadwal pengiriman <span class="font-bold text-gray-900 font-mono">{{ $deliverySchedule->schedule_number }}</span> telah selesai dan diterima dengan baik oleh pelanggan?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Status seluruh DO terkait akan ditandai selesai dan jurnal akuntansi pengiriman barang akan dibukukan secara otomatis.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Hapus Jadwal --}}
+    <x-confirmation-modal
+        name="delete-schedule"
+        title="Hapus Jadwal Pengiriman"
+        type="danger"
+        confirm-text="Ya, Hapus Jadwal"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus dokumen jadwal pengiriman <span class="font-bold text-gray-900 font-mono">{{ $deliverySchedule->schedule_number }}</span>?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Tindakan ini permanen dan tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
 @endsection

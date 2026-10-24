@@ -125,26 +125,12 @@
 
             <div>
                 <label for="warehouse_id" class="block text-xs font-medium text-gray-700 mb-1">Gudang</label>
-                <select name="warehouse_id" id="warehouse_id" class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white">
-                    <option value="">Semua Gudang (Konsolidasi)</option>
-                    @foreach ($warehouses as $wh)
-                        <option value="{{ $wh->id }}" {{ $filters['warehouse_id'] == $wh->id ? 'selected' : '' }}>
-                            {{ $wh->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name])->values()" :value="$filters['warehouse_id']" placeholder="Semua Gudang (Konsolidasi)" size="sm" id="warehouse_id" />
             </div>
 
             <div>
                 <label for="product_id" class="block text-xs font-medium text-gray-700 mb-1">Spesifik Produk</label>
-                <select name="product_id" id="product_id" class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white">
-                    <option value="">Semua Produk</option>
-                    @foreach ($products as $p)
-                        <option value="{{ $p->id }}" {{ $filters['product_id'] == $p->id ? 'selected' : '' }}>
-                            {{ $p->name }} ({{ $p->sku ?: '-' }})
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="product_id" :options="collect($products)->map(fn ($p) => ['id' => $p->id, 'label' => $p->name . ' (' . ($p->sku ?: '-') . ')'])->values()" :value="$filters['product_id']" placeholder="Semua Produk" size="sm" id="product_id" />
             </div>
 
             <div class="flex items-end gap-2">

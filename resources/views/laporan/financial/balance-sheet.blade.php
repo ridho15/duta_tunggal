@@ -62,18 +62,7 @@
                     <label for="cabang_id" class="block text-xs font-semibold text-gray-700 mb-1">
                         Entitas Cabang
                     </label>
-                    <select
-                        name="cabang_id"
-                        id="cabang_id"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-gray-900 bg-white"
-                    >
-                        <option value="">Semua Cabang (Konsolidasian)</option>
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ $cabangId == $cb->id ? 'selected' : '' }}>
-                                {{ $cb->nama }} ({{ $cb->kode }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->nama . ' (' . $cb->kode . ')'])->values()" :value="$cabangId" placeholder="Semua Cabang (Konsolidasian)" size="sm" id="cabang_id" />
                 </div>
 
                 {{-- Tombol Terapkan --}}

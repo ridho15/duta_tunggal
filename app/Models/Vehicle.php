@@ -29,8 +29,28 @@ class Vehicle extends Model
         return $this->hasMany(DeliveryOrder::class, 'vehicle_id');
     }
 
+    public function deliverySchedule()
+    {
+        return $this->hasMany(DeliverySchedule::class, 'vehicle_id');
+    }
+
     public function cabang()
     {
         return $this->belongsTo(Cabang::class, 'cabang_id')->withDefault();
+    }
+
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        if ($this->deliveryOrder()->exists()) {
+            $blockers[] = 'memiliki ' . $this->deliveryOrder()->count() . ' riwayat surat jalan (Delivery Order)';
+        }
+
+        if ($this->deliverySchedule()->exists()) {
+            $blockers[] = 'memiliki jadwal pengiriman terjadwal';
+        }
+
+        return $blockers;
     }
 }

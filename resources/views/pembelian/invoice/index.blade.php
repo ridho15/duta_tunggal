@@ -35,7 +35,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('pembelian.invoices.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -48,7 +48,7 @@
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total Tagihan Pembelian --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Total Tagihan (Aktif)</span>
                 <span class="p-2 bg-emerald-50 text-[#15803d] rounded-lg">
@@ -64,7 +64,7 @@
         </div>
 
         {{-- Hutang Belum Dibayar --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Belum Dibayar (Unpaid)</span>
                 <span class="p-2 bg-amber-50 text-amber-600 rounded-lg">
@@ -80,7 +80,7 @@
         </div>
 
         {{-- Jatuh Tempo (Overdue) --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Jatuh Tempo (Overdue)</span>
                 <span class="p-2 bg-red-50 text-red-600 rounded-lg">
@@ -97,7 +97,7 @@
         </div>
 
         {{-- Faktur Lunas --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Faktur Lunas (Paid)</span>
                 <span class="p-2 bg-emerald-50 text-[#15803d] rounded-lg">
@@ -115,7 +115,7 @@
     </div>
 
     {{-- Filter Tabs & Pencarian --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {{-- Tabs Status --}}
         <div class="flex items-center gap-1 p-2 border-b border-gray-100 overflow-x-auto bg-gray-50/50">
             @php
@@ -161,27 +161,13 @@
 
             {{-- Filter Supplier --}}
             <div>
-                <select name="supplier_id" class="w-full py-2 px-3 border border-gray-200 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition">
-                    <option value="">Semua Pemasok</option>
-                    @foreach ($suppliers as $sup)
-                        <option value="{{ $sup->id }}" {{ (string)$supplierFilter === (string)$sup->id ? 'selected' : '' }}>
-                            {{ $sup->perusahaan ? $sup->perusahaan . ' (' . $sup->name . ')' : $sup->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($sup) => ['id' => $sup->id, 'label' => ($sup->perusahaan ? $sup->perusahaan . ' (' . $sup->name . ')' : $sup->name)])->values()" :value="$supplierFilter" placeholder="Semua Pemasok" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Filter Cabang --}}
             @if (count($cabangs) > 1)
                 <div>
-                    <select name="cabang_id" class="w-full py-2 px-3 border border-gray-200 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition">
-                        <option value="">Semua Cabang</option>
-                        @foreach ($cabangs as $cabang)
-                            <option value="{{ $cabang->id }}" {{ (string)$cabangFilter === (string)$cabang->id ? 'selected' : '' }}>
-                                {{ $cabang->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->name])->values()" :value="$cabangFilter" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
                 </div>
             @else
                 <div>
@@ -215,7 +201,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3 px-4">No. Faktur</th>
                         <th class="py-3 px-4">Pemasok</th>
                         <th class="py-3 px-4">No. Faktur Vendor / Pajak</th>
@@ -232,16 +218,24 @@
                         @php
                             $status = strtolower((string)$inv->status);
                             $badgeClass = match ($status) {
-                                'draft' => 'bg-gray-100 text-gray-700 border-gray-200',
+                                'draft' => 'bg-gray-50 text-gray-700 border-gray-200',
                                 'sent' => 'bg-blue-50 text-blue-700 border-blue-200',
                                 'partially_paid' => 'bg-amber-50 text-amber-700 border-amber-200',
-                                'paid' => 'bg-emerald-50 text-[#15803d] border-emerald-200',
+                                'paid' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                                 'cancelled' => 'bg-rose-50 text-rose-700 border-rose-200',
-                                default => 'bg-gray-100 text-gray-700 border-gray-200',
+                                default => 'bg-gray-50 text-gray-700 border-gray-200',
+                            };
+                            $statusDot = match ($status) {
+                                'draft' => 'bg-gray-400',
+                                'sent' => 'bg-blue-500',
+                                'partially_paid' => 'bg-amber-500',
+                                'paid' => 'bg-emerald-500',
+                                'cancelled' => 'bg-rose-500',
+                                default => 'bg-gray-400',
                             };
                             $remaining = $inv->getRemainingAmount();
                         @endphp
-                        <tr class="hover:bg-gray-50/75 transition">
+                        <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3 px-4 font-semibold">
                                 <a href="{{ route('pembelian.invoices.show', $inv) }}" class="text-[#15803d] hover:underline font-bold">
                                     {{ $inv->invoice_number }}
@@ -278,7 +272,8 @@
                                 Rp {{ number_format((float)$remaining, 0, ',', '.') }}
                             </td>
                             <td class="py-3 px-4 text-center">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border {{ $badgeClass }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $badgeClass }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusDot }}"></span>
                                     {{ $inv->status_label }}
                                 </span>
                             </td>

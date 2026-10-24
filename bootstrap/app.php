@@ -24,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Profiler request: tidak melakukan apa pun kecuali PERF_PROFILE=true (config/perf.php).
         // Global (bukan grup web/api): rute panel Filament memakai daftar middleware panel sendiri, bukan grup web.
         $middleware->append(\App\Http\Middleware\ProfileRequest::class);
+        // Lockdown Filament: alihkan seluruh akses /admin ke Dashboard Blade Native
+        $middleware->append(\App\Http\Middleware\RedirectAdminToDashboard::class);
         $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
     })
     ->withProviders([

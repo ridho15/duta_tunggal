@@ -29,7 +29,7 @@
             </a>
             <a
                 href="{{ route('keuangan.asset.disposal.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl shadow-sm transition"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -39,24 +39,6 @@
         </div>
     </div>
 
-    {{-- Alert Notifikasi --}}
-    @if (session('success'))
-        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm">
-            <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('success') }}</span>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-sm">
-            <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('error') }}</span>
-        </div>
-    @endif
 
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -77,7 +59,7 @@
         </div>
 
         {{-- Kas Penjualan --}}
-        <div class="bg-white p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
+        <div class="p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
             <p class="text-xs font-semibold text-[#15803d] uppercase tracking-wider">Total Kas Penjualan</p>
             <h3 class="text-2xl font-bold text-[#15803d] mt-1 font-mono">
                 {{ \App\Helpers\MoneyHelper::rupiah($kpis['total_sale_price']) }}
@@ -118,14 +100,7 @@
             {{-- Cabang --}}
             <div>
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cabang</label>
-                <select name="cabang_id" class="w-full text-xs rounded-xl border-gray-200 focus:border-[#15803d] focus:ring focus:ring-emerald-200">
-                    <option value="">Semua Cabang</option>
-                    @foreach ($cabangs as $cabang)
-                        <option value="{{ $cabang->id }}" {{ request('cabang_id') == $cabang->id ? 'selected' : '' }}>
-                            {{ $cabang->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama])->values()" :value="request('cabang_id')" placeholder="Semua Cabang" size="sm" />
             </div>
 
             {{-- Pencarian --}}
@@ -145,7 +120,7 @@
                 <button type="submit" class="w-full py-2 px-3 bg-[#15803d] hover:bg-emerald-800 text-white font-semibold text-xs rounded-xl shadow-sm transition">
                     Terapkan Filter
                 </button>
-                <a href="{{ route('keuangan.asset.disposal.index') }}" class="p-2 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-200 rounded-xl transition" title="Reset Filter">
+                <a href="{{ route('keuangan.asset.disposal.index') }}" class="p-2 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition" title="Reset Filter">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
@@ -166,7 +141,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3 px-4">Tgl Pelepasan</th>
                         <th class="py-3 px-4">Aset Tetap</th>
                         <th class="py-3 px-4">Cabang</th>
@@ -179,7 +154,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($disposals as $item)
-                        <tr class="hover:bg-gray-50/75 transition-colors">
+                        <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3 px-4 whitespace-nowrap text-gray-700">
                                 {{ $item->disposal_date ? $item->disposal_date->format('d/m/Y') : '-' }}
                             </td>
@@ -194,23 +169,28 @@
                             </td>
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 @if ($item->disposal_type === 'sale')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Penjualan (Sale)
                                     </span>
                                 @elseif ($item->disposal_type === 'scrap')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Scrap / Rusak
                                     </span>
                                 @elseif ($item->disposal_type === 'donation')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                         Donasi
                                     </span>
                                 @elseif ($item->disposal_type === 'theft')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
                                         Hilang / Dicuri
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         {{ ucfirst($item->disposal_type) }}
                                     </span>
                                 @endif
@@ -268,7 +248,7 @@
         </div>
 
         @if ($disposals->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $disposals->links() }}
             </div>
         @endif

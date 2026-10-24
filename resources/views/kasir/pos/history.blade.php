@@ -33,7 +33,7 @@
     </div>
 
     {{-- Filter Card --}}
-    <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+    <div class="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
         <form action="{{ route('kasir.pos.history') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div class="sm:col-span-6">
                 <label class="block text-[10.5px] font-bold text-gray-400 uppercase mb-1">Cari Transaksi</label>
@@ -77,10 +77,10 @@
     </div>
 
     {{-- Transactions Table --}}
-    <div class="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-                <thead class="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider text-[10.5px]">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     <tr>
                         <th class="py-3 px-4">No. Transaksi</th>
                         <th class="py-3 px-4">Tanggal & Waktu</th>
@@ -119,8 +119,24 @@
                             <td class="py-3 px-4 text-right font-extrabold text-gray-900">
                                 Rp {{ number_format($order->grand_total, 0, ',', '.') }}
                             </td>
-                            <td class="py-3 px-4 text-center">
-                                <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-100 text-emerald-800">
+                            <td class="py-3 px-4 text-center whitespace-nowrap">
+                                @php
+                                    $st = strtolower((string)$order->status);
+                                    $badgeClass = match($st) {
+                                        'completed', 'paid', 'selesai' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                        'pending', 'draft' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                        'cancelled', 'batal' => 'bg-rose-50 text-rose-700 border-rose-200',
+                                        default => 'bg-gray-50 text-gray-700 border-gray-200',
+                                    };
+                                    $dotClass = match($st) {
+                                        'completed', 'paid', 'selesai' => 'bg-emerald-500',
+                                        'pending', 'draft' => 'bg-amber-500',
+                                        'cancelled', 'batal' => 'bg-rose-500',
+                                        default => 'bg-gray-400',
+                                    };
+                                @endphp
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $badgeClass }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $dotClass }}"></span>
                                     {{ ucfirst($order->status) }}
                                 </span>
                             </td>
@@ -150,7 +166,7 @@
         </div>
 
         @if($orders->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $orders->links() }}
             </div>
         @endif

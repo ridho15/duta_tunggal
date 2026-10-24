@@ -51,13 +51,9 @@
             </a>
 
             @if ($opname->status === 'draft')
-                <form action="{{ route('gudang.opname.destroy', $opname) }}" method="POST" onsubmit="return confirm('Hapus sesi draft opname ini?')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition">
-                        Hapus Sesi
-                    </button>
-                </form>
+                <button type="button" @click="$dispatch('open-modal-delete-opname')" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition">
+                    Hapus Sesi
+                </button>
 
                 <form action="{{ route('gudang.opname.start', $opname) }}" method="POST">
                     @csrf
@@ -73,23 +69,18 @@
             @endif
 
             @if ($opname->status === 'completed')
-                <form action="{{ route('gudang.opname.recount', $opname) }}" method="POST" onsubmit="return confirm('Kembalikan ke tahap hitung fisik untuk koreksi hasil hitung?')">
-                    @csrf
-                    <button type="submit" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
-                        Hitung Ulang
-                    </button>
-                </form>
+                <button type="button" @click="$dispatch('open-modal-recount-opname')" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+                    Hitung Ulang
+                </button>
 
-                <form action="{{ route('gudang.opname.approve', $opname) }}" method="POST" onsubmit="return confirm('Setujui hasil stock opname ini? Stok sistem akan disesuaikan otomatis dan Jurnal Akuntansi persediaan akan dicatat.')">
-                    @csrf
-                    <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                        <span>Setujui & Sesuaikan Stok</span>
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-approve-opname')"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg transition shadow-2xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span>Setujui &amp; Sesuaikan Stok</span>
+                </button>
             @endif
 
             {{-- Cetak PDF & Excel --}}
@@ -116,30 +107,6 @@
         </div>
     </div>
 
-    {{-- Alert Notifikasi --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700">✕</button>
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" stroke-width="2"></circle>
-                    <path d="M12 8v4m0 4h.01" stroke-width="2" stroke-linecap="round"></path>
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700">✕</button>
-        </div>
-    @endif
 
     {{-- Banner Approved & Jurnal GL --}}
     @if ($opname->status === 'approved')
@@ -503,4 +470,57 @@
         }
     }
 </script>
+    {{-- Modal Konfirmasi Hapus Draft Opname --}}
+    <x-confirmation-modal
+        name="delete-opname"
+        title="Hapus Sesi Stock Opname"
+        variant="danger"
+        confirm-text="Ya, Hapus Sesi"
+        cancel-text="Batal"
+        action="{{ route('gudang.opname.destroy', $opname) }}"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus sesi stock opname draft <strong>{{ $opname->opname_number }}</strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Tindakan ini tidak dapat dibatalkan dan seluruh draf perhitungan fisik akan dihapus.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Hitung Ulang --}}
+    <x-confirmation-modal
+        name="recount-opname"
+        title="Hitung Ulang Stock Opname"
+        variant="warning"
+        confirm-text="Ya, Hitung Ulang"
+        cancel-text="Batal"
+        action="{{ route('gudang.opname.recount', $opname) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Kembalikan sesi stock opname <strong>{{ $opname->opname_number }}</strong> ke tahap hitung fisik?
+        </p>
+        <p class="text-xs text-amber-700 mt-2">
+            Status akan kembali ke proses perhitungan sehingga petugas gudang dapat merevisi kuantitas fisik.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Setujui Opname --}}
+    <x-confirmation-modal
+        name="approve-opname"
+        title="Setujui Hasil Stock Opname"
+        variant="success"
+        confirm-text="Ya, Setujui &amp; Sesuaikan Stok"
+        cancel-text="Batal"
+        action="{{ route('gudang.opname.approve', $opname) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menyetujui hasil stock opname <strong>{{ $opname->opname_number }}</strong>?
+        </p>
+        <p class="text-xs text-[#15803d] mt-2 font-medium">
+            Stok sistem akan disesuaikan otomatis mengikuti hasil fisik riil, dan jurnal penyesuaian persediaan akan langsung dibukukan ke Buku Besar.
+        </p>
+    </x-confirmation-modal>
 @endsection

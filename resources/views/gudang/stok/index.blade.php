@@ -15,20 +15,20 @@
                 <span class="text-emerald-700 font-bold">Cek Stok Real-Time</span>
             </nav>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Cek Stok & Ketersediaan Barang</h1>
-            <p class="text-xs text-gray-500 mt-1">
+            <p class="text-sm text-gray-500 mt-0.5">
                 Monitoring posisi stok fisik, kuantitas terpesan (reserved), stok bebas siap jual (free stock), serta nilai persediaan di setiap gudang.
             </p>
         </div>
         <div class="flex items-center gap-2.5">
             <a href="{{ route('gudang.stok.inventory-card') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm active:scale-[0.98]">
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.5L17 7.5V19a2 2 0 0 1-2 2z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <span>Laporan Kartu Persediaan</span>
             </a>
             @if ($kpi['critical_count'] > 0)
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                     <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                     {{ $kpi['critical_count'] }} Produk Menipis/Habis
                 </span>
@@ -42,7 +42,7 @@
     {{-- KPI Stat Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total SKU Aktif --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4.5 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Katalog Produk Aktif</span>
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -59,7 +59,7 @@
         </div>
 
         {{-- Total Stok Fisik --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4.5 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Fisik di Gudang</span>
                 <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
@@ -76,7 +76,7 @@
         </div>
 
         {{-- Total Stok Siap Kirim (Free Qty) --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4.5 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Stok Bebas (Siap Kirim)</span>
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -92,7 +92,7 @@
         </div>
 
         {{-- Estimasi Nilai Aset Persediaan --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4.5 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Estimasi Nilai Aset</span>
                 <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
@@ -110,7 +110,7 @@
     </div>
 
     {{-- Filter Panel --}}
-    <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-2xs">
+    <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
         <form method="GET" action="{{ route('gudang.stok.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {{-- Search Input --}}
             <div class="lg:col-span-2">
@@ -134,27 +134,13 @@
             {{-- Kategori --}}
             <div>
                 <label for="category_id" class="block text-xs font-medium text-gray-700 mb-1">Kategori Produk</label>
-                <select name="category_id" id="category_id" class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white">
-                    <option value="">Semua Kategori</option>
-                    @foreach ($categories as $cat)
-                        <option value="{{ $cat->id }}" {{ $filters['category_id'] == $cat->id ? 'selected' : '' }}>
-                            {{ $cat->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="category_id" :options="collect($categories)->map(fn ($cat) => ['id' => $cat->id, 'label' => $cat->name])->values()" :value="$filters['category_id']" placeholder="Semua Kategori" size="sm" id="category_id" :auto-submit="true" />
             </div>
 
             {{-- Gudang --}}
             <div>
                 <label for="warehouse_id" class="block text-xs font-medium text-gray-700 mb-1">Gudang Penyimpanan</label>
-                <select name="warehouse_id" id="warehouse_id" class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white">
-                    <option value="">Semua Gudang (Konsolidasian)</option>
-                    @foreach ($warehouses as $wh)
-                        <option value="{{ $wh->id }}" {{ $filters['warehouse_id'] == $wh->id ? 'selected' : '' }}>
-                            {{ $wh->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name])->values()" :value="$filters['warehouse_id']" placeholder="Semua Gudang (Konsolidasian)" size="sm" id="warehouse_id" :auto-submit="true" />
             </div>
 
             {{-- Status Stok & Submit Buttons --}}
@@ -186,8 +172,8 @@
     </div>
 
     {{-- Products Stock Table --}}
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs">
-        <div class="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between bg-gray-50/50">
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+        <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <div class="text-xs font-semibold text-gray-800">
                 Daftar Persediaan Produk ({{ $products->total() }} barang ditemukan)
             </div>
@@ -198,7 +184,7 @@
 
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-gray-600">
-                <thead class="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
+                <thead class="bg-gray-50/80 text-[11px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-100">
                     <tr>
                         <th class="py-3 px-4 w-12 text-center">#</th>
                         <th class="py-3 px-4 min-w-[220px]">Produk & SKU</th>
@@ -227,15 +213,18 @@
                             if ($totalPhysical <= 0) {
                                 $statusLabel = 'Habis';
                                 $statusBadge = 'bg-rose-50 text-rose-700 border-rose-200';
+                                $statusDot = 'bg-rose-500';
                             } elseif ($totalPhysical <= $minStock) {
                                 $statusLabel = 'Menipis';
                                 $statusBadge = 'bg-amber-50 text-amber-700 border-amber-200';
+                                $statusDot = 'bg-amber-500';
                             } else {
                                 $statusLabel = 'Aman';
                                 $statusBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                $statusDot = 'bg-emerald-500';
                             }
                         @endphp
-                        <tr x-data="{ open: false }" class="hover:bg-gray-50/70 transition-colors">
+                        <tr x-data="{ open: false }" class="hover:bg-gray-50/60 transition-colors">
                             <td class="py-3.5 px-4 text-center font-sans text-gray-400 text-xs">
                                 {{ $products->firstItem() + $index }}
                             </td>
@@ -275,7 +264,8 @@
                                 </div>
                             </td>
                             <td class="py-3.5 px-3 text-center font-sans">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium border {{ $statusBadge }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusBadge }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusDot }}"></span>
                                     {{ $statusLabel }}
                                 </span>
                             </td>
@@ -347,7 +337,7 @@
         </div>
 
         @if ($products->hasPages())
-            <div class="px-5 py-3 border-t border-gray-200 bg-gray-50">
+            <div class="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
                 {{ $products->links() }}
             </div>
         @endif

@@ -1,5 +1,8 @@
 // Minimal Tailwind configuration to ensure content paths include Blade and Livewire
 // Project uses ESM (see package.json "type": "module") so export default is used.
+import animate from 'tailwindcss-animate';
+import plugin from 'tailwindcss/plugin';
+
 export default {
     darkMode: 'class',
     content: [
@@ -22,6 +25,22 @@ export default {
     ],
     theme: {
         extend: {
+            // Nama skala Tailwind v4 yang sudah dipakai di banyak view Blade; proyek ini memakai Tailwind v3,
+            // jadi didefinisikan di sini (nilainya sama dengan default v4) agar kelasnya benar-benar terbentuk.
+            boxShadow: {
+                '2xs': '0 1px rgb(0 0 0 / 0.05)',
+                xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+            },
+            backdropBlur: {
+                xs: '4px',
+            },
+            spacing: {
+                '0.2': '0.05rem',
+                '4.5': '1.125rem',
+            },
+            borderWidth: {
+                3: '3px',
+            },
             fontFamily: {
                 sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
             },
@@ -56,5 +75,20 @@ export default {
             },
         },
     },
-    plugins: [],
+    plugins: [
+        // animate-in / fade-in / zoom-in / slide-in-from-* (dipakai modal & panel; mengikuti konvensi shadcn/ui)
+        animate,
+        // Sembunyikan scrollbar pada bilah tab/filter yang bisa di-scroll horizontal (tetap bisa di-scroll)
+        plugin(function ({ addUtilities }) {
+            addUtilities({
+                '.scrollbar-none, .no-scrollbar, .scrollbar-hide': {
+                    '-ms-overflow-style': 'none',
+                    'scrollbar-width': 'none',
+                },
+                '.scrollbar-none::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar, .scrollbar-hide::-webkit-scrollbar': {
+                    display: 'none',
+                },
+            });
+        }),
+    ],
 };

@@ -53,19 +53,17 @@
 
             {{-- Susutkan Bulan Ini --}}
             @if ($asset->status === 'active' && $asset->monthly_depreciation > 0)
-                <form action="{{ route('keuangan.asset.depreciation.process-single', $asset) }}" method="POST" class="inline" onsubmit="return confirm('Proses penyusutan bulan ini sebesar {{ \App\Helpers\MoneyHelper::rupiah($asset->monthly_depreciation) }}?')">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
-                        title="Posting penyusutan bulan ini ke Buku Besar"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        Susutkan Bulan Ini
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-depreciate-single', { action: '{{ route('keuangan.asset.depreciation.process-single', $asset) }}' })"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
+                    title="Posting penyusutan bulan ini ke Buku Besar"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Susutkan Bulan Ini
+                </button>
             @endif
 
             {{-- Hitung Ulang Penyusutan --}}
@@ -160,28 +158,6 @@
         </div>
     @endif
 
-    {{-- Flash Notifications --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- Top 4 Financial Metric Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -411,16 +387,17 @@
                             </td>
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 @if ($entry->status === 'recorded')
-                                    <form action="{{ route('keuangan.asset.depreciation.reverse', $entry->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan (reverse) depresiasi periode ini? Jurnal beban dan akumulasi akan dihapus dari buku besar.');" class="inline">
-                                        @csrf
-                                        <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                            </svg>
-                                            <span>Batalkan (Reversal)</span>
-                                        </button>
-                                    </form>
-                                @else
+                                    <button
+                                         type="button"
+                                         @click="$dispatch('open-modal-reverse-depreciation', { action: '{{ route('keuangan.asset.depreciation.reverse', $entry->id) }}', period: '{{ \Carbon\Carbon::createFromDate($entry->period_year, $entry->period_month, 1)->translatedFormat('F Y') }}' })"
+                                         class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                                     >
+                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                         </svg>
+                                         <span>Batalkan (Reversal)</span>
+                                     </button>
+                                 @else
                                     <span class="text-[11px] text-gray-400 italic">Sudah Reversal</span>
                                 @endif
                             </td>
@@ -590,7 +567,38 @@
                     </tfoot>
                 @endif
             </table>
-        </div>
-    </div>
+    {{-- Modal Konfirmasi Susutkan Bulan Ini --}}
+    <x-confirmation-modal
+        name="depreciate-single"
+        title="Proses Penyusutan Aset Bulan Ini"
+        type="success"
+        confirm-text="Ya, Proses Penyusutan"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Proses penyusutan bulan ini untuk aset <span class="font-bold text-gray-900">{{ $asset->name }}</span> sebesar <strong class="text-gray-900 font-mono">{{ \App\Helpers\MoneyHelper::rupiah($asset->monthly_depreciation) }}</strong>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Jurnal depresiasi bulanan (Beban Penyusutan vs Akumulasi Penyusutan) akan otomatis dibukukan ke Buku Besar.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Reverse Depresiasi --}}
+    <x-confirmation-modal
+        name="reverse-depreciation"
+        title="Batalkan (Reverse) Depresiasi Periode"
+        type="danger"
+        confirm-text="Ya, Batalkan Depresiasi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin membatalkan (reverse) depresiasi periode <span class="font-bold text-gray-900 font-mono" x-text="data.period"></span>?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Jurnal beban depresiasi dan akumulasi terkait akan dihapus dari buku besar dan nilai buku aset akan disesuaikan kembali.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

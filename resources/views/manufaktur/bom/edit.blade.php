@@ -94,7 +94,7 @@
                                 id="bomCode"
                                 value="{{ old('code', $billOfMaterial->code) }}"
                                 required
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d] font-mono uppercase"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                         </div>
 
@@ -108,51 +108,34 @@
                                 name="nama_bom"
                                 value="{{ old('nama_bom', $billOfMaterial->nama_bom) }}"
                                 required
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                         </div>
 
                         {{-- Produk Jadi --}}
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Produk Jadi (Output) <span class="text-rose-500">*</span>
-                            </label>
-                            <select
+                            <x-searchable-select
                                 name="product_id"
                                 id="finishedProductSelect"
-                                required
-                                onchange="onFinishedProductChange(this)"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
-                            >
-                                @foreach ($manufacturedProducts as $p)
-                                    <option
-                                        value="{{ $p->id }}"
-                                        data-uom-id="{{ $p->uom_id }}"
-                                        data-sku="{{ $p->sku }}"
-                                        {{ old('product_id', $billOfMaterial->product_id) == $p->id ? 'selected' : '' }}
-                                    >
-                                        ({{ $p->sku }}) {{ $p->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                                label="Produk Jadi (Output)"
+                                :options="$manufacturedProducts->map(fn($p) => ['id' => $p->id, 'label' => $p->name, 'subtext' => $p->sku])->all()"
+                                :value="old('product_id', $billOfMaterial->product_id)"
+                                placeholder="-- Pilih Produk Manufaktur --"
+                                :required="true"
+                                hint="Hanya menampilkan produk yang ditandai sebagai barang hasil produksi."
+                            />
                         </div>
 
                         {{-- Cabang --}}
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                Cabang / Pabrik <span class="text-rose-500">*</span>
-                            </label>
-                            <select
+                            <x-searchable-select
                                 name="cabang_id"
-                                required
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
-                            >
-                                @foreach ($cabangs as $cb)
-                                    <option value="{{ $cb->id }}" {{ old('cabang_id', $billOfMaterial->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                        ({{ $cb->kode }}) {{ $cb->nama }}
-                                    </option>
-                                @endforeach
-                            </select>
+                                label="Cabang / Pabrik"
+                                :options="$cabangs->map(fn($cb) => ['id' => $cb->id, 'label' => $cb->nama, 'subtext' => $cb->kode])->all()"
+                                :value="old('cabang_id', $billOfMaterial->cabang_id)"
+                                placeholder="-- Pilih Cabang --"
+                                :required="true"
+                            />
                         </div>
 
                         {{-- Hasil Jadi (Qty Output) & Satuan --}}
@@ -169,7 +152,7 @@
                                 value="{{ old('quantity', rtrim(rtrim((string) $billOfMaterial->quantity, '0'), '.')) }}"
                                 required
                                 oninput="recalculateTotals()"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d] font-bold"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                         </div>
 
@@ -177,11 +160,11 @@
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                                 Satuan Ukur (UOM) <span class="text-rose-500">*</span>
                             </label>
-                            <select
+                            <select data-searchable
                                 name="uom_id"
                                 id="finishedUomSelect"
                                 required
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2.5 px-3 bg-white font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >
                                 @foreach ($uoms as $u)
                                     <option value="{{ $u->id }}" {{ old('uom_id', $billOfMaterial->uom_id) == $u->id ? 'selected' : '' }}>
@@ -199,7 +182,7 @@
                             <textarea
                                 name="note"
                                 rows="2"
-                                class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]"
+                                class="w-full text-sm rounded-lg border border-gray-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                             >{{ old('note', $billOfMaterial->note) }}</textarea>
                         </div>
                     </div>
@@ -273,7 +256,7 @@
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                                 Biaya Tenaga Kerja (TKL)
                             </label>
-                            <div class="relative rounded-xl shadow-sm">
+                            <div class="relative rounded-lg shadow-xs">
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-xs font-bold">Rp</span>
                                 <input
                                     type="number"
@@ -283,7 +266,7 @@
                                     id="laborCostInput"
                                     value="{{ old('labor_cost', (float) $billOfMaterial->labor_cost) }}"
                                     oninput="recalculateTotals()"
-                                    class="w-full text-xs rounded-xl border-gray-300 pl-10 pr-3 focus:ring-[#15803d] focus:border-[#15803d] font-mono text-right"
+                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 bg-white font-mono text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                                 >
                             </div>
                         </div>
@@ -292,7 +275,7 @@
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                                 Biaya Overhead Pabrik (FOH)
                             </label>
-                            <div class="relative rounded-xl shadow-sm">
+                            <div class="relative rounded-lg shadow-xs">
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-xs font-bold">Rp</span>
                                 <input
                                     type="number"
@@ -302,7 +285,7 @@
                                     id="overheadCostInput"
                                     value="{{ old('overhead_cost', (float) $billOfMaterial->overhead_cost) }}"
                                     oninput="recalculateTotals()"
-                                    class="w-full text-xs rounded-xl border-gray-300 pl-10 pr-3 focus:ring-[#15803d] focus:border-[#15803d] font-mono text-right"
+                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 bg-white font-mono text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
                                 >
                             </div>
                         </div>
@@ -359,13 +342,17 @@
 
 <script>
     const RAW_MATERIALS = @json($rawMaterials);
+    const MANUFACTURED_PRODUCTS = @json($manufacturedProducts->keyBy('id'));
     const UOMS = @json($uoms);
     let rowIndex = 0;
 
-    function onFinishedProductChange(select) {
-        const selectedOption = select.options[select.selectedIndex];
-        if (selectedOption && selectedOption.dataset.uomId) {
-            document.getElementById('finishedUomSelect').value = selectedOption.dataset.uomId;
+    function onFinishedProductChange(val) {
+        const prodId = typeof val === 'object' ? (val.value || val.id) : val;
+        if (prodId && MANUFACTURED_PRODUCTS[prodId]) {
+            const uomId = MANUFACTURED_PRODUCTS[prodId].uom_id;
+            if (uomId) {
+                document.getElementById('finishedUomSelect').value = uomId;
+            }
         }
     }
 
@@ -398,27 +385,27 @@
 
         tr.innerHTML = `
             <td class="py-2.5 px-3">
-                <select name="items[${currentIdx}][product_id]" required onchange="onMaterialProductChange(${currentIdx}, this)" class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]">
+                <select data-searchable name="items[${currentIdx}][product_id]" required onchange="onMaterialProductChange(${currentIdx}, this)" class="w-full text-xs rounded-lg border border-gray-300 py-2 px-2.5 bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
                     ${productOptions}
                 </select>
-                <input type="text" name="items[${currentIdx}][note]" value="${note}" placeholder="Catatan part..." class="w-full text-[11px] rounded-lg border-gray-200 mt-1 py-1 focus:ring-[#15803d] focus:border-[#15803d]">
+                <input type="text" name="items[${currentIdx}][note]" value="${note}" placeholder="Catatan part..." class="w-full text-[11px] rounded-lg border border-gray-200 mt-1 py-1 px-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]">
             </td>
             <td class="py-2.5 px-3">
-                <select name="items[${currentIdx}][uom_id]" id="itemUom_${currentIdx}" required class="w-full text-xs rounded-xl border-gray-300 focus:ring-[#15803d] focus:border-[#15803d]">
+                <select data-searchable name="items[${currentIdx}][uom_id]" id="itemUom_${currentIdx}" required class="w-full text-xs rounded-lg border border-gray-300 py-2 px-2 bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
                     ${uomOptions}
                 </select>
             </td>
             <td class="py-2.5 px-3 text-right">
-                <input type="number" step="any" min="0.0001" name="items[${currentIdx}][quantity]" id="itemQty_${currentIdx}" value="${qty}" required oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-xl border-gray-300 font-bold focus:ring-[#15803d] focus:border-[#15803d]">
+                <input type="number" step="any" min="0.0001" name="items[${currentIdx}][quantity]" id="itemQty_${currentIdx}" value="${qty}" required oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-lg border border-gray-300 py-2 px-2.5 bg-white font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
             </td>
             <td class="py-2.5 px-3 text-right">
-                <input type="number" step="any" min="0" name="items[${currentIdx}][unit_price]" id="itemPrice_${currentIdx}" value="${unitPrice}" oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-xl border-gray-300 font-mono focus:ring-[#15803d] focus:border-[#15803d]">
+                <input type="number" step="any" min="0" name="items[${currentIdx}][unit_price]" id="itemPrice_${currentIdx}" value="${unitPrice}" oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-lg border border-gray-300 py-2 px-2.5 bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#15803d]">
             </td>
             <td class="py-2.5 px-3 text-right font-mono font-bold text-gray-900" id="itemSubtotal_${currentIdx}">
                 Rp 0
             </td>
             <td class="py-2.5 px-3 text-center">
-                <button type="button" onclick="removeMaterialRow(${currentIdx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition" title="Hapus Baris">
+                <button type="button" onclick="removeMaterialRow(${currentIdx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer" title="Hapus Baris">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
@@ -501,6 +488,16 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        const finishedProductInput = document.getElementById('finishedProductSelect');
+        if (finishedProductInput) {
+            finishedProductInput.addEventListener('change', function () {
+                onFinishedProductChange(this.value);
+            });
+            if (finishedProductInput.value) {
+                onFinishedProductChange(finishedProductInput.value);
+            }
+        }
+
         const oldItems = @json(old('items', null));
         if (oldItems && oldItems.length > 0) {
             oldItems.forEach(item => addMaterialRow(item));

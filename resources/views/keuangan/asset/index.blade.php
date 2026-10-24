@@ -55,28 +55,6 @@
         </div>
     </div>
 
-    {{-- Flash Notifications --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- 5 KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -175,14 +153,7 @@
             @if ($canManageAll)
             <div>
                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Cabang</label>
-                <select name="cabang_id" class="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition">
-                    <option value="">Semua Cabang</option>
-                    @foreach ($cabangs as $cb)
-                        <option value="{{ $cb->id }}" {{ request('cabang_id') == $cb->id ? 'selected' : '' }}>
-                            {{ $cb->kode }} - {{ $cb->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->kode . ' - ' . $cb->nama])->values()" :value="request('cabang_id')" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
             @endif
 
@@ -200,14 +171,7 @@
             {{-- Filter Kategori COA --}}
             <div>
                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Kategori Akun</label>
-                <select name="asset_coa_id" class="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition">
-                    <option value="">Semua Kategori</option>
-                    @foreach ($assetCoas as $coa)
-                        <option value="{{ $coa->id }}" {{ request('asset_coa_id') == $coa->id ? 'selected' : '' }}>
-                            {{ $coa->code }} - {{ $coa->name }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="asset_coa_id" :options="collect($assetCoas)->map(fn ($coa) => ['id' => $coa->id, 'label' => $coa->code . ' - ' . $coa->name])->values()" :value="request('asset_coa_id')" placeholder="Semua Kategori" size="sm" :auto-submit="true" />
             </div>
 
             {{-- Tombol Filter & Reset --}}
@@ -234,7 +198,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3.5 px-4">Kode & Nama Aset</th>
                         <th class="py-3.5 px-4">Cabang</th>
                         <th class="py-3.5 px-4">Kategori Akun</th>
@@ -248,7 +212,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($assets as $asset)
-                        <tr class="hover:bg-gray-50/75 transition-colors">
+                        <tr class="hover:bg-gray-50/60 transition-colors">
                             {{-- Kode & Nama --}}
                             <td class="py-3.5 px-4">
                                 <a href="{{ route('keuangan.asset.show', $asset) }}" class="font-bold text-[#15803d] hover:underline block">
@@ -295,19 +259,23 @@
                             {{-- Status Badge --}}
                             <td class="py-3.5 px-4 text-center whitespace-nowrap">
                                 @if (in_array($asset->status, ['active', 'posted']))
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Aktif
                                     </span>
                                 @elseif ($asset->status === 'fully_depreciated')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                         Disusutkan Penuh
                                     </span>
                                 @elseif ($asset->status === 'disposed')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
-                                        Pelepasan / Dihapus
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                        Pelepasan
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         {{ ucfirst($asset->status) }}
                                     </span>
                                 @endif
@@ -380,7 +348,7 @@
 
         {{-- Pagination --}}
         @if ($assets->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $assets->links() }}
             </div>
         @endif

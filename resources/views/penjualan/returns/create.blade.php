@@ -67,7 +67,7 @@
                     <label class="block text-xs font-bold text-gray-700">
                         Pelanggan (Customer) <span class="text-red-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         name="customer_id"
                         x-model="customerId"
                         @change="onCustomerChange"
@@ -89,7 +89,7 @@
                         Faktur Penjualan (Invoice) <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
-                        <select
+                        <select data-searchable
                             name="invoice_id"
                             x-model="invoiceId"
                             @change="onInvoiceChange"
@@ -130,7 +130,7 @@
                     <label class="block text-xs font-bold text-gray-700">
                         Gudang Penerima Retur
                     </label>
-                    <select
+                    <select data-searchable
                         name="warehouse_id"
                         x-model="warehouseId"
                         class="w-full text-xs font-semibold py-2.5 px-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] bg-white"

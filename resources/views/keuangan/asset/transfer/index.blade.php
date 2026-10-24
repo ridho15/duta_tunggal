@@ -29,7 +29,7 @@
             </a>
             <a
                 href="{{ route('keuangan.asset.transfer.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-emerald-800 text-white text-sm font-semibold rounded-xl shadow-sm transition"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -39,24 +39,6 @@
         </div>
     </div>
 
-    {{-- Alert Notifikasi --}}
-    @if (session('success'))
-        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm">
-            <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('success') }}</span>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-sm">
-            <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="font-medium">{{ session('error') }}</span>
-        </div>
-    @endif
 
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -68,21 +50,21 @@
         </div>
 
         {{-- Pending --}}
-        <div class="bg-white p-5 rounded-2xl border border-amber-100 bg-amber-50/20 shadow-sm">
+        <div class="p-5 rounded-2xl border border-amber-100 bg-amber-50/20 shadow-sm">
             <p class="text-xs font-semibold text-amber-700 uppercase tracking-wider">Menunggu Persetujuan</p>
             <h3 class="text-2xl font-bold text-amber-700 mt-1">{{ number_format($kpis['pending_count']) }}</h3>
             <span class="text-[11px] text-amber-600/75 mt-0.5 block">Status pending approval</span>
         </div>
 
         {{-- Approved (Transit) --}}
-        <div class="bg-white p-5 rounded-2xl border border-blue-100 bg-blue-50/20 shadow-sm">
+        <div class="p-5 rounded-2xl border border-blue-100 bg-blue-50/20 shadow-sm">
             <p class="text-xs font-semibold text-blue-700 uppercase tracking-wider">Disetujui (Dalam Transit)</p>
             <h3 class="text-2xl font-bold text-blue-700 mt-1">{{ number_format($kpis['approved_count']) }}</h3>
             <span class="text-[11px] text-blue-600/75 mt-0.5 block">Siap diserahterimakan</span>
         </div>
 
         {{-- Completed --}}
-        <div class="bg-white p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
+        <div class="p-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
             <p class="text-xs font-semibold text-[#15803d] uppercase tracking-wider">Mutasi Selesai</p>
             <h3 class="text-2xl font-bold text-[#15803d] mt-1">{{ number_format($kpis['completed_count']) }}</h3>
             <span class="text-[11px] text-emerald-600/75 mt-0.5 block">Lokasi aset telah berpindah</span>
@@ -107,27 +89,13 @@
             {{-- Cabang Asal --}}
             <div>
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cabang Asal</label>
-                <select name="from_cabang_id" class="w-full text-xs rounded-xl border-gray-200 focus:border-[#15803d] focus:ring focus:ring-emerald-200">
-                    <option value="">Semua Cabang Asal</option>
-                    @foreach ($cabangs as $cabang)
-                        <option value="{{ $cabang->id }}" {{ request('from_cabang_id') == $cabang->id ? 'selected' : '' }}>
-                            {{ $cabang->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="from_cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama])->values()" :value="request('from_cabang_id')" placeholder="Semua Cabang Asal" size="sm" />
             </div>
 
             {{-- Cabang Tujuan --}}
             <div>
                 <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cabang Tujuan</label>
-                <select name="to_cabang_id" class="w-full text-xs rounded-xl border-gray-200 focus:border-[#15803d] focus:ring focus:ring-emerald-200">
-                    <option value="">Semua Cabang Tujuan</option>
-                    @foreach ($cabangs as $cabang)
-                        <option value="{{ $cabang->id }}" {{ request('to_cabang_id') == $cabang->id ? 'selected' : '' }}>
-                            {{ $cabang->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="to_cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama])->values()" :value="request('to_cabang_id')" placeholder="Semua Cabang Tujuan" size="sm" />
             </div>
 
             {{-- Pencarian --}}
@@ -168,7 +136,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3 px-4">Tgl Pengajuan</th>
                         <th class="py-3 px-4">Aset Tetap</th>
                         <th class="py-3 px-4">Cabang Asal</th>
@@ -180,7 +148,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($transfers as $item)
-                        <tr class="hover:bg-gray-50/75 transition-colors">
+                        <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3 px-4 whitespace-nowrap text-gray-700">
                                 {{ $item->transfer_date ? $item->transfer_date->format('d/m/Y') : '-' }}
                             </td>
@@ -201,19 +169,23 @@
                             </td>
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 @if ($item->status === 'pending')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                         Menunggu Persetujuan
                                     </span>
                                 @elseif ($item->status === 'approved')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                         Disetujui (Transit)
                                     </span>
                                 @elseif ($item->status === 'completed')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        Selesai (Completed)
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Selesai
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Dibatalkan
                                     </span>
                                 @endif
@@ -258,7 +230,7 @@
         </div>
 
         @if ($transfers->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $transfers->links() }}
             </div>
         @endif

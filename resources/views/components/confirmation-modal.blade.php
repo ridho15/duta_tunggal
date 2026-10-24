@@ -6,9 +6,11 @@
     'cancelText' => 'Batal',
     'action' => null,
     'method' => 'POST',
+    'hasForm' => true,
 ])
 
 @php
+    $isJsVar = preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$/', $name);
     $iconConfig = match ($variant) {
         'success' => [
             'bg' => 'bg-[#dcfce7]',
@@ -32,9 +34,27 @@
 @endphp
 
 <div
-    x-data="{ open: false, data: {} }"
+    x-data="{
+        open: false,
+        data: {},
+        init() {
+            @if ($isJsVar)
+                try {
+                    this.$watch('{{ $name }}', val => { this.open = Boolean(val); });
+                } catch (e) {}
+            @endif
+        },
+        closeModal() {
+            this.open = false;
+            @if ($isJsVar)
+                try {
+                    if (typeof {{ $name }} !== 'undefined') { {{ $name }} = false; }
+                } catch (e) {}
+            @endif
+        }
+    }"
     x-on:open-modal-{{ $name }}.window="open = true; data = $event.detail || {}"
-    x-on:close-modal-{{ $name }}.window="open = false"
+    x-on:close-modal-{{ $name }}.window="closeModal()"
     x-show="open"
     class="fixed inset-0 z-50 overflow-y-auto"
     style="display: none;"
@@ -51,7 +71,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity"
-        @click="open = false"
+        @click="closeModal()"
     ></div>
 
     <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
@@ -64,16 +84,14 @@
             x-transition:leave="ease-in duration-150"
             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            @click.outside="open = false"
-            @keydown.escape.window="open = false"
+            @click.outside="closeModal()"
+            @keydown.escape.window="closeModal()"
             class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-gray-100"
         >
-            @if ($action)
-                <form :action="data.action || '{{ $action }}'" method="POST">
+            @if ($hasForm)
+                <form :action="data.action || '{{ $action ?? '' }}'" method="POST">
                     @csrf
-                    @if (in_array(strtoupper($method), ['PUT', 'PATCH', 'DELETE']))
-                        @method($method)
-                    @endif
+                    <input type="hidden" name="_method" :value="data.method || '{{ strtoupper($method) }}'">
             @endif
 
             <div class="bg-white p-6 pb-4">
@@ -87,7 +105,7 @@
 
                     {{-- Content Area --}}
                     <div class="mt-3 text-center sm:mt-0 sm:text-left flex-1">
-                        <h3 class="text-base font-bold text-gray-900 tracking-tight" id="modal-title">
+                        <h3 class="text-base font-bold text-gray-900 tracking-tight" id="modal-title" x-text="data.title || '{{ $title }}'">
                             {{ $title }}
                         </h3>
                         <div class="mt-2 text-xs text-gray-600 leading-relaxed space-y-2">
@@ -101,16 +119,18 @@
             <div class="bg-gray-50 px-6 py-3.5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t border-gray-100">
                 <button
                     type="button"
-                    @click="open = false"
+                    @click="closeModal()"
                     class="w-full sm:w-auto inline-flex justify-center rounded-xl px-4 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-300 shadow-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition"
+                    x-text="data.cancelText || '{{ $cancelText }}'"
                 >
                     {{ $cancelText }}
                 </button>
 
-                @if ($action)
+                @if ($hasForm)
                     <button
                         type="submit"
                         class="w-full sm:w-auto inline-flex justify-center rounded-xl px-4 py-2 text-xs font-bold shadow-sm focus:outline-none focus:ring-2 transition {{ $iconConfig['button'] }}"
+                        x-text="data.confirmText || '{{ $confirmText }}'"
                     >
                         {{ $confirmText }}
                     </button>
@@ -119,7 +139,7 @@
                 @endif
             </div>
 
-            @if ($action)
+            @if ($hasForm)
                 </form>
             @endif
         </div>

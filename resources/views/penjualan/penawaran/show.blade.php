@@ -68,14 +68,12 @@
 
             {{-- Ajukan Persetujuan (dari Draft) --}}
             @if($canRequestApprove)
-                <form method="POST" action="{{ route('penjualan.quotations.requestApprove', $quotation) }}" onsubmit="return confirm('Ajukan penawaran harga ini untuk persetujuan manajer?');">
-                    @csrf
-                    <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition shadow-2xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>Ajukan Persetujuan</span>
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-request-approve-quotation', { action: '{{ route('penjualan.quotations.requestApprove', $quotation) }}' })"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition shadow-2xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Ajukan Persetujuan</span>
+                </button>
             @endif
 
             {{-- Tombol Setujui / Tolak (untuk yang menunggu persetujuan) --}}
@@ -88,27 +86,23 @@
                     </button>
                 @endif
                 @if($canApprove)
-                    <form method="POST" action="{{ route('penjualan.quotations.approve', $quotation) }}" onsubmit="return confirm('Apakah Anda yakin ingin menyetujui penawaran harga ini?');">
-                        @csrf
-                        <button type="submit"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            <span>Setujui (Approve)</span>
-                        </button>
-                    </form>
+                    <button type="button"
+                            @click="$dispatch('open-modal-approve-quotation', { action: '{{ route('penjualan.quotations.approve', $quotation) }}' })"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Setujui (Approve)</span>
+                    </button>
                 @endif
             @endif
 
             {{-- Buat Revisi (untuk Disetujui / Kedaluwarsa) --}}
             @if($canRevise)
-                <form method="POST" action="{{ route('penjualan.quotations.revision', $quotation) }}" onsubmit="return confirm('Terbitkan dokumen revisi baru dari penawaran ini? Versi baru akan bernomor otomatis (-R{{ $quotation->revision_no + 1 }}).');">
-                    @csrf
-                    <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition shadow-2xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        <span>Buat Revisi</span>
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-revision-quotation', { action: '{{ route('penjualan.quotations.revision', $quotation) }}' })"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition shadow-2xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Buat Revisi</span>
+                </button>
             @endif
 
             {{-- Konversi ke Sales Order (jika approved & usable) --}}
@@ -122,58 +116,15 @@
 
             {{-- Hapus (Draft / Reject) --}}
             @if($canDelete)
-                <form method="POST" action="{{ route('penjualan.quotations.destroy', $quotation) }}" onsubmit="return confirm('Hapus penawaran draft ini secara permanen?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit"
-                            class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition" title="Hapus Draft">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    </button>
-                </form>
+                <button type="button"
+                        @click="$dispatch('open-modal-delete-quotation', { action: '{{ route('penjualan.quotations.destroy', $quotation) }}' })"
+                        class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition" title="Hapus Draft">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
             @endif
         </div>
     </div>
 
-    {{-- Flash Notifications --}}
-    @if(session('success'))
-        <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-medium text-emerald-800 flex items-center justify-between shadow-2xs">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                <span>{{ session('success') }}</span>
-            </div>
-            <button onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-900">&times;</button>
-        </div>
-    @endif
-
-    @if(session('info'))
-        <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-medium text-blue-800 flex items-center justify-between shadow-2xs">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span>{{ session('info') }}</span>
-            </div>
-            <button onclick="this.parentElement.remove()" class="text-blue-600 hover:text-blue-900">&times;</button>
-        </div>
-    @endif
-
-    @if(session('warning'))
-        <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-medium text-amber-800 flex items-center justify-between shadow-2xs">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                <span>{{ session('warning') }}</span>
-            </div>
-            <button onclick="this.parentElement.remove()" class="text-amber-600 hover:text-amber-900">&times;</button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs font-medium text-red-800 flex items-center justify-between shadow-2xs">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                <span>{{ session('error') }}</span>
-            </div>
-            <button onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-900">&times;</button>
-        </div>
-    @endif
 
     {{-- Status Banner Info (if expired, rejected, superseded, or has active SO) --}}
     @if($isExpired)
@@ -482,4 +433,66 @@
         document.getElementById('rejectModal').classList.add('hidden');
     }
 </script>
+
+    {{-- Modal Ajukan Persetujuan --}}
+    <x-confirmation-modal
+        name="request-approve-quotation"
+        title="Ajukan Persetujuan Penawaran"
+        type="warning"
+        confirm-text="Ya, Ajukan Persetujuan"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Ajukan dokumen penawaran harga <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span> untuk diverifikasi dan disetujui oleh manajer?
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Setujui Penawaran --}}
+    <x-confirmation-modal
+        name="approve-quotation"
+        title="Setujui Penawaran Harga"
+        type="success"
+        confirm-text="Ya, Setujui Penawaran"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menyetujui penawaran harga <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span>? Dokumen penawaran resmi dapat diterbitkan ke pelanggan atau dikonversi menjadi Sales Order (SO).
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Buat Revisi --}}
+    <x-confirmation-modal
+        name="revision-quotation"
+        title="Terbitkan Revisi Penawaran"
+        type="info"
+        confirm-text="Ya, Buat Dokumen Revisi"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Terbitkan dokumen revisi baru dari penawaran <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span>?
+        </p>
+        <p class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 mt-2">
+            Versi revisi baru akan bernomor otomatis <strong>-R{{ $quotation->revision_no + 1 }}</strong> dan dokumen ini akan ditandai superseded.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Hapus Draft --}}
+    <x-confirmation-modal
+        name="delete-quotation"
+        title="Hapus Penawaran Harga"
+        type="danger"
+        confirm-text="Ya, Hapus Draft"
+        cancel-text="Batal"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus draft penawaran harga <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span> secara permanen?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Tindakan ini tidak dapat dipulihkan kembali.
+        </p>
+    </x-confirmation-modal>
 @endsection

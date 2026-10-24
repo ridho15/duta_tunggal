@@ -55,18 +55,16 @@
 
             {{-- 1. Pending -> Mark Received --}}
             @if($st === \App\Models\CustomerReturn::STATUS_PENDING)
-                <form method="POST" action="{{ route('penjualan.returns.markReceived', $customerReturn->id) }}" onsubmit="return confirm('Tandai bahwa fisik barang retur telah sampai & diterima di gudang?');">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
-                        </svg>
-                        <span>Tandai Diterima Gudang</span>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-mark-received', { action: '{{ route('penjualan.returns.markReceived', $customerReturn->id) }}' })"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                    <span>Tandai Diterima Gudang</span>
+                </button>
             @endif
 
             {{-- 2. Received -> Start QC --}}
@@ -87,36 +85,32 @@
 
             {{-- 3. QC Inspection -> Approve --}}
             @if($st === \App\Models\CustomerReturn::STATUS_QC_INSPECTION)
-                <form method="POST" action="{{ route('penjualan.returns.approve', $customerReturn->id) }}" onsubmit="return confirm('Setujui pengajuan retur ini? Seluruh keputusan penanganan akan difinalkan.');">
-                    @csrf
-                    <button
-                        type="submit"
-                        {{ !$allQcDone ? 'disabled' : '' }}
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#14532d] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition"
-                        title="{{ !$allQcDone ? 'Lengkapi hasil QC semua item terlebih dahulu' : 'Setujui Customer Return' }}"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span>Setujui Retur</span>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    {{ !$allQcDone ? 'disabled' : '' }}
+                    @click="$dispatch('open-modal-approve-return', { action: '{{ route('penjualan.returns.approve', $customerReturn->id) }}' })"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#14532d] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition"
+                    title="{{ !$allQcDone ? 'Lengkapi hasil QC semua item terlebih dahulu' : 'Setujui Customer Return' }}"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Setujui Retur</span>
+                </button>
             @endif
 
             {{-- 4. Approved -> Complete --}}
             @if($st === \App\Models\CustomerReturn::STATUS_APPROVED && !$customerReturn->stock_restored_at)
-                <form method="POST" action="{{ route('penjualan.returns.complete', $customerReturn->id) }}" onsubmit="return confirm('Selesaikan retur penjualan? Stok barang (Perbaikan/Penggantian) akan dipulihkan ke gudang dan jurnal akuntansi akan otomatis diposting. Aksi ini tidak dapat dibatalkan.');">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-sm transition"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                        </svg>
-                        <span>Selesaikan (Restorasi Stok & Jurnal)</span>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-complete-return', { action: '{{ route('penjualan.returns.complete', $customerReturn->id) }}' })"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-sm transition"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    <span>Selesaikan (Restorasi Stok & Jurnal)</span>
+                </button>
             @endif
 
             {{-- Tolak (Jika belum selesai & belum ditolak) --}}
@@ -359,16 +353,7 @@
                             @if(!$customerReturn->warehouse_id)
                                 <div class="flex items-center gap-2">
                                     <label class="text-xs font-bold text-gray-700 whitespace-nowrap">Gudang Penerima:</label>
-                                    <select
-                                        name="warehouse_id"
-                                        required
-                                        class="py-1 px-2.5 text-xs font-semibold border border-purple-300 rounded-lg bg-white focus:ring-1 focus:ring-purple-500"
-                                    >
-                                        <option value="">-- Pilih Gudang --</option>
-                                        @foreach(\App\Models\Warehouse::where('status', 1)->get() as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }}</option>
-                                        @endforeach
-                                    </select>
+                                    <x-searchable-select name="warehouse_id" :options="collect(\App\Models\Warehouse::where('status', 1)->get())->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name])->values()" placeholder="-- Pilih Gudang --" :required="true" size="xs" />
                                 </div>
                             @endif
                         </div>
@@ -721,5 +706,55 @@
         </div>
     </div>
 
+    {{-- Modal Konfirmasi Barang Sampai --}}
+    <x-confirmation-modal
+        name="mark-received"
+        title="Konfirmasi Penerimaan Fisik Retur"
+        type="info"
+        confirm-text="Ya, Barang Sudah Sampai"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Tandai bahwa fisik barang retur untuk pengajuan <span class="font-bold text-gray-900 font-mono">{{ $customerReturn->return_number }}</span> telah sampai dan diterima di gudang?
+        </p>
+        <p class="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg p-2.5 mt-2">
+            Status pengajuan akan beralih ke <strong>Diterima</strong> dan siap untuk proses inspeksi QC.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Setujui Retur --}}
+    <x-confirmation-modal
+        name="approve-return"
+        title="Setujui Pengajuan Retur"
+        type="success"
+        confirm-text="Ya, Setujui Retur"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Setujui pengajuan retur <span class="font-bold text-gray-900 font-mono">{{ $customerReturn->return_number }}</span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Seluruh keputusan penanganan (restorasi stok, servis/perbaikan, atau pembuatan nota kredit) akan difinalkan.
+        </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Selesaikan Retur --}}
+    <x-confirmation-modal
+        name="complete-return"
+        title="Selesaikan Retur Penjualan"
+        type="success"
+        confirm-text="Ya, Selesaikan Retur"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Selesaikan retur penjualan <span class="font-bold text-gray-900 font-mono">{{ $customerReturn->return_number }}</span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Stok barang yang diperbaiki/diganti akan dipulihkan ke gudang dan jurnal akuntansi akan otomatis diposting. Aksi ini tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

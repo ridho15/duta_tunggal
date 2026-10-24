@@ -196,4 +196,30 @@ class ChartOfAccount extends Model
     {
         return "{$this->code} - {$this->name}";
     }
+
+    /**
+     * Cek apakah akun COA dapat dihapus dengan aman.
+     */
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        if ($this->children()->exists()) {
+            $blockers[] = 'memiliki ' . $this->children()->count() . ' sub-akun turunan';
+        }
+
+        if ($this->journalEntries()->exists()) {
+            $blockers[] = 'telah digunakan dalam ' . $this->journalEntries()->count() . ' baris transaksi jurnal';
+        }
+
+        $usedInProduct = \App\Models\Product::where('inventory_coa_id', $this->id)
+            ->orWhere('sales_coa_id', $this->id)
+            ->orWhere('cogs_coa_id', $this->id)
+            ->exists();
+        if ($usedInProduct) {
+            $blockers[] = 'terdaftar sebagai akun default persediaan/penjualan/HPP produk';
+        }
+
+        return $blockers;
+    }
 }

@@ -7,19 +7,19 @@
     <div class="flex items-center justify-between pb-2 border-b border-gray-200">
         <div>
             <div class="flex items-center gap-2">
-                <h1 class="text-xl font-extrabold text-gray-900 tracking-tight">Siapkan & Kirim</h1>
+                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Siapkan & Kirim</h1>
                 <span class="text-[9px] font-bold text-[#15803d] border border-[#86efac] bg-[#f0fdf4] rounded px-1.5 py-0.5">
                     CHECKER
                 </span>
             </div>
-            <p class="text-xs text-gray-500 mt-0.5">Antrean barang yang harus dicek dan disiapkan di gudang.</p>
+            <p class="text-sm text-gray-500 mt-0.5">Antrean barang yang harus dicek dan disiapkan di gudang.</p>
         </div>
 
         {{-- Warehouse Selector Dropdown --}}
         <div>
             <form method="GET" action="{{ route('gudang.kiriman.index') }}" id="warehouseForm">
                 <input type="hidden" name="tab" value="{{ $tab }}">
-                <select
+                <select data-searchable
                     name="warehouse_id"
                     onchange="document.getElementById('warehouseForm').submit()"
                     class="text-xs font-bold text-gray-800 bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-[#15803d]"
@@ -99,11 +99,12 @@
 
             @if($isWaitingSJ)
                 {{-- Card Menunggu SJ (Dashed) --}}
-                <div class="bg-white border border-dashed border-gray-300 rounded-2xl p-4 space-y-2">
+                <div class="bg-white border border-dashed border-gray-200 rounded-2xl p-4 space-y-2">
                     <div class="flex items-center justify-between">
                         <span class="font-extrabold text-base text-gray-700">{{ $do->do_number }}</span>
-                        <span class="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
-                            MENUNGGU SJ
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Menunggu SJ
                         </span>
                     </div>
                     <div class="text-xs text-gray-600">
@@ -115,11 +116,12 @@
                 </div>
             @else
                 {{-- Card Siap Dicek --}}
-                <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-3 hover:border-gray-300 transition">
+                <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3 hover:border-gray-200 transition">
                     <div class="flex items-center justify-between">
                         <span class="font-extrabold text-base text-gray-900">{{ $do->do_number }}</span>
-                        <span class="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-0.5">
-                            SIAP DICEK
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            Siap Dicek
                         </span>
                     </div>
 
@@ -134,7 +136,7 @@
 
                         <a
                             href="{{ route('gudang.kiriman.check', $do->id) }}"
-                            class="bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2 rounded-xl font-bold text-xs shadow-xs transition"
+                            class="bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2 rounded-xl font-semibold text-xs shadow-sm transition active:scale-[0.98]"
                         >
                             Mulai cek
                         </a>
@@ -142,7 +144,7 @@
                 </div>
             @endif
         @empty
-            <div class="bg-white border border-gray-200 rounded-2xl p-8 text-center text-gray-400 text-xs">
+            <div class="bg-white border border-gray-100 rounded-2xl p-8 text-center text-gray-400 text-xs">
                 Tidak ada kiriman pada tab ini di gudang {{ $activeWarehouse->name ?? '' }}.
             </div>
         @endforelse

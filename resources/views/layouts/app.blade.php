@@ -41,6 +41,9 @@
         </div>
     </div>
 
+    {{-- Dropdown ber-pencarian untuk <select data-searchable> (baris item / dibuat lewat JS) --}}
+    @include('layouts.partials.select-enhancer')
+
     @stack('scripts')
 </body>
 </html>

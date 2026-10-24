@@ -34,7 +34,7 @@
         <div class="brand">DUTA TUNGGAL<span>ERP</span></div>
         @yield('content')
         <div class="actions">
-            <a class="btn primary" href="{{ url('/admin') }}">Kembali ke Beranda</a>
+            <a class="btn primary" href="{{ route('dashboard') }}">Kembali ke Beranda</a>
             <a class="btn secondary" href="javascript:history.back()">Halaman sebelumnya</a>
         </div>
     </main>

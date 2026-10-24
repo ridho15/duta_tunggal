@@ -68,19 +68,16 @@
 
             {{-- Pending Approval Actions --}}
             @if (in_array($materialIssue->status, ['draft', 'pending_approval']))
-                <form action="{{ route('manufaktur.material-issue.confirm-warehouse', $materialIssue) }}" method="POST" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
-                        onclick="return confirm('Konfirmasi serah terima fisik barang dan setujui dokumen ini?');"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        Konfirmasi & Setujui Gudang
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
+                    @click="$dispatch('open-modal-confirm-warehouse')"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Konfirmasi & Setujui Gudang
+                </button>
 
                 <button
                     type="button"
@@ -96,78 +93,34 @@
 
             {{-- Approved Actions --}}
             @if ($materialIssue->status === 'approved')
-                <form action="{{ route('manufaktur.material-issue.complete', $materialIssue) }}" method="POST" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
-                        onclick="return confirm('Selesaikan dokumen pengeluaran bahan ini? Stok fisik akan dipotong dan jurnal BDP otomatis dicatat.');"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Selesaikan Serah Terima
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
+                    @click="$dispatch('open-modal-complete-issue')"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Selesaikan Serah Terima
+                </button>
             @endif
 
             {{-- Delete action for Draft --}}
             @if ($materialIssue->status === 'draft')
-                <form
-                    action="{{ route('manufaktur.material-issue.destroy', $materialIssue) }}"
-                    method="POST"
-                    onsubmit="return confirm('Apakah Anda yakin ingin menghapus draft pengeluaran bahan {{ $materialIssue->issue_number }}?');"
-                    class="inline"
+                <button
+                    type="button"
+                    class="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent rounded-xl transition"
+                    title="Hapus Draft"
+                    @click="$dispatch('open-modal-delete-issue')"
                 >
-                    @csrf
-                    @method('DELETE')
-                    <button
-                        type="submit"
-                        class="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent rounded-xl transition"
-                        title="Hapus Draft"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </form>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             @endif
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('warning'))
-        <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>{{ session('warning') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- Stepper Status Lifecycle --}}
     @php
@@ -550,4 +503,55 @@
         </form>
     </div>
 </div>
+
+{{-- Modal Konfirmasi Setujui Gudang --}}
+<x-confirmation-modal
+    name="confirm-warehouse"
+    title="Konfirmasi & Setujui Pengeluaran Gudang"
+    variant="success"
+    confirm-text="Ya, Setujui Dokumen"
+    cancel-text="Batal"
+    action="{{ route('manufaktur.material-issue.confirm-warehouse', $materialIssue) }}"
+    method="POST"
+>
+    <p class="text-sm text-gray-600">
+        Konfirmasi serah terima fisik barang dan setujui dokumen pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>?
+    </p>
+    <p class="text-xs text-[#15803d] mt-2 font-medium">
+        Dokumen akan ditandai disetujui oleh gudang dan siap dieksekusi pemotongan stok fisik.
+    </p>
+</x-confirmation-modal>
+
+{{-- Modal Konfirmasi Selesaikan Pengeluaran Bahan --}}
+<x-confirmation-modal
+    name="complete-issue"
+    title="Selesaikan Serah Terima Bahan Baku"
+    variant="success"
+    confirm-text="Ya, Selesaikan & Potong Stok"
+    cancel-text="Batal"
+    action="{{ route('manufaktur.material-issue.complete', $materialIssue) }}"
+    method="POST"
+>
+    <p class="text-sm text-gray-600">
+        Selesaikan dokumen pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>?
+    </p>
+    <p class="text-xs text-[#15803d] mt-2 font-medium">
+        Stok fisik bahan baku di gudang akan langsung dipotong dan jurnal akuntansi Barang Dalam Proses (BDP) otomatis dibukukan.
+    </p>
+</x-confirmation-modal>
+
+{{-- Modal Konfirmasi Hapus Draft --}}
+<x-confirmation-modal
+    name="delete-issue"
+    title="Hapus Draft Pengeluaran Bahan"
+    variant="danger"
+    confirm-text="Ya, Hapus Draft"
+    cancel-text="Batal"
+    action="{{ route('manufaktur.material-issue.destroy', $materialIssue) }}"
+    method="DELETE"
+>
+    <p class="text-sm text-gray-600">
+        Apakah Anda yakin ingin menghapus draft pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
+    </p>
+</x-confirmation-modal>
 @endsection

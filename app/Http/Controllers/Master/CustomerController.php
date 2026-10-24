@@ -70,7 +70,10 @@ class CustomerController extends Controller
         $baseQuery = Customer::query()->with('cabang');
 
         if (! $canAccessAll && $userCabangId) {
-            $baseQuery->where('cabang_id', $userCabangId);
+            $baseQuery->where(function ($q) use ($userCabangId) {
+                $q->where('cabang_id', $userCabangId)
+                    ->orWhereNull('cabang_id');
+            });
         }
 
         // KPI Counts
@@ -231,10 +234,12 @@ class CustomerController extends Controller
         $this->authorizeAccess('delete customer');
 
         try {
-            // Cek apakah customer memiliki transaksi sales order aktif
-            $hasActiveOrders = $customer->sales()->whereIn('status', ['draft', 'approved', 'process'])->exists();
-            if ($hasActiveOrders) {
-                return back()->with('error', "Customer '{$customer->name}' tidak dapat dihapus karena masih memiliki pesanan penjualan aktif.");
+            // Cek apakah customer memiliki transaksi sales order aktif, piutang, atau saldo deposit
+            $blockers = $customer->getDeletionBlockers();
+            if ($blockers !== []) {
+                $reason = implode(', ', $blockers);
+
+                return back()->with('error', "Customer '{$customer->name}' tidak dapat dihapus karena {$reason}.");
             }
 
             $name = $customer->name;

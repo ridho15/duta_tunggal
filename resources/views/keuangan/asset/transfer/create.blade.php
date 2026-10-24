@@ -62,7 +62,7 @@
                     <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                         Pilih Aset Tetap <span class="text-rose-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         id="assetSelect"
                         name="asset_id"
                         required
@@ -106,18 +106,7 @@
                     <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                         Cabang Tujuan Mutasi <span class="text-rose-500">*</span>
                     </label>
-                    <select
-                        name="to_cabang_id"
-                        required
-                        class="w-full text-xs rounded-xl border-gray-200 focus:border-[#15803d] focus:ring focus:ring-emerald-200"
-                    >
-                        <option value="">-- Pilih Cabang Penerima --</option>
-                        @foreach ($cabangs as $cabang)
-                            <option value="{{ $cabang->id }}" {{ old('to_cabang_id') == $cabang->id ? 'selected' : '' }}>
-                                {{ $cabang->nama }} ({{ $cabang->kode }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="to_cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama . ' (' . $cabang->kode . ')'])->values()" :value="old('to_cabang_id')" placeholder="-- Pilih Cabang Penerima --" :required="true" size="sm" />
                     <span class="text-[11px] text-gray-400 mt-1 block">Pastikan cabang tujuan berbeda dengan cabang asal aset.</span>
                 </div>
 

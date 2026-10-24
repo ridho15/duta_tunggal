@@ -90,14 +90,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Cabang Pendaftaran
                     </label>
-                    <select name="cabang_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                        <option value="">Semua Cabang (Global)</option>
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ old('cabang_id', $customer->cabang_id) == $cb->id ? 'selected' : '' }}>
-                                ({{ $cb->kode }}) {{ $cb->nama }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => '(' . $cb->kode . ') ' . $cb->nama])->values()" :value="old('cabang_id', $customer->cabang_id)" placeholder="Semua Cabang (Global)" />
                 </div>
 
                 {{-- Nama Customer --}}
@@ -207,13 +200,12 @@
                 {{-- Telepon Kantor --}}
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
-                        Telepon Kantor <span class="text-rose-500">*</span>
+                        Telepon Kantor <span class="text-xs text-gray-400 font-normal">(Opsional)</span>
                     </label>
                     <input
                         type="text"
                         name="telephone"
                         value="{{ old('telephone', $customer->telephone) }}"
-                        required
                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-mono"
                     >
                 </div>
@@ -221,13 +213,12 @@
                 {{-- Email --}}
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
-                        Alamat Email <span class="text-rose-500">*</span>
+                        Alamat Email <span class="text-xs text-gray-400 font-normal">(Opsional)</span>
                     </label>
                     <input
                         type="email"
                         name="email"
                         value="{{ old('email', $customer->email) }}"
-                        required
                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
                     >
                 </div>
@@ -235,13 +226,12 @@
                 {{-- Fax --}}
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
-                        Nomor Fax <span class="text-rose-500">*</span>
+                        Nomor Fax <span class="text-xs text-gray-400 font-normal">(Opsional)</span>
                     </label>
                     <input
                         type="text"
                         name="fax"
                         value="{{ old('fax', $customer->fax) }}"
-                        required
                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-mono"
                     >
                 </div>

@@ -61,4 +61,42 @@ class Cabang extends Model
     {
         return $this->hasMany(Product::class, 'cabang_id');
     }
+
+    public function users()
+    {
+        return $this->hasMany(User::class, 'cabang_id');
+    }
+
+    public function sales()
+    {
+        return $this->hasMany(SaleOrder::class, 'cabang_id');
+    }
+
+    public function purchaseOrders()
+    {
+        return $this->hasMany(PurchaseOrder::class, 'cabang_id');
+    }
+
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        if ($this->warehouse()->exists()) {
+            $blockers[] = 'memiliki ' . $this->warehouse()->count() . ' gudang aktif';
+        }
+
+        if ($this->users()->exists()) {
+            $blockers[] = 'memiliki ' . $this->users()->count() . ' pengguna (user) terdaftar';
+        }
+
+        if ($this->sales()->exists()) {
+            $blockers[] = 'memiliki riwayat transaksi penjualan (Sales Order)';
+        }
+
+        if ($this->purchaseOrders()->exists()) {
+            $blockers[] = 'memiliki riwayat transaksi pembelian (Purchase Order)';
+        }
+
+        return $blockers;
+    }
 }

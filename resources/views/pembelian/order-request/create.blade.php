@@ -216,19 +216,52 @@
                             </div>
 
                             <div class="flex items-center gap-3">
-                                {{-- Cabang Per Item (Penting untuk split PO multi cabang) --}}
-                                <div class="flex items-center gap-1.5">
+                                {{-- Cabang Per Item (Searchable Dropdown) --}}
+                                <div class="flex items-center gap-1.5 relative" @click.outside="item.cabangDropdownOpen = false">
                                     <span class="text-xs font-semibold text-gray-500 hidden sm:inline">Cabang Tujuan:</span>
-                                    <select
-                                        :name="'items[' + index + '][cabang_id]'"
-                                        x-model="item.cabangId"
-                                        required
-                                        class="py-1 px-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#15803d]"
-                                    >
-                                        <template x-for="c in cabangs" :key="c.id">
-                                            <option :value="c.id" x-text="c.nama + (c.kode ? ' (' + c.kode + ')' : '')"></option>
-                                        </template>
-                                    </select>
+                                    <input type="hidden" :name="'items[' + index + '][cabang_id]'" :value="item.cabangId" required>
+                                    <div class="relative">
+                                        <button
+                                            type="button"
+                                            @click="item.cabangDropdownOpen = !item.cabangDropdownOpen; item.cabangSearchQuery = '';"
+                                            class="py-1 px-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium text-gray-700 flex items-center justify-between gap-1.5 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-[#15803d] transition"
+                                        >
+                                            <span x-text="getCabangLabel(item)" class="truncate max-w-[140px]"></span>
+                                            <svg class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150" :class="{'rotate-180 text-[#15803d]': item.cabangDropdownOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        <div
+                                            x-show="item.cabangDropdownOpen"
+                                            x-transition
+                                            class="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-1.5 text-xs"
+                                            style="display: none;"
+                                        >
+                                            <input
+                                                type="text"
+                                                x-model="item.cabangSearchQuery"
+                                                placeholder="Cari cabang..."
+                                                class="w-full px-2.5 py-1.5 mb-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]"
+                                                @click.stop
+                                            >
+                                            <div class="max-h-44 overflow-y-auto space-y-0.5 custom-scrollbar">
+                                                <template x-for="c in filteredCabangs(item)" :key="c.id">
+                                                    <div
+                                                        @click="item.cabangId = c.id; item.cabangDropdownOpen = false;"
+                                                        class="p-2 rounded-lg hover:bg-emerald-50 cursor-pointer flex items-center justify-between transition"
+                                                        :class="{'bg-emerald-50/80 font-bold text-emerald-900': item.cabangId == c.id}"
+                                                    >
+                                                        <span x-text="c.nama" class="truncate"></span>
+                                                        <span class="text-[10px] text-gray-400 font-mono ml-2 shrink-0" x-text="c.kode || ''"></span>
+                                                    </div>
+                                                </template>
+                                                <div x-show="filteredCabangs(item).length === 0" class="p-2 text-center text-gray-400 select-none">
+                                                    Cabang tidak ditemukan.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {{-- Hapus Baris --}}
@@ -322,22 +355,76 @@
                                 <div class="w-full py-2 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-center text-gray-700" x-text="item.uom || 'Pcs'"></div>
                             </div>
 
-                            {{-- Supplier Rekomendasi / Rekanan Pivot --}}
-                            <div class="md:col-span-3">
+                            {{-- Supplier Rekomendasi / Rekanan Pivot (Searchable Dropdown) --}}
+                            <div class="md:col-span-3 relative" @click.outside="item.supplierDropdownOpen = false">
                                 <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">
                                     Pilihan Rekanan / Supplier
                                 </label>
-                                <select
-                                    :name="'items[' + index + '][supplier_id]'"
-                                    x-model="item.supplierId"
-                                    @change="onSupplierChange(item)"
-                                    class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d]"
-                                >
-                                    <option value="">-- Bebas / Rekomendasi Purchasing --</option>
-                                    <template x-for="s in item.suppliersList" :key="s.id">
-                                        <option :value="s.id" x-text="s.label" :selected="s.id == item.supplierId"></option>
-                                    </template>
-                                </select>
+                                <input type="hidden" :name="'items[' + index + '][supplier_id]'" :value="item.supplierId">
+                                <div class="relative">
+                                    <button
+                                        type="button"
+                                        @click="item.supplierDropdownOpen = !item.supplierDropdownOpen; item.supplierSearchQuery = '';"
+                                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium text-gray-800 flex items-center justify-between gap-1 text-left hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-[#15803d] transition"
+                                    >
+                                        <span class="truncate" x-text="getSupplierLabel(item)"></span>
+                                        <div class="flex items-center gap-1 flex-shrink-0 text-gray-400">
+                                            <template x-if="item.supplierId">
+                                                <span
+                                                    role="button"
+                                                    @click.stop="item.supplierId = ''; onSupplierChange(item);"
+                                                    class="p-0.5 rounded hover:bg-gray-100 hover:text-red-500 transition"
+                                                    title="Kosongkan Pilihan Supplier"
+                                                >
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                </span>
+                                            </template>
+                                            <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-150" :class="{'rotate-180 text-[#15803d]': item.supplierDropdownOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </div>
+                                    </button>
+
+                                    {{-- Dropdown Panel --}}
+                                    <div
+                                        x-show="item.supplierDropdownOpen"
+                                        x-transition
+                                        class="absolute left-0 top-full mt-1 w-full min-w-[270px] bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-1.5 text-xs"
+                                        style="display: none;"
+                                    >
+                                        <input
+                                            type="text"
+                                            x-model="item.supplierSearchQuery"
+                                            placeholder="Ketik untuk mencari supplier..."
+                                            class="w-full px-2.5 py-1.5 mb-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]"
+                                            @click.stop
+                                        >
+                                        <div class="max-h-48 overflow-y-auto space-y-0.5 custom-scrollbar">
+                                            <div
+                                                @click="item.supplierId = ''; onSupplierChange(item); item.supplierDropdownOpen = false;"
+                                                class="p-2 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-500 italic transition"
+                                                :class="{'bg-gray-100 font-bold': !item.supplierId}"
+                                            >
+                                                -- Bebas / Rekomendasi Purchasing --
+                                            </div>
+                                            <template x-for="s in filteredSuppliers(item)" :key="s.id">
+                                                <div
+                                                    @click="item.supplierId = s.id; onSupplierChange(item); item.supplierDropdownOpen = false;"
+                                                    class="p-2 rounded-lg hover:bg-emerald-50 cursor-pointer flex items-center justify-between gap-1 transition"
+                                                    :class="{'bg-emerald-50/80 font-bold text-emerald-900': item.supplierId == s.id}"
+                                                >
+                                                    <span x-text="s.label" class="truncate"></span>
+                                                    <template x-if="s.price">
+                                                        <span class="text-[10px] font-mono font-semibold text-[#15803d] shrink-0" x-text="formatRupiah(s.price)"></span>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <div x-show="filteredSuppliers(item).length === 0" class="p-2 text-center text-gray-400 select-none">
+                                                Tidak ada supplier yang cocok.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             {{-- Catatan / Spek Item --}}
@@ -571,6 +658,10 @@ function orderRequestForm(config) {
                 isLoadingSuppliers: false,
                 recommendedSupplierText: prefill.recommended_supplier_text || '',
                 recommendedSupplierId: prefill.recommended_supplier_id || null,
+                supplierDropdownOpen: false,
+                supplierSearchQuery: '',
+                cabangDropdownOpen: false,
+                cabangSearchQuery: '',
 
                 // Commercial & Tax
                 quantity: prefill.quantity !== undefined ? parseFloat(prefill.quantity) : 1,
@@ -679,6 +770,35 @@ function orderRequestForm(config) {
                 item.originalPrice = found.supplier_price;
                 item.unitPrice = found.supplier_price;
             }
+        },
+
+        getSupplierLabel(item) {
+            if (!item.supplierId) return '-- Bebas / Rekomendasi Purchasing --';
+            const found = (item.suppliersList || []).find(s => String(s.id) === String(item.supplierId));
+            return found ? found.label : (item.recommendedSupplierText || 'Supplier #' + item.supplierId);
+        },
+
+        filteredSuppliers(item) {
+            const list = item.suppliersList || [];
+            if (!item.supplierSearchQuery || !item.supplierSearchQuery.trim()) {
+                return list;
+            }
+            const q = item.supplierSearchQuery.toLowerCase();
+            return list.filter(s => (s.label || '').toLowerCase().includes(q));
+        },
+
+        getCabangLabel(item) {
+            const found = (this.cabangs || []).find(c => String(c.id) === String(item.cabangId));
+            return found ? (found.nama + (found.kode ? ' (' + found.kode + ')' : '')) : '-- Pilih Cabang --';
+        },
+
+        filteredCabangs(item) {
+            const list = this.cabangs || [];
+            if (!item.cabangSearchQuery || !item.cabangSearchQuery.trim()) {
+                return list;
+            }
+            const q = item.cabangSearchQuery.toLowerCase();
+            return list.filter(c => (c.nama || '').toLowerCase().includes(q) || (c.kode || '').toLowerCase().includes(q));
         },
 
         onTipePajakChange(item, type) {

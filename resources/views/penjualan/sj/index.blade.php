@@ -11,8 +11,8 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-700 font-semibold">Surat Jalan</span>
             </nav>
-            <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Surat Jalan</h1>
-            <p class="text-xs text-gray-500 mt-0.5">
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Surat Jalan</h1>
+            <p class="text-sm text-gray-500 mt-0.5">
                 Dokumen pengiriman resmi serah-terima barang ke pihak logistik dan customer.
             </p>
         </div>
@@ -20,7 +20,7 @@
         <div>
             <a
                 href="{{ route('penjualan.sj.create') }}"
-                class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition"
+                class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4v16m8-8H4" stroke-width="2.2" stroke-linecap="round"></path>
@@ -66,7 +66,7 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white border border-gray-200 rounded-2xl p-3 shadow-xs">
+    <div class="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
         <form method="GET" action="{{ route('penjualan.sj.index') }}" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
 
@@ -89,18 +89,7 @@
 
             {{-- Cabang Filter --}}
             <div class="sm:w-56">
-                <select
-                    name="cabang_id"
-                    onchange="this.form.submit()"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-[#15803d]"
-                >
-                    <option value="">Semua Cabang</option>
-                    @foreach($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ $cabangId == $c->id ? 'selected' : '' }}>
-                            {{ $c->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" :auto-submit="true" size="sm" />
             </div>
 
             <button type="submit" class="bg-gray-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-black transition">
@@ -110,11 +99,11 @@
     </div>
 
     {{-- Desktop Table View --}}
-    <div class="hidden md:block bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="px-5 py-3.5">No. Surat Jalan</th>
                         <th class="px-4 py-3.5">Customer & SO</th>
                         <th class="px-4 py-3.5">Delivery Order (Gudang)</th>
@@ -181,16 +170,18 @@
                             {{-- Status --}}
                             <td class="px-4 py-4">
                                 @if($sj->status === \App\Models\SuratJalan::STATUS_ISSUED)
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Terbit
                                     </span>
                                 @elseif($sj->status === \App\Models\SuratJalan::STATUS_DRAFT)
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700 bg-gray-100 border border-gray-200 rounded-lg px-2.5 py-1">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         Draft
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Dibatalkan
                                     </span>
                                 @endif
@@ -233,7 +224,7 @@
 
         {{-- Pagination --}}
         @if($suratJalans->hasPages())
-            <div class="px-5 py-3 border-t border-gray-100">
+            <div class="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
                 {{ $suratJalans->links() }}
             </div>
         @endif
@@ -248,7 +239,7 @@
                 $customer = $primarySO?->customer;
                 $schedule = $sj->deliverySchedules->first();
             @endphp
-            <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-3">
+            <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <a href="{{ route('penjualan.sj.show', $sj->id) }}" class="font-extrabold text-gray-900 text-base">
@@ -259,15 +250,18 @@
                         </div>
                     </div>
                     @if($sj->status === \App\Models\SuratJalan::STATUS_ISSUED)
-                        <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Terbit
                         </span>
                     @elseif($sj->status === \App\Models\SuratJalan::STATUS_DRAFT)
-                        <span class="text-[10px] font-bold text-gray-700 bg-gray-100 border border-gray-200 rounded-md px-2 py-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                             Draft
                         </span>
                     @else
-                        <span class="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-md px-2 py-0.5">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                             Dibatalkan
                         </span>
                     @endif

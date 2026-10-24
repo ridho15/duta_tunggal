@@ -174,16 +174,7 @@
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                             Cabang Operasional
                         </label>
-                        <select
-                            name="cabang_id"
-                            class="w-full max-w-sm px-3.5 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
-                        >
-                            @foreach ($cabangs as $c)
-                                <option value="{{ $c->id }}" {{ (string)old('cabang_id', auth()->user()?->cabang_id) === (string)$c->id ? 'selected' : '' }}>
-                                    {{ $c->nama }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="(old('cabang_id', auth()->user()?->cabang_id)) ?: collect($cabangs)->first()?->id" />
                     </div>
                 @endif
             </div>

@@ -18,7 +18,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('penjualan.credit-notes.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -31,7 +31,7 @@
     {{-- 4 KPI Summary Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total Nota Kredit --}}
-        <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-gray-300 transition">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-200 transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-500">Total Dokumen</span>
                 <span class="p-2 bg-gray-100 rounded-lg text-gray-600">
@@ -50,7 +50,7 @@
         </div>
 
         {{-- Draf Menunggu Terbit --}}
-        <div class="bg-white rounded-xl border border-amber-200 p-4 shadow-sm hover:border-amber-300 transition bg-gradient-to-br from-amber-50/40 to-white">
+        <div class="bg-white rounded-2xl border border-amber-100 p-4 shadow-sm hover:border-amber-200 transition bg-gradient-to-br from-amber-50/40 to-white">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Draf Menunggu Terbit</span>
                 <span class="p-2 bg-amber-100 rounded-lg text-amber-700">
@@ -69,7 +69,7 @@
         </div>
 
         {{-- Diterbitkan (Issued) --}}
-        <div class="bg-white rounded-xl border border-emerald-200 p-4 shadow-sm hover:border-emerald-300 transition bg-gradient-to-br from-emerald-50/40 to-white">
+        <div class="bg-white rounded-2xl border border-emerald-100 p-4 shadow-sm hover:border-emerald-200 transition bg-gradient-to-br from-emerald-50/40 to-white">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Kredit Diterbitkan</span>
                 <span class="p-2 bg-emerald-100 rounded-lg text-emerald-700">
@@ -88,7 +88,7 @@
         </div>
 
         {{-- Alokasi Kredit Terbit --}}
-        <div class="bg-white rounded-xl border border-blue-200 p-4 shadow-sm hover:border-blue-300 transition bg-gradient-to-br from-blue-50/40 to-white">
+        <div class="bg-white rounded-2xl border border-blue-100 p-4 shadow-sm hover:border-blue-200 transition bg-gradient-to-br from-blue-50/40 to-white">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Alokasi Finansial</span>
                 <span class="p-2 bg-blue-100 rounded-lg text-blue-700">
@@ -111,7 +111,7 @@
     </div>
 
     {{-- Tabs Status & Filter Box --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-4">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
         {{-- Tabs --}}
         <div class="flex border-b border-gray-200 gap-6 overflow-x-auto text-sm font-semibold">
             <a
@@ -218,10 +218,10 @@
     </div>
 
     {{-- Tabel Data --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-50 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-500">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                     <tr>
                         <th class="py-3 px-4">Dokumen</th>
                         <th class="py-3 px-4">Jenis</th>
@@ -232,22 +232,22 @@
                         <th class="py-3 px-4 text-center">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody class="divide-y divide-gray-100">
                     @forelse ($creditNotes as $cn)
                         @php
                             $typeBadge = match ($cn->type) {
-                                \App\Models\CreditNote::TYPE_CANCELLATION => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'border' => 'border-rose-200', 'label' => 'Pembatalan Invoice'],
-                                \App\Models\CreditNote::TYPE_RETURN => ['bg' => 'bg-amber-50', 'text' => 'text-amber-800', 'border' => 'border-amber-200', 'label' => 'Retur Barang'],
-                                \App\Models\CreditNote::TYPE_CORRECTION => ['bg' => 'bg-blue-50', 'text' => 'text-blue-700', 'border' => 'border-blue-200', 'label' => 'Koreksi Sebagian'],
-                                default => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'label' => $cn->type],
+                                \App\Models\CreditNote::TYPE_CANCELLATION => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'border' => 'border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Pembatalan Invoice'],
+                                \App\Models\CreditNote::TYPE_RETURN => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Retur Barang'],
+                                \App\Models\CreditNote::TYPE_CORRECTION => ['bg' => 'bg-blue-50', 'text' => 'text-blue-700', 'border' => 'border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Koreksi Sebagian'],
+                                default => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400', 'label' => $cn->type],
                             };
 
                             $statusBadge = match ($cn->status) {
-                                \App\Models\CreditNote::STATUS_ISSUED => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'label' => 'Terbit (Issued)'],
-                                default => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'label' => 'Draf'],
+                                \App\Models\CreditNote::STATUS_ISSUED => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Terbit (Issued)'],
+                                default => ['bg' => 'bg-gray-50', 'text' => 'text-gray-700', 'border' => 'border-gray-200', 'dot' => 'bg-gray-400', 'label' => 'Draf'],
                             };
                         @endphp
-                        <tr class="hover:bg-gray-50/70 transition">
+                        <tr class="hover:bg-gray-50/60 transition">
                             {{-- Dokumen --}}
                             <td class="py-3 px-4 font-medium">
                                 <a href="{{ route('penjualan.credit-notes.show', $cn->id) }}" class="font-extrabold text-[#15803d] hover:underline block text-[13px]">
@@ -260,14 +260,16 @@
 
                             {{-- Jenis --}}
                             <td class="py-3 px-4">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $typeBadge['bg'] }} {{ $typeBadge['text'] }} {{ $typeBadge['border'] }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $typeBadge['bg'] }} {{ $typeBadge['text'] }} {{ $typeBadge['border'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $typeBadge['dot'] }}"></span>
                                     {{ $typeBadge['label'] }}
                                 </span>
                             </td>
 
                             {{-- Status --}}
                             <td class="py-3 px-4">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $statusBadge['bg'] }} {{ $statusBadge['text'] }} {{ $statusBadge['border'] }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $statusBadge['bg'] }} {{ $statusBadge['text'] }} {{ $statusBadge['border'] }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $statusBadge['dot'] }}"></span>
                                     {{ $statusBadge['label'] }}
                                 </span>
                             </td>
@@ -376,7 +378,7 @@
 
         {{-- Pagination --}}
         @if ($creditNotes->hasPages())
-            <div class="p-4 border-t border-gray-200">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $creditNotes->links() }}
             </div>
         @endif

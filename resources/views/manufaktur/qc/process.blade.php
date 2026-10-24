@@ -85,7 +85,7 @@
                             id="passed_quantity"
                             value="{{ old('passed_quantity', (float)($qc->passed_quantity ?? $targetQty)) }}"
                             required
-                            class="w-full px-3 py-2.5 bg-emerald-50/40 border border-emerald-300 rounded-xl text-base font-mono font-bold text-emerald-900 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                            class="w-full px-3 py-2.5 bg-emerald-50/40 border border-emerald-300 rounded-lg text-base font-mono font-bold text-emerald-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
                         >
                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-emerald-700 font-bold">
                             {{ $product?->uom?->name ?? 'Pcs' }}
@@ -107,7 +107,7 @@
                             id="rejected_quantity"
                             value="{{ old('rejected_quantity', (float)($qc->rejected_quantity ?? 0)) }}"
                             required
-                            class="w-full px-3 py-2.5 bg-rose-50/40 border border-rose-300 rounded-xl text-base font-mono font-bold text-rose-900 focus:bg-white focus:border-rose-600 focus:ring-1 focus:ring-rose-600 transition"
+                            class="w-full px-3 py-2.5 bg-rose-50/40 border border-rose-300 rounded-lg text-base font-mono font-bold text-rose-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition"
                         >
                         <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-rose-700 font-bold">
                             {{ $product?->uom?->name ?? 'Pcs' }}
@@ -125,7 +125,7 @@
                         id="reason_reject"
                         rows="2"
                         placeholder="Contoh: Terjadi keretakan fitting bodi, toleransi ukuran melenceng, dll..."
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                        class="w-full border border-gray-300 py-2.5 px-3 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
                     >{{ old('reason_reject', $qc->reason_reject) }}</textarea>
                 </div>
             </div>
@@ -139,28 +139,25 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Gudang Penyimpanan Barang Jadi <span class="text-rose-500">*</span>
                     </label>
-                    <select
+                    <x-searchable-select
                         name="warehouse_id"
                         id="warehouse_id"
-                        required
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                    >
-                        @foreach ($warehouses as $wh)
-                            <option value="{{ $wh->id }}" {{ old('warehouse_id', $qc->warehouse_id ?? $plan?->warehouse_id) == $wh->id ? 'selected' : '' }}>
-                                ({{ $wh->kode }}) {{ $wh->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                        :options="$warehouses->map(fn($w) => ['id' => $w->id, 'label' => '('.$w->kode.') '.$w->name])->values()"
+                        :value="old('warehouse_id', $qc->warehouse_id ?? $plan?->warehouse_id)"
+                        placeholder="Pilih Gudang Penyimpanan"
+                        :required="true"
+                        size="sm"
+                    />
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Rak Penyimpanan (Opsional)
                     </label>
-                    <select
+                    <select data-searchable
                         name="rak_id"
                         id="rak_id"
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                        class="w-full border border-gray-300 py-2.5 px-3 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
                     >
                         <option value="">-- Pilih Rak (Bila Ada) --</option>
                         @foreach ($raks as $rak)
@@ -175,17 +172,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Petugas Inspeksi (Inspected By) <span class="text-rose-500">*</span>
                     </label>
-                    <select
-                        name="inspected_by"
-                        required
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                    >
-                        @foreach ($inspectors as $inspector)
-                            <option value="{{ $inspector->id }}" {{ old('inspected_by', $qc->inspected_by ?? auth()->id()) == $inspector->id ? 'selected' : '' }}>
-                                {{ $inspector->name }} ({{ $inspector->email }})
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="inspected_by" :options="collect($inspectors)->map(fn ($inspector) => ['id' => $inspector->id, 'label' => $inspector->name . ' (' . $inspector->email . ')'])->values()" :value="(old('inspected_by', $qc->inspected_by ?? auth()->id())) ?: collect($inspectors)->first()?->id" :required="true" size="sm" />
                 </div>
 
                 <div>
@@ -197,7 +184,7 @@
                         name="notes"
                         value="{{ old('notes', $qc->notes) }}"
                         placeholder="Catatan inspeksi QC..."
-                        class="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
+                        class="w-full border border-gray-300 py-2.5 px-3 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
                     >
                 </div>
             </div>

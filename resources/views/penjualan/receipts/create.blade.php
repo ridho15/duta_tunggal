@@ -71,7 +71,7 @@
                     <label class="block text-xs font-bold text-gray-700">
                         Customer (Pelanggan) <span class="text-red-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         name="customer_id"
                         x-model="customerId"
                         @change="onCustomerChange"
@@ -143,9 +143,7 @@
                         <button
                             type="button"
                             @click="setPaymentMethod(m)"
-                            :class="paymentMethod === m
-                                ? 'border-[#15803d] bg-emerald-50/75 text-[#15803d] ring-2 ring-[#15803d]/30 font-bold'
-                                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 font-medium'"
+                            :class="paymentMethod === m ? 'border-[#15803d] bg-emerald-50/75 text-[#15803d] ring-2 ring-[#15803d]/30 font-bold' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 font-medium'"
                             class="p-3 border rounded-xl text-center text-xs transition flex flex-col items-center justify-center gap-1.5 shadow-xs"
                         >
                             <span x-text="methodLabel(m)"></span>
@@ -162,7 +160,7 @@
                     <label class="block text-xs font-bold text-gray-700">
                         Akun Kas / Bank Penerima <span class="text-red-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         name="coa_id"
                         x-ref="coaSelect"
                         x-model="selectedCoaId"

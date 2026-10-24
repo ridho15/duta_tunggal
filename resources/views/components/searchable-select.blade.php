@@ -9,6 +9,8 @@
     'id' => null,
     'error' => null,
     'hint' => null,
+    'autoSubmit' => false,
+    'size' => 'md',
 ])
 
 @php
@@ -42,6 +44,13 @@
     })->values()->all();
 
     $errorField = $error ?? $name;
+
+    $sizeClasses = [
+        'xs' => 'py-1 px-2.5 text-xs',
+        'sm' => 'py-2 px-3 text-xs',
+        'md' => 'py-2.5 px-3.5 text-sm',
+    ];
+    $buttonSizeClass = $sizeClasses[$size] ?? $sizeClasses['md'];
 @endphp
 
 <div
@@ -52,6 +61,7 @@
         selected: '{{ (string)$initialValue }}',
         placeholder: '{{ $placeholder }}',
         disabled: {{ $disabled ? 'true' : 'false' }},
+        autoSubmit: {{ $autoSubmit ? 'true' : 'false' }},
     })"
     x-id="['searchable-select']"
     @click.outside="open = false"
@@ -66,11 +76,12 @@
         </label>
     @endif
 
-    {{-- Native Hidden Input untuk Form POST/PUT --}}
+    {{-- Native Hidden Input untuk Form POST/PUT/GET --}}
     <input
         type="hidden"
         name="{{ $name }}"
         id="{{ $elementId }}"
+        value="{{ (string) $initialValue }}"
         x-model="selected"
         @if ($required) required @endif
     >
@@ -81,7 +92,7 @@
             type="button"
             @click="toggleDropdown()"
             :disabled="disabled"
-            class="w-full text-left bg-white rounded-lg border py-2.5 px-3.5 text-sm flex items-center justify-between gap-2 shadow-xs transition focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+            class="w-full text-left bg-white rounded-lg border {{ $buttonSizeClass }} flex items-center justify-between gap-2 shadow-xs transition focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
             :class="{
                 'border-red-400 bg-red-50/20': {{ $errors->has($errorField) ? 'true' : 'false' }},
                 'border-gray-300 hover:border-gray-400': !{{ $errors->has($errorField) ? 'true' : 'false' }} && !open,
@@ -250,6 +261,7 @@ function searchableSelect(config) {
         selected: config.selected || '',
         placeholder: config.placeholder || '-- Pilih Opsi --',
         disabled: config.disabled || false,
+        autoSubmit: config.autoSubmit || false,
         open: false,
         searchQuery: '',
         highlightIndex: 0,
@@ -290,6 +302,17 @@ function searchableSelect(config) {
             this.searchQuery = '';
             this.$dispatch('change', this.selected);
             this.$dispatch('input', this.selected);
+
+            this.$nextTick(() => {
+                const hiddenInput = this.$root.querySelector('input[type="hidden"]');
+                if (hiddenInput) {
+                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (this.autoSubmit) {
+                    const form = this.$root.closest('form');
+                    if (form) form.submit();
+                }
+            });
         },
 
         clearSelection() {
@@ -297,6 +320,17 @@ function searchableSelect(config) {
             this.searchQuery = '';
             this.$dispatch('change', '');
             this.$dispatch('input', '');
+
+            this.$nextTick(() => {
+                const hiddenInput = this.$root.querySelector('input[type="hidden"]');
+                if (hiddenInput) {
+                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (this.autoSubmit) {
+                    const form = this.$root.closest('form');
+                    if (form) form.submit();
+                }
+            });
         },
 
         highlightNext() {

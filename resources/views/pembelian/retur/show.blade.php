@@ -92,19 +92,16 @@
 
             {{-- Ajukan Persetujuan (Hanya Draft) --}}
             @if ($return->status === 'draft')
-                <form action="{{ route('pembelian.returns.submit', $return->id) }}" method="POST" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        onclick="return confirm('Apakah Anda yakin ingin mengajukan retur ini untuk persetujuan manajer?');"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shadow-sm transition"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Ajukan Persetujuan
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-submit-return', { action: '{{ route('pembelian.returns.submit', $return->id) }}' })"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Ajukan Persetujuan
+                </button>
             @endif
 
             {{-- Tombol Tolak (Pending Approval) --}}
@@ -910,5 +907,19 @@
             </form>
         </div>
     </div>
+
+    {{-- Modal Konfirmasi Ajukan Retur Pembelian --}}
+    <x-confirmation-modal
+        name="submit-return"
+        title="Ajukan Retur Pembelian"
+        type="warning"
+        confirm-text="Ya, Ajukan Persetujuan"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin mengajukan retur pembelian <span class="font-bold text-gray-900 font-mono">{{ $return->nota_retur }}</span> untuk persetujuan manajer?
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

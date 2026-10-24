@@ -62,7 +62,7 @@
                     <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                         Pilih Aset Tetap <span class="text-rose-500">*</span>
                     </label>
-                    <select
+                    <select data-searchable
                         id="assetSelect"
                         name="asset_id"
                         required

@@ -165,8 +165,8 @@ class CustomerResource extends Resource
                             ])
                             ->placeholder('Contoh: (+62) 830 9787 333')
                             ->rules([new InternationalPhoneNumber()])
-                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 12345678, 0211234567')
-                            ->required()
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 12345678, 0211234567 (Opsional)')
+                            ->nullable()
                             ->maxLength(50),
                         TextInput::make('phone')
                             ->label('Handphone')
@@ -183,10 +183,10 @@ class CustomerResource extends Resource
                             ->maxLength(50),
                         TextInput::make('email')
                             ->email()
-                            ->required()
+                            ->nullable()
                             ->maxLength(255)
+                            ->helperText('Alamat email penagihan faktur (Opsional)')
                             ->validationMessages([
-                                'required' => 'Email tidak boleh kosong',
                                 'email' => 'Format email tidak valid',
                                 'max' => 'Email terlalu panjang'
                             ]),
@@ -194,13 +194,12 @@ class CustomerResource extends Resource
                             ->label('Fax')
                             ->tel()
                             ->telRegex('/^[0-9+\s().-]*$/')
-                            ->required()
+                            ->nullable()
                             ->dehydrateStateUsing(fn ($state) => is_string($state) ? trim($state) : $state)
                             ->rules([new InternationalPhoneNumber()])
-                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789')
+                            ->helperText('Contoh : (+62) 830 9787 333, +62 21 1234567, 0213456789 (Opsional)')
                             ->maxLength(50)
                             ->validationMessages([
-                                'required' => 'Fax tidak boleh kosong',
                                 'max' => 'Fax terlalu panjang'
                             ]),
                         TextInput::make('tempo_kredit')
@@ -441,11 +440,50 @@ class CustomerResource extends Resource
                     EditAction::make()
                         ->color('success'),
                     DeleteAction::make()
+                        ->before(function (Customer $record, DeleteAction $action) {
+                            $blockers = $record->getDeletionBlockers();
+                            if ($blockers !== []) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Customer Tidak Dapat Dihapus')
+                                    ->body("Customer '{$record->name}' ({$record->code}) tidak dapat dihapus karena " . implode(', ', $blockers) . '.')
+                                    ->danger()
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        })
                 ])
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $deleted = 0;
+                            $failed = 0;
+                            foreach ($records as $record) {
+                                $blockers = $record->getDeletionBlockers();
+                                if ($blockers !== []) {
+                                    $failed++;
+                                    continue;
+                                }
+                                $record->delete();
+                                $deleted++;
+                            }
+
+                            if ($failed > 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Sebagian Customer Tidak Dapat Dihapus')
+                                    ->body("{$deleted} customer berhasil dihapus, {$failed} customer dilewati karena memiliki pesanan aktif, sisa piutang, atau saldo deposit.")
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Customer Terpilih Dihapus')
+                                    ->body("{$deleted} customer berhasil dihapus.")
+                                    ->success()
+                                    ->send();
+                            }
+                        }),
                 ]),
             ]);
     }

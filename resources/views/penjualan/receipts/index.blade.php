@@ -11,8 +11,8 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-700 font-semibold">Terima Pembayaran</span>
             </nav>
-            <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Terima Pembayaran Customer</h1>
-            <p class="text-xs text-gray-500 mt-0.5">
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Terima Pembayaran Customer</h1>
+            <p class="text-sm text-gray-500 mt-0.5">
                 Pencatatan kas & bank penerimaan piutang penjualan, bukti transfer, dan penerbitan kwitansi sah.
             </p>
         </div>
@@ -20,7 +20,7 @@
         <div>
             <a
                 href="{{ route('penjualan.receipts.create') }}"
-                class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition"
+                class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4v16m8-8H4" stroke-width="2.2" stroke-linecap="round"></path>
@@ -33,7 +33,7 @@
 
     {{-- KPI Cards Summary --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Total Penerimaan</span>
             <div class="text-xl font-black text-gray-900 mt-1">
                 Rp {{ number_format($totalReceived, 0, ',', '.') }}
@@ -41,7 +41,7 @@
             <span class="text-[11px] text-gray-500 mt-0.5 block">Akumulasi penerimaan sah</span>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Penerimaan Bulan Ini</span>
             <div class="text-xl font-black text-[#15803d] mt-1">
                 Rp {{ number_format($thisMonthReceived, 0, ',', '.') }}
@@ -49,7 +49,7 @@
             <span class="text-[11px] text-gray-500 mt-0.5 block">Periode {{ now()->isoFormat('MMMM Y') }}</span>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Piutang Tertagih (AR)</span>
             <div class="text-xl font-black text-blue-900 mt-1">
                 Rp {{ number_format($totalArPaid, 0, ',', '.') }}
@@ -57,7 +57,7 @@
             <span class="text-[11px] text-gray-500 mt-0.5 block">Total saldo AR terbayar</span>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
             <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Sisa Piutang Berjalan</span>
             <div class="text-xl font-black text-amber-900 mt-1">
                 Rp {{ number_format($totalArRemaining, 0, ',', '.') }}
@@ -108,7 +108,7 @@
     </div>
 
     {{-- Filter Bar --}}
-    <div class="bg-white border border-gray-200 rounded-2xl p-3 shadow-xs">
+    <div class="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
         <form method="GET" action="{{ route('penjualan.receipts.index') }}" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
 
@@ -129,14 +129,7 @@
             </div>
 
             <div class="w-full sm:w-48">
-                <select name="cabang_id" class="w-full py-2 px-3 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#15803d]">
-                    <option value="">Semua Cabang</option>
-                    @foreach($cabangs as $c)
-                        <option value="{{ $c->id }}" {{ (string)$cabangId === (string)$c->id ? 'selected' : '' }}>
-                            {{ $c->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
             </div>
 
             <div class="w-full sm:w-44">
@@ -164,10 +157,10 @@
     </div>
 
     {{-- Receipts Table --}}
-    <div class="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-                <thead class="bg-gray-50/75 border-b border-gray-200 text-gray-500 font-semibold uppercase tracking-wider text-[11px]">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider text-[11px]">
                     <tr>
                         <th class="py-3 px-4">No. Kwitansi</th>
                         <th class="py-3 px-4">Tanggal</th>
@@ -187,7 +180,13 @@
                                 'paid' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                                 'partial' => 'bg-amber-50 text-amber-700 border-amber-200',
                                 'cancelled' => 'bg-rose-50 text-rose-700 border-rose-200',
-                                default => 'bg-slate-50 text-slate-700 border-slate-200',
+                                default => 'bg-gray-50 text-gray-700 border-gray-200',
+                            };
+                            $dotClass = match($st) {
+                                'paid' => 'bg-emerald-500',
+                                'partial' => 'bg-amber-500',
+                                'cancelled' => 'bg-rose-500',
+                                default => 'bg-gray-400',
                             };
                             $badgeLabel = match($st) {
                                 'paid' => 'Lunas',
@@ -197,7 +196,7 @@
                             };
                             $kwNumber = 'KW-' . str_pad((string)$receipt->id, 6, '0', STR_PAD_LEFT);
                         @endphp
-                        <tr class="hover:bg-gray-50/70 transition">
+                        <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3.5 px-4">
                                 <a href="{{ route('penjualan.receipts.show', $receipt->id) }}" class="font-bold text-[#15803d] hover:underline flex items-center gap-1.5">
                                     <span>{{ $kwNumber }}</span>
@@ -259,7 +258,8 @@
                             </td>
 
                             <td class="py-3.5 px-4 text-center">
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full border text-[10px] font-bold {{ $badgeClass }}">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold {{ $badgeClass }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $dotClass }}"></span>
                                     {{ $badgeLabel }}
                                 </span>
                             </td>
@@ -316,7 +316,7 @@
         </div>
 
         @if($receipts->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $receipts->links() }}
             </div>
         @endif

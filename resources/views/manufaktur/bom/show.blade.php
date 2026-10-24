@@ -68,34 +68,20 @@
             </a>
 
             @if (!$isInUse)
-                <form method="POST" action="{{ route('manufaktur.bom.destroy', $billOfMaterial) }}" onsubmit="return confirm('Apakah Anda yakin ingin menghapus Resep BOM ini?');" class="inline">
-                    @csrf
-                    @method('DELETE')
-                    <button
-                        type="submit"
-                        class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition"
-                        title="Hapus Resep"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-delete-bom')"
+                    class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition"
+                    title="Hapus Resep"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             @endif
         </div>
     </div>
 
-    {{-- Flash Message --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- Grid Konten Utama --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -284,5 +270,23 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal Konfirmasi Hapus Resep BOM --}}
+    <x-confirmation-modal
+        name="delete-bom"
+        title="Hapus Resep BOM"
+        variant="danger"
+        confirm-text="Ya, Hapus Resep"
+        cancel-text="Batal"
+        action="{{ route('manufaktur.bom.destroy', $billOfMaterial) }}"
+        method="DELETE"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin menghapus Resep BOM untuk produk <strong>{{ $billOfMaterial->product?->name }}</strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Tindakan ini tidak dapat dibatalkan.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

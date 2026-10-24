@@ -54,7 +54,7 @@
                         <label class="block text-xs font-semibold text-gray-700 mb-1.5">
                             Pilih Transaksi SO <span class="text-red-500">*</span>
                         </label>
-                        <select
+                        <select data-searchable
                             id="soSelect"
                             class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] bg-white"
                             onchange="selectSO(this.value)"
@@ -99,7 +99,7 @@
                         <div class="so-sj-group space-y-3" id="so-sj-group-{{ $soData['so_id'] }}" style="display: none;">
                             @foreach($soData['surat_jalans'] as $sj)
                                 <label
-                                    class="flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/20 cursor-pointer transition has-checked:border-emerald-600 has-checked:bg-emerald-50/40"
+                                    class="flex items-start gap-4 p-4 rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/20 cursor-pointer transition has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/40"
                                 >
                                     <input
                                         type="checkbox"

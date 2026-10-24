@@ -25,4 +25,19 @@ class UnitOfMeasure extends Model
     {
         return $this->hasMany(ProductUnitConversion::class, 'uom_id');
     }
+
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        if ($this->product()->exists()) {
+            $blockers[] = 'sedang digunakan oleh ' . $this->product()->count() . ' produk';
+        }
+
+        if ($this->productUnitConversion()->exists()) {
+            $blockers[] = 'memiliki ' . $this->productUnitConversion()->count() . ' aturan konversi satuan';
+        }
+
+        return $blockers;
+    }
 }

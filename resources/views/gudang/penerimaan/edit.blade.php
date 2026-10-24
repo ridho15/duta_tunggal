@@ -153,17 +153,7 @@
                     <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                         Petugas Penerima Gudang <span class="text-red-500">*</span>
                     </label>
-                    <select
-                        name="received_by"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
-                        required
-                    >
-                        @foreach ($users as $user)
-                            <option value="{{ $user->id }}" {{ (string)old('received_by', $receipt->received_by) === (string)$user->id ? 'selected' : '' }}>
-                                {{ $user->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="received_by" :options="collect($users)->map(fn ($user) => ['id' => $user->id, 'label' => $user->name])->values()" :value="(old('received_by', $receipt->received_by)) ?: collect($users)->first()?->id" :required="true" />
                 </div>
 
                 {{-- Upload Foto Baru --}}
@@ -277,7 +267,7 @@
 
                                 {{-- Gudang & Alasan Tolak --}}
                                 <td class="py-3 px-3 space-y-1.5">
-                                    <select
+                                    <select data-searchable
                                         :name="'items[' + idx + '][warehouse_id]'"
                                         x-model="item.warehouse_id"
                                         class="w-full py-1.5 px-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"

@@ -74,19 +74,16 @@
                     Edit Draft
                 </a>
 
-                <form action="{{ route('pembelian.payments.post', $payment->id) }}" method="POST" class="inline">
-                    @csrf
-                    <button
-                        type="submit"
-                        onclick="return confirm('Posting pembayaran ini ke Buku Besar dan potong saldo hutang vendor?')"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Posting ke Buku Besar
-                    </button>
-                </form>
+                <button
+                    type="button"
+                    @click="$dispatch('open-modal-post-payment', { action: '{{ route('pembelian.payments.post', $payment->id) }}' })"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Posting ke Buku Besar
+                </button>
 
                 <button
                     type="button"
@@ -598,5 +595,22 @@
             </div>
         </div>
     @endif
+
+    {{-- Modal Konfirmasi Posting Pembayaran --}}
+    <x-confirmation-modal
+        name="post-payment"
+        title="Posting Pembayaran ke Buku Besar"
+        type="success"
+        confirm-text="Ya, Posting Pembayaran"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Posting pembayaran <span class="font-bold text-gray-900 font-mono">{{ $payment->payment_number }}</span> ke Buku Besar?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Jurnal pengeluaran kas/bank akan dibukukan dan saldo hutang vendor terkait akan langsung dipotong.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection

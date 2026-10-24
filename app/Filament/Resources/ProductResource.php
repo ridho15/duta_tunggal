@@ -731,7 +731,19 @@ class ProductResource extends Resource
                         ->color('primary'),
                     EditAction::make()
                         ->color('success'),
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->before(function (Product $record, DeleteAction $action) {
+                            $blockers = $record->getDeletionBlockers();
+                            if ($blockers !== []) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Produk Tidak Dapat Dihapus')
+                                    ->body("Produk '{$record->name}' (SKU: {$record->sku}) tidak dapat dihapus karena " . implode(', ', $blockers) . '.')
+                                    ->danger()
+                                    ->send();
+
+                                $action->halt();
+                            }
+                        }),
                     Action::make('updateHargaCepat')
                         ->label('Update Harga Cepat')
                         ->icon('heroicon-o-currency-dollar')
@@ -999,7 +1011,34 @@ class ProductResource extends Resource
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $deleted = 0;
+                            $failed = 0;
+                            foreach ($records as $record) {
+                                $blockers = $record->getDeletionBlockers();
+                                if ($blockers !== []) {
+                                    $failed++;
+                                    continue;
+                                }
+                                $record->delete();
+                                $deleted++;
+                            }
+
+                            if ($failed > 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Sebagian Produk Tidak Dapat Dihapus')
+                                    ->body("{$deleted} produk berhasil dihapus, {$failed} produk dilewati karena masih memiliki stok, pesanan berjalan, atau BOM aktif.")
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Produk Terpilih Dihapus')
+                                    ->body("{$deleted} produk berhasil dihapus.")
+                                    ->success()
+                                    ->send();
+                            }
+                        }),
 
                     BulkAction::make('bulk_activate')
                         ->label('Aktifkan Produk')

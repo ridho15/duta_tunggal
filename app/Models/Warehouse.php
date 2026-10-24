@@ -52,6 +52,21 @@ class Warehouse extends Model
     {
         static::addGlobalScope(new CabangScope);
 
+        static::created(function ($warehouse) {
+            $products = \App\Models\Product::all(['id']);
+            foreach ($products as $product) {
+                \App\Models\InventoryStock::firstOrCreate([
+                    'product_id' => $product->id,
+                    'warehouse_id' => $warehouse->id,
+                ], [
+                    'qty_available' => 0,
+                    'qty_reserved' => 0,
+                    'qty_min' => 0,
+                    'rak_id' => null,
+                ]);
+            }
+        });
+
         static::deleting(function ($warehouse) {
             if ($warehouse->isForceDeleting()) {
                 $warehouse->rak()->forceDelete();
@@ -63,5 +78,26 @@ class Warehouse extends Model
         static::restoring(function ($warehouse) {
             $warehouse->rak()->withTrashed()->restore();
         });
+    }
+
+    public function getDeletionBlockers(): array
+    {
+        $blockers = [];
+
+        $hasStock = $this->inventoryStock()
+            ->where(function ($q) {
+                $q->where('qty_available', '>', 0)
+                    ->orWhere('qty_reserved', '>', 0);
+            })->exists();
+
+        if ($hasStock) {
+            $blockers[] = 'masih memiliki stok barang aktif (tersedia/terpesan)';
+        }
+
+        if ($this->stockMovement()->exists()) {
+            $blockers[] = 'memiliki ' . $this->stockMovement()->count() . ' riwayat pergerakan stok';
+        }
+
+        return $blockers;
     }
 }

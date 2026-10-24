@@ -40,28 +40,6 @@
         </div>
     </div>
 
-    {{-- Flash Notifications --}}
-    @if (session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2 font-medium">
-                <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-        </div>
-    @endif
 
     {{-- 4 KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -147,7 +125,6 @@
                 method="POST"
                 id="batchDepreciationForm"
                 class="flex flex-wrap items-end gap-3 bg-white p-4 rounded-xl border border-emerald-100 shadow-sm"
-                onsubmit="return confirm('Apakah Anda yakin ingin mengeksekusi penyusutan massal untuk periode ' + document.getElementById('period_month_exec').options[document.getElementById('period_month_exec').selectedIndex].text + ' ' + document.getElementById('period_year_exec').value + '?')"
             >
                 @csrf
 
@@ -190,24 +167,20 @@
                 @if ($canManageAll)
                 <div>
                     <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Cabang</label>
-                    <select
-                        name="cabang_id"
-                        class="py-2 px-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d]"
-                    >
-                        <option value="">Semua Cabang</option>
-                        @foreach ($cabangs as $cb)
-                            <option value="{{ $cb->id }}" {{ request('cabang_id') == $cb->id ? 'selected' : '' }}>
-                                {{ $cb->kode }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cb) => ['id' => $cb->id, 'label' => $cb->kode])->values()" :value="request('cabang_id')" placeholder="Semua Cabang" size="sm" />
                 </div>
                 @endif
 
                 {{-- Tombol Eksekusi --}}
                 <div>
                     <button
-                        type="submit"
+                        type="button"
+                        @click="
+                            const m = document.getElementById('period_month_exec');
+                            const mText = m.options[m.selectedIndex].text;
+                            const yVal = document.getElementById('period_year_exec').value;
+                            $dispatch('open-modal-batch-depreciation', { periodText: mText + ' ' + yVal });
+                        "
                         class="inline-flex items-center gap-2 px-5 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,7 +271,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-sm">
                 <thead>
-                    <tr class="bg-gray-50/75 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    <tr class="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                         <th class="py-3.5 px-4">Periode</th>
                         <th class="py-3.5 px-4">Kode & Nama Aset</th>
                         <th class="py-3.5 px-4">Cabang</th>
@@ -312,7 +285,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($depreciations as $item)
-                        <tr class="hover:bg-gray-50/75 transition-colors">
+                        <tr class="hover:bg-gray-50/60 transition">
                             {{-- Periode --}}
                             <td class="py-3.5 px-4 whitespace-nowrap">
                                 <span class="font-bold text-gray-900 block">
@@ -360,15 +333,18 @@
                             {{-- Status Badge --}}
                             <td class="py-3.5 px-4 text-center whitespace-nowrap">
                                 @if ($item->status === 'recorded')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                         Tercatat
                                     </span>
                                 @elseif ($item->status === 'reversed')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                         Dibatalkan
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                                         {{ ucfirst($item->status) }}
                                     </span>
                                 @endif
@@ -391,23 +367,16 @@
 
                                     {{-- Reversal Action --}}
                                     @if ($item->status === 'recorded')
-                                        <form
-                                            action="{{ route('keuangan.asset.depreciation.reverse', $item) }}"
-                                            method="POST"
-                                            class="inline"
-                                            onsubmit="return confirm('Apakah Anda yakin ingin membatalkan penyusutan {{ $item->asset->name ?? 'Aset' }} periode {{ \Carbon\Carbon::createFromDate($item->period_year, $item->period_month, 1)->translatedFormat('F Y') }}? Jurnal buku besar terkait akan dihapus.')"
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('open-modal-reverse-depreciation', { action: '{{ route('keuangan.asset.depreciation.reverse', $item) }}', name: '{{ addslashes($item->asset->name ?? 'Aset') }}', period: '{{ \Carbon\Carbon::createFromDate($item->period_year, $item->period_month, 1)->translatedFormat('F Y') }}' })"
+                                            class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                                            title="Batalkan (Reverse) Penyusutan"
                                         >
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
-                                                title="Batalkan (Reverse) Penyusutan"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                                </svg>
-                                            </button>
-                                        </form>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            </svg>
+                                        </button>
                                     @endif
                                 </div>
                             </td>
@@ -433,10 +402,53 @@
 
         {{-- Pagination --}}
         @if ($depreciations->hasPages())
-            <div class="p-4 border-t border-gray-100">
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $depreciations->links() }}
             </div>
         @endif
     </div>
+
+    {{-- Modal Konfirmasi Eksekusi Penyusutan Massal --}}
+    <x-confirmation-modal
+        name="batch-depreciation"
+        title="Konfirmasi Eksekusi Penyusutan Massal"
+        type="success"
+        confirm-text="Ya, Proses Penyusutan Massal"
+        cancel-text="Batal"
+        :has-form="false"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin mengeksekusi penyusutan bulanan massal untuk periode <span class="font-bold text-gray-900 font-mono" x-text="data.periodText"></span>?
+        </p>
+        <p class="text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 mt-2">
+            Sistem akan menghitung depresiasi seluruh aset aktif dan otomatis memposting jurnal akuntansi ke Buku Besar.
+        </p>
+        <x-slot:footer>
+            <button
+                type="button"
+                onclick="document.getElementById('batchDepreciationForm').submit()"
+                class="w-full sm:w-auto inline-flex justify-center rounded-xl px-4 py-2 text-xs font-bold shadow-sm bg-[#15803d] hover:bg-[#14532d] text-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 transition"
+            >
+                Ya, Proses Penyusutan Massal
+            </button>
+        </x-slot:footer>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Reverse Depresiasi Aset --}}
+    <x-confirmation-modal
+        name="reverse-depreciation"
+        title="Batalkan (Reverse) Penyusutan Aset"
+        type="danger"
+        confirm-text="Ya, Batalkan Penyusutan"
+        cancel-text="Batal"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin membatalkan penyusutan <span class="font-bold text-gray-900" x-text="data.name"></span> untuk periode <span class="font-bold text-gray-900 font-mono" x-text="data.period"></span>?
+        </p>
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+            Jurnal buku besar terkait akan dihapus dan nilai buku aset akan disesuaikan kembali.
+        </p>
+    </x-confirmation-modal>
 </div>
 @endsection
