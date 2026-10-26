@@ -270,14 +270,17 @@
                     </div>
                     <div class="flex justify-between items-center text-xs text-gray-600">
                         <span>Diskon Tambahan (Rp)</span>
-                        <input
-                            type="number"
-                            id="inputGlobalDiscount"
-                            value="0"
-                            min="0"
-                            oninput="recalculateCart()"
-                            class="w-28 px-2 py-1 text-right text-xs font-bold border border-gray-300 rounded-lg focus:border-emerald-500"
-                        >
+                        <div class="relative w-32">
+                            <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-[10px] text-gray-400 font-bold pointer-events-none">Rp</span>
+                            <input
+                                type="text"
+                                id="displayGlobalDiscount"
+                                value="0"
+                                oninput="handleGlobalDiscountInput(this.value)"
+                                class="w-full pl-7 pr-2 py-1 text-right text-xs font-bold font-mono border border-gray-300 rounded-lg focus:border-emerald-500"
+                            >
+                            <input type="hidden" id="inputGlobalDiscount" value="0">
+                        </div>
                     </div>
                     <div class="flex justify-between items-center text-xs text-gray-600">
                         <span>Pajak (PPN 11%)</span>
@@ -337,14 +340,15 @@
                         </div>
 
                         <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 font-bold text-xs">Rp</span>
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 font-bold text-xs pointer-events-none">Rp</span>
                             <input
-                                type="number"
+                                type="text"
                                 id="cashReceivedInput"
                                 placeholder="0"
-                                oninput="recalculateChange()"
-                                class="w-full pl-9 pr-3 py-2 text-base font-extrabold text-gray-900 border-2 border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-right"
+                                oninput="handleCashReceivedInput(this.value)"
+                                class="w-full pl-9 pr-3 py-2 text-base font-extrabold text-gray-900 font-mono border-2 border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-right"
                             >
+                            <input type="hidden" id="cashReceivedRaw" value="0">
                         </div>
 
                         {{-- Change Display --}}
@@ -394,16 +398,24 @@
             @csrf
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Modal Awal Laci Kasir (Rp) <span class="text-rose-500">*</span></label>
-                <input
-                    type="number"
-                    name="starting_cash"
-                    required
-                    min="0"
-                    step="1000"
-                    placeholder="Contoh: 500000"
-                    class="w-full px-3 py-2.5 text-base font-extrabold text-gray-900 border border-gray-300 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    autofocus
-                >
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold text-xs pointer-events-none">Rp</span>
+                    <input
+                        type="text"
+                        id="display_starting_cash"
+                        required
+                        placeholder="Contoh: 500.000"
+                        oninput="handleStartingCashInput(this.value)"
+                        class="w-full pl-10 pr-3 py-2.5 text-base font-extrabold text-gray-900 font-mono border border-gray-300 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                        autofocus
+                    >
+                    <input
+                        type="hidden"
+                        name="starting_cash"
+                        id="starting_cash"
+                        value=""
+                    >
+                </div>
             </div>
 
             <div>
@@ -467,15 +479,23 @@
             @csrf
             <div>
                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Uang Fisik Kasir di Laci (Rp) <span class="text-rose-500">*</span></label>
-                <input
-                    type="number"
-                    name="cash_actual"
-                    id="closeShiftCashActual"
-                    required
-                    min="0"
-                    placeholder="Hitung uang fisik di laci..."
-                    class="w-full px-3 py-2.5 text-base font-extrabold text-gray-900 border border-gray-300 rounded-xl focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                >
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold text-xs pointer-events-none">Rp</span>
+                    <input
+                        type="text"
+                        id="display_cash_actual"
+                        required
+                        placeholder="Hitung uang fisik di laci..."
+                        oninput="handleCashActualInput(this.value)"
+                        class="w-full pl-10 pr-3 py-2.5 text-base font-extrabold text-gray-900 font-mono border border-gray-300 rounded-xl focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                    >
+                    <input
+                        type="hidden"
+                        name="cash_actual"
+                        id="closeShiftCashActual"
+                        value=""
+                    >
+                </div>
             </div>
 
             <div>
@@ -674,7 +694,8 @@
         const item = cart.find(i => i.product_id === productId);
         if (!item) return;
 
-        item.unit_price = Math.max(0, parseFloat(newPrice) || 0);
+        const clean = String(newPrice).replace(/[^0-9]/g, '');
+        item.unit_price = clean ? parseInt(clean, 10) : 0;
         renderCart();
     }
 
@@ -682,7 +703,8 @@
         const item = cart.find(i => i.product_id === productId);
         if (!item) return;
 
-        item.discount_amount = Math.max(0, parseFloat(newDiscount) || 0);
+        const clean = String(newDiscount).replace(/[^0-9]/g, '');
+        item.discount_amount = clean ? parseInt(clean, 10) : 0;
         renderCart();
     }
 
@@ -760,12 +782,12 @@
                         {{-- Harga Satuan --}}
                         <div class="col-span-4">
                             <input
-                                type="number"
-                                value="${item.unit_price}"
-                                min="0"
+                                type="text"
+                                value="${item.unit_price > 0 ? formatNumber(item.unit_price) : '0'}"
                                 onchange="updateCartPrice(${item.product_id}, this.value)"
+                                onfocus="this.select()"
                                 title="Harga Jual Satuan"
-                                class="w-full px-2 py-1 text-xs font-bold border rounded-lg text-right ${isBelowBoundary ? 'border-rose-400 bg-rose-50 text-rose-700' : 'border-gray-300 focus:border-emerald-500'}"
+                                class="w-full px-2 py-1 text-xs font-bold font-mono border rounded-lg text-right ${isBelowBoundary ? 'border-rose-400 bg-rose-50 text-rose-700' : 'border-gray-300 focus:border-emerald-500'}"
                             >
                         </div>
 
@@ -782,11 +804,11 @@
                         <div class="flex items-center gap-1">
                             <span class="text-gray-400">Diskon (Rp):</span>
                             <input
-                                type="number"
-                                value="${item.discount_amount}"
-                                min="0"
+                                type="text"
+                                value="${item.discount_amount > 0 ? formatNumber(item.discount_amount) : '0'}"
                                 onchange="updateCartDiscount(${item.product_id}, this.value)"
-                                class="w-16 px-1.5 py-0.5 text-[10.5px] border border-gray-300 rounded text-right"
+                                onfocus="this.select()"
+                                class="w-16 px-1.5 py-0.5 text-[10.5px] font-mono border border-gray-300 rounded text-right"
                             >
                         </div>
 
@@ -853,19 +875,47 @@
         recalculateChange();
     }
 
+    function handleCashReceivedInput(val) {
+        const clean = val.replace(/[^0-9]/g, '');
+        const num = clean ? parseInt(clean, 10) : 0;
+        document.getElementById('cashReceivedRaw').value = num;
+        document.getElementById('cashReceivedInput').value = num > 0 ? num.toLocaleString('id-ID') : '';
+        recalculateChange();
+    }
+
+    function handleGlobalDiscountInput(val) {
+        const clean = val.replace(/[^0-9]/g, '');
+        const num = clean ? parseInt(clean, 10) : 0;
+        document.getElementById('inputGlobalDiscount').value = num;
+        document.getElementById('displayGlobalDiscount').value = num > 0 ? num.toLocaleString('id-ID') : '0';
+        recalculateCart();
+    }
+
+    function handleStartingCashInput(val) {
+        const clean = val.replace(/[^0-9]/g, '');
+        const num = clean ? parseInt(clean, 10) : 0;
+        document.getElementById('starting_cash').value = num;
+        document.getElementById('display_starting_cash').value = num > 0 ? num.toLocaleString('id-ID') : '';
+    }
+
+    function handleCashActualInput(val) {
+        const clean = val.replace(/[^0-9]/g, '');
+        const num = clean ? parseInt(clean, 10) : 0;
+        document.getElementById('closeShiftCashActual').value = num;
+        document.getElementById('display_cash_actual').value = num > 0 ? num.toLocaleString('id-ID') : '';
+    }
+
     function setCashAmount(typeOrVal) {
         const grandTotal = getGrandTotal();
-        if (typeOrVal === 'pas') {
-            cashReceivedInput.value = grandTotal;
-        } else {
-            cashReceivedInput.value = typeOrVal;
-        }
+        const num = typeOrVal === 'pas' ? grandTotal : Number(typeOrVal);
+        document.getElementById('cashReceivedRaw').value = num;
+        document.getElementById('cashReceivedInput').value = num > 0 ? num.toLocaleString('id-ID') : '0';
         recalculateChange();
     }
 
     function recalculateChange() {
         const grandTotal = getGrandTotal();
-        const received = parseFloat(cashReceivedInput.value) || 0;
+        const received = parseFloat(document.getElementById('cashReceivedRaw')?.value) || 0;
 
         if (paymentMethod !== 'cash') {
             labelChangeAmount.innerText = 'Rp 0';
@@ -899,7 +949,7 @@
         if (cart.length === 0) return;
 
         const grandTotal = getGrandTotal();
-        const received = paymentMethod === 'cash' ? (parseFloat(cashReceivedInput.value) || 0) : grandTotal;
+        const received = paymentMethod === 'cash' ? (parseFloat(document.getElementById('cashReceivedRaw')?.value) || 0) : grandTotal;
 
         if (paymentMethod === 'cash' && received < grandTotal) {
             alert('Uang yang diterima kurang dari total tagihan!');

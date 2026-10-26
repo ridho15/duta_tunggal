@@ -97,15 +97,21 @@
                         Nilai Kurs ke Rupiah (IDR) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3.5 top-3 text-xs text-gray-400 font-bold">Rp</span>
+                        <span class="absolute left-3.5 top-3 text-xs text-gray-400 font-bold pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="0.0001"
-                            min="0.0001"
-                            name="to_rupiah"
-                            value="{{ old('to_rupiah', $mata_uang->to_rupiah) }}"
+                            type="text"
+                            id="display_to_rupiah"
+                            value="{{ old('to_rupiah', $mata_uang->to_rupiah) ? number_format(old('to_rupiah', $mata_uang->to_rupiah), 0, ',', '.') : '' }}"
+                            oninput="handleToRupiahInput(this.value)"
                             required
+                            placeholder="Contoh: 16.000"
                             class="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm font-mono border rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] outline-none transition @error('to_rupiah') border-rose-300 bg-rose-50/30 @else border-gray-200 @enderror"
+                        >
+                        <input
+                            type="hidden"
+                            name="to_rupiah"
+                            id="to_rupiah"
+                            value="{{ old('to_rupiah', $mata_uang->to_rupiah) }}"
                         >
                     </div>
                     @error('to_rupiah')
@@ -132,3 +138,14 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function handleToRupiahInput(val) {
+    const clean = val.replace(/[^0-9]/g, '');
+    const num = clean ? parseInt(clean, 10) : 0;
+    document.getElementById('to_rupiah').value = num;
+    document.getElementById('display_to_rupiah').value = num > 0 ? num.toLocaleString('id-ID') : '';
+}
+</script>
+@endpush
