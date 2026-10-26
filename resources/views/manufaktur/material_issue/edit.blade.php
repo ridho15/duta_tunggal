@@ -329,16 +329,24 @@
                     >
                 </td>
                 <td class="py-2 px-3">
-                    <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        name="items[${idx}][cost_per_unit]"
-                        id="cost_${idx}"
-                        value="${costPerUnit}"
-                        class="w-full py-1.5 px-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d] cost-input font-mono"
-                        oninput="recalculateRow(${idx})"
-                    >
+                    <div class="relative w-36 ml-auto">
+                        <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-[10px] font-bold text-gray-400">Rp</span>
+                        <input
+                            type="text"
+                            id="display_cost_${idx}"
+                            value="${costPerUnit > 0 ? Number(costPerUnit).toLocaleString('id-ID') : ''}"
+                            placeholder="0"
+                            class="w-full pl-7 pr-2 py-1.5 text-xs text-right font-mono border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]"
+                            oninput="handleMaterialCostInput(${idx}, this.value)"
+                        >
+                        <input
+                            type="hidden"
+                            name="items[${idx}][cost_per_unit]"
+                            id="cost_${idx}"
+                            value="${costPerUnit}"
+                            class="cost-input"
+                        >
+                    </div>
                 </td>
                 <td class="py-2 px-3 text-right font-mono font-bold text-gray-800" id="subtotal_${idx}">
                     Rp ${formatRupiah(subtotal)}
@@ -388,7 +396,19 @@
         document.getElementById(`uom_id_${idx}`).value = uomId;
         document.getElementById(`uom_display_${idx}`).innerText = uomName;
         document.getElementById(`cost_${idx}`).value = cost;
+        const displayCost = document.getElementById(`display_cost_${idx}`);
+        if (displayCost) displayCost.value = cost > 0 ? Number(cost).toLocaleString('id-ID') : '';
 
+        recalculateRow(idx);
+    }
+
+    function handleMaterialCostInput(idx, val) {
+        const clean = val.replace(/[^0-9]/g, '');
+        const num = clean ? parseInt(clean, 10) : 0;
+        const hidden = document.getElementById(`cost_${idx}`);
+        const display = document.getElementById(`display_cost_${idx}`);
+        if (hidden) hidden.value = num;
+        if (display) display.value = num > 0 ? num.toLocaleString('id-ID') : '';
         recalculateRow(idx);
     }
 

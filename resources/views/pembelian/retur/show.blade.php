@@ -523,14 +523,23 @@
                         <label class="block text-xs font-semibold text-gray-700 mb-1">
                             Nominal Nota Kredit (Rp)
                         </label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            name="credit_note_amount"
-                            value="{{ old('credit_note_amount', $return->credit_note_amount) }}"
-                            placeholder="0"
-                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition"
-                        />
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-gray-400">Rp</span>
+                            <input
+                                type="text"
+                                id="display_credit_note_amount"
+                                value="{{ old('credit_note_amount', $return->credit_note_amount) > 0 ? number_format(old('credit_note_amount', $return->credit_note_amount), 0, ',', '.') : '' }}"
+                                oninput="handleReturModalInput('credit_note_amount', this.value)"
+                                placeholder="0"
+                                class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition"
+                            />
+                            <input
+                                type="hidden"
+                                name="credit_note_amount"
+                                id="credit_note_amount"
+                                value="{{ old('credit_note_amount', $return->credit_note_amount) }}"
+                            />
+                        </div>
                     </div>
 
                     {{-- Nominal Refund Kas/Bank --}}
@@ -538,14 +547,23 @@
                         <label class="block text-xs font-semibold text-gray-700 mb-1">
                             Nominal Pengembalian Dana Kas/Bank (Rp)
                         </label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            name="refund_amount"
-                            value="{{ old('refund_amount', $return->refund_amount) }}"
-                            placeholder="0"
-                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition"
-                        />
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-gray-400">Rp</span>
+                            <input
+                                type="text"
+                                id="display_refund_amount"
+                                value="{{ old('refund_amount', $return->refund_amount) > 0 ? number_format(old('refund_amount', $return->refund_amount), 0, ',', '.') : '' }}"
+                                oninput="handleReturModalInput('refund_amount', this.value)"
+                                placeholder="0"
+                                class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition"
+                            />
+                            <input
+                                type="hidden"
+                                name="refund_amount"
+                                id="refund_amount"
+                                value="{{ old('refund_amount', $return->refund_amount) }}"
+                            />
+                        </div>
                     </div>
 
                     {{-- Tanggal Refund --}}
@@ -923,3 +941,16 @@
     </x-confirmation-modal>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function handleReturModalInput(field, val) {
+    const clean = val.replace(/[^0-9]/g, '');
+    const num = clean ? parseInt(clean, 10) : 0;
+    const hidden = document.getElementById(field);
+    const display = document.getElementById(`display_${field}`);
+    if (hidden) hidden.value = num;
+    if (display) display.value = num > 0 ? num.toLocaleString('id-ID') : '';
+}
+</script>
+@endpush

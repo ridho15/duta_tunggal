@@ -128,17 +128,26 @@
 
                 {{-- Saldo Awal --}}
                 <div>
-                    <label for="opening_balance" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                    <label for="display_opening_balance" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                         Saldo Awal (Rp)
                     </label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        name="opening_balance"
-                        id="opening_balance"
-                        value="{{ old('opening_balance', 0) }}"
-                        class="w-full px-3.5 py-2.5 text-sm font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15803d] focus:border-transparent outline-none transition"
-                    />
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-2.5 text-xs text-gray-400 font-bold pointer-events-none">Rp</span>
+                        <input
+                            type="text"
+                            id="display_opening_balance"
+                            value="{{ old('opening_balance', 0) > 0 ? number_format(old('opening_balance', 0), 0, ',', '.') : '' }}"
+                            oninput="handleOpeningBalanceInput(this.value)"
+                            placeholder="0"
+                            class="w-full pl-10 pr-3.5 py-2.5 text-sm font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15803d] focus:border-transparent outline-none transition"
+                        />
+                        <input
+                            type="hidden"
+                            name="opening_balance"
+                            id="opening_balance"
+                            value="{{ old('opening_balance', 0) }}"
+                        />
+                    </div>
                 </div>
 
                 {{-- Keterangan --}}
@@ -213,3 +222,14 @@
     </form>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function handleOpeningBalanceInput(val) {
+    const clean = val.replace(/[^0-9]/g, '');
+    const num = clean ? parseInt(clean, 10) : 0;
+    document.getElementById('opening_balance').value = num;
+    document.getElementById('display_opening_balance').value = num > 0 ? num.toLocaleString('id-ID') : '';
+}
+</script>
+@endpush

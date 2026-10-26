@@ -234,17 +234,19 @@
                                 <td class="px-3 py-3 text-right font-bold text-gray-900" x-text="inv.remaining_formatted"></td>
                                 <td class="px-3 py-3 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            :max="inv.remaining"
-                                            :name="'allocations[' + inv.id + ']'"
-                                            x-model.number="allocations[inv.id]"
-                                            :disabled="!isSelected(inv.id)"
-                                            placeholder="0"
-                                            class="w-32 px-2.5 py-1 text-right text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] disabled:bg-gray-100 disabled:text-gray-400 font-semibold text-gray-900"
-                                        >
+                                        <div class="relative w-36">
+                                            <span class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-[10px] font-bold text-gray-400">Rp</span>
+                                            <input
+                                                type="text"
+                                                :value="allocations[inv.id] ? formatRupiah(allocations[inv.id], false) : (allocations[inv.id] === 0 ? '0' : '')"
+                                                @input="allocations[inv.id] = parseRupiah($event.target.value); onAllocationInput(inv.id)"
+                                                @blur="$event.target.value = (allocations[inv.id] ? formatRupiah(allocations[inv.id], false) : (allocations[inv.id] === 0 ? '0' : ''))"
+                                                :disabled="!isSelected(inv.id)"
+                                                placeholder="0"
+                                                class="w-full pl-7 pr-2.5 py-1 text-right text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] disabled:bg-gray-100 disabled:text-gray-400 font-semibold text-gray-900 font-mono"
+                                            >
+                                            <input type="hidden" :name="'allocations[' + inv.id + ']'" :value="allocations[inv.id] || 0">
+                                        </div>
                                         <button
                                             type="button"
                                             @click="payFull(inv.id)"
@@ -416,9 +418,23 @@ function vendorPaymentEditForm(config) {
             }, 0);
         },
 
-        formatRupiah(num) {
+        parseRupiah(val) {
+            if (!val) return 0;
+            const clean = String(val).replace(/[^0-9]/g, '');
+            return clean ? parseInt(clean, 10) : 0;
+        },
+
+        onAllocationInput(id) {
+            const num = Number(id);
+            if (!this.isSelected(num)) {
+                this.selectedInvoices.push(num);
+            }
+        },
+
+        formatRupiah(num, withPrefix = true) {
             const n = Number(num) || 0;
-            return 'Rp ' + n.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            const formatted = n.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return withPrefix ? 'Rp ' + formatted : formatted;
         }
     };
 }

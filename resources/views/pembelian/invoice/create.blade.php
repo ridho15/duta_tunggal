@@ -138,6 +138,17 @@
             return this.calculateSubtotal() + this.calculateTax() + parseFloat(this.otherFee || 0);
         },
 
+        parseRupiah(val) {
+            if (!val) return 0;
+            const clean = String(val).replace(/[^0-9]/g, '');
+            return clean ? parseInt(clean, 10) : 0;
+        },
+
+        formatNumber(val) {
+            if (!val) return '';
+            return Number(val).toLocaleString('id-ID');
+        },
+
         formatMoney(amount) {
             return new Intl.NumberFormat('id-ID', {
                 style: 'currency',
@@ -286,15 +297,17 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Ongkos Kirim / Biaya Lain (Rp)
                     </label>
-                    <input
-                        type="number"
-                        name="other_fee"
-                        x-model.number="otherFee"
-                        min="0"
-                        step="100"
-                        placeholder="0"
-                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition"
-                    />
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-xs font-bold text-gray-400">Rp</span>
+                        <input
+                            type="text"
+                            :value="otherFee > 0 ? formatNumber(otherFee) : ''"
+                            @input="otherFee = parseRupiah($event.target.value); $event.target.value = otherFee > 0 ? formatNumber(otherFee) : ''"
+                            placeholder="0"
+                            class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-transparent transition"
+                        />
+                        <input type="hidden" name="other_fee" :value="otherFee">
+                    </div>
                     @error('other_fee')
                         <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
                     @enderror
@@ -442,14 +455,17 @@
                                 <td class="py-2.5 px-3 text-gray-500" x-text="item.uom"></td>
                                 <td class="py-2.5 px-3 text-right text-gray-500 font-mono" x-text="formatMoney(item.po_price)"></td>
                                 <td class="py-2.5 px-3 text-right">
-                                    <input
-                                        type="number"
-                                        :name="`items[${idx}][price]`"
-                                        x-model.number="item.price"
-                                        min="0"
-                                        step="100"
-                                        class="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs font-semibold focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
-                                    />
+                                    <div class="relative w-36 ml-auto">
+                                        <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-[10px] font-bold text-gray-400">Rp</span>
+                                        <input
+                                            type="text"
+                                            :value="item.price > 0 ? formatNumber(item.price) : ''"
+                                            @input="item.price = parseRupiah($event.target.value); $event.target.value = item.price > 0 ? formatNumber(item.price) : ''"
+                                            placeholder="0"
+                                            class="w-full pl-7 pr-2 py-1 border border-gray-200 rounded text-right text-xs font-semibold font-mono text-gray-900 focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
+                                        />
+                                        <input type="hidden" :name="`items[${idx}][price]`" :value="item.price">
+                                    </div>
                                 </td>
                                 <td class="py-2.5 px-3 text-right text-gray-600" x-text="`${item.tax_rate}%`"></td>
                                 <td class="py-2.5 px-3 text-right font-bold text-gray-900 font-mono" x-text="formatMoney(item.quantity * item.price)"></td>
