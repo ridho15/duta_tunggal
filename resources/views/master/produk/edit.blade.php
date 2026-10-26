@@ -174,15 +174,21 @@
                         Harga Beli Asli (Modal) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400">Rp</span>
+                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="0.01"
-                            name="cost_price"
-                            value="{{ old('cost_price', $product->cost_price) }}"
+                            type="text"
+                            id="display_cost_price"
+                            value="{{ old('cost_price', $product->cost_price) > 0 ? number_format(old('cost_price', $product->cost_price), 0, ',', '.') : '' }}"
+                            oninput="handleCostPriceInput(this.value)"
                             required
-                            min="0"
-                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-semibold text-gray-800"
+                            placeholder="0"
+                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-semibold text-gray-800 font-mono"
+                        >
+                        <input
+                            type="hidden"
+                            name="cost_price"
+                            id="cost_price"
+                            value="{{ old('cost_price', $product->cost_price) }}"
                         >
                     </div>
                 </div>
@@ -193,15 +199,21 @@
                         Harga Jual Standar <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400">Rp</span>
+                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="0.01"
-                            name="sell_price"
-                            value="{{ old('sell_price', $product->sell_price) }}"
+                            type="text"
+                            id="display_sell_price"
+                            value="{{ old('sell_price', $product->sell_price) > 0 ? number_format(old('sell_price', $product->sell_price), 0, ',', '.') : '' }}"
+                            oninput="handleSellPriceInput(this.value)"
                             required
-                            min="0"
-                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-bold text-[#15803d]"
+                            placeholder="0"
+                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-bold text-[#15803d] font-mono"
+                        >
+                        <input
+                            type="hidden"
+                            name="sell_price"
+                            id="sell_price"
+                            value="{{ old('sell_price', $product->sell_price) }}"
                         >
                     </div>
                 </div>
@@ -212,14 +224,20 @@
                         Biaya Tambahan
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400">Rp</span>
+                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            id="display_biaya"
+                            value="{{ old('biaya', $product->biaya) > 0 ? number_format(old('biaya', $product->biaya), 0, ',', '.') : '' }}"
+                            oninput="handleBiayaInput(this.value)"
+                            placeholder="0"
+                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-mono"
+                        >
+                        <input
+                            type="hidden"
                             name="biaya"
+                            id="biaya"
                             value="{{ old('biaya', $product->biaya) }}"
-                            min="0"
-                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
                         >
                     </div>
                 </div>
@@ -439,5 +457,26 @@
             });
         }
     });
+
+    function handleCostPriceInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        document.getElementById('cost_price').value = num;
+        document.getElementById('display_cost_price').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
+    }
+
+    function handleSellPriceInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        document.getElementById('sell_price').value = num;
+        document.getElementById('display_sell_price').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
+    }
+
+    function handleBiayaInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        document.getElementById('biaya').value = num;
+        document.getElementById('display_biaya').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
+    }
 </script>
 @endsection
