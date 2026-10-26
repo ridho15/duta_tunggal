@@ -21,7 +21,7 @@
 
     {{-- Warehouse Badge & DO Info --}}
     <div class="space-y-1">
-        <span class="inline-flex text-[10.5px] font-bold tracking-wider text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-md px-2 py-0.5 uppercase">
+        <span class="inline-flex text-[11px] font-bold tracking-wider text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-md px-2 py-0.5 uppercase">
             {{ $deliveryOrder->warehouse->name ?? 'GUDANG' }}
         </span>
         <h1 class="text-2xl font-black text-gray-900 tracking-tight mt-1">{{ $deliveryOrder->do_number }}</h1>
@@ -40,7 +40,7 @@
                     $isItemChecked = in_array($item->status, ['confirmed', 'sent', 'received'], true);
                 @endphp
                 <label
-                    class="flex items-center gap-3.5 p-4 rounded-2xl border transition cursor-pointer select-none {{ $isItemChecked ? 'bg-[#f0fdf4] border-[#86efac]' : 'bg-white border-gray-200' }} hover:border-emerald-400"
+                    class="flex items-center gap-3.5 p-4 rounded-2xl border transition cursor-pointer select-none {{ $isItemChecked ? 'bg-[#f0fdf4] border-[#86efac]' : 'bg-white border-gray-200' }} hover:border-[#15803d]/40"
                     id="label-item-{{ $item->id }}"
                 >
                     <input
@@ -82,7 +82,7 @@
                 type="submit"
                 id="submitKirimBtn"
                 disabled
-                class="w-full min-h-[52px] font-bold text-base rounded-2xl transition flex items-center justify-center gap-2 shadow-sm disabled:border-dashed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed bg-[#15803d] hover:bg-[#14532d] text-white"
+                class="w-full min-h-[52px] font-bold text-base rounded-2xl transition flex items-center justify-center gap-2 shadow-sm disabled:border-dashed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed bg-[#15803d] hover:bg-[#14532d] text-white active:scale-[0.98]"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M5 13l4 4L19 7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -96,7 +96,7 @@
 
             <a
                 href="{{ route('gudang.kiriman.retur', $deliveryOrder->id) }}"
-                class="w-full min-h-[48px] rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-center transition"
+                class="w-full min-h-[48px] rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-center transition shadow-sm"
             >
                 Ada kurang / rusak
             </a>
@@ -130,7 +130,7 @@
         if (checkedCount === totalItems && totalItems > 0) {
             submitBtn.disabled = false;
             hintText.innerText = 'Semua barang telah terverifikasi sesuai fisik gudang.';
-            hintText.className = 'text-[11px] text-emerald-600 text-center font-semibold';
+            hintText.className = 'text-[11px] text-[#15803d] text-center font-semibold';
         } else {
             submitBtn.disabled = true;
             hintText.innerText = 'Centang semua barang dulu untuk mengirim';

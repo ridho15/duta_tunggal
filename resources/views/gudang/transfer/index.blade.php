@@ -12,7 +12,7 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-500">Gudang & Stok</span>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold">Pindah Stok</span>
+                <span class="text-[#15803d] font-bold">Pindah Stok</span>
             </nav>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Pindah Stok Antar Gudang</h1>
             <p class="text-xs text-gray-500 mt-1">
@@ -21,7 +21,7 @@
         </div>
         <div class="flex items-center gap-2.5">
             <a href="{{ route('gudang.stok.index') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M21 8 12 3 3 8v8l9 5 9-5z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     <path d="M3 8l9 5 9-5M12 13v8" stroke-width="1.8" stroke-linecap="round"></path>
@@ -42,7 +42,7 @@
     {{-- KPI Stat Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total Transfer --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Dokumen</span>
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -58,7 +58,7 @@
         </div>
 
         {{-- Draft --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Draft Persiapan</span>
                 <div class="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
@@ -74,7 +74,7 @@
         </div>
 
         {{-- Menunggu Persetujuan --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Menunggu Approval</span>
                 <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
@@ -91,7 +91,7 @@
         </div>
 
         {{-- Disetujui / Selesai --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Disetujui / Selesai</span>
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -100,7 +100,7 @@
                     </svg>
                 </div>
             </div>
-            <div class="text-2xl font-bold text-emerald-700 tracking-tight">
+            <div class="text-2xl font-bold text-[#15803d] tracking-tight">
                 {{ number_format($kpi['approved'], 0, ',', '.') }}
             </div>
             <p class="text-[11px] text-gray-500 mt-1">Stok telah terpotong & terpindah</p>
@@ -108,7 +108,7 @@
     </div>
 
     {{-- Filter & Pencarian Bar --}}
-    <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-2xs">
+    <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
         <form action="{{ route('gudang.transfer.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-3">
             {{-- Search Box --}}
             <div class="md:col-span-3">
@@ -118,7 +118,7 @@
                            name="search"
                            value="{{ $search }}"
                            placeholder="No transfer, nama barang..."
-                           class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800">
+                           class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
@@ -141,7 +141,7 @@
             <div class="md:col-span-2">
                 <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Status</label>
                 <select name="status"
-                        class="w-full px-2.5 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800">
+                        class="w-full px-2.5 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
                     <option value="all" {{ $status === 'all' ? 'selected' : '' }}>Semua Status</option>
                     <option value="Draft" {{ $status === 'Draft' ? 'selected' : '' }}>Draft</option>
                     <option value="Request" {{ $status === 'Request' ? 'selected' : '' }}>Menunggu Approval (Request)</option>
@@ -153,7 +153,7 @@
             {{-- Action Buttons --}}
             <div class="md:col-span-3 flex items-end gap-2">
                 <button type="submit"
-                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gray-900 rounded-xl hover:bg-black transition shadow-sm">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
@@ -161,9 +161,11 @@
                 </button>
                 @if ($search || $fromWarehouseId || $toWarehouseId || $status !== 'all' || $startDate || $endDate)
                     <a href="{{ route('gudang.transfer.index') }}"
-                       class="px-2.5 py-2 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                       class="inline-flex items-center justify-center p-2 text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
                        title="Reset Filter">
-                        ✕
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
                     </a>
                 @endif
             </div>
@@ -190,7 +192,7 @@
                     @forelse ($transfers as $tf)
                         <tr class="hover:bg-gray-50/80 transition">
                             {{-- No. Dokumen --}}
-                            <td class="py-3 px-4 font-mono font-bold text-emerald-800">
+                            <td class="py-3 px-4 font-mono font-bold text-[#15803d]">
                                 <a href="{{ route('gudang.transfer.show', $tf) }}" class="hover:underline">
                                     {{ $tf->transfer_number }}
                                 </a>
@@ -208,7 +210,7 @@
 
                             {{-- Panah Arah --}}
                             <td class="py-3 px-4 text-center text-gray-400">
-                                <svg class="w-4 h-4 mx-auto text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 mx-auto text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                                 </svg>
                             </td>
@@ -255,14 +257,14 @@
                             <td class="py-3 px-4 text-right">
                                 <div class="inline-flex items-center gap-1.5">
                                     <a href="{{ route('gudang.transfer.show', $tf) }}"
-                                       class="px-2.5 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition shadow-2xs"
+                                       class="px-2.5 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"
                                        title="Lihat Rincian">
                                         Detail
                                     </a>
 
                                     @if ($tf->status === 'Draft')
                                         <a href="{{ route('gudang.transfer.edit', $tf) }}"
-                                           class="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 transition"
+                                           class="px-2.5 py-1 text-xs font-semibold text-[#15803d] bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition"
                                            title="Ubah Draft">
                                             Edit
                                         </a>

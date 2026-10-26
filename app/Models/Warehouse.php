@@ -100,4 +100,9 @@ class Warehouse extends Model
 
         return $blockers;
     }
+
+    public function getCodeAttribute(): string
+    {
+        return (string) ($this->attributes['kode'] ?? '');
+    }
 }

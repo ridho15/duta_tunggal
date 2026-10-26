@@ -16,7 +16,7 @@
     {{-- Retur Badge & Title --}}
     <div class="space-y-1">
         <div class="flex items-center gap-2">
-            <span class="inline-flex text-[10.5px] font-bold tracking-wider text-amber-900 bg-amber-50 border border-amber-300 rounded-md px-2 py-0.5 uppercase">
+            <span class="inline-flex text-[11px] font-bold tracking-wider text-amber-900 bg-amber-50 border border-amber-300 rounded-md px-2 py-0.5 uppercase">
                 RETUR DO · AKAN JADI {{ $deliveryOrder->do_number }}R
             </span>
             <span class="text-xs text-gray-400 font-medium">Proses Retur / Selisih DO</span>
@@ -34,7 +34,7 @@
         <div class="space-y-3">
             @foreach($deliveryOrder->deliveryOrderItem as $item)
                 @php $maxQty = (int)$item->quantity; @endphp
-                <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
                     <div class="flex items-start justify-between">
                         <div>
                             <span class="font-bold text-sm text-gray-900 block">{{ $item->product->name ?? 'Produk' }}</span>

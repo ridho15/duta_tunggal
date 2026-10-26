@@ -12,7 +12,7 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-500">Gudang & Stok</span>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold">Stock Opname</span>
+                <span class="text-[#15803d] font-bold">Stock Opname</span>
             </nav>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Stock Opname & Penyesuaian Persediaan</h1>
             <p class="text-xs text-gray-500 mt-1">
@@ -21,7 +21,7 @@
         </div>
         <div class="flex items-center gap-2.5">
             <a href="{{ route('gudang.stok.index') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M21 8 12 3 3 8v8l9 5 9-5z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     <path d="M3 8l9 5 9-5M12 13v8" stroke-width="1.8" stroke-linecap="round"></path>
@@ -42,7 +42,7 @@
     {{-- KPI Stat Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Total Sesi Opname --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Sesi Opname</span>
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -60,7 +60,7 @@
         </div>
 
         {{-- Sedang Dihitung --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Sedang Dihitung</span>
                 <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center">
@@ -76,7 +76,7 @@
         </div>
 
         {{-- Menunggu Approval (Completed) --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Menunggu Approval</span>
                 <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
@@ -93,7 +93,7 @@
         </div>
 
         {{-- Disetujui / Selesai --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Disetujui & Disesuaikan</span>
                 <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -102,7 +102,7 @@
                     </svg>
                 </div>
             </div>
-            <div class="text-2xl font-bold text-emerald-700 tracking-tight">
+            <div class="text-2xl font-bold text-[#15803d] tracking-tight">
                 {{ number_format($kpi['approved'], 0, ',', '.') }}
             </div>
             <p class="text-[11px] text-gray-500 mt-1">Stok & Jurnal GL telah disesuaikan</p>
@@ -110,7 +110,7 @@
     </div>
 
     {{-- Filter & Pencarian Bar --}}
-    <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-2xs">
+    <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
         <form action="{{ route('gudang.opname.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-3">
             {{-- Search Box --}}
             <div class="md:col-span-4">
@@ -120,7 +120,7 @@
                            name="search"
                            value="{{ $search }}"
                            placeholder="OPN-..., catatan sesi..."
-                           class="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800">
+                           class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
@@ -137,7 +137,7 @@
             <div class="md:col-span-3">
                 <label class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Status Opname</label>
                 <select name="status"
-                        class="w-full px-2.5 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-800">
+                        class="w-full px-2.5 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
                     <option value="all" {{ $status === 'all' ? 'selected' : '' }}>Semua Status</option>
                     <option value="draft" {{ $status === 'draft' ? 'selected' : '' }}>Draft (Persiapan)</option>
                     <option value="in_progress" {{ $status === 'in_progress' ? 'selected' : '' }}>Sedang Berlangsung (In Progress)</option>
@@ -149,7 +149,7 @@
             {{-- Action Buttons --}}
             <div class="md:col-span-2 flex items-end gap-2">
                 <button type="submit"
-                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gray-900 rounded-xl hover:bg-black transition shadow-sm">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
@@ -157,9 +157,11 @@
                 </button>
                 @if ($search || $warehouseId || $status !== 'all' || $startDate || $endDate)
                     <a href="{{ route('gudang.opname.index') }}"
-                       class="px-2.5 py-2 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                       class="inline-flex items-center justify-center p-2 text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
                        title="Reset Filter">
-                        ✕
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
                     </a>
                 @endif
             </div>
@@ -192,7 +194,7 @@
                         @endphp
                         <tr class="hover:bg-gray-50/80 transition">
                             {{-- No. Dokumen --}}
-                            <td class="py-3 px-4 font-mono font-bold text-emerald-800">
+                            <td class="py-3 px-4 font-mono font-bold text-[#15803d]">
                                 <a href="{{ route('gudang.opname.show', $op) }}" class="hover:underline">
                                     {{ $op->opname_number }}
                                 </a>
@@ -209,7 +211,7 @@
                             {{-- Gudang --}}
                             <td class="py-3 px-4 font-medium text-gray-900">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span class="w-2 h-2 rounded-full bg-[#15803d]"></span>
                                     <span>{{ $op->warehouse?->name ?? '-' }}</span>
                                 </div>
                             </td>
@@ -243,7 +245,7 @@
                             <td class="py-3 px-4 text-center font-medium">
                                 @if ($totalItems > 0)
                                     <span>{{ $countedItems }} / {{ $totalItems }}</span>
-                                    <span class="text-[10px] text-gray-400 block">({{ round(($countedItems / $totalItems) * 100) }}%)</span>
+                                    <span class="text-[10px] text-gray-400 block font-mono">({{ round(($countedItems / $totalItems) * 100) }}%)</span>
                                 @else
                                     <span class="text-gray-400 text-xs">Belum Dimulai</span>
                                 @endif
@@ -253,7 +255,7 @@
                             <td class="py-3 px-4 text-right font-mono font-bold">
                                 @if ($countedItems > 0)
                                     @if ($diffQty > 0)
-                                        <span class="text-emerald-700">+{{ number_format($diffQty, 0, ',', '.') }}</span>
+                                        <span class="text-[#15803d]">+{{ number_format($diffQty, 0, ',', '.') }}</span>
                                     @elseif ($diffQty < 0)
                                         <span class="text-rose-600">{{ number_format($diffQty, 0, ',', '.') }}</span>
                                     @else
@@ -268,7 +270,7 @@
                             <td class="py-3 px-4 text-right font-mono font-bold">
                                 @if ($countedItems > 0)
                                     @if ($diffValue > 0)
-                                        <span class="text-emerald-700">+Rp {{ number_format($diffValue, 0, ',', '.') }}</span>
+                                        <span class="text-[#15803d]">+Rp {{ number_format($diffValue, 0, ',', '.') }}</span>
                                     @elseif ($diffValue < 0)
                                         <span class="text-rose-600">-Rp {{ number_format(abs($diffValue), 0, ',', '.') }}</span>
                                     @else
@@ -283,7 +285,7 @@
                             <td class="py-3 px-4 text-right">
                                 <div class="inline-flex items-center gap-1.5">
                                     <a href="{{ route('gudang.opname.show', $op) }}"
-                                       class="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 transition shadow-2xs">
+                                       class="px-2.5 py-1 text-xs font-semibold text-[#15803d] bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition shadow-sm">
                                         Workspace
                                     </a>
 

@@ -38,6 +38,11 @@
         @if($product)
             <p><strong>Produk:</strong> {{ $product->name }}</p>
         @endif
+        @if(!empty($is_truncated))
+            <p style="color: #b91c1c; font-size: 10px; font-weight: bold; background: #fee2e2; border: 1px solid #f87171; padding: 4px 8px; margin-top: 4px;">
+                Catatan: Menampilkan {{ count($data) }} dari {{ $total_untruncated }} baris data untuk optimasi performa PDF. Untuk seluruh data tanpa batas, silakan gunakan fitur Ekspor Excel.
+            </p>
+        @endif
     </div>
 
     @if($type === 'stock')

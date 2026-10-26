@@ -125,31 +125,31 @@
             @endphp
             <a
                 href="{{ $tabUrl('all') }}"
-                class="px-3.5 py-1.5 rounded-lg transition {{ $status === 'all' ? 'bg-[#f0fdf4] text-[#15803d] font-bold border border-[#bbf7d0]' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-xl transition {{ $status === 'all' ? 'bg-[#f0fdf4] text-[#15803d] font-bold border border-[#bbf7d0]' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
             >
                 Semua
-                <span class="ml-1 px-1.5 py-0.2 bg-gray-100 text-gray-600 rounded-full text-xs">{{ $counts['total'] ?? 0 }}</span>
+                <span class="ml-1 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-mono">{{ $counts['total'] ?? 0 }}</span>
             </a>
             <a
                 href="{{ $tabUrl('draft') }}"
-                class="px-3.5 py-1.5 rounded-lg transition {{ $status === 'draft' ? 'bg-amber-50 text-amber-800 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-xl transition {{ $status === 'draft' ? 'bg-amber-50 text-amber-800 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
             >
                 Draf
-                <span class="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-xs">{{ $counts['draft'] ?? 0 }}</span>
+                <span class="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-mono">{{ $counts['draft'] ?? 0 }}</span>
             </a>
             <a
                 href="{{ $tabUrl('partial') }}"
-                class="px-3.5 py-1.5 rounded-lg transition {{ $status === 'partial' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-xl transition {{ $status === 'partial' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
             >
                 Sebagian
-                <span class="ml-1 px-1.5 py-0.2 bg-indigo-100 text-indigo-800 rounded-full text-xs">{{ $counts['partial'] ?? 0 }}</span>
+                <span class="ml-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-xs font-mono">{{ $counts['partial'] ?? 0 }}</span>
             </a>
             <a
                 href="{{ $tabUrl('completed') }}"
-                class="px-3.5 py-1.5 rounded-lg transition {{ $status === 'completed' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-xl transition {{ $status === 'completed' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
             >
                 Selesai
-                <span class="ml-1 px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full text-xs">{{ $counts['completed'] ?? 0 }}</span>
+                <span class="ml-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-mono">{{ $counts['completed'] ?? 0 }}</span>
             </a>
         </div>
 
@@ -166,7 +166,7 @@
                         name="q"
                         value="{{ $search }}"
                         placeholder="No. GRN, PO, Supplier, No. SJ..."
-                        class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                        class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
                     />
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -187,7 +187,7 @@
                     type="date"
                     name="start_date"
                     value="{{ $startDate }}"
-                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
+                    class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                 />
             </div>
 
@@ -198,7 +198,7 @@
                     type="date"
                     name="end_date"
                     value="{{ $endDate }}"
-                    class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] bg-white"
+                    class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                 />
             </div>
 
@@ -206,7 +206,7 @@
             <div class="lg:col-span-1 flex items-center gap-1">
                 <button
                     type="submit"
-                    class="w-full py-2 px-3 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+                    class="w-full py-2 px-3 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-sm transition"
                     title="Terapkan Filter"
                 >
                     Filter
@@ -214,7 +214,7 @@
                 @if ($search || $warehouseId || $startDate || $endDate || $status !== 'all')
                     <a
                         href="{{ route('gudang.penerimaan.index') }}"
-                        class="p-2 text-gray-500 hover:text-red-600 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+                        class="p-2 text-gray-500 hover:text-red-600 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
                         title="Reset Filter"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,7 +297,7 @@
                                     ({{ $receipt->purchaseReceiptItem->count() }} item)
                                 </span>
                                 @if ($totalRejectedQty > 0)
-                                    <span class="inline-block mt-0.5 px-1.5 py-0.2 bg-red-100 text-red-700 text-[10px] font-bold rounded">
+                                    <span class="inline-block mt-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 text-[11px] font-bold rounded">
                                         {{ number_format($totalRejectedQty) }} ditolak
                                     </span>
                                 @endif
@@ -311,8 +311,8 @@
                             {{-- Status Badge --}}
                             <td class="py-3.5 px-4 text-center whitespace-nowrap">
                                 @if ($receipt->status === 'completed')
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-[#15803d] border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-[#15803d]"></span>
                                         Selesai
                                     </span>
                                 @elseif ($receipt->status === 'partial')
@@ -334,7 +334,7 @@
                                     {{-- Detail --}}
                                     <a
                                         href="{{ route('gudang.penerimaan.show', $receipt) }}"
-                                        class="p-1.5 text-gray-500 hover:text-[#15803d] hover:bg-emerald-50 rounded-lg transition"
+                                        class="p-1.5 text-gray-500 hover:text-[#15803d] hover:bg-emerald-50 rounded-xl transition"
                                         title="Lihat Detail Penerimaan"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,7 +347,7 @@
                                     <a
                                         href="{{ route('gudang.penerimaan.pdf', $receipt) }}"
                                         target="_blank"
-                                        class="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                                        class="p-1.5 text-gray-500 hover:text-[#15803d] hover:bg-emerald-50 rounded-xl transition"
                                         title="Cetak Surat Jalan Masuk PDF"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,7 +359,7 @@
                                     @if ($receipt->status === 'draft')
                                         <a
                                             href="{{ route('gudang.penerimaan.edit', $receipt) }}"
-                                            class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                                            class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition"
                                             title="Edit Draf Penerimaan"
                                         >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -371,7 +371,7 @@
                                         <button
                                             type="button"
                                             @click="confirmDelete('{{ route('gudang.penerimaan.destroy', $receipt) }}', '{{ $receipt->receipt_number }}')"
-                                            class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                            class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
                                             title="Hapus Draf"
                                         >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -393,7 +393,7 @@
                                 <div class="mt-4">
                                     <a
                                         href="{{ route('gudang.penerimaan.create') }}"
-                                        class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                                        class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition"
                                     >
                                         + Terima Barang Baru
                                     </a>
@@ -445,13 +445,13 @@
                 <button
                     type="button"
                     @click="deleteModalOpen = false"
-                    class="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    class="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition"
                 >
                     Batal
                 </button>
                 <button
                     type="submit"
-                    class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition"
+                    class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition"
                 >
                     Hapus Dokumen
                 </button>

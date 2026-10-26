@@ -298,9 +298,26 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/quotations', function () { return redirect()->route('penjualan.quotations.index'); });
         Route::get('/quotations/create', function () { return redirect()->route('penjualan.quotations.create', request()->query()); });
         Route::get('/quotations/{quotation}', function ($quotation) { return redirect()->route('penjualan.quotations.show', $quotation); });
+
+        // Laporan Penjualan
+        Route::prefix('laporan')->name('laporan.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Penjualan\SalesReportController::class, 'index'])->name('index');
+            Route::get('/pdf', [\App\Http\Controllers\Penjualan\SalesReportController::class, 'exportPdf'])->name('pdf');
+            Route::get('/excel', [\App\Http\Controllers\Penjualan\SalesReportController::class, 'exportExcel'])->name('excel');
+        });
     });
 
-    // Modul Kasir / Point of Sale (POS)
+    /*
+    |--------------------------------------------------------------------------
+    | Modul Kasir / Point of Sale (POS Ritel) [SOFT DISABLED]
+    |--------------------------------------------------------------------------
+    | Modul Kasir POS ritel saat ini dinonaktifkan / disembunyikan karena seluruh
+    | transaksi dan operasional perusahaan terpusat pada Modul Penjualan B2B
+    | (Penawaran, SO, DO, Faktur Penjualan, dan Kwitansi Piutang).
+    |
+    | Jika di masa depan dibutuhkan aktivasi toko/outlet ritel fisik, silakan
+    | buka kembali blok route di bawah ini dan tautan menu di sidebar.blade.php.
+    |
     Route::prefix('kasir')->name('kasir.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Kasir\PosController::class, 'index'])->name('pos.index');
         Route::get('/cari-produk', [\App\Http\Controllers\Kasir\PosController::class, 'searchProduct'])->name('pos.search');
@@ -309,13 +326,18 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/riwayat', [\App\Http\Controllers\Kasir\PosController::class, 'history'])->name('pos.history');
         Route::get('/detail/{posOrder}', [\App\Http\Controllers\Kasir\PosController::class, 'show'])->name('pos.show');
 
-        // Shift Kasir
+        // Shift Kasir & Laporan Rekap POS
+        Route::get('/shift', [\App\Http\Controllers\Kasir\PosShiftController::class, 'index'])->name('shift.index');
         Route::post('/shift/buka', [\App\Http\Controllers\Kasir\PosShiftController::class, 'open'])->name('shift.open');
         Route::post('/shift/tutup', [\App\Http\Controllers\Kasir\PosShiftController::class, 'close'])->name('shift.close');
         Route::get('/shift/{posShift}/rekap', [\App\Http\Controllers\Kasir\PosShiftController::class, 'summary'])->name('shift.summary');
+        Route::get('/laporan', [\App\Http\Controllers\Kasir\PosShiftController::class, 'report'])->name('laporan.index');
+        Route::get('/laporan/pdf', [\App\Http\Controllers\Kasir\PosShiftController::class, 'exportPdf'])->name('laporan.pdf');
+        Route::get('/laporan/excel', [\App\Http\Controllers\Kasir\PosShiftController::class, 'exportExcel'])->name('laporan.excel');
     });
 
     Route::get('/pos', function () { return redirect()->route('kasir.pos.index'); });
+    */
 
     // Modul Gudang & Stok
     Route::prefix('gudang')->name('gudang.')->group(function () {
@@ -373,6 +395,13 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/opname/{opname}/approve', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'approve'])->name('opname.approve');
         Route::get('/opname/{opname}/pdf', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'pdf'])->name('opname.pdf');
         Route::get('/opname/{opname}/excel', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'excel'])->name('opname.excel');
+
+        // Laporan Persediaan & Mutasi Stok
+        Route::prefix('laporan')->name('laporan.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Gudang\InventoryReportController::class, 'index'])->name('index');
+            Route::get('/pdf', [\App\Http\Controllers\Gudang\InventoryReportController::class, 'exportPdf'])->name('pdf');
+            Route::get('/excel', [\App\Http\Controllers\Gudang\InventoryReportController::class, 'exportExcel'])->name('excel');
+        });
     });
 
     // Modul Pembelian
@@ -472,6 +501,13 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/purchase-returns', function () { return redirect()->route('pembelian.returns.index'); });
         Route::get('/purchase-returns/create', function () { return redirect()->route('pembelian.returns.create', request()->query()); });
         Route::get('/purchase-returns/{return}', function ($return) { return redirect()->route('pembelian.returns.show', $return); });
+
+        // Laporan Pembelian
+        Route::prefix('laporan')->name('laporan.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Pembelian\PurchaseReportController::class, 'index'])->name('index');
+            Route::get('/pdf', [\App\Http\Controllers\Pembelian\PurchaseReportController::class, 'exportPdf'])->name('pdf');
+            Route::get('/excel', [\App\Http\Controllers\Pembelian\PurchaseReportController::class, 'exportExcel'])->name('excel');
+        });
     });
 
     // Modul Keuangan & Akuntansi

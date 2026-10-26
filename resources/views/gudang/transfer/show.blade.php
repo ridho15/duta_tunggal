@@ -12,7 +12,7 @@
                 <span class="text-gray-300">/</span>
                 <a href="{{ route('gudang.transfer.index') }}" class="hover:text-gray-700">Pindah Stok</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold font-mono">{{ $transfer->transfer_number }}</span>
+                <span class="text-[#15803d] font-bold font-mono">{{ $transfer->transfer_number }}</span>
             </nav>
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-mono">
@@ -46,19 +46,19 @@
         {{-- Top Actions --}}
         <div class="flex items-center gap-2">
             <a href="{{ route('gudang.transfer.index') }}"
-               class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+               class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 ← Kembali
             </a>
 
             @if ($transfer->status === 'Draft')
                 <a href="{{ route('gudang.transfer.edit', $transfer) }}"
-                   class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+                   class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Edit Draft
                 </a>
 
                 <button type="button"
                         @click="$dispatch('open-modal-request-transfer')"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
@@ -67,7 +67,7 @@
 
                 <button type="button"
                         @click="$dispatch('open-modal-delete-transfer')"
-                        class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition">
+                        class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
                     Hapus
                 </button>
             @endif
@@ -75,13 +75,13 @@
             @if (in_array($transfer->status, ['Request', 'Pending']))
                 <button type="button"
                         onclick="openRejectModal()"
-                        class="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition shadow-2xs">
+                        class="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm">
                     Tolak
                 </button>
 
                 <button type="button"
                         @click="$dispatch('open-modal-approve-transfer')"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl transition shadow-sm active:scale-[0.98]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
@@ -92,8 +92,8 @@
             @if (in_array($transfer->status, ['Approved', 'completed']))
                 <a href="{{ route('gudang.transfer.pdf', $transfer) }}"
                    target="_blank"
-                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                    <svg class="w-4 h-4 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2zm8-12V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4h10z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>Cetak Surat Jalan (PDF)</span>
@@ -105,15 +105,15 @@
 
     {{-- Banner Status Approved --}}
     @if (in_array($transfer->status, ['Approved', 'completed']))
-        <div class="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-3">
-            <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+        <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-3">
+            <div class="w-7 h-7 rounded-lg bg-[#15803d] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
             </div>
             <div class="space-y-1">
                 <h4 class="font-bold">Transfer Stok Telah Disetujui & Selesai</h4>
-                <p class="text-emerald-800 text-[11.5px]">
+                <p class="text-emerald-800 text-xs">
                     Kuantitas barang telah otomatis dikeluarkan dari <strong>{{ $transfer->fromWarehouse?->name }}</strong> dan dimasukkan ke <strong>{{ $transfer->toWarehouse?->name }}</strong> pada buku mutasi stok.
                 </p>
             </div>
@@ -121,7 +121,7 @@
     @endif
 
     {{-- Kartu Info Rangkuman Dokumen --}}
-    <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-2xs space-y-4">
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
         <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Informasi Pindah Stok</h3>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-xs">
@@ -156,7 +156,7 @@
             {{-- Total Qty --}}
             <div>
                 <span class="text-gray-400 block mb-1">Total Kuantitas Pindah</span>
-                <span class="font-bold text-emerald-700 text-sm">
+                <span class="font-bold font-mono text-[#15803d] text-sm">
                     {{ number_format($transfer->stockTransferItem->sum('quantity'), 0, ',', '.') }} Unit
                 </span>
                 <span class="text-[11px] text-gray-400 block">({{ $transfer->stockTransferItem->count() }} Varian Barang)</span>
@@ -165,8 +165,8 @@
     </div>
 
     {{-- Tabel Rincian Item Barang --}}
-    <div class="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
-        <div class="px-5 py-3.5 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="px-5 py-3.5 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
             <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">
                 Daftar Barang yang Dipindahkan ({{ $transfer->stockTransferItem->count() }})
             </h3>
@@ -175,7 +175,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="bg-gray-50/50 text-gray-500 uppercase tracking-wider text-[11px] font-semibold border-b border-gray-200">
+                    <tr class="bg-gray-50/50 text-gray-500 uppercase tracking-wider text-[11px] font-semibold border-b border-gray-100">
                         <th class="py-3 px-4 w-12 text-center">No</th>
                         <th class="py-3 px-4">Nama Produk / SKU</th>
                         <th class="py-3 px-4 text-center">Satuan</th>
@@ -209,14 +209,14 @@
                             <td class="py-3 px-4 text-gray-600">
                                 {{ $item->toRak?->name ?? '-' }}
                             </td>
-                            <td class="py-3 px-4 text-right font-mono font-bold text-emerald-700 text-sm">
+                            <td class="py-3 px-4 text-right font-mono font-bold text-[#15803d] text-sm">
                                 {{ number_format($item->quantity, 0, ',', '.') }}
                             </td>
                             <td class="py-3 px-4 text-center">
                                 @if ($item->product)
                                     <a href="{{ route('gudang.stok.card', $item->product) }}"
                                        target="_blank"
-                                       class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 hover:bg-emerald-100 transition">
+                                       class="inline-flex items-center gap-1 text-[11px] font-semibold text-[#15803d] hover:text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition shadow-sm">
                                         <span>Buku Mutasi</span>
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -230,11 +230,11 @@
                     @endforeach
                 </tbody>
                 <tfoot>
-                    <tr class="bg-gray-50/80 font-bold text-gray-900 border-t border-gray-200">
+                    <tr class="bg-gray-50/80 font-bold text-gray-900 border-t border-gray-100">
                         <td colspan="5" class="py-3 px-4 text-right uppercase tracking-wider text-[11px]">
                             Total Kuantitas:
                         </td>
-                        <td class="py-3 px-4 text-right font-mono text-emerald-800 text-sm">
+                        <td class="py-3 px-4 text-right font-mono text-[#15803d] text-sm">
                             {{ number_format($transfer->stockTransferItem->sum('quantity'), 0, ',', '.') }}
                         </td>
                         <td></td>
@@ -246,11 +246,15 @@
 </div>
 
 {{-- Modal Penolakan Transfer --}}
-<div id="rejectModal" class="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-xs hidden flex items-center justify-center p-4">
+<div id="rejectModal" class="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
             <h3 class="text-sm font-bold text-gray-900">Tolak Transfer Stok</h3>
-            <button type="button" onclick="closeRejectModal()" class="text-gray-400 hover:text-gray-600">✕</button>
+            <button type="button" onclick="closeRejectModal()" class="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+            </button>
         </div>
         <form action="{{ route('gudang.transfer.reject', $transfer) }}" method="POST" class="space-y-4">
             @csrf
@@ -259,13 +263,13 @@
                 <textarea name="reason"
                           rows="3"
                           placeholder="Tuliskan alasan penolakan transfer stok..."
-                          class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-500 text-gray-800"></textarea>
+                          class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-gray-800"></textarea>
             </div>
             <div class="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onclick="closeRejectModal()" class="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg">
+                <button type="button" onclick="closeRejectModal()" class="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition">
                     Batal
                 </button>
-                <button type="submit" class="px-3.5 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition shadow-2xs">
+                <button type="submit" class="px-3.5 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition shadow-sm active:scale-[0.98]">
                     Konfirmasi Tolak
                 </button>
             </div>

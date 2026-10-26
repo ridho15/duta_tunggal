@@ -86,17 +86,6 @@
                     Penjualan
                 </div>
 
-                @if ($canSee(['OWN', 'SM', 'KSR', 'SLS', 'ADP']))
-                    <a href="{{ route('kasir.pos.index') }}" class="{{ $itemClass(request()->is('kasir*')) }}">
-                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <rect x="2" y="3" width="20" height="14" rx="2" stroke-width="1.8"></rect>
-                            <line x1="8" y1="21" x2="16" y2="21" stroke-width="1.8" stroke-linecap="round"></line>
-                            <line x1="12" y1="17" x2="12" y2="21" stroke-width="1.8" stroke-linecap="round"></line>
-                        </svg>
-                        <span class="flex-1">Kasir (POS Ritel)</span>
-                        <span class="text-[9.5px] font-bold text-emerald-700 bg-emerald-100 rounded px-1.5 py-0.5">Ritel</span>
-                    </a>
-                @endif
 
                 @if ($canSee(['OWN', 'SM', 'SLS']))
                     <a href="{{ route('penjualan.quotations.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/penawaran*')) }}">
@@ -186,6 +175,15 @@
                         <span>Nota Kredit</span>
                     </a>
                 @endif
+
+                @if ($canSee(['OWN', 'SM', 'SLS', 'FIN']))
+                    <a href="{{ route('penjualan.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/laporan*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Laporan Penjualan</span>
+                    </a>
+                @endif
             </div>
         @endif
 
@@ -240,6 +238,15 @@
                             <path d="M9 12h6M9 16h4" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
                         <span>Stock Opname</span>
+                    </a>
+                @endif
+
+                @if ($canSee(['OWN', 'GDG', 'PUR', 'FIN']))
+                    <a href="{{ route('gudang.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/laporan*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Laporan Stok & Mutasi</span>
                     </a>
                 @endif
             </div>
@@ -339,6 +346,13 @@
                             <path d="M4 9h10a6 6 0 0 1 0 12h-3" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
                         <span>Retur Pembelian</span>
+                    </a>
+
+                    <a href="{{ route('pembelian.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/laporan*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Laporan Pembelian</span>
                     </a>
                 @endif
             </div>

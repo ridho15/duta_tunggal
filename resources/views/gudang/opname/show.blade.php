@@ -12,7 +12,7 @@
                 <span class="text-gray-300">/</span>
                 <a href="{{ route('gudang.opname.index') }}" class="hover:text-gray-700">Stock Opname</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold font-mono">{{ $opname->opname_number }}</span>
+                <span class="text-[#15803d] font-bold font-mono">{{ $opname->opname_number }}</span>
             </nav>
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-mono">
@@ -46,19 +46,19 @@
         {{-- Top Actions --}}
         <div class="flex items-center gap-2">
             <a href="{{ route('gudang.opname.index') }}"
-               class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+               class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 ← Kembali
             </a>
 
             @if ($opname->status === 'draft')
-                <button type="button" @click="$dispatch('open-modal-delete-opname')" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition">
+                <button type="button" @click="$dispatch('open-modal-delete-opname')" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
                     Hapus Sesi
                 </button>
 
                 <form action="{{ route('gudang.opname.start', $opname) }}" method="POST">
                     @csrf
                     <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-width="2"></path>
                             <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2"></path>
@@ -69,13 +69,13 @@
             @endif
 
             @if ($opname->status === 'completed')
-                <button type="button" @click="$dispatch('open-modal-recount-opname')" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+                <button type="button" @click="$dispatch('open-modal-recount-opname')" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Hitung Ulang
                 </button>
 
                 <button type="button"
                         @click="$dispatch('open-modal-approve-opname')"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl transition shadow-sm active:scale-[0.98]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
@@ -86,9 +86,9 @@
             {{-- Cetak PDF & Excel --}}
             <a href="{{ route('gudang.opname.pdf', $opname) }}"
                target="_blank"
-               class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs"
+               class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"
                title="Cetak Berita Acara / Formulir Hitung Fisik">
-                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2zm8-12V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4h10z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <span>PDF</span>
@@ -96,9 +96,9 @@
 
             @if (in_array($opname->status, ['in_progress', 'completed', 'approved']))
                 <a href="{{ route('gudang.opname.excel', $opname) }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"
                    title="Ekspor CSV / Excel">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>Excel</span>
@@ -110,16 +110,16 @@
 
     {{-- Banner Approved & Jurnal GL --}}
     @if ($opname->status === 'approved')
-        <div class="p-4.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div class="w-8 h-8 rounded-lg bg-[#15803d] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </div>
                 <div>
                     <h4 class="font-bold text-sm text-emerald-900">Stock Opname Telah Selesai & Dibukukan</h4>
-                    <p class="text-emerald-800 mt-0.5 text-[11.5px]">
+                    <p class="text-emerald-800 mt-0.5 text-xs">
                         Disetujui oleh <strong>{{ $opname->approver?->name ?? 'Supervisor' }}</strong> pada {{ \Carbon\Carbon::parse($opname->approved_at)->translatedFormat('d F Y H:i') }}.
                         Saldo fisik stok telah disesuaikan di gudang <strong>{{ $opname->warehouse?->name }}</strong>.
                     </p>
@@ -127,7 +127,7 @@
             </div>
             <a href="{{ route('keuangan.journal.index', ['search' => 'ADJ-' . $opname->opname_number]) }}"
                target="_blank"
-               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition flex-shrink-0 shadow-2xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#15803d] text-white font-semibold text-xs hover:bg-[#166534] transition flex-shrink-0 shadow-sm active:scale-[0.98]">
                 <span>Lihat Jurnal Penyesuaian</span>
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -137,7 +137,7 @@
     @endif
 
     {{-- Header Info Sesi Opname --}}
-    <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-2xs space-y-4">
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
             <div>
                 <span class="text-gray-400 block mb-1">Tanggal Pelaksanaan</span>
@@ -148,7 +148,7 @@
             <div>
                 <span class="text-gray-400 block mb-1">Gudang Audit</span>
                 <div class="font-bold text-gray-900 text-sm flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="w-2 h-2 rounded-full bg-[#15803d]"></span>
                     <span>{{ $opname->warehouse?->name ?? '-' }}</span>
                 </div>
                 <span class="text-[11px] text-gray-400">Kode: {{ $opname->warehouse?->kode ?? '-' }}</span>
@@ -171,7 +171,7 @@
 
     {{-- State 1: DRAFT (Belum Mulai) --}}
     @if ($opname->status === 'draft')
-        <div class="bg-white rounded-xl p-10 border border-gray-200 text-center shadow-2xs space-y-4">
+        <div class="bg-white rounded-2xl p-10 border border-gray-100 text-center shadow-sm space-y-4">
             <div class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.8"></path>
@@ -188,7 +188,7 @@
             <div class="pt-2 flex items-center justify-center gap-3">
                 <a href="{{ route('gudang.opname.pdf', $opname) }}"
                    target="_blank"
-                   class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                   class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2zm8-12V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4h10z" stroke-width="1.8"></path>
                     </svg>
@@ -197,7 +197,7 @@
                 <form action="{{ route('gudang.opname.start', $opname) }}" method="POST">
                     @csrf
                     <button type="submit"
-                            class="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                            class="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-width="2"></path>
                             <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2"></path>
@@ -212,39 +212,39 @@
         {{-- KPI Cards Ringkasan Hitung Fisik --}}
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {{-- Total Item --}}
-            <div class="bg-white rounded-xl p-3.5 border border-gray-200 text-center shadow-2xs">
+            <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Total Produk</span>
-                <span class="text-xl font-bold text-gray-900">{{ $summary['total_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-gray-900">{{ $summary['total_items'] }}</span>
             </div>
 
             {{-- Dihitung --}}
-            <div class="bg-white rounded-xl p-3.5 border border-gray-200 text-center shadow-2xs">
+            <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Telah Dihitung</span>
-                <span class="text-xl font-bold text-sky-600">{{ $summary['counted_items'] }} / {{ $summary['total_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-sky-600">{{ $summary['counted_items'] }} / {{ $summary['total_items'] }}</span>
             </div>
 
             {{-- Cocok --}}
-            <div class="bg-white rounded-xl p-3.5 border border-gray-200 text-center shadow-2xs">
+            <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Stok Cocok</span>
-                <span class="text-xl font-bold text-emerald-600">{{ $summary['matched_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-[#15803d]">{{ $summary['matched_items'] }}</span>
             </div>
 
             {{-- Surplus (+) --}}
-            <div class="bg-white rounded-xl p-3.5 border border-gray-200 text-center shadow-2xs">
+            <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Surplus (+)</span>
-                <span class="text-xl font-bold text-emerald-700">+{{ $summary['surplus_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-[#15803d]">+{{ $summary['surplus_items'] }}</span>
             </div>
 
             {{-- Defisit (-) --}}
-            <div class="bg-white rounded-xl p-3.5 border border-gray-200 text-center shadow-2xs">
+            <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Defisit (-)</span>
-                <span class="text-xl font-bold text-rose-600">-{{ $summary['deficit_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-rose-600">-{{ $summary['deficit_items'] }}</span>
             </div>
 
             {{-- Total Nilai Selisih --}}
-            <div class="bg-white rounded-xl p-3.5 border border-gray-200 text-center shadow-2xs">
+            <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Total Selisih Rp</span>
-                <span class="text-sm font-bold {{ $summary['total_diff_value'] >= 0 ? 'text-emerald-700' : 'text-rose-600' }} block mt-1">
+                <span class="text-sm font-bold font-mono {{ $summary['total_diff_value'] >= 0 ? 'text-[#15803d]' : 'text-rose-600' }} block mt-1">
                     {{ $summary['total_diff_value'] >= 0 ? '+' : '' }}Rp {{ number_format($summary['total_diff_value'], 0, ',', '.') }}
                 </span>
             </div>
@@ -254,8 +254,8 @@
         <form action="{{ route('gudang.opname.save-progress', $opname) }}" method="POST" id="opnameForm" class="space-y-4">
             @csrf
 
-            <div class="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
-                <div class="p-4 bg-gray-50/80 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="p-4 bg-gray-50/80 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">
                             Lembar Kerja Hasil Hitung Fisik ({{ $opname->items->count() }} Item)
@@ -268,13 +268,13 @@
                                id="tableSearch"
                                onkeyup="filterTable()"
                                placeholder="Cari produk pada tabel..."
-                               class="px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800 w-56">
+                               class="px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800 w-56">
                     </div>
                 </div>
 
                 <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
                     <table class="w-full text-left text-xs border-collapse" id="opnameTable">
-                        <thead class="sticky top-0 z-10 bg-gray-100 border-b border-gray-200 shadow-2xs">
+                        <thead class="sticky top-0 z-10 bg-gray-50/90 border-b border-gray-100 shadow-sm">
                             <tr class="text-gray-600 uppercase tracking-wider text-[11px] font-semibold">
                                 <th class="py-3 px-3 w-10 text-center">No</th>
                                 <th class="py-3 px-3">Kode / SKU</th>
@@ -342,7 +342,7 @@
                                                    value="{{ $item->physical_qty !== null ? $item->physical_qty : '' }}"
                                                    placeholder="Input fisik..."
                                                    oninput="calculateRowVariance({{ $item->id }}, {{ $item->system_qty }}, {{ $item->unit_cost ?: ($item->average_cost ?: 0) }})"
-                                                   class="w-28 px-2 py-1 text-xs text-center font-bold border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 text-emerald-800">
+                                                   class="w-28 px-2 py-1.5 text-xs text-center font-bold font-mono border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-[#15803d]">
                                         @else
                                             <span class="font-mono font-bold text-gray-900 text-sm">
                                                 {{ $item->physical_qty !== null ? number_format($item->physical_qty, 0, ',', '.') : '-' }}
@@ -355,9 +355,9 @@
                                         @if ($isUncounted)
                                             <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Belum</span>
                                         @elseif ($isMatched)
-                                            <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700">Cocok</span>
+                                            <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-[#15803d]">Cocok</span>
                                         @elseif ($isSurplus)
-                                            <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800">+{{ number_format($diff, 0, ',', '.') }}</span>
+                                            <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-[#15803d]">+{{ number_format($diff, 0, ',', '.') }}</span>
                                         @else
                                             <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700">{{ number_format($diff, 0, ',', '.') }}</span>
                                         @endif
@@ -368,7 +368,7 @@
                                         @if ($isUncounted)
                                             <span class="text-gray-300">-</span>
                                         @elseif ($item->difference_value > 0)
-                                            <span class="text-emerald-700">+Rp {{ number_format($item->difference_value, 0, ',', '.') }}</span>
+                                            <span class="text-[#15803d]">+Rp {{ number_format($item->difference_value, 0, ',', '.') }}</span>
                                         @elseif ($item->difference_value < 0)
                                             <span class="text-rose-600">-Rp {{ number_format(abs($item->difference_value), 0, ',', '.') }}</span>
                                         @else
@@ -383,7 +383,7 @@
                                                    name="notes[{{ $item->id }}]"
                                                    value="{{ $item->notes }}"
                                                    placeholder="Keterangan selisih..."
-                                                   class="w-full px-2 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-700">
+                                                   class="w-full px-2 py-1 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-700">
                                         @else
                                             <span class="text-gray-500 text-[11px]">{{ $item->notes ?: '-' }}</span>
                                         @endif
@@ -396,7 +396,7 @@
 
                 {{-- Action Bar saat Status IN_PROGRESS --}}
                 @if ($opname->status === 'in_progress')
-                    <div class="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                    <div class="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
                         <span class="text-xs text-gray-500">
                             Simpan hasil hitung secara berkala agar tidak hilang saat input belum selesai.
                         </span>
@@ -404,13 +404,13 @@
                             <button type="submit"
                                     name="action"
                                     value="save"
-                                    class="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+                                    class="px-4 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                                 Simpan Progres Hitung
                             </button>
                             <button type="submit"
                                     name="action"
                                     value="complete"
-                                    class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                                    class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                                 </svg>
@@ -459,11 +459,11 @@
         const diffVal = diff * unitCost;
 
         if (diff === 0) {
-            diffQtyElem.innerHTML = '<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700">Cocok</span>';
+            diffQtyElem.innerHTML = '<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-[#15803d]">Cocok</span>';
             diffValElem.innerHTML = '<span class="text-gray-400">Rp 0</span>';
         } else if (diff > 0) {
-            diffQtyElem.innerHTML = `<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800">+${diff.toLocaleString('id-ID')}</span>`;
-            diffValElem.innerHTML = `<span class="text-emerald-700">+Rp ${Math.abs(diffVal).toLocaleString('id-ID')}</span>`;
+            diffQtyElem.innerHTML = `<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-[#15803d]">+${diff.toLocaleString('id-ID')}</span>`;
+            diffValElem.innerHTML = `<span class="text-[#15803d]">+Rp ${Math.abs(diffVal).toLocaleString('id-ID')}</span>`;
         } else {
             diffQtyElem.innerHTML = `<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700">${diff.toLocaleString('id-ID')}</span>`;
             diffValElem.innerHTML = `<span class="text-rose-600">-Rp ${Math.abs(diffVal).toLocaleString('id-ID')}</span>`;

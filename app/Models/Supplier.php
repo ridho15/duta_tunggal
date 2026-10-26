@@ -106,6 +106,11 @@ class Supplier extends Model
         return $blockers;
     }
 
+    public function getNameAttribute(): string
+    {
+        return (string) ($this->attributes['perusahaan'] ?? '');
+    }
+
     public function getAtasNamaAttribute()
     {
         return $this->nama_rekening;

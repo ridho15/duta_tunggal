@@ -50,7 +50,7 @@
         <div class="flex items-center gap-2">
             <a
                 href="{{ route('gudang.penerimaan.show', $receipt) }}"
-                class="px-4 py-2 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-sm transition"
+                class="px-4 py-2 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition"
             >
                 Batal
             </a>
@@ -88,7 +88,7 @@
         <input type="hidden" name="action" x-model="formAction">
 
         {{-- Card 1: Dokumen PO Terkait (Readonly) --}}
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
             <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h2 class="text-base font-bold text-gray-900">Pesanan Pembelian Terkait</h2>
                 <span class="px-2.5 py-0.5 bg-emerald-50 text-[#15803d] border border-emerald-200 font-bold text-xs rounded-full">
@@ -99,7 +99,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                 <div>
                     <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">Nomor PO</span>
-                    <span class="font-bold text-gray-900 block mt-0.5">{{ $receipt->purchaseOrder->po_number ?? '-' }}</span>
+                    <span class="font-bold text-gray-900 block mt-0.5 font-mono">{{ $receipt->purchaseOrder->po_number ?? '-' }}</span>
                 </div>
                 <div>
                     <span class="text-xs font-bold text-gray-400 uppercase tracking-wider block">Supplier</span>
@@ -115,7 +115,7 @@
         </div>
 
         {{-- Card 2: Informasi Dokumen Vendor & Petugas --}}
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div class="border-b border-gray-100 pb-3">
                 <h2 class="text-base font-bold text-gray-900">Informasi Kedatangan & Petugas</h2>
             </div>
@@ -130,7 +130,7 @@
                         type="date"
                         name="receipt_date"
                         value="{{ old('receipt_date', optional($receipt->receipt_date)->format('Y-m-d')) }}"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                        class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                         required
                     />
                 </div>
@@ -144,7 +144,7 @@
                         type="text"
                         name="supplier_delivery_note_number"
                         value="{{ old('supplier_delivery_note_number', $receipt->supplier_delivery_note_number) }}"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white font-mono"
+                        class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white font-mono"
                     />
                 </div>
 
@@ -166,7 +166,7 @@
                         name="photos[]"
                         multiple
                         accept="image/png,image/jpeg,image/webp"
-                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        class="w-full text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-[#15803d] hover:file:bg-emerald-100"
                     />
                 </div>
 
@@ -178,14 +178,14 @@
                     <textarea
                         name="notes"
                         rows="2"
-                        class="w-full py-2 px-3 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
                     >{{ old('notes', $receipt->clean_notes) }}</textarea>
                 </div>
             </div>
         </div>
 
         {{-- Card 3: Rincian Kuantitas Barang --}}
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div class="border-b border-gray-100 pb-3">
                 <h2 class="text-base font-bold text-gray-900">Rincian Barang yang Diterima</h2>
                 <p class="text-xs text-gray-500">Sesuaikan kuantitas fisik tiba, barang yang diterima baik, dan barang yang ditolak.</p>
@@ -206,7 +206,7 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <template x-for="(item, idx) in items" :key="item.id || item.purchase_order_item_id">
-                            <tr class="hover:bg-blue-50/20 transition">
+                            <tr class="hover:bg-emerald-50/20 transition">
                                 {{-- Produk Info --}}
                                 <td class="py-3 px-3">
                                     <input type="hidden" :name="'items[' + idx + '][id]'" :value="item.id">
@@ -217,11 +217,11 @@
                                 </td>
 
                                 {{-- Qty PO --}}
-                                <td class="py-3 px-3 text-center font-semibold text-gray-700 whitespace-nowrap" x-text="item.ordered_qty"></td>
+                                <td class="py-3 px-3 text-center font-mono font-semibold text-gray-700 whitespace-nowrap" x-text="item.ordered_qty"></td>
 
                                 {{-- Maks Sisa PO --}}
                                 <td class="py-3 px-3 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-xs" x-text="item.remaining_received"></span>
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-mono font-bold text-xs" x-text="item.remaining_received"></span>
                                 </td>
 
                                 {{-- Qty Tiba Fisik --}}
@@ -233,7 +233,7 @@
                                         :name="'items[' + idx + '][qty_received]'"
                                         x-model.number="item.qty_received"
                                         @input="handleQtyReceivedChange(idx)"
-                                        class="w-full py-1.5 px-2.5 text-sm font-bold text-gray-900 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                                        class="w-full py-1.5 px-2.5 text-sm font-mono font-bold text-gray-900 rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
                                         required
                                     />
                                 </td>
@@ -247,7 +247,7 @@
                                         :name="'items[' + idx + '][qty_accepted]'"
                                         x-model.number="item.qty_accepted"
                                         @input="handleQtyAcceptedChange(idx)"
-                                        class="w-full py-1.5 px-2.5 text-sm font-bold text-emerald-700 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 bg-emerald-50/20"
+                                        class="w-full py-1.5 px-2.5 text-sm font-mono font-bold text-[#15803d] rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-emerald-50/30"
                                         required
                                     />
                                 </td>
@@ -261,7 +261,7 @@
                                         :name="'items[' + idx + '][qty_rejected]'"
                                         x-model.number="item.qty_rejected"
                                         @input="handleQtyRejectedChange(idx)"
-                                        class="w-full py-1.5 px-2.5 text-sm font-bold text-red-600 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-600 bg-red-50/20"
+                                        class="w-full py-1.5 px-2.5 text-sm font-mono font-bold text-red-600 rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 bg-red-50/30"
                                     />
                                 </td>
 
@@ -270,7 +270,7 @@
                                     <select data-searchable
                                         :name="'items[' + idx + '][warehouse_id]'"
                                         x-model="item.warehouse_id"
-                                        class="w-full py-1.5 px-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 bg-white"
+                                        class="w-full py-1.5 px-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                                         required
                                     >
                                         @foreach ($warehouses as $wh)
@@ -284,7 +284,7 @@
                                             :name="'items[' + idx + '][reason_rejected]'"
                                             x-model="item.reason_rejected"
                                             placeholder="Alasan penolakan..."
-                                            class="w-full py-1 px-2 text-xs text-red-700 rounded border border-red-300 focus:outline-none focus:ring-1 focus:ring-red-500 bg-white"
+                                            class="w-full py-1 px-2 text-xs text-red-700 rounded-lg border border-red-300 focus:outline-none focus:ring-1 focus:ring-red-500 bg-white"
                                             :required="item.qty_rejected > 0"
                                         />
                                     </div>
@@ -297,11 +297,11 @@
         </div>
 
         {{-- Bottom Actions Bar --}}
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky bottom-4 z-10">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sticky bottom-4 z-10">
             <div class="flex items-center gap-2">
                 <a
                     href="{{ route('gudang.penerimaan.show', $receipt) }}"
-                    class="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    class="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition"
                 >
                     Kembali ke Detail
                 </a>
@@ -310,7 +310,7 @@
                 <button
                     type="submit"
                     @click="formAction = 'save_draft'"
-                    class="px-4 py-2 text-sm font-semibold text-gray-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition active:scale-[0.98]"
+                    class="px-4 py-2 text-sm font-semibold text-gray-800 bg-amber-100 hover:bg-amber-200 rounded-xl transition active:scale-[0.98]"
                 >
                     Simpan Perubahan Draf
                 </button>
@@ -318,7 +318,7 @@
                 <button
                     type="submit"
                     @click="formAction = 'save_and_confirm'"
-                    class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-[#15803d] hover:bg-[#14532d] rounded-lg shadow-sm transition active:scale-[0.98]"
+                    class="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl shadow-sm transition active:scale-[0.98]"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />

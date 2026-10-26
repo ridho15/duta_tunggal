@@ -11,7 +11,7 @@
             <span class="text-gray-300">/</span>
             <a href="{{ route('gudang.opname.index') }}" class="hover:text-gray-700">Stock Opname</a>
             <span class="text-gray-300">/</span>
-            <span class="text-emerald-700 font-bold">Buka Sesi Baru</span>
+            <span class="text-[#15803d] font-bold">Buka Sesi Baru</span>
         </nav>
         <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Buka Sesi Stock Opname Baru</h1>
         <p class="text-xs text-gray-500 mt-1">
@@ -38,7 +38,7 @@
     @endif
 
     {{-- Form --}}
-    <form action="{{ route('gudang.opname.store') }}" method="POST" class="bg-white rounded-xl p-6 border border-gray-200 shadow-2xs space-y-5">
+    <form action="{{ route('gudang.opname.store') }}" method="POST" class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-5">
         @csrf
 
         {{-- No. Opname --}}
@@ -50,7 +50,7 @@
                    name="opname_number"
                    value="{{ old('opname_number', $suggestedNumber) }}"
                    placeholder="Otomatis (contoh: OPN-...)"
-                   class="w-full px-3 py-2 text-xs font-mono font-bold bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800">
+                   class="w-full px-3 py-2 text-xs font-mono font-bold bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
             <p class="text-[10px] text-gray-400 mt-1">Dapat menggunakan penomoran otomatis sistem atau manual</p>
         </div>
 
@@ -63,7 +63,7 @@
                    name="opname_date"
                    value="{{ old('opname_date', now()->format('Y-m-d')) }}"
                    required
-                   class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800">
+                   class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
         </div>
 
         {{-- Gudang --}}
@@ -83,26 +83,26 @@
             <textarea name="notes"
                       rows="3"
                       placeholder="Contoh: Audit stok akhir bulan gudang utama, penyesuaian triwulan..."
-                      class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800">{{ old('notes') }}</textarea>
+                      class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">{{ old('notes') }}</textarea>
         </div>
 
         {{-- Action Buttons --}}
         <div class="flex items-center justify-between pt-3 border-t border-gray-100">
             <a href="{{ route('gudang.opname.index') }}"
-               class="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+               class="px-4 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 Batal
             </a>
             <div class="flex items-center gap-2.5">
                 <button type="submit"
                         name="action"
                         value="save_draft"
-                        class="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition">
+                        class="px-4 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Simpan Sesi (Draft)
                 </button>
                 <button type="submit"
                         name="action"
                         value="start_immediately"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-width="2"></path>
                         <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2"></path>

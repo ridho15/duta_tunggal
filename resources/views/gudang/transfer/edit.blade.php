@@ -13,7 +13,7 @@
             <span class="text-gray-300">/</span>
             <a href="{{ route('gudang.transfer.show', $transfer) }}" class="hover:text-gray-700">{{ $transfer->transfer_number }}</a>
             <span class="text-gray-300">/</span>
-            <span class="text-emerald-700 font-bold">Edit Draft</span>
+            <span class="text-[#15803d] font-bold">Edit Draft</span>
         </nav>
         <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Edit Draft Transfer Stok: {{ $transfer->transfer_number }}</h1>
         <p class="text-xs text-gray-500 mt-1">
@@ -45,9 +45,9 @@
         @method('PUT')
 
         {{-- Section 1: Informasi Dokumen & Lokasi --}}
-        <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-2xs space-y-4">
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
-                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span class="w-2 h-2 rounded-full bg-[#15803d]"></span>
                 <span>1. Informasi Dokumen & Lokasi Transfer</span>
             </h2>
 
@@ -60,7 +60,7 @@
                     <input type="text"
                            value="{{ $transfer->transfer_number }}"
                            readonly
-                           class="w-full px-3 py-2 text-xs font-mono font-bold bg-gray-100 border border-gray-300 rounded-lg text-gray-700 cursor-not-allowed">
+                           class="w-full px-3 py-2 text-xs font-mono font-bold bg-gray-100 border border-gray-200 rounded-xl text-gray-700 cursor-not-allowed">
                 </div>
 
                 {{-- Tanggal Transfer --}}
@@ -72,7 +72,7 @@
                            name="transfer_date"
                            value="{{ old('transfer_date', \Carbon\Carbon::parse($transfer->transfer_date)->format('Y-m-d')) }}"
                            required
-                           class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-gray-800">
+                           class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
                 </div>
 
                 {{-- Gudang Asal --}}
@@ -94,15 +94,15 @@
         </div>
 
         {{-- Section 2: Daftar Item Barang yang Dipindahkan --}}
-        <div class="bg-white rounded-xl p-5 border border-gray-200 shadow-2xs space-y-4">
+        <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
             <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <span class="w-2 h-2 rounded-full bg-[#15803d]"></span>
                     <span>2. Daftar Barang yang Dipindahkan</span>
                 </h2>
                 <button type="button"
                         onclick="addItemRow()"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#15803d] bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition shadow-sm">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M12 4v16m8-8H4" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
@@ -113,7 +113,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs border-collapse" id="itemsTable">
                     <thead>
-                        <tr class="bg-gray-50 text-gray-500 uppercase tracking-wider text-[11px] font-semibold border-b border-gray-200">
+                        <tr class="bg-gray-50/80 text-gray-500 uppercase tracking-wider text-[11px] font-semibold border-b border-gray-100">
                             <th class="py-2.5 px-3 w-5/12">Produk / Barang</th>
                             <th class="py-2.5 px-3 w-2/12 text-center">Stok Tersedia</th>
                             <th class="py-2.5 px-3 w-2/12">Rak Asal</th>
@@ -128,7 +128,7 @@
                 </table>
             </div>
 
-            <div id="emptyItemsNotice" class="py-8 text-center text-gray-400 bg-gray-50/50 rounded-lg border border-dashed border-gray-200 hidden">
+            <div id="emptyItemsNotice" class="py-8 text-center text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200 hidden">
                 <p class="text-xs">Klik tombol <strong>Tambah Baris</strong> untuk memasukkan barang.</p>
             </div>
         </div>
@@ -136,20 +136,20 @@
         {{-- Form Actions --}}
         <div class="flex items-center justify-between pt-2">
             <a href="{{ route('gudang.transfer.show', $transfer) }}"
-               class="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+               class="px-4 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 Batal
             </a>
             <div class="flex items-center gap-2.5">
                 <button type="submit"
                         name="action"
                         value="save_draft"
-                        class="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition">
+                        class="px-4 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Simpan Perubahan
                 </button>
                 <button type="submit"
                         name="action"
                         value="submit_request"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
@@ -240,25 +240,25 @@
                         id="prod-select-${idx}"
                         required
                         onchange="onProductSelectChange(${idx})"
-                        class="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 text-gray-800">
+                        class="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
                     ${productOptions}
                 </select>
             </td>
             <td class="py-2.5 px-3 text-center">
-                <span id="stock-display-${idx}" class="font-bold text-gray-700">-</span>
+                <span id="stock-display-${idx}" class="font-bold font-mono text-gray-700">-</span>
                 <span id="uom-display-${idx}" class="text-[10px] text-gray-400 ml-0.5"></span>
             </td>
             <td class="py-2.5 px-3">
                 <select data-searchable name="items[${idx}][from_rak_id]"
                         id="from-rak-${idx}"
-                        class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 text-gray-700">
+                        class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-700">
                     ${fromRakOptions}
                 </select>
             </td>
             <td class="py-2.5 px-3">
                 <select data-searchable name="items[${idx}][to_rak_id]"
                         id="to-rak-${idx}"
-                        class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 text-gray-700">
+                        class="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-700">
                     ${toRakOptions}
                 </select>
             </td>
@@ -270,7 +270,7 @@
                        step="any"
                        value="${qtyVal}"
                        required
-                       class="w-24 px-2 py-1.5 text-xs text-right font-bold border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 text-emerald-800">
+                       class="w-24 px-2 py-1.5 text-xs text-right font-bold font-mono border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-[#15803d]">
             </td>
             <td class="py-2.5 px-2 text-center">
                 <button type="button"

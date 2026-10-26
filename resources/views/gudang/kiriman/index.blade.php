@@ -22,7 +22,7 @@
                 <select data-searchable
                     name="warehouse_id"
                     onchange="document.getElementById('warehouseForm').submit()"
-                    class="text-xs font-bold text-gray-800 bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-[#15803d]"
+                    class="text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
                 >
                     @foreach($warehouses as $wh)
                         <option value="{{ $wh->id }}" {{ $currentWarehouseId == $wh->id ? 'selected' : '' }}>
@@ -46,10 +46,10 @@
                     name="q"
                     value="{{ $search }}"
                     placeholder="Cari no. DO / customer..."
-                    class="w-full h-11 border border-gray-300 rounded-xl px-3.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#15803d] bg-white"
+                    class="w-full h-11 border border-gray-200 rounded-xl px-3.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                 >
             </div>
-            <button type="submit" class="h-11 px-4 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black transition">
+            <button type="submit" class="h-11 px-4 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black transition shadow-sm">
                 Cari
             </button>
         </form>
@@ -58,21 +58,21 @@
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-bold scrollbar-none">
             <a
                 href="{{ route('gudang.kiriman.index', ['tab' => 'siap_dicek', 'warehouse_id' => $currentWarehouseId]) }}"
-                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'siap_dicek' ? 'bg-[#15803d] text-white shadow-xs' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'siap_dicek' ? 'bg-[#15803d] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
             >
                 Siap dicek · {{ $counts['siap_dicek'] }}
             </a>
 
             <a
                 href="{{ route('gudang.kiriman.index', ['tab' => 'menunggu_sj', 'warehouse_id' => $currentWarehouseId]) }}"
-                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'menunggu_sj' ? 'bg-[#15803d] text-white shadow-xs' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'menunggu_sj' ? 'bg-[#15803d] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
             >
                 Menunggu SJ · {{ $counts['menunggu_sj'] }}
             </a>
 
             <a
                 href="{{ route('gudang.kiriman.index', ['tab' => 'terkirim', 'warehouse_id' => $currentWarehouseId]) }}"
-                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'terkirim' ? 'bg-[#15803d] text-white shadow-xs' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'terkirim' ? 'bg-[#15803d] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
             >
                 Terkirim hari ini · {{ $counts['terkirim'] }}
             </a>
@@ -81,7 +81,7 @@
 
     {{-- Active Warehouse Label Pill --}}
     <div>
-        <span class="inline-flex items-center text-[10.5px] font-bold tracking-wider text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-md px-2.5 py-1 uppercase">
+        <span class="inline-flex items-center text-[11px] font-bold tracking-wider text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-md px-2.5 py-1 uppercase">
             GUDANG {{ $activeWarehouse->name ?? 'CABANG' }}
         </span>
     </div>

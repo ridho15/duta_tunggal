@@ -12,11 +12,11 @@
                 <span class="text-gray-300">/</span>
                 <a href="{{ route('gudang.stok.index') }}" class="hover:text-gray-700">Cek Stok</a>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold">Kartu Persediaan</span>
+                <span class="text-[#15803d] font-bold">Kartu Persediaan</span>
             </nav>
             <div class="flex items-center gap-3">
                 <a href="{{ route('gudang.stok.index') }}"
-                   class="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition shadow-2xs"
+                   class="p-1.5 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition shadow-sm"
                    title="Kembali ke Daftar Stok">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -33,7 +33,7 @@
         <div class="flex items-center gap-2.5">
             <a href="{{ route('gudang.stok.card.pdf', [$product->id] + request()->query()) }}"
                target="_blank"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4H7v4a2 2 0 0 0 2 2z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     <path d="M17 9V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -41,7 +41,7 @@
                 <span>Cetak PDF (Landscape)</span>
             </a>
             <a href="{{ route('gudang.stok.card.excel', [$product->id] + request()->query()) }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg hover:bg-emerald-100 transition shadow-2xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-xl hover:bg-emerald-100 transition shadow-sm">
                 <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.5L17 7.5V19a2 2 0 0 1-2 2z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
@@ -51,7 +51,7 @@
     </div>
 
     {{-- Product Identity Card --}}
-    <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+    <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-xs">
             <div>
                 <span class="text-[11px] text-gray-400 uppercase tracking-wider block">Kode / SKU</span>
@@ -93,7 +93,7 @@
     </div>
 
     {{-- Filter Bar & Quick Presets --}}
-    <div class="bg-white rounded-xl p-4 border border-gray-200 shadow-2xs space-y-3">
+    <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
         <form method="GET" action="{{ route('gudang.stok.card', $product->id) }}" id="filterForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {{-- Dari Tanggal --}}
             <div>
@@ -102,7 +102,7 @@
                        id="start_date"
                        name="start_date"
                        value="{{ $filters['start_date'] }}"
-                       class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                       class="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] outline-none">
             </div>
 
             {{-- Sampai Tanggal --}}
@@ -112,7 +112,7 @@
                        id="end_date"
                        name="end_date"
                        value="{{ $filters['end_date'] }}"
-                       class="w-full py-2 px-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                       class="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] outline-none">
             </div>
 
             {{-- Filter Gudang --}}
@@ -124,11 +124,11 @@
             {{-- Submit & Reset Buttons --}}
             <div class="flex items-end gap-2">
                 <button type="submit"
-                        class="flex-1 py-2 px-3 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-xs">
+                        class="flex-1 py-2 px-3 text-xs font-semibold text-white bg-[#15803d] rounded-xl hover:bg-[#166534] transition shadow-sm">
                     Tampilkan Mutasi
                 </button>
                 <a href="{{ route('gudang.stok.card', $product->id) }}"
-                   class="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                   class="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition"
                    title="Reset Filter">
                     Reset
                 </a>
@@ -138,18 +138,18 @@
         {{-- Quick Presets --}}
         <div class="pt-2 border-t border-gray-100 flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
             <span class="text-[11px] font-medium text-gray-400 uppercase tracking-wider mr-1">Preset Cepat:</span>
-            <button type="button" onclick="setPreset('today')" class="px-2.5 py-1 text-[11.5px] rounded-md bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Hari Ini</button>
-            <button type="button" onclick="setPreset('this_month')" class="px-2.5 py-1 text-[11.5px] rounded-md bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Bulan Ini</button>
-            <button type="button" onclick="setPreset('last_month')" class="px-2.5 py-1 text-[11.5px] rounded-md bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Bulan Lalu</button>
-            <button type="button" onclick="setPreset('quarter')" class="px-2.5 py-1 text-[11.5px] rounded-md bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Triwulan Ini</button>
-            <button type="button" onclick="setPreset('ytd')" class="px-2.5 py-1 text-[11.5px] rounded-md bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Tahun Ini (YTD)</button>
+            <button type="button" onclick="setPreset('today')" class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Hari Ini</button>
+            <button type="button" onclick="setPreset('this_month')" class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Bulan Ini</button>
+            <button type="button" onclick="setPreset('last_month')" class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Bulan Lalu</button>
+            <button type="button" onclick="setPreset('quarter')" class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Triwulan Ini</button>
+            <button type="button" onclick="setPreset('ytd')" class="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-gray-100 hover:bg-emerald-100 hover:text-emerald-800 transition">Tahun Ini (YTD)</button>
         </div>
     </div>
 
     {{-- Period KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Saldo Awal --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-1.5">
                 <span class="text-xs font-medium uppercase tracking-wider">Saldo Awal</span>
                 <span class="text-[10px] text-gray-400">Sebelum {{ date('d/m/Y', strtotime($filters['start_date'])) }}</span>
@@ -161,7 +161,7 @@
         </div>
 
         {{-- Total Masuk --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-1.5">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Masuk (+)</span>
                 <span class="w-6 h-6 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
@@ -175,7 +175,7 @@
         </div>
 
         {{-- Total Keluar --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-1.5">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Keluar (-)</span>
                 <span class="w-6 h-6 rounded-full bg-rose-50 text-rose-700 flex items-center justify-center font-bold text-xs">
@@ -189,7 +189,7 @@
         </div>
 
         {{-- Saldo Akhir Berjalan --}}
-        <div class="bg-white rounded-xl p-4.5 border border-gray-200 shadow-2xs">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-1.5">
                 <span class="text-xs font-medium uppercase tracking-wider">Saldo Akhir</span>
                 <span class="text-[10px] text-gray-400">Posisi {{ date('d/m/Y', strtotime($filters['end_date'])) }}</span>
@@ -202,7 +202,7 @@
     </div>
 
     {{-- Chronological Movement Ledger Table --}}
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs">
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
         <div class="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between bg-gray-50/50">
             <div class="text-xs font-semibold text-gray-800">
                 Histori Mutasi Kronologis ({{ count($movements) }} transaksi dalam periode)
@@ -227,24 +227,24 @@
                         <th class="py-3 px-4 min-w-[180px]">Catatan / Keterangan</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 font-mono text-[12px]">
+                <tbody class="divide-y divide-gray-100 text-xs text-gray-700">
                     {{-- Baris Saldo Awal --}}
                     <tr class="bg-gray-50/60 font-semibold text-gray-700">
-                        <td class="py-3 px-4 text-center text-gray-400 font-sans">•</td>
-                        <td class="py-3 px-4">{{ date('d/m/Y', strtotime($filters['start_date'])) }}</td>
-                        <td class="py-3 px-4 font-sans text-gray-500 italic">SALDO-AWAL</td>
-                        <td class="py-3 px-3 font-sans">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-medium bg-gray-100 text-gray-700">
+                        <td class="py-3 px-4 text-center text-gray-400">•</td>
+                        <td class="py-3 px-4 font-mono text-gray-600">{{ date('d/m/Y', strtotime($filters['start_date'])) }}</td>
+                        <td class="py-3 px-4 text-gray-500 italic">SALDO-AWAL</td>
+                        <td class="py-3 px-3">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700">
                                 Saldo Awal Periode
                             </span>
                         </td>
-                        <td class="py-3 px-3 font-sans text-gray-500">-</td>
-                        <td class="py-3 px-4 text-right text-gray-400">-</td>
-                        <td class="py-3 px-4 text-right text-gray-400">-</td>
-                        <td class="py-3 px-4 text-right font-bold text-gray-900 bg-blue-50/40">
+                        <td class="py-3 px-3 text-gray-500">-</td>
+                        <td class="py-3 px-4 text-right text-gray-400 font-mono">-</td>
+                        <td class="py-3 px-4 text-right text-gray-400 font-mono">-</td>
+                        <td class="py-3 px-4 text-right font-mono font-bold text-gray-900 bg-blue-50/40">
                             {{ number_format($openingQty, 0, ',', '.') }}
                         </td>
-                        <td class="py-3 px-4 font-sans text-gray-500 text-xs italic">
+                        <td class="py-3 px-4 text-gray-500 text-xs italic">
                             Saldo bawaan per awal tanggal {{ date('d M Y', strtotime($filters['start_date'])) }}
                         </td>
                     </tr>
@@ -252,19 +252,19 @@
                     {{-- Baris Mutasi Transaksi --}}
                     @forelse ($movements as $idx => $m)
                         <tr class="hover:bg-gray-50/80 transition-colors">
-                            <td class="py-3 px-4 text-center text-gray-400 font-sans text-xs">
+                            <td class="py-3 px-4 text-center text-gray-400 text-xs">
                                 {{ $idx + 1 }}
                             </td>
-                            <td class="py-3 px-4 text-gray-900">
+                            <td class="py-3 px-4 text-gray-900 font-mono">
                                 {{ date('d/m/Y H:i', strtotime($m['date'])) }}
                             </td>
-                            <td class="py-3 px-4">
+                            <td class="py-3 px-4 font-mono">
                                 @if ($m['reference_url'])
                                     <a href="{{ $m['reference_url'] }}"
-                                       class="font-bold text-emerald-700 hover:text-emerald-900 hover:underline flex items-center gap-1"
+                                       class="font-bold text-[#15803d] hover:text-[#166534] hover:underline flex items-center gap-1"
                                        target="_blank">
                                         <span>{{ $m['reference_number'] }}</span>
-                                        <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-3 h-3 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4M14 4h6m0 0v6m0-6L10 14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                                         </svg>
                                     </a>
@@ -272,7 +272,7 @@
                                     <span class="font-bold text-gray-800">{{ $m['reference_number'] }}</span>
                                 @endif
                             </td>
-                            <td class="py-3 px-3 font-sans">
+                            <td class="py-3 px-3">
                                 @php
                                     $typeBadge = match(true) {
                                         str_contains($m['type'], 'in') => 'bg-emerald-50 text-emerald-800 border-emerald-200',
@@ -280,52 +280,52 @@
                                         default => 'bg-blue-50 text-blue-800 border-blue-200',
                                     };
                                 @endphp
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-medium border {{ $typeBadge }}">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border {{ $typeBadge }}">
                                     {{ $m['type_label'] }}
                                 </span>
                             </td>
-                            <td class="py-3 px-3 font-sans">
+                            <td class="py-3 px-3">
                                 <div class="text-xs text-gray-900 font-medium">{{ $m['warehouse_name'] }}</div>
                                 @if ($m['rak_name'] !== '-')
                                     <div class="text-[10px] text-gray-400">Rak: {{ $m['rak_name'] }}</div>
                                 @endif
                             </td>
-                            <td class="py-3 px-4 text-right font-bold text-emerald-700">
+                            <td class="py-3 px-4 text-right font-mono font-bold text-emerald-700">
                                 {{ $m['qty_in'] > 0 ? '+' . number_format($m['qty_in'], 0, ',', '.') : '-' }}
                             </td>
-                            <td class="py-3 px-4 text-right font-bold text-rose-700">
+                            <td class="py-3 px-4 text-right font-mono font-bold text-rose-700">
                                 {{ $m['qty_out'] > 0 ? '-' . number_format($m['qty_out'], 0, ',', '.') : '-' }}
                             </td>
-                            <td class="py-3 px-4 text-right font-bold text-blue-800 bg-blue-50/30">
+                            <td class="py-3 px-4 text-right font-mono font-bold text-blue-800 bg-blue-50/30">
                                 {{ number_format($m['running_balance'], 0, ',', '.') }}
                             </td>
-                            <td class="py-3 px-4 font-sans text-xs text-gray-600">
+                            <td class="py-3 px-4 text-xs text-gray-600">
                                 {{ $m['notes'] }}
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="py-8 text-center text-gray-400 font-sans">
+                            <td colspan="9" class="py-8 text-center text-gray-400">
                                 Belum ada riwayat mutasi barang pada periode tanggal yang dipilih.
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
-                <tfoot class="bg-gray-50 border-t-2 border-gray-300 font-mono text-[12px] font-bold text-gray-900">
+                <tfoot class="bg-gray-50 border-t-2 border-gray-200 text-xs font-bold text-gray-900">
                     <tr>
-                        <td colspan="5" class="py-3.5 px-4 font-sans text-right uppercase tracking-wider text-xs">
+                        <td colspan="5" class="py-3.5 px-4 text-right uppercase tracking-wider text-xs text-gray-700">
                             TOTAL MUTASI PERIODE & SALDO AKHIR:
                         </td>
-                        <td class="py-3.5 px-4 text-right text-emerald-700">
+                        <td class="py-3.5 px-4 text-right font-mono font-bold text-emerald-700">
                             +{{ number_format($totalIn, 0, ',', '.') }}
                         </td>
-                        <td class="py-3.5 px-4 text-right text-rose-700">
+                        <td class="py-3.5 px-4 text-right font-mono font-bold text-rose-700">
                             -{{ number_format($totalOut, 0, ',', '.') }}
                         </td>
-                        <td class="py-3.5 px-4 text-right text-blue-800 bg-blue-100/50">
+                        <td class="py-3.5 px-4 text-right font-mono font-bold text-blue-800 bg-blue-100/50">
                             {{ number_format($closingQty, 0, ',', '.') }}
                         </td>
-                        <td class="py-3.5 px-4 font-sans text-xs text-gray-500 font-normal">
+                        <td class="py-3.5 px-4 text-xs text-gray-500 font-normal">
                             Posisi akhir per {{ date('d M Y', strtotime($filters['end_date'])) }}
                         </td>
                     </tr>
