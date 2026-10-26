@@ -111,7 +111,7 @@ class Quotation extends Model
 
     public function revisionOf()
     {
-        return $this->belongsTo(Quotation::class, 'revision_of_id')->withDefault();
+        return $this->belongsTo(Quotation::class, 'revision_of_id');
     }
 
     public function revisions()

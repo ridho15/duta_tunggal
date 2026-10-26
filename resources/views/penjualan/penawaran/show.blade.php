@@ -243,7 +243,7 @@
                         <span class="font-bold text-red-700">{{ $quotation->rejectBy->name ?? 'Manajer' }} ({{ \Carbon\Carbon::parse($quotation->reject_at)->format('d/m/Y') }})</span>
                     </div>
                 @endif
-                @if($quotation->revisionOf)
+                @if($quotation->revision_of_id && $quotation->revisionOf)
                     <div class="pt-1.5 border-t border-gray-100 flex justify-between">
                         <span class="text-gray-500">Revisi Dari:</span>
                         <a href="{{ route('penjualan.quotations.show', $quotation->revisionOf) }}" class="font-bold text-blue-600 hover:underline">

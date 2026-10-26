@@ -20,8 +20,8 @@
     @foreach ($tabs as $key => $tab)
         @php $isActive = ($currentTab === $key); @endphp
         <a href="{{ $tab['route'] }}"
-           class="group relative flex items-center gap-3.5 p-3.5 rounded-xl border transition-all duration-200 {{ $isActive ? 'bg-emerald-50/70 border-[#15803d]/40 text-emerald-950 shadow-sm' : 'bg-white border-gray-200 hover:border-[#15803d]/30 hover:bg-gray-50/80 text-gray-700 shadow-sm' }}">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors {{ $isActive ? 'bg-[#15803d] text-white shadow-sm' : 'bg-gray-100 text-gray-500 group-hover:bg-emerald-50 group-hover:text-[#15803d]' }}">
+           class="group relative flex items-center gap-3.5 p-3.5 rounded-xl border transition-all duration-200 {{ $isActive ? 'bg-[#f0fdf4] border-[#15803d]/40 text-emerald-950 shadow-sm' : 'bg-white border-gray-200 hover:border-[#15803d]/30 hover:bg-gray-50/80 text-gray-700 shadow-sm' }}">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors {{ $isActive ? 'bg-[#15803d] text-white shadow-sm' : 'bg-gray-100 text-gray-500 group-hover:bg-[#f0fdf4] group-hover:text-[#15803d]' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {!! $tab['icon'] !!}
                 </svg>
@@ -35,7 +35,7 @@
                 </div>
             </div>
             @if ($isActive)
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-[#15803d] border border-emerald-200">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-[#15803d] border border-[#86efac]">
                     Aktif
                 </span>
             @endif

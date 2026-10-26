@@ -45,7 +45,7 @@
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Sesi Opname</span>
-                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-[#f0fdf4] text-[#15803d] flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.8"></path>
                         <rect x="9" y="3" width="6" height="4" rx="1" stroke-width="1.8"></rect>
@@ -96,7 +96,7 @@
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Disetujui & Disesuaikan</span>
-                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-[#f0fdf4] text-[#15803d] flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
@@ -219,8 +219,8 @@
                             {{-- Status Badge --}}
                             <td class="py-3 px-4 text-center">
                                 @if ($op->status === 'approved')
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#f0fdf4] text-[#15803d] border border-[#86efac]">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-[#15803d]"></span>
                                         Disetujui
                                     </span>
                                 @elseif ($op->status === 'completed')
@@ -291,7 +291,7 @@
 
                                     <a href="{{ route('gudang.opname.pdf', $op) }}"
                                        target="_blank"
-                                       class="p-1 text-gray-500 hover:text-emerald-700 transition"
+                                       class="p-1 text-gray-500 hover:text-[#15803d] transition"
                                        title="Cetak Berita Acara / Lembar Kerja (PDF)">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2zm8-12V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4h10z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>

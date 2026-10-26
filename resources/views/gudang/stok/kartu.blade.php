@@ -42,7 +42,7 @@
             </a>
             <a href="{{ route('gudang.stok.card.excel', [$product->id] + request()->query()) }}"
                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-xl hover:bg-emerald-100 transition shadow-sm">
-                <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.5L17 7.5V19a2 2 0 0 1-2 2z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <span>Ekspor Excel</span>
@@ -79,7 +79,7 @@
             </div>
             <div>
                 <span class="text-[11px] text-gray-400 uppercase tracking-wider block">Harga Jual</span>
-                <span class="font-mono font-bold text-emerald-700 block mt-0.5">
+                <span class="font-mono font-bold text-[#15803d] block mt-0.5">
                     Rp {{ number_format($product->sell_price, 0, ',', '.') }}
                 </span>
             </div>
@@ -164,14 +164,14 @@
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-1.5">
                 <span class="text-xs font-medium uppercase tracking-wider">Total Masuk (+)</span>
-                <span class="w-6 h-6 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                <span class="w-6 h-6 rounded-full bg-[#f0fdf4] text-[#15803d] flex items-center justify-center font-bold text-xs">
                     &darr;
                 </span>
             </div>
-            <div class="text-2xl font-mono font-bold text-emerald-700 tracking-tight">
+            <div class="text-2xl font-mono font-bold text-[#15803d] tracking-tight">
                 +{{ number_format($totalIn, 0, ',', '.') }}
             </div>
-            <p class="text-[11px] text-emerald-600 mt-1">Penerimaan pembelian, retur, transfer</p>
+            <p class="text-[11px] text-[#15803d] mt-1">Penerimaan pembelian, retur, transfer</p>
         </div>
 
         {{-- Total Keluar --}}
@@ -290,7 +290,7 @@
                                     <div class="text-[10px] text-gray-400">Rak: {{ $m['rak_name'] }}</div>
                                 @endif
                             </td>
-                            <td class="py-3 px-4 text-right font-mono font-bold text-emerald-700">
+                            <td class="py-3 px-4 text-right font-mono font-bold text-[#15803d]">
                                 {{ $m['qty_in'] > 0 ? '+' . number_format($m['qty_in'], 0, ',', '.') : '-' }}
                             </td>
                             <td class="py-3 px-4 text-right font-mono font-bold text-rose-700">
@@ -316,7 +316,7 @@
                         <td colspan="5" class="py-3.5 px-4 text-right uppercase tracking-wider text-xs text-gray-700">
                             TOTAL MUTASI PERIODE & SALDO AKHIR:
                         </td>
-                        <td class="py-3.5 px-4 text-right font-mono font-bold text-emerald-700">
+                        <td class="py-3.5 px-4 text-right font-mono font-bold text-[#15803d]">
                             +{{ number_format($totalIn, 0, ',', '.') }}
                         </td>
                         <td class="py-3.5 px-4 text-right font-mono font-bold text-rose-700">

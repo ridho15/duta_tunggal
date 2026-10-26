@@ -42,7 +42,7 @@ class UserSeeder extends Seeder
             'email' => 'superadmin@gmail.com',
         ], [
             'email' => 'superadmin@gmail.com',
-            'username' => 'super_admin',
+            'username' => 'superadmin',
             'manage_type' => 'all',
             'first_name' => 'Super Admin',
             'status' => true,
@@ -51,7 +51,7 @@ class UserSeeder extends Seeder
             'name' => 'Super Admin',
             'cabang_id' => null, // Super admin can access all branches
             'email_verified_at' => now(),
-            'password' => Hash::make('superadmin')
+            'password' => Hash::make('12345678')
         ]);
 
         $user->syncRoles(Role::where('name', 'Super Admin')->first());

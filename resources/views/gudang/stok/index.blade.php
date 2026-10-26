@@ -12,7 +12,7 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-500">Gudang & Stok</span>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold">Cek Stok Real-Time</span>
+                <span class="text-[#15803d] font-bold">Cek Stok Real-Time</span>
             </nav>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Cek Stok & Ketersediaan Barang</h1>
             <p class="text-sm text-gray-500 mt-0.5">
@@ -45,7 +45,7 @@
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Katalog Produk Aktif</span>
-                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-[#f0fdf4] text-[#15803d] flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="m20.5 8.5-8.5-5-8.5 5 8.5 5 8.5-5Z" stroke-width="1.8" stroke-linecap="round"></path>
                         <path d="M3.5 8.5v7l8.5 5 8.5-5v-7" stroke-width="1.8" stroke-linecap="round"></path>
@@ -79,13 +79,13 @@
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
             <div class="flex items-center justify-between text-gray-500 mb-2">
                 <span class="text-xs font-medium uppercase tracking-wider">Stok Bebas (Siap Kirim)</span>
-                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-[#f0fdf4] text-[#15803d] flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </div>
             </div>
-            <div class="text-2xl font-bold text-emerald-700 tracking-tight">
+            <div class="text-2xl font-bold text-[#15803d] tracking-tight">
                 {{ number_format($kpi['total_free_qty'], 0, ',', '.') }}
             </div>
             <p class="text-[11px] text-gray-500 mt-1">Setelah dikurangi kuantitas pesanan/DO</p>
@@ -178,7 +178,7 @@
                 Daftar Persediaan Produk ({{ $products->total() }} barang ditemukan)
             </div>
             <div class="text-[11px] text-gray-500">
-                Klik tombol <span class="font-semibold text-emerald-700">Kartu Stok</span> untuk melihat audit trail mutasi kronologis.
+                Klik tombol <span class="font-semibold text-[#15803d]">Kartu Stok</span> untuk melihat audit trail mutasi kronologis.
             </div>
         </div>
 
@@ -220,8 +220,8 @@
                                 $statusDot = 'bg-amber-500';
                             } else {
                                 $statusLabel = 'Aman';
-                                $statusBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                                $statusDot = 'bg-emerald-500';
+                                $statusBadge = 'bg-[#f0fdf4] text-[#15803d] border-[#86efac]';
+                                $statusDot = 'bg-[#15803d]';
                             }
                         @endphp
                         <tr x-data="{ open: false }" class="hover:bg-gray-50/60 transition-colors">
@@ -249,7 +249,7 @@
                             <td class="py-3.5 px-3 text-right font-mono text-gray-500">
                                 {{ number_format($totalReserved, 0, ',', '.') }}
                             </td>
-                            <td class="py-3.5 px-3 text-right font-mono font-bold text-emerald-700">
+                            <td class="py-3.5 px-3 text-right font-mono font-bold text-[#15803d]">
                                 {{ number_format($totalFree, 0, ',', '.') }}
                             </td>
                             <td class="py-3.5 px-3 text-right font-mono text-gray-400">
@@ -272,7 +272,7 @@
                             <td class="py-3.5 px-4 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
                                     <a href="{{ route('gudang.stok.card', $product->id) }}"
-                                       class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition"
+                                       class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#15803d] bg-[#f0fdf4] hover:bg-emerald-100 rounded-xl border border-[#86efac] transition"
                                        title="Buka Kartu Persediaan">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" stroke-width="1.8"></path>
@@ -313,7 +313,7 @@
                                                 </div>
                                                 <div class="flex items-center justify-between text-xs font-mono pt-1 border-t border-gray-100">
                                                     <span class="text-gray-600">Fisik: <strong>{{ number_format($stock->qty_available, 0, ',', '.') }}</strong></span>
-                                                    <span class="text-emerald-700">Bebas: <strong>{{ number_format($stock->free_qty, 0, ',', '.') }}</strong></span>
+                                                    <span class="text-[#15803d]">Bebas: <strong>{{ number_format($stock->free_qty, 0, ',', '.') }}</strong></span>
                                                 </div>
                                             </div>
                                         @endforeach

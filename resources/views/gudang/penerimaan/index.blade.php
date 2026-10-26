@@ -102,7 +102,7 @@
             </div>
             <div class="mt-2 flex items-baseline gap-2">
                 <span class="text-2xl font-bold text-gray-900">{{ number_format($counts['completed'] ?? 0) }}</span>
-                <span class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Selesai</span>
+                <span class="text-xs font-semibold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] px-1.5 py-0.5 rounded">Selesai</span>
             </div>
             <span class="text-xs text-gray-400 mt-1 block">Stok persediaan resmi masuk</span>
         </div>
@@ -146,10 +146,10 @@
             </a>
             <a
                 href="{{ $tabUrl('completed') }}"
-                class="px-3.5 py-1.5 rounded-xl transition {{ $status === 'completed' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
+                class="px-3.5 py-1.5 rounded-xl transition {{ $status === 'completed' ? 'bg-[#f0fdf4] text-[#15803d] font-bold' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50' }}"
             >
                 Selesai
-                <span class="ml-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-mono">{{ $counts['completed'] ?? 0 }}</span>
+                <span class="ml-1 px-1.5 py-0.5 bg-emerald-100 text-[#15803d] rounded-full text-xs font-mono">{{ $counts['completed'] ?? 0 }}</span>
             </a>
         </div>
 

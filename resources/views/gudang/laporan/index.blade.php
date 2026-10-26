@@ -79,7 +79,7 @@
                 @endphp
                 <a
                     href="{{ $url }}"
-                    class="flex items-start gap-3 p-3.5 rounded-xl transition {{ $isActive ? 'bg-[#f0fdf4] border border-[#86efac] shadow-xs' : 'hover:bg-gray-50 border border-transparent text-gray-700' }}"
+                    class="flex items-start gap-3 p-3.5 rounded-xl transition {{ $isActive ? 'bg-[#f0fdf4] border border-[#86efac] shadow-sm' : 'hover:bg-gray-50 border border-transparent text-gray-700' }}"
                 >
                     <span class="p-2 rounded-xl {{ $isActive ? 'bg-[#15803d] text-white' : 'bg-gray-100 text-gray-500' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

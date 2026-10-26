@@ -143,11 +143,11 @@
 
             {{-- Step 3: Masuk Stok Gudang & Jurnal --}}
             <div class="flex items-start gap-3">
-                <div class="w-8 h-8 rounded-full font-bold flex items-center justify-center flex-shrink-0 text-sm {{ $isCompleted ? 'bg-emerald-600 text-white shadow' : 'bg-gray-100 text-gray-400' }}">
+                <div class="w-8 h-8 rounded-full font-bold flex items-center justify-center flex-shrink-0 text-sm {{ $isCompleted ? 'bg-[#15803d] text-white shadow' : 'bg-gray-100 text-gray-400' }}">
                     {{ $isCompleted ? '✓' : '3' }}
                 </div>
                 <div>
-                    <span class="text-xs font-bold uppercase tracking-wider {{ $isCompleted ? 'text-emerald-600' : 'text-gray-400' }}">Tahap 3</span>
+                    <span class="text-xs font-bold uppercase tracking-wider {{ $isCompleted ? 'text-[#15803d]' : 'text-gray-400' }}">Tahap 3</span>
                     <h4 class="text-sm font-bold text-gray-900 leading-tight">Masuk Stok Persediaan</h4>
                     <p class="text-[11px] text-gray-500 mt-0.5">Stok gudang bertambah & jurnal dibukukan</p>
                 </div>

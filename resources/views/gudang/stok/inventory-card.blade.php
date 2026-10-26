@@ -186,7 +186,7 @@
                             <td class="py-3 px-3 text-right font-mono text-gray-600">
                                 {{ number_format($row['opening_qty'], 0, ',', '.') }}
                             </td>
-                            <td class="py-3 px-3 text-right font-mono font-bold text-emerald-700">
+                            <td class="py-3 px-3 text-right font-mono font-bold text-[#15803d]">
                                 {{ $row['qty_in'] > 0 ? '+' . number_format($row['qty_in'], 0, ',', '.') : '-' }}
                             </td>
                             <td class="py-3 px-3 text-right font-mono font-bold text-rose-700">
@@ -215,7 +215,7 @@
                         <td class="py-3.5 px-3 text-right font-mono text-gray-700">
                             {{ number_format($totals['opening_qty'], 0, ',', '.') }}
                         </td>
-                        <td class="py-3.5 px-3 text-right font-mono text-emerald-700">
+                        <td class="py-3.5 px-3 text-right font-mono text-[#15803d]">
                             +{{ number_format($totals['qty_in'], 0, ',', '.') }}
                         </td>
                         <td class="py-3.5 px-3 text-right font-mono text-rose-700">
