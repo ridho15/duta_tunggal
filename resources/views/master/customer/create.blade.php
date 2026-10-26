@@ -315,15 +315,21 @@
                         Plafon Kredit Limit (Rp) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400">Rp</span>
+                        <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="0.01"
-                            name="kredit_limit"
-                            value="{{ old('kredit_limit', 10000000) }}"
+                            type="text"
+                            id="display_kredit_limit"
+                            value="{{ old('kredit_limit', 10000000) > 0 ? number_format(old('kredit_limit', 10000000), 0, ',', '.') : '' }}"
+                            oninput="handleKreditLimitInput(this.value)"
                             required
-                            min="0"
-                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-bold text-gray-900"
+                            placeholder="0"
+                            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] font-bold text-gray-900 font-mono"
+                        >
+                        <input
+                            type="hidden"
+                            name="kredit_limit"
+                            id="kredit_limit"
+                            value="{{ old('kredit_limit', 10000000) }}"
                         >
                     </div>
                     <p class="text-[11px] text-gray-500 mt-1">Sistem akan memblokir persetujuan Sales Order jika piutang customer melampaui angka ini.</p>
@@ -459,6 +465,13 @@
             }
         })
         .catch(err => console.error('Gagal memeriksa duplikasi customer:', err));
+    }
+
+    function handleKreditLimitInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        document.getElementById('kredit_limit').value = num;
+        document.getElementById('display_kredit_limit').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
     }
 </script>
 @endsection
