@@ -237,7 +237,7 @@
 
                     {{-- Jumlah Total --}}
                     <div>
-                        <label for="amount_single" class="block text-xs font-semibold text-gray-700 mb-1">
+                        <label for="amount_display" class="block text-xs font-semibold text-gray-700 mb-1">
                             Jumlah Nominal (Rp) <span class="text-rose-500">*</span>
                         </label>
                         <div class="relative">
@@ -245,14 +245,18 @@
                                 Rp
                             </span>
                             <input
-                                type="number"
-                                step="any"
-                                min="0.01"
-                                name="amount"
-                                id="amount_single"
-                                x-model="amount"
+                                type="text"
+                                id="amount_display"
+                                x-model="amount_display"
+                                @input="onAmountInput($event.target.value)"
                                 class="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-gray-900 @error('amount') border-rose-300 bg-rose-50/50 @enderror"
                                 placeholder="0"
+                            >
+                            <input
+                                type="hidden"
+                                name="amount"
+                                id="amount_single"
+                                :value="amount"
                             >
                         </div>
                         @error('amount')
@@ -302,17 +306,21 @@
                                         >
                                     </td>
                                     <td class="py-2 px-3 text-right">
-                                        <input
-                                            type="number"
-                                            step="any"
-                                            min="0"
-                                            :name="'details[' + index + '][amount]'"
-                                            x-model.number="detail.amount"
-                                            @input="recalculateBreakdownTotal()"
-                                            class="w-full px-2 py-1.5 text-xs text-right font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                                            placeholder="0"
-                                            required
-                                        >
+                                        <div class="relative">
+                                            <input
+                                                type="text"
+                                                x-model="detail.amount_display"
+                                                @input="onDetailAmountInput(index, $event.target.value)"
+                                                class="w-full px-2 py-1.5 text-xs text-right font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                                placeholder="0"
+                                                required
+                                            >
+                                            <input
+                                                type="hidden"
+                                                :name="'details[' + index + '][amount]'"
+                                                :value="detail.amount"
+                                            >
+                                        </div>
                                     </td>
                                     <td class="py-2 px-3 text-center">
                                         <button
@@ -435,13 +443,40 @@
 
 <script>
 function cashBankForm(config) {
+    const rawDetails = Array.isArray(config.initialDetails) && config.initialDetails.length > 0 
+        ? config.initialDetails 
+        : [{ chart_of_account_id: '', description: '', amount: '' }];
+
+    const formattedDetails = rawDetails.map(d => ({
+        chart_of_account_id: d.chart_of_account_id || '',
+        description: d.description || '',
+        amount: parseFloat(d.amount) || '',
+        amount_display: parseFloat(d.amount) > 0 ? Number(parseFloat(d.amount)).toLocaleString('id-ID') : ''
+    }));
+
+    const initAmount = parseFloat(config.initialAmount) || '';
+
     return {
         type: config.initialType || 'cash_out',
         mode: config.initialMode || 'single',
-        amount: config.initialAmount || '',
-        details: Array.isArray(config.initialDetails) && config.initialDetails.length > 0 
-            ? config.initialDetails 
-            : [{ chart_of_account_id: '', description: '', amount: '' }],
+        amount: initAmount,
+        amount_display: initAmount > 0 ? Number(initAmount).toLocaleString('id-ID') : '',
+        details: formattedDetails,
+
+        onAmountInput(rawVal) {
+            const clean = String(rawVal).replace(/\D/g, '');
+            const num = clean ? parseFloat(clean) : '';
+            this.amount = num;
+            this.amount_display = num ? Number(num).toLocaleString('id-ID') : '';
+        },
+
+        onDetailAmountInput(index, rawVal) {
+            const clean = String(rawVal).replace(/\D/g, '');
+            const num = clean ? parseFloat(clean) : '';
+            this.details[index].amount = num;
+            this.details[index].amount_display = num ? Number(num).toLocaleString('id-ID') : '';
+            this.recalculateBreakdownTotal();
+        },
 
         setMode(newMode) {
             this.mode = newMode;
@@ -457,7 +492,8 @@ function cashBankForm(config) {
             this.details.push({
                 chart_of_account_id: '',
                 description: '',
-                amount: ''
+                amount: '',
+                amount_display: ''
             });
         },
 
@@ -477,6 +513,7 @@ function cashBankForm(config) {
                 }
             });
             this.amount = total;
+            this.amount_display = total > 0 ? Number(total).toLocaleString('id-ID') : '';
         },
 
         formatNumber(num) {

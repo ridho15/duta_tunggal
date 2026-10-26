@@ -306,62 +306,109 @@
                                 <p class="text-xs text-gray-500">Pencarian produk cepat server-side, otomatis mengisi harga supplier pivot, diskon, dan kalkulasi PPN presisi.</p>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            @click="addRow()"
-                            class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition active:scale-[0.98] self-start sm:self-auto cursor-pointer shadow-xs border border-emerald-200"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-                            </svg>
-                            + Tambah Baris Barang
-                        </button>
+                        <div class="flex items-center gap-2 self-start sm:self-auto">
+                            <button
+                                type="button"
+                                @click="collapseAll()"
+                                class="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                                title="Tutup rincian semua barang"
+                            >
+                                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                                Tutup Semua
+                            </button>
+                            <button
+                                type="button"
+                                @click="expandAll()"
+                                class="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                                title="Buka rincian semua barang"
+                            >
+                                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                Buka Semua
+                            </button>
+                            <button
+                                type="button"
+                                @click="addRow()"
+                                class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition active:scale-[0.98] cursor-pointer shadow-xs border border-emerald-200"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                                </svg>
+                                + Tambah Baris Barang
+                            </button>
+                        </div>
                     </div>
 
-                    {{-- Repeater Items Container --}}
-                    <div class="space-y-4">
+                    {{-- Repeater Items Container (Structured Collapsible Card Layout - Filament Style) --}}
+                    <div class="space-y-3">
                         <template x-for="(item, index) in items" :key="index">
-                            <div class="border border-gray-200 rounded-2xl p-4 sm:p-5 bg-white shadow-xs hover:border-emerald-300 transition space-y-4 relative">
-                                {{-- Row Top Header --}}
-                                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                                    <div class="flex items-center gap-2.5">
-                                        <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 font-mono font-bold text-xs">
+                            <div class="border border-gray-200 rounded-2xl bg-white shadow-xs hover:border-emerald-300 transition overflow-hidden relative" :class="{'ring-1 ring-[#15803d]/30': item.isOpen}">
+                                {{-- Row Top Header (Accordion Trigger & Summary) --}}
+                                <div
+                                    class="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:px-5 cursor-pointer select-none transition"
+                                    :class="item.isOpen ? 'bg-gray-50/80 border-b border-gray-100' : 'bg-white hover:bg-gray-50/60'"
+                                    @click="item.isOpen = !item.isOpen"
+                                >
+                                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                        <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 font-mono font-bold text-xs shrink-0">
                                             Item #<span x-text="index + 1"></span>
                                         </span>
 
+                                        {{-- Filament-style itemLabel Summary --}}
+                                        <div class="truncate text-xs font-semibold text-gray-800 flex items-center gap-2">
+                                            <span x-text="getItemSummary(item, index)"></span>
+                                        </div>
+
                                         {{-- Limit OR Badge if applicable --}}
-                                        <template x-if="item.maxQuantity">
+                                        <template x-if="item.maxQuantity && item.isOpen">
                                             <span 
-                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                                                class="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold shrink-0"
                                                 :class="item.quantity > item.maxQuantity ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'"
                                             >
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <span>Maks Permintaan OR: <strong x-text="item.maxQuantity"></strong></span>
+                                                <span>Maks OR: <strong x-text="item.maxQuantity"></strong></span>
                                             </span>
                                         </template>
 
                                         {{-- Supplier Linked Price Info Badge --}}
-                                        <template x-if="item.isSupplierPriceLinked">
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-[#15803d] border border-emerald-200 text-xs font-semibold">
-                                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                                                <span>Harga Kontrak Rekanan Terpasang</span>
+                                        <template x-if="item.isSupplierPriceLinked && item.isOpen">
+                                            <span class="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-[#15803d] border border-emerald-200 text-xs font-semibold shrink-0">
+                                                <svg class="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                                <span>Harga Kontrak</span>
                                             </span>
                                         </template>
                                     </div>
 
-                                    {{-- Hapus Baris --}}
-                                    <button
-                                        type="button"
-                                        @click="removeRow(index)"
-                                        :disabled="items.length <= 1"
-                                        class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition cursor-pointer"
-                                        title="Hapus Baris Barang Ini"
-                                    >
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
+                                    <div class="flex items-center gap-2 shrink-0" @click.stop>
+                                        {{-- Accordion Toggle Chevron --}}
+                                        <button
+                                            type="button"
+                                            @click="item.isOpen = !item.isOpen"
+                                            class="p-1.5 rounded-lg text-gray-400 hover:text-[#15803d] hover:bg-emerald-50 transition cursor-pointer"
+                                            :title="item.isOpen ? 'Tutup Rincian Item' : 'Buka Rincian Item'"
+                                        >
+                                            <svg class="w-4 h-4 transition-transform duration-200" :class="{'rotate-180': item.isOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        {{-- Hapus Baris --}}
+                                        <button
+                                            type="button"
+                                            @click="removeRow(index)"
+                                            :disabled="items.length <= 1"
+                                            class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-gray-400 transition cursor-pointer"
+                                            title="Hapus Baris Barang Ini"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {{-- Collapsible Body (Accordion Form Content) --}}
+                                <div x-show="item.isOpen" x-collapse>
+                                    <div class="p-4 sm:p-5 pt-3 space-y-4">
 
                                 {{-- Level 1: Spesifikasi Produk Async Lookup --}}
                                 <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5">
@@ -488,20 +535,25 @@
                                         </template>
                                     </div>
 
-                                    {{-- Harga Satuan --}}
+                                    {{-- Harga Satuan (Currency Masking) --}}
                                     <div>
                                         <label class="block text-[11px] font-bold text-gray-600 mb-1">
                                             Harga Satuan (<span x-text="getItemCurrencySymbol(item)"></span>) <span class="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="number"
-                                            :name="'items[' + index + '][unit_price]'"
-                                            x-model.number="item.unitPrice"
-                                            min="0"
-                                            step="any"
-                                            required
-                                            class="w-full py-1.5 px-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 text-right bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
-                                        />
+                                        <div class="relative">
+                                            <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-xs font-bold text-gray-400" x-text="getItemCurrencySymbol(item)"></span>
+                                            <input
+                                                type="text"
+                                                :value="item.unitPrice ? formatRupiah(item.unitPrice, false) : (item.unitPrice === 0 ? '0' : '')"
+                                                @input="item.unitPrice = parseRupiah($event.target.value)"
+                                                @blur="$event.target.value = (item.unitPrice ? formatRupiah(item.unitPrice, false) : (item.unitPrice === 0 ? '0' : ''))"
+                                                @focus="if($event.target.value === '0') $event.target.value = ''"
+                                                required
+                                                class="w-full py-1.5 pl-8 pr-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 text-right bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d] font-mono"
+                                                placeholder="0"
+                                            />
+                                            <input type="hidden" :name="'items[' + index + '][unit_price]'" :value="item.unitPrice" required>
+                                        </div>
                                     </div>
 
                                     {{-- Total Kotor (Qty x Unit Price) --}}
@@ -544,6 +596,8 @@
                                     <div>
                                         <label class="block text-[11px] font-bold text-emerald-800 mb-1 text-right">Subtotal Bersih</label>
                                         <div class="w-full py-1.5 px-2 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs font-extrabold text-[#15803d] text-right" x-text="formatCurrency(calcSubtotal(item), item)"></div>
+                                    </div>
+                                </div>
                                     </div>
                                 </div>
                             </div>
@@ -657,7 +711,7 @@ function purchaseOrderForm(config) {
 
         init() {
             if (config.initialItems && config.initialItems.length > 0) {
-                this.items = config.initialItems.map(item => this.createEmptyItem(item));
+                this.items = config.initialItems.map((item, idx) => this.createEmptyItem(item, idx === 0));
             } else {
                 this.addRow();
             }
@@ -665,7 +719,7 @@ function purchaseOrderForm(config) {
             this.onCurrencyChange();
         },
 
-        createEmptyItem(prefill = {}) {
+        createEmptyItem(prefill = {}, isOpen = true) {
             const prodId = prefill.product_id || prefill.productId || '';
             const preloaded = this.preloadedProducts.find(p => String(p.id) === String(prodId));
 
@@ -683,6 +737,7 @@ function purchaseOrderForm(config) {
             const orderRequestItemId = prefill.order_request_item_id || '';
 
             return {
+                isOpen: prefill.is_open !== undefined ? Boolean(prefill.is_open) : isOpen,
                 productId: prodId,
                 orderRequestItemId: orderRequestItemId,
                 searchQuery: name ? (name + (sku && sku !== '-' ? ' (' + sku + ')' : '')) : '',
@@ -811,7 +866,31 @@ function purchaseOrderForm(config) {
         },
 
         addRow() {
-            this.items.push(this.createEmptyItem());
+            // Auto-collapse item sebelumnya agar halaman tetap rapi seperti Filament
+            this.items.forEach(it => it.isOpen = false);
+            this.items.push(this.createEmptyItem({}, true));
+        },
+
+        collapseAll() {
+            this.items.forEach(it => it.isOpen = false);
+        },
+
+        expandAll() {
+            this.items.forEach(it => it.isOpen = true);
+        },
+
+        getItemSummary(item, index) {
+            const parts = [];
+            if (item.searchQuery) {
+                parts.push(item.searchQuery);
+            } else {
+                parts.push('Belum memilih produk');
+            }
+            const qty = parseFloat(item.quantity) || 0;
+            parts.push(`${qty} ${item.uom || 'Pcs'}`);
+            const subtotal = this.calcSubtotal(item);
+            parts.push(`Subtotal: ${this.formatCurrency(subtotal, item)}`);
+            return parts.join(' · ');
         },
 
         removeRow(index) {

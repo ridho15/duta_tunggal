@@ -46,13 +46,13 @@
         {{-- Top Action Buttons --}}
         <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('penjualan.quotations.index') }}"
-               class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition shadow-2xs">
+               class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 &larr; Daftar
             </a>
 
             {{-- Cetak PDF --}}
             <a href="{{ route('penjualan.quotations.pdf', $quotation) }}" target="_blank"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition shadow-2xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-xl hover:bg-[#dcfce7] transition shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 <span>Cetak PDF</span>
             </a>
@@ -60,7 +60,7 @@
             {{-- Aksi Edit untuk Draft / Reject --}}
             @if($canEdit)
                 <a href="{{ route('penjualan.quotations.edit', $quotation) }}"
-                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition shadow-2xs">
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     <span>Edit Penawaran</span>
                 </a>
@@ -70,7 +70,7 @@
             @if($canRequestApprove)
                 <button type="button"
                         @click="$dispatch('open-modal-request-approve-quotation', { action: '{{ route('penjualan.quotations.requestApprove', $quotation) }}' })"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Ajukan Persetujuan</span>
                 </button>
@@ -80,7 +80,7 @@
             @if($quotation->status === 'request_approve')
                 @if($canReject)
                     <button type="button" onclick="openRejectModal()"
-                            class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition shadow-2xs">
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         <span>Tolak</span>
                     </button>
@@ -88,7 +88,7 @@
                 @if($canApprove)
                     <button type="button"
                             @click="$dispatch('open-modal-approve-quotation', { action: '{{ route('penjualan.quotations.approve', $quotation) }}' })"
-                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         <span>Setujui (Approve)</span>
                     </button>
@@ -99,7 +99,7 @@
             @if($canRevise)
                 <button type="button"
                         @click="$dispatch('open-modal-revision-quotation', { action: '{{ route('penjualan.quotations.revision', $quotation) }}' })"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition shadow-2xs">
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     <span>Buat Revisi</span>
                 </button>
@@ -108,7 +108,7 @@
             {{-- Konversi ke Sales Order (jika approved & usable) --}}
             @if($canConvertToSo)
                 <a href="{{ route('penjualan.quotations.convertToSaleOrder', $quotation) }}"
-                   class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-2xs">
+                   class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
                     <span>Buat Sales Order (SO)</span>
                 </a>
@@ -118,7 +118,7 @@
             @if($canDelete)
                 <button type="button"
                         @click="$dispatch('open-modal-delete-quotation', { action: '{{ route('penjualan.quotations.destroy', $quotation) }}' })"
-                        class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition" title="Hapus Draft">
+                        class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition" title="Hapus Draft">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             @endif
@@ -128,7 +128,7 @@
 
     {{-- Status Banner Info (if expired, rejected, superseded, or has active SO) --}}
     @if($isExpired)
-        <div class="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-start gap-3 shadow-2xs">
+        <div class="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 flex items-start gap-3 shadow-sm">
             <svg class="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <div>
                 <div class="font-bold">Masa Berlaku Penawaran Telah Habis</div>
@@ -138,7 +138,7 @@
             </div>
         </div>
     @elseif($quotation->superseded_at)
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-3 shadow-2xs">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-start gap-3 shadow-sm">
             <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <div>
                 <div class="font-bold">Dokumen Telah Digantikan Versi Baru</div>
@@ -148,14 +148,14 @@
             </div>
         </div>
     @elseif($quotation->saleOrders->isNotEmpty())
-        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-3 shadow-2xs">
-            <svg class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="p-4 bg-[#f0fdf4] border border-[#86efac] rounded-2xl text-xs text-[#166534] flex items-start gap-3 shadow-sm">
+            <svg class="w-5 h-5 text-[#15803d] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <div>
                 <div class="font-bold">Telah Dikonversi Menjadi Sales Order</div>
-                <div class="mt-0.5 text-emerald-700 flex flex-wrap gap-2 items-center">
+                <div class="mt-0.5 text-[#15803d] flex flex-wrap gap-2 items-center">
                     <span>Penawaran ini telah digunakan untuk Sales Order:</span>
                     @foreach($quotation->saleOrders as $so)
-                        <a href="{{ route('penjualan.so.show', $so) }}" class="inline-flex items-center gap-1 font-bold text-emerald-900 underline hover:text-emerald-950">
+                        <a href="{{ route('penjualan.so.show', $so) }}" class="inline-flex items-center gap-1 font-bold text-[#14532d] underline hover:text-[#166534]">
                             {{ $so->so_number }} ({{ $so->status }})
                         </a>
                     @endforeach
@@ -167,7 +167,7 @@
     {{-- Detail Panels Grid --}}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
         {{-- Panel 1: Pelanggan & Alamat --}}
-        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-2.5">
             <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                 <span>Informasi Pelanggan</span>
@@ -189,7 +189,7 @@
         </div>
 
         {{-- Panel 2: Parameter Finansial & Cabang --}}
-        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-2.5">
             <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Syarat & Cabang</span>
@@ -201,7 +201,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-500">Mata Uang:</span>
-                    <span class="font-bold text-gray-800">{{ $quotation->currency->code ?? 'IDR' }} (Kurs: {{ number_format($quotation->exchange_rate ?? 1, 2) }})</span>
+                    <span class="font-bold text-gray-800">{{ $quotation->currency->code ?? 'IDR' }} (Kurs: <span class="font-mono">{{ number_format($quotation->exchange_rate ?? 1, 2) }}</span>)</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-500">Tempo Pembayaran:</span>
@@ -215,7 +215,7 @@
         </div>
 
         {{-- Panel 3: Otorisasi & Riwayat Dokumen --}}
-        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-2.5">
             <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider pb-2 border-b border-gray-100 flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 <span>Otorisasi & Alur Kerja</span>
@@ -228,19 +228,19 @@
                 @if($quotation->request_approve_at)
                     <div class="flex justify-between">
                         <span class="text-gray-500">Diajukan:</span>
-                        <span class="font-medium text-gray-700">{{ \Carbon\Carbon::parse($quotation->request_approve_at)->format('d/m/Y H:i') }}</span>
+                        <span class="font-medium text-gray-700 font-mono">{{ \Carbon\Carbon::parse($quotation->request_approve_at)->format('d/m/Y H:i') }}</span>
                     </div>
                 @endif
                 @if($quotation->approve_at)
                     <div class="flex justify-between">
                         <span class="text-gray-500">Disetujui Oleh:</span>
-                        <span class="font-bold text-emerald-700">{{ $quotation->approveBy->name ?? 'Manajer' }} ({{ \Carbon\Carbon::parse($quotation->approve_at)->format('d/m/Y') }})</span>
+                        <span class="font-bold text-[#15803d]">{{ $quotation->approveBy->name ?? 'Manajer' }} (<span class="font-mono">{{ \Carbon\Carbon::parse($quotation->approve_at)->format('d/m/Y') }}</span>)</span>
                     </div>
                 @endif
                 @if($quotation->reject_at)
                     <div class="flex justify-between">
                         <span class="text-gray-500">Ditolak Oleh:</span>
-                        <span class="font-bold text-red-700">{{ $quotation->rejectBy->name ?? 'Manajer' }} ({{ \Carbon\Carbon::parse($quotation->reject_at)->format('d/m/Y') }})</span>
+                        <span class="font-bold text-red-700">{{ $quotation->rejectBy->name ?? 'Manajer' }} (<span class="font-mono">{{ \Carbon\Carbon::parse($quotation->reject_at)->format('d/m/Y') }}</span>)</span>
                     </div>
                 @endif
                 @if($quotation->revision_of_id && $quotation->revisionOf)
@@ -256,11 +256,11 @@
     </div>
 
     {{-- Tabel Rincian Item Penawaran --}}
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+    <div class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
         <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
             <h3 class="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                 <span>Daftar Barang & Estimasi Harga</span>
-                <span class="px-2 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full">
+                <span class="px-2 py-0.5 bg-[#f0fdf4] text-[#15803d] border border-[#86efac] text-[10px] font-black rounded-full font-mono">
                     {{ $quotation->quotationItem->count() }} Item
                 </span>
             </h3>
@@ -326,16 +326,16 @@
                                     <div class="text-[10px] text-gray-400 italic mt-0.5">{{ $item->notes }}</div>
                                 @endif
                             </td>
-                            <td class="py-3 px-3 text-right font-black text-gray-900">
+                            <td class="py-3 px-3 text-right font-black text-gray-900 font-mono">
                                 {{ number_format($item->quantity, 2) }}
                             </td>
                             <td class="py-3 px-2 text-center text-gray-500 font-medium">
                                 {{ $item->product->uom->abbreviation ?? 'PCS' }}
                             </td>
-                            <td class="py-3 px-3 text-right text-gray-800 font-medium">
+                            <td class="py-3 px-3 text-right text-gray-800 font-medium font-mono">
                                 Rp {{ number_format($item->unit_price, 0, ',', '.') }}
                             </td>
-                            <td class="py-3 px-3 text-right text-gray-600">
+                            <td class="py-3 px-3 text-right text-gray-600 font-mono">
                                 @if($item->discount > 0)
                                     <span class="text-red-600 font-bold">{{ $item->discount }}%</span>
                                     <div class="text-[10px] text-gray-400">(-Rp {{ number_format($discNominal, 0, ',', '.') }})</div>
@@ -348,7 +348,7 @@
                                     {{ $item->tax_type ?? 'None' }}
                                 </span>
                             </td>
-                            <td class="py-3 px-4 text-right font-black text-gray-900">
+                            <td class="py-3 px-4 text-right font-black text-gray-900 font-mono">
                                 Rp {{ number_format($item->total_price, 0, ',', '.') }}
                             </td>
                         </tr>
@@ -361,31 +361,31 @@
         <div class="p-5 border-t border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between gap-6">
             <div class="flex-1 space-y-2">
                 <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Catatan Tambahan:</div>
-                <div class="p-3 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 whitespace-pre-line leading-relaxed min-h-[60px]">
+                <div class="p-3.5 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 whitespace-pre-line leading-relaxed min-h-[60px]">
                     {{ $quotation->notes ?: 'Tidak ada catatan khusus pada penawaran ini.' }}
                 </div>
             </div>
 
-            <div class="w-full md:w-80 bg-white border border-gray-200 rounded-xl p-4 space-y-2 text-xs shadow-2xs">
+            <div class="w-full md:w-80 bg-white border border-gray-100 rounded-2xl p-5 space-y-2.5 text-xs shadow-sm">
                 <div class="flex justify-between text-gray-600 font-medium">
                     <span>Subtotal Kotor:</span>
-                    <span class="font-semibold text-gray-900">Rp {{ number_format($calcSubtotalGross, 0, ',', '.') }}</span>
+                    <span class="font-semibold text-gray-900 font-mono">Rp {{ number_format($calcSubtotalGross, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between text-gray-600 font-medium">
                     <span>Total Diskon:</span>
-                    <span class="text-red-600 font-semibold">- Rp {{ number_format($calcTotalDisc, 0, ',', '.') }}</span>
+                    <span class="text-red-600 font-semibold font-mono">- Rp {{ number_format($calcTotalDisc, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between text-gray-600 font-medium">
                     <span>Dasar Pengenaan Pajak (DPP):</span>
-                    <span class="font-semibold text-gray-900">Rp {{ number_format($calcTotalDpp, 0, ',', '.') }}</span>
+                    <span class="font-semibold text-gray-900 font-mono">Rp {{ number_format($calcTotalDpp, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between text-gray-600 font-medium">
                     <span>Total PPN (11%):</span>
-                    <span class="font-semibold text-gray-900">Rp {{ number_format($calcTotalTax, 0, ',', '.') }}</span>
+                    <span class="font-semibold text-gray-900 font-mono">Rp {{ number_format($calcTotalTax, 0, ',', '.') }}</span>
                 </div>
-                <div class="pt-2 border-t border-gray-200 flex justify-between text-sm font-black text-gray-900">
+                <div class="pt-2.5 border-t border-gray-100 flex justify-between text-sm font-black text-gray-900">
                     <span>Nilai Penawaran:</span>
-                    <span class="text-emerald-700 text-base">Rp {{ number_format($quotation->total_amount, 0, ',', '.') }}</span>
+                    <span class="text-[#15803d] text-base font-mono">Rp {{ number_format($quotation->total_amount, 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>
@@ -393,11 +393,13 @@
 </div>
 
 {{-- Reject Reason Modal --}}
-<div id="rejectModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white border border-gray-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+<div id="rejectModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white border border-gray-100 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between pb-3 border-b border-gray-100">
             <h3 class="text-sm font-bold text-gray-900">Tolak Penawaran Harga</h3>
-            <button type="button" onclick="closeRejectModal()" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+            <button type="button" onclick="closeRejectModal()" class="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
 
         <form method="POST" action="{{ route('penjualan.quotations.reject', $quotation) }}" class="space-y-4">
@@ -408,16 +410,16 @@
                 </label>
                 <textarea name="reason" rows="3" required
                           placeholder="Jelaskan alasan penolakan atau instruksi revisi harga untuk tim sales..."
-                          class="w-full py-2 px-3 text-xs bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-rose-600 focus:border-rose-600"></textarea>
+                          class="w-full py-2 px-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
                 <button type="button" onclick="closeRejectModal()"
-                        class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                        class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Batal
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 text-xs font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 shadow-2xs">
+                        class="px-4 py-2 text-xs font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 transition shadow-sm">
                     Konfirmasi Tolak
                 </button>
             </div>
@@ -474,7 +476,7 @@
         <p class="text-sm text-gray-600">
             Terbitkan dokumen revisi baru dari penawaran <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span>?
         </p>
-        <p class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 mt-2">
+        <p class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl p-3 mt-2">
             Versi revisi baru akan bernomor otomatis <strong>-R{{ $quotation->revision_no + 1 }}</strong> dan dokumen ini akan ditandai superseded.
         </p>
     </x-confirmation-modal>
@@ -491,7 +493,7 @@
         <p class="text-sm text-gray-600">
             Apakah Anda yakin ingin menghapus draft penawaran harga <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span> secara permanen?
         </p>
-        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-2.5 mt-2">
+        <p class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-3 mt-2">
             Tindakan ini tidak dapat dipulihkan kembali.
         </p>
     </x-confirmation-modal>

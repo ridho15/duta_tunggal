@@ -196,30 +196,38 @@
 
                                 {{-- Debit --}}
                                 <td class="py-2 px-3 text-right">
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        :name="'entries[' + index + '][debit]'"
-                                        x-model.number="line.debit"
-                                        @input="onDebitInput(index)"
-                                        class="w-full px-2.5 py-1.5 text-xs text-right font-mono font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                                        placeholder="0"
-                                    >
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            x-model="line.debit_display"
+                                            @input="onDebitInput(index, $event.target.value)"
+                                            class="w-full px-2.5 py-1.5 text-xs text-right font-mono font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                            placeholder="0"
+                                        >
+                                        <input
+                                            type="hidden"
+                                            :name="'entries[' + index + '][debit]'"
+                                            :value="line.debit"
+                                        >
+                                    </div>
                                 </td>
 
                                 {{-- Kredit --}}
                                 <td class="py-2 px-3 text-right">
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        :name="'entries[' + index + '][credit]'"
-                                        x-model.number="line.credit"
-                                        @input="onCreditInput(index)"
-                                        class="w-full px-2.5 py-1.5 text-xs text-right font-mono font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                                        placeholder="0"
-                                    >
+                                    <div class="relative">
+                                        <input
+                                            type="text"
+                                            x-model="line.credit_display"
+                                            @input="onCreditInput(index, $event.target.value)"
+                                            class="w-full px-2.5 py-1.5 text-xs text-right font-mono font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                            placeholder="0"
+                                        >
+                                        <input
+                                            type="hidden"
+                                            :name="'entries[' + index + '][credit]'"
+                                            :value="line.credit"
+                                        >
+                                    </div>
                                 </td>
 
                                 {{-- Hapus Baris --}}
@@ -292,20 +300,33 @@
 
 <script>
 function manualJournalForm(config) {
+    const rawEntries = Array.isArray(config.initialEntries) && config.initialEntries.length >= 2
+        ? config.initialEntries
+        : [
+            { coa_id: '', description: '', debit: '', credit: '' },
+            { coa_id: '', description: '', debit: '', credit: '' }
+        ];
+
+    const formattedEntries = rawEntries.map(e => ({
+        coa_id: e.coa_id || '',
+        description: e.description || '',
+        debit: parseFloat(e.debit) || '',
+        debit_display: parseFloat(e.debit) > 0 ? Number(parseFloat(e.debit)).toLocaleString('id-ID') : '',
+        credit: parseFloat(e.credit) || '',
+        credit_display: parseFloat(e.credit) > 0 ? Number(parseFloat(e.credit)).toLocaleString('id-ID') : ''
+    }));
+
     return {
-        entries: Array.isArray(config.initialEntries) && config.initialEntries.length >= 2
-            ? config.initialEntries
-            : [
-                { coa_id: '', description: '', debit: '', credit: '' },
-                { coa_id: '', description: '', debit: '', credit: '' }
-            ],
+        entries: formattedEntries,
 
         addLine() {
             this.entries.push({
                 coa_id: '',
                 description: '',
                 debit: '',
-                credit: ''
+                debit_display: '',
+                credit: '',
+                credit_display: ''
             });
         },
 
@@ -315,15 +336,25 @@ function manualJournalForm(config) {
             }
         },
 
-        onDebitInput(index) {
-            if (parseFloat(this.entries[index].debit) > 0) {
+        onDebitInput(index, rawVal) {
+            const clean = String(rawVal).replace(/\D/g, '');
+            const num = clean ? parseFloat(clean) : '';
+            this.entries[index].debit = num;
+            this.entries[index].debit_display = num ? Number(num).toLocaleString('id-ID') : '';
+            if (num > 0) {
                 this.entries[index].credit = '';
+                this.entries[index].credit_display = '';
             }
         },
 
-        onCreditInput(index) {
-            if (parseFloat(this.entries[index].credit) > 0) {
+        onCreditInput(index, rawVal) {
+            const clean = String(rawVal).replace(/\D/g, '');
+            const num = clean ? parseFloat(clean) : '';
+            this.entries[index].credit = num;
+            this.entries[index].credit_display = num ? Number(num).toLocaleString('id-ID') : '';
+            if (num > 0) {
                 this.entries[index].debit = '';
+                this.entries[index].debit_display = '';
             }
         },
 

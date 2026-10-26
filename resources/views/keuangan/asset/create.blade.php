@@ -178,16 +178,21 @@
                         Biaya Perolehan Aset (Rp) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500">Rp</span>
+                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="any"
+                            type="text"
+                            id="display_purchase_cost"
+                            value="{{ old('purchase_cost') ? number_format(old('purchase_cost'), 0, ',', '.') : '' }}"
+                            oninput="handlePurchaseCostInput(this.value)"
+                            required
+                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-bold text-gray-900 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition font-mono"
+                            placeholder="0"
+                        >
+                        <input
+                            type="hidden"
                             name="purchase_cost"
                             id="purchase_cost"
-                            value="{{ old('purchase_cost') }}"
-                            required
-                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-bold text-gray-900 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                            placeholder="0"
+                            value="{{ old('purchase_cost', '') }}"
                         >
                     </div>
                     <span class="text-[11px] text-gray-400 mt-1 block">Total harga beli + ongkos angkut + biaya instalasi s/d siap beroperasi.</span>
@@ -244,16 +249,21 @@
                         </button>
                     </div>
                     <div class="relative">
-                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500">Rp</span>
+                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="any"
+                            type="text"
+                            id="display_salvage_value"
+                            value="{{ old('salvage_value') ? number_format(old('salvage_value'), 0, ',', '.') : '0' }}"
+                            oninput="handleSalvageValueInput(this.value)"
+                            required
+                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition font-mono"
+                            placeholder="0"
+                        >
+                        <input
+                            type="hidden"
                             name="salvage_value"
                             id="salvage_value"
                             value="{{ old('salvage_value', 0) }}"
-                            required
-                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                            placeholder="0"
                         >
                     </div>
                     <span class="text-[11px] text-gray-400 mt-1 block">Nilai sisa aset di akhir masa manfaat (standar 5% dari biaya perolehan).</span>
@@ -434,10 +444,31 @@ document.addEventListener('DOMContentLoaded', function () {
         annualEstimateText.textContent = formatRupiah(annual);
     }
 
+    window.handlePurchaseCostInput = function(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : '';
+        costInput.value = num;
+        document.getElementById('display_purchase_cost').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
+        if (!salvageInput.value || salvageInput.value == 0) {
+            autoCalculateSalvage();
+        } else {
+            calculateDepreciationLive();
+        }
+    };
+
+    window.handleSalvageValueInput = function(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        salvageInput.value = num;
+        document.getElementById('display_salvage_value').value = num > 0 ? Number(num).toLocaleString('id-ID') : '0';
+        calculateDepreciationLive();
+    };
+
     function autoCalculateSalvage() {
         const cost = parseFloat(costInput.value) || 0;
-        const val = cost * 0.05;
-        salvageInput.value = val.toFixed(2);
+        const val = Math.round(cost * 0.05);
+        salvageInput.value = val;
+        document.getElementById('display_salvage_value').value = val > 0 ? Number(val).toLocaleString('id-ID') : '0';
         calculateDepreciationLive();
     }
 
@@ -473,21 +504,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const opt = this.options[this.selectedIndex];
             const cost = opt.getAttribute('data-cost');
             if (cost && (!costInput.value || costInput.value == 0)) {
-                costInput.value = parseFloat(cost).toFixed(2);
+                const num = parseFloat(cost) || 0;
+                costInput.value = num;
+                document.getElementById('display_purchase_cost').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
                 autoCalculateSalvage();
             }
         });
     }
 
-    costInput.addEventListener('input', function () {
-        if (!salvageInput.value || salvageInput.value == 0) {
-            autoCalculateSalvage();
-        } else {
-            calculateDepreciationLive();
-        }
-    });
-
-    salvageInput.addEventListener('input', calculateDepreciationLive);
     lifeInput.addEventListener('input', calculateDepreciationLive);
     methodSelect.addEventListener('change', calculateDepreciationLive);
     btnAuto5Percent.addEventListener('click', autoCalculateSalvage);

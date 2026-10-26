@@ -345,18 +345,23 @@
                                     <td class="py-3 px-3 text-right font-bold text-amber-900" x-text="inv.remaining_formatted"></td>
 
                                     <td class="py-3 px-3 text-right">
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            :name="'invoice_receipts[' + inv.id + ']'"
-                                            x-model.number="invoiceAmounts[inv.id]"
-                                            @input="onAmountInput(inv.id)"
-                                            :disabled="!selectedInvoices.includes(inv.id)"
-                                            placeholder="0"
-                                            class="w-full text-right text-xs py-1.5 px-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
-                                            :class="selectedInvoices.includes(inv.id) ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'"
-                                        >
+                                        <div class="relative">
+                                            <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-[10px] font-semibold text-gray-400 pointer-events-none">Rp</span>
+                                            <input
+                                                type="text"
+                                                :value="getFormattedAmount(inv.id)"
+                                                @input="handleInvoiceAmountInput(inv.id, $event.target.value)"
+                                                :disabled="!selectedInvoices.includes(inv.id)"
+                                                placeholder="0"
+                                                class="w-full text-right text-xs py-1.5 pl-8 pr-2.5 border rounded-lg font-mono font-bold focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
+                                                :class="selectedInvoices.includes(inv.id) ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'"
+                                            >
+                                            <input
+                                                type="hidden"
+                                                :name="'invoice_receipts[' + inv.id + ']'"
+                                                :value="invoiceAmounts[inv.id] || 0"
+                                            >
+                                        </div>
                                     </td>
 
                                     <td class="py-3 px-3 text-center">
@@ -584,6 +589,20 @@ function customerReceiptForm(config) {
                 }
             } else {
                 delete this.invoiceAmounts[invId];
+            }
+        },
+
+        getFormattedAmount(invId) {
+            const val = this.invoiceAmounts[invId];
+            return val > 0 ? Number(val).toLocaleString('id-ID') : '';
+        },
+
+        handleInvoiceAmountInput(invId, rawVal) {
+            const cleanDigits = String(rawVal).replace(/\D/g, '');
+            const numVal = parseFloat(cleanDigits) || 0;
+            this.invoiceAmounts[invId] = numVal;
+            if (!this.selectedInvoices.includes(invId)) {
+                this.selectedInvoices.push(invId);
             }
         },
 

@@ -186,16 +186,20 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                            Ongkos Kirim (Rp)
+                            Ongkos Kirim
                         </label>
-                        <input
-                            type="number"
-                            name="other_fee"
-                            id="otherFeeInput"
-                            value="0"
-                            min="0"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:border-[#15803d]"
-                        >
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-semibold text-gray-400 pointer-events-none">Rp</span>
+                            <input
+                                type="text"
+                                id="otherFeeDisplay"
+                                value="0"
+                                oninput="handleOtherFeeInput(this.value)"
+                                placeholder="0"
+                                class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-sm font-mono font-medium text-gray-800 text-right focus:outline-none focus:border-[#15803d]"
+                            >
+                            <input type="hidden" name="other_fee" id="otherFeeInput" value="0">
+                        </div>
                     </div>
 
                     <div class="sm:col-span-3">
@@ -261,7 +265,10 @@
         custTerms.innerText = `Tipe: ${data.customer ? (data.customer.tipe_pembayaran || 'Kredit') : 'Kredit'} · Pajak: ${data.tipe_pajak}`;
 
         if (otherFeeInput) {
-            otherFeeInput.value = data.shipping_cost || 0;
+            const cost = data.shipping_cost || 0;
+            otherFeeInput.value = cost;
+            const display = document.getElementById('otherFeeDisplay');
+            if (display) display.value = cost > 0 ? Number(cost).toLocaleString('id-ID') : '0';
         }
 
         const targetGroup = document.getElementById(`so-sj-group-${soId}`);
@@ -271,6 +278,13 @@
         }
 
         updateSelectedCount();
+    }
+
+    function handleOtherFeeInput(rawVal) {
+        const cleanDigits = String(rawVal).replace(/\D/g, '');
+        const numVal = parseFloat(cleanDigits) || 0;
+        document.getElementById('otherFeeInput').value = numVal;
+        document.getElementById('otherFeeDisplay').value = numVal > 0 ? Number(numVal).toLocaleString('id-ID') : '0';
     }
 
     function updateSelectedCount() {

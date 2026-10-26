@@ -182,43 +182,72 @@
                         <p class="text-xs text-gray-500">Pencarian cepat server-side, rekomendasi rekanan termurah, cabang per item, diskon, dan kalkulasi pajak terperinci.</p>
                     </div>
                 </div>
-                <button
-                    type="button"
-                    @click="addRow()"
-                    class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition active:scale-[0.98] self-start sm:self-auto cursor-pointer shadow-xs border border-emerald-200"
-                >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-                    </svg>
-                    + Tambah Baris Barang
-                </button>
+                <div class="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                        type="button"
+                        @click="collapseAll()"
+                        class="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                        title="Tutup rincian semua barang"
+                    >
+                        <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                        Tutup Semua
+                    </button>
+                    <button
+                        type="button"
+                        @click="expandAll()"
+                        class="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                        title="Buka rincian semua barang"
+                    >
+                        <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        Buka Semua
+                    </button>
+                    <button
+                        type="button"
+                        @click="addRow()"
+                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition active:scale-[0.98] cursor-pointer shadow-xs border border-emerald-200"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                        + Tambah Baris Barang
+                    </button>
+                </div>
             </div>
 
-            {{-- Repeater Items Container (Structured Row Card Layout) --}}
-            <div class="space-y-4">
+            {{-- Repeater Items Container (Structured Collapsible Card Layout - Filament Style) --}}
+            <div class="space-y-3">
                 <template x-for="(item, index) in items" :key="index">
-                    <div class="border border-gray-200 rounded-2xl p-4 sm:p-5 bg-white shadow-xs hover:border-emerald-300 transition space-y-4 relative">
-                        {{-- Row Header --}}
-                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                            <div class="flex items-center gap-2.5">
-                                <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 font-mono font-bold text-xs">
+                    <div class="border border-gray-200 rounded-2xl bg-white shadow-xs hover:border-emerald-300 transition overflow-hidden relative" :class="{'ring-1 ring-[#15803d]/30': item.isOpen}">
+                        {{-- Row Header (Accordion Trigger & Summary) --}}
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:px-5 cursor-pointer select-none transition"
+                            :class="item.isOpen ? 'bg-gray-50/80 border-b border-gray-100' : 'bg-white hover:bg-gray-50/60'"
+                            @click="item.isOpen = !item.isOpen"
+                        >
+                            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 font-mono font-bold text-xs shrink-0">
                                     Item #<span x-text="index + 1"></span>
                                 </span>
+
+                                {{-- Filament-style itemLabel Summary --}}
+                                <div class="truncate text-xs font-semibold text-gray-800 flex items-center gap-2">
+                                    <span x-text="getItemSummary(item, index)"></span>
+                                </div>
+
                                 {{-- Rekomendasi Supplier Badge --}}
-                                <template x-if="item.recommendedSupplierText">
-                                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-[#15803d] border border-emerald-200 text-xs font-semibold">
-                                        <svg class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <template x-if="item.recommendedSupplierText && item.isOpen">
+                                    <div class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-[#15803d] border border-emerald-200 text-[11px] font-semibold shrink-0">
+                                        <svg class="w-3 h-3 text-emerald-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                                         </svg>
-                                        <span>Rekomendasi Termurah: <strong x-text="item.recommendedSupplierText"></strong></span>
+                                        <span>Rekomendasi: <strong x-text="item.recommendedSupplierText"></strong></span>
                                     </div>
                                 </template>
                             </div>
 
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 shrink-0" @click.stop>
                                 {{-- Cabang Per Item (Searchable Dropdown) --}}
                                 <div class="flex items-center gap-1.5 relative" @click.outside="item.cabangDropdownOpen = false">
-                                    <span class="text-xs font-semibold text-gray-500 hidden sm:inline">Cabang Tujuan:</span>
                                     <input type="hidden" :name="'items[' + index + '][cabang_id]'" :value="item.cabangId" required>
                                     <div class="relative">
                                         <button
@@ -226,7 +255,7 @@
                                             @click="item.cabangDropdownOpen = !item.cabangDropdownOpen; item.cabangSearchQuery = '';"
                                             class="py-1 px-2.5 border border-gray-300 rounded-lg text-xs bg-white font-medium text-gray-700 flex items-center justify-between gap-1.5 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-[#15803d] transition"
                                         >
-                                            <span x-text="getCabangLabel(item)" class="truncate max-w-[140px]"></span>
+                                            <span x-text="getCabangLabel(item)" class="truncate max-w-[120px]"></span>
                                             <svg class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150" :class="{'rotate-180 text-[#15803d]': item.cabangDropdownOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                             </svg>
@@ -264,6 +293,18 @@
                                     </div>
                                 </div>
 
+                                {{-- Accordion Toggle Chevron --}}
+                                <button
+                                    type="button"
+                                    @click="item.isOpen = !item.isOpen"
+                                    class="p-1.5 rounded-lg text-gray-400 hover:text-[#15803d] hover:bg-emerald-50 transition cursor-pointer"
+                                    :title="item.isOpen ? 'Tutup Rincian Item' : 'Buka Rincian Item'"
+                                >
+                                    <svg class="w-4 h-4 transition-transform duration-200" :class="{'rotate-180': item.isOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
                                 {{-- Hapus Baris --}}
                                 <button
                                     type="button"
@@ -278,6 +319,10 @@
                                 </button>
                             </div>
                         </div>
+
+                        {{-- Collapsible Body (Accordion Form Content) --}}
+                        <div x-show="item.isOpen" x-collapse>
+                            <div class="p-4 sm:p-5 pt-3 space-y-4">
 
                         {{-- Level 1: Spesifikasi Produk & Rekanan --}}
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5">
@@ -469,21 +514,25 @@
                                 <input type="hidden" :name="'items[' + index + '][original_price]'" :value="item.originalPrice">
                             </div>
 
-                            {{-- Estimasi Harga Satuan (Unit Price Diajukan) --}}
+                            {{-- Estimasi Harga Satuan (Unit Price Diajukan - Rupiah Masking) --}}
                             <div>
                                 <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1">
                                     Estimasi Harga Satuan <span class="text-red-500">*</span>
                                 </label>
-                                <input
-                                    type="number"
-                                    :name="'items[' + index + '][unit_price]'"
-                                    x-model.number="item.unitPrice"
-                                    min="0"
-                                    step="any"
-                                    required
-                                    class="w-full py-1.5 px-2.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]"
-                                    placeholder="0"
-                                />
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-xs font-bold text-gray-400">Rp</span>
+                                    <input
+                                        type="text"
+                                        :value="item.unitPrice ? formatRupiah(item.unitPrice, false) : (item.unitPrice === 0 ? '0' : '')"
+                                        @input="item.unitPrice = parseRupiah($event.target.value)"
+                                        @blur="$event.target.value = (item.unitPrice ? formatRupiah(item.unitPrice, false) : (item.unitPrice === 0 ? '0' : ''))"
+                                        @focus="if($event.target.value === '0') $event.target.value = ''"
+                                        required
+                                        class="w-full py-1.5 pl-8 pr-2.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d] font-mono text-right"
+                                        placeholder="0"
+                                    />
+                                    <input type="hidden" :name="'items[' + index + '][unit_price]'" :value="item.unitPrice" required>
+                                </div>
                             </div>
 
                             {{-- Diskon (%) --}}
@@ -570,6 +619,8 @@
                                 <span class="text-base font-extrabold text-[#15803d]" x-text="formatRupiah(calculateItem(item).subtotal)"></span>
                             </div>
                         </div>
+                            </div>
+                        </div>
                     </div>
                 </template>
             </div>
@@ -637,8 +688,9 @@ function orderRequestForm(config) {
             }
         },
 
-        createItem(prefill = {}) {
+        createItem(prefill = {}, isOpen = true) {
             const item = {
+                isOpen: prefill.is_open !== undefined ? Boolean(prefill.is_open) : isOpen,
                 productId: prefill.product_id || '',
                 productName: prefill.product_name || '',
                 productSku: prefill.product_sku || '',
@@ -843,7 +895,32 @@ function orderRequestForm(config) {
         },
 
         addRow() {
-            this.items.push(this.createItem());
+            // Auto-collapse item sebelumnya agar tetap rapi seperti Filament
+            this.items.forEach(it => it.isOpen = false);
+            this.items.push(this.createItem({}, true));
+        },
+
+        collapseAll() {
+            this.items.forEach(it => it.isOpen = false);
+        },
+
+        expandAll() {
+            this.items.forEach(it => it.isOpen = true);
+        },
+
+        getItemSummary(item, index) {
+            const parts = [];
+            if (item.productSku || item.productName) {
+                const sku = item.productSku && item.productSku !== '-' ? `(${item.productSku}) ` : '';
+                parts.push(`${sku}${item.productName}`);
+            } else {
+                parts.push('Belum memilih produk');
+            }
+            const qty = parseFloat(item.quantity) || 0;
+            parts.push(`${qty} ${item.uom || 'Pcs'}`);
+            const calc = this.calculateItem(item);
+            parts.push(`Est: ${this.formatRupiah(calc.subtotal)}`);
+            return parts.join(' · ');
         },
 
         removeRow(index) {

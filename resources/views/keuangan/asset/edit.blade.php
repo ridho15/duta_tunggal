@@ -187,15 +187,21 @@
                         Biaya Perolehan Aset (Rp) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500">Rp</span>
+                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="any"
+                            type="text"
+                            id="display_purchase_cost"
+                            value="{{ old('purchase_cost', $asset->purchase_cost) ? number_format(old('purchase_cost', $asset->purchase_cost), 0, ',', '.') : '' }}"
+                            oninput="handlePurchaseCostInput(this.value)"
+                            required
+                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-bold text-gray-900 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition font-mono"
+                            placeholder="0"
+                        >
+                        <input
+                            type="hidden"
                             name="purchase_cost"
                             id="purchase_cost"
                             value="{{ old('purchase_cost', $asset->purchase_cost) }}"
-                            required
-                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-bold text-gray-900 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
                         >
                     </div>
                 </div>
@@ -242,15 +248,21 @@
                         Nilai Sisa / Residu (Rp) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
-                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500">Rp</span>
+                        <span class="absolute left-3.5 top-2.5 text-sm font-bold text-gray-500 pointer-events-none">Rp</span>
                         <input
-                            type="number"
-                            step="any"
+                            type="text"
+                            id="display_salvage_value"
+                            value="{{ old('salvage_value', $asset->salvage_value) ? number_format(old('salvage_value', $asset->salvage_value), 0, ',', '.') : '0' }}"
+                            oninput="handleSalvageValueInput(this.value)"
+                            required
+                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition font-mono"
+                            placeholder="0"
+                        >
+                        <input
+                            type="hidden"
                             name="salvage_value"
                             id="salvage_value"
                             value="{{ old('salvage_value', $asset->salvage_value) }}"
-                            required
-                            class="w-full pl-11 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
                         >
                     </div>
                 </div>
@@ -312,4 +324,20 @@
         </div>
     </form>
 </div>
+
+<script>
+    function handlePurchaseCostInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : '';
+        document.getElementById('purchase_cost').value = num;
+        document.getElementById('display_purchase_cost').value = num > 0 ? Number(num).toLocaleString('id-ID') : '';
+    }
+
+    function handleSalvageValueInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        document.getElementById('salvage_value').value = num;
+        document.getElementById('display_salvage_value').value = num > 0 ? Number(num).toLocaleString('id-ID') : '0';
+    }
+</script>
 @endsection

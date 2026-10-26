@@ -190,7 +190,7 @@
 
                 {{-- Kartu 2: Tabel Komponen Bahan Baku --}}
                 <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
-                    <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
+                    <div class="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div class="flex items-center gap-2.5">
                             <div class="w-8 h-8 rounded-lg bg-emerald-50 text-[#15803d] flex items-center justify-center font-bold text-sm">
                                 2
@@ -200,37 +200,44 @@
                                 <p class="text-xs text-gray-400">Daftar bahan baku yang dikonsumsi per batch formula ini.</p>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onclick="addMaterialRow()"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            + Tambah Bahan Baku
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onclick="collapseAllMaterials()"
+                                class="px-2.5 py-1.5 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition"
+                            >
+                                Tutup Semua
+                            </button>
+                            <button
+                                type="button"
+                                onclick="expandAllMaterials()"
+                                class="px-2.5 py-1.5 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition"
+                            >
+                                Buka Semua
+                            </button>
+                            <button
+                                type="button"
+                                onclick="addMaterialRow()"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#f0fdf4] border border-[#86efac] hover:bg-[#dcfce7] text-[#15803d] text-xs font-bold rounded-xl transition shadow-sm"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                + Tambah Bahan Baku
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs" id="materialsTable">
-                            <thead class="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                                <tr>
-                                    <th class="py-2.5 px-3 min-w-[200px]">Bahan Baku</th>
-                                    <th class="py-2.5 px-3 w-28">Satuan</th>
-                                    <th class="py-2.5 px-3 w-28 text-right">Kebutuhan Qty</th>
-                                    <th class="py-2.5 px-3 w-32 text-right">Estimasi Biaya</th>
-                                    <th class="py-2.5 px-3 w-36 text-right">Subtotal Biaya</th>
-                                    <th class="py-2.5 px-3 w-10 text-center"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="materialsTbody" class="divide-y divide-gray-100 font-medium">
-                                {{-- Baris diinjeksi via JavaScript --}}
-                            </tbody>
-                        </table>
+                    {{-- Container Accordion Baris Bahan Baku --}}
+                    <div id="materialsContainer" class="space-y-3">
+                        {{-- Baris akan diinjeksi via JavaScript atau old data --}}
                     </div>
 
-                    <div id="emptyMaterialsState" class="hidden py-8 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                    {{-- Empty State jika belum ada bahan --}}
+                    <div id="emptyMaterialsState" class="py-8 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                        <svg class="w-8 h-8 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
                         <p class="text-xs font-semibold text-gray-600">Belum ada bahan baku yang ditambahkan</p>
                         <p class="text-[11px] text-gray-400 mt-0.5">Klik tombol "+ Tambah Bahan Baku" untuk menambahkan komponen formula.</p>
                     </div>
@@ -257,18 +264,23 @@
                                 Biaya Tenaga Kerja (TKL)
                             </label>
                             <div class="relative rounded-lg shadow-xs">
-                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-xs font-bold">Rp</span>
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 text-xs font-bold pointer-events-none">Rp</span>
                                 <input
-                                    type="number"
-                                    step="any"
-                                    min="0"
+                                    type="text"
+                                    id="laborCostDisplay"
+                                    value="{{ old('labor_cost', (float)$billOfMaterial->labor_cost) > 0 ? number_format(old('labor_cost', (float)$billOfMaterial->labor_cost), 0, ',', '.') : '0' }}"
+                                    oninput="handleLaborCostInput(this.value)"
+                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 bg-white font-mono text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                                    placeholder="0"
+                                >
+                                <input
+                                    type="hidden"
                                     name="labor_cost"
                                     id="laborCostInput"
-                                    value="{{ old('labor_cost', (float) $billOfMaterial->labor_cost) }}"
-                                    oninput="recalculateTotals()"
-                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 bg-white font-mono text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                                    value="{{ old('labor_cost', (float)$billOfMaterial->labor_cost) }}"
                                 >
                             </div>
+                            <p class="text-[10px] text-gray-400 mt-1">Total upah operator/buruh langsung untuk batch ini.</p>
                         </div>
 
                         <div>
@@ -276,18 +288,23 @@
                                 Biaya Overhead Pabrik (FOH)
                             </label>
                             <div class="relative rounded-lg shadow-xs">
-                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-xs font-bold">Rp</span>
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 text-xs font-bold pointer-events-none">Rp</span>
                                 <input
-                                    type="number"
-                                    step="any"
-                                    min="0"
+                                    type="text"
+                                    id="overheadCostDisplay"
+                                    value="{{ old('overhead_cost', (float)$billOfMaterial->overhead_cost) > 0 ? number_format(old('overhead_cost', (float)$billOfMaterial->overhead_cost), 0, ',', '.') : '0' }}"
+                                    oninput="handleOverheadCostInput(this.value)"
+                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 bg-white font-mono text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                                    placeholder="0"
+                                >
+                                <input
+                                    type="hidden"
                                     name="overhead_cost"
                                     id="overheadCostInput"
-                                    value="{{ old('overhead_cost', (float) $billOfMaterial->overhead_cost) }}"
-                                    oninput="recalculateTotals()"
-                                    class="w-full text-sm rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 bg-white font-mono text-right focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                                    value="{{ old('overhead_cost', (float)$billOfMaterial->overhead_cost) }}"
                                 >
                             </div>
+                            <p class="text-[10px] text-gray-400 mt-1">Biaya listrik, bahan bakar, mesin, dan penyusutan per batch.</p>
                         </div>
                     </div>
                 </div>
@@ -356,19 +373,93 @@
         }
     }
 
-    function addMaterialRow(data = null) {
-        const tbody = document.getElementById('materialsTbody');
+    function handleLaborCostInput(rawVal) {
+        const cleanDigits = String(rawVal).replace(/\D/g, '');
+        const numVal = parseFloat(cleanDigits) || 0;
+        document.getElementById('laborCostInput').value = numVal;
+        document.getElementById('laborCostDisplay').value = numVal > 0 ? Number(numVal).toLocaleString('id-ID') : '0';
+        recalculateTotals();
+    }
+
+    function handleOverheadCostInput(rawVal) {
+        const cleanDigits = String(rawVal).replace(/\D/g, '');
+        const numVal = parseFloat(cleanDigits) || 0;
+        document.getElementById('overheadCostInput').value = numVal;
+        document.getElementById('overheadCostDisplay').value = numVal > 0 ? Number(numVal).toLocaleString('id-ID') : '0';
+        recalculateTotals();
+    }
+
+    function handleMaterialPriceInput(idx, rawVal) {
+        const cleanDigits = String(rawVal).replace(/\D/g, '');
+        const numVal = parseFloat(cleanDigits) || 0;
+        document.getElementById(`itemPrice_${idx}`).value = numVal;
+        document.getElementById(`display_itemPrice_${idx}`).value = numVal > 0 ? Number(numVal).toLocaleString('id-ID') : '';
+        calculateRowSubtotal(idx);
+    }
+
+    function toggleMaterialRow(idx) {
+        const body = document.getElementById(`materialBody_${idx}`);
+        const chevron = document.getElementById(`chevron_${idx}`);
+        if (!body) return;
+        const isHidden = body.classList.contains('hidden');
+        if (isHidden) {
+            body.classList.remove('hidden');
+            chevron?.classList.add('rotate-180');
+        } else {
+            body.classList.add('hidden');
+            chevron?.classList.remove('rotate-180');
+        }
+    }
+
+    function collapseAllMaterials() {
+        document.querySelectorAll('[id^="materialBody_"]').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('[id^="chevron_"]').forEach(el => el.classList.remove('rotate-180'));
+    }
+
+    function expandAllMaterials() {
+        document.querySelectorAll('[id^="materialBody_"]').forEach(el => el.classList.remove('hidden'));
+        document.querySelectorAll('[id^="chevron_"]').forEach(el => el.classList.add('rotate-180'));
+    }
+
+    function updateMaterialSummary(idx) {
+        const row = document.getElementById(`materialRow_${idx}`);
+        if (!row) return;
+
+        const select = row.querySelector('.material-select');
+        const opt = select?.selectedOptions[0];
+        const qty = parseFloat(document.getElementById(`itemQty_${idx}`)?.value || 0);
+        const uomSelect = document.getElementById(`itemUom_${idx}`);
+        const uomText = uomSelect?.selectedOptions[0]?.text || '';
+        const subtotalText = document.getElementById(`itemSubtotal_${idx}`)?.innerText || 'Rp 0';
+        const summaryEl = document.getElementById(`materialSummary_${idx}`);
+
+        if (summaryEl) {
+            if (opt && opt.value) {
+                const name = opt.text;
+                summaryEl.innerText = `${name} · ${qty} ${uomText} · ${subtotalText}`;
+            } else {
+                summaryEl.innerText = `Komponen #${idx + 1} — Pilih Bahan Baku...`;
+            }
+        }
+    }
+
+    function addMaterialRow(data = null, isOpen = true) {
+        if (isOpen && rowIndex > 0 && !data) {
+            collapseAllMaterials();
+        }
+
+        const container = document.getElementById('materialsContainer');
         document.getElementById('emptyMaterialsState').classList.add('hidden');
 
         const currentIdx = rowIndex++;
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50/70 transition';
-        tr.id = `materialRow_${currentIdx}`;
+        const card = document.createElement('div');
+        card.className = 'border border-gray-200 rounded-2xl overflow-hidden bg-white hover:border-gray-300 transition-all shadow-xs';
+        card.id = `materialRow_${currentIdx}`;
 
         const selectedProductId = data ? data.product_id : '';
-        const qty = data ? (data.quantity || 1) : 1;
+        const qty = data ? data.quantity : 1;
         const selectedUomId = data ? data.uom_id : '';
-        const unitPrice = data ? (data.unit_price || 0) : 0;
+        const unitPrice = parseFloat(data ? data.unit_price : 0) || 0;
         const note = data ? (data.note || '') : '';
 
         let productOptions = '<option value="">-- Pilih Bahan Baku --</option>';
@@ -383,37 +474,76 @@
             uomOptions += `<option value="${u.id}" ${isSel}>${u.name} (${u.abbreviation})</option>`;
         });
 
-        tr.innerHTML = `
-            <td class="py-2.5 px-3">
-                <select data-searchable name="items[${currentIdx}][product_id]" required onchange="onMaterialProductChange(${currentIdx}, this)" class="w-full text-xs rounded-lg border border-gray-300 py-2 px-2.5 bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
-                    ${productOptions}
-                </select>
-                <input type="text" name="items[${currentIdx}][note]" value="${note}" placeholder="Catatan part..." class="w-full text-[11px] rounded-lg border border-gray-200 mt-1 py-1 px-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]">
-            </td>
-            <td class="py-2.5 px-3">
-                <select data-searchable name="items[${currentIdx}][uom_id]" id="itemUom_${currentIdx}" required class="w-full text-xs rounded-lg border border-gray-300 py-2 px-2 bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
-                    ${uomOptions}
-                </select>
-            </td>
-            <td class="py-2.5 px-3 text-right">
-                <input type="number" step="any" min="0.0001" name="items[${currentIdx}][quantity]" id="itemQty_${currentIdx}" value="${qty}" required oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-lg border border-gray-300 py-2 px-2.5 bg-white font-bold text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
-            </td>
-            <td class="py-2.5 px-3 text-right">
-                <input type="number" step="any" min="0" name="items[${currentIdx}][unit_price]" id="itemPrice_${currentIdx}" value="${unitPrice}" oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-lg border border-gray-300 py-2 px-2.5 bg-white font-mono focus:outline-none focus:ring-1 focus:ring-[#15803d]">
-            </td>
-            <td class="py-2.5 px-3 text-right font-mono font-bold text-gray-900" id="itemSubtotal_${currentIdx}">
-                Rp 0
-            </td>
-            <td class="py-2.5 px-3 text-center">
-                <button type="button" onclick="removeMaterialRow(${currentIdx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer" title="Hapus Baris">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </button>
-            </td>
+        card.innerHTML = `
+            {{-- Header Accordion --}}
+            <div class="flex items-center justify-between px-4 py-3 bg-gray-50/80 cursor-pointer select-none border-b border-gray-100 hover:bg-gray-100/60 transition" onclick="toggleMaterialRow(${currentIdx})">
+                <div class="flex items-center gap-3 min-w-0 pr-2">
+                    <span class="w-6 h-6 rounded-lg bg-emerald-100 text-[#15803d] flex items-center justify-center font-bold text-xs shrink-0">
+                        ${currentIdx + 1}
+                    </span>
+                    <div class="truncate">
+                        <span id="materialSummary_${currentIdx}" class="text-xs font-bold text-gray-800 truncate block">
+                            Komponen #${currentIdx + 1} — Pilih Bahan Baku...
+                        </span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span id="itemSubtotal_${currentIdx}" class="text-xs font-mono font-bold text-[#15803d] mr-1">
+                        Rp 0
+                    </span>
+                    <button type="button" onclick="event.stopPropagation(); removeMaterialRow(${currentIdx})" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer" title="Hapus Baris">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                    <div id="chevron_${currentIdx}" class="text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Form Body --}}
+            <div id="materialBody_${currentIdx}" class="p-4 space-y-3 ${isOpen ? '' : 'hidden'}">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div class="md:col-span-8">
+                        <label class="block text-[11px] font-bold text-gray-700 mb-1">
+                            Bahan Baku <span class="text-rose-500">*</span>
+                        </label>
+                        <select data-searchable name="items[${currentIdx}][product_id]" required onchange="onMaterialProductChange(${currentIdx}, this)" class="w-full text-xs rounded-xl border border-gray-300 py-2 px-3 bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] material-select">
+                            ${productOptions}
+                        </select>
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-[11px] font-bold text-gray-700 mb-1">Catatan Part / Spesifikasi</label>
+                        <input type="text" name="items[${currentIdx}][note]" value="${note}" placeholder="Misal: Warna khusus, grade A..." class="w-full text-xs rounded-xl border border-gray-300 py-2 px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-gray-100">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-700 mb-1">Satuan <span class="text-rose-500">*</span></label>
+                        <select data-searchable name="items[${currentIdx}][uom_id]" id="itemUom_${currentIdx}" required onchange="updateMaterialSummary(${currentIdx})" class="w-full text-xs rounded-xl border border-gray-300 py-2 px-3 bg-white font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
+                            ${uomOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-700 mb-1">Kebutuhan Qty <span class="text-rose-500">*</span></label>
+                        <input type="number" step="any" min="0.0001" name="items[${currentIdx}][quantity]" id="itemQty_${currentIdx}" value="${qty}" required oninput="calculateRowSubtotal(${currentIdx})" class="w-full text-xs text-right rounded-xl border border-gray-300 py-2 px-3 bg-white font-bold font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#15803d]">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-700 mb-1">Estimasi Biaya Satuan</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-semibold text-gray-400 pointer-events-none">Rp</span>
+                            <input type="text" id="display_itemPrice_${currentIdx}" value="${unitPrice > 0 ? Number(unitPrice).toLocaleString('id-ID') : ''}"
+                                   oninput="handleMaterialPriceInput(${currentIdx}, this.value)"
+                                   placeholder="0"
+                                   class="w-full pl-9 pr-3 py-2 text-xs font-bold font-mono text-right border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d]">
+                            <input type="hidden" name="items[${currentIdx}][unit_price]" id="itemPrice_${currentIdx}" value="${unitPrice}">
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
 
-        tbody.appendChild(tr);
+        container.appendChild(card);
         calculateRowSubtotal(currentIdx);
     }
 
@@ -423,8 +553,8 @@
             row.remove();
         }
 
-        const tbody = document.getElementById('materialsTbody');
-        if (tbody.children.length === 0) {
+        const container = document.getElementById('materialsContainer');
+        if (container.children.length === 0) {
             document.getElementById('emptyMaterialsState').classList.remove('hidden');
         }
 
@@ -441,8 +571,10 @@
                 document.getElementById(`itemUom_${idx}`).value = uomId;
             }
             document.getElementById(`itemPrice_${idx}`).value = cost;
+            document.getElementById(`display_itemPrice_${idx}`).value = cost > 0 ? Number(cost).toLocaleString('id-ID') : '';
         } else {
             document.getElementById(`itemPrice_${idx}`).value = 0;
+            document.getElementById(`display_itemPrice_${idx}`).value = '';
         }
 
         calculateRowSubtotal(idx);
@@ -458,20 +590,20 @@
             subtotalEl.innerText = 'Rp ' + Math.round(subtotal).toLocaleString('id-ID');
         }
 
+        updateMaterialSummary(idx);
         recalculateTotals();
     }
 
     function recalculateTotals() {
-        const tbody = document.getElementById('materialsTbody');
+        const rows = document.querySelectorAll('#materialsContainer [id^="materialRow_"]');
         let totalMaterial = 0;
 
-        for (let i = 0; i < tbody.children.length; i++) {
-            const tr = tbody.children[i];
+        rows.forEach(tr => {
             const idx = tr.id.replace('materialRow_', '');
             const qty = parseFloat(document.getElementById(`itemQty_${idx}`)?.value) || 0;
             const price = parseFloat(document.getElementById(`itemPrice_${idx}`)?.value) || 0;
             totalMaterial += (qty * price);
-        }
+        });
 
         const labor = parseFloat(document.getElementById('laborCostInput')?.value) || 0;
         const overhead = parseFloat(document.getElementById('overheadCostInput')?.value) || 0;
@@ -500,13 +632,18 @@
 
         const oldItems = @json(old('items', null));
         if (oldItems && oldItems.length > 0) {
-            oldItems.forEach(item => addMaterialRow(item));
+            const itemsList = Object.values(oldItems);
+            itemsList.forEach((item, index) => {
+                addMaterialRow(item, index === itemsList.length - 1);
+            });
         } else {
             const existingItems = @json($billOfMaterial->items);
             if (existingItems && existingItems.length > 0) {
-                existingItems.forEach(item => addMaterialRow(item));
+                existingItems.forEach((item, idx) => {
+                    addMaterialRow(item, idx === 0);
+                });
             } else {
-                addMaterialRow();
+                addMaterialRow(null, true);
             }
         }
     });

@@ -27,6 +27,10 @@
         min-height: 100vh;
     }
 
+    [x-cloak] {
+        display: none !important;
+    }
+
     .font-mono,
     [data-tabular-num],
     input[type="number"] {

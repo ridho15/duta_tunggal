@@ -321,22 +321,24 @@
                                 {{-- Input Alokasi Pembayaran --}}
                                 <td class="px-3 py-3 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            :max="inv.remaining"
-                                            :name="'allocations[' + inv.id + ']'"
-                                            x-model.number="allocations[inv.id]"
-                                            @input="onAllocationInput(inv.id)"
-                                            :disabled="!isSelected(inv.id)"
-                                            placeholder="0"
-                                            class="w-32 px-2.5 py-1 text-right text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] disabled:bg-gray-100 disabled:text-gray-400 font-semibold text-gray-900"
-                                        >
+                                        <div class="relative w-36">
+                                            <span class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-[10px] font-bold text-gray-400">Rp</span>
+                                            <input
+                                                type="text"
+                                                :value="allocations[inv.id] ? formatRupiah(allocations[inv.id], false) : (allocations[inv.id] === 0 ? '0' : '')"
+                                                @input="allocations[inv.id] = parseRupiah($event.target.value); onAllocationInput(inv.id)"
+                                                @blur="$event.target.value = (allocations[inv.id] ? formatRupiah(allocations[inv.id], false) : (allocations[inv.id] === 0 ? '0' : ''))"
+                                                @focus="if($event.target.value === '0') $event.target.value = ''"
+                                                :disabled="!isSelected(inv.id)"
+                                                placeholder="0"
+                                                class="w-full pl-6 pr-2 py-1 text-right text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] disabled:bg-gray-100 disabled:text-gray-400 font-semibold text-gray-900 font-mono"
+                                            >
+                                            <input type="hidden" :name="'allocations[' + inv.id + ']'" :value="allocations[inv.id] || 0" :disabled="!isSelected(inv.id)">
+                                        </div>
                                         <button
                                             type="button"
                                             @click="payFull(inv.id)"
-                                            class="px-2 py-1 bg-gray-100 hover:bg-emerald-100 text-[#15803d] text-[10px] font-bold rounded border border-gray-200 transition"
+                                            class="px-2 py-1 bg-gray-100 hover:bg-emerald-100 text-[#15803d] text-[10px] font-bold rounded border border-gray-200 transition cursor-pointer"
                                             title="Bayar Penuh Sisa Hutang Ini"
                                         >
                                             Penuh

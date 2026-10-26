@@ -15,7 +15,9 @@
     {{-- Tailwind & App Styles --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    {{-- Alpine.js for lightweight UI interactivity (dropdowns, tabs, modals) --}}
+    {{-- Alpine.js Plugins & Core --}}
+    <style>[x-cloak] { display: none !important; }</style>
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.3/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
 
     @stack('styles')
@@ -43,6 +45,9 @@
 
     {{-- Dropdown ber-pencarian untuk <select data-searchable> (baris item / dibuat lewat JS) --}}
     @include('layouts.partials.select-enhancer')
+
+    {{-- Pemformat Mata Uang Rupiah (Pemisah ribuan & Masking) --}}
+    @include('layouts.partials.currency-enhancer')
 
     @stack('scripts')
 </body>

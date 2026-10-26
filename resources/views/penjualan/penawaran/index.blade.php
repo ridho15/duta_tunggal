@@ -12,7 +12,7 @@
                 <span class="text-gray-300">/</span>
                 <span class="text-gray-500">Penjualan</span>
                 <span class="text-gray-300">/</span>
-                <span class="text-emerald-700 font-bold">Penawaran Harga</span>
+                <span class="text-[#15803d] font-bold">Penawaran Harga</span>
             </nav>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Penawaran Harga (Quotation)</h1>
             <p class="text-xs text-gray-500 mt-1">
@@ -21,7 +21,7 @@
         </div>
         <div class="flex items-center gap-2.5">
             <a href="{{ route('penjualan.so.index') }}"
-               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs">
+               class="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -42,29 +42,29 @@
 
     {{-- KPI Cards --}}
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-        <div class="p-4 bg-white border border-gray-200 rounded-xl shadow-2xs">
+        <div class="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
             <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Penawaran</div>
-            <div class="text-2xl font-black text-gray-900 mt-1">{{ number_format($kpi['total']) }}</div>
+            <div class="text-2xl font-black text-gray-900 mt-1 font-mono">{{ number_format($kpi['total']) }}</div>
             <div class="text-[11px] text-gray-400 mt-0.5">Semua riwayat QO</div>
         </div>
-        <div class="p-4 bg-white border border-gray-200 rounded-xl shadow-2xs">
+        <div class="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
             <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft Disiapkan</div>
-            <div class="text-2xl font-black text-slate-700 mt-1">{{ number_format($kpi['draft']) }}</div>
+            <div class="text-2xl font-black text-slate-700 mt-1 font-mono">{{ number_format($kpi['draft']) }}</div>
             <div class="text-[11px] text-slate-500 mt-0.5">Belum diajukan</div>
         </div>
-        <div class="p-4 border border-amber-200 rounded-xl shadow-2xs bg-amber-50/20">
+        <div class="p-4 border border-amber-200 rounded-2xl shadow-sm bg-amber-50/20">
             <div class="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Menunggu Approval</div>
-            <div class="text-2xl font-black text-amber-700 mt-1">{{ number_format($kpi['menunggu']) }}</div>
+            <div class="text-2xl font-black text-amber-700 mt-1 font-mono">{{ number_format($kpi['menunggu']) }}</div>
             <div class="text-[11px] text-amber-600 mt-0.5">Perlu review atasan</div>
         </div>
-        <div class="p-4 border border-emerald-200 rounded-xl shadow-2xs bg-emerald-50/20">
-            <div class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Disetujui</div>
-            <div class="text-2xl font-black text-emerald-700 mt-1">{{ number_format($kpi['disetujui']) }}</div>
-            <div class="text-[11px] text-emerald-600 mt-0.5 font-medium">Rp {{ number_format($kpi['total_nilai_disetujui'], 0, ',', '.') }}</div>
+        <div class="p-4 border border-[#86efac] rounded-2xl shadow-sm bg-[#f0fdf4]/50">
+            <div class="text-[11px] font-bold text-[#15803d] uppercase tracking-wider">Disetujui</div>
+            <div class="text-2xl font-black text-[#15803d] mt-1 font-mono">{{ number_format($kpi['disetujui']) }}</div>
+            <div class="text-[11px] text-[#15803d] mt-0.5 font-medium font-mono">Rp {{ number_format($kpi['total_nilai_disetujui'], 0, ',', '.') }}</div>
         </div>
-        <div class="p-4 border border-red-200 rounded-xl shadow-2xs bg-red-50/20 col-span-2 md:col-span-1">
+        <div class="p-4 border border-red-200 rounded-2xl shadow-sm bg-red-50/20 col-span-2 md:col-span-1">
             <div class="text-[11px] font-bold text-red-700 uppercase tracking-wider">Kedaluwarsa</div>
-            <div class="text-2xl font-black text-red-600 mt-1">{{ number_format($kpi['kedaluwarsa']) }}</div>
+            <div class="text-2xl font-black text-red-600 mt-1 font-mono">{{ number_format($kpi['kedaluwarsa']) }}</div>
             <div class="text-[11px] text-red-500 mt-0.5">Perlu diterbitkan revisi</div>
         </div>
     </div>
@@ -85,10 +85,10 @@
         @foreach($tabs as $tabKey => $tab)
             @php $isSelected = ($activeTab === $tabKey); @endphp
             <a href="{{ route('penjualan.quotations.index', array_merge(request()->query(), ['tab' => $tabKey, 'page' => 1])) }}"
-               class="text-xs rounded-full px-3.5 py-1.5 whitespace-nowrap transition-all font-semibold flex items-center gap-1.5 {{ $isSelected ? 'bg-emerald-700 text-white border border-emerald-700 font-bold shadow-xs' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50' }}">
+               class="text-xs rounded-full px-3.5 py-1.5 whitespace-nowrap transition-all font-semibold flex items-center gap-1.5 {{ $isSelected ? 'bg-[#15803d] text-white border border-[#15803d] font-bold shadow-sm' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50' }}">
                 <span>{{ $tab['label'] }}</span>
                 @if($tab['count'] > 0)
-                    <span class="rounded-full px-1.5 py-0.2 text-[10px] font-bold {{ $isSelected ? 'bg-white text-emerald-800' : 'bg-gray-100 text-gray-600' }}">
+                    <span class="rounded-full px-1.5 py-0.5 text-[10px] font-bold {{ $isSelected ? 'bg-white text-[#15803d]' : 'bg-gray-100 text-gray-600' }}">
                         {{ $tab['count'] }}
                     </span>
                 @endif
@@ -109,7 +109,7 @@
                     </span>
                     <input type="search" name="search" value="{{ $search }}"
                            placeholder="Cari nomor penawaran, customer, perusahaan..."
-                           class="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600">
+                           class="w-full pl-9 pr-3 py-2 text-xs bg-white border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
                 </div>
             </div>
 
@@ -126,7 +126,7 @@
 
             <div class="min-w-[130px]">
                 <input type="month" name="date" value="{{ $dateFilter }}" onchange="this.form.submit()"
-                       class="w-full py-1.5 px-2.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                       class="w-full py-2 px-2.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
                        title="Filter Bulan">
             </div>
 
@@ -138,8 +138,9 @@
 
             @if($search || $customerId || $dateFilter || $cabangFilter)
                 <a href="{{ route('penjualan.quotations.index', ['tab' => $activeTab]) }}"
-                   class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-lg">
-                    Reset
+                   class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition">
+                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>Reset</span>
                 </a>
             @endif
         </form>
@@ -177,11 +178,11 @@
                         <tr class="hover:bg-gray-50/80 transition-colors group">
                             {{-- No Penawaran & Revisi --}}
                             <td class="py-3 px-4 font-semibold text-gray-900">
-                                <a href="{{ route('penjualan.quotations.show', $qo) }}" class="text-emerald-700 hover:text-emerald-900 hover:underline">
+                                <a href="{{ route('penjualan.quotations.show', $qo) }}" class="text-[#15803d] hover:text-[#166534] hover:underline">
                                     {{ $qo->quotation_number }}
                                 </a>
                                 @if($qo->revision_no > 0)
-                                    <span class="ml-1.5 px-1.5 py-0.2 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-sm border border-blue-200">
+                                    <span class="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200">
                                         Rev {{ $qo->revision_no }}
                                     </span>
                                 @endif
@@ -213,11 +214,11 @@
 
                             {{-- Nilai Total --}}
                             <td class="py-3 px-3 text-right">
-                                <div class="font-black text-gray-900">
+                                <div class="font-black text-gray-900 font-mono">
                                     Rp {{ number_format($qo->total_amount, 0, ',', '.') }}
                                 </div>
                                 @if($qo->currency && $qo->currency->code !== 'IDR')
-                                    <div class="text-[10px] text-gray-500 font-medium">
+                                    <div class="text-[10px] text-gray-500 font-medium font-mono">
                                         {{ $qo->currency->code }} {{ number_format($qo->total_amount / max(1, $qo->exchange_rate), 2) }}
                                     </div>
                                 @endif
@@ -241,19 +242,19 @@
                             <td class="py-3 px-4 text-right">
                                 <div class="inline-flex items-center gap-1.5">
                                     <a href="{{ route('penjualan.quotations.show', $qo) }}"
-                                       class="px-2 py-1 text-[11px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                       class="px-2.5 py-1 text-[11px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm transition"
                                        title="Lihat Detail">
                                         Detail
                                     </a>
                                     <a href="{{ route('penjualan.quotations.pdf', $qo) }}" target="_blank"
-                                       class="px-2 py-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100"
+                                       class="px-2.5 py-1 text-[11px] font-medium text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-xl hover:bg-[#dcfce7] shadow-sm transition"
                                        title="Cetak PDF">
                                         PDF
                                     </a>
                                     @if($qo->isEditable())
                                         @can('update', $qo)
                                         <a href="{{ route('penjualan.quotations.edit', $qo) }}"
-                                           class="px-2 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100"
+                                           class="px-2.5 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 shadow-sm transition"
                                            title="Edit Draft">
                                             Edit
                                         </a>
@@ -262,7 +263,7 @@
                                     @if(is_null($qo->unusableReasonForSaleOrder()))
                                         @can('create', App\Models\SaleOrder::class)
                                         <a href="{{ route('penjualan.quotations.convertToSaleOrder', $qo) }}"
-                                           class="px-2 py-1 text-[11px] font-bold text-white bg-emerald-600 rounded hover:bg-emerald-700"
+                                           class="px-2.5 py-1 text-[11px] font-bold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl shadow-sm transition"
                                            title="Buat Sales Order dari Penawaran Ini">
                                             Buat SO
                                         </a>

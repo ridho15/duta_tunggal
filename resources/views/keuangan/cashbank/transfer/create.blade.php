@@ -5,7 +5,21 @@
 @section('content')
 <div class="space-y-6" x-data="{
     amount: '{{ old('amount', '') }}',
+    amount_display: '{{ old('amount') ? number_format(old('amount'), 0, ',', '.') : '' }}',
     otherCosts: '{{ old('other_costs', 0) }}',
+    otherCosts_display: '{{ old('other_costs') ? number_format(old('other_costs'), 0, ',', '.') : '' }}',
+    onAmountInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : '';
+        this.amount = num;
+        this.amount_display = num ? Number(num).toLocaleString('id-ID') : '';
+    },
+    onOtherCostsInput(rawVal) {
+        const clean = String(rawVal).replace(/\D/g, '');
+        const num = clean ? parseFloat(clean) : 0;
+        this.otherCosts = num;
+        this.otherCosts_display = num > 0 ? Number(num).toLocaleString('id-ID') : '';
+    },
     get totalDikeluarkan() {
         const a = parseFloat(this.amount) || 0;
         const b = parseFloat(this.otherCosts) || 0;
@@ -168,7 +182,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {{-- Nominal Transfer --}}
                 <div>
-                    <label for="amount" class="block text-xs font-semibold text-gray-700 mb-1">
+                    <label for="amount_display" class="block text-xs font-semibold text-gray-700 mb-1">
                         Nominal Transfer (Dana yang Masuk ke Tujuan) <span class="text-rose-500">*</span>
                     </label>
                     <div class="relative">
@@ -176,15 +190,19 @@
                             Rp
                         </span>
                         <input
-                            type="number"
-                            step="any"
-                            min="0.01"
-                            name="amount"
-                            id="amount"
-                            x-model="amount"
+                            type="text"
+                            id="amount_display"
+                            x-model="amount_display"
+                            @input="onAmountInput($event.target.value)"
                             required
                             class="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-gray-900 @error('amount') border-rose-300 bg-rose-50/50 @enderror"
                             placeholder="0"
+                        >
+                        <input
+                            type="hidden"
+                            name="amount"
+                            id="amount"
+                            :value="amount"
                         >
                     </div>
                     @error('amount')
@@ -194,7 +212,7 @@
 
                 {{-- Biaya Administrasi Bank --}}
                 <div>
-                    <label for="other_costs" class="block text-xs font-semibold text-gray-700 mb-1">
+                    <label for="other_costs_display" class="block text-xs font-semibold text-gray-700 mb-1">
                         Biaya Admin Bank / Transfer (Jika Ada)
                     </label>
                     <div class="relative">
@@ -202,14 +220,18 @@
                             Rp
                         </span>
                         <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            name="other_costs"
-                            id="other_costs"
-                            x-model="otherCosts"
+                            type="text"
+                            id="other_costs_display"
+                            x-model="otherCosts_display"
+                            @input="onOtherCostsInput($event.target.value)"
                             class="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-gray-900"
                             placeholder="0"
+                        >
+                        <input
+                            type="hidden"
+                            name="other_costs"
+                            id="other_costs"
+                            :value="otherCosts"
                         >
                     </div>
                 </div>
