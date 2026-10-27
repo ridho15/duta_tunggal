@@ -217,8 +217,59 @@
                     <button type="button" id="btnAddRow"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-xl hover:bg-[#dcfce7] transition shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        <span>Tambah Baris Produk</span>
+                        <span>Tambah Baris Manual</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Quick-Add Search Bar (Non-terikat ke form item baris) -->
+            <div class="relative bg-gradient-to-r from-emerald-50/70 to-teal-50/40 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 transition shadow-xs" id="quickAddContainer">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <label for="quickSearchInput" class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Pencarian Cepat / Scan Barcode Produk</span>
+                    </label>
+                    <span id="quickAddFeedback" class="text-xs font-semibold text-[#15803d] transition-all duration-300 opacity-0 translate-x-1"></span>
+                </div>
+
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input type="text"
+                           id="quickSearchInput"
+                           autocomplete="off"
+                           placeholder="Ketik SKU / nama barang atau tembak barcode scanner..."
+                           class="w-full pl-10 pr-28 py-2.5 text-xs font-medium text-gray-900 bg-white border border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 focus:border-[#15803d] placeholder:text-gray-400 shadow-xs transition">
+                    
+                    <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                        <button type="button"
+                                id="btnQuickAddClear"
+                                onclick="clearQuickSearch()"
+                                class="hidden px-2 py-1 text-[11px] font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+                                title="Bersihkan pencarian">
+                            Bersihkan
+                        </button>
+                        <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10.5px] font-mono font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200 rounded-md">
+                            <svg class="w-3 h-3 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                            </svg>
+                            Scanner Ready
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Dropdown List Hasil Pencarian (Floating) -->
+                <div id="quickSearchResults"
+                     class="hidden absolute left-3 right-3 sm:left-4 sm:right-4 top-full mt-1.5 max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-50 divide-y divide-gray-100">
+                    <!-- Populated dynamically by JS -->
+                </div>
+
+                <div class="mt-2 text-[11px] text-gray-500 flex flex-wrap items-center justify-between gap-2 px-1">
+                    <span>Pilih produk / tekan <b>Enter</b>: otomatis menambah baris di posisi teratas (#1) atau menambah <b>Qty (+1)</b> bila item sudah ada.</span>
+                    <span class="text-gray-400 font-mono text-[10px]">Navigasi: ↑ ↓ Enter · Esc untuk tutup</span>
                 </div>
             </div>
 
@@ -316,11 +367,31 @@
         calculateRow(idx);
     }
 
-    function updateSummary(idx) {
+    function renumberItemRows() {
+        const rows = document.querySelectorAll('#itemsContainer > [id^="row_"]');
+        rows.forEach((row, i) => {
+            const visualNum = i + 1;
+            const badge = row.querySelector('.item-badge-number');
+            if (badge) {
+                badge.innerText = visualNum;
+            }
+            const idx = row.id.replace('row_', '');
+            updateSummary(idx, visualNum);
+        });
+    }
+
+    function updateSummary(idx, visualNum = null) {
         const tr = document.getElementById(`row_${idx}`);
         if (!tr) return;
+
+        if (visualNum === null) {
+            const rows = Array.from(document.querySelectorAll('#itemsContainer > [id^="row_"]'));
+            const foundIdx = rows.indexOf(tr);
+            visualNum = foundIdx >= 0 ? foundIdx + 1 : parseInt(idx);
+        }
+
         const select = tr.querySelector('.product-select');
-        const selectedOption = select.options[select.selectedIndex];
+        const selectedOption = select?.options[select.selectedIndex];
         const qty = parseFloat(tr.querySelector('.item-qty')?.value) || 0;
         const uom = document.getElementById(`uom_${idx}`)?.innerText || 'PCS';
         const subtotalText = document.getElementById(`badge_subtotal_${idx}`)?.innerText || 'Rp 0';
@@ -330,16 +401,16 @@
             if (selectedOption && selectedOption.value) {
                 const sku = selectedOption.dataset.sku ? `[${selectedOption.dataset.sku}] ` : '';
                 const name = selectedOption.text.split('–')[1]?.trim() || selectedOption.text;
-                summaryEl.innerText = `${sku}${name} · ${qty} ${uom} · ${subtotalText}`;
+                summaryEl.innerText = `#${visualNum} · ${sku}${name} · ${qty} ${uom} · ${subtotalText}`;
             } else {
-                summaryEl.innerText = `Item #${idx} — Pilih Produk...`;
+                summaryEl.innerText = `Item #${visualNum} — Pilih Produk...`;
             }
         }
     }
 
-    function addRow(data = {}, isOpen = true) {
+    function addRow(data = {}, isOpen = true, atTop = true) {
         // Auto-collapse older rows when user explicitly clicks add row
-        if (isOpen && rowCounter > 0 && !data.product_id) {
+        if (isOpen && rowCounter > 0) {
             collapseAllRows();
         }
 
@@ -365,12 +436,12 @@
             {{-- Header Accordion --}}
             <div class="flex items-center justify-between px-4 py-3 bg-gray-50/80 cursor-pointer select-none border-b border-gray-100 hover:bg-gray-100/60 transition" onclick="toggleRow(${idx})">
                 <div class="flex items-center gap-3 min-w-0">
-                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#f0fdf4] text-[#15803d] font-bold text-[11px] border border-[#86efac] shrink-0">
-                        ${idx}
+                    <span class="item-badge-number inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#f0fdf4] text-[#15803d] font-bold text-[11px] border border-[#86efac] shrink-0">
+                        1
                     </span>
                     <div class="truncate">
                         <span id="summary_${idx}" class="text-xs font-bold text-gray-800">
-                            Item #${idx} — Pilih Produk...
+                            Item #1 — Pilih Produk...
                         </span>
                     </div>
                 </div>
@@ -461,11 +532,16 @@
             </div>
         `;
 
-        container.appendChild(card);
+        if (atTop && container.firstChild) {
+            container.prepend(card);
+        } else {
+            container.appendChild(card);
+        }
 
         if (data.product_id) {
             onProductChange(idx, false);
         }
+        renumberItemRows();
         calculateRow(idx);
     }
 
@@ -473,6 +549,7 @@
         const row = document.getElementById(`row_${idx}`);
         if (row) {
             row.remove();
+            renumberItemRows();
             calculateAll();
         }
     }
@@ -623,7 +700,255 @@
         handleCustomerChange(this.value);
     });
 
-    document.getElementById('btnAddRow').addEventListener('click', () => addRow({}, true));
+    // --- QUICK-ADD SEARCH PRODUCT ENGINE ---
+    let quickHighlightedIndex = -1;
+    let currentFilteredProducts = [];
+
+    const quickSearchInput = document.getElementById('quickSearchInput');
+    const quickSearchResults = document.getElementById('quickSearchResults');
+    const btnQuickAddClear = document.getElementById('btnQuickAddClear');
+    const quickAddFeedback = document.getElementById('quickAddFeedback');
+    const quickAddContainer = document.getElementById('quickAddContainer');
+
+    function showQuickFeedback(message, isSuccess = true) {
+        if (!quickAddFeedback) return;
+        quickAddFeedback.innerText = message;
+        quickAddFeedback.className = `text-xs font-semibold ${isSuccess ? 'text-[#15803d]' : 'text-amber-700'} transition-all duration-300 opacity-100 translate-x-0`;
+        clearTimeout(quickAddFeedback._timeout);
+        quickAddFeedback._timeout = setTimeout(() => {
+            quickAddFeedback.className = 'text-xs font-semibold text-[#15803d] transition-all duration-300 opacity-0 translate-x-1';
+        }, 3000);
+    }
+
+    function clearQuickSearch() {
+        if (!quickSearchInput) return;
+        quickSearchInput.value = '';
+        if (quickSearchResults) {
+            quickSearchResults.innerHTML = '';
+            quickSearchResults.classList.add('hidden');
+        }
+        if (btnQuickAddClear) btnQuickAddClear.classList.add('hidden');
+        currentFilteredProducts = [];
+        quickHighlightedIndex = -1;
+        quickSearchInput.focus();
+    }
+
+    function renderQuickSearchResults(matches) {
+        currentFilteredProducts = matches;
+        quickHighlightedIndex = matches.length > 0 ? 0 : -1;
+
+        if (!quickSearchResults) return;
+        if (matches.length === 0) {
+            quickSearchResults.innerHTML = `
+                <div class="p-4 text-center text-xs text-gray-500">
+                    Tidak ditemukan produk yang cocok dengan pencarian Anda.
+                </div>
+            `;
+            quickSearchResults.classList.remove('hidden');
+            return;
+        }
+
+        let html = '';
+        matches.slice(0, 25).forEach((p, index) => {
+            const isHighlighted = index === quickHighlightedIndex;
+            html += `
+                <div class="px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition ${isHighlighted ? 'bg-emerald-50/90 text-emerald-950 font-semibold' : 'hover:bg-gray-50 text-gray-800'}"
+                     id="quick-item-${index}"
+                     onclick="selectQuickProduct(${p.id})">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono font-bold text-emerald-700 shrink-0">[${p.sku}]</span>
+                            <span class="truncate font-medium text-gray-900">${p.name}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200">${p.uom || 'PCS'}</span>
+                        <span class="font-mono font-bold text-[#15803d]">Rp ${formatNumber(p.sell_price)}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        quickSearchResults.innerHTML = html;
+        quickSearchResults.classList.remove('hidden');
+    }
+
+    function highlightQuickItem(index) {
+        if (!quickSearchResults || currentFilteredProducts.length === 0) return;
+        const total = Math.min(currentFilteredProducts.length, 25);
+        if (index < 0) index = total - 1;
+        if (index >= total) index = 0;
+        quickHighlightedIndex = index;
+
+        for (let i = 0; i < total; i++) {
+            const el = document.getElementById(`quick-item-${i}`);
+            if (el) {
+                if (i === quickHighlightedIndex) {
+                    el.className = 'px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition bg-emerald-50/90 text-emerald-950 font-semibold';
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.className = 'px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition hover:bg-gray-50 text-gray-800';
+                }
+            }
+        }
+    }
+
+    function flashRowHighlight(idx) {
+        const row = document.getElementById(`row_${idx}`);
+        if (!row) return;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('ring-2', 'ring-emerald-500', 'bg-emerald-50/60');
+        setTimeout(() => {
+            row.classList.remove('ring-2', 'ring-emerald-500', 'bg-emerald-50/60');
+        }, 1200);
+    }
+
+    function selectQuickProduct(productId) {
+        const product = productsCatalog.find(p => p.id == productId);
+        if (!product) return;
+
+        const container = document.getElementById('itemsContainer');
+        const rows = document.querySelectorAll('#itemsContainer > [id^="row_"]');
+        let targetRowIdx = null;
+        let targetRowEl = null;
+        let isExistingProduct = false;
+        let emptyRowIdx = null;
+        let emptyRowEl = null;
+
+        rows.forEach(row => {
+            const idx = row.id.replace('row_', '');
+            const sel = row.querySelector('.product-select');
+            if (sel) {
+                if (sel.value == product.id) {
+                    targetRowIdx = idx;
+                    targetRowEl = row;
+                    isExistingProduct = true;
+                } else if (!sel.value && emptyRowIdx === null) {
+                    emptyRowIdx = idx;
+                    emptyRowEl = row;
+                }
+            }
+        });
+
+        if (isExistingProduct && targetRowIdx !== null) {
+            // Produk sudah ada -> Naikkan kuantitas +1
+            const qtyInput = targetRowEl.querySelector('.item-qty');
+            if (qtyInput) {
+                const curQty = parseFloat(qtyInput.value) || 0;
+                const newQty = curQty + 1;
+                qtyInput.value = newQty;
+            }
+
+            // PINDAHKAN KARTU KE PALING ATAS
+            collapseAllRows();
+            container.prepend(targetRowEl);
+            const body = document.getElementById(`card_body_${targetRowIdx}`);
+            const chevron = document.getElementById(`chevron_${targetRowIdx}`);
+            body?.classList.remove('hidden');
+            chevron?.classList.add('rotate-180');
+
+            renumberItemRows();
+            calculateRow(targetRowIdx);
+            flashRowHighlight(targetRowIdx);
+            const uom = document.getElementById(`uom_${targetRowIdx}`)?.innerText || product.uom;
+            const finalQty = qtyInput ? qtyInput.value : 1;
+            showQuickFeedback(`+1 ${product.sku} (Dipindahkan ke posisi #1 · Total: ${finalQty} ${uom})`, true);
+
+        } else if (emptyRowIdx !== null) {
+            // Ada baris kosong bawaan -> Isi dan letakkan di posisi teratas
+            collapseAllRows();
+            container.prepend(emptyRowEl);
+            const body = document.getElementById(`card_body_${emptyRowIdx}`);
+            const chevron = document.getElementById(`chevron_${emptyRowIdx}`);
+            body?.classList.remove('hidden');
+            chevron?.classList.add('rotate-180');
+
+            const sel = emptyRowEl.querySelector('.product-select');
+            if (sel) {
+                sel.value = product.id;
+                onProductChange(emptyRowIdx, true);
+            }
+            renumberItemRows();
+            flashRowHighlight(emptyRowIdx);
+            showQuickFeedback(`Item [${product.sku}] dimasukkan ke posisi teratas (#1)`, true);
+
+        } else {
+            // Tambahkan baris baru di posisi paling atas (atTop = true)
+            addRow({
+                product_id: product.id,
+                quantity: 1,
+                unit_price: product.sell_price,
+                uom: product.uom
+            }, true, true);
+
+            renumberItemRows();
+            const newIdx = rowCounter;
+            flashRowHighlight(newIdx);
+            showQuickFeedback(`Item [${product.sku}] ditambahkan di posisi teratas (#1)`, true);
+        }
+
+        clearQuickSearch();
+    }
+
+    if (quickSearchInput) {
+        quickSearchInput.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            if (btnQuickAddClear) {
+                btnQuickAddClear.classList.toggle('hidden', query.length === 0);
+            }
+            if (!query) {
+                if (quickSearchResults) quickSearchResults.classList.add('hidden');
+                currentFilteredProducts = [];
+                quickHighlightedIndex = -1;
+                return;
+            }
+
+            const matches = productsCatalog.filter(p => {
+                const sku = (p.sku || '').toLowerCase();
+                const name = (p.name || '').toLowerCase();
+                return sku.includes(query) || name.includes(query);
+            });
+
+            renderQuickSearchResults(matches);
+        });
+
+        quickSearchInput.addEventListener('keydown', function (e) {
+            const query = this.value.trim().toLowerCase();
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightQuickItem(quickHighlightedIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightQuickItem(quickHighlightedIndex - 1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const exactSku = productsCatalog.find(p => (p.sku || '').toLowerCase() === query);
+                if (exactSku) {
+                    selectQuickProduct(exactSku.id);
+                    return;
+                }
+                if (quickHighlightedIndex >= 0 && currentFilteredProducts[quickHighlightedIndex]) {
+                    selectQuickProduct(currentFilteredProducts[quickHighlightedIndex].id);
+                    return;
+                }
+                if (currentFilteredProducts.length > 0) {
+                    selectQuickProduct(currentFilteredProducts[0].id);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                clearQuickSearch();
+            }
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        if (quickAddContainer && !quickAddContainer.contains(e.target)) {
+            if (quickSearchResults) quickSearchResults.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('btnAddRow').addEventListener('click', () => addRow({}, true, true));
 
     // Initialize with old items or 1 default row on load
     document.addEventListener('DOMContentLoaded', () => {
@@ -631,11 +956,12 @@
             const oldItems = @json(old('items'));
             const itemsList = Object.values(oldItems);
             itemsList.forEach((item, index) => {
-                addRow(item, index === itemsList.length - 1);
+                addRow(item, index === itemsList.length - 1, false);
             });
         @else
-            addRow({}, true);
+            addRow({}, true, false);
         @endif
+        renumberItemRows();
     });
 </script>
 @endsection

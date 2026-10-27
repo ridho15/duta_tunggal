@@ -95,7 +95,7 @@
                                 {{ $t['badge'] }}
                             </span>
                         </div>
-                        <p class="text-[11px] mt-0.5 {{ $isActive ? 'text-emerald-800' : 'text-gray-400' }} leading-tight line-clamp-2">
+                        <p class="text-[11px] mt-0.5 {{ $isActive ? 'text-[#166534]' : 'text-gray-400' }} leading-tight line-clamp-2">
                             {{ $t['desc'] }}
                         </p>
                     </div>

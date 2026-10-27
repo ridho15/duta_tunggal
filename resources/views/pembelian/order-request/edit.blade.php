@@ -2,6 +2,32 @@
 
 @section('title', 'Ubah Permintaan Pembelian (' . $orderRequest->request_number . ') – Duta Tunggal ERP')
 
+@php
+    $defaultCurrencyId = (int) ($orderRequest->currency_id ?? 1);
+    $initialOldItems = old('items', $orderRequest->orderRequestItem->map(function ($item) use ($preloadedProducts, $defaultCurrencyId) {
+        $p = $preloadedProducts->get($item->product_id);
+        return [
+            'product_id' => $item->product_id,
+            'product_name' => $p['name'] ?? ($item->product?->name ?? ''),
+            'product_sku' => $p['sku'] ?? ($item->product?->sku ?? ''),
+            'search_query' => $p['label'] ?? ($item->product ? "({$item->product->sku}) {$item->product->name}" : ''),
+            'uom' => $p['uom'] ?? ($item->product?->uom?->abbreviation ?? $item->product?->uom?->name ?? 'Pcs'),
+            'cabang_id' => $item->cabang_id,
+            'currency_id' => $item->currency_id ?? $defaultCurrencyId,
+            'supplier_id' => $item->supplier_id,
+            'quantity' => (float)$item->quantity,
+            'original_price' => (float)($item->original_price ?? $item->unit_price),
+            'unit_price' => (float)$item->unit_price,
+            'discount' => (float)($item->discount ?? 0),
+            'tipe_pajak' => $item->tipe_pajak ?? 'eklusif',
+            'tax' => (float)($item->tax ?? 11),
+            'note' => $item->note,
+            'recommended_supplier_text' => $p['recommended_supplier']['label'] ?? '',
+            'recommended_supplier_id' => $p['recommended_supplier']['id'] ?? null,
+        ];
+    }));
+@endphp
+
 @section('content')
 <div 
     class="space-y-6 max-w-7xl mx-auto pb-16"
@@ -9,31 +35,10 @@
         cabangs: {{ Js::from($cabangs->map(fn($c) => ['id' => $c->id, 'nama' => $c->nama, 'kode' => $c->kode ?? ''])) }},
         currencies: {{ Js::from($currencies->map(fn($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name, 'symbol' => $c->symbol])) }},
         defaultCabangId: {{ (int) $orderRequest->cabang_id }},
-        defaultCurrencyId: {{ (int) ($orderRequest->currency_id ?? 1) }},
+        defaultCurrencyId: {{ $defaultCurrencyId }},
         productsSearchUrl: '{{ route('pembelian.products.search') }}',
         suppliersSearchUrl: '{{ route('pembelian.suppliers.search') }}',
-        oldItems: {{ Js::from(old('items', $orderRequest->orderRequestItem->map(function ($item) use ($preloadedProducts) {
-            $p = $preloadedProducts->get($item->product_id);
-            return [
-                'product_id' => $item->product_id,
-                'product_name' => $p['name'] ?? ($item->product?->name ?? ''),
-                'product_sku' => $p['sku'] ?? ($item->product?->sku ?? ''),
-                'search_query' => $p['label'] ?? ($item->product ? "({$item->product->sku}) {$item->product->name}" : ''),
-                'uom' => $p['uom'] ?? ($item->product?->uom?->abbreviation ?? $item->product?->uom?->name ?? 'Pcs'),
-                'cabang_id' => $item->cabang_id,
-                'currency_id' => $item->currency_id ?? $orderRequest->currency_id,
-                'supplier_id' => $item->supplier_id,
-                'quantity' => (float)$item->quantity,
-                'original_price' => (float)($item->original_price ?? $item->unit_price),
-                'unit_price' => (float)$item->unit_price,
-                'discount' => (float)($item->discount ?? 0),
-                'tipe_pajak' => $item->tipe_pajak ?? 'eklusif',
-                'tax' => (float)($item->tax ?? 11),
-                'note' => $item->note,
-                'recommended_supplier_text' => $p['recommended_supplier']['label'] ?? '',
-                'recommended_supplier_id' => $p['recommended_supplier']['id'] ?? null,
-            ];
-        }))) }}
+        oldItems: {{ Js::from($initialOldItems) }}
     })"
 >
     {{-- Header Breadcrumb & Actions --}}
@@ -227,7 +232,8 @@
                     </button>
                     <button
                         type="button"
-                        @click="addRow()"
+                        @click="addRow(true)"
+                        id="btnAddRow"
                         class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition active:scale-[0.98] cursor-pointer shadow-xs border border-emerald-200"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,6 +241,98 @@
                         </svg>
                         + Tambah Baris Barang
                     </button>
+                </div>
+            </div>
+
+            <!-- Quick-Add Search Bar (Non-terikat ke form item baris) -->
+            <div class="relative bg-gradient-to-r from-emerald-50/70 to-teal-50/40 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 transition shadow-xs" id="quickAddContainer">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <label for="quickSearchInput" class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Pencarian Cepat / Scan Barcode Produk</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Scanner Ready</span>
+                    </label>
+                    <span x-text="quickFeedback"
+                          :class="quickFeedback ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-1'"
+                          id="quickAddFeedback"
+                          class="text-xs font-semibold text-[#15803d] transition-all duration-300"></span>
+                </div>
+
+                <div class="relative" @click.outside="quickSearchResults = []">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input type="text"
+                           id="quickSearchInput"
+                           x-model="quickSearchQuery"
+                           @input="onQuickSearchInput()"
+                           @keydown.arrow-down.prevent="highlightNextQuick()"
+                           @keydown.arrow-up.prevent="highlightPrevQuick()"
+                           @keydown.enter.prevent="selectHighlightedQuick()"
+                           @keydown.escape.prevent="clearQuickSearch()"
+                           autocomplete="off"
+                           placeholder="Ketik SKU / nama barang atau tembak barcode scanner..."
+                           class="w-full pl-10 pr-28 py-2.5 text-xs font-medium text-gray-900 bg-white border border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 focus:border-[#15803d] placeholder:text-gray-400 shadow-xs transition">
+                    
+                    <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                        <button type="button"
+                                id="btnQuickAddClear"
+                                x-show="quickSearchQuery.length > 0"
+                                @click="clearQuickSearch()"
+                                class="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
+                                title="Bersihkan">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                        <span class="px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200 rounded-md select-none hidden sm:inline-block">
+                            ENTER ↵
+                        </span>
+                    </div>
+
+                    <!-- Dropdown Auto-Suggest Results (Floating) -->
+                    <div id="quickSearchResults"
+                         x-show="quickSearchResults.length > 0 || isQuickSearching"
+                         x-transition
+                         class="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden max-h-72 overflow-y-auto divide-y divide-gray-100">
+                        <template x-if="isQuickSearching">
+                            <div class="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                <svg class="animate-spin h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Mencari produk...</span>
+                            </div>
+                        </template>
+
+                        <template x-for="(p, pIdx) in quickSearchResults" :key="p.id">
+                            <div class="px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition"
+                                 :class="pIdx === quickHighlightedIndex ? 'bg-emerald-50/90 text-emerald-950 font-semibold' : 'hover:bg-gray-50 text-gray-800'"
+                                 :id="'quick-result-' + pIdx"
+                                 @click="selectQuickProduct(p)">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono font-bold text-emerald-700 shrink-0" x-text="'[' + (p.sku || '-') + ']'"></span>
+                                        <span class="truncate font-medium text-gray-900" x-text="p.name"></span>
+                                    </div>
+                                    <template x-if="p.recommended_supplier">
+                                        <div class="text-[10.5px] text-gray-500 mt-0.5 truncate flex items-center gap-1">
+                                            <span>Rekomendasi Rekanan:</span>
+                                            <span class="font-medium text-gray-700" x-text="p.recommended_supplier.label"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex items-center gap-3 shrink-0">
+                                    <span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200" x-text="p.uom || 'Pcs'"></span>
+                                    <span class="font-mono font-bold text-[#15803d]" x-text="formatRupiah(p.cost_price || (p.recommended_supplier ? p.recommended_supplier.price : 0))"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                    <span>💡 <em>Klik produk atau tekan Enter untuk menambah/menaikkan kuantitas item di posisi paling atas (#1).</em></span>
+                    <span class="text-[10px] text-gray-400 hidden md:inline">Gunakan panah ↑/↓ untuk navigasi</span>
                 </div>
             </div>
 
@@ -706,11 +804,20 @@ function orderRequestForm(config) {
         productsSearchUrl: config.productsSearchUrl,
         suppliersSearchUrl: config.suppliersSearchUrl,
 
+        // Quick-Add Search Bar State
+        quickSearchQuery: '',
+        quickSearchResults: [],
+        isQuickSearching: false,
+        quickHighlightedIndex: -1,
+        quickSearchTimeout: null,
+        quickFeedback: '',
+        quickFeedbackTimeout: null,
+
         init() {
             if (config.oldItems && config.oldItems.length > 0) {
                 this.items = config.oldItems.map((item, idx) => this.createItem(item, idx === 0));
             } else {
-                this.addRow();
+                this.addRow(false);
             }
         },
 
@@ -920,10 +1027,128 @@ function orderRequestForm(config) {
             };
         },
 
-        addRow() {
+        addRow(atTop = true) {
             // Auto-collapse item sebelumnya agar tetap rapi seperti Filament
             this.items.forEach(it => it.isOpen = false);
-            this.items.push(this.createItem({}, true));
+            const newItem = this.createItem({}, true);
+            if (atTop) {
+                this.items.unshift(newItem);
+            } else {
+                this.items.push(newItem);
+            }
+        },
+
+        // --- Quick-Add Search Engine Methods ---
+        showQuickFeedback(msg) {
+            this.quickFeedback = msg;
+            if (this.quickFeedbackTimeout) clearTimeout(this.quickFeedbackTimeout);
+            this.quickFeedbackTimeout = setTimeout(() => {
+                this.quickFeedback = '';
+            }, 3000);
+        },
+
+        clearQuickSearch() {
+            this.quickSearchQuery = '';
+            this.quickSearchResults = [];
+            this.isQuickSearching = false;
+            this.quickHighlightedIndex = -1;
+            if (this.quickSearchTimeout) clearTimeout(this.quickSearchTimeout);
+            this.$nextTick(() => {
+                const el = document.getElementById('quickSearchInput');
+                if (el) el.focus();
+            });
+        },
+
+        onQuickSearchInput() {
+            if (this.quickSearchTimeout) clearTimeout(this.quickSearchTimeout);
+            const q = (this.quickSearchQuery || '').trim();
+            if (q.length < 1) {
+                this.quickSearchResults = [];
+                this.isQuickSearching = false;
+                this.quickHighlightedIndex = -1;
+                return;
+            }
+
+            this.isQuickSearching = true;
+            this.quickSearchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`${this.productsSearchUrl}?q=${encodeURIComponent(q)}&cabang_id=${this.headerCabangId || ''}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        this.quickSearchResults = data.products || [];
+                        this.quickHighlightedIndex = this.quickSearchResults.length > 0 ? 0 : -1;
+                    }
+                } catch (e) {
+                    console.error('Error in Quick-Add search:', e);
+                } finally {
+                    this.isQuickSearching = false;
+                }
+            }, 250);
+        },
+
+        highlightNextQuick() {
+            if (this.quickSearchResults.length === 0) return;
+            this.quickHighlightedIndex = (this.quickHighlightedIndex + 1) % this.quickSearchResults.length;
+            this.scrollQuickItemIntoView();
+        },
+
+        highlightPrevQuick() {
+            if (this.quickSearchResults.length === 0) return;
+            this.quickHighlightedIndex = (this.quickHighlightedIndex - 1 + this.quickSearchResults.length) % this.quickSearchResults.length;
+            this.scrollQuickItemIntoView();
+        },
+
+        scrollQuickItemIntoView() {
+            this.$nextTick(() => {
+                const el = document.getElementById(`quick-result-${this.quickHighlightedIndex}`);
+                if (el) el.scrollIntoView({ block: 'nearest' });
+            });
+        },
+
+        selectHighlightedQuick() {
+            if (this.quickHighlightedIndex >= 0 && this.quickSearchResults[this.quickHighlightedIndex]) {
+                this.selectQuickProduct(this.quickSearchResults[this.quickHighlightedIndex]);
+            } else if (this.quickSearchResults.length > 0) {
+                this.selectQuickProduct(this.quickSearchResults[0]);
+            }
+        },
+
+        selectQuickProduct(p) {
+            if (!p || !p.id) return;
+
+            // Cari apakah produk sudah ada di daftar item
+            const existingIndex = this.items.findIndex(it => String(it.productId) === String(p.id));
+
+            if (existingIndex >= 0) {
+                // Produk sudah ada -> Tambah kuantitas +1 dan PINDAHKAN KE POSISI PALING ATAS (Index 0 / #1)
+                const existingItem = this.items[existingIndex];
+                existingItem.quantity = (parseFloat(existingItem.quantity) || 0) + 1;
+
+                this.items.splice(existingIndex, 1);
+                this.collapseAll();
+                existingItem.isOpen = true;
+                this.items.unshift(existingItem);
+
+                const uom = existingItem.uom || 'Pcs';
+                this.showQuickFeedback(`+1 [${p.sku || '-'}] (Dipindahkan ke posisi #1 · Total: ${existingItem.quantity} ${uom})`);
+            } else if (this.items.length === 1 && !this.items[0].productId) {
+                // Ada 1 baris kosong bawaan di paling atas -> Pakai baris tersebut
+                this.selectProduct(this.items[0], p);
+                this.items[0].quantity = 1;
+                this.items[0].isOpen = true;
+                this.showQuickFeedback(`Item [${p.sku || '-'}] dimasukkan ke posisi teratas (#1)`);
+            } else {
+                // Item baru -> Buat item baru dan masukkan ke paling atas (unshift)
+                this.collapseAll();
+                const newItem = this.createItem({}, true);
+                this.selectProduct(newItem, p);
+                newItem.quantity = 1;
+                newItem.isOpen = true;
+                this.items.unshift(newItem);
+                this.showQuickFeedback(`Item [${p.sku || '-'}] ditambahkan di posisi teratas (#1)`);
+            }
+
+            this.clearQuickSearch();
         },
 
         collapseAll() {

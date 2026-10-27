@@ -34,10 +34,10 @@
         @foreach($tabs as $tabKey => $tab)
             @php $isSelected = ($activeTab === $tabKey); @endphp
             <a href="{{ route('penjualan.so.index', array_merge(request()->query(), ['tab' => $tabKey, 'page' => 1])) }}"
-               class="text-xs sm:text-[13px] rounded-full px-3.5 py-2 whitespace-nowrap transition-all font-semibold flex items-center gap-1.5 {{ $isSelected ? 'bg-emerald-700 text-white border border-emerald-700 font-bold shadow-sm' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50' }}">
+               class="text-xs sm:text-[13px] rounded-full px-3.5 py-2 whitespace-nowrap transition-all font-semibold flex items-center gap-1.5 {{ $isSelected ? 'bg-[#15803d] text-white border border-[#15803d] font-bold shadow-sm' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50' }}">
                 <span>{{ $tab['label'] }}</span>
                 @if($tab['count'] > 0)
-                    <span class="rounded-full px-1.5 py-0.2 text-[11px] font-bold {{ $isSelected ? 'bg-white text-emerald-800' : 'bg-gray-100 text-gray-600' }}">
+                    <span class="rounded-full px-1.5 py-0.5 text-[11px] font-bold {{ $isSelected ? 'bg-white text-[#15803d]' : 'bg-gray-100 text-gray-600' }}">
                         {{ $tab['count'] }}
                     </span>
                 @endif
@@ -51,13 +51,13 @@
         <form method="GET" action="{{ route('penjualan.so.index') }}" class="flex flex-wrap gap-2.5 items-center p-3.5 sm:p-4 border-b border-gray-100 bg-gray-50/50">
             <input type="hidden" name="tab" value="{{ $activeTab }}">
 
-            <label class="flex-1 min-w-[240px] flex items-center gap-2 border border-gray-300 rounded-xl px-3 py-2 bg-white focus-within:border-emerald-600 focus-within:ring-1 focus-within:ring-emerald-600 transition-all">
+            <label class="flex-1 min-w-[240px] flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white focus-within:border-[#15803d] focus-within:ring-1 focus-within:ring-[#15803d] transition-all">
                 <svg class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                 <input type="search" name="search" value="{{ $search }}" placeholder="Cari nomor SO, customer, atau produk" class="border-none outline-none text-sm w-full bg-transparent text-gray-800 placeholder-gray-400">
             </label>
 
             <!-- Filter Bulan / Tanggal -->
-            <select name="date" onchange="this.form.submit()" class="text-xs sm:text-[13px] font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:border-emerald-600 cursor-pointer">
+            <select name="date" onchange="this.form.submit()" class="text-xs sm:text-[13px] font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] cursor-pointer">
                 <option value="">Semua Periode</option>
                 <option value="{{ now()->format('Y-m') }}" {{ request('date') === now()->format('Y-m') ? 'selected' : '' }}>Bulan Ini ({{ now()->translatedFormat('M Y') }})</option>
                 <option value="{{ now()->subMonth()->format('Y-m') }}" {{ request('date') === now()->subMonth()->format('Y-m') ? 'selected' : '' }}>Bulan Lalu ({{ now()->subMonth()->translatedFormat('M Y') }})</option>
@@ -103,28 +103,28 @@
                             // Tentukan status badge berstandar dot indicator
                             $statusConfig = match($so->status) {
                                 'request_approve' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Perlu Approval'],
-                                'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Siap buat DO'],
-                                'confirmed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Dikonfirmasi'],
+                                'approved' => ['badge' => 'bg-emerald-50 text-[#15803d] border-[#15803d]/30', 'dot' => 'bg-[#15803d]', 'label' => 'Siap buat DO'],
+                                'confirmed' => ['badge' => 'bg-emerald-50 text-[#15803d] border-[#15803d]/30', 'dot' => 'bg-[#15803d]', 'label' => 'Dikonfirmasi'],
                                 'partially_delivered' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Sebagian DO'],
                                 'received' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Diterima Customer'],
-                                'completed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai'],
+                                'completed' => ['badge' => 'bg-emerald-50 text-[#15803d] border-[#15803d]/30', 'dot' => 'bg-[#15803d]', 'label' => 'Selesai'],
                                 'reject' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak · Revisi'],
                                 default => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($so->status)],
                             };
                         @endphp
                         <tr class="hover:bg-gray-50/60 transition">
                             <td class="py-3 px-4">
-                                <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold text-gray-900 hover:text-emerald-700 transition-colors">
+                                <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold font-mono text-gray-900 hover:text-[#15803d] transition-colors">
                                     {{ $so->so_number }}
                                 </a>
                                 <div class="text-xs text-gray-400 mt-0.5">
-                                    {{ $so->order_date ? $so->order_date->format('d M') : '-' }} · {{ $so->createdBy->name ?? 'Sales' }}
+                                    <span class="font-mono">{{ $so->order_date ? $so->order_date->format('d M') : '-' }}</span> · {{ $so->createdBy->name ?? 'Sales' }}
                                 </div>
                             </td>
                             <td class="py-3 px-3 font-medium text-gray-800">
                                 {{ $so->customer?->name ?? '-' }}
                             </td>
-                            <td class="py-3 px-3 text-right font-semibold text-gray-900">
+                            <td class="py-3 px-3 text-right font-semibold font-mono text-gray-900">
                                 Rp {{ number_format($so->grandTotal(), 0, ',', '.') }}
                             </td>
                             <td class="py-3 px-3 whitespace-nowrap">
@@ -135,9 +135,9 @@
                             </td>
                             <td class="py-3 px-3 text-xs text-gray-600 min-w-[110px]">
                                 @if($ordered > 0)
-                                    <div>{{ round($ordered - $available) }}/{{ round($ordered) }} pcs</div>
+                                    <div><span class="font-mono">{{ round($ordered - $available) }}/{{ round($ordered) }}</span> pcs</div>
                                     <div class="h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden w-24">
-                                        <div class="h-full bg-emerald-600 rounded-full" style="width: {{ $pct }}%"></div>
+                                        <div class="h-full bg-[#15803d] rounded-full" style="width: {{ $pct }}%"></div>
                                     </div>
                                 @else
                                     <span class="text-gray-400">–</span>
@@ -146,33 +146,33 @@
                             <td class="py-3 px-4 text-right whitespace-nowrap">
                                 <div class="inline-flex items-center gap-1.5">
                                     @if($so->status === 'request_approve')
-                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-bold px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-colors">
+                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Approve
                                         </a>
                                     @elseif($so->status === 'draft')
-                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl shadow-sm transition-colors">
                                             Lanjutkan
                                         </a>
                                     @elseif(in_array($so->status, ['approved', 'confirmed', 'partially_delivered']) && $available > 0)
-                                        <a href="{{ route('penjualan.do.create', ['so_id' => $so->id]) }}" class="text-xs font-bold px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-colors">
+                                        <a href="{{ route('penjualan.do.create', ['so_id' => $so->id]) }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Buat DO
                                         </a>
                                     @elseif($so->status === 'received')
-                                        <a href="{{ route('penjualan.invoices.index') }}" class="text-xs font-bold px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-colors">
+                                        <a href="{{ route('penjualan.invoices.index') }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Buat Invoice
                                         </a>
                                     @elseif($so->status === 'reject')
-                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-red-300 text-red-700 hover:bg-red-50 rounded-lg transition-colors">
+                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-xl shadow-sm transition-colors">
                                             Revisi
                                         </a>
                                     @else
-                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl shadow-sm transition-colors">
                                             Detail
                                         </a>
                                     @endif
 
                                     <!-- Dropdown Menu / PDF Link -->
-                                    <a href="{{ route('pdf-stream', ['type' => 'sale-order', 'id' => $so->id]) }}" target="_blank" title="Cetak PDF SO" class="p-1.5 text-gray-500 hover:text-emerald-700 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <a href="{{ route('pdf-stream', ['type' => 'sale-order', 'id' => $so->id]) }}" target="_blank" title="Cetak PDF SO" class="p-1.5 text-gray-500 hover:text-[#15803d] hover:bg-gray-100 rounded-xl transition-colors">
                                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                                     </a>
                                 </div>
@@ -202,18 +202,18 @@
 
                     $statusConfigMob = match($so->status) {
                         'request_approve' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Perlu atasan'],
-                        'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Siap DO'],
-                        'confirmed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Dikonfirmasi'],
+                        'approved' => ['badge' => 'bg-emerald-50 text-[#15803d] border-[#15803d]/30', 'dot' => 'bg-[#15803d]', 'label' => 'Siap DO'],
+                        'confirmed' => ['badge' => 'bg-emerald-50 text-[#15803d] border-[#15803d]/30', 'dot' => 'bg-[#15803d]', 'label' => 'Dikonfirmasi'],
                         'partially_delivered' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Sebagian DO'],
                         'received' => ['badge' => 'bg-blue-50 text-blue-700 border-blue-200', 'dot' => 'bg-blue-500', 'label' => 'Diterima'],
-                        'completed' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Selesai'],
+                        'completed' => ['badge' => 'bg-emerald-50 text-[#15803d] border-[#15803d]/30', 'dot' => 'bg-[#15803d]', 'label' => 'Selesai'],
                         'reject' => ['badge' => 'bg-rose-50 text-rose-700 border-rose-200', 'dot' => 'bg-rose-500', 'label' => 'Ditolak'],
                         default => ['badge' => 'bg-gray-50 text-gray-700 border-gray-200', 'dot' => 'bg-gray-400', 'label' => ucfirst($so->status)],
                     };
                 @endphp
                 <div class="p-4 hover:bg-gray-50/80 transition-colors">
                     <div class="flex justify-between items-center">
-                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold text-gray-900 text-base">
+                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold font-mono text-gray-900 text-base">
                             {{ $so->so_number }}
                         </a>
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $statusConfigMob['badge'] }}">
@@ -226,19 +226,19 @@
                     </div>
 
                     @if($ordered > 0)
-                        <div class="text-[11.5px] text-gray-500 mt-2">
-                            Terkirim {{ round($ordered - $available) }} dari {{ round($ordered) }} pcs
+                        <div class="text-xs text-gray-500 mt-2">
+                            Terkirim <span class="font-mono">{{ round($ordered - $available) }}</span> dari <span class="font-mono">{{ round($ordered) }}</span> pcs
                         </div>
                         <div class="h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
-                            <div class="h-full bg-emerald-600 rounded-full" style="width: {{ $pct }}%"></div>
+                            <div class="h-full bg-[#15803d] rounded-full" style="width: {{ $pct }}%"></div>
                         </div>
                     @endif
 
                     <div class="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                        <span class="text-sm font-extrabold text-gray-900">
+                        <span class="text-sm font-extrabold font-mono text-gray-900">
                             Rp {{ number_format($so->grandTotal(), 0, ',', '.') }}
                         </span>
-                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-bold px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-colors">
+                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                             Lihat SO ›
                         </a>
                     </div>

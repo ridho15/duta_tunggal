@@ -101,13 +101,66 @@
                     <span>2. Daftar Barang yang Dipindahkan</span>
                 </h2>
                 <button type="button"
-                        onclick="addItemRow()"
+                        onclick="addItemRow(null, true)"
+                        id="btnAddRow"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#15803d] bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition shadow-sm">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M12 4v16m8-8H4" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
                     <span>Tambah Baris</span>
                 </button>
+            </div>
+
+            <!-- Quick-Add Search Bar (Non-terikat ke form item baris) -->
+            <div class="relative bg-gradient-to-r from-emerald-50/70 to-teal-50/40 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 transition shadow-xs" id="quickAddContainer">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <label for="quickSearchInput" class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Pencarian Cepat / Scan Barcode Produk</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">Scanner Ready</span>
+                    </label>
+                    <span id="quickAddFeedback"
+                          class="text-xs font-semibold text-[#15803d] opacity-0 transition-all duration-300"></span>
+                </div>
+
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input type="text"
+                           id="quickSearchInput"
+                           oninput="onQuickSearchInput()"
+                           onkeydown="handleQuickSearchKeydown(event)"
+                           autocomplete="off"
+                           placeholder="Ketik SKU / nama barang atau tembak barcode scanner..."
+                           class="w-full pl-10 pr-28 py-2.5 text-xs font-medium text-gray-900 bg-white border border-emerald-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 focus:border-[#15803d] placeholder:text-gray-400 shadow-xs transition">
+                    
+                    <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                        <button type="button"
+                                id="btnQuickAddClear"
+                                onclick="clearQuickSearch()"
+                                style="display: none;"
+                                class="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
+                                title="Bersihkan">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                        <span class="px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-200 rounded-md select-none hidden sm:inline-block">
+                            ENTER ↵
+                        </span>
+                    </div>
+
+                    <!-- Dropdown Auto-Suggest Results (Floating) -->
+                    <div id="quickSearchResults"
+                         style="display: none;"
+                         class="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden max-h-72 overflow-y-auto divide-y divide-gray-100">
+                    </div>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                    <span>💡 <em>Klik produk atau tekan Enter untuk menambah/menaikkan kuantitas item di posisi paling atas (#1).</em></span>
+                    <span class="text-[10px] text-gray-400 hidden md:inline">Gunakan panah ↑/↓ untuk navigasi</span>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -166,6 +219,230 @@
     let toWarehouseRaks = [];
     let rowIndex = 0;
 
+    // Quick-Add State
+    let quickHighlightedIndex = -1;
+    let filteredQuickProducts = [];
+    let quickFeedbackTimeout = null;
+
+    function showQuickFeedback(msg) {
+        const fb = document.getElementById('quickAddFeedback');
+        if (!fb) return;
+        fb.textContent = msg;
+        fb.classList.remove('opacity-0');
+        fb.classList.add('opacity-100');
+        if (quickFeedbackTimeout) clearTimeout(quickFeedbackTimeout);
+        quickFeedbackTimeout = setTimeout(() => {
+            fb.classList.remove('opacity-100');
+            fb.classList.add('opacity-0');
+        }, 3000);
+    }
+
+    function clearQuickSearch() {
+        const input = document.getElementById('quickSearchInput');
+        if (input) input.value = '';
+        const resultsEl = document.getElementById('quickSearchResults');
+        if (resultsEl) {
+            resultsEl.innerHTML = '';
+            resultsEl.style.display = 'none';
+        }
+        const btnClear = document.getElementById('btnQuickAddClear');
+        if (btnClear) btnClear.style.display = 'none';
+        quickHighlightedIndex = -1;
+        filteredQuickProducts = [];
+        if (input) input.focus();
+    }
+
+    function onQuickSearchInput() {
+        const input = document.getElementById('quickSearchInput');
+        const q = (input ? input.value : '').trim().toLowerCase();
+        const btnClear = document.getElementById('btnQuickAddClear');
+        const resultsEl = document.getElementById('quickSearchResults');
+        if (!input || !resultsEl) return;
+
+        if (btnClear) {
+            btnClear.style.display = q.length > 0 ? 'inline-flex' : 'none';
+        }
+
+        if (q.length < 1) {
+            resultsEl.innerHTML = '';
+            resultsEl.style.display = 'none';
+            quickHighlightedIndex = -1;
+            filteredQuickProducts = [];
+            return;
+        }
+
+        const fromWh = document.getElementById('fromWarehouseSelect').value;
+        if (!fromWh) {
+            showQuickFeedback('Pilih Gudang Asal terlebih dahulu!');
+            resultsEl.innerHTML = `
+                <div class="p-3 text-center text-xs text-amber-700 bg-amber-50">
+                    ⚠️ Silakan pilih Gudang Asal (Sumber Stok) terlebih dahulu.
+                </div>
+            `;
+            resultsEl.style.display = 'block';
+            return;
+        }
+
+        filteredQuickProducts = availableProducts.filter(p => {
+            const name = (p.name || '').toLowerCase();
+            const sku = (p.sku || '').toLowerCase();
+            return name.includes(q) || sku.includes(q);
+        });
+
+        quickHighlightedIndex = filteredQuickProducts.length > 0 ? 0 : -1;
+        renderQuickSearchResults();
+    }
+
+    function renderQuickSearchResults() {
+        const resultsEl = document.getElementById('quickSearchResults');
+        if (!resultsEl) return;
+
+        if (filteredQuickProducts.length === 0) {
+            resultsEl.innerHTML = `
+                <div class="p-3 text-center text-xs text-gray-500">
+                    Tidak ada barang ditemukan dengan stok tersedia di gudang asal ini.
+                </div>
+            `;
+            resultsEl.style.display = 'block';
+            return;
+        }
+
+        let html = '';
+        filteredQuickProducts.forEach((p, idx) => {
+            const isHighlighted = idx === quickHighlightedIndex;
+            const bgClass = isHighlighted ? 'bg-emerald-50/90 text-emerald-950 font-semibold' : 'hover:bg-gray-50 text-gray-800';
+            html += `
+                <div id="quick-res-${idx}"
+                     class="px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 text-xs transition ${bgClass}"
+                     onclick="selectQuickProductByIndex(${idx})">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono font-bold text-emerald-700 shrink-0">[${p.sku || '-'}]</span>
+                            <span class="truncate font-medium text-gray-900">${p.name}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                            Stok: ${Number(p.qty_available).toLocaleString('id-ID')} ${p.uom_name || 'Pcs'}
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+
+        resultsEl.innerHTML = html;
+        resultsEl.style.display = 'block';
+        scrollQuickIntoView();
+    }
+
+    function scrollQuickIntoView() {
+        if (quickHighlightedIndex >= 0) {
+            const el = document.getElementById(`quick-res-${quickHighlightedIndex}`);
+            if (el) el.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function handleQuickSearchKeydown(e) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (filteredQuickProducts.length > 0) {
+                quickHighlightedIndex = (quickHighlightedIndex + 1) % filteredQuickProducts.length;
+                renderQuickSearchResults();
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (filteredQuickProducts.length > 0) {
+                quickHighlightedIndex = (quickHighlightedIndex - 1 + filteredQuickProducts.length) % filteredQuickProducts.length;
+                renderQuickSearchResults();
+            }
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (filteredQuickProducts.length > 0) {
+                const targetIdx = quickHighlightedIndex >= 0 ? quickHighlightedIndex : 0;
+                selectQuickProduct(filteredQuickProducts[targetIdx]);
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            clearQuickSearch();
+        }
+    }
+
+    function selectQuickProductByIndex(idx) {
+        if (filteredQuickProducts[idx]) {
+            selectQuickProduct(filteredQuickProducts[idx]);
+        }
+    }
+
+    function selectQuickProduct(p) {
+        if (!p || !p.product_id) return;
+
+        const container = document.getElementById('itemsContainer');
+        document.getElementById('emptyItemsNotice').classList.add('hidden');
+
+        // Cari apakah produk sudah ada di baris tabel
+        let existingTr = null;
+
+        for (let tr of container.children) {
+            const select = tr.querySelector('select[name^="items"][name$="[product_id]"]');
+            if (select && String(select.value) === String(p.product_id)) {
+                existingTr = tr;
+                break;
+            }
+        }
+
+        if (existingTr) {
+            // Produk sudah ada -> Tambah kuantitas +1 dan PINDAHKAN KE POSISI PALING ATAS (#1)
+            const qtyInput = existingTr.querySelector('input[name^="items"][name$="[quantity]"]');
+            let newQty = 1;
+            if (qtyInput) {
+                newQty = (parseFloat(qtyInput.value) || 0) + 1;
+                qtyInput.value = newQty;
+            }
+
+            container.prepend(existingTr);
+            existingTr.classList.add('bg-emerald-50/80');
+            setTimeout(() => existingTr.classList.remove('bg-emerald-50/80'), 1500);
+
+            showQuickFeedback(`+1 [${p.sku || '-'}] (Dipindahkan ke posisi #1 · Total: ${newQty} ${p.uom_name || 'Pcs'})`);
+        } else if (container.children.length === 1) {
+            // Cek apakah ada 1 baris kosong yang belum dipilih produknya
+            const firstTr = container.children[0];
+            const select = firstTr.querySelector('select[name^="items"][name$="[product_id]"]');
+            if (select && !select.value) {
+                const rowId = firstTr.id.replace('row-', '');
+                select.value = p.product_id;
+                onProductSelectChange(rowId);
+                const qtyInput = firstTr.querySelector('input[name^="items"][name$="[quantity]"]');
+                if (qtyInput) qtyInput.value = 1;
+                showQuickFeedback(`Item [${p.sku || '-'}] dimasukkan ke posisi teratas (#1)`);
+            } else {
+                // Tambah baris baru di posisi paling atas (#1)
+                const newIdx = addItemRow(null, true);
+                const select = document.getElementById(`prod-select-${newIdx}`);
+                if (select) {
+                    select.value = p.product_id;
+                    onProductSelectChange(newIdx);
+                }
+                const qtyInput = document.getElementById(`qty-input-${newIdx}`);
+                if (qtyInput) qtyInput.value = 1;
+                showQuickFeedback(`Item [${p.sku || '-'}] ditambahkan di posisi teratas (#1)`);
+            }
+        } else {
+            // Tambah baris baru di posisi paling atas (#1)
+            const newIdx = addItemRow(null, true);
+            const select = document.getElementById(`prod-select-${newIdx}`);
+            if (select) {
+                select.value = p.product_id;
+                onProductSelectChange(newIdx);
+            }
+            const qtyInput = document.getElementById(`qty-input-${newIdx}`);
+            if (qtyInput) qtyInput.value = 1;
+            showQuickFeedback(`Item [${p.sku || '-'}] ditambahkan di posisi teratas (#1)`);
+        }
+
+        clearQuickSearch();
+    }
+
     // Existing initial items from transfer
     const existingItems = @json($transfer->stockTransferItem->map(fn($i) => [
         'product_id' => $i->product_id,
@@ -204,7 +481,7 @@
         }
     }
 
-    function addItemRow(initialData = null) {
+    function addItemRow(initialData = null, atTop = true) {
         document.getElementById('emptyItemsNotice').classList.add('hidden');
         const container = document.getElementById('itemsContainer');
         const idx = rowIndex++;
@@ -283,8 +560,18 @@
                 </button>
             </td>
         `;
-        container.appendChild(tr);
-        onProductSelectChange(idx);
+
+        if (atTop) {
+            container.prepend(tr);
+        } else {
+            container.appendChild(tr);
+        }
+
+        if (initialData) {
+            onProductSelectChange(idx);
+        }
+
+        return idx;
     }
 
     function removeRow(idx) {
@@ -378,9 +665,9 @@
         }
 
         if (existingItems && existingItems.length > 0) {
-            existingItems.forEach(item => addItemRow(item));
+            existingItems.forEach(item => addItemRow(item, false));
         } else {
-            addItemRow();
+            addItemRow(null, false);
         }
     });
 </script>
