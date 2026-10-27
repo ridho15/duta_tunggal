@@ -212,7 +212,7 @@ class BladePurchaseReturnWorkflowTest extends TestCase
         $response->assertSee('Retur Bulan Ini');
         $response->assertSee('Menunggu Persetujuan');
         $response->assertSee('Draft Disimpan');
-        $response->assertSee('+ Buat Retur Pembelian');
+        $response->assertSee('Buat Retur Pembelian');
     }
 
     /**

@@ -305,7 +305,7 @@
                                         href="{{ route('penjualan.receipts.create') }}"
                                         class="mt-4 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl transition shadow-xs"
                                     >
-                                        + Buat Penerimaan Baru
+                                        Buat Penerimaan Baru
                                     </a>
                                 </div>
                             </td>

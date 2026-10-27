@@ -150,6 +150,13 @@
         @endforelse
     </div>
 
+    {{-- Paginasi DO Kiriman --}}
+    @if ($deliveryOrders->hasPages())
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+            {{ $deliveryOrders->links() }}
+        </div>
+    @endif
+
     {{-- Bottom Action Link Cetak Picking List --}}
     <div class="pt-4 text-center">
         <a

@@ -75,7 +75,7 @@ class KirimanController extends Controller
             });
         }
 
-        $deliveryOrders = $query->orderBy('id', 'desc')->get();
+        $deliveryOrders = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
 
         return view('gudang.kiriman.index', compact(
             'deliveryOrders',
@@ -108,6 +108,11 @@ class KirimanController extends Controller
     public function submitCheck(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
         $checkedItemIds = $request->input('checked_items', []);
+        $totalItems = $deliveryOrder->deliveryOrderItem()->count();
+
+        if (count($checkedItemIds) < $totalItems) {
+            return back()->with('error', "Periksa dan centang semua barang terlebih dahulu sebelum mengirim, atau pilih tombol 'Ada Kurang / Rusak' jika ada selisih.");
+        }
 
         DB::transaction(function () use ($deliveryOrder, $checkedItemIds) {
             foreach ($deliveryOrder->deliveryOrderItem as $item) {
@@ -130,8 +135,13 @@ class KirimanController extends Controller
     /**
      * Layar Catat Barang Kurang / Rusak (Mockup F2_ReturDO-HP.html).
      */
-    public function retur(DeliveryOrder $deliveryOrder): View
+    public function retur(DeliveryOrder $deliveryOrder): View|RedirectResponse
     {
+        if ($deliveryOrder->hasIssuedSuratJalan()) {
+            return redirect()->route('gudang.kiriman.check', $deliveryOrder->id)
+                ->with('error', "{$deliveryOrder->do_number} sudah punya Surat Jalan aktif, jadi tidak bisa diretur dari sini.");
+        }
+
         $deliveryOrder->loadMissing([
             'salesOrders.customer',
             'warehouse',
@@ -146,50 +156,26 @@ class KirimanController extends Controller
      */
     public function submitRetur(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
+        if ($deliveryOrder->hasIssuedSuratJalan()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'lines' => "{$deliveryOrder->do_number} sudah punya Surat Jalan aktif, jadi tidak bisa diretur dari sini.",
+            ]);
+        }
+
         $itemsData = $request->input('items', []);
+        $lines = [];
+        foreach ($itemsData as $itemId => $row) {
+            $lines[$itemId] = [
+                'short' => (int) ($row['kurang'] ?? 0),
+                'reject' => (int) ($row['reject'] ?? 0),
+            ];
+        }
 
-        DB::transaction(function () use ($deliveryOrder, $itemsData) {
-            $now = now();
-            $originalDoNumber = $deliveryOrder->do_number;
-
-            // 1. Tandai DO Asal sebagai diretur
-            $deliveryOrder->update([
-                'returned_at' => $now,
-                'status' => 'returned',
-            ]);
-
-            // 2. Buat DO Pengganti (...C) untuk barang yang sesuai dan siap dijadikan Surat Jalan
-            $replacementDo = DeliveryOrder::create([
-                'do_number' => "{$originalDoNumber}C",
-                'status' => 'approved',
-                'warehouse_id' => $deliveryOrder->warehouse_id,
-                'cabang_id' => $deliveryOrder->cabang_id,
-                'created_by' => Auth::id(),
-                'original_delivery_order_id' => $deliveryOrder->id,
-            ]);
-
-            // Hubungkan relasi SO ke DO pengganti
-            $replacementDo->salesOrders()->attach($deliveryOrder->salesOrders->pluck('id'));
-
-            // Buat baris barang pengganti
-            foreach ($deliveryOrder->deliveryOrderItem as $item) {
-                $kurang = (int) ($itemsData[$item->id]['kurang'] ?? 0);
-                $reject = (int) ($itemsData[$item->id]['reject'] ?? 0);
-                $acceptedQty = max(0, (int)$item->quantity - $kurang - $reject);
-
-                if ($acceptedQty > 0) {
-                    DeliveryOrderItem::create([
-                        'delivery_order_id' => $replacementDo->id,
-                        'product_id' => $item->product_id,
-                        'quantity' => $acceptedQty,
-                        'sale_order_item_id' => $item->sale_order_item_id,
-                    ]);
-                }
-            }
-        });
+        $service = app(\App\Services\Hp\DeliveryOrderShortageReturn::class);
+        $return = $service->create($deliveryOrder, $lines, $request->input('notes'));
 
         return redirect()->route('gudang.kiriman.index')
-            ->with('success', "Retur berhasil dicatat. DO pengganti {$deliveryOrder->do_number}C dibuat untuk pengiriman Surat Jalan.");
+            ->with('success', "Retur {$return->return_number} berhasil dicatat. Menunggu persetujuan kepala gudang.");
     }
 
     /**

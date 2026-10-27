@@ -40,7 +40,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                + Buat PO Baru
+                Buat PO Baru
             </a>
         </div>
     </div>
@@ -145,70 +145,80 @@
         </div>
 
         {{-- Baris Filter Terpadu --}}
-        <div class="p-4 bg-gray-50/50 border-b border-gray-100">
-            <form action="{{ route('pembelian.po.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
+        <div class="p-3.5 sm:p-4 bg-gray-50/50 border-b border-gray-100">
+            <form action="{{ route('pembelian.po.index') }}" method="GET" class="flex flex-wrap items-center justify-between gap-3">
                 <input type="hidden" name="tab" value="{{ $activeTab }}">
 
-                {{-- Input Cari --}}
-                <div class="lg:col-span-3 relative">
-                    <input
-                        type="text"
-                        name="search"
-                        value="{{ $search }}"
-                        placeholder="Cari nomor PO, supplier, atau catatan..."
-                        class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
-                    />
-                    <svg class="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                {{-- Kolom Kiri: Cari, Supplier, Cabang --}}
+                <div class="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2.5 min-w-[280px]">
+                    {{-- Input Cari --}}
+                    <div class="relative flex-1 min-w-[200px]">
+                        <input
+                            type="text"
+                            name="search"
+                            value="{{ $search }}"
+                            placeholder="Cari nomor PO, supplier, atau catatan..."
+                            class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
+                        />
+                        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+
+                    {{-- Filter Supplier --}}
+                    <div class="w-full sm:w-48 flex-shrink-0">
+                        <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierFilter" placeholder="Semua Supplier" size="sm" :auto-submit="true" />
+                    </div>
+
+                    {{-- Filter Cabang --}}
+                    <div class="w-full sm:w-44 flex-shrink-0">
+                        <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangFilter" placeholder="Semua Cabang" size="sm" :auto-submit="true" />
+                    </div>
                 </div>
 
-                {{-- Filter Supplier --}}
-                <div class="lg:col-span-3">
-                    <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierFilter" placeholder="-- Semua Supplier --" size="sm" :auto-submit="true" />
-                </div>
+                {{-- Kolom Kanan: Rentang Tanggal & Tombol Aksi --}}
+                <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-shrink-0">
+                    {{-- Rentang Tanggal --}}
+                    <div class="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                        <span class="text-[11px] font-semibold text-gray-400 select-none">Tgl:</span>
+                        <input
+                            type="date"
+                            name="date_from"
+                            value="{{ $dateFrom }}"
+                            class="w-28 sm:w-32 p-0 border-0 text-xs text-gray-700 bg-transparent focus:ring-0 focus:outline-none"
+                            title="Dari Tanggal Order"
+                        />
+                        <span class="text-gray-300 text-xs flex-shrink-0 select-none">-</span>
+                        <input
+                            type="date"
+                            name="date_to"
+                            value="{{ $dateTo }}"
+                            class="w-28 sm:w-32 p-0 border-0 text-xs text-gray-700 bg-transparent focus:ring-0 focus:outline-none"
+                            title="Sampai Tanggal Order"
+                        />
+                    </div>
 
-                {{-- Filter Cabang --}}
-                <div class="lg:col-span-2">
-                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($c) => ['id' => $c->id, 'label' => $c->nama])->values()" :value="$cabangFilter" placeholder="-- Semua Cabang --" size="sm" :auto-submit="true" />
-                </div>
-
-                {{-- Rentang Tanggal --}}
-                <div class="lg:col-span-2 flex items-center gap-1.5">
-                    <input
-                        type="date"
-                        name="date_from"
-                        value="{{ $dateFrom }}"
-                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
-                        title="Dari Tanggal Order"
-                    />
-                    <span class="text-gray-400 text-xs">-</span>
-                    <input
-                        type="date"
-                        name="date_to"
-                        value="{{ $dateTo }}"
-                        class="w-full py-2 px-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
-                        title="Sampai Tanggal Order"
-                    />
-                </div>
-
-                {{-- Tombol Filter & Reset --}}
-                <div class="lg:col-span-2 flex items-center gap-2">
-                    <button
-                        type="submit"
-                        class="w-full px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-lg shadow-sm transition"
-                    >
-                        Filter
-                    </button>
-                    @if ($search || $supplierFilter || $cabangFilter || $dateFrom || $dateTo || $activeTab !== 'semua')
-                        <a
-                            href="{{ route('pembelian.po.index') }}"
-                            class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg transition"
-                            title="Reset Filter"
+                    {{-- Tombol Filter & Reset --}}
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                            type="submit"
+                            class="px-3.5 py-2 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
                         >
-                            Reset
-                        </a>
-                    @endif
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            <span>Filter</span>
+                        </button>
+                        @if ($search || $supplierFilter || $cabangFilter || $dateFrom || $dateTo || $activeTab !== 'semua')
+                            <a
+                                href="{{ route('pembelian.po.index') }}"
+                                class="px-3 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg transition whitespace-nowrap"
+                                title="Reset Filter"
+                            >
+                                Reset
+                            </a>
+                        @endif
+                    </div>
                 </div>
             </form>
         </div>
@@ -404,7 +414,7 @@
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                         </svg>
-                                        + Buat PO Baru
+                                        Buat PO Baru
                                     </a>
                                 </div>
                             </td>

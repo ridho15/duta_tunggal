@@ -32,7 +32,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                + Catat Pembayaran Baru
+                Catat Pembayaran Baru
             </a>
         </div>
     </div>
@@ -389,7 +389,7 @@
                                         href="{{ route('pembelian.payments.create') }}"
                                         class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
                                     >
-                                        + Catat Pembayaran Baru
+                                        Catat Pembayaran Baru
                                     </a>
                                 </div>
                             </td>

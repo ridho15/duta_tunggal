@@ -123,10 +123,12 @@
         </div>
 
         {{-- Filter Form --}}
-        <form method="GET" action="{{ route('manufaktur.material-issue.index') }}" class="p-4 sm:p-6 bg-gray-50/50 border-b border-gray-100">
+        <form method="GET" action="{{ route('manufaktur.material-issue.index') }}" class="p-4 sm:p-6 bg-gray-50/50 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-                <div class="lg:col-span-5 relative">
+            
+            {{-- Grup Kiri: Input Pencarian & Dropdown Gudang --}}
+            <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -141,31 +143,36 @@
                     >
                 </div>
 
-                <div class="lg:col-span-3">
+                <div>
                     <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->kode . ' - ' . $wh->name])->values()" :value="$warehouseId" placeholder="Semua Gudang" size="sm" />
                 </div>
+            </div>
 
-                <div class="lg:col-span-2">
+            {{-- Grup Kanan: Rentang Tanggal Terpadu & Aksi Filter (Anti-Overlap) --}}
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                <div class="inline-flex items-center bg-white border border-gray-200 rounded-xl px-2 py-0.5 focus-within:border-[#15803d] focus-within:ring-2 focus-within:ring-[#15803d]/20 transition">
                     <input
                         type="date"
                         name="start_date"
                         value="{{ $startDate }}"
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                        class="bg-transparent border-0 text-xs sm:text-sm py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
                         title="Dari Tanggal"
                     >
-                </div>
-
-                <div class="lg:col-span-2 flex items-center gap-2">
+                    <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
                     <input
                         type="date"
                         name="end_date"
                         value="{{ $endDate }}"
-                        class="w-full py-2 px-3 text-xs sm:text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]"
+                        class="bg-transparent border-0 text-xs sm:text-sm py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
                         title="Sampai Tanggal"
                     >
+                </div>
+
+                <div class="flex items-center gap-1.5">
                     <button
                         type="submit"
-                        class="px-3.5 py-2 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-xl transition"
+                        class="px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition"
+                        title="Terapkan Filter"
                     >
                         Filter
                     </button>

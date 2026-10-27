@@ -198,7 +198,7 @@
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Sync Button -->
-                    <button class="group flex items-center p-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-lg transition-all duration-200 transform hover:-translate-y-1 hover:shadow-lg"
+                    <button class="group flex items-center p-4 bg-[#15803d] hover:bg-[#166534] text-white rounded-lg transition-all duration-200 shadow-sm"
                             wire:click="syncAll"
                             wire:loading.attr="disabled">
                         <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-200">

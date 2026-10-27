@@ -62,7 +62,7 @@
                             <a href="{{ $transferUrl }}" class="dt-hp-btn is-secondary" style="flex:1">Pindah stok</a>
                         @endif
                         @if ($requestUrl)
-                            <a href="{{ $requestUrl }}" class="dt-hp-btn is-secondary" style="flex:1">+ Minta pembelian</a>
+                            <a href="{{ $requestUrl }}" class="dt-hp-btn is-secondary" style="flex:1">Minta Pembelian</a>
                         @endif
                     </div>
                 @endif

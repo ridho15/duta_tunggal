@@ -30,7 +30,7 @@
             <div class="dt-hp-empty">
                 Video tutorial untuk peran Anda belum tersedia.
                 @if ($manageUrl)
-                    <div style="margin-top:8px"><a href="{{ $manageUrl }}" class="dt-hp-link">+ Tambah video tutorial</a></div>
+                    <div style="margin-top:8px"><a href="{{ $manageUrl }}" class="dt-hp-link">Tambah video tutorial</a></div>
                 @endif
             </div>
         @endforelse

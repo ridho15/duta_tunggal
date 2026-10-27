@@ -30,7 +30,7 @@
                     <div class="dt-hp-empty">
                         Tidak ada stock opname yang perlu dihitung di gudang ini.
                         @if ($createUrl)
-                            <div style="margin-top:8px"><a href="{{ $createUrl }}" class="dt-hp-link">+ Buat stock opname</a></div>
+                            <div style="margin-top:8px"><a href="{{ $createUrl }}" class="dt-hp-link">Buat stock opname</a></div>
                         @else
                             Opname akan muncul di sini setelah dibuat oleh admin gudang.
                         @endif

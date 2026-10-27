@@ -115,12 +115,13 @@
         </div>
 
         {{-- Search & Date Filters --}}
-        <form method="GET" action="{{ route('manufaktur.production.index') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+        <form method="GET" action="{{ route('manufaktur.production.index') }}" class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             @if(request()->filled('status'))
                 <input type="hidden" name="status" value="{{ request('status') }}">
             @endif
 
-            <div class="sm:col-span-5 relative">
+            {{-- Grup Kiri: Pencarian Kata Kunci --}}
+            <div class="flex-1 relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -135,35 +136,35 @@
                 >
             </div>
 
-            <div class="sm:col-span-3">
-                <input
-                    type="date"
-                    name="date_from"
-                    value="{{ request('date_from') }}"
-                    placeholder="Dari Tanggal"
-                    class="w-full px-3 py-2 bg-gray-50/70 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                >
-            </div>
+            {{-- Grup Kanan: Rentang Tanggal Terpadu & Tombol Aksi (Anti-Overlap) --}}
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                <div class="inline-flex items-center bg-gray-50/70 border border-gray-200 rounded-xl px-2 py-0.5 focus-within:bg-white focus-within:border-[#15803d] focus-within:ring-1 focus-within:ring-[#15803d] transition">
+                    <input
+                        type="date"
+                        name="date_from"
+                        value="{{ request('date_from') }}"
+                        class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                        title="Dari Tanggal"
+                    >
+                    <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                    <input
+                        type="date"
+                        name="date_until"
+                        value="{{ request('date_until') }}"
+                        class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                        title="Sampai Tanggal"
+                    >
+                </div>
 
-            <div class="sm:col-span-3">
-                <input
-                    type="date"
-                    name="date_until"
-                    value="{{ request('date_until') }}"
-                    placeholder="Sampai Tanggal"
-                    class="w-full px-3 py-2 bg-gray-50/70 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-[#15803d] focus:ring-1 focus:ring-[#15803d] transition"
-                >
-            </div>
-
-            <div class="sm:col-span-1 flex items-center gap-1">
                 <button
                     type="submit"
-                    class="w-full h-full py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl transition flex items-center justify-center shadow-xs"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl transition shadow-xs whitespace-nowrap"
                     title="Terapkan Filter"
                 >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
+                    <span>Filter</span>
                 </button>
                 @if(request()->anyFilled(['search', 'date_from', 'date_until', 'status']))
                     <a

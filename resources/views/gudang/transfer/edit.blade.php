@@ -444,12 +444,12 @@
     }
 
     // Existing initial items from transfer
-    const existingItems = @json($transfer->stockTransferItem->map(fn($i) => [
+    const existingItems = {!! json_encode($transfer->stockTransferItem->map(fn($i) => [
         'product_id' => $i->product_id,
         'quantity' => (float) $i->quantity,
         'from_rak_id' => $i->from_rak_id,
         'to_rak_id' => $i->to_rak_id,
-    ]));
+    ])) !!};
 
     async function onWarehouseChange() {
         const fromWarehouseId = document.getElementById('fromWarehouseSelect').value;

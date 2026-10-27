@@ -138,3 +138,37 @@
         </button>
     </div>
 @endif
+
+@if ($errors->any())
+    <div
+        x-data="{ show: true }"
+        x-show="show"
+        class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start gap-3 shadow-sm relative"
+        role="alert"
+    >
+        <div class="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" stroke-width="2"></circle>
+                <path d="M12 8v4M12 16h.01" stroke-width="2.5" stroke-linecap="round"></path>
+            </svg>
+        </div>
+        <div class="flex-1 font-semibold pr-6">
+            <div class="font-bold mb-1">Perhatian / Validasi Ditolak:</div>
+            <ul class="list-disc pl-4 text-xs font-medium space-y-0.5">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+        <button
+            type="button"
+            @click="show = false"
+            class="absolute top-3.5 right-3 text-red-600/60 hover:text-red-800 p-1 rounded-lg hover:bg-red-100/60 transition"
+            aria-label="Tutup notifikasi"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+@endif

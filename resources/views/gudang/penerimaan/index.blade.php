@@ -32,7 +32,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                + Terima Barang Baru
+                Terima Barang Baru
             </a>
         </div>
     </div>
@@ -154,74 +154,78 @@
         </div>
 
         {{-- Filter Inputs Form --}}
-        <form method="GET" action="{{ route('gudang.penerimaan.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+        <form method="GET" action="{{ route('gudang.penerimaan.index') }}" class="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
             <input type="hidden" name="status" value="{{ $status }}">
 
-            {{-- Search Bar --}}
-            <div class="lg:col-span-4">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Cari Penerimaan</label>
-                <div class="relative">
-                    <input
-                        type="text"
-                        name="q"
-                        value="{{ $search }}"
-                        placeholder="No. GRN, PO, Supplier, No. SJ..."
-                        class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
-                    />
-                    <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+            {{-- Grup Kiri: Input Pencarian & Dropdown Gudang --}}
+            <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {{-- Search Bar --}}
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Cari Penerimaan</label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ $search }}"
+                            placeholder="No. GRN, PO, Supplier, No. SJ..."
+                            class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
+                        />
+                        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+
+                {{-- Gudang --}}
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Gudang Penyimpanan</label>
+                    <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . $wh->kode . ')'])->values()" :value="$warehouseId" placeholder="Semua Gudang" size="sm" :auto-submit="true" />
                 </div>
             </div>
 
-            {{-- Gudang --}}
-            <div class="lg:col-span-3">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Gudang Penyimpanan</label>
-                <x-searchable-select name="warehouse_id" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . $wh->kode . ')'])->values()" :value="$warehouseId" placeholder="Semua Gudang" size="sm" :auto-submit="true" />
-            </div>
+            {{-- Grup Kanan: Rentang Tanggal Terpadu & Aksi Filter (Anti-Overlap) --}}
+            <div class="flex flex-wrap sm:flex-nowrap items-end gap-2 shrink-0">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Periode Penerimaan</label>
+                    <div class="inline-flex items-center bg-white border border-gray-200 rounded-xl px-2 py-0.5 focus-within:border-[#15803d] focus-within:ring-1 focus-within:ring-[#15803d] transition">
+                        <input
+                            type="date"
+                            name="start_date"
+                            value="{{ $startDate }}"
+                            class="bg-transparent border-0 text-sm py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Tanggal Mulai"
+                        />
+                        <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                        <input
+                            type="date"
+                            name="end_date"
+                            value="{{ $endDate }}"
+                            class="bg-transparent border-0 text-sm py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Tanggal Selesai"
+                        />
+                    </div>
+                </div>
 
-            {{-- Tanggal Mulai --}}
-            <div class="lg:col-span-2">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Tanggal Mulai</label>
-                <input
-                    type="date"
-                    name="start_date"
-                    value="{{ $startDate }}"
-                    class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
-                />
-            </div>
-
-            {{-- Tanggal Selesai --}}
-            <div class="lg:col-span-2">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Tanggal Selesai</label>
-                <input
-                    type="date"
-                    name="end_date"
-                    value="{{ $endDate }}"
-                    class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
-                />
-            </div>
-
-            {{-- Tombol Aksi Filter --}}
-            <div class="lg:col-span-1 flex items-center gap-1">
-                <button
-                    type="submit"
-                    class="w-full py-2 px-3 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-sm transition"
-                    title="Terapkan Filter"
-                >
-                    Filter
-                </button>
-                @if ($search || $warehouseId || $startDate || $endDate || $status !== 'all')
-                    <a
-                        href="{{ route('gudang.penerimaan.index') }}"
-                        class="p-2 text-gray-500 hover:text-red-600 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
-                        title="Reset Filter"
+                <div class="flex items-center gap-1.5 self-end pb-0.5">
+                    <button
+                        type="submit"
+                        class="px-4 py-2 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-sm transition"
+                        title="Terapkan Filter"
                     >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </a>
-                @endif
+                        Filter
+                    </button>
+                    @if ($search || $warehouseId || $startDate || $endDate || $status !== 'all')
+                        <a
+                            href="{{ route('gudang.penerimaan.index') }}"
+                            class="p-2 text-gray-500 hover:text-red-600 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
+                            title="Reset Filter"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </a>
+                    @endif
+                </div>
             </div>
         </form>
     </div>
@@ -395,7 +399,7 @@
                                         href="{{ route('gudang.penerimaan.create') }}"
                                         class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition"
                                     >
-                                        + Terima Barang Baru
+                                        Terima Barang Baru
                                     </a>
                                 </div>
                             </td>

@@ -99,11 +99,13 @@
                 </h2>
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="openQuickDriverModal()" class="text-xs text-[#15803d] hover:underline font-bold flex items-center gap-1">
-                        + Tambah Driver
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Tambah Driver
                     </button>
                     <span class="text-gray-300">|</span>
                     <button type="button" onclick="openQuickVehicleModal()" class="text-xs text-[#15803d] hover:underline font-bold flex items-center gap-1">
-                        + Tambah Kendaraan
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Tambah Kendaraan
                     </button>
                 </div>
             </div>

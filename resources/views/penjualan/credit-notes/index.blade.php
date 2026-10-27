@@ -144,75 +144,79 @@
         </div>
 
         {{-- Form Filter & Pencarian --}}
-        <form method="GET" action="{{ route('penjualan.credit-notes.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <form method="GET" action="{{ route('penjualan.credit-notes.index') }}" class="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
 
-            {{-- Input Pencarian --}}
-            <div class="lg:col-span-2">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Cari Nota Kredit</label>
-                <div class="relative">
-                    <input
-                        type="text"
-                        name="q"
-                        value="{{ $search }}"
-                        placeholder="Cari No. CN, Pelanggan, No. Invoice..."
-                        class="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
-                    >
-                    <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+            {{-- Grup Kiri: Input Pencarian & Dropdown Filter --}}
+            <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Cari Nota Kredit</label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ $search }}"
+                            placeholder="Cari No. CN, Pelanggan, No. Invoice..."
+                            class="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
+                        >
+                        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Jenis Nota Kredit</label>
+                    <select name="type" class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
+                        <option value="">Semua Jenis</option>
+                        @foreach (\App\Models\CreditNote::TYPE_LABELS as $key => $label)
+                            <option value="{{ $key }}" {{ $type === $key ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
-            {{-- Filter Jenis --}}
-            <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Jenis Nota Kredit</label>
-                <select name="type" class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]">
-                    <option value="">Semua Jenis</option>
-                    @foreach (\App\Models\CreditNote::TYPE_LABELS as $key => $label)
-                        <option value="{{ $key }}" {{ $type === $key ? 'selected' : '' }}>{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Filter Tanggal Mulai --}}
-            <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Dari Tanggal</label>
-                <input
-                    type="date"
-                    name="date_from"
-                    value="{{ $dateFrom }}"
-                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
-                >
-            </div>
-
-            {{-- Filter Tanggal Sampai & Tombol --}}
-            <div class="flex items-end gap-2">
-                <div class="flex-1">
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Sampai</label>
-                    <input
-                        type="date"
-                        name="date_to"
-                        value="{{ $dateTo }}"
-                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
-                    >
+            {{-- Grup Kanan: Rentang Tanggal Terpadu & Aksi Filter (Anti-Overlap) --}}
+            <div class="flex flex-wrap sm:flex-nowrap items-end gap-2 shrink-0">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Periode Tanggal</label>
+                    <div class="inline-flex items-center bg-gray-50 border border-gray-300 rounded-lg px-2 py-0.5 focus-within:border-[#15803d] focus-within:ring-2 focus-within:ring-[#15803d] transition">
+                        <input
+                            type="date"
+                            name="date_from"
+                            value="{{ $dateFrom }}"
+                            class="bg-transparent border-0 text-xs py-1 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Dari Tanggal"
+                        >
+                        <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                        <input
+                            type="date"
+                            name="date_to"
+                            value="{{ $dateTo }}"
+                            class="bg-transparent border-0 text-xs py-1 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Sampai Tanggal"
+                        >
+                    </div>
                 </div>
-                <button
-                    type="submit"
-                    class="px-3 py-2 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-lg transition active:scale-[0.98]"
-                    title="Terapkan Filter"
-                >
-                    Filter
-                </button>
-                @if ($search || $type || $cabangId || $dateFrom || $dateTo || $tab !== 'semua')
-                    <a
-                        href="{{ route('penjualan.credit-notes.index') }}"
-                        class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition"
-                        title="Reset Filter"
+
+                <div class="flex items-center gap-1.5 self-end pb-0.5">
+                    <button
+                        type="submit"
+                        class="px-3.5 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg shadow-xs transition active:scale-[0.98]"
+                        title="Terapkan Filter"
                     >
-                        Reset
-                    </a>
-                @endif
+                        Filter
+                    </button>
+                    @if ($search || $type || $cabangId || $dateFrom || $dateTo || $tab !== 'semua')
+                        <a
+                            href="{{ route('penjualan.credit-notes.index') }}"
+                            class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition"
+                            title="Reset Filter"
+                        >
+                            Reset
+                        </a>
+                    @endif
+                </div>
             </div>
         </form>
     </div>
@@ -365,7 +369,7 @@
                                             href="{{ route('penjualan.credit-notes.create') }}"
                                             class="inline-flex items-center gap-2 px-3 py-1.5 bg-[#15803d] text-white text-xs font-semibold rounded-lg hover:bg-[#166534] transition"
                                         >
-                                            + Buat Draf Pertama
+                                            Buat Draf Pertama
                                         </a>
                                     </div>
                                 </div>

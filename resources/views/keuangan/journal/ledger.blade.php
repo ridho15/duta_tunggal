@@ -27,59 +27,59 @@
 
     {{-- Filter Bar --}}
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-        <form method="GET" action="{{ route('keuangan.journal.ledger') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-end">
-            {{-- Pilih Akun COA --}}
-            <div class="lg:col-span-5">
-                <label for="coa_id" class="block text-xs font-semibold text-gray-700 mb-1">
-                    Pilih Akun Chart of Account (COA) <span class="text-rose-500">*</span>
-                </label>
-                <x-searchable-select name="coa_id" :options="collect($chartOfAccounts)->map(fn ($acc) => ['id' => $acc->id, 'label' => $acc->code . ' - ' . $acc->name . ' (' . $acc->type . ')'])->values()" :value="($coaId) ?: collect($chartOfAccounts)->first()?->id" :required="true" size="sm" id="coa_id" />
+        <form method="GET" action="{{ route('keuangan.journal.ledger') }}" class="flex flex-col lg:flex-row lg:items-end justify-between gap-3.5">
+            {{-- Grup Kiri: Pilih Akun COA & Cabang --}}
+            <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                    <label for="coa_id" class="block text-xs font-semibold text-gray-700 mb-1">
+                        Pilih Akun Chart of Account (COA) <span class="text-rose-500">*</span>
+                    </label>
+                    <x-searchable-select name="coa_id" :options="collect($chartOfAccounts)->map(fn ($acc) => ['id' => $acc->id, 'label' => $acc->code . ' - ' . $acc->name . ' (' . $acc->type . ')'])->values()" :value="($coaId) ?: collect($chartOfAccounts)->first()?->id" :required="true" size="sm" id="coa_id" />
+                </div>
+
+                <div>
+                    <label for="cabang_id" class="block text-xs font-semibold text-gray-700 mb-1">
+                        Cabang
+                    </label>
+                    <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" id="cabang_id" />
+                </div>
             </div>
 
-            {{-- Tanggal Mulai --}}
-            <div class="lg:col-span-2">
-                <label for="start_date" class="block text-xs font-semibold text-gray-700 mb-1">
-                    Dari Tanggal
-                </label>
-                <input
-                    type="date"
-                    name="start_date"
-                    id="start_date"
-                    value="{{ $startDate }}"
-                    class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-gray-900"
-                >
-            </div>
+            {{-- Grup Kanan: Rentang Tanggal Terpadu & Tombol Aksi (Anti-Overlap) --}}
+            <div class="flex flex-wrap sm:flex-nowrap items-end gap-2 shrink-0">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">
+                        Periode Tanggal
+                    </label>
+                    <div class="inline-flex items-center bg-gray-50 border border-gray-300 rounded-lg px-2 py-0.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition">
+                        <input
+                            type="date"
+                            name="start_date"
+                            id="start_date"
+                            value="{{ $startDate }}"
+                            class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Dari Tanggal"
+                        >
+                        <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                        <input
+                            type="date"
+                            name="end_date"
+                            id="end_date"
+                            value="{{ $endDate }}"
+                            class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Sampai Tanggal"
+                        >
+                    </div>
+                </div>
 
-            {{-- Tanggal Akhir --}}
-            <div class="lg:col-span-2">
-                <label for="end_date" class="block text-xs font-semibold text-gray-700 mb-1">
-                    Sampai Tanggal
-                </label>
-                <input
-                    type="date"
-                    name="end_date"
-                    id="end_date"
-                    value="{{ $endDate }}"
-                    class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-gray-900"
-                >
-            </div>
-
-            {{-- Cabang --}}
-            <div class="lg:col-span-2">
-                <label for="cabang_id" class="block text-xs font-semibold text-gray-700 mb-1">
-                    Cabang
-                </label>
-                <x-searchable-select name="cabang_id" :options="collect($cabangs)->map(fn ($cabang) => ['id' => $cabang->id, 'label' => $cabang->nama])->values()" :value="$cabangId" placeholder="Semua Cabang" size="sm" id="cabang_id" />
-            </div>
-
-            {{-- Tombol Terapkan --}}
-            <div class="lg:col-span-1">
-                <button
-                    type="submit"
-                    class="w-full px-3 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
-                >
-                    Tampilkan
-                </button>
+                <div class="self-end pb-0.5">
+                    <button
+                        type="submit"
+                        class="px-5 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                    >
+                        Tampilkan
+                    </button>
+                </div>
             </div>
         </form>
     </div>
@@ -160,16 +160,24 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 font-sans">
-                        {{-- Baris Saldo Awal --}}
+                        {{-- Baris Saldo Awal / Bawaan --}}
                         <tr class="bg-amber-50/30 font-semibold text-gray-900">
                             <td class="py-2.5 px-4 text-gray-500 font-mono">{{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }}</td>
-                            <td class="py-2.5 px-4 font-mono text-gray-400">SALDO-AWAL</td>
-                            <td class="py-2.5 px-4 text-gray-700">Saldo Awal per {{ \Carbon\Carbon::parse($startDate)->translatedFormat('d F Y') }}</td>
+                            <td class="py-2.5 px-4 font-mono text-gray-400">
+                                {{ method_exists($ledgerEntries, 'currentPage') && $ledgerEntries->currentPage() > 1 ? 'SALDO-BAWAAN' : 'SALDO-AWAL' }}
+                            </td>
+                            <td class="py-2.5 px-4 text-gray-700">
+                                @if (method_exists($ledgerEntries, 'currentPage') && $ledgerEntries->currentPage() > 1)
+                                    Saldo Bawaan dari Halaman Sebelumnya (Hal. {{ $ledgerEntries->currentPage() }})
+                                @else
+                                    Saldo Awal per {{ \Carbon\Carbon::parse($startDate)->translatedFormat('d F Y') }}
+                                @endif
+                            </td>
                             <td class="py-2.5 px-4 text-gray-400">-</td>
                             <td class="py-2.5 px-4 text-right font-mono text-gray-400">-</td>
                             <td class="py-2.5 px-4 text-right font-mono text-gray-400">-</td>
                             <td class="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
-                                {{ \App\Helpers\MoneyHelper::rupiah($openingBalance) }}
+                                {{ \App\Helpers\MoneyHelper::rupiah($pageStartingBalance ?? $openingBalance) }}
                             </td>
                         </tr>
 
@@ -225,6 +233,12 @@
                     </tfoot>
                 </table>
             </div>
+
+            @if ($ledgerEntries && method_exists($ledgerEntries, 'hasPages') && $ledgerEntries->hasPages())
+                <div class="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+                    {{ $ledgerEntries->links() }}
+                </div>
+            @endif
         </div>
     @endif
 </div>

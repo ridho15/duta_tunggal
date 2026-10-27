@@ -25,7 +25,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
-                <span>+ Buat Retur Pembelian</span>
+                <span>Buat Retur Pembelian</span>
             </a>
         </div>
     </div>
@@ -127,56 +127,58 @@
 
         {{-- Filter & Pencarian Bar --}}
         <div class="p-4 bg-white border-b border-gray-100">
-            <form method="GET" action="{{ route('pembelian.returns.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            <form method="GET" action="{{ route('pembelian.returns.index') }}" class="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
                 <input type="hidden" name="tab" value="{{ $tab }}">
 
-                {{-- Cari Teks --}}
-                <div class="lg:col-span-2">
-                    <label class="block text-[11px] font-medium text-gray-600 mb-1">Cari Retur / Supplier / GRN</label>
-                    <div class="relative">
-                        <input
-                            type="text"
-                            name="q"
-                            value="{{ $search }}"
-                            placeholder="Ketik No. Nota Retur, Supplier, No. GRN..."
-                            class="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition"
-                        />
-                        <svg class="w-4 h-4 absolute left-2.5 top-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
+                {{-- Grup Kiri: Input Pencarian & Dropdown Filter --}}
+                <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-600 mb-1">Cari Retur / Supplier / GRN</label>
+                        <div class="relative">
+                            <input
+                                type="text"
+                                name="q"
+                                value="{{ $search }}"
+                                placeholder="Ketik No. Nota Retur, Supplier, No. GRN..."
+                                class="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition"
+                            />
+                            <svg class="w-4 h-4 absolute left-2.5 top-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-600 mb-1">Supplier / Vendor</label>
+                        <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierId" placeholder="Semua Supplier" size="xs" :auto-submit="true" />
                     </div>
                 </div>
 
-                {{-- Filter Supplier --}}
-                <div>
-                    <label class="block text-[11px] font-medium text-gray-600 mb-1">Supplier / Vendor</label>
-                    <x-searchable-select name="supplier_id" :options="collect($suppliers)->map(fn ($s) => ['id' => $s->id, 'label' => $s->perusahaan])->values()" :value="$supplierId" placeholder="Semua Supplier" size="xs" :auto-submit="true" />
-                </div>
-
-                {{-- Rentang Tanggal Dari --}}
-                <div>
-                    <label class="block text-[11px] font-medium text-gray-600 mb-1">Tanggal Dari</label>
-                    <input
-                        type="date"
-                        name="start_date"
-                        value="{{ $startDate }}"
-                        class="w-full py-1.5 px-2.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition"
-                    />
-                </div>
-
-                {{-- Rentang Tanggal Sampai & Tombol --}}
-                <div class="flex items-center gap-2">
-                    <div class="flex-1">
-                        <label class="block text-[11px] font-medium text-gray-600 mb-1">Sampai</label>
-                        <input
-                            type="date"
-                            name="end_date"
-                            value="{{ $endDate }}"
-                            class="w-full py-1.5 px-2.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition"
-                        />
+                {{-- Grup Kanan: Rentang Tanggal Terpadu & Aksi Filter (Anti-Overlap) --}}
+                <div class="flex flex-wrap sm:flex-nowrap items-end gap-2 shrink-0">
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-600 mb-1">Periode Tanggal Retur</label>
+                        <div class="inline-flex items-center bg-gray-50 border border-gray-200 rounded-lg px-2 py-0.5 focus-within:border-[#15803d] focus-within:ring-1 focus-within:ring-[#15803d] transition">
+                            <input
+                                type="date"
+                                name="start_date"
+                                value="{{ $startDate }}"
+                                class="bg-transparent border-0 text-xs py-1 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                                title="Tanggal Mulai"
+                            />
+                            <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                            <input
+                                type="date"
+                                name="end_date"
+                                value="{{ $endDate }}"
+                                class="bg-transparent border-0 text-xs py-1 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                                title="Tanggal Akhir"
+                            />
+                        </div>
                     </div>
-                    <div class="flex items-center gap-1 mt-auto">
-                        <button type="submit" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg transition" title="Terapkan Filter">
+
+                    <div class="flex items-center gap-1.5 self-end pb-0.5">
+                        <button type="submit" class="px-3.5 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg shadow-xs transition" title="Terapkan Filter">
                             Filter
                         </button>
                         @if ($search || $supplierId || $startDate || $endDate)
@@ -376,7 +378,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14 4 9l5-5m0 0h10a6 6 0 0 1 0 12h-3" />
                                     </svg>
                                     <p class="text-sm font-medium text-gray-600">Tidak ada dokumen retur pembelian yang ditemukan.</p>
-                                    <p class="text-xs text-gray-400 mt-1">Gunakan tombol "+ Buat Retur Pembelian" di kanan atas untuk membuat retur baru.</p>
+                                    <p class="text-xs text-gray-400 mt-1">Gunakan tombol "Buat Retur Pembelian" di kanan atas untuk membuat retur baru.</p>
                                 </div>
                             </td>
                         </tr>

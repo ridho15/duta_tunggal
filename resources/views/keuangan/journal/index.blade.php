@@ -7,6 +7,11 @@
     deleteModalOpen: false,
     deleteActionUrl: '',
     deleteReference: '',
+    allExpanded: false,
+    toggleAll() {
+        this.allExpanded = !this.allExpanded;
+        $dispatch('toggle-all-vouchers', this.allExpanded);
+    },
     confirmDelete(url, ref) {
         this.deleteActionUrl = url;
         this.deleteReference = ref;
@@ -41,7 +46,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                + Jurnal Penyesuaian Manual
+                Jurnal Penyesuaian Manual
             </a>
         </div>
     </div>
@@ -155,57 +160,56 @@
 
         {{-- Filter & Search Bar --}}
         <div class="p-4 sm:px-6 border-b border-gray-100 bg-white">
-            <form method="GET" action="{{ route('keuangan.journal.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+            <form method="GET" action="{{ route('keuangan.journal.index') }}" class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <input type="hidden" name="tab" value="{{ $tab }}">
 
-                {{-- Pencarian Kata Kunci --}}
-                <div class="lg:col-span-4 relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+                {{-- Grup Kiri: Pencarian Kata Kunci & Filter Akun --}}
+                <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {{-- Pencarian Kata Kunci --}}
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ $search }}"
+                            placeholder="Cari no. referensi, keterangan, akun..."
+                            class="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 placeholder-gray-400"
+                        >
                     </div>
-                    <input
-                        type="text"
-                        name="q"
-                        value="{{ $search }}"
-                        placeholder="Cari no. referensi, keterangan, akun..."
-                        class="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 placeholder-gray-400"
-                    >
+
+                    {{-- Filter Akun COA --}}
+                    <div>
+                        <x-searchable-select name="coa_id" :options="collect($chartOfAccounts)->map(fn ($acc) => ['id' => $acc->id, 'label' => $acc->code . ' - ' . $acc->name])->values()" :value="$coaId" placeholder="-- Semua Akun COA --" size="sm" :auto-submit="true" />
+                    </div>
                 </div>
 
-                {{-- Filter Akun COA --}}
-                <div class="lg:col-span-3">
-                    <x-searchable-select name="coa_id" :options="collect($chartOfAccounts)->map(fn ($acc) => ['id' => $acc->id, 'label' => $acc->code . ' - ' . $acc->name])->values()" :value="$coaId" placeholder="-- Semua Akun COA --" size="sm" :auto-submit="true" />
-                </div>
+                {{-- Grup Kanan: Rentang Tanggal Terpadu & Tombol Aksi (Anti-Overlap) --}}
+                <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                    <div class="inline-flex items-center bg-gray-50 border border-gray-300 rounded-lg px-2 py-0.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition">
+                        <input
+                            type="date"
+                            name="start_date"
+                            value="{{ $startDate }}"
+                            class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Dari Tanggal"
+                        >
+                        <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                        <input
+                            type="date"
+                            name="end_date"
+                            value="{{ $endDate }}"
+                            class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Sampai Tanggal"
+                        >
+                    </div>
 
-                {{-- Tanggal Dari --}}
-                <div class="lg:col-span-2">
-                    <input
-                        type="date"
-                        name="start_date"
-                        value="{{ $startDate }}"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                        title="Dari Tanggal"
-                    >
-                </div>
-
-                {{-- Tanggal Sampai --}}
-                <div class="lg:col-span-2">
-                    <input
-                        type="date"
-                        name="end_date"
-                        value="{{ $endDate }}"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                        title="Sampai Tanggal"
-                    >
-                </div>
-
-                {{-- Tombol Filter & Reset --}}
-                <div class="lg:col-span-1 flex items-center gap-1.5">
                     <button
                         type="submit"
-                        class="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                        class="px-3.5 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition whitespace-nowrap"
                         title="Terapkan Filter"
                     >
                         Filter
@@ -223,6 +227,32 @@
             </form>
         </div>
 
+        {{-- Header Baris Voucher & Tombol Buka/Tutup Semua --}}
+        <div class="px-4 py-3 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between text-xs">
+            <span class="font-bold text-gray-700 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                <svg class="w-4 h-4 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Daftar Dokumen Voucher Jurnal
+            </span>
+            <button
+                type="button"
+                @click="toggleAll()"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg shadow-2xs transition active:scale-[0.98] cursor-pointer"
+            >
+                <svg
+                    class="w-3.5 h-3.5 text-[#15803d] transition-transform duration-200"
+                    :class="{ 'rotate-180': allExpanded }"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+                <span x-text="allExpanded ? 'Tutup Semua Rincian' : 'Buka Semua Rincian'">Buka Semua Rincian</span>
+            </button>
+        </div>
+
         {{-- Daftar Voucher Jurnal Berkelompok --}}
         <div class="divide-y divide-gray-200">
             @forelse ($groupedVouchers as $voucher)
@@ -231,12 +261,27 @@
                     $isManual = empty($voucher->source_type) || in_array($voucher->journal_type, ['manual', 'adjustment', 'reversal']);
                     $isBalanced = abs($voucher->total_debit - $voucher->total_credit) < 0.01;
                 @endphp
-                <div class="p-4 sm:p-5 hover:bg-gray-50/50 transition">
-                    {{-- Header Voucher Transaksi --}}
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-3 border-b border-gray-100">
-                        <div class="flex items-center gap-2.5 flex-wrap">
+                <div
+                    x-data="{ isExpanded: false }"
+                    @toggle-all-vouchers.window="isExpanded = $event.detail"
+                    class="p-4 sm:p-5 hover:bg-gray-50/50 transition"
+                >
+                    {{-- Header Voucher Transaksi (Collapsible Trigger) --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-2.5">
+                        <div class="flex items-center gap-2.5 flex-wrap cursor-pointer select-none" @click="isExpanded = !isExpanded">
+                            <span class="p-1 rounded-md text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 transition">
+                                <svg
+                                    class="w-4 h-4 transition-transform duration-200 text-emerald-700"
+                                    :class="{ 'rotate-180': isExpanded }"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </span>
                             <span class="font-mono font-bold text-sm text-gray-900">
-                                <a href="{{ route('keuangan.journal.show', $voucher->reference) }}" class="text-emerald-700 hover:underline">
+                                <a href="{{ route('keuangan.journal.show', $voucher->reference) }}" class="text-emerald-700 hover:underline" @click.stop>
                                     {{ $voucher->reference }}
                                 </a>
                             </span>
@@ -246,6 +291,9 @@
                             </span>
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-gray-100 text-gray-700 uppercase">
                                 {{ str_replace('_', ' ', $voucher->journal_type) }}
+                            </span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                {{ $lines->count() }} Kaki Jurnal
                             </span>
                             @if ($isBalanced)
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -294,13 +342,13 @@
 
                     {{-- Deskripsi Umum Voucher --}}
                     @if ($voucher->description)
-                        <div class="text-xs text-gray-600 mt-2 italic">
+                        <div class="text-xs text-gray-600 mt-1 mb-2 italic">
                             {{ $voucher->description }}
                         </div>
                     @endif
 
-                    {{-- Sub-tabel Baris Jurnal (Double-Entry Legs) --}}
-                    <div class="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white">
+                    {{-- Sub-tabel Baris Jurnal (Double-Entry Legs) dengan Animasi Collapse --}}
+                    <div x-show="isExpanded" x-collapse x-cloak class="mt-3 overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-2xs">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-gray-50/80 text-gray-500 font-semibold uppercase text-[11px] border-b border-gray-100">
                                 <tr>
@@ -344,7 +392,7 @@
                     <div class="flex flex-col items-center justify-center">
                         <svg class="w-10 h-10 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         <p class="text-sm font-semibold text-gray-600">Tidak ada jurnal ditemukan</p>
-                        <p class="text-xs text-gray-400 mt-0.5">Gunakan filter di atas atau klik tombol "+ Jurnal Penyesuaian Manual".</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Gunakan filter di atas atau klik tombol "Jurnal Penyesuaian Manual".</p>
                     </div>
                 </div>
             @endforelse
@@ -352,7 +400,7 @@
 
         @if ($groupedVouchers && $groupedVouchers->hasPages())
             <div class="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50/50">
-                {{ $groupedVouchers->links('components.pagination-clean') }}
+                {{ $groupedVouchers->links() }}
             </div>
         @endif
     </div>

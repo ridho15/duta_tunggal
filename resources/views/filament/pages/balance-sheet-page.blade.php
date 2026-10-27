@@ -674,7 +674,7 @@
         <div class="filter-grid">
             <!-- Single Date Mode -->
             <div class="filter-group" x-show="!$wire.use_multi_period">
-                <label class="filter-label">📅 Tanggal Neraca</label>
+                <label class="filter-label">Tanggal Neraca</label>
                 <input type="date"
                        wire:model="as_of_date"
                        class="filter-input">
@@ -682,7 +682,7 @@
 
             <!-- Multi-Period Mode -->
             <div class="filter-group" x-show="$wire.use_multi_period">
-                <label class="filter-label">📊 Periode Multi</label>
+                <label class="filter-label">Periode Multi</label>
                 <div class="multi-period-container">
                     @foreach($selected_periods as $index => $period)
                         <div class="period-item">
@@ -693,24 +693,25 @@
                             <button type="button"
                                     wire:click="removePeriod({{ $index }})"
                                     class="remove-period-btn"
+                                    title="Hapus Periode"
                                     x-show="$wire.selected_periods.length > 1">
-                                ❌
+                                <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
                     @endforeach
                     <button type="button"
                             wire:click="addPeriod"
                             class="add-period-btn">
-                        ➕ Tambah Periode
+                        + Tambah Periode
                     </button>
                 </div>
             </div>
 
             <div class="filter-group">
-                <label class="filter-label">🏢 Cabang</label>
+                <label class="filter-label">Cabang</label>
                 <select wire:model="cabang_id"
                         class="filter-input filter-select">
-                    <option value="">🌐 Semua Cabang</option>
+                    <option value="">Semua Cabang</option>
                     @foreach($this->getCabangOptions() as $id => $name)
                         <option value="{{ $id }}">{{ $name }}</option>
                     @endforeach
@@ -718,7 +719,7 @@
             </div>
 
             <div class="filter-group">
-                <label class="filter-label">⚙️ Opsi Tampilan</label>
+                <label class="filter-label">Opsi Tampilan</label>
                 <div class="display-options">
                     <div class="option-group">
                         <label class="option-label">Mode Periode:</label>
@@ -737,23 +738,23 @@
                     <div class="option-group">
                         <label class="option-label">Level Tampilan:</label>
                         <select wire:model.live="display_level" class="filter-input filter-select">
-                            <option value="all">📋 Semua Akun</option>
-                            <option value="parent_only">🏠 Hanya Akun Induk</option>
-                            <option value="totals_only">💰 Hanya Total</option>
+                            <option value="all">Semua Akun</option>
+                            <option value="parent_only">Hanya Akun Induk</option>
+                            <option value="totals_only">Hanya Total</option>
                         </select>
                     </div>
 
                     <div class="option-group">
                         <label class="checkbox-label">
                             <input type="checkbox" wire:model.live="show_zero_balance">
-                            <span>📊 Tampilkan Saldo 0</span>
+                            <span>Tampilkan Saldo 0</span>
                         </label>
                     </div>
 
                     <div class="option-group">
                         <label class="checkbox-label">
                             <input type="checkbox" wire:model.live="show_comparison" x-show="!$wire.use_multi_period">
-                            <span>🔄 Bandingkan Periode</span>
+                            <span>Bandingkan Periode</span>
                         </label>
                         <input type="date"
                                wire:model="comparison_date"
@@ -769,25 +770,25 @@
             <button type="button"
                     wire:click="generateReport"
                     class="btn-primary">
-                🔄 Perbarui Laporan
+                Perbarui Laporan
             </button>
 
             <button type="button"
                     wire:click="exportPdf"
                     class="btn-secondary btn-export">
-                📄 Export PDF
+                Export PDF
             </button>
 
             <button type="button"
                     wire:click="exportExcel"
                     class="btn-secondary btn-export">
-                📊 Export Excel
+                Export Excel
             </button>
 
             <button type="button"
                     onclick="window.print()"
                     class="btn-secondary btn-export">
-                🖨️ Print
+                Cetak
             </button>
         </div>
     </div>
@@ -801,21 +802,27 @@
                     <h3 class="period-title">{{ \Carbon\Carbon::parse($period)->format('M Y') }}</h3>
                     <div class="period-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
                         <div class="summary-card">
-                            <div class="summary-icon assets-icon">💰</div>
+                            <div class="summary-icon assets-icon">
+                                <svg class="w-6 h-6 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
                             <div class="summary-label">Total Aset</div>
                             <div class="summary-value text-green-600">
                                 Rp {{ number_format($periodData['total_assets'], 0, ',', '.') }}
                             </div>
                         </div>
                         <div class="summary-card">
-                            <div class="summary-icon liabilities-icon">💰</div>
+                            <div class="summary-icon liabilities-icon">
+                                <svg class="w-6 h-6 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
+                            </div>
                             <div class="summary-label">Total Kewajiban</div>
                             <div class="summary-value text-yellow-600">
                                 Rp {{ number_format($periodData['total_liabilities'], 0, ',', '.') }}
                             </div>
                         </div>
                         <div class="summary-card">
-                            <div class="summary-icon equity-icon">🏛️</div>
+                            <div class="summary-icon equity-icon">
+                                <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                            </div>
                             <div class="summary-label">Total Ekuitas</div>
                             <div class="summary-value text-blue-600">
                                 Rp {{ number_format($periodData['total_equity'], 0, ',', '.') }}
@@ -827,7 +834,7 @@
         @else
             <div class="summary-card">
                 <div class="summary-icon assets-icon">
-                    💰
+                    <svg class="w-6 h-6 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div class="summary-label">Total Aset</div>
                 <div class="summary-value text-green-600">
@@ -837,7 +844,7 @@
 
             <div class="summary-card">
                 <div class="summary-icon liabilities-icon">
-                    📊
+                    <svg class="w-6 h-6 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
                 </div>
                 <div class="summary-label">Total Kewajiban</div>
                 <div class="summary-value text-yellow-600">
@@ -847,7 +854,7 @@
 
             <div class="summary-card">
                 <div class="summary-icon equity-icon">
-                    🏛️
+                    <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
                 </div>
                 <div class="summary-label">Total Ekuitas</div>
                 <div class="summary-value text-blue-600">
@@ -857,7 +864,7 @@
 
             <div class="summary-card">
                 <div class="summary-icon ratio-icon">
-                    📈
+                    <svg class="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                 </div>
                 <div class="summary-label">Rasio Lancar</div>
                 <div class="summary-value text-purple-600">

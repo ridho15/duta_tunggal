@@ -40,7 +40,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                + Buat Faktur Baru
+                Buat Faktur Baru
             </a>
         </div>
     </div>
@@ -340,7 +340,7 @@
                                     <div class="text-sm font-semibold text-gray-500">Tidak ada Faktur Pembelian yang ditemukan</div>
                                     <p class="text-xs text-gray-400 max-w-sm">Coba sesuaikan kata kunci pencarian atau ubah tab filter di atas.</p>
                                     <a href="{{ route('pembelian.invoices.create') }}" class="mt-2 inline-flex items-center gap-1.5 text-xs text-white bg-[#15803d] hover:bg-[#14532d] px-3.5 py-1.5 rounded-lg font-semibold transition">
-                                        + Buat Faktur Pembelian Baru
+                                        Buat Faktur Pembelian Baru
                                     </a>
                                 </div>
                             </td>

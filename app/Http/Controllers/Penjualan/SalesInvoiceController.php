@@ -283,6 +283,9 @@ class SalesInvoiceController extends Controller
                 $inv->invoiceItem()->create($line);
             }
 
+            // Posting jurnal penjualan otomatis
+            (new \App\Observers\InvoiceObserver())->postSalesInvoice($inv->fresh());
+
             return $inv;
         });
 

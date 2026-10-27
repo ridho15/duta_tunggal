@@ -93,7 +93,7 @@
     </div>
 
     {{-- Main Card: Tabs, Filter & Table --}}
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm">
         {{-- Status Tabs --}}
         <div class="border-b border-gray-100 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
             @php
@@ -120,76 +120,86 @@
             @endforeach
         </div>
 
-        {{-- Filters Toolbar --}}
-        <form method="GET" action="{{ route('pembelian.or.index') }}" class="p-4 bg-gray-50/60 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {{-- Filters Toolbar (Layout Flex Responsif & Anti-Tumpang Tindih) --}}
+        <form method="GET" action="{{ route('pembelian.or.index') }}" class="p-3.5 sm:p-4 bg-gray-50/60 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <input type="hidden" name="tab" value="{{ $activeTab }}">
 
-            {{-- Pencarian --}}
-            <div class="lg:col-span-2 relative">
-                <input
-                    type="text"
-                    name="search"
-                    value="{{ $search }}"
-                    placeholder="Cari No. Request, keperluan, atau produk..."
-                    class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
-                />
-                <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+            {{-- Kolom Kiri: Search & Cabang --}}
+            <div class="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2.5 min-w-[280px]">
+                {{-- Pencarian --}}
+                <div class="relative flex-1 min-w-[200px]">
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ $search }}"
+                        placeholder="Cari No. Request, keperluan, atau produk..."
+                        class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
+                    />
+                    <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+
+                {{-- Cabang --}}
+                <div class="w-full sm:w-48 flex-shrink-0">
+                    <x-searchable-select
+                        name="cabang_id"
+                        size="sm"
+                        :auto-submit="true"
+                        :options="$cabangs->map(fn($c) => [
+                            'id' => (string)$c->id,
+                            'label' => $c->nama,
+                            'subtext' => $c->kode ?? ''
+                        ])->prepend(['id' => '', 'label' => 'Semua Cabang', 'subtext' => ''])"
+                        :value="(string)$cabangFilter"
+                        placeholder="Semua Cabang"
+                    />
+                </div>
             </div>
 
-            {{-- Cabang --}}
-            <div>
-                <x-searchable-select
-                    name="cabang_id"
-                    size="sm"
-                    :auto-submit="true"
-                    :options="$cabangs->map(fn($c) => [
-                        'id' => (string)$c->id,
-                        'label' => $c->nama,
-                        'subtext' => $c->kode ?? ''
-                    ])->prepend(['id' => '', 'label' => 'Semua Cabang', 'subtext' => ''])"
-                    :value="(string)$cabangFilter"
-                    placeholder="Semua Cabang"
-                />
-            </div>
+            {{-- Kolom Kanan: Rentang Tanggal & Tombol Aksi --}}
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-shrink-0">
+                {{-- Tanggal Permintaan Dari - Sampai --}}
+                <div class="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                    <span class="text-[11px] font-semibold text-gray-400 select-none">Tgl:</span>
+                    <input
+                        type="date"
+                        name="date_from"
+                        value="{{ $dateFrom }}"
+                        class="w-28 sm:w-32 p-0 border-0 text-xs text-gray-700 bg-transparent focus:ring-0 focus:outline-none"
+                        title="Tanggal Dari"
+                    />
+                    <span class="text-gray-300 text-xs flex-shrink-0 select-none">-</span>
+                    <input
+                        type="date"
+                        name="date_to"
+                        value="{{ $dateTo }}"
+                        class="w-28 sm:w-32 p-0 border-0 text-xs text-gray-700 bg-transparent focus:ring-0 focus:outline-none"
+                        title="Tanggal Sampai"
+                    />
+                </div>
 
-            {{-- Tanggal Permintaan Dari - Sampai --}}
-            <div class="flex items-center gap-1">
-                <input
-                    type="date"
-                    name="date_from"
-                    value="{{ $dateFrom }}"
-                    class="w-full py-2 px-2 border border-gray-300 rounded-lg text-xs focus:ring-1 focus:ring-[#15803d]"
-                    title="Tanggal Dari"
-                />
-                <span class="text-gray-400 text-xs">-</span>
-                <input
-                    type="date"
-                    name="date_to"
-                    value="{{ $dateTo }}"
-                    class="w-full py-2 px-2 border border-gray-300 rounded-lg text-xs focus:ring-1 focus:ring-[#15803d]"
-                    title="Tanggal Sampai"
-                />
-            </div>
-
-            {{-- Tombol Filter & Reset --}}
-            <div class="flex items-center gap-2">
-                <button
-                    type="submit"
-                    class="flex-1 py-2 px-3 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg shadow-sm transition"
-                >
-                    Filter
-                </button>
-                @if ($search || $cabangFilter || $supplierFilter || $dateFrom || $dateTo)
-                    <a
-                        href="{{ route('pembelian.or.index', ['tab' => $activeTab]) }}"
-                        class="py-2 px-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition"
-                        title="Reset Filter"
+                {{-- Tombol Filter & Reset --}}
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                        type="submit"
+                        class="px-3.5 py-2 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
                     >
-                        Reset
-                    </a>
-                @endif
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        <span>Filter</span>
+                    </button>
+                    @if ($search || $cabangFilter || $dateFrom || $dateTo || $activeTab !== 'semua')
+                        <a
+                            href="{{ route('pembelian.or.index') }}"
+                            class="px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition whitespace-nowrap"
+                            title="Reset Filter"
+                        >
+                            Reset
+                        </a>
+                    @endif
+                </div>
             </div>
         </form>
 
@@ -296,7 +306,7 @@
                                 <div class="inline-flex items-center gap-1.5">
                                     <a
                                         href="{{ route('pembelian.or.show', $or) }}"
-                                        class="p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition"
+                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition shadow-2xs"
                                         title="Lihat Rincian"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,7 +318,7 @@
                                     @if (in_array($or->status, ['draft', 'rejected'], true))
                                         <a
                                             href="{{ route('pembelian.or.edit', $or) }}"
-                                            class="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition"
+                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition shadow-2xs"
                                             title="Ubah Data"
                                         >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,7 +330,7 @@
                                     <a
                                         href="{{ route('pembelian.or.pdf', $or) }}"
                                         target="_blank"
-                                        class="p-1.5 rounded-md text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 transition"
+                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition shadow-2xs"
                                         title="Cetak PDF"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

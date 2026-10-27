@@ -2277,7 +2277,7 @@
                     x-on:click="collapseAll()">Collapse All</button>
                 <button type="button" class="dt-item-nav-button primary" data-dt-or-add-navigator
                     x-on:click="addItem()" x-bind:disabled="isAddingItem || isLoading">
-                    <span x-show="! isAddingItem && ! recentlyAddedMessage">+ Tambah Item</span>
+                    <span x-show="! isAddingItem && ! recentlyAddedMessage">Tambah Item</span>
                     <span x-cloak x-show="! isAddingItem && recentlyAddedMessage">Item baru dibuka</span>
                     <span x-cloak x-show="isAddingItem">Menambahkan item...</span>
                 </button>

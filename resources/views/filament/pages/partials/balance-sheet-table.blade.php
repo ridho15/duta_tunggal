@@ -6,7 +6,7 @@
 <!-- ASSETS Section -->
 @if($displayLevel !== 'totals_only')
 <div class="section-header assets">
-    🏦 ASET (ASSETS)
+    ASET (ASSETS)
 </div>
 @endif
 
@@ -14,7 +14,7 @@
 <!-- Current Assets -->
 @if($displayLevel !== 'totals_only')
 <div class="subsection-header">
-    💵 Aset Lancar (Current Assets)
+    Aset Lancar (Current Assets)
 </div>
 @endif
 @if($displayLevel !== 'totals_only')
@@ -33,14 +33,14 @@
 @endforeach
 @endif
 <div class="subtotal-row">
-    <div>💰 Total Aset Lancar</div>
+    <div>Total Aset Lancar</div>
     <div>Rp {{ number_format($data['current_assets']['total'], 0, ',', '.') }}</div>
 </div>
 
 <!-- Fixed Assets -->
 @if($displayLevel !== 'totals_only')
 <div class="subsection-header">
-    🏢 Aset Tetap (Fixed Assets)
+    Aset Tetap (Fixed Assets)
 </div>
 @endif
 @if($displayLevel !== 'totals_only')
@@ -59,14 +59,14 @@
 @endforeach
 @endif
 <div class="subtotal-row">
-    <div>🏗️ Total Aset Tetap</div>
+    <div>Total Aset Tetap</div>
     <div>Rp {{ number_format($data['fixed_assets']['total'], 0, ',', '.') }}</div>
 </div>
 
 <!-- Contra Assets (Accumulated Depreciation) -->
 @if($data['contra_assets']['accounts']->count() > 0 && $displayLevel !== 'totals_only')
 <div class="subsection-header">
-    📉 Aset Kontra (Contra Assets)
+    Aset Kontra (Contra Assets)
 </div>
 @foreach($data['contra_assets']['accounts'] as $account)
     <div class="account-row">
@@ -82,7 +82,7 @@
     </div>
 @endforeach
 <div class="subtotal-row">
-    <div>📊 Total Aset Kontra</div>
+    <div>Total Aset Kontra</div>
     <div>(Rp {{ number_format(abs($data['contra_assets']['total']), 0, ',', '.') }})</div>
 </div>
 @endif
@@ -90,14 +90,14 @@
 
 <!-- Total Assets -->
 <div class="total-row assets">
-    <div>🏦 TOTAL ASET</div>
+    <div>TOTAL ASET</div>
     <div>Rp {{ number_format($data['total_assets'], 0, ',', '.') }}</div>
 </div>
 
 <!-- LIABILITIES & EQUITY Section -->
 @if($displayLevel !== 'totals_only')
 <div class="section-header liabilities">
-    📋 KEWAJIBAN (LIABILITIES)
+    KEWAJIBAN (LIABILITIES)
 </div>
 @endif
 
@@ -105,7 +105,7 @@
 <!-- Current Liabilities -->
 @if($displayLevel !== 'totals_only')
 <div class="subsection-header">
-    💳 Kewajiban Lancar (Current Liabilities)
+    Kewajiban Lancar (Current Liabilities)
 </div>
 @endif
 @if($displayLevel !== 'totals_only')
@@ -124,14 +124,14 @@
 @endforeach
 @endif
 <div class="subtotal-row">
-    <div>💰 Total Kewajiban Lancar</div>
+    <div>Total Kewajiban Lancar</div>
     <div>Rp {{ number_format($data['current_liabilities']['total'], 0, ',', '.') }}</div>
 </div>
 
 <!-- Long-term Liabilities -->
 @if($displayLevel !== 'totals_only')
 <div class="subsection-header">
-    🏢 Kewajiban Jangka Panjang (Long-term Liabilities)
+    Kewajiban Jangka Panjang (Long-term Liabilities)
 </div>
 @endif
 @if($displayLevel !== 'totals_only')
@@ -150,14 +150,14 @@
 @endforeach
 @endif
 <div class="subtotal-row">
-    <div>🏗️ Total Kewajiban Jangka Panjang</div>
+    <div>Total Kewajiban Jangka Panjang</div>
     <div>Rp {{ number_format($data['long_term_liabilities']['total'], 0, ',', '.') }}</div>
 </div>
 @endif
 
 <!-- Total Liabilities -->
 <div class="subtotal-row">
-    <div>📊 TOTAL KEWAJIBAN</div>
+    <div>TOTAL KEWAJIBAN</div>
     <div>Rp {{ number_format($data['total_liabilities'], 0, ',', '.') }}</div>
 </div>
 
@@ -165,10 +165,10 @@
 <!-- Equity -->
 @if($displayLevel !== 'totals_only')
 <div class="section-header equity">
-    🏛️ EKUITAS (EQUITY)
+    EKUITAS (EQUITY)
 </div>
 <div class="subsection-header">
-    🏛️ Ekuitas (Equity)
+    Ekuitas (Equity)
 </div>
 @endif
 @if($displayLevel !== 'totals_only')
@@ -187,7 +187,7 @@
 @endforeach
 @endif
 <div class="subtotal-row">
-    <div>💼 Total Ekuitas</div>
+    <div>Total Ekuitas</div>
     <div>Rp {{ number_format($data['total_equity'], 0, ',', '.') }}</div>
 </div>
 
@@ -207,7 +207,7 @@
 
 <!-- Total Liabilities & Equity -->
 <div class="total-row equity">
-    <div>⚖️ TOTAL KEWAJIBAN & EKUITAS</div>
+    <div>TOTAL KEWAJIBAN & EKUITAS</div>
     <div>Rp {{ number_format($data['total_liabilities_and_equity'], 0, ',', '.') }}</div>
 </div>
 
@@ -215,7 +215,11 @@
 @if($displayLevel !== 'totals_only')
 <div class="balance-check {{ $data['is_balanced'] ? 'balanced' : 'unbalanced' }}">
     <div class="balance-icon">
-        {{ $data['is_balanced'] ? '✅' : '❌' }}
+        @if($data['is_balanced'])
+            <svg class="w-5 h-5 text-emerald-600 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+        @else
+            <svg class="w-5 h-5 text-red-600 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+        @endif
     </div>
     <div class="balance-text">
         <div class="balance-status">
@@ -237,7 +241,7 @@
 @if(isset($show_comparison) && $show_comparison && isset($comparison))
 <div class="comparison-section">
     <div class="comparison-header">
-        📊 Perbandingan dengan {{ \Carbon\Carbon::parse($comparison['as_of_date'])->format('M Y') }}
+        Perbandingan dengan {{ \Carbon\Carbon::parse($comparison['as_of_date'])->format('M Y') }}
     </div>
     <div class="comparison-grid">
         <div class="comparison-item">

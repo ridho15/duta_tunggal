@@ -316,7 +316,7 @@
                                         href="{{ route('manufaktur.spk.create') }}"
                                         class="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold bg-[#15803d] text-white rounded-xl shadow-sm hover:bg-[#166534] transition"
                                     >
-                                        + Terbitkan SPK Baru
+                                        Terbitkan SPK Baru
                                     </a>
                                 </div>
                             </td>

@@ -43,7 +43,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                + Catat Transaksi Baru
+                Catat Transaksi Baru
             </a>
         </div>
     </div>
@@ -212,14 +212,14 @@
 
         {{-- Filter & Search Bar --}}
         <div class="p-4 sm:px-6 border-b border-gray-100 bg-white">
-            <form method="GET" action="{{ route('keuangan.cashbank.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+            <form method="GET" action="{{ route('keuangan.cashbank.index') }}" class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <input type="hidden" name="tab" value="{{ $tab }}">
                 @if ($accountId)
                     <input type="hidden" name="account_id" value="{{ $accountId }}">
                 @endif
 
-                {{-- Pencarian Kata Kunci --}}
-                <div class="lg:col-span-5 relative">
+                {{-- Grup Kiri: Pencarian Kata Kunci --}}
+                <div class="flex-1 relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -234,46 +234,44 @@
                     >
                 </div>
 
-                {{-- Tanggal Dari --}}
-                <div class="lg:col-span-3">
-                    <input
-                        type="date"
-                        name="start_date"
-                        value="{{ $startDate }}"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                        title="Dari Tanggal"
-                    >
-                </div>
-
-                {{-- Tanggal Sampai --}}
-                <div class="lg:col-span-3">
-                    <input
-                        type="date"
-                        name="end_date"
-                        value="{{ $endDate }}"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                        title="Sampai Tanggal"
-                    >
-                </div>
-
-                {{-- Tombol Filter & Reset --}}
-                <div class="lg:col-span-1 flex items-center gap-1.5">
-                    <button
-                        type="submit"
-                        class="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition"
-                        title="Terapkan Filter"
-                    >
-                        Filter
-                    </button>
-                    @if ($search || $startDate || $endDate || $accountId)
-                        <a
-                            href="{{ route('keuangan.cashbank.index', ['tab' => $tab]) }}"
-                            class="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
-                            title="Reset Filter"
+                {{-- Grup Kanan: Rentang Tanggal Terpadu & Tombol Aksi (Anti-Overlap) --}}
+                <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                    <div class="inline-flex items-center bg-gray-50 border border-gray-300 rounded-lg px-2 py-0.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition">
+                        <input
+                            type="date"
+                            name="start_date"
+                            value="{{ $startDate }}"
+                            class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Dari Tanggal"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </a>
-                    @endif
+                        <span class="text-xs text-gray-400 px-1 font-medium">s/d</span>
+                        <input
+                            type="date"
+                            name="end_date"
+                            value="{{ $endDate }}"
+                            class="bg-transparent border-0 text-xs py-1.5 px-1 focus:ring-0 focus:outline-none text-gray-700 min-w-[130px]"
+                            title="Sampai Tanggal"
+                        >
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                        <button
+                            type="submit"
+                            class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                            title="Terapkan Filter"
+                        >
+                            Filter
+                        </button>
+                        @if ($search || $startDate || $endDate || $accountId)
+                            <a
+                                href="{{ route('keuangan.cashbank.index', ['tab' => $tab]) }}"
+                                class="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                                title="Reset Filter"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </a>
+                        @endif
+                    </div>
                 </div>
             </form>
         </div>
@@ -360,7 +358,7 @@
                                     <div class="flex flex-col items-center justify-center">
                                         <svg class="w-10 h-10 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                         <p class="text-sm font-semibold text-gray-600">Belum ada riwayat transfer internal</p>
-                                        <p class="text-xs text-gray-400 mt-0.5">Klik tombol "+ Transfer Antar Kas/Bank" untuk memindahkan dana antar rekening.</p>
+                                        <p class="text-xs text-gray-400 mt-0.5">Klik tombol "Transfer Antar Kas/Bank" untuk memindahkan dana antar rekening.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -371,7 +369,7 @@
 
             @if ($transfers && $transfers->hasPages())
                 <div class="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50/50">
-                    {{ $transfers->links('components.pagination-clean') }}
+                    {{ $transfers->links() }}
                 </div>
             @endif
         @else
@@ -491,7 +489,7 @@
                                     <div class="flex flex-col items-center justify-center">
                                         <svg class="w-10 h-10 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                                         <p class="text-sm font-semibold text-gray-600">Tidak ada transaksi ditemukan</p>
-                                        <p class="text-xs text-gray-400 mt-0.5">Gunakan tombol "+ Catat Transaksi Baru" untuk membukukan mutasi kas/bank.</p>
+                                        <p class="text-xs text-gray-400 mt-0.5">Gunakan tombol "Catat Transaksi Baru" untuk membukukan mutasi kas/bank.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -502,7 +500,7 @@
 
             @if ($transactions && $transactions->hasPages())
                 <div class="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50/50">
-                    {{ $transactions->links('components.pagination-clean') }}
+                    {{ $transactions->links() }}
                 </div>
             @endif
         @endif

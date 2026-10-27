@@ -239,7 +239,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
                         </svg>
-                        + Tambah Baris Barang
+                        Tambah Baris Barang
                     </button>
                 </div>
             </div>
@@ -540,15 +540,17 @@
                                                 <span
                                                     role="button"
                                                     @click.stop="item.supplierId = ''; onSupplierChange(item);"
-                                                    class="p-0.5 rounded hover:bg-gray-100 hover:text-red-500 transition"
+                                                    class="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                                                     title="Kosongkan Pilihan Supplier"
                                                 >
                                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                 </span>
                                             </template>
-                                            <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-150" :class="{'rotate-180 text-[#15803d]': item.supplierDropdownOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                            </svg>
+                                            <span class="p-0.5 pointer-events-none text-gray-400">
+                                                <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-150" :class="{'rotate-180 text-[#15803d]': item.supplierDropdownOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </span>
                                         </div>
                                     </button>
 

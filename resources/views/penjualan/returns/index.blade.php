@@ -309,7 +309,7 @@
                                         href="{{ route('penjualan.returns.create') }}"
                                         class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#15803d] hover:underline"
                                     >
-                                        + Ajukan Retur Pertama
+                                        Ajukan Retur Pertama
                                     </a>
                                 </div>
                             </td>

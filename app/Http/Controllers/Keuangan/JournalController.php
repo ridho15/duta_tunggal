@@ -192,7 +192,11 @@ class JournalController extends Controller
         $totalDebitPeriod = 0.0;
         $totalCreditPeriod = 0.0;
         $endingBalance = 0.0;
-        $ledgerEntries = collect();
+        $pageStartingBalance = 0.0;
+        $ledgerEntries = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 25, 1, [
+            'path' => $request->url(),
+            'query' => $request->query(),
+        ]);
 
         if ($selectedCoa) {
             // Hitung Saldo Awal (Opening balance per tgl mulai)
@@ -227,15 +231,46 @@ class JournalController extends Controller
                 $periodQuery->where('cabang_id', $cabangId);
             }
 
-            $entries = $periodQuery->orderBy('date', 'asc')->orderBy('id', 'asc')->get();
+            // Total mutasi periode keseluruhan
+            $totalDebitPeriod = (float) (clone $periodQuery)->sum('debit');
+            $totalCreditPeriod = (float) (clone $periodQuery)->sum('credit');
 
-            // Hitung Running Balance baris demi baris
-            $currentRunning = $openingBalance;
+            if ($isDebitNormal) {
+                $endingBalance = $openingBalance + $totalDebitPeriod - $totalCreditPeriod;
+            } else {
+                $endingBalance = $openingBalance - $totalDebitPeriod + $totalCreditPeriod;
+            }
+
+            // Paginasi 25 baris per halaman
+            $perPage = 25;
+            $currentPage = (int) $request->query('page', 1);
+            if ($currentPage < 1) {
+                $currentPage = 1;
+            }
+            $pageOffset = ($currentPage - 1) * $perPage;
+
+            // Hitung saldo bawaan untuk halaman aktif
+            $priorInPeriodDebit = 0.0;
+            $priorInPeriodCredit = 0.0;
+            if ($pageOffset > 0) {
+                $priorInPeriod = (clone $periodQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->take($pageOffset)->get();
+                $priorInPeriodDebit = (float) $priorInPeriod->sum('debit');
+                $priorInPeriodCredit = (float) $priorInPeriod->sum('credit');
+            }
+
+            if ($isDebitNormal) {
+                $pageStartingBalance = $openingBalance + $priorInPeriodDebit - $priorInPeriodCredit;
+            } else {
+                $pageStartingBalance = $openingBalance - $priorInPeriodDebit + $priorInPeriodCredit;
+            }
+
+            $entries = (clone $periodQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->paginate($perPage)->withQueryString();
+
+            // Hitung Running Balance baris demi baris pada halaman aktif
+            $currentRunning = $pageStartingBalance;
             foreach ($entries as $entry) {
                 $dr = (float) $entry->debit;
                 $cr = (float) $entry->credit;
-                $totalDebitPeriod += $dr;
-                $totalCreditPeriod += $cr;
 
                 if ($isDebitNormal) {
                     $currentRunning += $dr - $cr;
@@ -245,7 +280,6 @@ class JournalController extends Controller
                 $entry->running_balance = $currentRunning;
             }
 
-            $endingBalance = $currentRunning;
             $ledgerEntries = $entries;
         }
 
@@ -260,6 +294,7 @@ class JournalController extends Controller
             'chartOfAccounts',
             'isDebitNormal',
             'openingBalance',
+            'pageStartingBalance',
             'totalDebitPeriod',
             'totalCreditPeriod',
             'endingBalance',

@@ -147,9 +147,10 @@
             </div>
 
             {{-- Action Buttons --}}
-            <div class="md:col-span-2 flex items-end gap-2">
+            <div class="md:col-span-2 flex items-end gap-2 shrink-0">
                 <button type="submit"
-                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gray-900 rounded-xl hover:bg-black transition shadow-sm">
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-gray-900 rounded-xl hover:bg-black transition shadow-sm whitespace-nowrap"
+                        title="Terapkan Filter">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
@@ -157,7 +158,7 @@
                 </button>
                 @if ($search || $warehouseId || $status !== 'all' || $startDate || $endDate)
                     <a href="{{ route('gudang.opname.index') }}"
-                       class="inline-flex items-center justify-center p-2 text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
+                       class="inline-flex items-center justify-center p-2 text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition shrink-0"
                        title="Reset Filter">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>

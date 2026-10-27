@@ -119,13 +119,13 @@
                 </template>
             </div>
 
-            <div class="flex items-center gap-1.5 flex-shrink-0 text-gray-400">
+            <div class="flex items-center gap-1 flex-shrink-0 text-gray-400">
                 {{-- Clear Selection Button --}}
                 <template x-if="selected && !disabled && !{{ $required ? 'true' : 'false' }}">
                     <span
                         role="button"
                         @click.stop="clearSelection()"
-                        class="p-0.5 rounded hover:bg-gray-100 hover:text-gray-600 transition"
+                        class="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Hapus Pilihan"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,15 +134,17 @@
                     </span>
                 </template>
                 {{-- Dropdown Chevron --}}
-                <svg
-                    class="w-4 h-4 transition-transform duration-200"
-                    :class="{ 'rotate-180 text-[#15803d]': open }"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
+                <span class="p-0.5 pointer-events-none text-gray-400">
+                    <svg
+                        class="w-4 h-4 transition-transform duration-200"
+                        :class="{ 'rotate-180 text-[#15803d]': open }"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </span>
             </div>
         </button>
 

@@ -261,7 +261,7 @@
         </div>
 
         <!-- Kolom Kanan: Ringkasan Sticky (Aside) -->
-        <aside class="w-full lg:w-[320px] shrink-0 bg-white border border-gray-100 rounded-2xl p-5 sm:p-6 flex flex-col gap-3.5 shadow-sm sticky top-[70px]">
+        <aside class="w-full lg:w-[320px] shrink-0 bg-white border border-gray-100 rounded-2xl p-5 sm:p-6 flex flex-col gap-3.5 shadow-sm sticky top-[70px] max-h-[calc(100vh-90px)] overflow-y-auto">
             <h2 class="m-0 text-base font-bold text-gray-900 border-b border-gray-100 pb-3">Ringkasan</h2>
 
             <div class="flex justify-between text-sm text-gray-600">

@@ -115,7 +115,7 @@
                         <rect x="3" y="6" width="18" height="14" rx="2" stroke-width="2"></rect>
                         <path d="M3 10h18M16 15h2" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
-                    + Bayar Tagihan Ini
+                    Bayar Tagihan Ini
                 </a>
             @endif
 
@@ -144,7 +144,7 @@
                         <path d="M9 14 4 9l5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                         <path d="M4 9h10a6 6 0 0 1 0 12h-3" stroke-width="2" stroke-linecap="round"></path>
                     </svg>
-                    + Buat Retur
+                    Buat Retur
                 </a>
             @endif
         </div>
@@ -436,7 +436,7 @@
                             href="{{ route('pembelian.payments.create', ['supplier_id' => $invoice->supplier_id ?: $invoice->purchaseOrder?->supplier_id, 'invoice_id' => $invoice->id]) }}"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition self-start sm:self-auto"
                         >
-                            + Catat Pembayaran Tagihan Ini
+                            Catat Pembayaran Tagihan Ini
                         </a>
                     @endif
                 </div>

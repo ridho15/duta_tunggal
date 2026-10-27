@@ -355,9 +355,10 @@
 
             <a
                 href="{{ route('pembelian.or.index') }}"
-                class="self-start text-xs font-bold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] hover:bg-[#dcfce7] rounded-xl px-3.5 py-2 no-underline mt-auto transition"
+                class="self-start inline-flex items-center gap-1.5 text-xs font-bold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] hover:bg-[#dcfce7] rounded-xl px-3.5 py-2 no-underline mt-auto transition"
             >
-                + Buat Permintaan Pembelian dari stok menipis
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Buat Permintaan Pembelian dari stok menipis
             </a>
         </section>
 
