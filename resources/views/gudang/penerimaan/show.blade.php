@@ -110,6 +110,37 @@
         </div>
     </div>
 
+    {{-- Banner Retur Pembelian Otomatis (Jika Terdapat Barang Reject) --}}
+    @if ($receipt->purchaseReturns->isNotEmpty())
+        @foreach ($receipt->purchaseReturns as $ret)
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-amber-100 text-amber-800 rounded-xl flex-shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 14 4 9l5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <path d="M4 9h10a6 6 0 0 1 0 12h-3" stroke-width="2" stroke-linecap="round"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-amber-900 uppercase tracking-wide">Retur Pembelian Otomatis (QC Reject)</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 font-mono">{{ $ret->nota_retur }}</span>
+                        </div>
+                        <p class="text-xs text-amber-700 mt-0.5">
+                            Sebanyak <strong>{{ number_format($ret->purchaseReturnItem->sum('qty_returned')) }} pcs</strong> barang reject dialihkan otomatis ke dokumen retur supplier dan tidak masuk kartu stok gudang.
+                        </p>
+                    </div>
+                </div>
+                <a
+                    href="{{ route('pembelian.returns.show', $ret) }}"
+                    class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition inline-flex items-center gap-1 flex-shrink-0 self-start sm:self-auto"
+                >
+                    Lihat Dokumen Retur &rarr;
+                </a>
+            </div>
+        @endforeach
+    @endif
+
     {{-- Visual Stepper Process --}}
     @php
         $isCompleted = ($receipt->status === 'completed');

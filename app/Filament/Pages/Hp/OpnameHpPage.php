@@ -53,6 +53,10 @@ class OpnameHpPage extends Page
 
     public function mount(): void
     {
+        if (! $this->opnameId && request()->filled('opname')) {
+            $this->opnameId = (int) request()->query('opname');
+        }
+
         if ($this->opnameId && ! $this->opname()) {
             $this->opnameId = null;
         }

@@ -13,10 +13,15 @@ use App\Models\PurchaseReceipt;
 use App\Models\PurchaseReceiptBiaya;
 use App\Models\PurchaseReceiptItem;
 use App\Models\PurchaseReceiptPhoto;
+use App\Models\PurchaseReturn;
+use App\Models\PurchaseReturnItem;
+use App\Models\QualityControl;
 use App\Models\Rak;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\PurchaseReceiptService;
+use App\Services\PurchaseReturnService;
+use App\Services\QualityControlService;
 use App\Support\OrderRequestQuantityLock;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -281,6 +286,7 @@ class PenerimaanBarangController extends Controller
                 // Jika langsung konfirmasi & masuk stok
                 if ($isDirectConfirm) {
                     $this->receiptService->postPurchaseReceipt($purchaseReceipt);
+                    $this->handleReceivingQcAndAutoReturn($purchaseReceipt);
                     $purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
                 }
 
@@ -457,6 +463,7 @@ class PenerimaanBarangController extends Controller
                 // Jika langsung konfirmasi & masuk stok
                 if ($isDirectConfirm) {
                     $this->receiptService->postPurchaseReceipt($penerimaan);
+                    $this->handleReceivingQcAndAutoReturn($penerimaan);
                     if ($penerimaan->purchaseOrder) {
                         $penerimaan->purchaseOrder->syncReceiptFulfillmentStatus(Auth::id());
                     }
@@ -494,6 +501,7 @@ class PenerimaanBarangController extends Controller
 
                 // Posting persediaan dan jurnal via service
                 $this->receiptService->postPurchaseReceipt($penerimaan);
+                $this->handleReceivingQcAndAutoReturn($penerimaan);
 
                 // Sinkronisasi status pemenuhan PO
                 if ($penerimaan->purchaseOrder) {
@@ -610,5 +618,118 @@ class PenerimaanBarangController extends Controller
             ],
             'items' => $items,
         ]);
+    }
+
+    /**
+     * Otomatis membuat QualityControl dan PurchaseReturn draft jika terdapat barang yang ditolak (rejected).
+     * Menerapkan aturan idempotensi anti-duplikasi retur (Bug C2 Guard).
+     */
+    protected function handleReceivingQcAndAutoReturn(PurchaseReceipt $purchaseReceipt): void
+    {
+        $purchaseReceipt->loadMissing([
+            'purchaseReceiptItem.purchaseOrderItem',
+            'purchaseReceiptItem.product',
+            'purchaseOrder',
+        ]);
+
+        $rejectedItems = $purchaseReceipt->purchaseReceiptItem->filter(function ($item) {
+            return (float) ($item->qty_rejected ?? 0) > 0;
+        });
+
+        if ($rejectedItems->isEmpty()) {
+            return;
+        }
+
+        $purchaseOrder = $purchaseReceipt->purchaseOrder;
+        $qcService = app(QualityControlService::class);
+        $purchaseReturnService = app(PurchaseReturnService::class);
+
+        // 1. Cari atau buat 1 dokumen QualityControl untuk mencatat hasil inspeksi
+        $qualityControl = QualityControl::where('from_model_type', PurchaseReceipt::class)
+            ->where('from_model_id', $purchaseReceipt->id)
+            ->first();
+
+        $totalReceived = (float) $purchaseReceipt->purchaseReceiptItem->sum('qty_received');
+        $totalPassed = (float) $purchaseReceipt->purchaseReceiptItem->sum('qty_accepted');
+        $totalRejected = (float) $rejectedItems->sum('qty_rejected');
+        $firstItem = $purchaseReceipt->purchaseReceiptItem->first();
+        $reasons = $rejectedItems->pluck('reason_rejected')->filter()->unique()->implode('; ');
+
+        if (! $qualityControl) {
+            $qualityControl = QualityControl::create([
+                'qc_number'         => $qcService->generateQcNumber(),
+                'purchase_order_id' => $purchaseOrder?->id,
+                'inspected_by'      => Auth::id() ?? $purchaseReceipt->received_by ?? 1,
+                'passed_quantity'   => $totalPassed,
+                'rejected_quantity' => $totalRejected,
+                'quantity_received' => $totalReceived,
+                'notes'             => "QC Penerimaan Barang #{$purchaseReceipt->receipt_number}",
+                'status'            => 1, // Selesai / Terproses
+                'warehouse_id'      => $firstItem?->warehouse_id ?? $purchaseOrder?->warehouse_id,
+                'reason_reject'     => $reasons ?: 'Barang rusak / ditolak saat penerimaan logistik',
+                'product_id'        => $firstItem?->product_id,
+                'from_model_type'   => PurchaseReceipt::class,
+                'from_model_id'     => $purchaseReceipt->id,
+                'purchase_return_processed' => now(),
+                'cabang_id'         => $purchaseReceipt->cabang_id ?? $purchaseOrder?->cabang_id ?? 1,
+            ]);
+        } else {
+            $qualityControl->update([
+                'passed_quantity'   => $totalPassed,
+                'rejected_quantity' => $totalRejected,
+                'quantity_received' => $totalReceived,
+                'reason_reject'     => $reasons ?: $qualityControl->reason_reject,
+                'status'            => 1,
+                'purchase_return_processed' => now(),
+            ]);
+        }
+
+        // 2. Cari atau buat TEPAT 1 dokumen PurchaseReturn (Anti-Duplicate Return Guard Bug C2)
+        $purchaseReturn = PurchaseReturn::where('purchase_receipt_id', $purchaseReceipt->id)
+            ->orWhere('quality_control_id', $qualityControl->id)
+            ->first();
+
+        if (! $purchaseReturn) {
+            $purchaseReturn = PurchaseReturn::create([
+                'quality_control_id'  => $qualityControl->id,
+                'purchase_receipt_id' => $purchaseReceipt->id,
+                'failed_qc_action'    => PurchaseReturn::QC_ACTION_RETURN_SUPPLIER,
+                'nota_retur'          => $purchaseReturnService->generateNotaRetur(),
+                'return_date'         => now(),
+                'created_by'          => Auth::id() ?? $purchaseReceipt->received_by ?? 1,
+                'status'              => 'draft',
+                'cabang_id'           => $purchaseReceipt->cabang_id ?? $purchaseOrder?->cabang_id ?? 1,
+                'notes'               => "Retur otomatis dari QC penerimaan #{$purchaseReceipt->receipt_number} untuk PO #{$purchaseOrder?->po_number}.",
+            ]);
+        } else {
+            if (!$purchaseReturn->quality_control_id) {
+                $purchaseReturn->update(['quality_control_id' => $qualityControl->id]);
+            }
+            if (!$purchaseReturn->purchase_receipt_id) {
+                $purchaseReturn->update(['purchase_receipt_id' => $purchaseReceipt->id]);
+            }
+        }
+
+        // 3. Tambahkan item retur jika belum ada (idempotensi per item)
+        foreach ($rejectedItems as $rejItem) {
+            $hasItem = PurchaseReturnItem::where('purchase_return_id', $purchaseReturn->id)
+                ->where(function ($q) use ($rejItem) {
+                    $q->where('purchase_receipt_item_id', $rejItem->id)
+                      ->orWhere('product_id', $rejItem->product_id);
+                })
+                ->exists();
+
+            if (! $hasItem) {
+                $poItem = $rejItem->purchaseOrderItem;
+                PurchaseReturnItem::create([
+                    'purchase_return_id'       => $purchaseReturn->id,
+                    'purchase_receipt_item_id' => $rejItem->id,
+                    'product_id'               => $rejItem->product_id,
+                    'qty_returned'             => (float) $rejItem->qty_rejected,
+                    'unit_price'               => $poItem?->unit_price ?? $rejItem->product?->cost_price ?? 0,
+                    'reason'                   => $rejItem->reason_rejected ?? 'Ditolak saat pemeriksaan penerimaan barang',
+                ]);
+            }
+        }
     }
 }

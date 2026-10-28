@@ -152,7 +152,7 @@ class StockTransferController extends Controller
             $fromWarehouseId = $validated['from_warehouse_id'];
             $toWarehouseId = $validated['to_warehouse_id'];
 
-            // Validasi ketersediaan stok sumber di gudang asal
+            // Validasi ketersediaan stok sumber di gudang asal (sadar reservasi stok bebas)
             foreach ($validated['items'] as $index => $itemData) {
                 $stockQuery = InventoryStock::where('warehouse_id', $fromWarehouseId)
                     ->where('product_id', $itemData['product_id']);
@@ -161,11 +161,21 @@ class StockTransferController extends Controller
                     $stockQuery->where('rak_id', $itemData['from_rak_id']);
                 }
 
-                $available = (float) ($stockQuery->sum('qty_available') ?? 0);
-                if ($available < (float) $itemData['quantity']) {
+                $physical = (float) ($stockQuery->sum('qty_available') ?? 0);
+                $reserved = (float) ($stockQuery->sum('qty_reserved') ?? 0);
+                $freeStock = max(0, $physical - $reserved);
+
+                if ($freeStock < (float) $itemData['quantity']) {
                     $product = Product::find($itemData['product_id']);
+                    $fromWh = Warehouse::find($fromWarehouseId);
+                    $whName = $fromWh?->name ?? 'Gudang Asal';
+                    $productCode = $product->sku ?: $product->name;
+                    $qtyTransfer = (string) (float) $itemData['quantity'];
+                    $qtyFree = (string) (float) $freeStock;
+                    $msg = "Kuantitas transfer untuk {$productCode} ({$qtyTransfer} pcs) melebihi stok bebas yang tersedia di {$whName} ({$qtyFree} pcs).";
                     throw ValidationException::withMessages([
-                        "items.{$index}.quantity" => "Stok untuk {$product->name} di gudang asal hanya tersedia {$available}. Diminta: {$itemData['quantity']}.",
+                        "items.{$index}.quantity" => $msg,
+                        "items" => $msg,
                     ]);
                 }
             }
@@ -430,6 +440,7 @@ class StockTransferController extends Controller
                 'rak_id' => $stock->rak_id,
                 'rak_name' => $stock->rak?->name ?? '-',
                 'qty_available' => (float) $stock->qty_available,
+                'free_qty' => max(0, (float) $stock->qty_available - (float) $stock->qty_reserved),
             ];
         });
 

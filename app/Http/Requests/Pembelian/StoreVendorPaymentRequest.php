@@ -92,10 +92,9 @@ class StoreVendorPaymentRequest extends FormRequest
 
                 $remainingDebt = (float) ($invoice->accountPayable?->remaining ?? $invoice->total);
                 if ($allocatedAmount > ($remainingDebt + 1.00)) {
-                    $validator->errors()->add(
-                        "allocations.{$invId}",
-                        "Nominal pembayaran faktur {$invoice->invoice_number} (" . MoneyHelper::rupiah($allocatedAmount) . ") melebihi sisa hutang (" . MoneyHelper::rupiah($remainingDebt) . ")."
-                    );
+                    $msg = "Jumlah pembayaran (" . MoneyHelper::rupiah($allocatedAmount) . ") tidak boleh melebihi sisa tagihan faktur (" . MoneyHelper::rupiah($remainingDebt) . ").";
+                    $validator->errors()->add("allocations.{$invId}", $msg);
+                    $validator->errors()->add('allocations', $msg);
                 }
 
                 $totalPayment += $allocatedAmount;

@@ -218,7 +218,7 @@ class VendorPaymentController extends Controller
         $bankName = $supplier->nama_bank ?? $supplier->bank_name ?? '';
         $bankNum = $supplier->nomor_rekening ?? $supplier->rekening_bank ?? '';
         $holder = $supplier->nama_rekening ?? $supplier->atas_nama ?? $supplier->perusahaan ?? '';
-        $targetBank = trim("{$bankName} - {$bankNum} (a.n. {$holder})", ' -()');
+        $targetBank = $bankNum ? "{$bankName} - {$bankNum} (a.n. {$holder})" : '';
 
         return response()->json([
             'supplier' => [

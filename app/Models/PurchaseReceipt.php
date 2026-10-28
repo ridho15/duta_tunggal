@@ -84,6 +84,17 @@ class PurchaseReceipt extends Model
         return $this->hasMany(PurchaseReceiptBiaya::class, 'purchase_receipt_id');
     }
 
+    public function purchaseReturns()
+    {
+        return $this->hasMany(PurchaseReturn::class, 'purchase_receipt_id');
+    }
+
+    public function qualityControl()
+    {
+        return $this->hasOne(QualityControl::class, 'from_model_id')
+            ->where('from_model_type', self::class);
+    }
+
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');

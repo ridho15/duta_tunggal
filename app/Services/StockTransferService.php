@@ -128,16 +128,17 @@ class StockTransferService
                     ]);
                 }
 
-                if ((float) $sourceStock->qty_available < (float) $item->quantity) {
+                $physical = (float) $sourceStock->qty_available;
+                $reserved = (float) $sourceStock->qty_reserved;
+                $freeStock = max(0, $physical - $reserved);
+
+                if ($freeStock < (float) $item->quantity) {
+                    $productCode = $item->product?->sku ?: ($item->product?->name ?? $item->product_id);
+                    $qtyTransfer = rtrim(rtrim((string) $item->quantity, '0'), '.');
+                    $qtyFree = rtrim(rtrim((string) $freeStock, '0'), '.');
+                    $whName = $item->fromWarehouse?->name ?? 'Gudang Asal';
                     throw ValidationException::withMessages([
-                        'stock' => sprintf(
-                            'Stok tidak cukup untuk produk %s di gudang %s / rak %s. Tersedia %s, diminta %s.',
-                            $item->product?->name ?? $item->product_id,
-                            $item->fromWarehouse?->name ?? '-',
-                            $item->fromRak?->name ?? '-',
-                            rtrim(rtrim((string) $sourceStock->qty_available, '0'), '.'),
-                            rtrim(rtrim((string) $item->quantity, '0'), '.')
-                        ),
+                        'stock' => "Kuantitas transfer untuk {$productCode} ({$qtyTransfer} pcs) melebihi stok bebas yang tersedia di {$whName} ({$qtyFree} pcs).",
                     ]);
                 }
 

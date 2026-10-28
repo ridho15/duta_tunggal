@@ -5,7 +5,6 @@
 @section('content')
 <div class="space-y-6" x-data="goodsReceiptCreate({
     selectedPoId: '{{ $selectedPoId ?? '' }}',
-    initialItems: @json($poItemsData ?? []),
     poItemsUrl: '{{ url('gudang/penerimaan-po-items') }}'
 })">
     {{-- Header Formulir --}}
@@ -391,11 +390,25 @@
     </form>
 </div>
 
+<script id="po-items-initial-data" type="application/json">
+    {!! json_encode($poItemsData ?? []) !!}
+</script>
+
 <script>
 function goodsReceiptCreate(config) {
+    let initialItems = [];
+    try {
+        const rawEl = document.getElementById('po-items-initial-data');
+        if (rawEl && rawEl.textContent) {
+            initialItems = JSON.parse(rawEl.textContent);
+        }
+    } catch (e) {
+        console.error('Failed to parse po-items-initial-data:', e);
+    }
+
     return {
         selectedPoId: config.selectedPoId || '',
-        items: config.initialItems || [],
+        items: initialItems,
         poItemsUrl: config.poItemsUrl || '',
         loadingPo: false,
         formAction: 'save_draft',
@@ -476,31 +489,17 @@ function goodsReceiptCreate(config) {
 
             const received = parseFloat(item.qty_received) || 0;
             const rejected = parseFloat(item.qty_rejected) || 0;
-            item.qty_accepted = Math.max(0, received - rejected);
+            if (rejected === 0) {
+                item.qty_accepted = received;
+            }
         },
 
         handleQtyAcceptedChange(idx) {
-            const item = this.items[idx];
-            if (!item) return;
-
-            const received = parseFloat(item.qty_received) || 0;
-            const accepted = parseFloat(item.qty_accepted) || 0;
-            if (accepted > received) {
-                item.qty_accepted = received;
-            }
-            item.qty_rejected = Math.max(0, received - item.qty_accepted);
+            // Biarkan user menginput kuantitas fisik riil yang lolos inspeksi
         },
 
         handleQtyRejectedChange(idx) {
-            const item = this.items[idx];
-            if (!item) return;
-
-            const received = parseFloat(item.qty_received) || 0;
-            const rejected = parseFloat(item.qty_rejected) || 0;
-            if (rejected > received) {
-                item.qty_rejected = received;
-            }
-            item.qty_accepted = Math.max(0, received - item.qty_rejected);
+            // Biarkan user menginput kuantitas fisik riil yang ditolak inspeksi
         }
     };
 }

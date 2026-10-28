@@ -82,9 +82,10 @@ class StorePurchaseReceiptRequest extends FormRequest
                 }
 
                 if (round($qtyAccepted + $qtyRejected, 4) > round($qtyReceived, 4)) {
+                    $totalQc = $qtyAccepted + $qtyRejected;
                     $validator->errors()->add(
                         "items.{$index}.qty_accepted",
-                        "Total kuantitas disetujui ({$qtyAccepted}) dan ditolak ({$qtyRejected}) tidak boleh melebihi kuantitas diterima ({$qtyReceived})."
+                        "Total QC passed dan rejected ({$totalQc}) tidak boleh melebihi Qty Received ({$qtyReceived})."
                     );
                 }
 

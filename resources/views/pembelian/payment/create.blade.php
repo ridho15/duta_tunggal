@@ -3,7 +3,7 @@
 @section('title', 'Catat Pembayaran Hutang Vendor – Duta Tunggal ERP')
 
 @section('content')
-<div class="space-y-6" x-data="vendorPaymentForm({
+<div id="vendor-payment-root" class="space-y-6" x-data="vendorPaymentForm({
     initialSupplierId: '{{ old('supplier_id', $preselectedSupplierId ?? '') }}',
     initialInvoiceId: '{{ old('preselected_invoice_id', $preselectedInvoiceId ?? '') }}',
     initialTargetBank: '{{ old('target_bank_account', '') }}',
@@ -36,6 +36,22 @@
     <form action="{{ route('pembelian.payments.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
         @csrf
 
+        @if ($errors->any())
+            <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm flex items-start gap-3 shadow-xs">
+                <svg class="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div class="space-y-1">
+                    <span class="font-bold text-rose-950 block">Terjadi Kesalahan Validasi:</span>
+                    <ul class="list-disc list-inside space-y-0.5 text-xs text-rose-700">
+                        @foreach ($errors->all() as $err)
+                            <li>{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        @endif
+
         {{-- Kartu 1: Informasi Pembayaran & Vendor --}}
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-6 space-y-4">
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2.5 flex items-center gap-2">
@@ -49,7 +65,7 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {{-- Supplier Selection --}}
-                <div class="sm:col-span-2 lg:col-span-1" @change="onSupplierChange($event.target.value)">
+                <div class="sm:col-span-2 lg:col-span-1" @change="onSupplierChange($event.target.value || $event.detail)">
                     @php
                         $supplierOptions = $suppliers->map(function ($s) {
                             return [
@@ -125,7 +141,7 @@
                         name="coa_id"
                         label="Akun Kas / Bank Pengeluar"
                         :options="$coaOptions"
-                        :value="old('coa_id')"
+                        :value="old('coa_id', $cashBankAccounts->first()?->id)"
                         placeholder="-- Pilih Akun Kas / Bank --"
                         required="true"
                     />
@@ -144,8 +160,17 @@
                         name="target_bank_account"
                         x-model="targetBankAccount"
                         placeholder="Contoh: BCA - 1234567890 (a.n. PT Vendor)"
-                        class="w-full px-3.5 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition"
+                        class="w-full px-3.5 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d] transition font-mono"
                     >
+                    <div x-show="targetBankAccount" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
+                        <svg class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        <div>
+                            <span class="font-bold text-blue-950 block">Informasi Rekening Tujuan Supplier (Master Data):</span>
+                            <span class="font-mono text-blue-900 font-semibold" x-text="targetBankAccount"></span>
+                        </div>
+                    </div>
                     @error('target_bank_account')
                         <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
                     @enderror
@@ -509,7 +534,7 @@ function vendorPaymentForm(config) {
                 .then(res => res.json())
                 .then(data => {
                     this.invoices = data.invoices || [];
-                    if (data.supplier && data.supplier.target_bank_account && !this.targetBankAccount) {
+                    if (data.supplier && data.supplier.target_bank_account) {
                         this.targetBankAccount = data.supplier.target_bank_account;
                     }
 
@@ -582,9 +607,6 @@ function vendorPaymentForm(config) {
             const inv = this.invoices.find(item => Number(item.id) === id);
             if (!inv) return;
 
-            if (this.allocations[id] > inv.remaining) {
-                this.allocations[id] = inv.remaining;
-            }
             if (!this.isSelected(id) && this.allocations[id] > 0) {
                 this.selectedInvoices.push(id);
             }

@@ -176,7 +176,9 @@ class QualityControlObserver
             return;
         }
 
-        $returnProductItem = $returnProduct->returnProductItems()->first();
+        $returnProductItem = method_exists($returnProduct, 'returnProductItem') 
+            ? $returnProduct->returnProductItem()->first() 
+            : $returnProduct->returnProductItems()->first();
         if ($returnProductItem) {
             $returnProductItem->quantity = $qualityControl->rejected_quantity;
             $returnProductItem->save();
