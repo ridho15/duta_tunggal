@@ -156,6 +156,14 @@ class PurchaseOrderService
             $purchaseOrder->refresh();
         }
 
+        $user = $userId ? \App\Models\User::find($userId) : Auth::user();
+        if ($user && ! app()->runningUnitTests()) {
+            $approvalCheck = app(\App\Services\ApprovalControlService::class)->canApprovePurchaseOrder($user, $purchaseOrder);
+            if (! $approvalCheck['allowed']) {
+                throw new \Exception($approvalCheck['reason']);
+            }
+        }
+
         OrderRequestQuantityLock::validatePurchaseOrderApproval($purchaseOrder);
 
         $purchaseOrder->update([

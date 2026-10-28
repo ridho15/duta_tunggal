@@ -326,4 +326,22 @@ class SalesInvoiceController extends Controller
 
         return $pdf->stream("Invoice-Penjualan-{$invoice->invoice_number}.pdf");
     }
+
+    /**
+     * Mengisi/mengubah No. Faktur Pajak 16 digit pada Faktur Penjualan resmi (UAT-INV-04).
+     */
+    public function updateTaxNumber(Request $request, Invoice $invoice): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tax_invoice_number' => ['nullable', 'string', 'max:50', new \App\Rules\TaxInvoiceNumber($invoice->getKey())],
+        ]);
+
+        app(\App\Services\SalesInvoiceTaxNumber::class)->set($invoice, $validated['tax_invoice_number'] ?? null);
+
+        $msg = filled($validated['tax_invoice_number'] ?? null)
+            ? 'No. Faktur Pajak disimpan. Jurnal dan piutang tidak berubah.'
+            : 'No. Faktur Pajak dihapus.';
+
+        return redirect()->route('penjualan.invoices.show', $invoice->id)->with('success', $msg);
+    }
 }

@@ -29,6 +29,8 @@ class SalesInvoiceTaxResolver
 
         if ($firstTaxType !== null && trim((string) $firstTaxType) !== '') {
             $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $firstTaxType);
+        } elseif (!empty($saleOrder->tipe_pajak)) {
+            $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $saleOrder->tipe_pajak);
         } elseif ($resolvedTaxRate > 0) {
             $resolvedTaxType = 'Eksklusif';
         } else {
@@ -42,6 +44,10 @@ class SalesInvoiceTaxResolver
                     $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $firstTaxType);
                 }
             }
+        }
+
+        if ($resolvedTaxRate <= 0 && (float)($saleOrder->ppn_rate ?? 0) > 0) {
+            $resolvedTaxRate = (float) $saleOrder->ppn_rate;
         }
 
         return [

@@ -63,6 +63,17 @@
             @endif
 
             @if(!in_array(strtolower((string) $invoice->status), ['draft', 'cancelled', 'canceled']))
+                <button
+                    type="button"
+                    onclick="document.getElementById('taxNumberModal').classList.remove('hidden')"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span>{{ filled($invoice->tax_invoice_number) ? 'Ubah No. Faktur Pajak' : 'Isi No. Faktur Pajak' }}</span>
+                </button>
+
                 <a
                     href="{{ route('penjualan.credit-notes.create', ['invoice_id' => $invoice->id]) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs shadow-xs transition"
@@ -179,6 +190,13 @@
                         @endforeach
                     </div>
                 </div>
+
+                <div class="space-y-1">
+                    <span class="text-gray-400 block text-[11px]">No. Faktur Pajak:</span>
+                    <span class="font-bold {{ filled($invoice->tax_invoice_number) ? 'text-emerald-700 font-mono' : 'text-gray-400 italic' }} text-sm block">
+                        {{ $invoice->tax_invoice_number ?? 'Belum diisi' }}
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -200,8 +218,8 @@
                 </div>
 
                 <div class="flex justify-between text-gray-600">
-                    <span>Ongkos Kirim</span>
-                    <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->other_fee, 0, ',', '.') }}</span>
+                    <span>Biaya Lain / Ongkos Kirim</span>
+                    <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->other_fee_total, 0, ',', '.') }}</span>
                 </div>
 
                 <div class="pt-2 border-t border-gray-100 flex justify-between items-center text-sm">
@@ -285,6 +303,59 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    {{-- Modal Isi No. Faktur Pajak --}}
+    <div id="taxNumberModal" class="{{ $errors->has('tax_invoice_number') ? '' : 'hidden' }} fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <h3 class="text-base font-bold text-gray-900">No. Faktur Pajak</h3>
+                <button type="button" onclick="document.getElementById('taxNumberModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round"></path></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ route('penjualan.invoices.updateTaxNumber', $invoice->id) }}" class="space-y-4">
+                @csrf
+                <div>
+                    <label for="tax_invoice_number" class="block text-xs font-semibold text-gray-700 mb-1">
+                        No. Faktur Pajak
+                    </label>
+                    <input
+                        type="text"
+                        name="tax_invoice_number"
+                        id="tax_invoice_number"
+                        value="{{ old('tax_invoice_number', $invoice->tax_invoice_number) }}"
+                        placeholder="010.000-26.12345678"
+                        class="w-full px-3 py-2 border rounded-xl text-sm font-mono {{ $errors->has('tax_invoice_number') ? 'border-red-500 bg-red-50/50' : 'border-gray-300' }} focus:outline-none focus:border-[#15803d]"
+                    >
+                    @if($errors->has('tax_invoice_number'))
+                        <p class="text-xs text-red-600 font-semibold mt-1">
+                            {{ $errors->first('tax_invoice_number') }}
+                        </p>
+                    @endif
+                    <p class="text-[11px] text-gray-400 mt-1">
+                        16 digit. Kosongkan untuk menghapus nomor. Perubahan tercatat di riwayat aktivitas.
+                    </p>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button
+                        type="button"
+                        onclick="document.getElementById('taxNumberModal').classList.add('hidden')"
+                        class="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white rounded-xl text-xs font-bold shadow-xs transition"
+                    >
+                        Simpan
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

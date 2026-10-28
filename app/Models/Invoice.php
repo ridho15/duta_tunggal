@@ -254,7 +254,15 @@ class Invoice extends Model
      */
     public function setOtherFeeAttribute($value): void
     {
-        $this->attributes['other_fee'] = is_array($value) ? json_encode($value) : json_encode([]);
+        if (is_array($value)) {
+            $this->attributes['other_fee'] = json_encode($value);
+        } elseif (is_numeric($value) && (float) $value > 0) {
+            $this->attributes['other_fee'] = json_encode([
+                ['name' => 'Biaya Lain / Ongkos Kirim', 'amount' => (float) $value]
+            ]);
+        } else {
+            $this->attributes['other_fee'] = json_encode([]);
+        }
     }
 
     protected static function boot()

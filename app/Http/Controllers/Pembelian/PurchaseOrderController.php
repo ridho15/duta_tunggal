@@ -648,6 +648,11 @@ class PurchaseOrderController extends Controller
             return back()->with('error', 'Hanya PO berstatus Draf atau Menunggu Persetujuan yang dapat disetujui.');
         }
 
+        $approvalCheck = app(\App\Services\ApprovalControlService::class)->canApprovePurchaseOrder(Auth::user(), $purchaseOrder);
+        if (! $approvalCheck['allowed']) {
+            return back()->with('error', $approvalCheck['reason']);
+        }
+
         try {
             DB::beginTransaction();
             $this->purchaseOrderService->approvePo($purchaseOrder, Auth::id());

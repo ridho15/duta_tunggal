@@ -6,6 +6,7 @@ use App\Models\ApprovalOverride;
 use App\Models\ApprovalRule;
 use App\Models\OrderRequest;
 use App\Models\PaymentRequest;
+use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\SaleOrder;
 use App\Models\User;
@@ -68,6 +69,7 @@ class ApprovalControlService
             $record instanceof OrderRequest => $record->created_by,
             $record instanceof SaleOrder => $record->created_by,
             $record instanceof PaymentRequest => $record->requested_by,
+            $record instanceof PurchaseOrder => $record->created_by,
             default => $record->created_by ?? $record->user_id ?? null,
         };
 
@@ -76,6 +78,57 @@ class ApprovalControlService
         }
 
         return (int) $user->id === (int) $creatorId;
+    }
+
+    /**
+     * Determine whether the user can approve the given Purchase Order.
+     *
+     * UAT Modul 06:
+     * - Anti-Self-Approval: Pembuat PO dilarang menyetujui dokumen miliknya sendiri (kecuali Super Admin / Owner).
+     *   Pesan: "Pemisahan tugas (Segregation of Duties): Pembuat Purchase Order tidak boleh menyetujui dokumen miliknya sendiri."
+     * - Persetujuan Bertingkat: PO > Rp 10.000.000 wajib disetujui oleh Direktur / Owner / Finance Manager.
+     *   Pesan: "Persetujuan bertingkat: Nilai Purchase Order di atas Rp 10.000.000 wajib disetujui oleh Direktur / Owner / Finance Manager."
+     * - PO <= Rp 10.000.000 dapat disetujui oleh Purchasing Manager / Direktur.
+     *   Pesan: "Persetujuan Purchase Order membutuhkan wewenang Purchasing Manager / Direktur."
+     *
+     * @return array{allowed: bool, reason: string|null, self_override: bool}
+     */
+    public function canApprovePurchaseOrder(?User $user, PurchaseOrder $purchaseOrder): array
+    {
+        if (! $user) {
+            return ['allowed' => false, 'reason' => 'Pengguna tidak terautentikasi.', 'self_override' => false];
+        }
+
+        // 1. Anti-Self-Approval
+        if ($this->isSelfApproval($user, $purchaseOrder) && ! $user->hasRole(['Super Admin', 'Owner'])) {
+            return [
+                'allowed' => false,
+                'reason' => 'Pemisahan tugas (Segregation of Duties): Pembuat Purchase Order tidak boleh menyetujui dokumen miliknya sendiri.',
+                'self_override' => false,
+            ];
+        }
+
+        // 2. Persetujuan Bertingkat (Tier Limit)
+        $amount = (float) ($purchaseOrder->total_amount ?? 0);
+        if ($amount > self::TIER_1_MAX_AMOUNT) {
+            if (! $user->hasRole(self::TOP_TIER_ROLES)) {
+                return [
+                    'allowed' => false,
+                    'reason' => 'Persetujuan bertingkat: Nilai Purchase Order di atas Rp 10.000.000 wajib disetujui oleh Direktur / Owner / Finance Manager.',
+                    'self_override' => false,
+                ];
+            }
+        } else {
+            if ($user->roles()->exists() && ! $user->hasRole(self::PURCHASING_TIER_1_ROLES)) {
+                return [
+                    'allowed' => false,
+                    'reason' => 'Persetujuan Purchase Order membutuhkan wewenang Purchasing Manager / Direktur.',
+                    'self_override' => false,
+                ];
+            }
+        }
+
+        return ['allowed' => true, 'reason' => null, 'self_override' => false];
     }
 
     /**

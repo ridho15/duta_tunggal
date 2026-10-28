@@ -271,6 +271,18 @@
                         <span class="font-semibold text-gray-800">{{ $purchaseOrder->tempo_hutang }} Hari</span>
                     </div>
                 @endif
+                @if ($purchaseOrder->refer_model_type === \App\Models\OrderRequest::class && $purchaseOrder->refer_model_id)
+                    @php $linkedOr = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id); @endphp
+                    <div class="flex justify-between items-center pt-1 border-t border-gray-100">
+                        <span class="text-gray-400">Ref. Order Request:</span>
+                        <a href="{{ route('pembelian.or.show', $purchaseOrder->refer_model_id) }}" class="font-bold text-[#15803d] hover:underline flex items-center gap-1">
+                            <span>{{ $linkedOr?->request_number ?? ('OR #' . $purchaseOrder->refer_model_id) }}</span>
+                            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>
+                    </div>
+                @endif
             </div>
         </div>
 

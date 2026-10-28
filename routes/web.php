@@ -219,6 +219,11 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/invoice/create', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'create'])->name('invoices.create');
         Route::post('/invoice', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'store'])->name('invoices.store');
         Route::get('/invoice/{invoice}', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('/invoice/{invoice}/edit', function (\App\Models\Invoice $invoice) {
+            return redirect()->route('penjualan.invoices.show', $invoice->id)
+                ->with('error', 'Invoice dengan status "' . ($invoice->status_label ?? $invoice->status) . '" telah diposting dan terkunci demi integritas jurnal. Koreksi finansial harus dilakukan melalui Credit Note.');
+        })->name('invoices.edit');
+        Route::post('/invoice/{invoice}/tax-number', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'updateTaxNumber'])->name('invoices.updateTaxNumber');
         Route::get('/invoice/{invoice}/pdf', [\App\Http\Controllers\Penjualan\SalesInvoiceController::class, 'pdf'])->name('invoices.pdf');
 
         // Aliases for plural URL compatibility
