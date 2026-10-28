@@ -34,14 +34,12 @@ class OrderRequest extends Model
 
     public function warehouse()
     {
-        // legacy accessor removed
-        return null;
+        return $this->belongsTo(\App\Models\Warehouse::class, 'warehouse_id')->withDefault();
     }
 
     public function cabang()
     {
-        // legacy accessor removed
-        return null;
+        return $this->belongsTo(\App\Models\Cabang::class, 'cabang_id')->withDefault();
     }
 
     public function currency()

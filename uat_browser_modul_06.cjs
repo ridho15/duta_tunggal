@@ -43,18 +43,15 @@ const { execSync } = require('child_process');
 
     async function loginAs(email, password = 'password') {
         console.log(`   [LOGIN] Masuk sebagai ${email}...`);
+        await context.clearCookies();
         await page.goto('http://localhost:8009/login', { waitUntil: 'networkidle' });
-        // Jika sudah login, logout dulu jika bukan email yang sama
-        const alreadyLoggedIn = await page.$('form[action*="logout"]');
-        if (alreadyLoggedIn) {
-            await page.click('form[action*="logout"] button[type="submit"]');
-            await page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {});
-            await page.goto('http://localhost:8009/login', { waitUntil: 'networkidle' });
-        }
         await page.fill('#login', email);
         await page.fill('#password', password);
-        await page.click('button[type="submit"]');
-        await page.waitForTimeout(1500);
+        await Promise.all([
+            page.waitForNavigation({ waitUntil: 'networkidle' }),
+            page.click('button[type="submit"]')
+        ]);
+        await page.waitForTimeout(1000);
     }
 
     try {
@@ -71,11 +68,10 @@ const { execSync } = require('child_process');
 
         console.log('   Mengeklik tombol "Terbitkan Purchase Order (PO)"...');
         const createPoLink = await page.waitForSelector('a:has-text("Terbitkan Purchase Order")');
-        await Promise.all([
-            page.waitForNavigation({ waitUntil: 'networkidle' }),
-            createPoLink.click()
-        ]);
-        await page.waitForTimeout(1500);
+        const poCreateUrl = await createPoLink.getAttribute('href');
+        console.log('   Navigasi ke URL:', poCreateUrl);
+        await page.goto(poCreateUrl, { waitUntil: 'networkidle' });
+        await page.waitForTimeout(2000);
 
         console.log('   Form PO Create terbuka:', page.url());
         await page.screenshot({ path: path.join(screenshotsDir, '02_uat_po_01_po_create_from_or.png'), fullPage: true });

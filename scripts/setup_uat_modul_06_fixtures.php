@@ -28,10 +28,14 @@ $usersToUpdate = [
     'inventory_manager@example.com',
 ];
 
+$cabang = Cabang::find(27) ?? Cabang::first();
+$warehouse = Warehouse::where('cabang_id', $cabang->id)->first() ?? Warehouse::first();
+
 foreach ($usersToUpdate as $email) {
     User::where('email', $email)->update([
         'manage_type' => ['all'],
-        'cabang_id' => 1,
+        'cabang_id' => $cabang->id,
+        'password' => \Illuminate\Support\Facades\Hash::make('password'),
     ]);
 }
 
@@ -41,8 +45,6 @@ $ownerUser = User::where('email', 'owner@example.com')->firstOrFail();
 $inventoryManagerUser = User::where('email', 'inventory_manager@example.com')->firstOrFail();
 
 $currency = Currency::where('code', 'IDR')->first() ?? Currency::first();
-$cabang = Cabang::find(1) ?? Cabang::first();
-$warehouse = Warehouse::where('cabang_id', $cabang->id)->first() ?? Warehouse::first();
 
 // 2. Verifikasi / Buat Supplier SUPP-TEST-UAT-001
 $supplier = Supplier::updateOrCreate(

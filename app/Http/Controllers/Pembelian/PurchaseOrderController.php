@@ -311,6 +311,17 @@ class PurchaseOrderController extends Controller
                     $currencyId = !empty($item['currency_id']) ? (int) $item['currency_id'] : (!empty($validated['currency_id']) ? (int) $validated['currency_id'] : null);
                     $orItemId = !empty($item['order_request_item_id']) ? (int) $item['order_request_item_id'] : null;
 
+                    $orItem = null;
+                    if ($orItemId) {
+                        $orItem = OrderRequestItem::find($orItemId);
+                        if ($orItem) {
+                            $limit = OrderRequestQuantityLock::orderRequestItemLimit($orItemId);
+                            if ($qty > $limit['remaining_for_po']) {
+                                throw new \Exception("Kuantitas produk '{$orItem->product?->name}' ({$qty}) melebihi sisa permintaan pada Order Request (Maks: {$limit['remaining_for_po']}).");
+                            }
+                        }
+                    }
+
                     PurchaseOrderItem::create([
                         'purchase_order_id' => $poRecord->id,
                         'product_id' => $item['product_id'],
@@ -325,15 +336,8 @@ class PurchaseOrderController extends Controller
                         'refer_item_model_id' => $orItemId,
                     ]);
 
-                    if ($orItemId) {
-                        $orItem = OrderRequestItem::find($orItemId);
-                        if ($orItem) {
-                            $limit = OrderRequestQuantityLock::orderRequestItemLimit($orItemId);
-                            if ($qty > $limit['remaining_for_po']) {
-                                throw new \Exception("Kuantitas produk '{$orItem->product?->name}' ({$qty}) melebihi sisa permintaan pada Order Request (Maks: {$limit['remaining_for_po']}).");
-                            }
-                            $orItem->addFulfilledQuantity($qty);
-                        }
+                    if ($orItem) {
+                        $orItem->addFulfilledQuantity($qty);
                     }
                 }
 

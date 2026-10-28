@@ -181,7 +181,7 @@
 
                 {{-- Step 3 --}}
                 <div class="flex flex-col items-center relative z-10">
-                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs {{ $isApproved ? 'bg-[#15803d] text-white' : 'bg-gray-100 text-gray-400 border border-gray-300') }}">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs {{ $isApproved ? 'bg-[#15803d] text-white' : 'bg-gray-100 text-gray-400 border border-gray-300' }}">
                         {{ $isApproved ? '✓' : '3' }}
                     </div>
                     <span class="text-xs font-bold {{ $isApproved ? 'text-gray-900' : 'text-gray-400' }} mt-1.5">
@@ -194,7 +194,7 @@
 
                 {{-- Step 4 --}}
                 <div class="flex flex-col items-center relative z-10">
-                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs {{ $isPO ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-400 border border-gray-300') }}">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs {{ $isPO ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-400 border border-gray-300' }}">
                         {{ $isPO ? '✓' : '4' }}
                     </div>
                     <span class="text-xs font-bold {{ $isPO ? 'text-purple-700' : 'text-gray-400' }} mt-1.5">
