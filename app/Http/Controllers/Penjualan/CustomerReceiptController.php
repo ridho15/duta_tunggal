@@ -339,7 +339,8 @@ class CustomerReceiptController extends Controller
             $proofPath = $request->file('proof')->store('customer-receipts/proofs', 'local');
         }
 
-        $receipt = DB::transaction(function () use ($validated, $plan, $proofPath, $paymentMethod, $allowDepositOverpayment) {
+        try {
+            $receipt = DB::transaction(function () use ($validated, $plan, $proofPath, $paymentMethod, $allowDepositOverpayment) {
             $totalApplied = round(array_sum($plan['applied']), 2);
             $overpayment = round((float) ($plan['overpayment'] ?? 0), 2);
             $firstInvoiceId = array_key_first($plan['applied']);
@@ -440,11 +441,7 @@ class CustomerReceiptController extends Controller
             $finalStatus = $allPaid ? 'Paid' : ($anyPartial ? 'Partial' : 'Paid');
             $receipt->update(['status' => $finalStatus]);
 
-            try {
-                $this->ledgerService->postCustomerReceipt($receipt->fresh());
-            } catch (Throwable $e) {
-                // Jurnal tetap diupayakan tercatat
-            }
+            $this->ledgerService->postCustomerReceipt($receipt->fresh());
 
             // 4. Catat Kelebihan Bayar sebagai Deposit bila opsi aktif
             if ($overpayment > 0 && $allowDepositOverpayment) {
@@ -462,17 +459,18 @@ class CustomerReceiptController extends Controller
                     'created_by' => Auth::id(),
                 ]);
 
-                try {
-                    $this->ledgerService->postDeposit($deposit, $receipt->cabang_id ? (int) $receipt->cabang_id : null);
-                } catch (Throwable $e) {
-                    // Deposit journal posting
-                }
+                $this->ledgerService->postDeposit($deposit, $receipt->cabang_id ? (int) $receipt->cabang_id : null);
 
                 $receipt->update(['deposit_id' => $deposit->id]);
             }
 
             return $receipt;
         });
+        } catch (ValidationException $e) {
+            return back()->withInput()->withErrors($e->errors());
+        } catch (Throwable $e) {
+            return back()->withInput()->with('error', 'Gagal memproses penerimaan: ' . $e->getMessage());
+        }
 
         $msg = "Penerimaan Customer KW-" . str_pad((string) $receipt->id, 6, '0', STR_PAD_LEFT) . " senilai " . MoneyHelper::rupiah($receipt->total_payment) . " berhasil diproses.";
         if ($receipt->deposit_id && $receipt->deposit) {

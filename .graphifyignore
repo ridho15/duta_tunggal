@@ -1,0 +1,21 @@
+# Ponytail: Exclude localization dictionaries (2000+ translation files with no architectural logic)
+/lang/
+
+# Ponytail: Exclude test archives and visual testing screenshots
+/tests_archive/
+/tests/playwright/screenshots/
+/playwright-report/
+/test-results/
+
+# Ponytail: Exclude cache, runtime storage, logs, and compiled assets
+/storage/
+/public/build/
+/public/vendor/
+/public/storage/
+/tmp/
+/docs/archive/
+/docs/internal_references/
+
+# Standard dependencies
+/vendor/
+/node_modules/

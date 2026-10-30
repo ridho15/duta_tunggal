@@ -148,14 +148,9 @@ class OrderRequestApiController extends Controller
                 'data' => $data,
             ]);
         } catch (Throwable $e) {
-            Log::error('OrderRequestApiController::dependencies failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memuat master data: ' . $e->getMessage(),
+                'message' => 'Gagal mengambil dependencies Order Request: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -176,6 +171,13 @@ class OrderRequestApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (! Auth::user()?->can('create', OrderRequest::class)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk membuat Order Request.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'request_number' => 'required|string|max:255|unique:order_requests,request_number',
             'request_date' => 'required|date',
@@ -218,7 +220,7 @@ class OrderRequestApiController extends Controller
 
         return DB::transaction(function () use ($validated) {
             $currencyId = $validated['currency_id'] ?? CurrencyConversionResolver::resolveCurrencyIdByCode('IDR');
-            $userId = Auth::id() ?? 1; // Fallback to user ID 1 if not logged in via session/token
+            $userId = Auth::id();
 
             // 1. Create OrderRequest Header
             $orderRequest = OrderRequest::create([
@@ -266,8 +268,6 @@ class OrderRequestApiController extends Controller
                     'cabang_id' => $itemData['cabang_id'] ?? null,
                     'currency_id' => $itemCurrencyId,
                     'quantity' => $quantity,
-                    'fulfilled_quantity' => 0,
-                    'status' => OrderRequestItem::STATUS_DRAFT,
                     'unit_price' => $unitPrice,
                     'unit_price_idr' => $unitPriceIdr,
                     'original_price' => $originalPrice,
@@ -277,6 +277,7 @@ class OrderRequestApiController extends Controller
                     'tipe_pajak' => $tipePajak,
                     'subtotal' => $subtotal,
                     'note' => $itemData['note'] ?? null,
+                    'status' => OrderRequestItem::STATUS_DRAFT,
                 ]);
             }
 
@@ -300,7 +301,7 @@ class OrderRequestApiController extends Controller
     }
 
     /**
-     * Update the specified Order Request and its items.
+     * Update an existing Order Request and sync items.
      */
     public function update(Request $request, $id): JsonResponse
     {
@@ -310,6 +311,13 @@ class OrderRequestApiController extends Controller
                 'success' => false,
                 'message' => 'Order Request tidak ditemukan.',
             ], 404);
+        }
+
+        if (! Auth::user()?->can('update', $orderRequest)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengubah Order Request.',
+            ], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -418,12 +426,16 @@ class OrderRequestApiController extends Controller
                     ? OrderRequestItem::normalizeApprovalStatus($itemData['status'])
                     : null;
                 if ($itemStatus) {
+                    if (in_array($itemStatus, [OrderRequestItem::STATUS_APPROVED, OrderRequestItem::STATUS_REJECTED], true)
+                        && ! Auth::user()?->hasPermissionTo('approve order request')) {
+                        throw new \Illuminate\Auth\Access\AuthorizationException('Anda tidak memiliki izin untuk menyetujui atau menolak Order Request.');
+                    }
                     $itemPayload['status'] = $itemStatus;
                     if ($itemStatus === OrderRequestItem::STATUS_APPROVED) {
-                        $itemPayload['approved_by'] = Auth::id() ?? 1;
+                        $itemPayload['approved_by'] = Auth::id();
                         $itemPayload['approved_at'] = now();
                     } elseif ($itemStatus === OrderRequestItem::STATUS_REJECTED) {
-                        $itemPayload['rejected_by'] = Auth::id() ?? 1;
+                        $itemPayload['rejected_by'] = Auth::id();
                         $itemPayload['rejected_at'] = now();
                     }
                 }
@@ -476,4 +488,3 @@ class OrderRequestApiController extends Controller
         });
     }
 }
-

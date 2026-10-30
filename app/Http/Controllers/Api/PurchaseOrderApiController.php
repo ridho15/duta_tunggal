@@ -130,8 +130,14 @@ class PurchaseOrderApiController extends Controller
                 });
 
             // 6. Fetch Available Order Requests with remaining approved items for PO
-            $orderRequests = OrderRequest::query()
-                ->whereIn('status', ['approved', 'partial', 'approve'])
+            $orderRequestsQuery = OrderRequest::query()
+                ->whereIn('status', ['approved', 'partial', 'approve']);
+            if (! $canAccessAllCabang && $user?->cabang_id) {
+                $orderRequestsQuery->whereHas('orderRequestItem', function ($q) use ($user) {
+                    $q->where('cabang_id', $user->cabang_id);
+                });
+            }
+            $orderRequests = $orderRequestsQuery
                 ->with([
                     'orderRequestItem' => function ($q) {
                         $q->select('id', 'order_request_id', 'product_id', 'supplier_id', 'cabang_id', 'quantity', 'fulfilled_quantity', 'status')
@@ -192,8 +198,12 @@ class PurchaseOrderApiController extends Controller
                 ->values();
 
             // 6. Fetch Available Sales Orders
-            $salesOrders = SaleOrder::query()
-                ->whereIn('status', ['approved', 'confirmed', 'draft'])
+            $salesOrdersQuery = SaleOrder::query()
+                ->whereIn('status', ['approved', 'confirmed', 'draft']);
+            if (! $canAccessAllCabang && $user?->cabang_id) {
+                $salesOrdersQuery->where('cabang_id', $user->cabang_id);
+            }
+            $salesOrders = $salesOrdersQuery
                 ->with(['customer:id,code,name', 'saleOrderItem'])
                 ->orderByDesc('id')
                 ->limit(50)
@@ -273,6 +283,7 @@ class PurchaseOrderApiController extends Controller
             $items = [];
             $headerDefaults = [];
 
+            $user = Auth::user();
             if ($type === 'App\Models\OrderRequest' || $type === 'OrderRequest') {
                 $orderRequest = OrderRequest::with([
                     'orderRequestItem.product.uom',
@@ -281,6 +292,13 @@ class PurchaseOrderApiController extends Controller
                         $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')->withPivot('supplier_price');
                     },
                 ])->find($id);
+
+                if ($orderRequest && ! $user?->canAccessCabang($orderRequest->orderRequestItem->first()?->cabang_id)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Anda tidak memiliki akses ke cabang Order Request ini.',
+                    ], 403);
+                }
 
                 if ($orderRequest) {
                     $matchedSupplier = $supplierFilter ? Supplier::find($supplierFilter) : null;
@@ -350,6 +368,13 @@ class PurchaseOrderApiController extends Controller
                         $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')->withPivot('supplier_price');
                     },
                 ])->find($id);
+
+                if ($saleOrder && ! $user?->canAccessCabang($saleOrder->cabang_id)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Anda tidak memiliki akses ke cabang Sales Order ini.',
+                    ], 403);
+                }
 
                 if ($saleOrder) {
                     $headerDefaults = [
@@ -426,6 +451,12 @@ class PurchaseOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (! Auth::user()?->can('create', PurchaseOrder::class)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk membuat Purchase Order.',
+            ], 403);
+        }
         $validator = Validator::make($request->all(), [
             'header.po_number' => 'required|string|max:255|unique:purchase_orders,po_number',
             'header.supplier_id' => 'required|integer|exists:suppliers,id',
@@ -605,6 +636,13 @@ class PurchaseOrderApiController extends Controller
                 'cabang',
             ])->findOrFail($id);
 
+            if (! Auth::user()?->can('view', $po)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki izin untuk melihat Purchase Order ini.',
+                ], 403);
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -663,6 +701,13 @@ class PurchaseOrderApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $po = PurchaseOrder::findOrFail($id);
+
+        if (! Auth::user()?->can('update', $po)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengubah Purchase Order ini.',
+            ], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'header.po_number' => "required|string|max:255|unique:purchase_orders,po_number,{$id}",

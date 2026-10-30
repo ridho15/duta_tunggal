@@ -9,10 +9,42 @@ use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class OrderRequestApiTest extends TestCase
 {
+    protected User $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->user = User::withoutGlobalScopes()->first() ?? User::factory()->create();
+        $role = Role::firstOrCreate(['name' => 'Super Admin']);
+        if (! $this->user->hasRole('Super Admin')) {
+            $this->user->assignRole($role);
+        }
+        $this->actingAs($this->user);
+    }
+
+    public function test_unauthenticated_request_is_blocked(): void
+    {
+        auth()->logout();
+        $this->getJson('/api/v1/order-requests/dependencies')->assertStatus(401);
+        $this->postJson('/api/v1/order-requests', [])->assertStatus(401);
+    }
+
+    public function test_user_without_permission_cannot_create_order_request(): void
+    {
+        $restrictedUser = User::factory()->create([
+            'email' => 'restricted_' . uniqid() . '@example.com',
+            'username' => 'restr_' . substr(uniqid(), 0, 7),
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->postJson('/api/v1/order-requests', [])->assertStatus(403);
+    }
+
     public function test_can_fetch_order_request_dependencies()
     {
         $response = $this->getJson('/api/v1/order-requests/dependencies');
@@ -147,32 +179,12 @@ class OrderRequestApiTest extends TestCase
         ]);
     }
 
-    public function test_filament_create_order_request_page_renders_successfully()
+    public function test_legacy_filament_order_request_urls_redirect_to_dashboard_under_lockdown()
     {
         $user = User::first() ?? User::factory()->create();
-        $p1 = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'view any order request']);
-        $p2 = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'create order request']);
-        $user->givePermissionTo([$p1, $p2]);
-
-        $response = $this->actingAs($user)->get('/admin/order-requests/create');
-
-        $response->assertStatus(200);
-        $response->assertSee('order-request-next-app');
-    }
-
-    public function test_filament_edit_order_request_page_renders_successfully()
-    {
-        $user = User::first() ?? User::factory()->create();
-        $p1 = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'view any order request']);
-        $p2 = \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'update order request']);
-        $user->givePermissionTo([$p1, $p2]);
-
         $orderRequest = OrderRequest::first() ?? OrderRequest::factory()->create();
 
-        $response = $this->actingAs($user)->get("/admin/order-requests/{$orderRequest->id}/edit");
-
-        $response->assertStatus(200);
-        $response->assertSee('order-request-next-app');
-        $response->assertSee('__ORDER_REQUEST_RECORD__');
+        $this->actingAs($user)->get('/admin/order-requests/create')->assertRedirect(route('dashboard'));
+        $this->actingAs($user)->get("/admin/order-requests/{$orderRequest->id}/edit")->assertRedirect(route('dashboard'));
     }
 }

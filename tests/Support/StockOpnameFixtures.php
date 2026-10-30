@@ -71,8 +71,13 @@ function opnContext(array $overrides = []): array
     $inventoryCoa = ChartOfAccount::whereIn('code', ['1100', config('coa.inventory', '1140.01'), '1140.10'])->first()
         ?? $coa('1100', 'Persediaan Barang Dagang', 'Asset');
 
-    $adjustmentCoa = ChartOfAccount::whereIn('code', ['5100', '5100.10', config('coa.general_expense', '6100')])->first()
-        ?? $coa('5100.10', 'Selisih Penyesuaian Persediaan (Opname)', 'Expense');
+    $incomeVarianceCoa = ChartOfAccount::where('code', config('coa.inventory_variance_gain', '7000.04'))->first()
+        ?? $coa('7000.04', 'Pendapatan Selisih Penyesuaian Persediaan', 'Revenue');
+
+    $expenseVarianceCoa = ChartOfAccount::where('code', config('coa.inventory_variance_loss', '8000.05'))->first()
+        ?? $coa('8000.05', 'Beban Selisih Penyesuaian Persediaan', 'Expense');
+
+    $adjustmentCoa = $expenseVarianceCoa;
 
     $kasCoa = $coa('1101', 'Kas Operasional', 'Asset');
 
@@ -90,6 +95,7 @@ function opnContext(array $overrides = []): array
     return array_merge(compact(
         'cabang', 'user', 'warehouse', 'warehouseTarget',
         'rakSource', 'rakTarget', 'inventoryCoa', 'adjustmentCoa',
+        'incomeVarianceCoa', 'expenseVarianceCoa',
         'kasCoa', 'uom', 'product'
     ), $overrides);
 }

@@ -184,8 +184,8 @@ $whKarantina = Warehouse::firstOrCreate(
 echo "[5] Gudang Uji: {$whUtama->name}, {$whKenari->name}, {$whKarantina->name} siap" . PHP_EOL;
 
 // 6. UOM & Category
-$uom = UnitOfMeasure::where('abbreviation', 'pcs')->first() ?? UnitOfMeasure::first();
-$category = ProductCategory::first() ?? ProductCategory::create(['name' => 'Pipa & Fitting', 'cabang_id' => $cabang->id]);
+$uom = UnitOfMeasure::where('abbreviation', 'pcs')->first() ?? UnitOfMeasure::first() ?? UnitOfMeasure::create(['name' => 'Pieces', 'abbreviation' => 'pcs']);
+$category = ProductCategory::first() ?? ProductCategory::create(['kode' => 'CAT-PIPA', 'name' => 'Pipa & Fitting', 'cabang_id' => $cabang->id]);
 
 // Referensi CoA default
 $firstCoa = ChartOfAccount::first();

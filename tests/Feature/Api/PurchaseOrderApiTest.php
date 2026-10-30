@@ -15,6 +15,37 @@ use Tests\TestCase;
 
 class PurchaseOrderApiTest extends TestCase
 {
+    protected User $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->user = User::withoutGlobalScopes()->first() ?? User::factory()->create();
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin']);
+        if (! $this->user->hasRole('Super Admin')) {
+            $this->user->assignRole($role);
+        }
+        $this->actingAs($this->user);
+    }
+
+    public function test_unauthenticated_request_is_blocked(): void
+    {
+        auth()->logout();
+        $this->getJson('/api/v1/purchase-orders/dependencies')->assertStatus(401);
+        $this->postJson('/api/v1/purchase-orders', [])->assertStatus(401);
+    }
+
+    public function test_user_without_permission_cannot_create_purchase_order(): void
+    {
+        $restrictedUser = User::factory()->create([
+            'email' => 'restricted_po_' . uniqid() . '@example.com',
+            'username' => 'repo_' . substr(uniqid(), 0, 8),
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->postJson('/api/v1/purchase-orders', [])->assertStatus(403);
+    }
+
     private function activeWarehouse(array $overrides = []): Warehouse
     {
         return Warehouse::factory()->create(array_merge(['status' => 1], $overrides));

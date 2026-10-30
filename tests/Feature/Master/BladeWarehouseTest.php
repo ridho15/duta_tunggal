@@ -187,7 +187,7 @@ class BladeWarehouseTest extends TestCase
             'status' => 1,
         ]);
 
-        $product = Product::first();
+        $product = Product::first() ?? Product::factory()->create();
         if ($product) {
             InventoryStock::updateOrCreate(
                 [
