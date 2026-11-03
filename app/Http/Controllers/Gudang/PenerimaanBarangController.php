@@ -171,7 +171,7 @@ class PenerimaanBarangController extends Controller
                             'qty_accepted' => (float) $limit['remaining_accepted'],
                             'qty_rejected' => 0,
                             'reason_rejected' => '',
-                            'warehouse_id' => $selectedPo->warehouse_id ?? $warehouses->first()?->id,
+                            'warehouse_id' => $selectedPo->warehouse_id,   // tanpa gudang tujuan PO: kosong, petugas wajib memilih
                             'rak_id' => null,
                         ];
                     }
@@ -229,6 +229,7 @@ class PenerimaanBarangController extends Controller
                     'receipt_date' => $validated['receipt_date'],
                     'received_by' => $validated['received_by'] ?? Auth::id() ?? 1,
                     'notes' => $fullNotes ?: null,
+                    'warehouse_override_reason' => $this->warehouseOverrideReason($purchaseOrder->warehouse_id, $validated),
                     'currency_id' => $currencyId,
                     'other_cost' => 0,
                     'status' => $receiptStatus,
@@ -414,6 +415,7 @@ class PenerimaanBarangController extends Controller
                     'receipt_date' => $validated['receipt_date'],
                     'received_by' => $validated['received_by'] ?? $penerimaan->received_by,
                     'notes' => $fullNotes ?: null,
+                    'warehouse_override_reason' => $this->warehouseOverrideReason($penerimaan->purchaseOrder?->warehouse_id, $validated),
                     'status' => $receiptStatus,
                 ]);
 
@@ -569,6 +571,14 @@ class PenerimaanBarangController extends Controller
         $filename = 'Bukti-Penerimaan-' . ($penerimaan->receipt_number ?: 'GRN-' . $penerimaan->id) . '.pdf';
 
         return $pdf->stream($filename);
+    }
+
+    /** Alasan hanya disimpan bila gudang terima memang berbeda dari tujuan PO (wajib diisi oleh FormRequest). */
+    private function warehouseOverrideReason(?int $poWarehouseId, array $validated): ?string
+    {
+        $differs = PurchaseReceipt::differsFromPoWarehouse($poWarehouseId, collect($validated['items'])->pluck('warehouse_id')->all());
+
+        return $differs ? trim((string) ($validated['warehouse_override_reason'] ?? '')) : null;
     }
 
     /**

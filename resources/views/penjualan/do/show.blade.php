@@ -60,6 +60,30 @@
                 <span>Cetak DO (PDF)</span>
             </a>
 
+            @if($canConfirmStock)
+                <form method="POST" action="{{ route('penjualan.do.confirmStock', $deliveryOrder->id) }}">
+                    @csrf
+                    <button
+                        type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-2 min-h-[44px] sm:min-h-0 rounded-xl bg-[#15803d] hover:bg-[#14532d] text-white font-bold text-xs shadow-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#15803d]"
+                    >
+                        Konfirmasi Stok
+                    </button>
+                </form>
+            @endif
+
+            @if($canSend)
+                <form method="POST" action="{{ route('penjualan.do.send', $deliveryOrder->id) }}" onsubmit="return confirm('Barang akan keluar dari gudang dan stok fisik berkurang. Kirim {{ $deliveryOrder->do_number }} sekarang?')">
+                    @csrf
+                    <button
+                        type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-2 min-h-[44px] sm:min-h-0 rounded-xl bg-[#15803d] hover:bg-[#14532d] text-white font-bold text-xs shadow-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#15803d]"
+                    >
+                        Kirim
+                    </button>
+                </form>
+            @endif
+
             @if($canCreateSj)
                 @php
                     $primarySo = $deliveryOrder->salesOrders->first();
@@ -88,7 +112,18 @@
     </div>
 
     {{-- Alert Status Khusus --}}
-    @if($deliveryOrder->status === 'approved' && empty($deliveryOrder->returned_at))
+    @if(in_array($deliveryOrder->status, ['request_stock', 'request_approve'], true) && empty($deliveryOrder->returned_at))
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900">
+            <div class="font-bold">Menunggu Konfirmasi Stok</div>
+            <div class="mt-0.5 text-amber-800">
+                @if($canConfirmStock)
+                    Gudang {{ $deliveryOrder->warehouse?->name ?? '-' }} perlu memastikan barang ada, lalu tekan <span class="font-bold">Konfirmasi Stok</span>. Setelah itu checker bisa mengecek barang di Gudang → Siapkan & Kirim.
+                @else
+                    Menunggu petugas Gudang {{ $deliveryOrder->warehouse?->name ?? '-' }} mengonfirmasi stok. Surat Jalan baru bisa dibuat setelah itu.
+                @endif
+            </div>
+        </div>
+    @elseif($deliveryOrder->status === 'approved' && empty($deliveryOrder->returned_at))
         <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
             <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" stroke-width="2"></circle>

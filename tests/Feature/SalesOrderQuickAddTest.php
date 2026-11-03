@@ -76,8 +76,10 @@ class SalesOrderQuickAddTest extends TestCase
         $response->assertSee('flashRowHighlight', false);
         $response->assertSee('clearQuickSearch', false);
 
-        // 3. Verifikasi dropdown select produk di baris form items tetap dipertahankan
-        $response->assertSee('select data-searchable name="items[${idx}][product_id]"', false);
+        // 3. Pemilih produk per baris memakai pencarian AJAX (master produk tidak lagi ditempel di halaman)
+        $response->assertSee('name="items[${idx}][product_id]"', false);
+        $response->assertSee('id="product-search-${idx}"', false);
+        $response->assertSee(substr(json_encode(route('penjualan.so.products.search')), 1, -1), false);   // @json meng-escape '/'
         $response->assertSee('id="addItemBtn"', false);
     }
 }

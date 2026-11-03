@@ -208,6 +208,20 @@
                             <td style="font-weight: bold; font-family: monospace;">{{ $receipt->purchaseOrder->po_number ?? '-' }}</td>
                         </tr>
                         <tr>
+                            <td style="color: #718096;">Gudang Tujuan PO:</td>
+                            <td style="font-weight: bold;">{{ $receipt->purchaseOrder?->warehouse?->name ?? 'Tidak ditentukan di PO' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #718096;">Gudang Terima:</td>
+                            <td style="font-weight: bold;">{{ $receipt->purchaseReceiptItem->map(fn ($i) => $i->warehouse?->name)->filter()->unique()->implode(', ') ?: '-' }}</td>
+                        </tr>
+                        @if($receipt->warehouse_differs_from_po)
+                        <tr>
+                            <td style="color: #92400e;">Alasan beda gudang:</td>
+                            <td style="font-weight: bold; color: #92400e;">{{ $receipt->warehouse_override_reason ?: '(tidak dicatat)' }}</td>
+                        </tr>
+                        @endif
+                        <tr>
                             <td style="color: #718096;">Penerima Gudang:</td>
                             <td style="font-weight: bold;">{{ $receipt->receivedBy->name ?? 'Gudang' }}</td>
                         </tr>

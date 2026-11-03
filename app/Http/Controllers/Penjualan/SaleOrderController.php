@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
+use App\Models\QuotationItem;
 use App\Models\SaleOrder;
 use App\Models\SaleOrderItem;
 use App\Models\User;
@@ -21,6 +22,7 @@ use App\Services\SaleOrderDeliveryProgress;
 use App\Services\SalesOrderService;
 use App\Support\CurrencyConversionResolver;
 use App\Support\ProductPriceLimitation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -187,28 +189,12 @@ class SaleOrderController extends Controller
                 'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe'
             ]);
 
-        // Hitung stok bebas produk
-        $freeStockByProduct = InventoryStock::query()
-            ->selectRaw('product_id, GREATEST(0, SUM(qty_available - qty_reserved)) as free_stock')
-            ->groupBy('product_id')
-            ->pluck('free_stock', 'product_id');
-
-        $products = Product::query()
-            ->with('uom')
-            ->where(fn ($q) => $q->whereNull('is_active')->orWhere('is_active', true))
-            ->orderBy('name')
-            ->get()
-            ->map(function ($p) use ($freeStockByProduct) {
-                return [
-                    'id' => $p->id,
-                    'sku' => $p->sku,
-                    'name' => $p->name,
-                    'sell_price' => (float) $p->sell_price,
-                    'bottom_price' => (float) ($p->bottom_price ?? 0),
-                    'free_stock' => max(0.0, (float) ($freeStockByProduct[$p->id] ?? 0)),
-                    'uom' => $p->uom?->abbreviation ?? 'PCS',
-                ];
-            });
+        // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
+        $selectedQuotationId = $request->query('quotation_id');
+        $prefillIds = collect(old('items', []))->pluck('product_id')
+            ->merge($selectedQuotationId ? QuotationItem::where('quotation_id', $selectedQuotationId)->pluck('product_id') : [])
+            ->filter()->unique()->values();
+        $products = $this->productPayload($this->activeProducts()->whereIn('id', $prefillIds)->get());
 
         $quotations = Quotation::query()
             ->usable()
@@ -217,7 +203,6 @@ class SaleOrderController extends Controller
             ->limit(50)
             ->get(['id', 'quotation_number', 'customer_id', 'total_amount']);
 
-        $selectedQuotationId = $request->query('quotation_id');
         $selectedQuotation = null;
         if ($selectedQuotationId) {
             $selectedQuotation = Quotation::query()
@@ -239,6 +224,51 @@ class SaleOrderController extends Controller
             'selectedQuotationId' => $selectedQuotationId,
             'user' => $user,
         ]);
+    }
+
+    /**
+     * Pencarian produk untuk form Buat SO (AJAX). Menggantikan pengiriman seluruh master produk di payload halaman.
+     * Setiap kata harus cocok di nama atau SKU; SKU yang persis sama diurutkan lebih dulu (pemindai barcode).
+     */
+    public function searchProducts(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+        abort_if($q === '', 422, 'Kata pencarian wajib diisi.');
+
+        $query = $this->activeProducts();
+        foreach (preg_split('/\s+/', $q, -1, PREG_SPLIT_NO_EMPTY) as $term) {
+            $like = '%'.addcslashes($term, '\\%_').'%';
+            $query->where(fn ($w) => $w->where('name', 'like', $like)->orWhere('sku', 'like', $like));
+        }
+
+        $products = $query->orderByRaw('sku = ? desc', [$q])->orderBy('name')->limit(25)->get();
+
+        return response()->json(['success' => true, 'products' => $this->productPayload($products)]);
+    }
+
+    private function activeProducts()
+    {
+        return Product::query()->with('uom')->where(fn ($q) => $q->whereNull('is_active')->orWhere('is_active', true));
+    }
+
+    /** Bentuk data produk yang dibaca JS form SO (harga, harga dasar, stok bebas, satuan). */
+    private function productPayload($products)
+    {
+        $freeStock = InventoryStock::query()
+            ->selectRaw('product_id, GREATEST(0, SUM(qty_available - qty_reserved)) as free_stock')
+            ->whereIn('product_id', $products->pluck('id'))
+            ->groupBy('product_id')
+            ->pluck('free_stock', 'product_id');
+
+        return $products->map(fn ($p) => [
+            'id' => $p->id,
+            'sku' => $p->sku,
+            'name' => $p->name,
+            'sell_price' => (float) $p->sell_price,
+            'bottom_price' => (float) ($p->bottom_price ?? 0),
+            'free_stock' => max(0.0, (float) ($freeStock[$p->id] ?? 0)),
+            'uom' => $p->uom?->abbreviation ?? 'PCS',
+        ])->values();
     }
 
     /**

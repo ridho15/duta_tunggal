@@ -7,6 +7,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePurchaseReceiptRequest extends FormRequest
 {
+    use ValidatesWarehouseOverride;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -28,6 +30,7 @@ class UpdatePurchaseReceiptRequest extends FormRequest
             'warehouse_id' => 'nullable|exists:warehouses,id',
             'supplier_delivery_note_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:2000',
+            'warehouse_override_reason' => 'nullable|string|max:500',
             'action' => 'nullable|string|in:save_draft,save_and_confirm',
             'items' => 'required|array|min:1',
             'items.*.id' => 'nullable|exists:purchase_receipt_items,id',
@@ -54,6 +57,8 @@ class UpdatePurchaseReceiptRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            $this->validateWarehouseOverride($validator, $this->route('penerimaan')?->purchase_order_id);
+
             $items = $this->input('items', []);
 
             foreach ($items as $index => $item) {
@@ -109,6 +114,7 @@ class UpdatePurchaseReceiptRequest extends FormRequest
             'receipt_date' => 'Tanggal Penerimaan',
             'received_by' => 'Petugas Penerima',
             'warehouse_id' => 'Gudang Tujuan',
+            'warehouse_override_reason' => 'Alasan perubahan gudang',
             'supplier_delivery_note_number' => 'No. Surat Jalan Vendor',
             'notes' => 'Catatan',
             'items' => 'Daftar Barang',

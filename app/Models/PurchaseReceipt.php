@@ -30,11 +30,30 @@ class PurchaseReceipt extends Model
         'receipt_date',
         'received_by',
         'notes',
+        'warehouse_override_reason',
         'currency_id',
         'other_cost',
         'status', // draft, partial, completed
         'cabang_id'
     ];
+
+    /** Apakah ada gudang terima yang berbeda dari gudang tujuan PO (PO tanpa gudang tujuan: tidak ada pembanding). */
+    public static function differsFromPoWarehouse(?int $poWarehouseId, array $receiptWarehouseIds): bool
+    {
+        if (! $poWarehouseId) {
+            return false;
+        }
+
+        return collect($receiptWarehouseIds)->filter()->contains(fn ($id) => (int) $id !== $poWarehouseId);
+    }
+
+    public function getWarehouseDiffersFromPoAttribute(): bool
+    {
+        return self::differsFromPoWarehouse(
+            $this->purchaseOrder?->warehouse_id,
+            $this->purchaseReceiptItem->pluck('warehouse_id')->all()
+        );
+    }
 
     public function getSupplierDeliveryNoteNumberAttribute(): ?string
     {

@@ -30,7 +30,7 @@ class SuratJalanService
 
     /**
      * Delivery Order yang layak dibuatkan Surat Jalan:
-     *  - berstatus approved,
+     *  - berstatus approved/confirmed/partial (sudah dikonfirmasi gudang),
      *  - berasal dari satu cabang,
      *  - belum tercantum di Surat Jalan lain yang masih berlaku (Draft/Terbit).
      *
@@ -45,7 +45,7 @@ class SuratJalanService
             throw ValidationException::withMessages([$field => 'Pilih minimal satu Delivery Order.']);
         }
 
-        $invalid = $deliveryOrders->where('status', '!=', 'approved');
+        $invalid = $deliveryOrders->whereNotIn('status', ['approved', 'confirmed', 'partial']);
         if ($invalid->isNotEmpty()) {
             $details = $invalid->map(function ($do) {
                 $statusLabel = DeliveryOrder::statusLabel($do->status);
@@ -53,7 +53,7 @@ class SuratJalanService
             })->implode(', ');
 
             throw ValidationException::withMessages([
-                $field => "Surat Jalan hanya dapat dibuat dari Delivery Order berstatus approved (disetujui). DO berikut belum memenuhi syarat: {$details}.",
+                $field => "Surat Jalan hanya dapat dibuat dari Delivery Order yang sudah dikonfirmasi gudang (Siap dicek & dikirim atau Dikonfirmasi). Konfirmasi stok DO dulu di Gudang → Siapkan & Kirim. DO berikut belum memenuhi syarat: {$details}.",
             ]);
         }
 

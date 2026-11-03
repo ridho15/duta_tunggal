@@ -57,6 +57,13 @@
         {{-- Status Filter Tabs --}}
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-bold scrollbar-none">
             <a
+                href="{{ route('gudang.kiriman.index', ['tab' => 'menunggu_stok', 'warehouse_id' => $currentWarehouseId]) }}"
+                class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'menunggu_stok' ? 'bg-[#15803d] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
+            >
+                Menunggu konfirmasi stok · {{ $counts['menunggu_stok'] }}
+            </a>
+
+            <a
                 href="{{ route('gudang.kiriman.index', ['tab' => 'siap_dicek', 'warehouse_id' => $currentWarehouseId]) }}"
                 class="px-3.5 py-1.5 rounded-full whitespace-nowrap {{ $tab === 'siap_dicek' ? 'bg-[#15803d] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50' }}"
             >
@@ -95,9 +102,41 @@
                 $totalItems = $do->deliveryOrderItem->count();
                 $totalPcs = (int) $do->deliveryOrderItem->sum('quantity');
                 $isWaitingSJ = $do->status === 'confirmed' && $do->suratJalan->isEmpty();
+                $isWaitingStock = in_array($do->status, ['request_stock', 'request_approve'], true);
             @endphp
 
-            @if($isWaitingSJ)
+            @if($isWaitingStock)
+                {{-- Card Menunggu Konfirmasi Stok --}}
+                <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="font-extrabold text-base text-gray-900">{{ $do->do_number }}</span>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Menunggu konfirmasi stok
+                        </span>
+                    </div>
+
+                    <div class="text-xs text-gray-600">
+                        <span class="font-semibold text-gray-800">{{ $customer->name ?? 'Customer' }}</span> · {{ $totalItems }} barang · {{ $totalPcs }} pcs
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 pt-1">
+                        <a href="{{ route('penjualan.do.show', $do->id) }}" class="text-xs font-bold text-gray-600 hover:text-gray-900 hover:underline">
+                            Lihat detail DO
+                        </a>
+
+                        <form method="POST" action="{{ route('penjualan.do.confirmStock', $do->id) }}">
+                            @csrf
+                            <button
+                                type="submit"
+                                class="min-h-[44px] bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2 rounded-xl font-semibold text-xs shadow-sm transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#15803d]"
+                            >
+                                Konfirmasi stok
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @elseif($isWaitingSJ)
                 {{-- Card Menunggu SJ (Dashed) --}}
                 <div class="bg-white border border-dashed border-gray-200 rounded-2xl p-4 space-y-2">
                     <div class="flex items-center justify-between">

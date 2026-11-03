@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Penjualan;
 
+use App\Exceptions\DeliveryOrderTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Models\DeliveryOrder;
@@ -14,6 +15,7 @@ use App\Models\Warehouse;
 use App\Observers\DeliveryOrderObserver;
 use App\Services\DeliveryOrderService;
 use App\Services\DeliveryOrderSplitter;
+use App\Services\DeliveryOrderTransitions;
 use App\Services\SaleOrderDeliveryProgress;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -384,7 +386,16 @@ class DeliveryOrderController extends Controller
             && ! in_array($deliveryOrder->status, ['closed', 'returned', 'sent', 'received', 'completed'], true)
             && ! $deliveryOrder->hasIssuedSuratJalan();
 
-        return view('penjualan.do.show', compact('deliveryOrder', 'breakdown', 'canCreateSj', 'canCancel'));
+        $canWarehouse = $this->canRespond();
+        $canConfirmStock = $canWarehouse
+            && in_array($deliveryOrder->status, ['request_stock', 'request_approve'], true)
+            && empty($deliveryOrder->returned_at);
+        $canSend = $canWarehouse
+            && in_array($deliveryOrder->status, ['approved', 'confirmed', 'partial', 'delivery_failed'], true)
+            && empty($deliveryOrder->returned_at)
+            && (! DeliveryOrderTransitions::requiresSuratJalan() || $deliveryOrder->hasIssuedSuratJalan());
+
+        return view('penjualan.do.show', compact('deliveryOrder', 'breakdown', 'canCreateSj', 'canCancel', 'canConfirmStock', 'canSend'));
     }
 
     /**
@@ -456,5 +467,45 @@ class DeliveryOrderController extends Controller
 
         return redirect()->route('penjualan.do.index')
             ->with('success', "Perintah Kirim {$deliveryOrder->do_number} berhasil dibatalkan. Alokasi stok persediaan telah dikembalikan.");
+    }
+
+    /**
+     * Gudang mengonfirmasi stok DO: Menunggu Konfirmasi Stok → Siap dicek & dikirim.
+     */
+    public function confirmStock(DeliveryOrder $deliveryOrder): RedirectResponse
+    {
+        abort_unless($this->canRespond(), 403);
+
+        try {
+            $this->deliveryOrderService->confirmStock($deliveryOrder);
+        } catch (DeliveryOrderTransitionException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Stok {$deliveryOrder->do_number} dikonfirmasi. Barang siap dicek checker di Gudang → Siapkan & Kirim.");
+    }
+
+    /**
+     * Kirim: barang berangkat dari gudang (status Dikirim, stok fisik berkurang). Wajib Surat Jalan terbit bila konfigurasi mengharuskan.
+     */
+    public function send(DeliveryOrder $deliveryOrder): RedirectResponse
+    {
+        abort_unless($this->canRespond(), 403);
+
+        try {
+            app(DeliveryOrderTransitions::class)->to($deliveryOrder, 'sent', ['source' => 'blade']);
+        } catch (DeliveryOrderTransitionException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Perintah Kirim {$deliveryOrder->do_number} berstatus Dikirim. Stok gudang sudah dikurangi.");
+    }
+
+    /** Sama dengan DeliveryOrderActions::can() di Filament, ditambah peran Checker. */
+    private function canRespond(): bool
+    {
+        $user = Auth::user();
+
+        return (bool) ($user?->hasRole(['Super Admin', 'Owner', 'Admin', 'Checker']) || $user?->can('response delivery order'));
     }
 }

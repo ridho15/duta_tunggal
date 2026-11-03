@@ -167,6 +167,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::prefix('penjualan')->name('penjualan.')->group(function () {
         Route::get('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'index'])->name('so.index');
         Route::get('/so/create', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'create'])->name('so.create');
+        Route::get('/so/products/search', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'searchProducts'])->name('so.products.search');
         Route::post('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'store'])->name('so.store');
         Route::get('/so/{saleOrder}', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'show'])->name('so.show');
         Route::post('/so/{saleOrder}/approve', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'approve'])->name('so.approve');
@@ -179,6 +180,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/do/{deliveryOrder}', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'show'])->name('do.show');
         Route::get('/do/{deliveryOrder}/pdf', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'pdf'])->name('do.pdf');
         Route::post('/do/{deliveryOrder}/cancel', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'cancel'])->name('do.cancel');
+        Route::post('/do/{deliveryOrder}/confirm-stock', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'confirmStock'])->name('do.confirmStock');
+        Route::post('/do/{deliveryOrder}/send', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'send'])->name('do.send');
 
         // Aliases for English / plural URL compatibility
         Route::get('/delivery-orders', function () { return redirect()->route('penjualan.do.index'); });
@@ -350,6 +353,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/kiriman/picking-list', [\App\Http\Controllers\Gudang\KirimanController::class, 'pickingList'])->name('kiriman.pickingList');
         Route::get('/kiriman/{deliveryOrder}/check', [\App\Http\Controllers\Gudang\KirimanController::class, 'check'])->name('kiriman.check');
         Route::post('/kiriman/{deliveryOrder}/check', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitCheck'])->name('kiriman.submitCheck');
+        Route::post('/kiriman/{deliveryOrder}/edit-qty', [\App\Http\Controllers\Gudang\KirimanController::class, 'editQty'])->name('kiriman.editQty');
         Route::get('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'retur'])->name('kiriman.retur');
         Route::post('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitRetur'])->name('kiriman.submitRetur');
         // Penerimaan Barang (Goods Receipt / Surat Jalan Masuk)

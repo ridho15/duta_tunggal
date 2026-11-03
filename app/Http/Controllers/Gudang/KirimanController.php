@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Gudang;
 
+use App\Exceptions\DeliveryOrderTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
@@ -35,7 +36,7 @@ class KirimanController extends Controller
         }
 
         $activeWarehouse = Warehouse::find($currentWarehouseId);
-        $tab = $request->query('tab', 'siap_dicek');
+        $tab = $request->query('tab');
         $search = $request->query('q');
 
         // Query dasar DO untuk gudang ini
@@ -50,14 +51,20 @@ class KirimanController extends Controller
 
         // Hitung counter tab
         $counts = [
+            'menunggu_stok' => (clone $baseQuery)->whereIn('status', ['request_stock', 'request_approve'])->count(),
             'siap_dicek' => (clone $baseQuery)->whereIn('status', ['approved', 'confirmed'])->whereDoesntHave('suratJalan')->count(),
             'menunggu_sj' => (clone $baseQuery)->where('status', 'confirmed')->whereDoesntHave('suratJalan')->count(),
             'terkirim' => (clone $baseQuery)->whereHas('suratJalan')->whereDate('updated_at', today())->count(),
         ];
 
+        // Tanpa tab eksplisit: buka antrean yang berisi pekerjaan (konfirmasi stok dulu, karena DO baru mulai dari sana).
+        $tab ??= $counts['siap_dicek'] === 0 && $counts['menunggu_stok'] > 0 ? 'menunggu_stok' : 'siap_dicek';
+
         $query = clone $baseQuery;
 
-        if ($tab === 'menunggu_sj') {
+        if ($tab === 'menunggu_stok') {
+            $query->whereIn('status', ['request_stock', 'request_approve']);
+        } elseif ($tab === 'menunggu_sj') {
             $query->where('status', 'confirmed')->whereDoesntHave('suratJalan');
         } elseif ($tab === 'terkirim') {
             $query->whereHas('suratJalan');
@@ -91,12 +98,18 @@ class KirimanController extends Controller
     /**
      * Layar Checklist Pengecekan Barang DO di HP (Mockup E5_Gudang-HP.html).
      */
-    public function check(DeliveryOrder $deliveryOrder): View
+    public function check(DeliveryOrder $deliveryOrder): View|RedirectResponse
     {
+        if (in_array($deliveryOrder->status, ['request_stock', 'request_approve'], true)) {
+            return redirect()->route('gudang.kiriman.index', ['tab' => 'menunggu_stok', 'warehouse_id' => $deliveryOrder->warehouse_id])
+                ->with('error', "Konfirmasi stok {$deliveryOrder->do_number} dulu sebelum barangnya dicek.");
+        }
+
         $deliveryOrder->loadMissing([
             'salesOrders.customer',
             'warehouse',
             'deliveryOrderItem.product.uom',
+            'deliveryOrderItem.itemCheck',
         ]);
 
         return view('gudang.kiriman.check', compact('deliveryOrder'));
@@ -107,6 +120,10 @@ class KirimanController extends Controller
      */
     public function submitCheck(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
+        if (! in_array($deliveryOrder->status, ['approved', 'confirmed'], true)) {
+            return back()->with('error', "{$deliveryOrder->do_number} berstatus \"".DeliveryOrder::statusLabel($deliveryOrder->status).'", belum bisa dicek.');
+        }
+
         $checkedItemIds = $request->input('checked_items', []);
         $totalItems = $deliveryOrder->deliveryOrderItem()->count();
 
@@ -130,6 +147,31 @@ class KirimanController extends Controller
 
         return redirect()->route('gudang.kiriman.index')
             ->with('success', "Pengecekan {$deliveryOrder->do_number} selesai. Barang siap dikirim.");
+    }
+
+    /**
+     * Checker Edit Qty: turunkan kuantitas item DO yang kurang di rak sebelum dicek dan dikirim.
+     */
+    public function editQty(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'quantities' => ['required', 'array'],
+            'quantities.*' => ['required', 'numeric', 'min:0'],
+            'notes' => ['required', 'string', 'max:500'],
+        ], [
+            'notes.required' => 'Alasan perubahan qty wajib diisi.',
+        ]);
+
+        try {
+            $changed = app(\App\Services\DeliveryOrderService::class)
+                ->updateCheckerQuantities($deliveryOrder, $data['quantities'], $data['notes']);
+        } catch (DeliveryOrderTransitionException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', $changed > 0
+            ? "Qty {$deliveryOrder->do_number} diperbarui ({$changed} barang). Cek ulang barangnya sebelum mengirim."
+            : 'Tidak ada qty yang berubah.');
     }
 
     /**

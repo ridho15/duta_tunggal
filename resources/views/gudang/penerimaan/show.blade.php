@@ -230,6 +230,28 @@
                         </span>
                     </div>
 
+                    @php
+                        $poWarehouseName = $receipt->purchaseOrder?->warehouse?->name;
+                        $receivedWarehouseNames = $receipt->purchaseReceiptItem->map(fn ($i) => $i->warehouse?->name)->filter()->unique()->values();
+                        $warehouseDiffers = $receipt->warehouse_differs_from_po;
+                    @endphp
+                    <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Gudang Tujuan PO</span>
+                            <span class="text-sm font-bold text-gray-900 block mt-0.5">{{ $poWarehouseName ?? 'Tidak ditentukan di PO' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Gudang Terima</span>
+                            <span class="text-sm font-bold {{ $warehouseDiffers ? 'text-amber-800' : 'text-gray-900' }} block mt-0.5">{{ $receivedWarehouseNames->implode(', ') ?: '-' }}</span>
+                        </div>
+                        @if($warehouseDiffers)
+                            <div class="sm:col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                                <span class="font-bold">Gudang terima berbeda dari tujuan PO.</span>
+                                Alasan: {{ $receipt->warehouse_override_reason ?: '(tidak dicatat)' }}
+                            </div>
+                        @endif
+                    </div>
+
                     <div>
                         <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Surat Jalan Vendor</span>
                         <span class="text-base font-bold text-gray-900 block mt-0.5 font-mono">

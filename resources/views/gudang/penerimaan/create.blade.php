@@ -98,6 +98,7 @@
                         />
                     </div>
                     <span class="text-[11px] text-gray-400 mt-1 block">Hanya menampilkan PO berstatus Approved atau Sebagian Diterima.</span>
+                    <p x-show="poLoadError" x-cloak role="alert" class="text-xs font-semibold text-red-700 mt-1" x-text="poLoadError"></p>
                 </div>
 
                 {{-- Status PO Badge / Info --}}
@@ -163,19 +164,43 @@
                 {{-- Gudang Penyimpanan Default --}}
                 <div>
                     <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                        Gudang Penyimpanan
+                        Gudang Terima <span class="text-red-500">*</span>
                     </label>
                     <select data-searchable
                         name="warehouse_id"
                         x-model="defaultWarehouseId"
+                        @change="applyWarehouseToItems()"
+                        required
                         class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                     >
+                        <option value="">Pilih gudang terima</option>
                         @foreach ($warehouses as $wh)
-                            <option value="{{ $wh->id }}" {{ (string)old('warehouse_id', $selectedPo->warehouse_id ?? '') === (string)$wh->id ? 'selected' : '' }}>
-                                {{ $wh->name }} ({{ $wh->kode }})
-                            </option>
+                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }})</option>
                         @endforeach
                     </select>
+                    <span class="text-[11px] text-gray-500 mt-1 block">Otomatis mengikuti gudang tujuan PO. Mengubahnya menerapkan gudang yang sama ke semua baris barang.</span>
+                </div>
+
+                {{-- Peringatan: gudang terima berbeda dari tujuan PO (alasan wajib) --}}
+                <div class="sm:col-span-2 lg:col-span-3" x-show="warehouseMismatch" x-cloak>
+                    <div role="alert" class="rounded-xl border border-amber-300 bg-amber-50 p-3.5 space-y-2">
+                        <p class="text-xs font-bold text-amber-900">
+                            Gudang terima berbeda dari gudang tujuan PO (<span x-text="poInfo.warehouse_name || '-'"></span>).
+                        </p>
+                        <p class="text-xs text-amber-900">Barang akan masuk ke stok gudang yang Anda pilih, bukan gudang tujuan PO. Jelaskan alasannya agar tercatat di dokumen.</p>
+                        <label for="warehouse_override_reason" class="block text-xs font-bold text-gray-800">Alasan perubahan gudang <span class="text-red-500">*</span></label>
+                        <textarea
+                            id="warehouse_override_reason"
+                            name="warehouse_override_reason"
+                            rows="2"
+                            maxlength="500"
+                            :required="warehouseMismatch"
+                            :disabled="!warehouseMismatch"
+                            placeholder="Contoh: gudang tujuan penuh, barang dititipkan sementara di gudang lain"
+                            class="w-full py-2 px-3 text-sm rounded-xl border border-amber-300 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
+                        >{{ old('warehouse_override_reason') }}</textarea>
+                        @error('warehouse_override_reason') <p class="text-xs font-semibold text-red-700">{{ $message }}</p> @enderror
+                    </div>
                 </div>
 
                 {{-- Catatan / Keterangan --}}
@@ -329,6 +354,7 @@
                                         class="w-full py-1.5 px-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
                                         required
                                     >
+                                        <option value="">Pilih gudang</option>
                                         @foreach ($warehouses as $wh)
                                             <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }})</option>
                                         @endforeach
@@ -411,11 +437,22 @@ function goodsReceiptCreate(config) {
         items: initialItems,
         poItemsUrl: config.poItemsUrl || '',
         loadingPo: false,
+        poLoadError: '',
         formAction: 'save_draft',
-        defaultWarehouseId: '{{ $warehouses->first()?->id ?? 1 }}',
+        // Gudang tujuan PO adalah pembanding; gudang terima mengikutinya, tidak pernah jatuh diam-diam ke gudang pertama.
+        poWarehouseId: '{{ $selectedPo?->warehouse_id ?? '' }}',
+        defaultWarehouseId: '{{ old('warehouse_id', $selectedPo?->warehouse_id ?? '') }}',
         poInfo: {
             supplier_name: '{{ $selectedPo?->supplier?->name ?? '' }}',
             warehouse_name: '{{ $selectedPo?->warehouse?->name ?? '' }}',
+        },
+
+        get warehouseMismatch() {
+            return !!this.poWarehouseId && this.items.some(i => i.warehouse_id && String(i.warehouse_id) !== String(this.poWarehouseId));
+        },
+
+        applyWarehouseToItems() {
+            if (this.defaultWarehouseId) this.items.forEach(i => { i.warehouse_id = this.defaultWarehouseId; });
         },
 
         init() {
@@ -441,11 +478,13 @@ function goodsReceiptCreate(config) {
         handlePoSelection(poId) {
             if (!poId) {
                 this.items = [];
+                this.poWarehouseId = '';
                 this.poInfo = { supplier_name: '', warehouse_name: '' };
                 return;
             }
 
             this.loadingPo = true;
+            this.poLoadError = '';
             fetch(`${this.poItemsUrl}/${poId}`)
                 .then(res => res.json())
                 .then(data => {
@@ -455,8 +494,9 @@ function goodsReceiptCreate(config) {
                             supplier_name: data.purchase_order.supplier_name,
                             warehouse_name: data.purchase_order.warehouse_name,
                         };
-                        this.defaultWarehouseId = data.purchase_order.warehouse_id || this.defaultWarehouseId;
-                        
+                        this.poWarehouseId = data.purchase_order.warehouse_id || '';
+                        this.defaultWarehouseId = this.poWarehouseId;
+
                         this.items = data.items.map(item => ({
                             purchase_order_item_id: item.purchase_order_item_id,
                             product_id: item.product_id,
@@ -472,13 +512,14 @@ function goodsReceiptCreate(config) {
                             qty_accepted: item.default_qty,
                             qty_rejected: 0,
                             reason_rejected: '',
-                            warehouse_id: item.warehouse_id || this.defaultWarehouseId,
+                            warehouse_id: item.warehouse_id || this.defaultWarehouseId || '',
                             rak_id: null,
                         }));
                     }
                 })
                 .catch(err => {
                     this.loadingPo = false;
+                    this.poLoadError = 'Gagal memuat item PO. Pilih ulang PO atau muat ulang halaman.';
                     console.error('Failed to fetch PO items:', err);
                 });
         },

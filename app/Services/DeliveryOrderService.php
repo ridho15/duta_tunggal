@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\DeliveryOrderTransitionException;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderLog;
 use App\Models\JournalEntry;
@@ -73,6 +74,97 @@ class DeliveryOrderService
     }
 
     public function updateQuantity() {}
+
+    /**
+     * Konfirmasi stok oleh gudang (Menunggu Konfirmasi Stok → Siap dicek & dikirim).
+     * Jalurnya sama dengan Filament: semua Warehouse Confirmation DO dikonfirmasi, status DO mengikuti (lihat
+     * DeliveryOrder::updateStatusFromWarehouseConfirmations). WC yang ditolak tidak diubah; bila hasil akhirnya bukan `approved`
+     * seluruh perubahan dibatalkan.
+     *
+     * @throws DeliveryOrderTransitionException
+     */
+    public function confirmStock(DeliveryOrder $deliveryOrder): DeliveryOrder
+    {
+        if (! in_array($deliveryOrder->status, ['request_stock', 'request_approve'], true) || $deliveryOrder->returned_at) {
+            throw new DeliveryOrderTransitionException(
+                "Perintah Kirim {$deliveryOrder->do_number} berstatus \"".DeliveryOrder::statusLabel($deliveryOrder->status).'", tidak ada stok yang perlu dikonfirmasi.'
+            );
+        }
+
+        DB::transaction(function () use ($deliveryOrder) {
+            if (! $deliveryOrder->warehouseConfirmations()->exists()) {
+                $this->createWarehouseConfirmationsForDeliveryOrder($deliveryOrder);
+            }
+
+            $deliveryOrder->warehouseConfirmations()->whereIn('status', ['request', 'partial_confirmed'])->get()
+                ->each(fn (WarehouseConfirmation $wc) => $wc->update(['status' => 'confirmed']));
+
+            if ($deliveryOrder->fresh()->status !== 'approved') {
+                throw new DeliveryOrderTransitionException(
+                    "Perintah Kirim {$deliveryOrder->do_number} belum dapat disetujui: ada konfirmasi gudang yang ditolak."
+                );
+            }
+        });
+
+        return $deliveryOrder->refresh();
+    }
+
+    /**
+     * Checker Edit Qty: kuantitas item boleh diturunkan (tidak dinaikkan) selama DO belum punya Surat Jalan aktif.
+     * Stok, jurnal, dan progres SO mengikuti lewat hook DeliveryOrderItem. Tiap perubahan dicatat di log DO.
+     *
+     * @param  array<int|string, int|float|string>  $quantities  item DO id => kuantitas baru
+     * @return int jumlah item yang berubah
+     *
+     * @throws DeliveryOrderTransitionException
+     */
+    public function updateCheckerQuantities(DeliveryOrder $deliveryOrder, array $quantities, ?string $notes = null): int
+    {
+        if (! in_array($deliveryOrder->status, ['approved', 'confirmed'], true) || $deliveryOrder->hasIssuedSuratJalan()) {
+            throw new DeliveryOrderTransitionException("Qty {$deliveryOrder->do_number} tidak dapat diubah: hanya untuk DO Siap dicek yang belum punya Surat Jalan aktif.");
+        }
+
+        return DB::transaction(function () use ($deliveryOrder, $quantities, $notes) {
+            $changed = 0;
+
+            foreach ($deliveryOrder->deliveryOrderItem()->get() as $item) {
+                if (! array_key_exists($item->id, $quantities)) {
+                    continue;
+                }
+
+                $old = (float) $item->quantity;
+                $new = (float) $quantities[$item->id];
+
+                if ($new < 0 || $new > $old) {
+                    throw new DeliveryOrderTransitionException("Qty baru harus antara 0 dan {$old} (qty saat ini); checker hanya boleh menurunkan.");
+                }
+                if (abs($new - $old) < 0.0001) {
+                    continue;
+                }
+
+                $item->update(['quantity' => $new]);
+                $changed++;
+
+                DeliveryOrderLog::create([
+                    'delivery_order_id' => $deliveryOrder->id,
+                    'status' => $deliveryOrder->status,
+                    'confirmed_by' => Auth::id(),
+                    'user_id' => Auth::id(),
+                    'action' => 'quantity_updated_by_checker',
+                    'comments' => "Old: {$old}, New: {$new}. ".($notes ?? ''),
+                    'old_value' => (string) $old,
+                    'new_value' => (string) $new,
+                    'notes' => $notes,
+                ]);
+            }
+
+            if ($changed > 0 && (float) $deliveryOrder->deliveryOrderItem()->sum('quantity') <= 0) {
+                throw new DeliveryOrderTransitionException('Seluruh qty tidak boleh nol. Batalkan DO bila memang tidak ada yang dikirim.');
+            }
+
+            return $changed;
+        });
+    }
 
     public function createWarehouseConfirmationsForDeliveryOrder(DeliveryOrder $deliveryOrder): array
     {

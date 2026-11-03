@@ -300,8 +300,124 @@
 
 <!-- Template Script & Interaktivitas Form -->
 <script>
+    // Cache produk yang pernah dimuat (prefill dari server + hasil pencarian). Master produk TIDAK dikirim di halaman ini.
     const productsData = @json($products);
+    const productSearchUrl = @json(route('penjualan.so.products.search'));
     let itemIndex = 0;
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function rememberProducts(list) {
+        list.forEach(p => {
+            const i = productsData.findIndex(x => x.id == p.id);
+            if (i >= 0) productsData[i] = p; else productsData.push(p);
+        });
+    }
+
+    function getProduct(id) {
+        return id ? (productsData.find(p => p.id == id) || null) : null;
+    }
+
+    function getRowProduct(idx) {
+        return getProduct(document.getElementById(`product-id-${idx}`)?.value);
+    }
+
+    function productLabel(p) {
+        return p ? `${p.sku || '-'} – ${p.name}` : '';
+    }
+
+    async function fetchProducts(q) {
+        const res = await fetch(`${productSearchUrl}?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        rememberProducts(data.products);
+        return data.products;
+    }
+
+    // --- Pemilih produk per baris (pencarian AJAX) ---
+    const rowSearchSeq = {};
+    const rowSearchTimers = {};
+
+    function setRowProduct(idx, product) {
+        document.getElementById(`product-id-${idx}`).value = product ? product.id : '';
+        document.getElementById(`product-search-${idx}`).value = productLabel(product);
+        hideRowResults(idx);
+        handleProductChange(idx, true);
+    }
+
+    function hideRowResults(idx) {
+        document.getElementById(`product-results-${idx}`)?.classList.add('hidden');
+        document.getElementById(`product-search-${idx}`)?.setAttribute('aria-expanded', 'false');
+    }
+
+    function renderRowResults(idx, html) {
+        const box = document.getElementById(`product-results-${idx}`);
+        if (!box) return;
+        box.innerHTML = html;
+        box.classList.remove('hidden');
+        document.getElementById(`product-search-${idx}`)?.setAttribute('aria-expanded', 'true');
+    }
+
+    function onRowProductInput(idx, value) {
+        // mengetik = membatalkan pilihan sebelumnya sampai produk baru dipilih
+        document.getElementById(`product-id-${idx}`).value = '';
+        handleProductChange(idx, false);
+        clearTimeout(rowSearchTimers[idx]);
+
+        const q = value.trim();
+        if (!q) { hideRowResults(idx); return; }
+
+        renderRowResults(idx, '<div class="p-3 text-xs text-gray-600">Mencari produk...</div>');
+        const seq = (rowSearchSeq[idx] = (rowSearchSeq[idx] || 0) + 1);
+        rowSearchTimers[idx] = setTimeout(async () => {
+            try {
+                const list = await fetchProducts(q);
+                if (seq !== rowSearchSeq[idx]) return;   // hasil usang: pengguna sudah mengetik lagi
+                if (!list.length) {
+                    renderRowResults(idx, '<div class="p-3 text-xs text-gray-600">Tidak ada produk yang cocok. Coba SKU atau kata lain.</div>');
+                    return;
+                }
+                renderRowResults(idx, list.map(p => `
+                    <button type="button" role="option" onclick="pickRowProduct(${idx}, ${p.id})"
+                            class="w-full min-h-[44px] px-3 py-2 flex items-center justify-between gap-3 text-left text-xs hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#15803d]">
+                        <span class="min-w-0"><span class="font-mono font-bold text-emerald-800">[${esc(p.sku)}]</span> <span class="text-gray-900">${esc(p.name)}</span></span>
+                        <span class="shrink-0 font-mono font-bold text-gray-800">${formatRupiah(p.sell_price)}</span>
+                    </button>`).join(''));
+            } catch (e) {
+                if (seq !== rowSearchSeq[idx]) return;
+                renderRowResults(idx, `<div class="p-3 text-xs text-red-700">Gagal memuat produk. <button type="button" class="underline font-bold" onclick="onRowProductInput(${idx}, document.getElementById('product-search-${idx}').value)">Coba lagi</button></div>`);
+            }
+        }, 250);
+    }
+
+    function pickRowProduct(idx, productId) {
+        setRowProduct(idx, getProduct(productId));
+        document.getElementById(`product-search-${idx}`)?.focus();
+    }
+
+    function onRowProductKeydown(e, idx) {
+        const box = document.getElementById(`product-results-${idx}`);
+        const options = box ? Array.from(box.querySelectorAll('[role="option"]')) : [];
+        if (e.key === 'ArrowDown' && options.length) { e.preventDefault(); options[0].focus(); }
+        else if (e.key === 'Enter') { e.preventDefault(); options[0]?.click(); }
+        else if (e.key === 'Escape') { hideRowResults(idx); }
+    }
+
+    function onRowResultKeydown(e, idx) {
+        const options = Array.from(e.currentTarget.querySelectorAll('[role="option"]'));
+        const at = options.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); options[Math.min(at + 1, options.length - 1)]?.focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); (at <= 0 ? document.getElementById(`product-search-${idx}`) : options[at - 1])?.focus(); }
+        else if (e.key === 'Escape') { hideRowResults(idx); document.getElementById(`product-search-${idx}`)?.focus(); }
+    }
+
+    document.addEventListener('click', e => {
+        document.querySelectorAll('[id^="product-results-"]:not(.hidden)').forEach(box => {
+            if (!box.parentElement.contains(e.target)) hideRowResults(box.id.replace('product-results-', ''));
+        });
+    });
 
     function formatRupiah(amount) {
         return 'Rp ' + Number(amount || 0).toLocaleString('id-ID');
@@ -370,18 +486,16 @@
             visualNum = foundIdx >= 0 ? foundIdx + 1 : parseInt(idx) + 1;
         }
 
-        const select = row.querySelector(`select[name="items[${idx}][product_id]"]`);
-        const opt = select?.selectedOptions[0];
+        const prod = getRowProduct(idx);
         const qty = parseFloat(row.querySelector(`input[name="items[${idx}][quantity]"]`)?.value || 0);
         const uom = document.getElementById(`item-uom-${idx}`)?.innerText || 'PCS';
         const subtotalText = document.getElementById(`item-subtotal-${idx}`)?.innerText || 'Rp 0';
         const summaryEl = document.getElementById(`item-summary-${idx}`);
 
         if (summaryEl) {
-            if (opt && opt.value) {
-                const sku = opt.getAttribute('data-sku') || '';
-                const name = opt.text.split('–')[1]?.trim() || opt.text.split('(')[0]?.trim() || opt.text;
-                summaryEl.innerText = `#${visualNum} · ${sku ? '[' + sku + '] ' : ''}${name} · ${qty} ${uom} · ${subtotalText}`;
+            if (prod) {
+                const sku = prod.sku || '';
+                summaryEl.innerText = `#${visualNum} · ${sku ? '[' + sku + '] ' : ''}${prod.name} · ${qty} ${uom} · ${subtotalText}`;
             } else {
                 summaryEl.innerText = `Item #${visualNum} — Pilih Produk...`;
             }
@@ -398,11 +512,7 @@
         row.className = 'border border-gray-200 rounded-2xl overflow-hidden bg-white hover:border-gray-300 transition-all shadow-xs';
         row.id = `item-row-${idx}`;
 
-        let productOptions = '<option value="">-- Pilih Produk --</option>';
-        productsData.forEach(p => {
-            const isSelected = prefill.product_id == p.id ? 'selected' : '';
-            productOptions += `<option value="${p.id}" data-price="${p.sell_price}" data-bottom="${p.bottom_price}" data-stock="${p.free_stock}" data-uom="${p.uom}" data-sku="${p.sku}" ${isSelected}>${p.sku} – ${p.name}</option>`;
-        });
+        const prefillProduct = getProduct(prefill.product_id);
 
         const rawPrice = parseFloat(prefill.unit_price) || 0;
 
@@ -434,11 +544,15 @@
 
             {{-- Form Body --}}
             <div id="item-body-${idx}" class="p-4 flex flex-col gap-3 ${isOpen ? '' : 'hidden'}">
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-[11px] font-bold text-gray-700">Produk <span class="text-red-500">*</span></label>
-                    <select data-searchable name="items[${idx}][product_id]" required onchange="handleProductChange(${idx})" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:outline-none focus:border-emerald-600 bg-white">
-                        ${productOptions}
-                    </select>
+                <div class="flex flex-col gap-1.5 relative">
+                    <label for="product-search-${idx}" class="text-[11px] font-bold text-gray-700">Produk <span class="text-red-500">*</span></label>
+                    <input type="hidden" name="items[${idx}][product_id]" id="product-id-${idx}" value="${prefillProduct ? prefillProduct.id : ''}">
+                    <input type="text" id="product-search-${idx}" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="product-results-${idx}"
+                           value="${esc(productLabel(prefillProduct))}" placeholder="Ketik SKU atau nama produk..."
+                           oninput="onRowProductInput(${idx}, this.value)" onkeydown="onRowProductKeydown(event, ${idx})"
+                           class="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 placeholder:text-gray-500 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 bg-white">
+                    <div id="product-results-${idx}" role="listbox" aria-label="Hasil pencarian produk" onkeydown="onRowResultKeydown(event, ${idx})"
+                         class="hidden absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-40 divide-y divide-gray-100"></div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 text-xs" id="item-meta-${idx}">
@@ -495,19 +609,19 @@
         const row = document.getElementById(`item-row-${idx}`);
         if (!row) return;
 
-        const select = row.querySelector(`select[name="items[${idx}][product_id]"]`);
-        const opt = select?.selectedOptions[0];
-        if (!opt || !opt.value) {
+        const prod = getRowProduct(idx);
+        if (!prod) {
             document.getElementById(`item-sku-${idx}`).innerText = 'Pilih produk terlebih dahulu';
             document.getElementById(`item-stock-badge-${idx}`).className = 'hidden';
+            updateSoItemSummary(idx);
             return;
         }
 
-        const price = parseFloat(opt.getAttribute('data-price') || 0);
-        const bottom = parseFloat(opt.getAttribute('data-bottom') || 0);
-        const stock = parseFloat(opt.getAttribute('data-stock') || 0);
-        const uom = opt.getAttribute('data-uom') || 'PCS';
-        const sku = opt.getAttribute('data-sku') || '-';
+        const price = prod.sell_price || 0;
+        const bottom = prod.bottom_price || 0;
+        const stock = prod.free_stock || 0;
+        const uom = prod.uom || 'PCS';
+        const sku = prod.sku || '-';
 
         document.getElementById(`item-sku-${idx}`).innerText = sku;
         document.getElementById(`item-uom-${idx}`).innerText = uom;
@@ -535,8 +649,7 @@
 
         rows.forEach(row => {
             const idx = row.id.replace('item-row-', '');
-            const select = row.querySelector(`select[name="items[${idx}][product_id]"]`);
-            const opt = select?.selectedOptions[0];
+            const prod = getRowProduct(idx);
             const qtyInput = row.querySelector(`input[name="items[${idx}][quantity]"]`);
             const priceInput = document.getElementById(`unit-price-${idx}`);
             const displayPriceInput = document.getElementById(`display-price-${idx}`);
@@ -552,9 +665,9 @@
 
             subtotalBarang += lineSubtotal;
 
-            if (opt && opt.value) {
-                const bottom = parseFloat(opt.getAttribute('data-bottom') || 0);
-                const stock = parseFloat(opt.getAttribute('data-stock') || 0);
+            if (prod) {
+                const bottom = prod.bottom_price || 0;
+                const stock = prod.free_stock || 0;
                 const floorInfo = document.getElementById(`item-floor-info-${idx}`);
                 const warningEl = document.getElementById(`item-stock-warning-${idx}`);
 
@@ -702,6 +815,7 @@
 
     function clearQuickSearch() {
         if (!quickSearchInput) return;
+        quickSearchSeq++;   // abaikan hasil pencarian yang masih di jalan
         quickSearchInput.value = '';
         if (quickSearchResults) {
             quickSearchResults.innerHTML = '';
@@ -741,8 +855,8 @@
                      onclick="selectQuickProduct(${p.id})">
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                            <span class="font-mono font-bold text-emerald-700 shrink-0">[${p.sku}]</span>
-                            <span class="truncate font-medium text-gray-900">${p.name}</span>
+                            <span class="font-mono font-bold text-emerald-700 shrink-0">[${esc(p.sku)}]</span>
+                            <span class="truncate font-medium text-gray-900">${esc(p.name)}</span>
                         </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
@@ -801,7 +915,7 @@
 
         rows.forEach(row => {
             const idx = row.id.replace('item-row-', '');
-            const sel = row.querySelector(`select[name="items[${idx}][product_id]"]`);
+            const sel = row.querySelector(`input[name="items[${idx}][product_id]"]`);
             if (sel) {
                 if (sel.value == product.id) {
                     targetRowIdx = idx;
@@ -847,11 +961,7 @@
             body?.classList.remove('hidden');
             chevron?.classList.add('rotate-180');
 
-            const sel = document.querySelector(`select[name="items[${emptyRowIdx}][product_id]"]`);
-            if (sel) {
-                sel.value = product.id;
-                handleProductChange(emptyRowIdx, true);
-            }
+            setRowProduct(emptyRowIdx, product);
             renumberItemRows();
             flashRowHighlight(emptyRowIdx);
             showQuickFeedback(`Item [${product.sku}] dimasukkan ke posisi teratas (#1)`, true);
@@ -873,13 +983,24 @@
         clearQuickSearch();
     }
 
-    // Event listener untuk input pencarian
+    // Event listener untuk input pencarian (AJAX, debounce 250ms; hasil usang diabaikan)
+    let quickSearchSeq = 0;
+    let quickSearchTimer = null;
+
+    function showQuickMessage(html) {
+        if (!quickSearchResults) return;
+        quickSearchResults.innerHTML = `<div class="p-4 text-center text-xs text-gray-600">${html}</div>`;
+        quickSearchResults.classList.remove('hidden');
+    }
+
     if (quickSearchInput) {
         quickSearchInput.addEventListener('input', function () {
-            const query = this.value.trim().toLowerCase();
+            const query = this.value.trim();
             if (btnQuickAddClear) {
                 btnQuickAddClear.classList.toggle('hidden', query.length === 0);
             }
+            clearTimeout(quickSearchTimer);
+            const seq = ++quickSearchSeq;
             if (!query) {
                 if (quickSearchResults) quickSearchResults.classList.add('hidden');
                 currentFilteredProducts = [];
@@ -887,16 +1008,18 @@
                 return;
             }
 
-            const matches = productsData.filter(p => {
-                const sku = (p.sku || '').toLowerCase();
-                const name = (p.name || '').toLowerCase();
-                return sku.includes(query) || name.includes(query);
-            });
-
-            renderQuickSearchResults(matches);
+            showQuickMessage('Mencari produk...');
+            quickSearchTimer = setTimeout(async () => {
+                try {
+                    const matches = await fetchProducts(query);
+                    if (seq === quickSearchSeq) renderQuickSearchResults(matches);
+                } catch (e) {
+                    if (seq === quickSearchSeq) showQuickMessage('<span class="text-red-700">Gagal memuat produk. Periksa koneksi lalu ketik ulang.</span>');
+                }
+            }, 250);
         });
 
-        quickSearchInput.addEventListener('keydown', function (e) {
+        quickSearchInput.addEventListener('keydown', async function (e) {
             const query = this.value.trim().toLowerCase();
 
             if (e.key === 'ArrowDown') {
@@ -907,10 +1030,21 @@
                 highlightQuickItem(quickHighlightedIndex - 1);
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                // 1. Cek jika ada produk yang match persis SKU (Barcode Scanner case)
-                const exactSku = productsData.find(p => (p.sku || '').toLowerCase() === query);
-                if (exactSku) {
-                    selectQuickProduct(exactSku.id);
+                if (!query) return;
+                // 1. Cek jika ada produk yang match persis SKU (Barcode Scanner case): tanya server, jangan andalkan hasil debounce yang mungkin belum datang
+                clearTimeout(quickSearchTimer);
+                const seq = ++quickSearchSeq;
+                try {
+                    const fresh = await fetchProducts(query);
+                    if (seq !== quickSearchSeq) return;
+                    currentFilteredProducts = fresh;
+                    const exactSku = fresh.find(p => (p.sku || '').toLowerCase() === query);
+                    if (exactSku) {
+                        selectQuickProduct(exactSku.id);
+                        return;
+                    }
+                } catch (err) {
+                    showQuickMessage('<span class="text-red-700">Gagal memuat produk. Periksa koneksi lalu coba lagi.</span>');
                     return;
                 }
                 // 2. Cek item yang sedang di-highlight
@@ -939,6 +1073,16 @@
     document.getElementById('addItemBtn').addEventListener('click', () => createItemRow({}, true, true));
 
     function submitSo(actionType) {
+        const emptyRow = Array.from(document.querySelectorAll('#itemsContainer > [id^="item-row-"]'))
+            .find(r => !r.querySelector('input[id^="product-id-"]')?.value);
+        if (emptyRow) {
+            const idx = emptyRow.id.replace('item-row-', '');
+            document.getElementById(`item-body-${idx}`)?.classList.remove('hidden');
+            const input = document.getElementById(`product-search-${idx}`);
+            input?.focus();
+            showQuickFeedback('Pilih produk dari hasil pencarian untuk semua baris sebelum menyimpan.', false);
+            return;
+        }
         document.getElementById('formAction').value = actionType;
         document.getElementById('soForm').submit();
     }
