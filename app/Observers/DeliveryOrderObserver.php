@@ -669,11 +669,12 @@ class DeliveryOrderObserver
             $goodsDeliveryCoa = $product?->resolveGoodsDeliveryCoaOrDefault() ?? $defaultGoodsDeliveryCoa;
 
             if (!$inventoryCoa || !$goodsDeliveryCoa) {
-                throw new \Exception(
+                $settings = app(\App\Services\AccountingSettings::class);
+                throw new \App\Exceptions\ProductCoaMissingException(
                     'Akun COA untuk produk "' . ($product?->name ?? 'tidak diketahui') . '" tidak ditemukan. '
-                    . 'Diperlukan: Persediaan (' . ($inventoryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('inventory')[0] ?? '-')) . ') dan '
-                    . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? '\u2713' : (app(\App\Services\AccountingSettings::class)->codes('goods_in_transit')[0] ?? '-')) . '). '
-                    . 'Silakan konfigurasi COA produk tersebut sebelum mengirim Delivery Order.'
+                    . 'Diperlukan: Persediaan (' . ($inventoryCoa ? "\u{2713}" : ($settings->codes('inventory')[0] ?? '-')) . ') dan '
+                    . 'Penyerahan Barang (' . ($goodsDeliveryCoa ? "\u{2713}" : ($settings->codes('goods_in_transit')[0] ?? '-')) . '). '
+                    . 'Silakan konfigurasi COA produk tersebut (Master Data > Produk) sebelum mengirim Delivery Order.'
                 );
             }
 

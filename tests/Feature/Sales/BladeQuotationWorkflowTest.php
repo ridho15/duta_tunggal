@@ -13,13 +13,10 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeQuotationWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected User $authorizedUser;
     protected User $unauthorizedUser;
     protected Cabang $cabang;

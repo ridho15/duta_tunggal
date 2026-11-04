@@ -20,13 +20,10 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Role;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeDeliveryOrderWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected User $user;
     protected User $unauthorizedUser;
     protected Cabang $cabang;
@@ -69,7 +66,7 @@ class BladeDeliveryOrderWorkflowTest extends TestCase
         $this->unauthorizedUser->assignRole($roleGuest);
 
         $this->warehouseA = Warehouse::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'name' => 'Gudang Alpha DO Test',
                 'kode' => 'GDG-DO-A',
                 'location' => 'Jakarta Barat',
@@ -78,7 +75,7 @@ class BladeDeliveryOrderWorkflowTest extends TestCase
             ]);
 
         $this->warehouseB = Warehouse::withoutGlobalScopes()->where('id', '!=', $this->warehouseA->id)->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'name' => 'Gudang Beta DO Test',
                 'kode' => 'GDG-DO-B',
                 'location' => 'Jakarta Timur',
@@ -133,13 +130,12 @@ class BladeDeliveryOrderWorkflowTest extends TestCase
         ChartOfAccount::firstOrCreate(['code' => '4100.10'], ['name' => 'Penjualan Produk', 'type' => 'Revenue', 'is_active' => true]);
         ChartOfAccount::firstOrCreate(['code' => '5100.10'], ['name' => 'HPP Barang Dagangan', 'type' => 'Expense', 'is_active' => true]);
 
-        $this->customer = Customer::withoutGlobalScopes()->first() ?? Customer::create([
+        $this->customer = Customer::withoutGlobalScopes()->first() ?? Customer::factory()->create([
             'code' => 'CUST-DO-001',
             'name' => 'Toko Bangunan Berkah Sentosa',
             'cabang_id' => $this->cabang->id,
-            'is_active' => true,
             'tipe_pembayaran' => 'Kredit',
-            'credit_limit' => 50000000,
+            'kredit_limit' => 50000000,
             'address' => 'Jl. Pembangunan No. 88, Jakarta',
             'telephone' => '08123456789',
         ]);
@@ -384,8 +380,8 @@ class BladeDeliveryOrderWorkflowTest extends TestCase
     {
         $do = $this->createSampleDeliveryOrder('confirmed');
 
-        $driver = Driver::withoutGlobalScopes()->first() ?? Driver::create(['name' => 'Budi Santoso', 'cabang_id' => $this->cabang->id]);
-        $vehicle = Vehicle::withoutGlobalScopes()->first() ?? Vehicle::create(['plate_number' => 'B 1234 CD', 'cabang_id' => $this->cabang->id]);
+        $driver = Driver::withoutGlobalScopes()->first() ?? Driver::factory()->create(['name' => 'Budi Santoso', 'cabang_id' => $this->cabang->id]);
+        $vehicle = Vehicle::withoutGlobalScopes()->first() ?? Vehicle::factory()->create(['plate' => 'B 1234 CD', 'cabang_id' => $this->cabang->id]);
 
         $sj = SuratJalan::create([
             'sj_number' => 'SJ-TEST-' . uniqid(),

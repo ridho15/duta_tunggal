@@ -62,15 +62,15 @@ class BladePurchaseReceiptWorkflowTest extends TestCase
             $this->user->assignRole('Super Admin');
         }
 
-        $this->supplier = Supplier::first() ?? Supplier::create([
+        $this->supplier = Supplier::first() ?? Supplier::factory()->create([
             'code' => 'SUP-RECEIPT-01',
             'perusahaan' => 'PT Supplier Logistik Utama',
             'address' => 'Jl. Logistik No. 1',
-            'status' => 1,
+            'phone' => '021-5550001',
             'cabang_id' => $this->cabang->id,
         ]);
 
-        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::create([
+        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::factory()->create([
             'kode' => 'GDG-RCV-01',
             'name' => 'Gudang Utama Penerimaan',
             'cabang_id' => $this->cabang->id,
@@ -85,19 +85,18 @@ class BladePurchaseReceiptWorkflowTest extends TestCase
             'status' => 1,
         ]);
 
-        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::create(['name' => 'Pcs', 'code' => 'PCS']);
+        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::factory()->create(['name' => 'Pcs', 'abbreviation' => 'pcs']);
 
         $invCoa = ChartOfAccount::where('type', 'Asset')->first();
         $unbilledCoa = ChartOfAccount::where('type', 'Liability')->first();
 
-        $this->product = Product::first() ?? Product::create([
+        $this->product = Product::first() ?? Product::factory()->create([
             'name' => 'Baut Baja M10 x 50mm',
             'sku' => 'BB-M10-50',
-            'unit_id' => $uom->id,
+            'uom_id' => $uom->id,
             'cabang_id' => $this->cabang->id,
             'inventory_coa_id' => $invCoa?->id,
             'unbilled_purchase_coa_id' => $unbilledCoa?->id,
-            'status' => 1,
         ]);
     }
 

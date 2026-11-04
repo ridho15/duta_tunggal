@@ -20,13 +20,10 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Role;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeCustomerReturnWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;

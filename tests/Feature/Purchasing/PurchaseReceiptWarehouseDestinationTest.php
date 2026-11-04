@@ -67,7 +67,7 @@ it('gudang terima sama dengan tujuan PO: tersimpan tanpa alasan', function () {
 
     $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id))->assertSessionHasNoErrors();
 
-    $grn = PurchaseReceipt::firstOrFail();
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();
     expect($grn->warehouse_override_reason)->toBeNull()->and($grn->warehouse_differs_from_po)->toBeFalse();
 });
 
@@ -77,16 +77,17 @@ it('gudang terima berbeda tanpa alasan ditolak; dengan alasan tersimpan dan tamp
     $other = stkWarehouse($ctx, 'Gudang Titipan');
     $po = grnPo($ctx, $target);
 
+    $before = PurchaseReceipt::count();   // relatif: tes lama tanpa isolasi dapat menyisakan GRN
     $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $other->id))
         ->assertSessionHasErrors('warehouse_override_reason');
     $this->post(route('gudang.penerimaan.store'), grnPayload($po, $other->id, ['warehouse_override_reason' => '   ']))
         ->assertSessionHasErrors('warehouse_override_reason');
-    expect(PurchaseReceipt::count())->toBe(0);
+    expect(PurchaseReceipt::count())->toBe($before);
 
     $this->post(route('gudang.penerimaan.store'), grnPayload($po, $other->id, ['warehouse_override_reason' => 'Gudang tujuan penuh']))
         ->assertSessionHasNoErrors();
 
-    $grn = PurchaseReceipt::firstOrFail();
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();
     expect($grn->warehouse_override_reason)->toBe('Gudang tujuan penuh')->and($grn->warehouse_differs_from_po)->toBeTrue();
 
     $this->get(route('gudang.penerimaan.show', $grn))->assertOk()
@@ -102,7 +103,7 @@ it('PO tanpa gudang tujuan: tidak ada pembanding, alasan tidak diminta dan tidak
     $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $any->id, ['warehouse_override_reason' => 'tidak perlu']))
         ->assertSessionHasNoErrors();
 
-    expect(PurchaseReceipt::firstOrFail()->warehouse_override_reason)->toBeNull();
+    expect(PurchaseReceipt::latest('id')->firstOrFail()->warehouse_override_reason)->toBeNull();
 });
 
 it('edit GRN yang memindah ke gudang lain juga wajib beralasan', function () {
@@ -111,7 +112,7 @@ it('edit GRN yang memindah ke gudang lain juga wajib beralasan', function () {
     $other = stkWarehouse($ctx, 'Gudang Titipan');
     $po = grnPo($ctx, $target);
     $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id));
-    $grn = PurchaseReceipt::firstOrFail();
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();
     $item = $grn->purchaseReceiptItem()->firstOrFail();
 
     $payload = grnPayload($po, $other->id);
@@ -128,7 +129,7 @@ it('halaman edit GRN memuat data item di atribut x-data tanpa memutus atribut (b
     $target = stkWarehouse($ctx, 'Gudang Tujuan');
     $po = grnPo($ctx, $target);
     $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id));
-    $grn = PurchaseReceipt::firstOrFail();
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();
 
     $html = $this->get(route('gudang.penerimaan.edit', $grn))->assertOk()->getContent();
 

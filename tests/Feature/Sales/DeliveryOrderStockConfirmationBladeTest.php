@@ -156,3 +156,43 @@ it('Checker Edit Qty: boleh turun + tercatat di log; naik ditolak; DO dengan SJ 
     $this->post(route('gudang.kiriman.editQty', $do->id), ['quantities' => [$itemId => 5], 'notes' => 'telat'])->assertSessionHas('error');
     expect((float) $do->deliveryOrderItem()->value('quantity'))->toBe(8.0);
 });
+
+it('SJ gagal terbit karena COA produk kosong: pesan validasi (bukan 500), SJ tidak terbentuk, DO tetap', function () {
+    [$ctx, $do, $checker] = cnfWaitingDo();
+    app(DeliveryOrderService::class)->confirmStock($do);
+    $do->update(['status' => 'confirmed']);
+
+    // produk tanpa COA sendiri DAN akun bawaan pengaturan tidak ada
+    $ctx['product']->forceFill(['inventory_coa_id' => null, 'goods_delivery_coa_id' => null])->save();
+    \App\Models\ChartOfAccount::whereIn('code', ['1140.10', '1140.20'])->delete();
+    $sjBefore = SuratJalan::count();
+
+    $response = $this->actingAs($checker)->post(route('penjualan.sj.store'), [
+        'delivery_order_ids' => [$do->id], 'issued_at' => now()->toDateString(), 'delivery_method' => 'ekspedisi', 'expedition_name' => 'JNE',
+    ]);
+
+    $response->assertSessionHasErrors('delivery_order_ids');
+    expect(session('errors')->first('delivery_order_ids'))->toContain('Akun COA untuk produk')->toContain('1140.10')->toContain('1140.20')->not->toContain('u2713')
+        ->and(SuratJalan::count())->toBe($sjBefore)
+        ->and($do->fresh()->status)->toBe('confirmed');
+});
+
+it('DO yang dipecah ke 2 gudang: tiap DO bernomor dengan kode gudangnya sendiri (bukan kode gudang pertama + akhiran)', function () {
+    $ctx = stkContext();
+    $second = stkWarehouse($ctx, 'Gudang Kedua');
+    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
+    stkSetStock($ctx['product'], $second, 30);
+    [$so, $item] = stkSaleOrder($ctx, 10);
+
+    $this->actingAs($ctx['user'])->post(route('penjualan.do.store'), [
+        'sale_order_id' => $so->id,
+        'items' => [['item_id' => $item->id, 'product_id' => $item->product_id, 'warehouses' => [$ctx['warehouse']->id => 6, $second->id => 4]]],
+    ])->assertSessionHasNoErrors();
+
+    $numbers = DeliveryOrder::whereHas('salesOrders', fn ($q) => $q->where('sale_orders.id', $so->id))->orderBy('warehouse_id')->pluck('do_number', 'warehouse_id');
+
+    expect($numbers)->toHaveCount(2)
+        ->and($numbers[$ctx['warehouse']->id])->toMatch('/^DO-'.preg_quote($ctx['warehouse']->kode, '/').'-\d{8}-\d{2}$/')
+        ->and($numbers[$second->id])->toMatch('/^DO-'.preg_quote($second->kode, '/').'-\d{8}-\d{2}$/')
+        ->and($numbers->unique())->toHaveCount(2);
+});

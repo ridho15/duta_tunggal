@@ -46,6 +46,22 @@ class DeliveryOrderSplitter
         }
     }
 
+    /**
+     * Nomor DO hasil pecahan memakai kode gudangnya sendiri (DO-{KODE_GUDANG}-{YYYYMMDD}-{SEQ2}), bukan kode gudang pertama + akhiran.
+     * DO pertama mempertahankan nomor dasar bila nomor itu memang dibuat untuk gudangnya (atau bila penomoran terpusat hidup).
+     */
+    private function numberFor(string $baseNumber, int $warehouseId, bool $keepBase): string
+    {
+        if ($keepBase) {
+            $code = \App\Models\Warehouse::whereKey($warehouseId)->value('kode');
+            if (\App\Services\DocumentNumberService::enabled() || ($code && str_starts_with($baseNumber, "DO-{$code}-"))) {
+                return $baseNumber;
+            }
+        }
+
+        return DeliveryOrderService::generateStaticDoNumber(null, $warehouseId);
+    }
+
     private function performSplit(DeliveryOrder $deliveryOrder, $items, $warehouseIds): array
     {
         return DB::transaction(function () use ($deliveryOrder, $items, $warehouseIds) {
@@ -54,14 +70,12 @@ class DeliveryOrderSplitter
             $result = [];
 
             foreach ($warehouseIds as $index => $warehouseId) {
-                $suffix = str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT);
-
                 if ($index === 0) {
                     $target = $deliveryOrder;
-                    $target->forceFill(['do_number' => "{$baseNumber}-{$suffix}", 'warehouse_id' => $warehouseId])->saveQuietly();
+                    $target->forceFill(['do_number' => $this->numberFor($baseNumber, (int) $warehouseId, keepBase: true), 'warehouse_id' => $warehouseId])->saveQuietly();
                 } else {
                     $target = $deliveryOrder->replicate(['id', 'created_at', 'updated_at', 'deleted_at', 'additional_cost', 'additional_cost_description']);
-                    $target->do_number = "{$baseNumber}-{$suffix}";
+                    $target->do_number = $this->numberFor($baseNumber, (int) $warehouseId, keepBase: false);
                     $target->warehouse_id = $warehouseId;
                     $target->save();
                     $target->salesOrders()->sync($saleOrderIds);

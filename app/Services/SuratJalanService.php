@@ -136,20 +136,25 @@ class SuratJalanService
         $transitions = app(DeliveryOrderTransitions::class);
         $note = "Surat Jalan {$suratJalan->sj_number} terbit";
 
-        foreach ($suratJalan->deliveryOrder()->get() as $deliveryOrder) {
-            $deliveryOrder->refresh();
+        try {
+            foreach ($suratJalan->deliveryOrder()->get() as $deliveryOrder) {
+                $deliveryOrder->refresh();
 
-            if (in_array($deliveryOrder->status, ['approved', 'confirmed', 'partial'], true)) {
-                $transitions->to($deliveryOrder, 'sent', ['comments' => "Dikirim otomatis: {$note}", 'source' => 'surat_jalan']);
-            }
+                if (in_array($deliveryOrder->status, ['approved', 'confirmed', 'partial'], true)) {
+                    $transitions->to($deliveryOrder, 'sent', ['comments' => "Dikirim otomatis: {$note}", 'source' => 'surat_jalan']);
+                }
 
-            if ($deliveryOrder->refresh()->status === 'sent') {
-                $transitions->to($deliveryOrder, 'received', [
-                    'comments' => "Diterima otomatis: {$note}",
-                    'received_by' => "Surat Jalan {$suratJalan->sj_number}",
-                    'source' => 'surat_jalan',
-                ]);
+                if ($deliveryOrder->refresh()->status === 'sent') {
+                    $transitions->to($deliveryOrder, 'received', [
+                        'comments' => "Diterima otomatis: {$note}",
+                        'received_by' => "Surat Jalan {$suratJalan->sj_number}",
+                        'source' => 'surat_jalan',
+                    ]);
+                }
             }
+        } catch (\App\Exceptions\ProductCoaMissingException $e) {
+            // Dipanggil di dalam transaksi pemanggil: melempar ValidationException membatalkan penerbitan dan tampil sebagai pesan, bukan halaman 500.
+            throw ValidationException::withMessages(['delivery_order_ids' => $e->getMessage()]);
         }
     }
 
