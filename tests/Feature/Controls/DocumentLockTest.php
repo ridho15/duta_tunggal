@@ -144,7 +144,8 @@ it('[flag mati] policy berperilaku lama: hanya izin (DO Dikirim masih dapat diub
     $user = ctlUser($ctx, 'Sales Manager', ['update delivery order', 'update customer receipt', 'update delivery schedule']);
 
     expect((new DeliveryOrderPolicy)->update($user, lockDoc(DeliveryOrder::class, 'sent')))->toBeTrue()
-        ->and((new CustomerReceiptPolicy)->update($user, lockDoc(CustomerReceipt::class, 'Paid')))->toBeTrue()
+        ->and((new CustomerReceiptPolicy)->update($user, lockDoc(CustomerReceipt::class, 'Paid')))->toBeFalse()   // kunci status Paid/Partial berlaku tanpa flag (hardening 9 Okt: gunakan Batalkan Penerimaan)
+        ->and((new CustomerReceiptPolicy)->update($user, lockDoc(CustomerReceipt::class, 'Draft')))->toBeTrue()
         ->and((new DeliverySchedulePolicy)->update($user, lockDoc(DeliverySchedule::class, 'delivered')))->toBeTrue();
 });
 

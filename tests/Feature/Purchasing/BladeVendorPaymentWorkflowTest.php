@@ -20,10 +20,13 @@ use App\Models\VendorPaymentDetail;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeVendorPaymentWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Supplier $supplier;
@@ -67,32 +70,25 @@ class BladeVendorPaymentWorkflowTest extends TestCase
             $this->user->assignRole('Super Admin');
         }
 
-        $this->supplier = Supplier::first() ?? Supplier::create([
+        $this->supplier = Supplier::first() ?? Supplier::factory()->create([
             'code' => 'SUP-VP-01',
             'perusahaan' => 'PT Baja Perkasa Mandiri',
             'nama_bank' => 'BCA',
             'nomor_rekening' => '8880192837',
-            'atas_nama' => 'PT Baja Perkasa Mandiri',
             'tempo_hutang' => 30,
             'cabang_id' => $this->cabang->id,
         ]);
 
-        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::create([
+        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::factory()->create([
             'kode' => 'GDG-VP-01',
             'name' => 'Gudang Utama Test',
             'cabang_id' => $this->cabang->id,
             'status' => 1,
         ]);
 
-        $this->currency = Currency::where('code', 'IDR')->first() ?? Currency::create([
-            'code' => 'IDR',
-            'name' => 'Indonesian Rupiah',
-            'symbol' => 'Rp',
-            'exchange_rate' => 1,
-            'status' => 1,
-        ]);
+        $this->currency = Currency::firstOrCreate(['code' => 'IDR'], ['name' => 'Indonesian Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
 
-        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::create(['name' => 'Pcs', 'code' => 'PCS']);
+        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::factory()->create(['name' => 'Pcs', 'abbreviation' => 'pcs']);
 
         $this->apCoa = ChartOfAccount::firstOrCreate([
             'code' => config('coa.accounts_payable', '21100'),
@@ -119,15 +115,9 @@ class BladeVendorPaymentWorkflowTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->product = Product::first() ?? Product::create([
-            'part_number' => 'PRD-VP-01',
+        $this->product = Product::first() ?? Product::factory()->create([
             'name' => 'Pipa Baja Seamless 2 Inch',
-            'type' => 'raw_material',
-            'category_id' => 1,
-            'unit_id' => $uom->id,
-            'purchase_price' => 100000,
-            'sale_price' => 150000,
-            'status' => 1,
+            'uom_id' => $uom->id,
             'inventory_coa_id' => $invCoa->id,
         ]);
     }
@@ -182,7 +172,7 @@ class BladeVendorPaymentWorkflowTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Pembayaran Hutang Vendor');
-        $response->assertSee('+ Catat Pembayaran Baru');
+        $response->assertSee('Catat Pembayaran Baru');
         $response->assertSee('Total Pembayaran (Aktif)');
         $response->assertSee('Dibayar Bulan Ini');
         $response->assertSee('Total Sisa Hutang (AP)');

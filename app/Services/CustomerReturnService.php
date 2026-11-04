@@ -266,8 +266,7 @@ class CustomerReturnService
         $defaultInventoryCoa = $this->firstExistingCoa([
             ...$settings->codes('return_inventory'),
             config('coa.inventory'),
-            '1140.01',
-            '1140.10',
+            ...$settings->codes('inventory'),
         ]);
 
         // COA: WIP / In-Repair holding account
@@ -276,8 +275,7 @@ class CustomerReturnService
         // COA: COGS reversal
         $cogsCoa = $this->firstExistingCoa([
             ...$settings->codes('cogs'),
-            '5100.10',
-            '5100',
+            ...$settings->codes('return_cogs'),
         ]);
 
         if (! $defaultInventoryCoa || ! $cogsCoa) {
@@ -386,30 +384,22 @@ class CustomerReturnService
 
         $settings = app(AccountingSettings::class);
         $salesReturnCoa = $this->firstExistingCoa([
-            ...$settings->codes('sales_return'),
-            '4120.10',
-            '4120',
-            '4101',
-            '4100.10',
+            ...$settings->codes('sales_returns'),
+            ...$settings->codes('return_sales_returns'),
         ], 'Retur Penjualan');
 
         $vatCoa = $this->firstExistingCoa([
-            $settings->codes('sales_output_vat')[0] ?? null,
-            config('coa.sales_output_vat'),
-            '2120.06',
-            '2130',
+            ...$settings->codes('sales_output_vat'),
+            ...$settings->codes('return_output_vat'),
         ], 'PPN Keluaran');
 
         $arCoa = $this->firstExistingCoa([
-            $settings->codes('accounts_receivable')[0] ?? null,
-            config('coa.accounts_receivable'),
-            '1120',
+            ...$settings->codes('accounts_receivable'),
         ], 'Piutang');
 
         $depositCoa = $this->firstExistingCoa([
             ...$settings->codes('customer_deposit'),
-            '2160.04',
-            '2130',
+            ...$settings->codes('return_deposit'),
         ], 'Deposit Konsumen');
 
         if (! $salesReturnCoa || ! $arCoa) {

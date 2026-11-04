@@ -25,10 +25,13 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeCustomerReceiptWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;
@@ -337,29 +340,17 @@ class BladeCustomerReceiptWorkflowTest extends TestCase
     {
         $invoice = $this->createInvoiceWithAR(1000000);
 
-        $receipt = CustomerReceipt::create([
+        // Dibuat lewat rute resmi (sama seperti tes lain), bukan CustomerReceipt::create langsung yang memicu observer tanpa rincian.
+        $this->actingAs($this->user)->post(route('penjualan.receipts.store'), [
             'customer_id' => $this->customer->id,
-            'cabang_id' => $this->cabang->id,
             'payment_date' => now()->toDateString(),
             'payment_method' => 'Cash',
             'coa_id' => $this->cashCoa->id,
-            'total_payment' => 1000000,
-            'total_payment_idr' => 1000000,
-            'status' => 'Paid',
             'selected_invoices' => [$invoice->id],
             'invoice_receipts' => [$invoice->id => 1000000],
-            'created_by' => $this->user->id,
         ]);
-
-        CustomerReceiptItem::create([
-            'customer_receipt_id' => $receipt->id,
-            'invoice_id' => $invoice->id,
-            'amount' => 1000000,
-            'amount_idr' => 1000000,
-            'method' => 'Cash',
-            'coa_id' => $this->cashCoa->id,
-            'selected_invoices' => [$invoice->id],
-        ]);
+        $receipt = CustomerReceipt::withoutGlobalScopes()->latest('id')->first();
+        $this->assertNotNull($receipt);
 
         $response = $this->actingAs($this->user)->get(route('penjualan.receipts.pdf', $receipt->id));
 

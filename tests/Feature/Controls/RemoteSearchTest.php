@@ -57,8 +57,8 @@ it('hasil dibatasi 50; endpoint melaporkan terpotong + petunjuk; kueri sempit ti
 
 it('karakter wildcard LIKE (%, _) dicari apa adanya, tidak menjadi "cocok semua"', function () {
     $ctx = stkContext();
-    Customer::factory()->create(['name' => 'Toko Diskon 50% Off', 'code' => 'C-PCT', 'cabang_id' => $ctx['cabang']->id]);
-    Customer::factory()->create(['name' => 'Toko Biasa', 'code' => 'C-BIASA', 'cabang_id' => $ctx['cabang']->id]);
+    Customer::factory()->create(['name' => 'Toko Diskon 50% Off', 'code' => 'C-PCT', 'perusahaan' => '', 'cabang_id' => $ctx['cabang']->id]);
+    Customer::factory()->create(['name' => 'Toko Biasa', 'code' => 'C-BIASA', 'perusahaan' => '', 'cabang_id' => $ctx['cabang']->id]);
     $service = new RemoteSearch;
 
     expect(array_values($service->options('customers', '%')))->toBe(['(C-PCT) Toko Diskon 50% Off'])
@@ -70,7 +70,7 @@ it('label nilai terpilih pulih walau di luar 50 teratas; customer yang sudah dig
     rsCustomers(80, $ctx);
     $service = new RemoteSearch;
     $last = Customer::where('code', 'C-0080')->first();
-    $merged = Customer::factory()->create(['name' => 'Pelanggan Lama', 'code' => 'C-OLD', 'cabang_id' => $ctx['cabang']->id, 'merged_into' => $last->id]);
+    $merged = Customer::factory()->create(['name' => 'Pelanggan Lama', 'code' => 'C-OLD', 'perusahaan' => '', 'cabang_id' => $ctx['cabang']->id, 'merged_into' => $last->id]);
 
     expect($service->options('customers'))->not->toHaveKey($last->id)                         // di luar 50 teratas
         ->and($service->label('customers', $last->id))->toBe('(C-0080) Pelanggan 080')

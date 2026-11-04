@@ -52,12 +52,10 @@ class BladeDeliveryScheduleWorkflowTest extends TestCase
         ]);
 
         $this->warehouse = Warehouse::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'name' => 'Gudang Logistik Test',
                 'cabang_id' => $this->cabang->id,
                 'kode' => 'GDG-SCH-01',
-                'tipe' => 'utama',
-                'status' => 'aktif',
             ]);
 
         $uniq = uniqid();
@@ -103,7 +101,7 @@ class BladeDeliveryScheduleWorkflowTest extends TestCase
             ]
         );
 
-        $this->customer = Customer::withoutGlobalScopes()->first() ?? Customer::create([
+        $this->customer = Customer::withoutGlobalScopes()->first() ?? Customer::factory()->create([
             'code' => 'CUST-SCH-' . $uniq,
             'name' => 'Toko Bangunan Maju',
             'address' => 'Jl. Pengiriman Logistik No. 12',
@@ -111,26 +109,22 @@ class BladeDeliveryScheduleWorkflowTest extends TestCase
             'cabang_id' => $this->cabang->id,
         ]);
 
-        $category = ProductCategory::withoutGlobalScopes()->first() ?? ProductCategory::create([
+        $category = ProductCategory::withoutGlobalScopes()->first() ?? ProductCategory::factory()->create([
             'kode' => 'CAT-SCH',
             'name' => 'Kategori Logistik',
         ]);
 
-        $uom = UnitOfMeasure::withoutGlobalScopes()->first() ?? UnitOfMeasure::create([
+        $uom = UnitOfMeasure::withoutGlobalScopes()->first() ?? UnitOfMeasure::factory()->create([
             'name' => 'Zak',
             'abbreviation' => 'zk',
         ]);
 
-        $this->product = Product::withoutGlobalScopes()->first() ?? Product::create([
+        $this->product = Product::withoutGlobalScopes()->first() ?? Product::factory()->create([
             'name' => 'Semen Gresik 50kg',
-            'code' => 'SMN-GRS-50',
             'sku' => 'SMN-GRS-50',
             'product_category_id' => $category->id,
-            'unit_id' => $uom->id,
-            'price' => 75000,
-            'cost' => 60000,
+            'sell_price' => 75000,
             'cabang_id' => $this->cabang->id,
-            'status' => 'aktif',
         ]);
 
         // Siapkan DO dan Surat Jalan untuk muatan

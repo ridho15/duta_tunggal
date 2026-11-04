@@ -166,12 +166,49 @@ class BladeSalesOrderWorkflowTest extends TestCase
         ]);
     }
 
+    /** SO approved dengan satu item; dibuat bila belum ada, agar tes tidak bergantung pada data sisa/dev. */
+    protected function ensureApprovedSalesOrder(): SaleOrder
+    {
+        $so = SaleOrder::where('status', 'approved')->first();
+        if ($so) {
+            return $so;
+        }
+
+        $currency = Currency::where('code', 'IDR')->first() ?? Currency::create([
+            'code' => 'IDR',
+            'name' => 'Rupiah',
+            'symbol' => 'Rp',
+            'to_rupiah' => 1,
+        ]);
+        $so = SaleOrder::create([
+            'so_number' => 'SO-TEST-APPROVED-' . uniqid(),
+            'customer_id' => $this->customer->id,
+            'cabang_id' => $this->cabang->id,
+            'order_date' => now()->format('Y-m-d'),
+            'status' => 'approved',
+            'payment_type' => 'Kredit',
+            'currency_id' => $currency->id,
+            'created_by' => $this->user->id,
+            'subtotal' => 35000,
+            'tax_amount' => 0,
+            'discount_amount' => 0,
+            'total_amount' => 35000,
+        ]);
+        SaleOrderItem::create([
+            'sale_order_id' => $so->id,
+            'product_id' => $this->product1->id,
+            'quantity' => 5,
+            'unit_price' => 7000,
+            'discount' => 0,
+            'tax_type' => 'None',
+        ]);
+
+        return $so;
+    }
+
     public function test_user_can_view_sales_order_detail()
     {
-        $so = SaleOrder::first();
-        if (!$so) {
-            $this->markTestSkipped('No SO in database.');
-        }
+        $so = $this->ensureApprovedSalesOrder();
 
         $response = $this->actingAs($this->user)->get(route('penjualan.so.show', $so->id));
 
@@ -183,37 +220,7 @@ class BladeSalesOrderWorkflowTest extends TestCase
 
     public function test_user_can_view_do_create_page()
     {
-        $so = SaleOrder::where('status', 'approved')->first();
-        if (!$so) {
-            $currency = Currency::where('code', 'IDR')->first() ?? Currency::create([
-                'code' => 'IDR',
-                'name' => 'Rupiah',
-                'symbol' => 'Rp',
-                'to_rupiah' => 1,
-            ]);
-            $so = SaleOrder::create([
-                'so_number' => 'SO-TEST-APPROVED-' . time(),
-                'customer_id' => $this->customer->id,
-                'cabang_id' => $this->cabang->id,
-                'order_date' => now()->format('Y-m-d'),
-                'status' => 'approved',
-                'payment_type' => 'Kredit',
-                'currency_id' => $currency->id,
-                'created_by' => $this->user->id,
-                'subtotal' => 35000,
-                'tax_amount' => 0,
-                'discount_amount' => 0,
-                'total_amount' => 35000,
-            ]);
-            SaleOrderItem::create([
-                'sale_order_id' => $so->id,
-                'product_id' => $this->product1->id,
-                'quantity' => 5,
-                'unit_price' => 7000,
-                'discount' => 0,
-                'tax_type' => 'None',
-            ]);
-        }
+        $so = $this->ensureApprovedSalesOrder();
 
         $response = $this->actingAs($this->user)->get(route('penjualan.do.create', ['so_id' => $so->id]));
 

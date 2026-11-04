@@ -22,10 +22,13 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladePurchaseReturnWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Supplier $supplier;
@@ -69,32 +72,25 @@ class BladePurchaseReturnWorkflowTest extends TestCase
             $this->user->assignRole('Super Admin');
         }
 
-        $this->supplier = Supplier::first() ?? Supplier::create([
+        $this->supplier = Supplier::first() ?? Supplier::factory()->create([
             'code' => 'SUP-RET-01',
             'perusahaan' => 'PT Supplier Utama Retur',
             'nama_bank' => 'BCA',
             'nomor_rekening' => '8880192837',
-            'atas_nama' => 'PT Supplier Utama Retur',
             'tempo_hutang' => 30,
             'cabang_id' => $this->cabang->id,
         ]);
 
-        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::create([
+        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::factory()->create([
             'kode' => 'GDG-RET-01',
             'name' => 'Gudang Utama Retur',
             'cabang_id' => $this->cabang->id,
             'status' => 1,
         ]);
 
-        $this->currency = Currency::where('code', 'IDR')->first() ?? Currency::create([
-            'code' => 'IDR',
-            'name' => 'Indonesian Rupiah',
-            'symbol' => 'Rp',
-            'exchange_rate' => 1,
-            'status' => 1,
-        ]);
+        $this->currency = Currency::firstOrCreate(['code' => 'IDR'], ['name' => 'Indonesian Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
 
-        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::create(['name' => 'Batang', 'code' => 'BTG']);
+        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::factory()->create(['name' => 'Batang', 'abbreviation' => 'btg']);
 
         $this->apCoa = ChartOfAccount::firstOrCreate([
             'code' => config('coa.accounts_payable', '21100'),
@@ -120,12 +116,10 @@ class BladePurchaseReturnWorkflowTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->product = Product::first() ?? Product::create([
-            'code' => 'PRD-RET-001',
+        $this->product = Product::first() ?? Product::factory()->create([
             'name' => 'Besi Beton Ulir 12mm',
             'uom_id' => $uom->id,
             'cabang_id' => $this->cabang->id,
-            'status' => 1,
             'inventory_coa_id' => $this->invCoa->id,
         ]);
 

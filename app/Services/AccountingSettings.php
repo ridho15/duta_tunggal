@@ -35,6 +35,11 @@ class AccountingSettings
         'sales_shipping' => ['label' => 'Biaya Pengiriman Penjualan', 'types' => ['Expense'], 'config' => 'sales_shipping', 'prefix' => [], 'fallbacks' => ['6100.02'], 'editable' => true, 'inherits' => null, 'hint' => 'Ongkir pada invoice'],
         // Daftar internal (tidak dapat diatur sendiri; mengikuti kunci induknya) — mempertahankan urutan kode bawaan retur customer
         'return_inventory' => ['label' => 'Persediaan retur', 'types' => ['Asset'], 'config' => 'inventory', 'prefix' => ['1101.01'], 'fallbacks' => ['1140.10', '1100'], 'editable' => false, 'inherits' => 'inventory', 'hint' => ''],
+        // Alternatif kode bawaan lama untuk jurnal retur customer (sebelumnya literal di CustomerReturnService); mewarisi pengaturan kunci induknya
+        'return_cogs' => ['label' => 'HPP retur (alternatif)', 'types' => ['Expense'], 'config' => null, 'prefix' => [], 'fallbacks' => ['5100'], 'editable' => false, 'inherits' => 'cogs', 'hint' => ''],
+        'return_sales_returns' => ['label' => 'Retur penjualan (alternatif)', 'types' => ['Expense', 'Revenue', 'Contra Asset'], 'config' => null, 'prefix' => [], 'fallbacks' => ['4120', '4101', '4100.10'], 'editable' => false, 'inherits' => 'sales_returns', 'hint' => ''],
+        'return_output_vat' => ['label' => 'PPN keluaran retur (alternatif)', 'types' => ['Liability'], 'config' => null, 'prefix' => [], 'fallbacks' => ['2130'], 'editable' => false, 'inherits' => 'sales_output_vat', 'hint' => ''],
+        'return_deposit' => ['label' => 'Deposit retur (alternatif)', 'types' => ['Liability'], 'config' => null, 'prefix' => [], 'fallbacks' => ['2160.04', '2130'], 'editable' => false, 'inherits' => 'customer_deposit', 'hint' => ''],
         'return_wip' => ['label' => 'Akun barang dalam perbaikan (retur)', 'types' => ['Asset'], 'config' => null, 'prefix' => [], 'fallbacks' => ['1101.02', '1-201', '1140.02'], 'editable' => false, 'inherits' => null, 'hint' => ''],
     ];
 

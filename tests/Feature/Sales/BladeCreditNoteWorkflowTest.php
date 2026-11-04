@@ -24,10 +24,13 @@ use App\Models\Warehouse;
 use App\Services\CreditNoteService;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeCreditNoteWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;
@@ -40,6 +43,11 @@ class BladeCreditNoteWorkflowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // CreditNoteService menolak penerbitan tanpa akun-akun ini (Pengaturan Akuntansi)
+        foreach ([['1120', 'Piutang Dagang', 'Asset'], ['4000', 'Penjualan', 'Revenue'], ['4120.10', 'Retur Penjualan', 'Revenue'], ['2120.06', 'PPn Keluaran', 'Liability'], ['6100.02', 'Biaya Pengiriman', 'Expense']] as [$code, $name, $type]) {
+            \App\Models\ChartOfAccount::firstOrCreate(['code' => $code], ['name' => $name, 'type' => $type, 'is_active' => true, 'opening_balance' => 0]);
+        }
 
         config(['sales.controls.credit_notes' => true]);
 
@@ -84,7 +92,7 @@ class BladeCreditNoteWorkflowTest extends TestCase
 
         $this->warehouse = Warehouse::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
             ?? Warehouse::withoutGlobalScopes()->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'name' => 'Gudang Utama Surabaya',
                 'kode' => 'GDG-SBY',
                 'location' => 'Surabaya',
@@ -92,25 +100,23 @@ class BladeCreditNoteWorkflowTest extends TestCase
                 'status' => true,
             ]);
 
-        $uom = UnitOfMeasure::withoutGlobalScopes()->first() ?? UnitOfMeasure::create([
+        $uom = UnitOfMeasure::withoutGlobalScopes()->first() ?? UnitOfMeasure::factory()->create([
             'name' => 'Pcs',
             'abbreviation' => 'pcs',
         ]);
 
-        $category = ProductCategory::withoutGlobalScopes()->first() ?? ProductCategory::create([
+        $category = ProductCategory::withoutGlobalScopes()->first() ?? ProductCategory::factory()->create([
             'name' => 'Fitting Tembaga',
-            'code' => 'FT-CU',
+            'kode' => 'FT-CU',
         ]);
 
-        $this->product = Product::withoutGlobalScopes()->first() ?? Product::create([
+        $this->product = Product::withoutGlobalScopes()->first() ?? Product::factory()->create([
             'name' => 'COPPER ELBO 5/8',
-            'code' => 'ELB-058',
-            'unit' => 'Pcs',
+            'sku' => 'ELB-058',
             'uom_id' => $uom->id,
-            'category_id' => $category->id,
+            'product_category_id' => $category->id,
             'cost_price' => 50000,
-            'price' => 70000,
-            'status' => true,
+            'sell_price' => 70000,
         ]);
 
         $this->saleOrder = SaleOrder::withoutGlobalScopes()->first() ?? SaleOrder::create([
@@ -119,7 +125,7 @@ class BladeCreditNoteWorkflowTest extends TestCase
             'customer_id' => $this->customer->id,
             'cabang_id' => $this->cabang->id,
             'warehouse_id' => $this->warehouse->id,
-            'status' => SaleOrder::STATUS_APPROVED,
+            'status' => 'approved',
             'total_amount' => 700000,
             'created_by' => $this->user->id,
         ]);

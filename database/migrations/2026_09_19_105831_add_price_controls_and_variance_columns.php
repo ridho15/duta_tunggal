@@ -40,7 +40,7 @@ return new class extends Migration
                 'code' => '5160',
                 'name' => 'Selisih Pembelian',
                 'type' => 'Expense',
-                'parent_id' => $parent?->id ?? 50,
+                'parent_id' => $parent?->id,   // tanpa induk 5000: null (dulu 50 diset mati, menjadi parent_id menggantung di database baru)
                 'is_active' => true,
                 'is_current' => false,
                 'opening_balance' => 0,

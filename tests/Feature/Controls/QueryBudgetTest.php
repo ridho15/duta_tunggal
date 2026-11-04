@@ -47,8 +47,9 @@ it('anggaran: Jadwal Mulai/Selesai (rantai DO → stok → jurnal → invoice), 
     $creditNote = app(CreditNoteService::class)->draft($invoice, CreditNote::TYPE_RETURN, [$invoiceItem->id => 3], 'Barang rusak dikembalikan customer', actor: $finance);
     $issue = qbCount(fn () => app(CreditNoteService::class)->issue($creditNote, $finance));
 
-    // Terukur (data dev): mulai 37 · selesai 100 (target audit ≤ 60, lanjutan) · approve 7 · terbit 37
-    expect($start)->toBeLessThanOrEqual(45, "Jadwal Mulai: {$start} kueri")
+    // Terukur (data dev): mulai 37 (22 Sep) → 49 (4 Nov: +5 insert activity_log untuk jejak audit, +cek periode akuntansi per jurnal; tanpa N+1) ·
+    // selesai 100 (target audit ≤ 60, lanjutan) · approve 7 · terbit 37. Anggaran = terukur + ±15%.
+    expect($start)->toBeLessThanOrEqual(57, "Jadwal Mulai: {$start} kueri")
         ->and($complete)->toBeLessThanOrEqual(115, "Jadwal Selesai: {$complete} kueri")
         ->and($approve)->toBeLessThanOrEqual(10, "SO Approve: {$approve} kueri")
         ->and($issue)->toBeLessThanOrEqual(45, "Nota Kredit Terbit: {$issue} kueri");

@@ -20,10 +20,13 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeDeliveryOrderWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected User $unauthorizedUser;
     protected Cabang $cabang;

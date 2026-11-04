@@ -32,7 +32,7 @@ it('nilai awal tabel = konstanta lama (dua aturan per dokumen; Nota Kredit ditam
 
     expect($rules)->toHaveCount(6)
         ->and($rules->pluck('document_type')->unique()->sort()->values()->all())->toBe(['credit_note', 'quotation', 'sale_order'])
-        ->and(ApprovalRule::forDocument('sale_order', 10000000)->approver_label)->toBe('Sales Manager / Direktur')      // batas atas inklusif
+        ->and(ApprovalRule::forDocument('sale_order', 10000000)->approver_label)->toBe('Sales Manager / Kasir (harga sesuai batas) / Direktur')      // batas atas inklusif; Kasir ditambahkan migration 13 Okt (grant_cashier_sale_order_approval)
         ->and(ApprovalRule::forDocument('sale_order', 10000000.01)->approver_label)->toBe('Direktur / Owner / Finance Manager');
 });
 
@@ -69,7 +69,7 @@ it('pesan penolakan identik dengan teks lama', function () {
     $self = $service->canApprove($creator, ctlSo($ctx, 1000, $creator));
 
     expect($big['reason'])->toBe('Persetujuan bertingkat: Nilai Sales Order di atas Rp 10.000.000 wajib disetujui oleh Direktur / Owner / Finance Manager.')
-        ->and($regular['reason'])->toBe('Persetujuan Sales Order membutuhkan wewenang Sales Manager / Direktur.')
+        ->and($regular['reason'])->toBe('Persetujuan Sales Order membutuhkan wewenang Sales Manager / Kasir (harga sesuai batas) / Direktur.')
         ->and($self['reason'])->toContain('Segregation of Duties');
 });
 

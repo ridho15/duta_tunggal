@@ -20,10 +20,13 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladePurchaseInvoiceWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Supplier $supplier;
@@ -65,30 +68,23 @@ class BladePurchaseInvoiceWorkflowTest extends TestCase
             $this->user->assignRole('Super Admin');
         }
 
-        $this->supplier = Supplier::first() ?? Supplier::create([
+        $this->supplier = Supplier::first() ?? Supplier::factory()->create([
             'code' => 'SUP-INV-01',
             'perusahaan' => 'PT Sumber Logam Abadi',
-            'name' => 'Budi Santoso',
             'tempo_hutang' => 30,
             'cabang_id' => $this->cabang->id,
         ]);
 
-        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::create([
+        $this->warehouse = Warehouse::where('status', 1)->first() ?? Warehouse::factory()->create([
             'kode' => 'GDG-INV-01',
             'name' => 'Gudang Pusat Penerimaan',
             'cabang_id' => $this->cabang->id,
             'status' => 1,
         ]);
 
-        $this->currency = Currency::where('code', 'IDR')->first() ?? Currency::create([
-            'code' => 'IDR',
-            'name' => 'Indonesian Rupiah',
-            'symbol' => 'Rp',
-            'exchange_rate' => 1,
-            'status' => 1,
-        ]);
+        $this->currency = Currency::firstOrCreate(['code' => 'IDR'], ['name' => 'Indonesian Rupiah', 'symbol' => 'Rp', 'to_rupiah' => 1]);
 
-        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::create(['name' => 'Pcs', 'code' => 'PCS']);
+        $uom = UnitOfMeasure::first() ?? UnitOfMeasure::factory()->create(['name' => 'Pcs', 'abbreviation' => 'pcs']);
 
         $invCoa = ChartOfAccount::firstOrCreate([
             'code' => config('coa.inventory', '11300'),
@@ -122,14 +118,13 @@ class BladePurchaseInvoiceWorkflowTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->product = Product::first() ?? Product::create([
+        $this->product = Product::first() ?? Product::factory()->create([
             'name' => 'Plat Baja 5mm',
             'sku' => 'PB-5MM-TEST',
-            'unit_id' => $uom->id,
+            'uom_id' => $uom->id,
             'cabang_id' => $this->cabang->id,
             'inventory_coa_id' => $invCoa->id,
             'unbilled_purchase_coa_id' => $unbilledCoa->id,
-            'status' => 1,
         ]);
 
         // Buat Purchase Order disetujui

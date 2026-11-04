@@ -20,10 +20,13 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeCustomerReturnWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;
@@ -66,7 +69,7 @@ class BladeCustomerReturnWorkflowTest extends TestCase
 
         $this->warehouse = Warehouse::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
             ?? Warehouse::withoutGlobalScopes()->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'name' => 'Gudang Utama Surabaya',
                 'kode' => 'GDG-SBY',
                 'location' => 'Surabaya',
@@ -74,26 +77,25 @@ class BladeCustomerReturnWorkflowTest extends TestCase
                 'status' => true,
             ]);
 
-        $uom = UnitOfMeasure::withoutGlobalScopes()->first() ?? UnitOfMeasure::create([
+        $uom = UnitOfMeasure::withoutGlobalScopes()->first() ?? UnitOfMeasure::factory()->create([
             'name' => 'Pcs',
             'abbreviation' => 'pcs',
         ]);
 
-        $category = ProductCategory::withoutGlobalScopes()->first() ?? ProductCategory::create([
+        $category = ProductCategory::withoutGlobalScopes()->first() ?? ProductCategory::factory()->create([
             'name' => 'Umum',
-            'code' => 'GEN',
+            'kode' => 'GEN',
         ]);
 
         $this->product = Product::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
             ?? Product::withoutGlobalScopes()->first()
-            ?? Product::create([
+            ?? Product::factory()->create([
                 'name' => 'Produk Tes Retur Penjualan',
                 'sku' => 'SKU-RET-001',
                 'uom_id' => $uom->id,
                 'product_category_id' => $category->id,
                 'sell_price' => 25000,
                 'cost_price' => 15000,
-                'status' => true,
                 'cabang_id' => $this->cabang->id,
             ]);
 
