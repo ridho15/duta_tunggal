@@ -175,7 +175,7 @@
                     >
                         <option value="">Pilih gudang terima</option>
                         @foreach ($warehouses as $wh)
-                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }})</option>
+                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }}){{ $wh->status ? '' : ' · nonaktif' }}</option>
                         @endforeach
                     </select>
                     <span class="text-[11px] text-gray-500 mt-1 block">Otomatis mengikuti gudang tujuan PO. Mengubahnya menerapkan gudang yang sama ke semua baris barang.</span>
@@ -356,7 +356,7 @@
                                     >
                                         <option value="">Pilih gudang</option>
                                         @foreach ($warehouses as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }})</option>
+                                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }}){{ $wh->status ? '' : ' · nonaktif' }}</option>
                                         @endforeach
                                     </select>
 

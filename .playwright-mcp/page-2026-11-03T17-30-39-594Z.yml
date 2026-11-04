@@ -1,0 +1,240 @@
+- generic [ref=f18e2]:
+  - complementary "Menu navigasi utama" [ref=f18e3]:
+    - link "DUTA TUNGGAL ERP" [ref=f18e5] [cursor=pointer]:
+      - /url: http://localhost:8001/dashboard
+      - generic [ref=f18e6]: DUTA TUNGGAL
+      - generic [ref=f18e7]: ERP
+    - generic [ref=f18e8]:
+      - link "Dashboard" [ref=f18e10] [cursor=pointer]:
+        - /url: http://localhost:8001/dashboard
+      - generic [ref=f18e15]:
+        - generic [ref=f18e16]: Penjualan
+        - link "Penawaran Harga" [ref=f18e17] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/penawaran
+        - link "Pesanan Penjualan" [ref=f18e22] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/so
+        - link "Perintah Kirim (DO)" [ref=f18e27] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/do
+        - link "Surat Jalan" [ref=f18e33] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/surat-jalan
+        - link "Jadwal Kirim" [ref=f18e39] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/jadwal-kirim
+        - link "Invoice Penjualan" [ref=f18e44] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/invoice
+        - link "Terima Pembayaran" [ref=f18e49] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/terima-pembayaran
+        - link "Retur Penjualan" [ref=f18e54] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/retur
+        - link "Nota Kredit" [ref=f18e59] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/nota-kredit
+        - link "Laporan Penjualan" [ref=f18e64] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/laporan
+      - generic [ref=f18e68]:
+        - generic [ref=f18e69]: Gudang & Stok
+        - link "Siapkan & Kirim" [ref=f18e70] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/kiriman
+        - link "Terima Barang" [ref=f18e76] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/penerimaan
+        - link "Cek Stok" [ref=f18e81] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/stok
+        - link "Pindah Stok" [ref=f18e86] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/transfer
+        - link "Stock Opname" [ref=f18e90] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/opname
+        - link "Laporan Stok & Mutasi" [ref=f18e96] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/laporan
+      - generic [ref=f18e100]:
+        - generic [ref=f18e101]: Produksi & Manufaktur
+        - link "Resep Produksi (BOM)" [ref=f18e102] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/bom
+        - link "Perintah Kerja (SPK)" [ref=f18e106] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/spk
+        - link "Pengeluaran Bahan" [ref=f18e110] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/material-issue
+        - link "Hasil Produksi" [ref=f18e114] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/production
+        - link "QC Pabrik" [ref=f18e118] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/qc
+      - generic [ref=f18e122]:
+        - generic [ref=f18e123]: Pembelian
+        - link "Permintaan (OR)" [ref=f18e124] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/permintaan
+        - link "Pesanan (PO)" [ref=f18e129] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/po
+        - link "Invoice Pembelian" [ref=f18e134] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/invoice
+        - link "Pembayaran Hutang" [ref=f18e139] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/pembayaran
+        - link "Retur Pembelian" [ref=f18e144] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/retur
+        - link "Laporan Pembelian" [ref=f18e149] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/laporan
+      - generic [ref=f18e153]:
+        - generic [ref=f18e154]: Keuangan
+        - link "Kas & Bank" [ref=f18e155] [cursor=pointer]:
+          - /url: http://localhost:8001/keuangan/kas-bank
+        - link "Buku Besar & Jurnal" [ref=f18e159] [cursor=pointer]:
+          - /url: http://localhost:8001/keuangan/jurnal
+        - link "Bagan Akun (COA)" [ref=f18e164] [cursor=pointer]:
+          - /url: http://localhost:8001/master/coa
+        - link "Aset Tetap" [ref=f18e168] [cursor=pointer]:
+          - /url: http://localhost:8001/keuangan/aset
+        - link "Laporan Keuangan" [ref=f18e172] [cursor=pointer]:
+          - /url: http://localhost:8001/laporan/keuangan
+      - generic [ref=f18e177]:
+        - generic [ref=f18e178]: Master Data
+        - link "Produk" [ref=f18e179] [cursor=pointer]:
+          - /url: http://localhost:8001/master/produk
+        - link "Customer" [ref=f18e184] [cursor=pointer]:
+          - /url: http://localhost:8001/master/customer
+        - link "Supplier" [ref=f18e189] [cursor=pointer]:
+          - /url: http://localhost:8001/master/supplier
+        - link "Cabang" [ref=f18e195] [cursor=pointer]:
+          - /url: http://localhost:8001/master/cabang
+        - link "Gudang & Rak" [ref=f18e199] [cursor=pointer]:
+          - /url: http://localhost:8001/master/gudang
+        - link "Kategori" [ref=f18e203] [cursor=pointer]:
+          - /url: http://localhost:8001/master/kategori
+        - link "Satuan" [ref=f18e207] [cursor=pointer]:
+          - /url: http://localhost:8001/master/satuan
+        - link "Armada & Driver" [ref=f18e211] [cursor=pointer]:
+          - /url: http://localhost:8001/master/kendaraan
+        - link "Mata Uang & Kurs" [ref=f18e215] [cursor=pointer]:
+          - /url: http://localhost:8001/master/mata-uang
+        - link "Tarif Pajak" [ref=f18e219] [cursor=pointer]:
+          - /url: http://localhost:8001/master/pajak
+      - generic [ref=f18e223]:
+        - generic [ref=f18e224]: Pengaturan
+        - link "Pengguna & Peran" [ref=f18e225] [cursor=pointer]:
+          - /url: http://localhost:8001/pengaturan/pengguna
+    - generic [ref=f18e230]: v2.0 (Tailwind Native)
+  - generic [ref=f18e233]:
+    - banner [ref=f18e234]:
+      - navigation "Breadcrumb" [ref=f18e236]:
+        - generic [ref=f18e237]:
+          - generic [ref=f18e238]: Duta Tunggal
+          - generic [ref=f18e239]: /
+          - generic [ref=f18e240]: Perintah Kirim DO-GDG-UTM-20261104-01-01
+      - button "Super Admin · u" [ref=f18e243] [cursor=pointer]:
+        - generic [ref=f18e244]: Super Admin ·
+        - generic [ref=f18e245]: u
+    - main [ref=f18e248]:
+      - generic [ref=f18e249]:
+        - generic [ref=f18e250]:
+          - generic [ref=f18e251]:
+            - navigation [ref=f18e252]:
+              - link "Perintah Kirim (DO)" [ref=f18e253] [cursor=pointer]:
+                - /url: http://localhost:8001/penjualan/do
+              - generic [ref=f18e254]: /
+              - generic [ref=f18e255]: DO-GDG-UTM-20261104-01-01
+            - generic [ref=f18e256]:
+              - heading "DO-GDG-UTM-20261104-01-01" [level=1] [ref=f18e257]
+              - generic [ref=f18e258]: SIAP SURAT JALAN
+            - paragraph [ref=f18e259]: "Gudang: Gudang Utama · Cabang: Cabang Utama Jakarta · Dibuat: 04 November 2026, 00:27"
+          - generic [ref=f18e260]:
+            - link "Cetak DO (PDF)" [ref=f18e261] [cursor=pointer]:
+              - /url: http://localhost:8001/penjualan/do/1/pdf
+            - link "Terbitkan Surat Jalan" [ref=f18e266] [cursor=pointer]:
+              - /url: http://localhost:8001/penjualan/surat-jalan/create?so_id=1&do_id=1
+            - button "Batalkan DO" [ref=f18e270] [cursor=pointer]
+        - generic [ref=f18e274]:
+          - generic [ref=f18e275]: Pengecekan Fisik Selesai — Siap Terbitkan Surat Jalan
+          - generic [ref=f18e276]: Barang telah diverifikasi oleh petugas gudang dan siap diterbitkan Surat Jalan resmi untuk pengiriman ke customer.
+        - generic [ref=f18e278]:
+          - generic [ref=f18e279]:
+            - generic [ref=f18e280]:
+              - generic [ref=f18e281]: ✓
+              - generic [ref=f18e282]: 1. Pesanan (SO)
+            - generic [ref=f18e283]: SO-00001
+          - generic [ref=f18e284]:
+            - generic [ref=f18e285]:
+              - generic [ref=f18e286]: ✓
+              - generic [ref=f18e287]: 2. Alokasi DO
+            - generic [ref=f18e288]: Gudang Utama
+          - generic [ref=f18e289]:
+            - generic [ref=f18e290]:
+              - generic [ref=f18e291]: ✓
+              - generic [ref=f18e292]: 3. Cek Checker
+            - generic [ref=f18e293]: Selesai Dicek
+          - generic [ref=f18e294]:
+            - generic [ref=f18e295]:
+              - generic [ref=f18e296]: •
+              - generic [ref=f18e297]: 4. Surat Jalan
+            - generic [ref=f18e298]: Siap Diterbitkan
+          - generic [ref=f18e299]:
+            - generic [ref=f18e300]:
+              - generic [ref=f18e301]: •
+              - generic [ref=f18e302]: 5. Terkirim
+            - generic [ref=f18e303]: Dalam Proses
+        - generic [ref=f18e304]:
+          - generic [ref=f18e305]:
+            - heading "Informasi Dokumen" [level=3] [ref=f18e306]
+            - generic [ref=f18e307]:
+              - generic [ref=f18e308]:
+                - generic [ref=f18e309]: Nomor DO
+                - generic [ref=f18e310]: DO-GDG-UTM-20261104-01-01
+              - generic [ref=f18e311]:
+                - generic [ref=f18e312]: Tanggal Pengiriman
+                - generic [ref=f18e313]: 04 November 2026
+              - generic [ref=f18e314]:
+                - generic [ref=f18e315]: Asal Gudang
+                - generic [ref=f18e316]: Gudang Utama
+              - generic [ref=f18e317]:
+                - generic [ref=f18e318]: Cabang
+                - generic [ref=f18e319]: Cabang Utama Jakarta
+              - generic [ref=f18e320]:
+                - generic [ref=f18e321]: Dibuat Oleh
+                - generic [ref=f18e322]: uat_admin
+          - generic [ref=f18e323]:
+            - heading "Rujukan Pesanan & Pelanggan" [level=3] [ref=f18e324]
+            - generic [ref=f18e325]:
+              - generic [ref=f18e326]:
+                - generic [ref=f18e327]: Nomor SO
+                - link "SO-00001" [ref=f18e328] [cursor=pointer]:
+                  - /url: http://localhost:8001/penjualan/so/1
+              - generic [ref=f18e329]:
+                - generic [ref=f18e330]: Customer
+                - generic [ref=f18e331]: PT UAT Pelanggan Kredit
+              - generic [ref=f18e332]:
+                - generic [ref=f18e333]: Kode Customer
+                - generic [ref=f18e334]: CUST-TEST-UAT-001
+              - generic [ref=f18e335]:
+                - generic [ref=f18e336]: Telepon
+                - generic [ref=f18e337]: "081234567891"
+              - generic [ref=f18e338]:
+                - generic [ref=f18e339]: Alamat Pengiriman
+                - text: Kawasan Industri Pulogadung Blok A1, Jakarta Timur
+          - generic [ref=f18e340]:
+            - heading "Dokumen Terkait" [level=3] [ref=f18e341]
+            - generic [ref=f18e342]:
+              - generic [ref=f18e343]:
+                - generic [ref=f18e344]: Surat Jalan (SJ)
+                - text: Belum ada Surat Jalan yang terbit
+              - generic [ref=f18e345]:
+                - generic [ref=f18e346]: Total Nilai Barang (DPP + Pajak)
+                - text: Rp 30.000
+        - generic [ref=f18e347]:
+          - generic [ref=f18e348]:
+            - heading "Rincian Barang yang Dikeluarkan" [level=3] [ref=f18e349]
+            - generic [ref=f18e350]: 1 Item Barang
+          - table [ref=f18e352]:
+            - rowgroup [ref=f18e353]:
+              - row [ref=f18e354]:
+                - columnheader "No" [ref=f18e355]
+                - columnheader "Kode & Nama Produk" [ref=f18e356]
+                - columnheader "Kuantitas Kirim" [ref=f18e357]
+                - columnheader "Satuan" [ref=f18e358]
+                - columnheader "Gudang / Sumber" [ref=f18e359]
+                - columnheader "Status Cek Fisik Gudang" [ref=f18e360]
+            - rowgroup [ref=f18e361]:
+              - row [ref=f18e362]:
+                - cell "1" [ref=f18e363]
+                - 'cell "Pipa Seamless 5/8 Inch SKU: PROD-TEST-A" [ref=f18e364]':
+                  - generic [ref=f18e365]: Pipa Seamless 5/8 Inch
+                  - generic [ref=f18e366]: "SKU: PROD-TEST-A"
+                - cell "4" [ref=f18e367]
+                - cell "Pieces" [ref=f18e368]
+                - 'cell "Gudang Utama: 4" [ref=f18e369]'
+                - 'cell "Sudah Dicek Oleh: uat_checker" [ref=f18e372]':
+                  - generic [ref=f18e373]: Sudah Dicek
+                  - generic [ref=f18e377]: "Oleh: uat_checker"

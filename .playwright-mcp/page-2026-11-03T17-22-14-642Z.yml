@@ -1,0 +1,262 @@
+- generic [ref=f3e2]:
+  - complementary "Menu navigasi utama" [ref=f3e3]:
+    - generic [ref=f3e4]:
+      - link "DUTA TUNGGAL ERP" [ref=f3e5] [cursor=pointer]:
+        - /url: http://localhost:8001/favicon.ico/dashboard
+      - button "Tutup menu" [ref=f3e6]
+    - generic [ref=f3e8]:
+      - link "Dashboard" [ref=f3e10] [cursor=pointer]:
+        - /url: http://localhost:8001/favicon.ico/dashboard
+      - generic [ref=f3e14]:
+        - generic [ref=f3e15]: Penjualan
+        - link "Penawaran Harga" [ref=f3e16] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/penawaran
+        - link "Pesanan Penjualan" [ref=f3e20] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/so
+        - link "Perintah Kirim (DO)" [ref=f3e24] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/do
+        - link "Surat Jalan" [ref=f3e29] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/surat-jalan
+        - link "Jadwal Kirim" [ref=f3e34] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/jadwal-kirim
+        - link "Invoice Penjualan" [ref=f3e38] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/invoice
+        - link "Terima Pembayaran" [ref=f3e42] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/terima-pembayaran
+        - link "Retur Penjualan" [ref=f3e46] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/retur
+        - link "Nota Kredit" [ref=f3e50] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/nota-kredit
+        - link "Laporan Penjualan" [ref=f3e54] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/penjualan/laporan
+      - generic [ref=f3e57]:
+        - generic [ref=f3e58]: Gudang & Stok
+        - link "Siapkan & Kirim" [ref=f3e59] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/gudang/kiriman
+        - link "Terima Barang" [ref=f3e64] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/gudang/penerimaan
+        - link "Cek Stok" [ref=f3e68] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/gudang/stok
+        - link "Pindah Stok" [ref=f3e72] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/gudang/transfer
+        - link "Stock Opname" [ref=f3e75] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/gudang/opname
+        - link "Laporan Stok & Mutasi" [ref=f3e80] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/gudang/laporan
+      - generic [ref=f3e83]:
+        - generic [ref=f3e84]: Produksi & Manufaktur
+        - link "Resep Produksi (BOM)" [ref=f3e85] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/manufaktur/bom
+        - link "Perintah Kerja (SPK)" [ref=f3e88] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/manufaktur/spk
+        - link "Pengeluaran Bahan" [ref=f3e91] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/manufaktur/material-issue
+        - link "Hasil Produksi" [ref=f3e94] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/manufaktur/production
+        - link "QC Pabrik" [ref=f3e97] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/manufaktur/qc
+      - generic [ref=f3e100]:
+        - generic [ref=f3e101]: Pembelian
+        - link "Permintaan (OR)" [ref=f3e102] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pembelian/permintaan
+        - link "Pesanan (PO)" [ref=f3e106] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pembelian/po
+        - link "Invoice Pembelian" [ref=f3e110] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pembelian/invoice
+        - link "Pembayaran Hutang" [ref=f3e114] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pembelian/pembayaran
+        - link "Retur Pembelian" [ref=f3e118] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pembelian/retur
+        - link "Laporan Pembelian" [ref=f3e122] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pembelian/laporan
+      - generic [ref=f3e125]:
+        - generic [ref=f3e126]: Keuangan
+        - link "Kas & Bank" [ref=f3e127] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/keuangan/kas-bank
+        - link "Buku Besar & Jurnal" [ref=f3e130] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/keuangan/jurnal
+        - link "Bagan Akun (COA)" [ref=f3e134] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/coa
+        - link "Aset Tetap" [ref=f3e137] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/keuangan/aset
+        - link "Laporan Keuangan" [ref=f3e140] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/laporan/keuangan
+      - generic [ref=f3e144]:
+        - generic [ref=f3e145]: Master Data
+        - link "Produk" [ref=f3e146] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/produk
+        - link "Customer" [ref=f3e150] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/customer
+        - link "Supplier" [ref=f3e154] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/supplier
+        - link "Cabang" [ref=f3e159] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/cabang
+        - link "Gudang & Rak" [ref=f3e162] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/gudang
+        - link "Kategori" [ref=f3e165] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/kategori
+        - link "Satuan" [ref=f3e168] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/satuan
+        - link "Armada & Driver" [ref=f3e171] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/kendaraan
+        - link "Mata Uang & Kurs" [ref=f3e174] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/mata-uang
+        - link "Tarif Pajak" [ref=f3e177] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/master/pajak
+      - generic [ref=f3e180]:
+        - generic [ref=f3e181]: Pengaturan
+        - link "Pengguna & Peran" [ref=f3e182] [cursor=pointer]:
+          - /url: http://localhost:8001/favicon.ico/pengaturan/pengguna
+    - generic [ref=f3e186]: v2.0 (Tailwind Native)
+  - generic [ref=f3e187]:
+    - banner [ref=f3e188]:
+      - generic [ref=f3e189]:
+        - button "Buka menu" [ref=f3e190]
+        - navigation "Breadcrumb" [ref=f3e192]:
+          - generic [ref=f3e193]: Duta Tunggal / Dashboard
+      - button [ref=f3e196]:
+        - generic [ref=f3e197]: Super Admin ·
+        - text: u
+    - main [ref=f3e200]:
+      - generic [ref=f3e201]:
+        - generic [ref=f3e202]:
+          - generic [ref=f3e203]:
+            - generic [ref=f3e204]: RABU, 4 NOVEMBER 2026
+            - heading "Ringkasan Bisnis" [level=1] [ref=f3e208]
+            - generic [ref=f3e209]: Angka diperbarui setiap 5 menit. Klik kartu mana saja untuk melihat detailnya.
+          - generic [ref=f3e210]:
+            - group "Periode" [ref=f3e211]:
+              - link "Hari ini" [ref=f3e212] [cursor=pointer]:
+                - /url: "?periode=today"
+              - link "7 hari" [ref=f3e213] [cursor=pointer]:
+                - /url: "?periode=7d"
+              - link "Bulan ini" [ref=f3e214] [cursor=pointer]:
+                - /url: "?periode=month"
+              - button "Pilih…" [ref=f3e215]
+            - button "Semua cabang" [ref=f3e217]
+        - generic [ref=f3e220]:
+          - link "Penjualan hari ini Rp0 ▲ 0% dari Rabu lalu · 0 SO" [ref=f3e221] [cursor=pointer]:
+            - /url: http://localhost:8001/favicon.ico/penjualan/so
+          - link "Kas & Bank Rp186,4 jt Masuk Rp31,2 jt · Keluar Rp12,8 jt" [ref=f3e222] [cursor=pointer]:
+            - /url: http://localhost:8001/favicon.ico/keuangan/kas-bank
+          - link "Piutang lewat jatuh tempo Rp0 1 customer · tagih sekarang ›" [ref=f3e223] [cursor=pointer]:
+            - /url: http://localhost:8001/favicon.ico/keuangan/kas-bank
+          - link "Hutang jatuh tempo ≤ 7 hari Rp21,2 jt 3 supplier · terdekat 6 Nov" [ref=f3e224] [cursor=pointer]:
+            - /url: http://localhost:8001/favicon.ico/pembelian/po
+        - region [ref=f3e225]:
+          - generic [ref=f3e226]:
+            - generic [ref=f3e231]:
+              - heading "Perlu keputusan Anda" [level=2] [ref=f3e232]
+              - generic [ref=f3e233]: Hal yang tidak bisa diputuskan kasir atau staf
+            - text: 3 menunggu
+          - generic [ref=f3e234]:
+            - generic [ref=f3e235]:
+              - generic [ref=f3e236]:
+                - generic [ref=f3e237]: SO-00009 melewati limit kredit
+                - generic [ref=f3e238]: DAYA TEKNIK MEDIKA · Rp9,4 jt · sisa limit Rp7,7 jt
+              - generic [ref=f3e239]:
+                - button "Setujui" [ref=f3e240]
+                - link "Lihat" [ref=f3e241] [cursor=pointer]:
+                  - /url: http://localhost:8001/favicon.ico/penjualan/so/1
+            - generic [ref=f3e242]:
+              - generic [ref=f3e243]:
+                - generic [ref=f3e244]: SO-00011 harga di bawah batas
+                - generic [ref=f3e245]: COPPER ELBO 1/2'' Rp3.000 · minimum Rp3.600
+              - generic [ref=f3e246]:
+                - button "Setujui" [ref=f3e247]
+                - link "Lihat" [ref=f3e248] [cursor=pointer]:
+                  - /url: http://localhost:8001/favicon.ico/penjualan/so/1
+            - generic [ref=f3e249]:
+              - generic [ref=f3e250]:
+                - generic [ref=f3e251]: 2 pengajuan dana
+                - generic [ref=f3e252]: Total Rp4,6 jt · dari Purchasing & Gudang
+              - link "Periksa" [ref=f3e254] [cursor=pointer]:
+                - /url: http://localhost:8001/favicon.ico/keuangan/kas-bank
+        - region [ref=f3e255]:
+          - generic [ref=f3e256]:
+            - heading "Alur pesanan saat ini" [level=2] [ref=f3e257]
+            - text: Klik tahap untuk melihat dokumennya
+          - generic [ref=f3e258]:
+            - link "5 Menunggu approve" [ref=f3e259] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/penjualan/so?status=request_approve
+              - generic [ref=f3e260]: "5"
+              - generic [ref=f3e261]: Menunggu approve
+            - link "4 Siap dibuatkan DO" [ref=f3e262] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/penjualan/so?status=approved
+              - generic [ref=f3e263]: "4"
+              - generic [ref=f3e264]: Siap dibuatkan DO
+            - link "7 Disiapkan gudang · 2 > 1 hari" [ref=f3e265] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/penjualan/do
+              - generic [ref=f3e266]: "7"
+              - generic [ref=f3e267]: Disiapkan gudang · 2 > 1 hari
+            - link "6 Dalam pengiriman" [ref=f3e268] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/penjualan/surat-jalan
+              - generic [ref=f3e269]: "6"
+              - generic [ref=f3e270]: Dalam pengiriman
+            - link "3 Terkirim, belum ditagih" [ref=f3e271] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/penjualan/surat-jalan
+              - generic [ref=f3e272]: "3"
+              - generic [ref=f3e273]: Terkirim, belum ditagih
+        - generic [ref=f3e274]:
+          - region [ref=f3e275]:
+            - generic [ref=f3e276]:
+              - heading "Penjualan 7 hari terakhir" [level=2] [ref=f3e277]
+              - text: Total Rp148,9 jt · rata-rata Rp21,3 jt/hari
+            - img "Grafik batang penjualan 7 hari terakhir" [ref=f3e278]:
+              - 'generic "Kam 29: Rp 18.200.000,00" [ref=f3e280]'
+              - 'generic "Jum 30: Rp 22.500.000,00" [ref=f3e282]'
+              - 'generic "Sab 31: Rp 15.100.000,00" [ref=f3e284]'
+              - generic [ref=f3e285]:
+                - text: 31,4 jt
+                - 'generic "Min 1: Rp 31.400.000,00" [ref=f3e286]'
+              - 'generic "Sen 2: Rp 9.600.000,00" [ref=f3e288]'
+              - 'generic "Sel 3: Rp 27.800.000,00" [ref=f3e290]'
+              - generic [ref=f3e291]:
+                - text: 24,3 jt
+                - 'generic "Hari ini: Rp 24.300.000,00" [ref=f3e292]'
+            - generic [ref=f3e293]: Kam 29 Jum 30 Sab 31 Min 1 Sen 2 Sel 3 Hari ini
+          - region [ref=f3e294]:
+            - heading "Produk terlaris (7 hari)" [level=2] [ref=f3e295]
+            - generic [ref=f3e296]:
+              - generic [ref=f3e297]: COPPER ELBO 5/8'' Rp32,1 jt
+              - generic [ref=f3e299]: COPPER ELBO 1/2'' Rp24,8 jt
+              - generic [ref=f3e301]: COPPER PIPE 3/8'' Rp18,5 jt
+              - generic [ref=f3e303]: FREON R32 DUTA Rp12,2 jt
+              - generic [ref=f3e305]: ISOLASI PIPA TEBAL Rp9,7 jt
+            - link "Laporan penjualan lengkap ›" [ref=f3e307] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/penjualan/so
+        - generic [ref=f3e308]:
+          - region [ref=f3e309]:
+            - generic [ref=f3e310]:
+              - heading "Stok perlu perhatian" [level=2] [ref=f3e311]
+              - text: Nilai stok Rp9,3 jt
+            - generic [ref=f3e312]:
+              - generic [ref=f3e313]: ✕ Habis Pipa Seamless 5/8 Inch 0 / min 0
+              - generic [ref=f3e314]: ✕ Habis Pipa Galvanis 1/2 Inch 0 / min 0
+              - generic [ref=f3e315]: ✕ Habis Pipa Galvanis 1/2 Inch 0 / min 0
+              - generic [ref=f3e316]: ✕ Habis Fitting Elbow 3/4 Inch 0 / min 0
+              - generic [ref=f3e317]: ✕ Habis Fitting Elbow 3/4 Inch 0 / min 0
+              - generic [ref=f3e318]:
+                - text: ◷ Lambat 12 produk tidak terjual > 90 hari
+                - link "Lihat" [ref=f3e319] [cursor=pointer]:
+                  - /url: http://localhost:8001/favicon.ico/penjualan/so
+            - link "Buat Permintaan Pembelian dari stok menipis" [ref=f3e320] [cursor=pointer]:
+              - /url: http://localhost:8001/favicon.ico/pembelian/permintaan
+          - region [ref=f3e323]:
+            - heading "Pembelian" [level=2] [ref=f3e324]
+            - generic [ref=f3e325]:
+              - link "2 Permintaan baru" [ref=f3e326] [cursor=pointer]:
+                - /url: http://localhost:8001/favicon.ico/pembelian/permintaan
+                - generic [ref=f3e327]: "2"
+                - generic [ref=f3e328]: Permintaan baru
+              - link "3 PO menunggu barang" [ref=f3e329] [cursor=pointer]:
+                - /url: http://localhost:8001/favicon.ico/pembelian/po
+                - generic [ref=f3e330]: "3"
+                - generic [ref=f3e331]: PO menunggu barang
+              - link "1 Tiba hari ini" [ref=f3e332] [cursor=pointer]:
+                - /url: http://localhost:8001/favicon.ico/pembelian/po
+                - generic [ref=f3e333]: "1"
+                - generic [ref=f3e334]: Tiba hari ini
+            - generic [ref=f3e335]:
+              - generic [ref=f3e336]: PO-2026-0041 · Abdi Karya · terlambat 2 hari
+              - generic [ref=f3e337]: "Retur pembelian menunggu: 1 dokumen"

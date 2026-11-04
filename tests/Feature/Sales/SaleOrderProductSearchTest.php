@@ -32,7 +32,7 @@ it('produk dari quotation tetap ter-prefill, produk lain tidak ikut dikirim', fu
     $html = $this->actingAs($ctx['user'])->get(route('penjualan.so.create', ['quotation_id' => $quotation->id]))->assertOk()->getContent();
 
     expect($html)->toContain($ctx['product']->sku)->and($html)->not->toContain('NOPE-1');
-})->skip(fn () => ! class_exists(\Database\Factories\QuotationFactory::class) || ! class_exists(\Database\Factories\QuotationItemFactory::class), 'factory quotation belum tersedia');
+});
 
 it('pencarian produk: cocok nama/SKU, SKU persis didahulukan, berisi harga/stok/satuan, maksimal 25', function () {
     $ctx = stkContext();

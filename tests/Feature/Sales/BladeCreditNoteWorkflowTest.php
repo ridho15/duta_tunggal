@@ -24,10 +24,13 @@ use App\Models\Warehouse;
 use App\Services\CreditNoteService;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeCreditNoteWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;

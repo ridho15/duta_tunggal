@@ -122,3 +122,27 @@ it('edit GRN yang memindah ke gudang lain juga wajib beralasan', function () {
     $this->put(route('gudang.penerimaan.update', $grn), $payload + ['warehouse_override_reason' => 'Dititipkan'])->assertSessionHasNoErrors();
     expect($grn->fresh()->warehouse_override_reason)->toBe('Dititipkan');
 });
+
+it('halaman edit GRN memuat data item di atribut x-data tanpa memutus atribut (bug @json di dalam kutip ganda)', function () {
+    $ctx = stkContext();
+    $target = stkWarehouse($ctx, 'Gudang Tujuan');
+    $po = grnPo($ctx, $target);
+    $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id));
+    $grn = PurchaseReceipt::firstOrFail();
+
+    $html = $this->get(route('gudang.penerimaan.edit', $grn))->assertOk()->getContent();
+
+    expect($html)->not->toContain('items: [{"')            // JSON mentah dengan " akan memutus x-data="..."
+        ->and($html)->toContain('JSON.parse')
+        ->and($html)->toContain('name="warehouse_override_reason"');
+});
+
+it('gudang tujuan PO yang sudah nonaktif tetap muncul di pilihan form GRN', function () {
+    $ctx = stkContext();
+    $target = stkWarehouse($ctx, 'Gudang Lama');
+    $target->update(['status' => 0]);
+    $po = grnPo($ctx, $target);
+
+    $this->actingAs($ctx['user'])->get(route('gudang.penerimaan.create', ['po_id' => $po->id]))
+        ->assertOk()->assertSee('Gudang Lama')->assertSee('nonaktif');
+});

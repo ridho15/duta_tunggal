@@ -1,0 +1,242 @@
+- generic [ref=f7e2]:
+  - complementary "Menu navigasi utama" [ref=f7e3]:
+    - link "DUTA TUNGGAL ERP" [ref=f7e5] [cursor=pointer]:
+      - /url: http://localhost:8001/dashboard
+      - generic [ref=f7e6]: DUTA TUNGGAL
+      - generic [ref=f7e7]: ERP
+    - generic [ref=f7e8]:
+      - link "Dashboard" [ref=f7e10] [cursor=pointer]:
+        - /url: http://localhost:8001/dashboard
+      - generic [ref=f7e15]:
+        - generic [ref=f7e16]: Penjualan
+        - link "Penawaran Harga" [ref=f7e17] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/penawaran
+        - link "Pesanan Penjualan" [ref=f7e22] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/so
+        - link "Perintah Kirim (DO)" [ref=f7e27] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/do
+        - link "Surat Jalan" [ref=f7e33] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/surat-jalan
+        - link "Jadwal Kirim" [ref=f7e39] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/jadwal-kirim
+        - link "Invoice Penjualan" [ref=f7e44] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/invoice
+        - link "Terima Pembayaran" [ref=f7e49] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/terima-pembayaran
+        - link "Retur Penjualan" [ref=f7e54] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/retur
+        - link "Nota Kredit" [ref=f7e59] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/nota-kredit
+        - link "Laporan Penjualan" [ref=f7e64] [cursor=pointer]:
+          - /url: http://localhost:8001/penjualan/laporan
+      - generic [ref=f7e68]:
+        - generic [ref=f7e69]: Gudang & Stok
+        - link "Siapkan & Kirim" [ref=f7e70] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/kiriman
+        - link "Terima Barang" [ref=f7e76] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/penerimaan
+        - link "Cek Stok" [ref=f7e81] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/stok
+        - link "Pindah Stok" [ref=f7e86] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/transfer
+        - link "Stock Opname" [ref=f7e90] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/opname
+        - link "Laporan Stok & Mutasi" [ref=f7e96] [cursor=pointer]:
+          - /url: http://localhost:8001/gudang/laporan
+      - generic [ref=f7e100]:
+        - generic [ref=f7e101]: Produksi & Manufaktur
+        - link "Resep Produksi (BOM)" [ref=f7e102] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/bom
+        - link "Perintah Kerja (SPK)" [ref=f7e106] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/spk
+        - link "Pengeluaran Bahan" [ref=f7e110] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/material-issue
+        - link "Hasil Produksi" [ref=f7e114] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/production
+        - link "QC Pabrik" [ref=f7e118] [cursor=pointer]:
+          - /url: http://localhost:8001/manufaktur/qc
+      - generic [ref=f7e122]:
+        - generic [ref=f7e123]: Pembelian
+        - link "Permintaan (OR)" [ref=f7e124] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/permintaan
+        - link "Pesanan (PO)" [ref=f7e129] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/po
+        - link "Invoice Pembelian" [ref=f7e134] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/invoice
+        - link "Pembayaran Hutang" [ref=f7e139] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/pembayaran
+        - link "Retur Pembelian" [ref=f7e144] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/retur
+        - link "Laporan Pembelian" [ref=f7e149] [cursor=pointer]:
+          - /url: http://localhost:8001/pembelian/laporan
+      - generic [ref=f7e153]:
+        - generic [ref=f7e154]: Keuangan
+        - link "Kas & Bank" [ref=f7e155] [cursor=pointer]:
+          - /url: http://localhost:8001/keuangan/kas-bank
+        - link "Buku Besar & Jurnal" [ref=f7e159] [cursor=pointer]:
+          - /url: http://localhost:8001/keuangan/jurnal
+        - link "Bagan Akun (COA)" [ref=f7e164] [cursor=pointer]:
+          - /url: http://localhost:8001/master/coa
+        - link "Aset Tetap" [ref=f7e168] [cursor=pointer]:
+          - /url: http://localhost:8001/keuangan/aset
+        - link "Laporan Keuangan" [ref=f7e172] [cursor=pointer]:
+          - /url: http://localhost:8001/laporan/keuangan
+      - generic [ref=f7e177]:
+        - generic [ref=f7e178]: Master Data
+        - link "Produk" [ref=f7e179] [cursor=pointer]:
+          - /url: http://localhost:8001/master/produk
+        - link "Customer" [ref=f7e184] [cursor=pointer]:
+          - /url: http://localhost:8001/master/customer
+        - link "Supplier" [ref=f7e189] [cursor=pointer]:
+          - /url: http://localhost:8001/master/supplier
+        - link "Cabang" [ref=f7e195] [cursor=pointer]:
+          - /url: http://localhost:8001/master/cabang
+        - link "Gudang & Rak" [ref=f7e199] [cursor=pointer]:
+          - /url: http://localhost:8001/master/gudang
+        - link "Kategori" [ref=f7e203] [cursor=pointer]:
+          - /url: http://localhost:8001/master/kategori
+        - link "Satuan" [ref=f7e207] [cursor=pointer]:
+          - /url: http://localhost:8001/master/satuan
+        - link "Armada & Driver" [ref=f7e211] [cursor=pointer]:
+          - /url: http://localhost:8001/master/kendaraan
+        - link "Mata Uang & Kurs" [ref=f7e215] [cursor=pointer]:
+          - /url: http://localhost:8001/master/mata-uang
+        - link "Tarif Pajak" [ref=f7e219] [cursor=pointer]:
+          - /url: http://localhost:8001/master/pajak
+      - generic [ref=f7e223]:
+        - generic [ref=f7e224]: Pengaturan
+        - link "Pengguna & Peran" [ref=f7e225] [cursor=pointer]:
+          - /url: http://localhost:8001/pengaturan/pengguna
+    - generic [ref=f7e230]: v2.0 (Tailwind Native)
+  - generic [ref=f7e233]:
+    - banner [ref=f7e234]:
+      - navigation "Breadcrumb" [ref=f7e236]:
+        - generic [ref=f7e237]:
+          - generic [ref=f7e238]: Duta Tunggal
+          - generic [ref=f7e239]: /
+          - generic [ref=f7e240]: Beranda
+      - button "Super Admin · u" [ref=f7e243] [cursor=pointer]:
+        - generic [ref=f7e244]: Super Admin ·
+        - generic [ref=f7e245]: u
+    - main [ref=f7e248]:
+      - generic [ref=f7e249]:
+        - generic [ref=f7e250]:
+          - generic [ref=f7e251]:
+            - link "Pesanan Penjualan" [ref=f7e252] [cursor=pointer]:
+              - /url: http://localhost:8001/penjualan/so
+            - generic [ref=f7e253]: /
+            - generic [ref=f7e254]: Buat baru
+          - heading "Buat Pesanan Penjualan" [level=1] [ref=f7e255]
+          - generic [ref=f7e256]: Nomor SO, cabang, dan tanggal terisi otomatis saat disimpan.
+        - generic [ref=f7e257]:
+          - generic [ref=f7e258]:
+            - generic [ref=f7e259]:
+              - generic [ref=f7e260]:
+                - generic [ref=f7e261]: "1"
+                - heading "Customer & Pengiriman" [level=2] [ref=f7e262]
+              - generic [ref=f7e263]:
+                - generic [ref=f7e265]:
+                  - generic [ref=f7e266]: Customer *
+                  - button "-- Pilih Customer --" [ref=f7e268] [cursor=pointer]
+                - generic [ref=f7e272]:
+                  - generic [ref=f7e273]: Cabang *
+                  - button "Cabang Utama Jakarta (CAB-JKT) CAB-JKT" [ref=f7e275] [cursor=pointer]:
+                    - generic [ref=f7e277]:
+                      - generic [ref=f7e278]: Cabang Utama Jakarta
+                      - generic [ref=f7e279]: (CAB-JKT)
+                      - generic [ref=f7e280]: CAB-JKT
+              - generic [ref=f7e282]:
+                - generic [ref=f7e283]:
+                  - generic [ref=f7e284]: Limit kredit
+                  - generic [ref=f7e285]: Rp 0
+                - generic [ref=f7e286]:
+                  - generic [ref=f7e287]: Saldo Titip / Terpakai
+                  - generic [ref=f7e288]: Rp 0
+                - generic [ref=f7e289]:
+                  - generic [ref=f7e290]: Tipe Pembayaran
+                  - generic [ref=f7e291]: "-"
+              - generic [ref=f7e292]:
+                - generic [ref=f7e293]:
+                  - generic [ref=f7e294]: Tanggal Order *
+                  - textbox [ref=f7e295]: 2026-11-04
+                - generic [ref=f7e296]:
+                  - generic [ref=f7e297]: Estimasi Kirim
+                  - textbox [ref=f7e298]: 2026-11-11
+                - generic [ref=f7e299]:
+                  - generic [ref=f7e300]: Tipe Pengiriman *
+                  - combobox [ref=f7e301]:
+                    - option "Kirim Langsung" [selected]
+                    - option "Ambil Sendiri"
+              - generic [ref=f7e302]:
+                - generic [ref=f7e303]: Alamat Kirim
+                - textbox "Otomatis dari data customer jika kosong" [ref=f7e304]
+            - generic [ref=f7e305]:
+              - generic [ref=f7e306]:
+                - generic [ref=f7e307]:
+                  - generic [ref=f7e308]: "2"
+                  - heading "Barang" [level=2] [ref=f7e309]
+                  - generic [ref=f7e310]: 1 item
+                - generic [ref=f7e311]:
+                  - button "Tutup Semua" [ref=f7e312] [cursor=pointer]
+                  - button "Buka Semua" [ref=f7e313] [cursor=pointer]
+                  - button "Tambah Baris Manual" [ref=f7e314] [cursor=pointer]
+              - generic [ref=f7e318]:
+                - generic [ref=f7e319]: Pencarian Cepat / Scan Barcode Produk
+                - generic [ref=f7e323]:
+                  - textbox "Pencarian Cepat / Scan Barcode Produk" [ref=f7e324]:
+                    - /placeholder: Ketik SKU / nama barang atau tembak barcode scanner...
+                  - generic [ref=f7e325]: Scanner Ready
+                - generic [ref=f7e329]:
+                  - generic [ref=f7e330]: "Pilih produk / tekan Enter: otomatis menambah baris atau menambah Qty (+1) bila item sudah ada."
+                  - generic [ref=f7e331]: "Navigasi: ↑ ↓ Enter · Esc untuk tutup"
+              - generic [ref=f7e333]:
+                - generic [ref=f7e334] [cursor=pointer]:
+                  - generic [ref=f7e335]:
+                    - generic [ref=f7e336]: "1"
+                    - generic [ref=f7e337]: "Item #1 — Pilih Produk..."
+                  - generic [ref=f7e338]:
+                    - generic [ref=f7e339]: Rp 0
+                    - button "Hapus item" [ref=f7e340]
+                - generic [ref=f7e346]:
+                  - generic [ref=f7e347]:
+                    - generic [ref=f7e348]: Produk *
+                    - combobox "Produk *" [ref=f7e349]
+                  - generic [ref=f7e350]: Pilih produk terlebih dahulu
+                  - generic [ref=f7e352]:
+                    - generic [ref=f7e353]:
+                      - generic [ref=f7e354]: Qty (PCS) *
+                      - spinbutton [ref=f7e355]: "1"
+                    - generic [ref=f7e356]:
+                      - generic [ref=f7e357]: Harga Satuan *
+                      - generic [ref=f7e358]:
+                        - generic: Rp
+                        - textbox "0" [ref=f7e359]
+                      - generic [ref=f7e360]: Min. Rp 0
+              - generic [ref=f7e361]:
+                - generic [ref=f7e362]:
+                  - generic [ref=f7e363]: Ongkos Kirim
+                  - generic [ref=f7e364]:
+                    - generic: Rp
+                    - textbox "0" [ref=f7e365]
+                - generic [ref=f7e367]:
+                  - generic [ref=f7e368]: Mata Uang
+                  - button "IDR - Rupiah IDR" [ref=f7e370] [cursor=pointer]:
+                    - generic [ref=f7e372]:
+                      - generic [ref=f7e373]: IDR - Rupiah
+                      - generic [ref=f7e374]: IDR
+                    - button "Hapus Pilihan" [ref=f7e376]
+              - button "Catatan Tambahan (Internal Pesanan)" [ref=f7e380] [cursor=pointer]
+          - complementary [ref=f7e387]:
+            - heading "Ringkasan" [level=2] [ref=f7e388]
+            - generic [ref=f7e389]:
+              - generic [ref=f7e390]: Subtotal barang
+              - generic [ref=f7e391]: Rp 0
+            - generic [ref=f7e392]:
+              - generic [ref=f7e393]: Ongkos kirim
+              - generic [ref=f7e394]: Rp 0
+            - generic [ref=f7e395]:
+              - generic [ref=f7e396]: Total
+              - generic [ref=f7e397]: Rp 0
+            - generic [ref=f7e398]: Pilih customer untuk melihat status limit kredit.
+            - button "Simpan & Ajukan Approve" [ref=f7e399] [cursor=pointer]
+            - button "Simpan sebagai draft" [ref=f7e400] [cursor=pointer]

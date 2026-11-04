@@ -1,0 +1,270 @@
+[     586ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8001/login:0
+[ 1004564ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8001/login:0
+[ 1938926ms] [WARNING] Alpine Expression Error: Unexpected token ';'
+
+Expression: "{
+    formAction: 'save_draft',
+    items: [{"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1938938ms] [WARNING] Alpine Expression Error: formAction is not defined
+
+Expression: "formAction"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1938938ms] [WARNING] Alpine Expression Error: warehouseMismatch is not defined
+
+Expression: "warehouseMismatch"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1938938ms] [WARNING] Alpine Expression Error: warehouseMismatch is not defined
+
+Expression: "warehouseMismatch"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1938938ms] [WARNING] Alpine Expression Error: warehouseMismatch is not defined
+
+Expression: "!warehouseMismatch"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1938938ms] [WARNING] Alpine Expression Error: items is not defined
+
+Expression: "items"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939054ms] Uncaught SyntaxError: Unexpected token ';'
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:665)
+    at jn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:889)
+    at Fn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:934)
+    at xt (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:302)
+    at x (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:180)
+    at R (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:137)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:34192)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939055ms] Uncaught ReferenceError: formAction is not defined
+    at [Alpine] formAction (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at c (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:30699)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:31671)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:31658)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939055ms] Uncaught ReferenceError: warehouseMismatch is not defined
+    at [Alpine] warehouseMismatch (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35099)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35093)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939055ms] Uncaught ReferenceError: warehouseMismatch is not defined
+    at [Alpine] warehouseMismatch (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33666)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at Sn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33660)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939055ms] Uncaught ReferenceError: warehouseMismatch is not defined
+    at [Alpine] !warehouseMismatch (:3:33)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33666)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at Sn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33660)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939055ms] Uncaught ReferenceError: items is not defined
+    at [Alpine] items (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at eo (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35524)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35324)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35318)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939659ms] [WARNING] Alpine Expression Error: Unexpected token ';'
+
+Expression: "{
+    formAction: 'save_draft',
+    items: [{"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939664ms] [WARNING] Alpine Expression Error: formAction is not defined
+
+Expression: "formAction"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939664ms] [WARNING] Alpine Expression Error: warehouseMismatch is not defined
+
+Expression: "warehouseMismatch"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939664ms] [WARNING] Alpine Expression Error: warehouseMismatch is not defined
+
+Expression: "warehouseMismatch"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939664ms] [WARNING] Alpine Expression Error: warehouseMismatch is not defined
+
+Expression: "!warehouseMismatch"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939664ms] [WARNING] Alpine Expression Error: items is not defined
+
+Expression: "items"
+
+ JSHandle@node @ https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:0
+[ 1939671ms] Uncaught SyntaxError: Unexpected token ';'
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:665)
+    at jn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:889)
+    at Fn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:934)
+    at xt (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:302)
+    at x (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:180)
+    at R (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:137)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:34192)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939671ms] Uncaught ReferenceError: formAction is not defined
+    at [Alpine] formAction (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at c (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:30699)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:31671)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:31658)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939671ms] Uncaught ReferenceError: warehouseMismatch is not defined
+    at [Alpine] warehouseMismatch (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35099)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35093)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939671ms] Uncaught ReferenceError: warehouseMismatch is not defined
+    at [Alpine] warehouseMismatch (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33666)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at Sn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33660)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939671ms] Uncaught ReferenceError: warehouseMismatch is not defined
+    at [Alpine] !warehouseMismatch (:3:33)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33666)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at Sn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:33660)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)
+[ 1939671ms] Uncaught ReferenceError: items is not defined
+    at [Alpine] items (:3:32)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:1068)
+    at or (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:5075)
+    at eo (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35524)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35324)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18484)
+    at rn (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:18272)
+    at N (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:398)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:1:511)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:35318)
+    at r (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2323)
+    at n (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2353)
+    at fr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:2363)
+    at v (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:5101)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4561)
+    at gr (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:4549)
+    at <anonymous> (https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js:5:39497)

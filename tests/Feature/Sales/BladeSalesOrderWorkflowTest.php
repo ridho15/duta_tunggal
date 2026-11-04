@@ -22,6 +22,8 @@ use Tests\TestCase;
 
 class BladeSalesOrderWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;

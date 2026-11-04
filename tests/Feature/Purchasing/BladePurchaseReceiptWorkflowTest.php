@@ -65,6 +65,7 @@ class BladePurchaseReceiptWorkflowTest extends TestCase
         $this->supplier = Supplier::first() ?? Supplier::create([
             'code' => 'SUP-RECEIPT-01',
             'perusahaan' => 'PT Supplier Logistik Utama',
+            'address' => 'Jl. Logistik No. 1',
             'status' => 1,
             'cabang_id' => $this->cabang->id,
         ]);
@@ -151,7 +152,7 @@ class BladePurchaseReceiptWorkflowTest extends TestCase
         $response->assertSee('Total Penerimaan');
         $response->assertSee('Draf Penerimaan');
         $response->assertSee('Selesai Masuk Stok');
-        $response->assertSee('+ Terima Barang Baru');
+        $response->assertSee('Terima Barang Baru');
     }
 
     public function test_penerimaan_create_page_loads_with_pos_and_warehouses(): void

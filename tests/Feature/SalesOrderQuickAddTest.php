@@ -13,6 +13,8 @@ use Tests\TestCase;
 
 class SalesOrderQuickAddTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * Memastikan halaman pembuatan Sales Order merender komponen Quick-Add Search Bar
      * dan mempertahankan dropdown pemilihan produk di setiap baris item.

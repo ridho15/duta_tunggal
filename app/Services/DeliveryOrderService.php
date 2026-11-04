@@ -106,7 +106,28 @@ class DeliveryOrderService
             }
         });
 
+        // Flag strict_dispatch hidup: log ditulis observer. Mati: tanpa ini konfirmasi stok tidak berjejak.
+        if (! DeliveryOrderTransitions::enabled()) {
+            $this->createLog($deliveryOrder->id, 'approved', 'Stok dikonfirmasi gudang', 'stock_confirmed');
+        }
+
         return $deliveryOrder->refresh();
+    }
+
+    /** Turunkan baris sumber gudang (dari yang terakhir) agar jumlahnya tetap sama dengan qty item setelah checker menurunkan qty. */
+    private function trimWarehouseSources(\App\Models\DeliveryOrderItem $item, float $newQuantity): void
+    {
+        $excess = (float) $item->warehouseSources()->sum('quantity') - $newQuantity;
+
+        foreach ($item->warehouseSources()->orderByDesc('id')->get() as $source) {
+            if ($excess <= 0.00001) {
+                break;
+            }
+            $cut = min($excess, (float) $source->quantity);
+            $remaining = (float) $source->quantity - $cut;
+            $remaining > 0.00001 ? $source->update(['quantity' => $remaining]) : $source->delete();
+            $excess -= $cut;
+        }
     }
 
     /**
@@ -142,6 +163,7 @@ class DeliveryOrderService
                     continue;
                 }
 
+                $this->trimWarehouseSources($item, $new);
                 $item->update(['quantity' => $new]);
                 $changed++;
 

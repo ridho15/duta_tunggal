@@ -791,7 +791,6 @@
         handleCustomerSelectChange(this.value);
     });
 
-    document.getElementById('addItemBtn').addEventListener('click', () => createItemRow({}, true));
 
     // --- QUICK-ADD SEARCH PRODUCT ENGINE ---
     let quickHighlightedIndex = -1;

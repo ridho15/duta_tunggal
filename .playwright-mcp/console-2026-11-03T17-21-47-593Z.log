@@ -1,0 +1,4 @@
+[      65ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8009/build/assets/app-liM7HSaS.css:0
+[      78ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8009/build/assets/app-Ckd9I3lx.js:0
+[      78ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8009/build/assets/_commonjsHelpers-Cpj98o6Y.js:0
+[      81ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8001/login:0

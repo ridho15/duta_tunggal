@@ -117,9 +117,9 @@
             <div class="font-bold">Menunggu Konfirmasi Stok</div>
             <div class="mt-0.5 text-amber-800">
                 @if($canConfirmStock)
-                    Gudang {{ $deliveryOrder->warehouse?->name ?? '-' }} perlu memastikan barang ada, lalu tekan <span class="font-bold">Konfirmasi Stok</span>. Setelah itu checker bisa mengecek barang di Gudang → Siapkan & Kirim.
+                    Petugas {{ $deliveryOrder->warehouse?->name ?? '-' }} perlu memastikan barang ada, lalu tekan <span class="font-bold">Konfirmasi Stok</span>. Setelah itu checker bisa mengecek barang di Gudang → Siapkan & Kirim.
                 @else
-                    Menunggu petugas Gudang {{ $deliveryOrder->warehouse?->name ?? '-' }} mengonfirmasi stok. Surat Jalan baru bisa dibuat setelah itu.
+                    Menunggu petugas {{ $deliveryOrder->warehouse?->name ?? '-' }} mengonfirmasi stok. Surat Jalan baru bisa dibuat setelah itu.
                 @endif
             </div>
         </div>

@@ -13,10 +13,13 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladePurchaseOrderWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Supplier $supplier;

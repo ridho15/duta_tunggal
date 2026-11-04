@@ -498,6 +498,11 @@ class DeliveryOrderController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
+        // Flag strict_dispatch hidup: log ditulis observer. Mati: tanpa ini pengiriman tidak berjejak.
+        if (! DeliveryOrderTransitions::enabled()) {
+            $this->deliveryOrderService->createLog($deliveryOrder->id, 'sent', 'Dikirim dari halaman DO', 'dispatched');
+        }
+
         return back()->with('success', "Perintah Kirim {$deliveryOrder->do_number} berstatus Dikirim. Stok gudang sudah dikurangi.");
     }
 

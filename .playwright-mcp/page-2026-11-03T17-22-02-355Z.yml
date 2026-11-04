@@ -1,0 +1,22 @@
+- generic [ref=f2e3]:
+  - generic [ref=f2e4]:
+    - generic [ref=f2e5]: DUTA TUNGGAL ERP
+    - paragraph [ref=f2e6]: Sistem Operasional & Manajemen Terpadu
+  - generic [ref=f2e7]:
+    - generic [ref=f2e8]:
+      - heading "Masuk ke Akun Anda" [level=1] [ref=f2e9]
+      - paragraph [ref=f2e10]: Masukkan kredensial Anda untuk membuka modul kerja.
+    - generic [ref=f2e11]:
+      - generic [ref=f2e12]:
+        - text: Email atau Username
+        - textbox "Email atau Username" [active] [ref=f2e13]:
+          - /placeholder: Masukkan email atau username
+      - generic [ref=f2e14]:
+        - text: Password
+        - textbox "Password" [ref=f2e15]:
+          - /placeholder: ••••••••
+      - generic [ref=f2e17]:
+        - checkbox "Ingat saya" [ref=f2e18]
+        - text: Ingat saya
+      - button "Masuk ke Sistem" [ref=f2e20]
+  - generic [ref=f2e23]: © 2026 PT Duta Tunggal. Seluruh hak cipta dilindungi.

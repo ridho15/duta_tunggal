@@ -23,10 +23,13 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeSuratJalanInvoiceWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected Customer $customer;
@@ -40,6 +43,11 @@ class BladeSuratJalanInvoiceWorkflowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // InvoiceObserver menolak invoice tanpa akun Piutang Dagang & Penjualan
+        foreach ([['1120', 'Piutang Dagang', 'Asset'], ['4000', 'Penjualan', 'Revenue']] as [$code, $name, $type]) {
+            ChartOfAccount::firstOrCreate(['code' => $code], ['name' => $name, 'type' => $type, 'is_active' => true, 'opening_balance' => 0]);
+        }
 
         $this->cabang = Cabang::withoutGlobalScopes()->first() ?? Cabang::create([
             'kode' => 'CBG-TEST',

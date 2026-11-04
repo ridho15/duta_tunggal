@@ -137,7 +137,10 @@ class PenerimaanBarangController extends Controller
             ->limit(50)
             ->get();
 
-        $warehouses = Warehouse::where('status', 1)->orderBy('name')->get();
+        // Gudang tujuan PO harus selalu bisa dipilih walau sudah dinonaktifkan; kalau tidak, dropdown tampil kosong.
+        $warehouses = Warehouse::where('status', 1)
+            ->orWhereIn('id', $purchaseOrders->pluck('warehouse_id')->filter()->push($selectedPoId ? PurchaseOrder::whereKey($selectedPoId)->value('warehouse_id') : null)->filter())
+            ->orderBy('name')->get();
         $users = User::orderBy('name')->limit(100)->get();
         $currencies = Currency::orderBy('name')->get();
 
@@ -353,7 +356,10 @@ class PenerimaanBarangController extends Controller
             'purchaseReceiptBiaya',
         ]);
 
-        $warehouses = Warehouse::where('status', 1)->orderBy('name')->get();
+        // Gudang tujuan PO dan gudang yang sudah tersimpan di item harus tetap bisa dipilih walau dinonaktifkan.
+        $warehouses = Warehouse::where('status', 1)
+            ->orWhereIn('id', $penerimaan->purchaseReceiptItem->pluck('warehouse_id')->push($penerimaan->purchaseOrder?->warehouse_id)->filter())
+            ->orderBy('name')->get();
         $users = User::orderBy('name')->limit(100)->get();
 
         $itemsData = $penerimaan->purchaseReceiptItem->map(function ($item) {

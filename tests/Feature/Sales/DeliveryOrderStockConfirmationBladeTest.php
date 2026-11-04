@@ -45,7 +45,8 @@ it('Konfirmasi Stok memindahkan DO ke approved dan DO muncul di antrean Gudang',
         ->assertRedirect()->assertSessionHas('success');
 
     expect($do->fresh()->status)->toBe('approved')
-        ->and(WarehouseConfirmation::where('confirmable_id', $do->id)->where('status', '!=', 'confirmed')->count())->toBe(0);
+        ->and(WarehouseConfirmation::where('confirmable_id', $do->id)->where('status', '!=', 'confirmed')->count())->toBe(0)
+        ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->where('action', 'stock_confirmed')->count())->toBe(1);
 
     $this->get(route('gudang.kiriman.index', ['warehouse_id' => $ctx['warehouse']->id]))->assertSee('Mulai cek');
 });
@@ -122,7 +123,8 @@ it('Kirim di halaman DO: butuh SJ terbit, lalu DO berstatus sent dan stok keluar
     $this->actingAs($checker)->get(route('penjualan.do.show', $do->id))->assertSee('Kirim');
     $this->post(route('penjualan.do.send', $do->id))->assertSessionHas('success');
 
-    expect($do->fresh()->status)->toBe('sent');
+    expect($do->fresh()->status)->toBe('sent')
+        ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->where('status', 'sent')->count())->toBe(1);
 });
 
 it('Checker Edit Qty: boleh turun + tercatat di log; naik ditolak; DO dengan SJ aktif ditolak', function () {
@@ -142,6 +144,7 @@ it('Checker Edit Qty: boleh turun + tercatat di log; naik ditolak; DO dengan SJ 
     $this->post(route('gudang.kiriman.editQty', $do->id), ['quantities' => [$itemId => 8], 'notes' => 'Rak tinggal 8'])
         ->assertSessionHas('success');
     expect((float) $do->deliveryOrderItem()->value('quantity'))->toBe(8.0)
+        ->and((float) $do->deliveryOrderItem()->first()->warehouseSources()->sum('quantity'))->toBe(8.0)   // sumber gudang ikut turun
         ->and(DeliveryOrderLog::where('delivery_order_id', $do->id)->where('action', 'quantity_updated_by_checker')->where('new_value', '8')->exists())->toBeTrue();
 
     // semua nol → ditolak

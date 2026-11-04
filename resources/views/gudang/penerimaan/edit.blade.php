@@ -5,7 +5,11 @@
 @section('content')
 <div class="space-y-6" x-data="{
     formAction: 'save_draft',
-    items: @json($itemsData ?? []),
+    items: {{ \Illuminate\Support\Js::from($itemsData ?? []) }},
+    poWarehouseId: '{{ $receipt->purchaseOrder?->warehouse_id ?? '' }}',
+    get warehouseMismatch() {
+        return !!this.poWarehouseId && this.items.some(i => i.warehouse_id && String(i.warehouse_id) !== String(this.poWarehouseId));
+    },
     handleQtyReceivedChange(idx) {
         const item = this.items[idx];
         if (!item) return;
@@ -181,6 +185,27 @@
                         class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"
                     >{{ old('notes', $receipt->clean_notes) }}</textarea>
                 </div>
+
+                {{-- Peringatan: gudang terima berbeda dari tujuan PO (alasan wajib) --}}
+                <div class="sm:col-span-2 lg:col-span-4" x-show="warehouseMismatch" x-cloak>
+                    <div role="alert" class="rounded-xl border border-amber-300 bg-amber-50 p-3.5 space-y-2">
+                        <p class="text-xs font-bold text-amber-900">
+                            Gudang terima berbeda dari gudang tujuan PO ({{ $receipt->purchaseOrder?->warehouse?->name ?? '-' }}).
+                        </p>
+                        <p class="text-xs text-amber-900">Barang akan masuk ke stok gudang yang Anda pilih, bukan gudang tujuan PO. Jelaskan alasannya agar tercatat di dokumen.</p>
+                        <label for="warehouse_override_reason" class="block text-xs font-bold text-gray-800">Alasan perubahan gudang <span class="text-red-500">*</span></label>
+                        <textarea
+                            id="warehouse_override_reason"
+                            name="warehouse_override_reason"
+                            rows="2"
+                            maxlength="500"
+                            :required="warehouseMismatch"
+                            :disabled="!warehouseMismatch"
+                            class="w-full py-2 px-3 text-sm rounded-xl border border-amber-300 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
+                        >{{ old('warehouse_override_reason', $receipt->warehouse_override_reason) }}</textarea>
+                        @error('warehouse_override_reason') <p class="text-xs font-semibold text-red-700">{{ $message }}</p> @enderror
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -274,7 +299,7 @@
                                         required
                                     >
                                         @foreach ($warehouses as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }})</option>
+                                            <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }}){{ $wh->status ? '' : ' · nonaktif' }}</option>
                                         @endforeach
                                     </select>
 

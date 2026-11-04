@@ -1,0 +1,6 @@
+[   34717ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8001/penjualan/sj/create?so_id=1&do_id=1:0
+[   34869ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8001/penjualan/sj:0
+[   45146ms] TypeError: Cannot read properties of null (reading 'value')
+    at HTMLDocument.<anonymous> (http://localhost:8001/penjualan/surat-jalan/create?so_id=1&do_id=1:1198:62)
+[   45309ms] TypeError: Cannot read properties of null (reading 'value')
+    at HTMLDocument.<anonymous> (http://localhost:8001/penjualan/surat-jalan/create?so_id=1&do_id=1:1227:62)

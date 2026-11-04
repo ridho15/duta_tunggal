@@ -4,6 +4,7 @@ namespace Tests\Feature\Sales;
 
 use App\Models\Product;
 use App\Support\ProductPriceLimitation;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
@@ -12,6 +13,8 @@ use Tests\TestCase;
  */
 class ProductPriceLimitationTest extends TestCase
 {
+    use RefreshDatabase;
+
     private function product(float $sell, float $cost, float $limit): Product
     {
         return (new Product)->forceFill(['id' => 1, 'name' => 'Uji', 'sell_price' => $sell, 'cost_price' => $cost, 'harga_batas' => $limit]);
